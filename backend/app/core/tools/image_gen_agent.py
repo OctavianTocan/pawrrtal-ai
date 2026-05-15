@@ -101,14 +101,14 @@ def _make_slug(prompt: str) -> str:
 def make_image_gen_tool(
     *,
     workspace_root: Path,
-    user_id: uuid.UUID | None = None,
+    workspace_id: uuid.UUID | None = None,
 ) -> AgentTool:
     """Return an :class:`AgentTool` that generates images via Codex OAuth.
 
     Args:
         workspace_root: The user's workspace directory.  Generated images are
             saved here under ``generated_images/``.
-        user_id: Authenticated user UUID, used to resolve the
+        workspace_id: Active workspace UUID, used to resolve the
             ``OPENAI_CODEX_OAUTH_TOKEN`` workspace override if set.
 
     Returns:
@@ -127,8 +127,8 @@ def make_image_gen_tool(
 
         # Resolve Codex OAuth token: workspace override → auth.json fallback.
         override_token: str | None = None
-        if user_id is not None:
-            override_token = resolve_api_key(user_id, "OPENAI_CODEX_OAUTH_TOKEN")
+        if workspace_id is not None:
+            override_token = resolve_api_key(workspace_id, "OPENAI_CODEX_OAUTH_TOKEN")
 
         try:
             oauth_token = resolve_codex_oauth_token(override_token)

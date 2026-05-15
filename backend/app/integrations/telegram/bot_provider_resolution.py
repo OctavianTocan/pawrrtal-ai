@@ -12,6 +12,7 @@ See ``_resolve_provider_with_auto_clear`` for the auto-clear contract
 from __future__ import annotations
 
 import logging
+import uuid
 
 from app.core.providers import resolve_llm
 from app.core.providers.base import AILLM
@@ -26,6 +27,8 @@ logger = logging.getLogger(__name__)
 
 async def resolve_provider_with_auto_clear(
     context: TelegramTurnContext,
+    *,
+    workspace_id: uuid.UUID | None,
 ) -> tuple[AILLM, str | None]:
     """Resolve a provider for ``context.model_id`` with an auto-clear safety net.
 
@@ -51,7 +54,7 @@ async def resolve_provider_with_auto_clear(
     """
     try:
         require_known(context.model_id)
-        provider = resolve_llm(context.model_id, user_id=context.nexus_user_id)
+        provider = resolve_llm(context.model_id, workspace_id=workspace_id)
     except (InvalidModelId, UnknownModelId) as exc:
         fallback_id = default_model().id
         warning = (
@@ -69,6 +72,6 @@ async def resolve_provider_with_auto_clear(
             context.conversation_id,
             context.model_id,
         )
-        provider = resolve_llm(fallback_id, user_id=context.nexus_user_id)
+        provider = resolve_llm(fallback_id, workspace_id=workspace_id)
         return provider, warning
     return provider, None

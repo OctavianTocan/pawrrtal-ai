@@ -44,7 +44,7 @@ export function useOnboardingReadiness(): OnboardingReadiness {
 	const { hasBackend, backendFingerprint } = state;
 	const onboardingStatusQuery = useAuthedQuery<OnboardingStatusResponse>(
 		[...ONBOARDING_STATUS_QUERY_KEY, backendFingerprint],
-		API_ENDPOINTS.workspace.onboardingStatus,
+		API_ENDPOINTS.workspaces.onboardingStatus,
 		{
 			enabled: hasBackend,
 			staleTime: 15 * 1000,

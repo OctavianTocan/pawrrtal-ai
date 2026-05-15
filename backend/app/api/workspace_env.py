@@ -1,16 +1,21 @@
-"""HTTP endpoints for per-user workspace environment variables.
+"""HTTP endpoints for per-workspace environment variables.
 
-Workspace env files live at ``{settings.workspace_base_dir}/{user_id}/.env``
+Workspace env files live at ``{settings.workspace_base_dir}/{workspace_id}/.env``
 (encrypted at rest) and let users override gateway-level settings (e.g.
 their own ``GEMINI_API_KEY``) without modifying the server's global ``.env``.
+Each of a user's workspaces has its own independent ``.env``.
 
-Mounted at: ``/api/v1/workspace``.
+Mounted at: ``/api/v1/workspaces/{workspace_id}/env``.
 """
 
 from __future__ import annotations
 
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.keys import (
     OVERRIDABLE_KEYS,
@@ -18,7 +23,8 @@ from app.core.keys import (
     load_workspace_env,
     save_workspace_env,
 )
-from app.db import User
+from app.db import User, get_async_session
+from app.models import Workspace
 from app.users import get_allowed_user
 
 # Maximum number of distinct keys a single PUT may set/update. Each user can
@@ -58,7 +64,7 @@ class WorkspaceEnvVars(BaseModel):
         The on-disk format is one ``KEY=value`` per line, so a value
         containing a newline would split into a second key=value pair on
         the next read — letting a user with one writable key inject
-        arbitrary other keys (e.g. ``GEMINI_API_KEY=...\\nEXA_API_KEY=hijack``).
+        arbitrary other keys (e.g. ``GEMINI_API_KEY=...\nEXA_API_KEY=hijack``).
         Rejection at validation time is the only safe enforcement boundary
         because the serialiser does no escaping.
         """
@@ -90,34 +96,63 @@ def _all_keys_response(env: dict[str, str]) -> WorkspaceEnvResponse:
     return WorkspaceEnvResponse(vars={k: env.get(k, "") for k in OVERRIDABLE_KEYS})
 
 
-def get_workspace_env_router() -> APIRouter:
-    """Build the per-user workspace env override router.
+async def _get_owned_workspace_id(
+    workspace_id: uuid.UUID,
+    user: User,
+    session: AsyncSession,
+) -> uuid.UUID:
+    """Return ``workspace_id`` after verifying it belongs to ``user``.
 
-    Three endpoints:
-      * ``GET  /env`` — return the user's current overrides (with empty-string
-        defaults for unset keys).
-      * ``PUT  /env`` — merge new overrides on top of existing ones. Empty
-        string values are stored as "absent" (the on-disk file omits them).
-      * ``DELETE /env/{key}`` — remove a single override, falling back to the
-        gateway default for that key.
-
-    All endpoints require an authenticated user.
+    Raises 404 (not 403) when the workspace exists but belongs to someone
+    else — leaking ownership via the status code would let an attacker
+    enumerate workspace IDs.
     """
-    router = APIRouter(prefix="/api/v1/workspace", tags=["workspace-env"])
+    result = await session.execute(
+        select(Workspace.id).where(
+            Workspace.id == workspace_id,
+            Workspace.user_id == user.id,
+        )
+    )
+    owned = result.scalar_one_or_none()
+    if owned is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
+    return owned
 
-    @router.get("/env", response_model=WorkspaceEnvResponse)
+
+def get_workspace_env_router() -> APIRouter:
+    """Build the per-workspace env override router.
+
+    Three endpoints, all scoped to a single workspace owned by the caller:
+      * ``GET  /workspaces/{workspace_id}/env`` — return the workspace's
+        current overrides (with empty-string defaults for unset keys).
+      * ``PUT  /workspaces/{workspace_id}/env`` — merge new overrides on
+        top of existing ones. Empty-string values are stored as "absent"
+        (the on-disk file omits them).
+      * ``DELETE /workspaces/{workspace_id}/env/{key}`` — remove a single
+        override, falling back to the gateway default for that key.
+
+    All endpoints require the authenticated user to own the workspace.
+    """
+    router = APIRouter(prefix="/api/v1/workspaces", tags=["workspace-env"])
+
+    @router.get("/{workspace_id}/env", response_model=WorkspaceEnvResponse)
     async def get_workspace_env(
+        workspace_id: uuid.UUID,
         user: User = Depends(get_allowed_user),
+        session: AsyncSession = Depends(get_async_session),
     ) -> WorkspaceEnvResponse:
-        """Return the current user's workspace env overrides."""
-        return _all_keys_response(load_workspace_env(user.id))
+        """Return the workspace's env overrides."""
+        owned = await _get_owned_workspace_id(workspace_id, user, session)
+        return _all_keys_response(load_workspace_env(owned))
 
-    @router.put("/env", response_model=WorkspaceEnvResponse)
+    @router.put("/{workspace_id}/env", response_model=WorkspaceEnvResponse)
     async def put_workspace_env(
+        workspace_id: uuid.UUID,
         payload: WorkspaceEnvVars,
         user: User = Depends(get_allowed_user),
+        session: AsyncSession = Depends(get_async_session),
     ) -> WorkspaceEnvResponse:
-        """Merge ``payload.vars`` into the user's workspace env file.
+        """Merge ``payload.vars`` into the workspace's env file.
 
         Existing keys not mentioned in ``payload.vars`` are preserved
         (PATCH-like semantics, despite the PUT verb — the field-by-field
@@ -125,6 +160,7 @@ def get_workspace_env_router() -> APIRouter:
         and stored as "absent" so clearing a field in the UI reverts that
         key to the gateway default.
         """
+        owned = await _get_owned_workspace_id(workspace_id, user, session)
         if len(payload.vars) > MAX_KEYS:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -144,27 +180,30 @@ def get_workspace_env_router() -> APIRouter:
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                     detail=f"Value for '{k}' exceeds {MAX_VALUE_LENGTH} characters.",
                 )
-        existing = load_workspace_env(user.id)
+        existing = load_workspace_env(owned)
         existing.update(payload.vars)
-        save_workspace_env(user.id, existing)
+        save_workspace_env(owned, existing)
         # Re-load from disk so the response reflects what was actually
         # persisted (empty-string values are stripped during save, so the
         # echoed payload should match what subsequent GETs return).
-        return _all_keys_response(load_workspace_env(user.id))
+        return _all_keys_response(load_workspace_env(owned))
 
-    @router.delete("/env/{key}", status_code=status.HTTP_204_NO_CONTENT)
+    @router.delete("/{workspace_id}/env/{key}", status_code=status.HTTP_204_NO_CONTENT)
     async def delete_workspace_env_key(
+        workspace_id: uuid.UUID,
         key: str,
         user: User = Depends(get_allowed_user),
+        session: AsyncSession = Depends(get_async_session),
     ) -> None:
-        """Remove a single override key for the current user."""
+        """Remove a single override key for the workspace."""
         if key not in OVERRIDABLE_KEYS:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Unknown workspace env key: '{key}'.",
             )
-        existing = load_workspace_env(user.id)
+        owned = await _get_owned_workspace_id(workspace_id, user, session)
+        existing = load_workspace_env(owned)
         existing.pop(key, None)
-        save_workspace_env(user.id, existing)
+        save_workspace_env(owned, existing)
 
     return router

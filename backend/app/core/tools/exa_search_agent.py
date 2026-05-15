@@ -74,11 +74,11 @@ _PARAMETERS: dict = {
 }
 
 
-def make_exa_search_tool(*, user_id: uuid.UUID | None = None) -> AgentTool:
+def make_exa_search_tool(*, workspace_id: uuid.UUID | None = None) -> AgentTool:
     """Return an :class:`AgentTool` wrapping the Exa web-search core.
 
     Args:
-        user_id: Authenticated user UUID, used to resolve per-workspace
+        workspace_id: Active workspace UUID, used to resolve per-workspace
             API key overrides. When ``None`` the global settings key is used.
 
     Returns:
@@ -92,8 +92,8 @@ def make_exa_search_tool(*, user_id: uuid.UUID | None = None) -> AgentTool:
         num_results = int(kwargs.get("num_results") or 5)
         include_full_text = bool(kwargs.get("include_full_text") or False)
         api_key = None
-        if user_id:
-            api_key = resolve_api_key(user_id, "EXA_API_KEY")
+        if workspace_id:
+            api_key = resolve_api_key(workspace_id, "EXA_API_KEY")
         result = await exa_search(
             query,
             num_results=num_results,

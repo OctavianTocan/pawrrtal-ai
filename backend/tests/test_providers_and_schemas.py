@@ -2,7 +2,7 @@
 
 This module covers:
 - :func:`resolve_llm` routing (model-id prefix → provider class)
-- :func:`resolve_llm` user_id propagation to providers (workspace env support)
+- :func:`resolve_llm` workspace_id propagation to providers (workspace env support)
 - Schema validation for :class:`ConversationCreate`, :class:`ConversationUpdate`,
   :class:`UserCreate`
 - :func:`resolve_api_key` precedence (workspace override > settings fallback)
@@ -93,61 +93,61 @@ def test_user_create_strips_invite_code_from_create_update_dict() -> None:
 
 
 # ---------------------------------------------------------------------------
-# resolve_llm: user_id propagation
+# resolve_llm: workspace_id propagation
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_llm_accepts_user_id_for_gemini() -> None:
-    """resolve_llm with a user_id returns a GeminiLLM instance.
+def test_resolve_llm_accepts_workspace_id_for_gemini() -> None:
+    """resolve_llm with a workspace_id returns a GeminiLLM instance.
 
-    This verifies the new user_id kwarg is forwarded without blowing up.
+    This verifies the new workspace_id kwarg is forwarded without blowing up.
     The actual key resolution happens inside GeminiLLM.stream() which is
     tested separately.
     """
-    provider = resolve_llm("google/gemini-3-flash-preview", user_id=uuid4())
+    provider = resolve_llm("google/gemini-3-flash-preview", workspace_id=uuid4())
     assert isinstance(provider, GeminiLLM)
 
 
-def test_resolve_llm_accepts_user_id_for_claude() -> None:
-    """resolve_llm with a user_id returns a ClaudeLLM instance."""
-    provider = resolve_llm("anthropic/claude-sonnet-4-6", user_id=uuid4())
+def test_resolve_llm_accepts_workspace_id_for_claude() -> None:
+    """resolve_llm with a workspace_id returns a ClaudeLLM instance."""
+    provider = resolve_llm("anthropic/claude-sonnet-4-6", workspace_id=uuid4())
     assert isinstance(provider, ClaudeLLM)
 
 
-def test_resolve_llm_user_id_none_is_default() -> None:
-    """Passing user_id=None (the default) must behave identically to omitting it.
+def test_resolve_llm_workspace_id_none_is_default() -> None:
+    """Passing workspace_id=None (the default) must behave identically to omitting it.
 
-    Both paths must route by model-id prefix; user_id only affects key
+    Both paths must route by model-id prefix; workspace_id only affects key
     resolution inside the provider, not which provider class is returned.
     """
     without = resolve_llm("google/gemini-3-flash-preview")
-    with_none = resolve_llm("google/gemini-3-flash-preview", user_id=None)
+    with_none = resolve_llm("google/gemini-3-flash-preview", workspace_id=None)
 
     assert type(without) is type(with_none)
 
 
-def test_resolve_llm_gemini_accepts_user_id_without_error() -> None:
-    """resolve_llm(user_id=uid) for Gemini must not raise AttributeError or TypeError.
+def test_resolve_llm_gemini_accepts_workspace_id_without_error() -> None:
+    """resolve_llm(workspace_id=uid) for Gemini must not raise AttributeError or TypeError.
 
-    The user_id kwarg is forwarded to make_gemini_stream_fn internally;
+    The workspace_id kwarg is forwarded to make_gemini_stream_fn internally;
     this test ensures the forwarding wiring isn't accidentally dropped.
     """
     uid = uuid4()
     # Must not raise.
-    provider = resolve_llm("google/gemini-3-flash-preview", user_id=uid)
+    provider = resolve_llm("google/gemini-3-flash-preview", workspace_id=uid)
     assert isinstance(provider, GeminiLLM)
 
 
-def test_resolve_llm_claude_provider_stores_user_id() -> None:
-    """The ClaudeLLM instance returned by resolve_llm carries the user_id.
+def test_resolve_llm_claude_provider_stores_workspace_id() -> None:
+    """The ClaudeLLM instance returned by resolve_llm carries the workspace_id.
 
-    ClaudeLLM stores user_id internally as ``_user_id`` and uses it
+    ClaudeLLM stores workspace_id internally as ``_workspace_id`` and uses it
     during stream() to resolve per-workspace CLAUDE_CODE_OAUTH_TOKEN.
     """
     uid = uuid4()
-    provider = resolve_llm("anthropic/claude-sonnet-4-6", user_id=uid)
+    provider = resolve_llm("anthropic/claude-sonnet-4-6", workspace_id=uid)
     assert isinstance(provider, ClaudeLLM)
-    assert provider._user_id == uid
+    assert provider._workspace_id == uid
 
 
 # ---------------------------------------------------------------------------

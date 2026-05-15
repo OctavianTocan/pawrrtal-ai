@@ -79,7 +79,7 @@ def is_activated_by_env_keys(plugin: Plugin) -> Callable[[ToolContext], bool]:
     required_keys = tuple(spec.name for spec in plugin.env_keys if spec.required)
 
     def _predicate(ctx: ToolContext) -> bool:
-        return all(resolve_api_key(ctx.user_id, key_name) for key_name in required_keys)
+        return all(resolve_api_key(ctx.workspace_id, key_name) for key_name in required_keys)
 
     return _predicate
 
