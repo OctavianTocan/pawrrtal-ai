@@ -1,0 +1,197 @@
+---
+title: Plugin system for Pawrrtal and Notion as the first plugin
+description: ADR — formalize a Python-native, tools-only plugin registry; migrate workspace env to workspace_id keying; ship a Notion plugin that wraps the official `ntn` CLI.
+---
+
+# ADR: Plugin system and Notion integration
+
+- **Date:** 2026-05-15
+- **Owners:** OctavianTocan
+- **Tracking:** beans TBD
+- **Reference:** [openclaw-notion](https://github.com/OctavianTocan/openclaw-notion) (read for shape, not portability — Pawrrtal does not host OpenClaw plugins)
+
+<Callout type="info" title="Status: Proposed">
+Add a thin Python plugin registry in `backend/app/integrations/`, migrate workspace `.env` to per-workspace keying, and ship a Notion plugin that subprocesses the official `ntn` CLI with per-call `NOTION_API_TOKEN` injection. 18-tool parity with openclaw-notion.
+</Callout>
+
+## Context
+
+Three drivers point at the same gap:
+
+1. The agent's tool surface (`backend/app/core/agent_tools.py:42`) is one hardcoded function that knows about every tool. Adding a Notion integration today means editing it, editing `OVERRIDABLE_KEYS`, editing the Settings frontend mirror, and editing the chat router. Four touchpoints for one capability.
+2. Workspaces (`backend/app/models.py:269` — `Workspace`) are per-user-many, but workspace `.env` overrides (`backend/app/core/keys.py`) are keyed by `user_id`. A user with two workspaces shares one set of API keys across both, which contradicts the "workspace as isolated agent home" model.
+3. We want Notion next. openclaw-notion already proves the shape (18 focused tools, per-agent token routing, SQLite audit log, file-based auth). We want that shape, not its Node runtime — and not its assumption that Notion calls go through `@notionhq/client` (which we'd have to maintain).
+
+The job is therefore: pick the smallest formalization of "plugin" that fits the existing architecture, fix the workspace-keying mismatch on the way through, and ship Notion as proof.
+
+## Decision
+
+### 1. Plugin system shape (tools-only v1)
+
+A "plugin" is a Python package under `backend/app/integrations/<plugin_id>/` exporting one `Plugin` object:
+
+```python
+# backend/app/core/plugins/types.py
+@dataclass(frozen=True)
+class Plugin:
+    id: str                                      # "notion"
+    name: str                                    # "Notion"
+    description: str
+    env_keys: tuple[EnvKeySpec, ...]             # extends OVERRIDABLE_KEYS
+    tool_factories: tuple[ToolFactory, ...]      # (ctx) -> AgentTool
+    is_activated: Callable[[ToolContext], bool]  # default: all env_keys resolve
+
+ToolFactory = Callable[[ToolContext], AgentTool]
+
+@dataclass(frozen=True)
+class ToolContext:
+    workspace_id: uuid.UUID
+    workspace_root: Path
+    user_id: uuid.UUID
+    send_fn: SendFn | None
+```
+
+Discovery is `import` — `backend/app/integrations/__init__.py` imports each integration package, and each package appends to a module-level registry in `backend/app/core/plugins/registry.py`. No dynamic loading, no manifest JSON, no hot reload. Same trust model as the current `build_agent_tools`: plugins are first-party Python code.
+
+`build_agent_tools` becomes:
+
+```python
+def build_agent_tools(*, workspace_id, workspace_root, user_id, send_fn) -> list[AgentTool]:
+    ctx = ToolContext(workspace_id=workspace_id, workspace_root=workspace_root,
+                      user_id=user_id, send_fn=send_fn)
+    tools: list[AgentTool] = []
+    for plugin in registry.all():
+        if not plugin.is_activated(ctx):
+            continue
+        tools.extend(factory(ctx) for factory in plugin.tool_factories)
+    return tools
+```
+
+Today's tools (workspace files, Exa, image-gen, artifact, send_message) migrate to this shape in the same PR — they become four small in-tree plugins (`core_workspace`, `exa`, `image_gen`, `artifact`/`send_message` as a "channel" plugin). Net behaviour change: zero.
+
+**Out of scope for v1:** plugin-registered channels, providers, hooks, HTTP routes. The seams exist (`Channel` protocol, `LLMProvider`) and can grow later without changing this design.
+
+### 2. Workspace-keyed `.env` migration
+
+`workspace.path` is already the workspace directory (`backend/app/core/workspace.py`). The encrypted env file moves from `{workspace_base_dir}/{user_id}/.env` to `{workspace.path}/.env` — sitting next to `AGENTS.md`, `memory/`, `skills/`.
+
+API surface changes:
+
+- `resolve_api_key(workspace_id, key)` replaces `resolve_api_key(user_id, key)`.
+- `load_workspace_env(workspace_id)` / `save_workspace_env(workspace_id, env)` likewise.
+- `GET/PUT/DELETE /api/v1/workspace/env` becomes `/api/v1/workspaces/{workspace_id}/env` — workspace-scoped, matching the rest of the workspace router.
+
+Callers updated: `agent_tools.py` (Exa/image-gen lookups), Telegram bot (already has user → workspace lookup via `chat.py:122` pattern), `image_gen.py`.
+
+Migration:
+
+- Alembic migration adds nothing to the schema (workspace rows already exist).
+- A startup task moves each existing `{workspace_base_dir}/{user_id}/.env` to `{default_workspace.path}/.env` for the user, once, and renames the source to `.env.migrated-<timestamp>`.
+- Users with more than one workspace at migration time only get the default workspace seeded; secondary workspaces start blank, which is correct.
+
+### 3. Notion plugin — wraps `ntn` CLI
+
+The plugin lives at `backend/app/integrations/notion/`. It registers 18 tools matching openclaw-notion's contract exactly (same names, same parameter shapes, same return format), so anything written against that contract works against Pawrrtal with no change.
+
+Execution maps each tool to a `ntn` invocation:
+
+| Tool | `ntn` invocation |
+|---|---|
+| `notion_search` | `ntn api v1/search query=<q>` |
+| `notion_read` | `ntn api v1/blocks/<id>/children` |
+| `notion_read_markdown` | `ntn pages get <id>` |
+| `notion_append` | `ntn api v1/blocks/<id>/children -X PATCH -d ...` |
+| `notion_create` | `ntn pages create --parent --content` |
+| `notion_update_markdown` | `ntn pages update` |
+| `notion_update_page` | `ntn pages update` |
+| `notion_comment_create` | `ntn api v1/comments -X POST -d ...` |
+| `notion_comment_list` | `ntn api v1/comments parent_id==<id>` |
+| `notion_query` | `ntn api v1/databases/<id>/query -d ...` |
+| `notion_delete` | `ntn api v1/blocks/<id> -X DELETE` |
+| `notion_move` | `ntn api v1/pages/<id> -X PATCH parent[page_id]=...` |
+| `notion_publish` | `ntn api v1/pages/<id> -X PATCH ...` |
+| `notion_file_tree` | composite — multiple `ntn api` calls |
+| `notion_sync` | composite — local FS reads + `ntn pages get/update` |
+| `notion_help` | static markdown, no subprocess |
+| `notion_doctor` | `ntn api v1/users/me` for connectivity probe |
+| `notion_logs_read` | reads audit DB, no subprocess |
+
+Multi-user is solved by per-subprocess env injection — no `ntn login` ever runs server-side. Each call:
+
+```python
+async def call_ntn(args: list[str], token: str) -> bytes:
+    with tempfile.TemporaryDirectory() as home:
+        env = {
+            "PATH": os.environ["PATH"],
+            "HOME": home,                         # isolated; no shared `ntn` state
+            "NOTION_API_TOKEN": token,
+            "NO_COLOR": "1",
+        }
+        proc = await asyncio.create_subprocess_exec(
+            "ntn", *args, env=env, stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+        )
+        out, err = await proc.communicate()
+        if proc.returncode != 0:
+            raise NtnError(returncode=proc.returncode, stderr=err.decode())
+        return out
+```
+
+`HOME` is a per-call tempdir so any state `ntn` writes (e.g. residual `ntn login` artifacts) can't leak between users. We accept the closed-source-binary risk for v1 because the trust boundary is "Pawrrtal already runs trusted server code"; we'll revisit if Pawrrtal goes multi-tenant.
+
+Token entry: an Internal Integration token (`ntn_***`) pasted into Workspace Settings → encrypted into `{workspace.path}/.env` under `NOTION_API_KEY`. No OAuth in v1.
+
+Audit log: new `notion_operation_logs` SQLAlchemy table mirroring openclaw-notion's `audit.ts` schema (id, workspace_id, operation, tool_name, page_id, database_id, duration_ms, status, error, request_json, response_json, created_at). Lives in the app DB — no sidecar SQLite.
+
+### 4. Settings UI
+
+`NOTION_API_KEY` is added to `OVERRIDABLE_KEYS` in `backend/app/core/keys.py` and mirrored in `frontend/features/settings/workspace-env/use-workspace-env.ts`. Reuses the existing workspace-env settings form — one labeled row, link to `https://www.notion.so/profile/integrations` for the user to mint the token.
+
+Once the plugin system lands, future plugins extend both lists automatically through `plugin.env_keys`. This is a v1.1 follow-up; for now the Notion key is added explicitly alongside the existing keys.
+
+## Consequences
+
+**Wins**
+
+- One file per integration; adding the next one (Slack, Linear) is a localised change.
+- Per-workspace keys make multi-workspace per user actually mean something.
+- Notion gets 18 tools without writing 18 HTTP wrappers; Notion maintains the API mapping.
+- openclaw-notion stays the authoritative reference for tool shape — any agent prompt that knows that contract works against Pawrrtal.
+
+**Trade-offs**
+
+- `ntn` is closed-source. We can't audit its handling of `NOTION_API_TOKEN`. Mitigation: per-call `HOME` isolation; document the trust boundary; revisit before multi-tenant.
+- Per-call subprocess startup is ~50–100 ms on top of Notion's own latency. Acceptable for chat-tool latency; not acceptable for high-frequency loops, which the agent doesn't do today.
+- The workspace-env migration touches every existing caller of `resolve_api_key`. Risk is contained — the function returns `None` when no key is configured, which all callers already handle.
+
+**Risks**
+
+- `ntn` install on Railway prod: needs a `curl -fsSL https://ntn.dev | bash` line in `backend/Dockerfile` (or whatever the prod image is). If `ntn.dev` enforces UA gating that rejects curl from Docker build contexts, we need a fallback fetch URL — investigate during implementation.
+- `ntn`'s `--content` / `--parent` flag shapes are documented in the SKILL.md but not formally specified. Each tool's parameter shaping needs an integration test against a real `ntn` binary, not a mock.
+
+## Rollout
+
+Single PR, committed as logical units:
+
+1. `feat(plugins): add Plugin/ToolContext types and integration registry` — types module, empty registry, no behavior change.
+2. `refactor(tools): migrate existing tools to plugin registry` — Exa/workspace-files/artifact/image-gen/send-message become four in-tree plugins. `build_agent_tools` walks the registry. Snapshot tests confirm zero behavior change.
+3. `feat(keys): migrate workspace env to workspace_id keying` — `resolve_api_key(workspace_id, ...)`, file path moves to `{workspace.path}/.env`, startup migration task, callers updated. Frontend env endpoint becomes workspace-scoped.
+4. `feat(notion): add Notion plugin with 18-tool `ntn` wrapper` — plugin manifest, `ntn_client.py` subprocess wrapper, one file per tool under `notion/tools/`, audit log table + Alembic migration, `NOTION_API_KEY` added to `OVERRIDABLE_KEYS`.
+5. `feat(settings): add Notion API key row to workspace settings` — frontend mirror + UI row.
+6. `docs(handbook): add 'adding a plugin' guide` — handbook page describing the registry shape, env-key declaration, ToolContext, testing pattern.
+7. `chore(docker): install ntn in backend image` — `curl -fsSL https://ntn.dev | bash` in the prod image with a pinned `NTN_VERSION`.
+
+Tests follow the `ScriptedStreamFn` pattern (per `.claude/rules/testing/agent-loop-testing-philosophy.md`) — plugin activation, tool dispatch, and audit logging are tested through the real loop with the LLM seam scripted; the `ntn` subprocess itself is mocked at the `call_ntn` seam.
+
+## Out of scope
+
+- Plugin-registered channels, providers, hooks. Architecturally compatible; not built now.
+- OAuth (Public Integration) token flow for Notion. Internal-token paste covers the use case for v1.
+- Frontend plugin marketplace / install UI. There is no install — plugins are in-tree Python packages.
+- Hot reload / plugin reload-on-config-change.
+- Bundling `ntn` into a desktop build (Pawrrtal is currently web-only).
+
+## Open questions
+
+- Does `ntn.dev`'s install script accept Docker build contexts (no human UA)? If not, we need a direct binary download URL — to be confirmed during PR #7.
+- Should secondary workspaces inherit env keys from the default workspace on first creation, or always start blank? Current proposal: blank (forces explicit configuration; matches "isolated workspace" intent).
