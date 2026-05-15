@@ -53,13 +53,14 @@ class ToolContext:
 
 Discovery is `import` — `backend/app/integrations/__init__.py` imports each integration package, and each package appends to a module-level registry in `backend/app/core/plugins/registry.py`. No dynamic loading, no manifest JSON, no hot reload. Same trust model as the current `build_agent_tools`: plugins are first-party Python code.
 
-`build_agent_tools` becomes:
+`build_agent_tools` is left intact for the existing tools (workspace files, Exa, image-gen, artifact, send_message) — they stay hardcoded where they are today. A single new block at the end iterates the plugin registry and appends plugin-contributed tools:
 
 ```python
 def build_agent_tools(*, workspace_id, workspace_root, user_id, send_fn) -> list[AgentTool]:
+    tools: list[AgentTool] = [...]  # existing core tools, unchanged
+
     ctx = ToolContext(workspace_id=workspace_id, workspace_root=workspace_root,
                       user_id=user_id, send_fn=send_fn)
-    tools: list[AgentTool] = []
     for plugin in registry.all():
         if not plugin.is_activated(ctx):
             continue
@@ -67,7 +68,7 @@ def build_agent_tools(*, workspace_id, workspace_root, user_id, send_fn) -> list
     return tools
 ```
 
-Today's tools (workspace files, Exa, image-gen, artifact, send_message) migrate to this shape in the same PR — they become four small in-tree plugins (`core_workspace`, `exa`, `image_gen`, `artifact`/`send_message` as a "channel" plugin). Net behaviour change: zero.
+This is deliberate. The plugin registry is **additive** — for capabilities like Notion, Slack, Linear that conceptually sit outside the core agent surface. The core tools (filesystem, web search, image gen, channel delivery) stay first-class citizens with no indirection. We avoid a refactor whose only payoff would be uniformity for its own sake.
 
 **Out of scope for v1:** plugin-registered channels, providers, hooks, HTTP routes. The seams exist (`Channel` protocol, `LLMProvider`) and can grow later without changing this design.
 
@@ -173,13 +174,12 @@ Once the plugin system lands, future plugins extend both lists automatically thr
 
 Single PR, committed as logical units:
 
-1. `feat(plugins): add Plugin/ToolContext types and integration registry` — types module, empty registry, no behavior change.
-2. `refactor(tools): migrate existing tools to plugin registry` — Exa/workspace-files/artifact/image-gen/send-message become four in-tree plugins. `build_agent_tools` walks the registry. Snapshot tests confirm zero behavior change.
-3. `feat(keys): migrate workspace env to workspace_id keying` — `resolve_api_key(workspace_id, ...)`, file path moves to `{workspace.path}/.env`, startup migration task, callers updated. Frontend env endpoint becomes workspace-scoped.
-4. `feat(notion): add Notion plugin with 18-tool `ntn` wrapper` — plugin manifest, `ntn_client.py` subprocess wrapper, one file per tool under `notion/tools/`, audit log table + Alembic migration, `NOTION_API_KEY` added to `OVERRIDABLE_KEYS`.
-5. `feat(settings): add Notion API key row to workspace settings` — frontend mirror + UI row.
-6. `docs(handbook): add 'adding a plugin' guide` — handbook page describing the registry shape, env-key declaration, ToolContext, testing pattern.
-7. `chore(docker): install ntn in backend image` — `curl -fsSL https://ntn.dev | bash` in the prod image with a pinned `NTN_VERSION`.
+1. `feat(plugins): add Plugin/ToolContext types and integration registry` — types module, empty registry, `build_agent_tools` gains a registry-walk tail. Core tools untouched.
+2. `feat(keys): migrate workspace env to workspace_id keying` — `resolve_api_key(workspace_id, ...)`, file path moves to `{workspace.path}/.env`, startup migration task, callers updated. Frontend env endpoint becomes workspace-scoped.
+3. `feat(notion): add Notion plugin with 18-tool `ntn` wrapper` — plugin manifest, `ntn_client.py` subprocess wrapper, one file per tool under `notion/tools/`, audit log table + Alembic migration, `NOTION_API_KEY` added to `OVERRIDABLE_KEYS`.
+4. `feat(settings): add Notion API key row to workspace settings` — frontend mirror + UI row.
+5. `docs(handbook): add 'adding a plugin' guide` — handbook page describing the registry shape, env-key declaration, ToolContext, testing pattern.
+6. `chore(docker): install ntn in backend image` — `curl -fsSL https://ntn.dev | bash` in the prod image with a pinned `NTN_VERSION`.
 
 Tests follow the `ScriptedStreamFn` pattern (per `.claude/rules/testing/agent-loop-testing-philosophy.md`) — plugin activation, tool dispatch, and audit logging are tested through the real loop with the LLM seam scripted; the `ntn` subprocess itself is mocked at the `call_ntn` seam.
 
