@@ -190,21 +190,46 @@ def build_agent_tools(
             )
 
     # Plugin-contributed tools.  Additive only — core tools above are
-    # unaffected.  Skipped entirely when the workspace context isn't
-    # available (legacy callers, background jobs): plugins gate on
-    # workspace-scoped env keys, so they have nothing to resolve without
-    # a workspace_id + user_id pair.
-    if workspace_id is not None and user_id is not None:
-        ctx = ToolContext(
-            workspace_id=workspace_id,
+    # unaffected.  Extracted into a helper so the main composition body
+    # stays under the project's branch-count ceiling.
+    tools.extend(
+        _build_plugin_tools(
             workspace_root=workspace_root,
             user_id=user_id,
+            workspace_id=workspace_id,
             send_fn=send_fn,
         )
-        for plugin in all_plugins():
-            predicate = plugin.is_activated or is_activated_by_env_keys(plugin)
-            if not predicate(ctx):
-                continue
-            tools.extend(factory(ctx) for factory in plugin.tool_factories)
+    )
 
     return tools
+
+
+def _build_plugin_tools(
+    *,
+    workspace_root: Path,
+    user_id: uuid.UUID | None,
+    workspace_id: uuid.UUID | None,
+    send_fn: SendFn | None,
+) -> list[AgentTool]:
+    """Walk the plugin registry and return every activated plugin's tools.
+
+    Skipped entirely when the workspace context isn't available (legacy
+    callers, background jobs): plugins gate on workspace-scoped env keys,
+    so they have nothing to resolve without a ``workspace_id + user_id``
+    pair.
+    """
+    if workspace_id is None or user_id is None:
+        return []
+    ctx = ToolContext(
+        workspace_id=workspace_id,
+        workspace_root=workspace_root,
+        user_id=user_id,
+        send_fn=send_fn,
+    )
+    out: list[AgentTool] = []
+    for plugin in all_plugins():
+        predicate = plugin.is_activated or is_activated_by_env_keys(plugin)
+        if not predicate(ctx):
+            continue
+        out.extend(factory(ctx) for factory in plugin.tool_factories)
+    return out

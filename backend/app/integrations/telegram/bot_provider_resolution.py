@@ -45,6 +45,11 @@ async def resolve_provider_with_auto_clear(
 
     Args:
         context: Resolved turn context with the stored ``model_id``.
+        workspace_id: The user's default workspace UUID, used to scope
+            provider API-key resolution (per the workspace-keyed env
+            migration).  ``None`` when no default workspace exists yet
+            (incomplete onboarding) — provider lookups fall through to
+            the gateway-global key.
 
     Returns:
         A tuple of ``(provider, warning_text_or_None)``. When the auto-clear
