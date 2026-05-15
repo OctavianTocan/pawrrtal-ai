@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
@@ -104,13 +105,19 @@ def _maybe_artifact_event(event: StreamEvent) -> StreamEvent | None:
     )
 
 
-async def _require_workspace_root(
+async def _require_workspace(
     *,
     user_id: object,
     session: AsyncSession,
     request_id: str,
-) -> Path:
-    """Return the user's default workspace path or reject the chat turn."""
+) -> tuple[uuid.UUID, Path]:
+    """Return the user's default workspace ``(id, path)`` or reject the chat turn.
+
+    Returns the workspace UUID alongside the directory path so callers
+    can pass both into :func:`app.core.agent_tools.build_agent_tools` —
+    the UUID drives plugin activation (and, post-migration, env-key
+    resolution); the path drives the existing core workspace tools.
+    """
     workspace = await get_default_workspace(user_id, session)
     if workspace is None:
         raise HTTPException(
@@ -129,7 +136,7 @@ async def _require_workspace_root(
             status_code=412,
             detail="Workspace directory is missing on disk.  Re-run onboarding.",
         )
-    return root
+    return workspace.id, root
 
 
 def get_chat_router() -> APIRouter:
@@ -229,7 +236,9 @@ def get_chat_router() -> APIRouter:
         # that flow yet — the agent should not run at all in that state.
         # Refuse with 412 (Precondition Failed) so the frontend can route to
         # onboarding instead of pretending we shipped a degraded reply.
-        root = await _require_workspace_root(user_id=user.id, session=session, request_id=rid)
+        workspace_id, root = await _require_workspace(
+            user_id=user.id, session=session, request_id=rid
+        )
         # Pre-flight per-user cost gate (PR 04).  Refuses with HTTP
         # 402 when the user's rolling-window spend + a small reservation
         # would exceed ``cost_max_per_user_daily_usd``.  This sits
@@ -270,6 +279,7 @@ def get_chat_router() -> APIRouter:
         agent_tools = build_agent_tools(
             workspace_root=root,
             user_id=user.id,
+            workspace_id=workspace_id,
             send_fn=_web_send_fn,
             surface=surface,
             conversation_id=request.conversation_id,

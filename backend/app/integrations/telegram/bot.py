@@ -156,6 +156,7 @@ async def _run_llm_turn(*, message: Message, context: TelegramTurnContext) -> No
         build_agent_tools(
             workspace_root=Path(workspace.path),
             user_id=context.nexus_user_id,
+            workspace_id=workspace.id,
             send_fn=tg_sender,
             surface="telegram",
         )

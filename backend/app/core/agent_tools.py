@@ -32,6 +32,8 @@ from pathlib import Path
 from app.core.agent_loop.types import AgentTool
 from app.core.config import settings
 from app.core.keys import resolve_api_key
+from app.core.plugins import ToolContext, all_plugins
+from app.core.plugins.registry import is_activated_by_env_keys
 from app.core.providers.catalog import default_model
 from app.core.tools.artifact_agent import make_artifact_tool
 from app.core.tools.exa_search_agent import make_exa_search_tool
@@ -51,6 +53,7 @@ def build_agent_tools(
     *,
     workspace_root: Path,
     user_id: uuid.UUID | None = None,
+    workspace_id: uuid.UUID | None = None,
     send_fn: SendFn | None = None,
     surface: str | None = None,
     conversation_id: uuid.UUID | None = None,
@@ -72,6 +75,12 @@ def build_agent_tools(
             under prompt pressure.
         user_id: Authenticated user UUID, used to resolve per-workspace
             API key overrides for tools that call external services.
+        workspace_id: Active workspace UUID.  When supplied alongside
+            ``user_id``, plugin tools (additive integrations registered
+            under :mod:`app.core.plugins`) are appended after the core
+            tools.  When ``None`` — including in legacy tests that
+            haven't been updated yet — plugin tools are skipped; core
+            tool composition is unaffected.
         send_fn: Optional channel delivery callback.  When supplied the
             ``send_message`` tool is added to the list so the agent can
             proactively push text and files back to the user.  Both the
@@ -95,9 +104,9 @@ def build_agent_tools(
         A fresh list of :class:`AgentTool` ready to hand to a provider.
         Order is **stable**: workspace tools first (the agent's default
         operating surface), then capability-gated tools (web search,
-        future capabilities).  Stable order matters for the Claude
-        bridge's ``allowed_tools`` whitelist construction and for
-        snapshot-style tests.
+        future capabilities), then any plugin-contributed tools.
+        Stable order matters for the Claude bridge's ``allowed_tools``
+        whitelist construction and for snapshot-style tests.
     """
     tools: list[AgentTool] = []
 
@@ -179,5 +188,23 @@ def build_agent_tools(
                     model_id=expand_model_id,
                 )
             )
+
+    # Plugin-contributed tools.  Additive only — core tools above are
+    # unaffected.  Skipped entirely when the workspace context isn't
+    # available (legacy callers, background jobs): plugins gate on
+    # workspace-scoped env keys, so they have nothing to resolve without
+    # a workspace_id + user_id pair.
+    if workspace_id is not None and user_id is not None:
+        ctx = ToolContext(
+            workspace_id=workspace_id,
+            workspace_root=workspace_root,
+            user_id=user_id,
+            send_fn=send_fn,
+        )
+        for plugin in all_plugins():
+            predicate = plugin.is_activated or is_activated_by_env_keys(plugin)
+            if not predicate(ctx):
+                continue
+            tools.extend(factory(ctx) for factory in plugin.tool_factories)
 
     return tools
