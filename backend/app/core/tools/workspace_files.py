@@ -22,7 +22,9 @@ Usage::
 
 from __future__ import annotations
 
+import errno
 import logging
+import os
 import re
 from collections.abc import Awaitable, Callable
 from pathlib import Path
@@ -141,7 +143,10 @@ def is_path_within_workspace(path: str, workspace_root: Path) -> bool:
             resolved = (root_resolved / path.lstrip("/")).resolve()
     except (OSError, ValueError):
         return False
-    return str(resolved).startswith(str(root_resolved))
+    # Path-aware containment via ``is_relative_to`` (Python 3.9+) — a
+    # plain ``str.startswith`` accepts sibling-directory prefixes
+    # (``/data/workspaces/abc`` vs ``/data/workspaces/abcdef``).
+    return resolved == root_resolved or resolved.is_relative_to(root_resolved)
 
 
 def _resolve_safe(root: Path, rel_path: str) -> Path:
@@ -157,8 +162,12 @@ def _resolve_safe(root: Path, rel_path: str) -> Path:
             ToolErrorCode.INVALID_PATH,
             f"Could not resolve path '{rel_path}': {exc}",
         ) from exc
-    # resolve() follows symlinks; check the string prefix.
-    if not str(target).startswith(str(root.resolve())):
+    # resolve() follows symlinks; check containment via ``is_relative_to``
+    # so a sibling directory whose name shares a string prefix with the
+    # root (``/data/workspaces/abc`` vs ``/data/workspaces/abcdef``) is
+    # still rejected.
+    root_resolved = root.resolve()
+    if target != root_resolved and not target.is_relative_to(root_resolved):
         raise ToolError(
             ToolErrorCode.OUT_OF_ROOT,
             f"Path '{rel_path}' resolves outside the workspace root.",
@@ -237,7 +246,25 @@ def _read_file_sync(target: Path, raw_path: str) -> str:
             ToolErrorCode.WRONG_KIND,
             f"'{raw_path}' is a directory, not a file.",
         )
-    raw = target.read_bytes()
+    # Open with ``O_NOFOLLOW`` so a symlink swapped in between the earlier
+    # ``resolve()`` containment check and this read can't escape the jail.
+    # ``Path.read_bytes`` uses plain ``open()`` which follows symlinks at
+    # syscall time, leaving a TOCTOU window the workspace agent could trip
+    # accidentally (a stray symlink it wrote earlier in the conversation).
+    try:
+        fd = os.open(target, os.O_RDONLY | os.O_NOFOLLOW)
+    except OSError as exc:
+        # ``ELOOP`` is the canonical "target is a symlink" failure when
+        # ``O_NOFOLLOW`` is set; surface it as ``OUT_OF_ROOT`` so the
+        # model gets the same shape of error as a traversal attempt.
+        if exc.errno == errno.ELOOP:
+            raise ToolError(
+                ToolErrorCode.OUT_OF_ROOT,
+                f"'{raw_path}' is a symlink and cannot be read for safety.",
+            ) from exc
+        raise
+    with os.fdopen(fd, "rb") as fh:
+        raw = fh.read(_MAX_READ_BYTES + 1)
     if len(raw) > _MAX_READ_BYTES:
         raw = raw[:_MAX_READ_BYTES]
         suffix = f"\n\n[truncated — file exceeds {_MAX_READ_BYTES // _BYTES_PER_KIB} KB]"
@@ -263,7 +290,28 @@ def _write_file_sync(target: Path, raw_path: str, content: str) -> str:
             f"'{raw_path}' is a directory.",
         )
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(content, encoding="utf-8")
+    # Open with ``O_NOFOLLOW`` so a symlink swapped in between
+    # ``_resolve_safe`` and this write can't escape the jail. Mirrors the
+    # protection ``read_file`` already has — without it, an attacker (or
+    # the agent itself, via the ``python`` tool's ``os.symlink``) could
+    # plant a symlink inside the workspace pointing at e.g. ``/etc/cron.d``
+    # and have us overwrite it.
+    encoded = content.encode("utf-8")
+    try:
+        fd = os.open(
+            target,
+            os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW,
+            0o644,
+        )
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise ToolError(
+                ToolErrorCode.OUT_OF_ROOT,
+                f"'{raw_path}' is a symlink and cannot be written for safety.",
+            ) from exc
+        raise
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(encoded)
     return f"Written {len(content)} characters to '{raw_path}'."
 
 

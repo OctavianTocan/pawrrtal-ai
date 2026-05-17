@@ -43,6 +43,7 @@ from app.core.tools.lcm_describe_agent import (
 from app.core.tools.lcm_expand_query_agent import make_lcm_expand_query_tool
 from app.core.tools.lcm_grep_agent import make_lcm_grep_tool
 from app.core.tools.markitdown_convert import make_markitdown_tool
+from app.core.tools.python_exec import make_virtual_python_tool
 from app.core.tools.send_message import SendFn, make_send_message_tool
 from app.core.tools.workspace_files import make_workspace_tools
 
@@ -139,6 +140,19 @@ def build_agent_tools(
     # Document-to-Markdown conversion via markitdown.  Always present —
     # no external API key required; all conversion happens locally.
     tools.append(make_markitdown_tool(workspace_root=workspace_root))
+
+    # In-process Python execution.  Opt-in via
+    # ``settings.virtual_python_enabled`` because the tool is *not*
+    # sandboxed — the deployment model assumes a single trusted
+    # operator (see ``app/core/tools/python_exec.py`` docstring).
+    if settings.virtual_python_enabled:
+        tools.append(
+            make_virtual_python_tool(
+                workspace_root=workspace_root,
+                timeout_seconds=settings.virtual_python_timeout_seconds,
+                output_cap_bytes=settings.virtual_python_output_cap_bytes,
+            )
+        )
 
     # Channel delivery — present for both web (asyncio-queue SSE drain)
     # and Telegram (MIME-aware bot API calls).  The mechanism differs;

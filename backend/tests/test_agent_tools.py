@@ -69,3 +69,36 @@ class TestBuildAgentToolsWithSendFn:
         assert "render_artifact" in names
         # At least one workspace tool (read_file / write_file / list_files)
         assert any(n in names for n in ("read_file", "write_file", "list_files"))
+
+
+class TestVirtualPythonGate:
+    """``python`` tool only appears when ``virtual_python_enabled`` is True."""
+
+    def test_python_absent_by_default(self, tmp_workspace: Path) -> None:
+        with patch("app.core.keys.resolve_api_key", return_value=None):
+            tools = build_agent_tools(workspace_root=tmp_workspace)
+
+        names = [t.name for t in tools]
+        assert "python" not in names
+
+    def test_python_present_when_enabled(self, tmp_workspace: Path) -> None:
+        with (
+            patch("app.core.keys.resolve_api_key", return_value=None),
+            patch("app.core.agent_tools.settings.virtual_python_enabled", True),
+        ):
+            tools = build_agent_tools(workspace_root=tmp_workspace)
+
+        names = [t.name for t in tools]
+        assert "python" in names
+
+    def test_python_appears_before_send_message(self, tmp_workspace: Path) -> None:
+        """Stable ordering: ``python`` sits between ``markitdown`` and ``send_message``."""
+        send_fn = _make_send_fn()
+        with (
+            patch("app.core.keys.resolve_api_key", return_value=None),
+            patch("app.core.agent_tools.settings.virtual_python_enabled", True),
+        ):
+            tools = build_agent_tools(workspace_root=tmp_workspace, send_fn=send_fn)
+
+        names = [t.name for t in tools]
+        assert names.index("python") < names.index("send_message")
