@@ -15,14 +15,32 @@ rationale for the pattern.
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import AsyncIterator
+
 import pytest
 
-from app.core.agent_loop import AgentSafetyConfig
+from app.core.agent_loop import (
+    AgentContext,
+    AgentEvent,
+    AgentLoopConfig,
+    AgentMessage,
+    AgentSafetyConfig,
+    AgentTool,
+    LLMDoneEvent,
+    LLMEvent,
+    LLMTextDeltaEvent,
+    LLMToolCallEvent,
+    UserMessage,
+    agent_loop,
+)
+from app.core.agent_loop.types import TextContent, ToolCallContent
 from tests.agent_harness import (
     ScriptedStreamFn,
     echo_tool,
     error_turn,
     failing_tool,
+    identity_convert,
     run_scenario,
     text_turn,
     tool_call_turn,
@@ -94,6 +112,76 @@ async def test_tool_call_then_text_reply_full_lifecycle() -> None:
     assert any("I echoed" in e.get("text", "") for e in text_events)
 
     # Loop finished cleanly.
+    assert any(e["type"] == "agent_end" for e in events)
+    assert not any(e["type"] == "agent_terminated" for e in events)
+
+
+@pytest.mark.anyio
+async def test_tool_call_event_streams_before_provider_done() -> None:
+    """Tool calls are yielded immediately, not replayed after LLM ``done``."""
+    allow_done = asyncio.Event()
+    saw_tool_call = asyncio.Event()
+    events: list[AgentEvent] = []
+    call_count = 0
+
+    async def stream_fn(
+        messages: list[AgentMessage],
+        tools: list[AgentTool],
+    ) -> AsyncIterator[LLMEvent]:
+        nonlocal call_count
+        call_count += 1
+        if call_count == 1:
+            yield LLMToolCallEvent(
+                type="tool_call",
+                tool_call_id="tc-live",
+                name="echo",
+                arguments={"value": "hi"},
+            )
+            await allow_done.wait()
+            yield LLMDoneEvent(
+                type="done",
+                stop_reason="tool_use",
+                content=[
+                    ToolCallContent(
+                        type="toolCall",
+                        tool_call_id="tc-live",
+                        name="echo",
+                        arguments={"value": "hi"},
+                    )
+                ],
+            )
+            return
+
+        yield LLMTextDeltaEvent(type="text_delta", text="Done.")
+        yield LLMDoneEvent(
+            type="done",
+            stop_reason="stop",
+            content=[TextContent(type="text", text="Done.")],
+        )
+
+    async def consume() -> None:
+        context = AgentContext(system_prompt="", messages=[], tools=[echo_tool()])
+        config = AgentLoopConfig(
+            convert_to_llm=identity_convert,
+            safety=AgentSafetyConfig.disabled(),
+        )
+        prompt = UserMessage(role="user", content="use the tool")
+        async for event in agent_loop([prompt], context, config, stream_fn):
+            events.append(event)
+            if event["type"] == "tool_call_end":
+                saw_tool_call.set()
+
+    task = asyncio.create_task(consume())
+    await asyncio.wait_for(saw_tool_call.wait(), timeout=1)
+
+    assert not task.done()
+    assert [event["type"] for event in events][-2:] == [
+        "tool_call_start",
+        "tool_call_end",
+    ]
+
+    allow_done.set()
+    await asyncio.wait_for(task, timeout=1)
     assert any(e["type"] == "agent_end" for e in events)
     assert not any(e["type"] == "agent_terminated" for e in events)
 

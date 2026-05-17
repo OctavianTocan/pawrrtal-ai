@@ -26,7 +26,7 @@ def agent_event_to_stream_event(event: Any) -> StreamEvent | None:
 
     Returns ``None`` for events that don't carry user-facing payload
     (``agent_start`` / ``agent_end`` / ``message_*`` / ``turn_*`` /
-    ``tool_call_end``) — the chat router emits the ``[DONE]`` sentinel
+    ``tool_call_start``) — the chat router emits the ``[DONE]`` sentinel
     itself when the loop completes.
     """
     event_type = event["type"]
@@ -34,12 +34,13 @@ def agent_event_to_stream_event(event: Any) -> StreamEvent | None:
         return StreamEvent(type="delta", content=event["text"])
     if event_type == "thinking_delta":
         return StreamEvent(type="thinking", content=event["text"])
-    if event_type == "tool_call_start":
+    if event_type == "tool_call_end":
         return StreamEvent(
             type="tool_use",
             name=event["name"],
-            input={},
+            input=event["arguments"],
             tool_use_id=event["tool_call_id"],
+            display=event.get("display"),
         )
     if event_type == "tool_result":
         return StreamEvent(

@@ -24,6 +24,7 @@ from __future__ import annotations
 import uuid
 
 from app.core.agent_loop.types import AgentTool
+from app.core.tools.display import make_tool_display
 from app.core.tools.lcm_describe import lcm_describe, lcm_list_summaries
 from app.db import async_session_maker
 
@@ -64,6 +65,12 @@ def make_lcm_list_summaries_tool(*, conversation_id: uuid.UUID) -> AgentTool:
         description=_LIST_TOOL_DESCRIPTION,
         parameters=_LIST_PARAMETERS,
         execute=_execute,
+        display=make_tool_display(
+            icon="🧠",
+            label="List memory summaries",
+            present=lambda _args: "🧠 Listing memory summaries",
+            compact=lambda _args: "List memory summaries",
+        ),
     )
 
 
@@ -125,4 +132,10 @@ def make_lcm_describe_tool(*, conversation_id: uuid.UUID) -> AgentTool:
         description=_DESCRIBE_TOOL_DESCRIPTION,
         parameters=_DESCRIBE_PARAMETERS,
         execute=_execute,
+        display=make_tool_display(
+            icon="🧠",
+            label="Read memory summary",
+            present=lambda _args: "🧠 Reading memory summary",
+            compact=lambda _args: "Read memory summary",
+        ),
     )

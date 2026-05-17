@@ -43,17 +43,22 @@ from app.integrations.telegram.bot_provider_resolution import (
 from app.integrations.telegram.handlers import (
     TelegramSender,
     TelegramTurnContext,
-    handle_model_command,
     handle_new_command,
     handle_plain_message,
     handle_start_command,
     handle_stop_command,
     handle_verbose_command,
 )
+from app.integrations.telegram.model_picker import MODEL_CALLBACK_PREFIX
+from app.integrations.telegram.model_picker_runtime import (
+    answer_model_command,
+    answer_model_picker,
+    handle_model_picker_callback,
+)
 
 if TYPE_CHECKING:
     from aiogram import Bot, Dispatcher
-    from aiogram.types import Message, Update
+    from aiogram.types import CallbackQuery, Message, Update
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +66,7 @@ _TELEGRAM_COMMANDS: tuple[tuple[str, str], ...] = (
     ("start", "Connect your Pawrrtal account"),
     ("new", "Start a new conversation"),
     ("model", "Switch the model for this conversation"),
+    ("models", "Browse available models"),
     ("verbose", "Set detail level: 0 quiet, 1 tools, 2 thinking"),
     ("stop", "Stop the active run"),
 )
@@ -124,6 +130,13 @@ async def _maintain_typing_indicator(
         return
 
 
+def _reply_parameters(message_id: int) -> object:
+    """Build aiogram reply parameters without importing aiogram at module load."""
+    from aiogram.types import ReplyParameters  # noqa: PLC0415
+
+    return ReplyParameters(message_id=message_id)
+
+
 # TODO: This is pretty nonsensical. We have a custom entire chat impkementation that just duplicates the logic here.
 async def _run_llm_turn(*, message: Message, context: TelegramTurnContext) -> None:
     """Drive the LLM streaming pipeline for one Telegram turn.
@@ -142,7 +155,10 @@ async def _run_llm_turn(*, message: Message, context: TelegramTurnContext) -> No
     user_text = message.text or ""
     if message.bot is None:
         raise RuntimeError("Telegram message has no bot; refusing to stream.")
-    thinking_msg = await message.answer("⏳")
+    thinking_msg = await message.answer(
+        "⏳",
+        reply_parameters=_reply_parameters(message.message_id),
+    )
 
     async with async_session_maker() as ws_session:
         workspace = await get_default_workspace(context.nexus_user_id, ws_session)
@@ -151,6 +167,7 @@ async def _run_llm_turn(*, message: Message, context: TelegramTurnContext) -> No
         message.bot,
         message.chat.id,
         message_thread_id=context.thread_id,
+        reply_to_message_id=message.message_id,
     )
     agent_tools = (
         build_agent_tools(
@@ -165,7 +182,7 @@ async def _run_llm_turn(*, message: Message, context: TelegramTurnContext) -> No
 
     provider, warning = await resolve_provider_with_auto_clear(context)
     if warning is not None:
-        await message.answer(warning)
+        await message.answer(warning, reply_parameters=_reply_parameters(message.message_id))
 
     channel_message: ChannelMessage = {
         "user_id": context.nexus_user_id,
@@ -177,6 +194,8 @@ async def _run_llm_turn(*, message: Message, context: TelegramTurnContext) -> No
             "bot": message.bot,
             "chat_id": message.chat.id,
             "message_id": thinking_msg.message_id,
+            "reply_to_message_id": message.message_id,
+            "message_thread_id": context.thread_id,
         },
     }
     turn_input = ChatTurnInput(
@@ -266,7 +285,7 @@ class TelegramService:
         await self.dispatcher.feed_update(self.bot, update)
 
 
-def build_telegram_service() -> TelegramService:  # noqa: PLR0915 — single dispatcher-registration body; splitting fragments shared `dispatcher` closure
+def build_telegram_service() -> TelegramService:
     """Construct the aiogram primitives and register the dispatcher routes.
 
     Raises ``RuntimeError`` if Telegram support is not configured. The
@@ -278,7 +297,6 @@ def build_telegram_service() -> TelegramService:  # noqa: PLR0915 — single dis
     from aiogram import Bot, Dispatcher  # noqa: PLC0415
     from aiogram.client.default import DefaultBotProperties  # noqa: PLC0415
     from aiogram.enums import ParseMode  # noqa: PLC0415
-    from aiogram.filters import Command, CommandStart  # noqa: PLC0415
 
     if not settings.telegram_bot_token:
         raise RuntimeError("TELEGRAM_BOT_TOKEN must be set to start the Telegram service.")
@@ -288,6 +306,17 @@ def build_telegram_service() -> TelegramService:  # noqa: PLR0915 — single dis
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     dispatcher = Dispatcher()
+
+    _register_telegram_command_handlers(dispatcher)
+    _register_telegram_callback_handlers(dispatcher)
+    _register_telegram_message_handler(dispatcher)
+
+    return TelegramService(bot=bot, dispatcher=dispatcher)
+
+
+def _register_telegram_command_handlers(dispatcher: Dispatcher) -> None:
+    """Register slash-command handlers on the aiogram dispatcher."""
+    from aiogram.filters import Command, CommandStart  # noqa: PLC0415
 
     @dispatcher.message(CommandStart(deep_link=True))
     @dispatcher.message(CommandStart())
@@ -325,10 +354,11 @@ def build_telegram_service() -> TelegramService:  # noqa: PLR0915 — single dis
         # Strip the "/model" prefix (plus optional @botname) and grab the rest.
         parts = text.strip().split(maxsplit=1)
         model_arg = parts[1].strip() if len(parts) > 1 else ""
-        sender = _sender_from_message(message)
-        async with async_session_maker() as session:
-            reply = await handle_model_command(sender=sender, model_arg=model_arg, session=session)
-        await message.answer(reply)
+        await answer_model_command(message=message, model_arg=model_arg)
+
+    @dispatcher.message(Command("models"))
+    async def _on_models(message: Message) -> None:
+        await answer_model_picker(message=message)
 
     @dispatcher.message(Command("verbose"))
     async def _on_verbose(message: Message) -> None:
@@ -341,6 +371,18 @@ def build_telegram_service() -> TelegramService:  # noqa: PLR0915 — single dis
                 sender=sender, level_arg=level_arg, session=session
             )
         await message.answer(reply)
+
+
+def _register_telegram_callback_handlers(dispatcher: Dispatcher) -> None:
+    """Register inline-keyboard callback handlers on the aiogram dispatcher."""
+
+    @dispatcher.callback_query(lambda query: (query.data or "").startswith(MODEL_CALLBACK_PREFIX))
+    async def _on_model_picker(callback: CallbackQuery) -> None:
+        await handle_model_picker_callback(callback=callback)
+
+
+def _register_telegram_message_handler(dispatcher: Dispatcher) -> None:
+    """Register the plain text chat handler on the aiogram dispatcher."""
 
     @dispatcher.message()
     async def _on_message(message: Message) -> None:
@@ -356,8 +398,6 @@ def build_telegram_service() -> TelegramService:  # noqa: PLR0915 — single dis
             return
 
         await _run_llm_turn(message=message, context=result)
-
-    return TelegramService(bot=bot, dispatcher=dispatcher)
 
 
 async def refresh_telegram_commands(bot: Bot) -> None:

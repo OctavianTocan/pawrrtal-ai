@@ -41,6 +41,7 @@ from pathlib import Path
 from typing import Any
 
 from app.core.agent_loop.types import AgentTool
+from app.core.tools.display import make_tool_display, summarize_path
 from app.core.tools.errors import ToolError, ToolErrorCode
 
 log = logging.getLogger(__name__)
@@ -201,4 +202,24 @@ def make_send_message_tool(
             "required": [],
         },
         execute=execute,
+        display=make_tool_display(
+            icon="💬",
+            label="Send message",
+            present=_send_message_present,
+            compact=_send_message_compact,
+        ),
     )
+
+
+def _send_message_present(args: dict[str, Any]) -> str:
+    attachment = args.get("attachment")
+    if attachment:
+        return f"💬 Sending {summarize_path(attachment)}"
+    return "💬 Sending message"
+
+
+def _send_message_compact(args: dict[str, Any]) -> str:
+    attachment = args.get("attachment")
+    if attachment:
+        return f"Send message -> {summarize_path(attachment)}"
+    return "Send message"

@@ -32,9 +32,15 @@ A **Thinking** row at the bottom of the top-level menu is a peer of the vendor
 rows. It opens a submenu for setting the reasoning level independently of which
 model you are using. See [Modes & Reasoning](/docs/product/modes) for details.
 
+## Choosing models in Telegram
+
+In Telegram, send `/models` or `/model list` to open an inline model picker. The
+picker groups models by provider, shows the same backend catalog as the web app,
+and applies the selected model to the current Telegram conversation.
+
 ## Model selection scope
 
-The selected model is persisted to `localStorage` (key:
+In the web app, the selected model is persisted to `localStorage` (key:
 `chat-composer:selected-model-id`). It applies to new messages until you change
 it — it is not locked per conversation. If you start a conversation with one
 model and then switch, subsequent messages in the same conversation use the new

@@ -1,11 +1,11 @@
 ---
 # pawrrtal-uppe
 title: Telegram /model command — switch model for current conversation
-status: todo
+status: completed
 type: feature
 priority: normal
 created_at: 2026-05-07T16:18:07Z
-updated_at: 2026-05-07T16:18:07Z
+updated_at: 2026-05-17T09:57:44Z
 ---
 
 ## Goal
@@ -46,3 +46,11 @@ Add a ``/model`` command in the Telegram bot that switches the active model for 
 ## Related
 
 - Depends on the model-registry bean for the source of truth on valid models
+
+
+
+Session update 2026-05-17: Implementing Telegram inline model picker based on OpenClaw's provider -> paged model selection pattern. Keep typed /model <id> support, add /models, and make /model with no argument open the picker.
+
+
+
+Completed 2026-05-17: Added /models and /model-without-argument inline picker using the backend MODEL_CATALOG. Picker opens provider buttons, paginates models, marks the active model, and writes the selected canonical model_id through the existing Telegram /model update path. Also added proactive catalog validation for typed /model values so unknown-but-well-formed IDs are rejected immediately. Tests added in backend/tests/test_telegram_model_picker.py and backend/tests/test_telegram_channel.py.

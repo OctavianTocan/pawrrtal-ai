@@ -37,6 +37,7 @@ def test_tool_break_starts_new_thinking_entry() -> None:
             "tool_use_id": "t1",
             "name": "web_search",
             "input": {"q": "x"},
+            "display": {"present": "Searching the web for x"},
         }
     )
     agg.apply({"type": "thinking", "content": "B"})
@@ -57,12 +58,14 @@ def test_tool_result_completes_matching_call() -> None:
             "tool_use_id": "t1",
             "name": "web_search",
             "input": {"q": "x"},
+            "display": {"present": "Searching the web for x"},
         }
     )
     agg.apply({"type": "tool_result", "tool_use_id": "t1", "content": "[]"})
 
     assert agg.tool_calls[0].status == "completed"
     assert agg.tool_calls[0].result == "[]"
+    assert agg.tool_calls[0].display == {"present": "Searching the web for x"}
 
 
 def test_persisted_shape_failed_with_no_content_uses_error_text() -> None:
@@ -80,7 +83,15 @@ def test_persisted_shape_complete_keeps_streamed_content() -> None:
     agg = ChatTurnAggregator()
     agg.apply({"type": "delta", "content": "All done."})
     agg.apply({"type": "thinking", "content": "Let me check."})
-    agg.apply({"type": "tool_use", "tool_use_id": "t1", "name": "web_search", "input": {}})
+    agg.apply(
+        {
+            "type": "tool_use",
+            "tool_use_id": "t1",
+            "name": "web_search",
+            "input": {},
+            "display": {"compact": "Search web"},
+        }
+    )
     agg.apply({"type": "tool_result", "tool_use_id": "t1", "content": "ok"})
 
     snapshot = agg.to_persisted_shape(status="complete")
@@ -89,4 +100,5 @@ def test_persisted_shape_complete_keeps_streamed_content() -> None:
     assert snapshot["assistant_status"] == "complete"
     assert snapshot["tool_calls"] is not None
     assert snapshot["tool_calls"][0]["status"] == "completed"
+    assert snapshot["tool_calls"][0]["display"] == {"compact": "Search web"}
     assert snapshot["timeline"] is not None

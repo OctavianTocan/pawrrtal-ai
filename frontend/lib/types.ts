@@ -19,6 +19,15 @@ export type AssistantMessageStatus = 'streaming' | 'complete' | 'failed';
 /** Lifecycle of a single tool invocation as observed from the SSE stream. */
 export type ChatToolCallStatus = 'pending' | 'completed' | 'failed';
 
+/** User-facing display metadata for a tool invocation. */
+export interface ToolDisplayPayload {
+	icon?: string;
+	label?: string;
+	present?: string;
+	compact?: string;
+	detail?: string;
+}
+
 /**
  * The transport-level shape of a tool invocation, without any parsed-source
  * denormalisations. `features/chat/types.ts` extends this with `webSources`
@@ -31,6 +40,8 @@ export interface ChatToolCallBase {
 	name: string;
 	/** Input arguments the assistant passed to the tool. */
 	input: Record<string, unknown>;
+	/** Optional shared user-facing display metadata from the backend. */
+	display?: ToolDisplayPayload;
 	/** Tool result text (only present once the tool has finished). */
 	result?: string;
 	/** Whether the result has arrived yet. */

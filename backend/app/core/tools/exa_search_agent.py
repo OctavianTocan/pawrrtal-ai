@@ -20,6 +20,7 @@ import uuid
 
 from app.core.agent_loop.types import AgentTool
 from app.core.keys import resolve_api_key
+from app.core.tools.display import make_tool_display, summarize_query
 from app.core.tools.exa_search import (
     MAX_NUM_RESULTS,
     exa_search,
@@ -107,4 +108,10 @@ def make_exa_search_tool(*, user_id: uuid.UUID | None = None) -> AgentTool:
         description=_TOOL_DESCRIPTION,
         parameters=_PARAMETERS,
         execute=_execute,
+        display=make_tool_display(
+            icon="🌐",
+            label="Search web",
+            present=lambda args: f"🌐 Searching the web for {summarize_query(args.get('query'))}",
+            compact=lambda args: f"Search web -> {summarize_query(args.get('query'))}",
+        ),
     )
