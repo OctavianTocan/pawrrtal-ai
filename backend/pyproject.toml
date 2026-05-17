@@ -6,7 +6,6 @@ readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
     "aiogram>=3.27.0",
-    "markdown-it-py>=3.0.0",
     "alembic>=1.13.0",
     "aiosqlite>=0.22.1",
     "anyio>=4.0.0",
@@ -14,14 +13,13 @@ dependencies = [
     "claude-agent-sdk",
     "fastapi-users[sqlalchemy]>=15.0.3",
     "fastapi[standard]>=0.136.0",
-    "google-genai>=2.3.0",
+    "google-genai>=1.56.0",
     "mcp>=1.27.0",
     "psycopg>=3.3.3",
     "pydantic>=2.12.5,<2.14",
     "pydantic-settings>=2.12.0",
     "python-dotenv>=1.2.1",
     "sqlalchemy-utils>=0.42.1",
-    "structlog>=24.0.0",
     "opentelemetry-api>=1.29.0",
     "opentelemetry-sdk>=1.29.0",
     "opentelemetry-exporter-otlp-proto-http>=1.29.0",
@@ -29,17 +27,6 @@ dependencies = [
     "opentelemetry-instrumentation-httpx>=0.50b0",
     "opentelemetry-instrumentation-sqlalchemy>=0.50b0",
     "opentelemetry-instrumentation-logging>=0.50b0",
-    "markitdown[all]>=0.1.1",
-]
-
-# Optional voice transcription backends (PR 14). The ``api/stt.py``
-# xAI proxy is in the core dependencies; these are needed only when
-# ``VOICE_PROVIDER`` is ``mistral`` or ``openai``. Local whisper.cpp
-# uses subprocess calls and needs no Python package.
-[project.optional-dependencies]
-voice = [
-    "mistralai>=1.0.0",
-    "openai>=1.0.0",
 ]
 
 [dependency-groups]
@@ -51,7 +38,6 @@ dev = [
     "bandit[toml]>=1.7.10",
     "pre-commit>=4.0.0",
     "types-pyyaml>=6.0.12",
-    "import-linter>=2.11",
 ]
 
 # --- ruff: linter + formatter ----------------------------------------------
@@ -131,9 +117,6 @@ ignore = [
     "S106",    # hardcoded password (function arg)
     "S108",    # /tmp paths in test scenarios are fine
     "PT018",   # compound asserts in tests are fine if they're checking related state
-    "PLC0415", # lazy/in-fn imports in tests are intentional: avoid module-load
-               # side effects, isolate `importlib.reload` cases, and let fixtures
-               # set env before the SUT is bound. Hoisting defeats those patterns.
 ]
 "tests/conftest.py" = ["D", "E402"]   # sys.path manipulation must come before imports
 "alembic/**" = ["D", "E", "I", "S"]   # migrations are auto-generated
@@ -206,7 +189,7 @@ disallow_untyped_defs = false  # test fixtures are fine without explicit types
 
 [[tool.mypy.overrides]]
 # Third-party packages without complete type stubs.
-module = ["sqlalchemy_utils.*", "mcp.*", "markitdown.*"]
+module = ["sqlalchemy_utils.*", "agno.*", "mcp.*"]
 ignore_missing_imports = true
 
 # --- bandit: security scanner ------------------------------------------------
