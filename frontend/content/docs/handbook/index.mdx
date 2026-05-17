@@ -5,18 +5,92 @@ description: Internal-but-public reference for Pawrrtal contributors and agents.
 
 # Pawrrtal Handbook
 
-This is the durable reference set for Pawrrtal: architecture decisions,
-agent guidance, CI notes, and deployment. Working notes (in-flight
-plans, debug write-ups) live as raw markdown in the repo and are
+This is the durable reference set for Pawrrtal — the bits worth
+writing down once and pointing at later. Working notes (in-flight
+plans, debug write-ups) stay as raw markdown in the repo and are
 intentionally not rendered here.
 
-Start with:
+## Mental model
 
-- [Decisions](/docs/handbook/decisions) — ADRs explaining why the
-  codebase looks the way it does.
+Pawrrtal is a multi-provider AI chat product organized around four
+layers:
+
+1. **Frontend** — Next.js 16 App Router + React 19 + Tailwind v4.
+   Talks to the backend through `useAuthedFetch` / TanStack Query
+   only. Lives in `frontend/`.
+2. **Backend** — FastAPI on Python 3.13, SQLAlchemy 2 async +
+   Alembic, fastapi-users for JWT cookie auth. Lives in `backend/`.
+3. **Agent loop** — provider-agnostic event loop (`StreamFn` seam +
+   `AgentTool[]`) with two providers wired in today: Claude (via
+   `claude-agent-sdk`) and Gemini (via `google-genai`). The seam is
+   what `ScriptedStreamFn` tests target.
+4. **Channels** — surfaces a conversation can arrive through. Web is
+   SSE; Telegram is `aiogram` with both polling and webhook modes.
+
+The plugin system layers on top: a `Plugin` provides one or more
+`AgentTool`s and is opted into per workspace. Notion is the
+reference plugin (18 tools, all shelling out to `ntn`).
+
+LCM (Lossless Context Management) is the conversation-compaction
+DAG that lets long sessions survive without losing causal links.
+
+## Where to start
+
+- [Decisions](/docs/handbook/decisions) — ADRs explaining *why* the
+  codebase looks the way it does. Read these before proposing big
+  structural changes. Recent ones cover Fumadocs adoption,
+  the plugin system + Notion integration, the model-ID format,
+  Stagehand vs browser-use, ripping the theming system, and the
+  Workshop OTel integration.
 - [Agents](/docs/handbook/agents) — how agents should work in this
-  repo (issue tracker, triage, domain docs).
-- [CI](/docs/handbook/ci) — self-hosted runner setup.
-- [Deployment](/docs/handbook/deployment) — VPS deploy notes.
+  repo (`beans` issue tracker, triage flow, domain docs).
+- [Integrations](/docs/handbook/integrations) — how to add a new
+  plugin (token resolution, tool factories, agent loop wiring).
+- [CI](/docs/handbook/ci) — self-hosted runner pool on the VPS,
+  actor-gate requirements, runner isolation.
+- [Deployment](/docs/handbook/deployment) — VPS deploy + Railway
+  notes.
 - [Design system](/docs/handbook/design-system) — pointer to the
   canonical `DESIGN.md` at the repo root.
+
+## Repository layout (one-screen view)
+
+```
+backend/
+  app/
+    api/                 FastAPI routes (one file per domain)
+    channels/            web SSE + Telegram adapters
+    core/
+      agent_loop/        provider-agnostic loop + StreamFn seam
+      providers/         claude_provider, gemini_provider
+      tools/             AgentTool factories
+    integrations/        plugins, including notion/
+    crud/                async DB access
+    models.py            SQLAlchemy ORM
+  alembic/versions/      migration history (single head as of 016)
+frontend/
+  app/                   Next.js App Router routes
+  features/              feature modules (container + view + hooks)
+  components/            shared UI (shadcn-style + Craft tokens)
+  content/docs/          this handbook (rendered by Fumadocs)
+electron/                desktop shell (additive — web behaviour unchanged)
+.beans/                  markdown task tracking
+.claude/rules/           path-scoped rules for agents
+DESIGN.md                canonical design tokens (mirrors globals.css)
+```
+
+## Conventions worth knowing before your first PR
+
+- **`just` is the task runner.** `just dev` for both servers,
+  `just check` for the unified lint gate, `just check-all` for the
+  full pre-push gate.
+- **500-line file cap** on `.ts` / `.tsx` / `.py` (enforced by
+  `scripts/check-file-lines.mjs`).
+- **Nesting depth ≤ 3** in functions
+  (`scripts/check-nesting.{py,mjs}`).
+- **No `any`, no `@ts-nocheck`, no Tailwind literal colours.** Use
+  the design tokens.
+- **Agent-loop tests use `ScriptedStreamFn`**, not patched
+  `agent_loop`. See `backend/tests/agent_harness.py` and the
+  testing rules.
+- **Conventional Commits.** PRs land small and reviewable.

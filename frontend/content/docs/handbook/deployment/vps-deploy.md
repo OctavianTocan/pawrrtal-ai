@@ -117,7 +117,6 @@ Fill it in.  Annotated template:
 # ── Core ─────────────────────────────────────────────────────────
 ENV=prod                                  # cookies become secure-only
 DATABASE_URL=postgresql://pawrrtal:<POSTGRES_PASSWORD>@postgres:5432/pawrrtal
-SECRET_KEY=<from step 3>
 AUTH_SECRET=<from step 3>
 BACKEND_API_KEY=<from step 3>             # X-Pawrrtal-Key header gate
 WORKSPACE_ENCRYPTION_KEY=<from step 3>    # Fernet
@@ -137,6 +136,9 @@ CHAT_RATE_LIMIT_PER_MINUTE=30
 # ── CORS ─────────────────────────────────────────────────────────
 # Comma-separated list of origins your frontend will hit the API from.
 CORS_ORIGINS=["https://pawrrtal.your-domain.com"]
+# Optional regex applied in addition to the list — handy for Vercel
+# previews where the subdomain changes per deploy.
+# CORS_ORIGIN_REGEX=^https:\/\/.*\.vercel\.app$
 
 # ── Cookies ──────────────────────────────────────────────────────
 COOKIE_DOMAIN=.your-domain.com            # share session across www + bare
@@ -162,6 +164,9 @@ TELEGRAM_BOT_USERNAME=
 TELEGRAM_MODE=polling                     # webhook needs a public URL
 TELEGRAM_WEBHOOK_URL=
 TELEGRAM_WEBHOOK_SECRET=
+# TELEGRAM_VERBOSE_DEFAULT=1              # 0=quiet, 1=tools, 2=+thinking
+# TELEGRAM_TYPING_REFRESH_SECONDS=2.5     # typing indicator refresh cadence
+# TELEGRAM_USE_DRAFT_STREAMING=false      # Bot API 9.3+ animated streaming
 
 # ── OAuth (optional — see section 8) ─────────────────────────────
 GOOGLE_OAUTH_CLIENT_ID=
@@ -173,11 +178,92 @@ APPLE_OAUTH_KEY_ID=
 APPLE_OAUTH_PRIVATE_KEY=
 APPLE_OAUTH_REDIRECT_URI=
 OAUTH_POST_LOGIN_REDIRECT=https://pawrrtal.your-domain.com/
+
+# ── Hardening + opt-in features (defaults are sensible; tune as needed)
+#
+# Cost / budget enforcement (forwarded to Claude SDK; mirrored in Gemini loop):
+COST_TRACKER_ENABLED=true
+COST_MAX_PER_REQUEST_USD=1.0
+COST_MAX_PER_USER_DAILY_USD=10.0
+COST_RESET_WINDOW_HOURS=24
+#
+# Audit log retention:
+AUDIT_LOG_ENABLED=true
+AUDIT_LOG_RETENTION_DAYS=90
+SECRET_REDACTION_ENABLED=true
+#
+# Agent safety caps (empty string disables a guard):
+AGENT_MAX_ITERATIONS=25
+AGENT_MAX_WALL_CLOCK_SECONDS=300
+AGENT_MAX_CONSECUTIVE_LLM_ERRORS=3
+AGENT_MAX_CONSECUTIVE_TOOL_ERRORS=5
+AGENT_LLM_RETRY_BACKOFF_SECONDS=1.0
+#
+# Claude SDK macOS Seatbelt sandbox (off — opt-in only):
+CLAUDE_SANDBOX_ENABLED=false
+CLAUDE_SANDBOX_AUTO_ALLOW_BASH=true
+CLAUDE_SANDBOX_EXCLUDED_COMMANDS=sudo,ssh,scp,rsync
+#
+# Claude SDK retry-with-backoff (caps transient-error retry):
+CLAUDE_RETRY_MAX_ATTEMPTS=3
+CLAUDE_RETRY_BASE_DELAY_SECONDS=1.0
+CLAUDE_RETRY_MAX_DELAY_SECONDS=30.0
+CLAUDE_RETRY_BACKOFF_FACTOR=2.0
+#
+# Workspace context assembly (CLAUDE.md/AGENTS.md/SOUL.md + skills):
+WORKSPACE_CONTEXT_ENABLED=true
+WORKSPACE_SKILLS_DIR_NAME=.claude/skills
+WORKSPACE_SETTINGS_FILENAME=.claude/settings.json
+#
+# In-process `python` agent tool — single-tenant only, NOT sandboxed:
+VIRTUAL_PYTHON_ENABLED=false
+VIRTUAL_PYTHON_TIMEOUT_SECONDS=30
+VIRTUAL_PYTHON_OUTPUT_CAP_BYTES=32000
+#
+# LCM (lossless context management). Off by default; on if you expect
+# long sessions or chat surfaces with short, dense messages (Telegram).
+LCM_ENABLED=false
+LCM_FRESH_TAIL_COUNT=64
+LCM_LEAF_CHUNK_TOKENS=20000
+LCM_CONTEXT_THRESHOLD=0.75
+LCM_INCREMENTAL_MAX_DEPTH=1
+# LCM_SUMMARY_MODEL=                      # empty = same model as conversation
+#
+# Webhooks (ingest CI events, external triggers — opt-in):
+WEBHOOK_API_ENABLED=false
+WEBHOOK_API_SECRET=
+GITHUB_WEBHOOK_SECRET=
+#
+# Scheduler (APScheduler — drives audit-purge job + future jobs):
+SCHEDULER_ENABLED=false
+SCHEDULER_PERSISTENT_JOBSTORE=true
+#
+# Voice / STT (xai is the default; mistral/openai/local are alternates):
+VOICE_PROVIDER=xai
+# VOICE_MISTRAL_API_KEY=
+# VOICE_OPENAI_API_KEY=
+# VOICE_WHISPER_CPP_BINARY=               # auto-detected from PATH when empty
+# VOICE_WHISPER_CPP_MODEL=base
+VOICE_MAX_SIZE_MB=25
+#
+# Strict mode for the ConversationRead schema (422 on non-canonical
+# stored model_id). Set false as an escape hatch — bad rows fall back
+# to the catalog default and are logged.
+STRICT_CONVERSATION_READ_VALIDATION=true
+#
+# Public-demo lockdown — refuses to start the Telegram channel and
+# enforces the demo restrictions in docs/deployment/demo-mode.md.
+DEMO_MODE=false
 ```
+
+Every variable above maps to a field on
+[`backend/app/core/config.py::Settings`](https://github.com/OctavianTocan/pawrrtal/blob/development/backend/app/core/config.py).
+The full reference template (with every field commented) lives at
+[`backend/.env.example`](https://github.com/OctavianTocan/pawrrtal/blob/development/backend/.env.example).
 
 Then update `docker-compose.yml`'s postgres service to read
 `POSTGRES_PASSWORD` from `.env` instead of the hardcoded
-`nexus_dev`:
+`pawrrtal_dev`:
 
 ```yaml
 postgres:
@@ -187,7 +273,7 @@ postgres:
     POSTGRES_DB: ${POSTGRES_DB}
 ```
 
-…or set `POSTGRES_PASSWORD=nexus_dev` in `.env` to keep the
+…or set `POSTGRES_PASSWORD=pawrrtal_dev` in `.env` to keep the
 compose file unchanged (NOT recommended for prod).
 
 ## 5. Set up the reverse proxy + TLS (REQUIRED)
