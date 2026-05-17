@@ -33,8 +33,7 @@ from claude_agent_sdk import (
     UserMessage,
 )
 
-from app.core.agent_loop.types import ToolDisplay
-from app.core.tools.display import render_display_from_map
+from app.core.agent_loop.display import ToolDisplay, render_display_from_map
 
 from .base import StreamEvent
 

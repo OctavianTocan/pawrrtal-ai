@@ -23,8 +23,8 @@ import time
 from collections.abc import AsyncIterator
 from typing import Any
 
+from app.core.agent_loop.display import render_display_from_map, tool_display_map
 from app.core.observability.workshop import tool_span
-from app.core.tools.display import render_display_from_map, tool_display_map
 
 from .types import (
     AgentContext,

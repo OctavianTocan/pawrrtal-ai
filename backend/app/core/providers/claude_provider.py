@@ -57,13 +57,13 @@ from claude_agent_sdk import (
     query,
 )
 
+from app.core.agent_loop.display import tool_display_map
 from app.core.agent_loop.types import AgentTool, PermissionCheckFn
 from app.core.agent_system_prompt import (
     DEFAULT_AGENT_SYSTEM_PROMPT as _DEFAULT_SYSTEM_PROMPT,
 )
 from app.core.config import settings as _settings
 from app.core.keys import resolve_api_key
-from app.core.tools.display import tool_display_map
 
 from ._claude_tool_bridge import (
     MCP_SERVER_NAME as AGENT_TOOL_MCP_SERVER_NAME,

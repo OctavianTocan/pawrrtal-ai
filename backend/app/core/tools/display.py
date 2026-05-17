@@ -2,24 +2,47 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Callable
 from pathlib import PurePosixPath
 from typing import TYPE_CHECKING, Any
 
-from app.core.agent_loop.display import ToolDisplay, ToolDisplayPayload
+from app.core.agent_loop.display import (
+    ToolDisplay,
+    ToolDisplayPayload,
+    fallback_tool_display,
+    visible_argument_keys,
+)
 
 if TYPE_CHECKING:
     from app.core.agent_loop.types import AgentTool
+
+__all__ = [
+    "fallback_tool_display",
+    "make_tool_display",
+    "render_tool_display",
+    "summarize_path",
+    "summarize_query",
+    "summarize_title",
+    "truncate_text",
+    "visible_argument_keys",
+]
 
 _MAX_VALUE_CHARS = 72
 _MAX_PATH_CHARS = 64
 _MAX_QUERY_CHARS = 96
 _PATH_TAIL_PARTS = 2
 
-_SENSITIVE_KEY_PATTERN = re.compile(
-    r"(api[_-]?key|secret|token|password|credential|authorization|content|payload|data)",
-    re.IGNORECASE,
+_SENSITIVE_KEY_PATTERN = (
+    "api_key",
+    "apikey",
+    "secret",
+    "token",
+    "password",
+    "credential",
+    "authorization",
+    "content",
+    "payload",
+    "data",
 )
 
 
@@ -55,47 +78,6 @@ def render_tool_display(tool: AgentTool | None, arguments: dict[str, Any]) -> To
         return tool.display.render(arguments)
     name = tool.name if tool is not None else "tool"
     return fallback_tool_display(name, arguments)
-
-
-def tool_display_map(tools: list[AgentTool]) -> dict[str, ToolDisplay]:
-    """Return display formatters keyed by bare tool name."""
-    return {tool.name: tool.display for tool in tools if tool.display is not None}
-
-
-def render_display_from_map(
-    display_by_name: dict[str, ToolDisplay],
-    name: str,
-    arguments: dict[str, Any],
-) -> ToolDisplayPayload:
-    """Render display metadata using a name-keyed formatter map."""
-    display = display_by_name.get(name)
-    if display is not None:
-        return display.render(arguments)
-    return fallback_tool_display(name, arguments)
-
-
-def fallback_tool_display(name: str, arguments: dict[str, Any]) -> ToolDisplayPayload:
-    """Generic display for tools without custom display metadata."""
-    label = friendly_tool_name(name)
-    keys = visible_argument_keys(arguments)
-    suffix = f" ({', '.join(keys)})" if keys else ""
-    return ToolDisplayPayload(
-        icon="🛠",
-        label=label,
-        present=f"🛠 Running {label}{suffix}",
-        compact=f"{label}{suffix}",
-    )
-
-
-def friendly_tool_name(name: str) -> str:
-    """Convert a machine tool name to a compact display label."""
-    bare = name.rsplit("__", 1)[-1]
-    return bare.replace("_", " ").replace("-", " ").strip().title() or "Tool"
-
-
-def visible_argument_keys(arguments: dict[str, Any]) -> list[str]:
-    """Return keys that are safe and useful to show in generic fallbacks."""
-    return [str(key) for key in arguments if not _is_sensitive_key(str(key))]
 
 
 def summarize_path(value: Any) -> str:
@@ -144,4 +126,5 @@ def display_safe_value(key: str, value: Any) -> str:
 
 
 def _is_sensitive_key(key: str) -> bool:
-    return bool(_SENSITIVE_KEY_PATTERN.search(key))
+    normalized = key.lower().replace("-", "_")
+    return any(part in normalized for part in _SENSITIVE_KEY_PATTERN)
