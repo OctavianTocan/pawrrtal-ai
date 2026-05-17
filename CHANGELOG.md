@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Added
+- **Telegram inbound attachment processing** (`backend/app/integrations/telegram/_attachments.py`) — the bot no longer silently drops messages with attachments. Photo attachments are downloaded, base64-encoded, and forwarded as `image_inputs` through `ChatTurnInput.images` so vision-capable models can read them. Voice / audio / documents become bounded `[User sent X]` annotations on the user message so the agent at least has metadata. Full STT and markitdown extraction are tracked as follow-up work. (#304 partial, #305 partial)
+- **Biome `noRestrictedImports` rule** banning raw shadcn `@/components/ui/{dialog,alert-dialog,sheet}` imports from `frontend/features/**`. The existing `frontend/features/onboarding/**` flow is carved out as known tech debt — its nested DialogHeader/DialogDescription usage predates `AppDialog`. (#270 part 2)
 - **Telegram block-transition rendering** (#288) — alternating `thinking → tools → thinking` sequences now produce three separate Telegram messages instead of two ever-growing blobs. The channel tracks `previous_block_kind` and opens a fresh Telegram message on every kind change; the placeholder is consumed by the *first* block whichever it is.
 - **`@axe-core/playwright` accessibility smoke specs** (#276) — four specs under `frontend/e2e/a11y.spec.ts` cover login, authenticated home shell, settings, and chat composer with a draft. WCAG 2.0 + 2.1, levels A + AA.
 - **Single-alembic-head CI gate** (#296) — Backend Check now fails when `alembic heads` reports more than one head, catching the multi-head class of bug that motivated #295 at PR time instead of deploy time.
