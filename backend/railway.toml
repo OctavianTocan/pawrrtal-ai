@@ -1,4 +1,10 @@
 [deploy]
-startCommand = "uvicorn main:app --host 0.0.0.0 --port $PORT"
+# Wrap in `sh -c` so `$PORT` (injected by Railway at runtime) is shell-expanded.
+# Without the shell, Railway passes the command as exec-form argv and uvicorn
+# receives the literal string "$PORT", failing with:
+#   Error: Invalid value for '--port': '$PORT' is not a valid integer.
+# Migrations are idempotent — `alembic upgrade head` exits 0 immediately when
+# the DB is already current.
+startCommand = "sh -c 'alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}'"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
