@@ -15,6 +15,7 @@ programming error.
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 
 from app.core.config import settings
 
@@ -38,6 +39,7 @@ def resolve_llm(
     model_id: str | ParsedModelId | None,
     *,
     user_id: uuid.UUID | None = None,
+    workspace_root: Path | None = None,
 ) -> AILLM:
     """Return the correct :class:`AILLM` for ``model_id``.
 
@@ -47,6 +49,15 @@ def resolve_llm(
             default model.
         user_id: Authenticated user UUID, used to resolve per-workspace
             API-key overrides. ``None`` falls back to the global key.
+        workspace_root: The caller's per-user workspace directory. When
+            supplied, the Claude SDK subprocess runs with this as its
+            ``cwd`` so its transcript files land under the workspace
+            (not the backend process directory). ``None`` leaves
+            ``cwd`` unset for back-compat with non-chat callers
+            (LCM jobs, event-bus handlers) that don't have a
+            workspace in scope — those paths still rely on
+            ``setting_sources=[]`` in the provider to keep filesystem
+            sources off.
 
     Returns:
         A provider instance ready to ``stream()``.
@@ -75,6 +86,7 @@ def resolve_llm(
     if provider_cls is ClaudeLLM:
         config = ClaudeLLMConfig(
             oauth_token=settings.claude_code_oauth_token or None,
+            cwd=str(workspace_root) if workspace_root is not None else None,
         )
         return ClaudeLLM(parsed.model, config=config, user_id=user_id)
     if provider_cls is GeminiLLM:

@@ -222,14 +222,19 @@ def get_chat_router() -> APIRouter:
                 session=session,
             )
 
-        provider = resolve_llm(model_id, user_id=user.id)
-
         # Resolve the user's default workspace.  A workspace is created as
         # part of onboarding, so its absence means the user hasn't finished
         # that flow yet — the agent should not run at all in that state.
         # Refuse with 412 (Precondition Failed) so the frontend can route to
         # onboarding instead of pretending we shipped a degraded reply.
+        #
+        # Hoisted above ``resolve_llm`` so we can pass ``workspace_root``
+        # into the Claude SDK as its ``cwd``. Without it, the SDK falls
+        # back to the uvicorn process directory and writes its transcript
+        # files there.
         root = await _require_workspace_root(user_id=user.id, session=session, request_id=rid)
+
+        provider = resolve_llm(model_id, user_id=user.id, workspace_root=root)
         # Pre-flight per-user cost gate (PR 04).  Refuses with HTTP
         # 402 when the user's rolling-window spend + a small reservation
         # would exceed ``cost_max_per_user_daily_usd``.  This sits
