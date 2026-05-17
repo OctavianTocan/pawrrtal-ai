@@ -163,7 +163,13 @@ def _reply_parameters(message_id: int) -> object:
 
 
 # TODO: This is pretty nonsensical. We have a custom entire chat impkementation that just duplicates the logic here.
-async def _run_llm_turn(*, message: Message, context: TelegramTurnContext) -> None:
+async def _run_llm_turn(
+    *,
+    message: Message,
+    context: TelegramTurnContext,
+    images: list[dict[str, str]] | None = None,
+    text_annotations: list[str] | None = None,
+) -> None:
     """Drive the LLM streaming pipeline for one Telegram turn.
 
     Extracted from ``_on_message`` to keep that dispatcher closure narrow
@@ -176,8 +182,21 @@ async def _run_llm_turn(*, message: Message, context: TelegramTurnContext) -> No
         message: The inbound aiogram ``Message`` (used for ``answer``,
             ``chat.id``, ``bot``, and ``message_thread_id``).
         context: Resolved turn context from ``handle_plain_message``.
+        images: Image inputs collected via :func:`collect_attachments`
+            (#305). Forwarded to ``ChatTurnInput.images`` so the
+            provider can pass them as multimodal content blocks.
+        text_annotations: ``"User sent X."`` lines appended to the
+            user message body so the agent has metadata for voice /
+            document attachments we couldn't fully extract (#304, #305).
     """
-    user_text = message.text or ""
+    base_text = (message.text or message.caption or "").strip()
+    annotation_block = "\n".join(text_annotations or []).strip()
+    if base_text and annotation_block:
+        user_text = f"{base_text}\n\n{annotation_block}"
+    else:
+        # Either: text-only message, attachment-only message, or both
+        # — string concat falls through to whichever is non-empty.
+        user_text = base_text or annotation_block
     if message.bot is None:
         raise RuntimeError("Telegram message has no bot; refusing to stream.")
     thinking_msg = await message.answer(
@@ -237,6 +256,7 @@ async def _run_llm_turn(*, message: Message, context: TelegramTurnContext) -> No
         channel_message=channel_message,
         workspace_root=Path(workspace.path) if workspace is not None else None,
         tools=agent_tools,
+        images=images,
         permission_check=build_telegram_permission_check(
             context,
             Path(workspace.path) if workspace is not None else None,
@@ -438,18 +458,46 @@ def _register_telegram_message_handler(dispatcher: Dispatcher) -> None:
 
     @dispatcher.message()
     async def _on_message(message: Message) -> None:
-        if not message.text:
+        # Collect inbound attachments BEFORE deciding to skip the message.
+        # An image-only message (no text) is still a real turn now (#305).
+        # Voice / documents become text annotations so the agent has
+        # metadata to act on (partial #304 / #305 — full STT + markitdown
+        # extraction land in follow-up PRs).
+        from app.integrations.telegram._attachments import (  # noqa: PLC0415
+            collect_attachments,
+        )
+
+        attachments = (
+            await collect_attachments(message, message.bot) if message.bot is not None else None
+        )
+
+        # Build the effective user text: caption + annotations.
+        text_source = (message.text or message.caption or "").strip()
+        has_attachments = attachments is not None and attachments.has_any
+        if not text_source and not has_attachments:
+            # Nothing actionable — silently drop (matches previous behavior
+            # for empty-text messages).
             return
+
         sender = _sender_from_message(message)
         async with async_session_maker() as session:
-            result = await handle_plain_message(sender=sender, text=message.text, session=session)
+            result = await handle_plain_message(
+                sender=sender,
+                text=text_source or "[attachment-only message]",
+                session=session,
+            )
 
         if isinstance(result, str):
             # Terminal reply — user isn't bound or some other error.
             await message.answer(result)
             return
 
-        await _run_llm_turn(message=message, context=result)
+        await _run_llm_turn(
+            message=message,
+            context=result,
+            images=attachments.images if attachments is not None else None,
+            text_annotations=(attachments.text_annotations if attachments is not None else None),
+        )
 
 
 async def refresh_telegram_commands(bot: Bot) -> None:
