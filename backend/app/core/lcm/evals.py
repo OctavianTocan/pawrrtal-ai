@@ -48,6 +48,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.lcm import assemble_context
+from app.core.lcm.embeddings import (
+    DeterministicHashEmbedder,
+    Embedder,
+    lcm_hybrid_search,
+    upsert_embedding,
+)
 from app.core.lcm.pack import PackCandidate, pack_context
 from app.core.tools.lcm_grep import lcm_grep
 from app.core.tools.lcm_search import format_results as format_search_results
@@ -103,6 +109,8 @@ class LCMEvalMode(StrEnum):
     LCM_GREP = "lcm_grep"
     LCM_SEARCH = "lcm_search"
     LCM_SEARCH_PACKED = "lcm_search_packed"
+    LCM_SEMANTIC = "lcm_semantic"
+    LCM_HYBRID = "lcm_hybrid"
 
 
 @dataclass(frozen=True)
@@ -194,6 +202,52 @@ def _approx_tokens(text: str) -> int:
 def _utcnow() -> datetime:
     """Timezone-aware UTC now."""
     return datetime.now(UTC)
+
+
+async def seed_embeddings_for_conversation(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    embedder: Embedder | None = None,
+) -> int:
+    """Embed every persisted message + summary for one conversation.
+
+    Used by tests that want to exercise the semantic / hybrid
+    retrieval paths after :func:`seed_scenario` has written raw
+    rows.  Returns the number of embeddings written or refreshed
+    so callers can assert on the count.
+    """
+    used_embedder = embedder or DeterministicHashEmbedder()
+    count = 0
+    msg_result = await session.execute(
+        select(ChatMessage).where(ChatMessage.conversation_id == conversation_id)
+    )
+    for msg in msg_result.scalars().all():
+        row = await upsert_embedding(
+            session,
+            conversation_id=conversation_id,
+            item_kind="message",
+            item_id=msg.id,
+            content=msg.content or "",
+            embedder=used_embedder,
+        )
+        if row is not None:
+            count += 1
+    sum_result = await session.execute(
+        select(LCMSummary).where(LCMSummary.conversation_id == conversation_id)
+    )
+    for summary in sum_result.scalars().all():
+        row = await upsert_embedding(
+            session,
+            conversation_id=conversation_id,
+            item_kind="summary",
+            item_id=summary.id,
+            content=summary.content or "",
+            embedder=used_embedder,
+        )
+        if row is not None:
+            count += 1
+    return count
 
 
 async def seed_scenario(
@@ -500,6 +554,36 @@ async def _retrieve_lcm_search(
     return blob[:_MAX_CONTEXT_CHARS], ["lcm_search"]
 
 
+async def _retrieve_hybrid(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    question: str,
+    mode: str,
+    embedder: Embedder | None = None,
+) -> tuple[str, list[str]]:
+    """Hybrid (or one-leg) retrieval via :func:`lcm_hybrid_search`."""
+    used_embedder = embedder or DeterministicHashEmbedder()
+    rows = await lcm_hybrid_search(
+        session,
+        conversation_id=conversation_id,
+        query=question,
+        mode=mode,  # type: ignore[arg-type]
+        embedder=used_embedder,
+    )
+    parts = [
+        f"[{row['item_kind'].upper()} score={row['final_score']:.3f}] {row['excerpt']}"
+        for row in rows
+    ]
+    blob = "\n\n".join(parts)
+    tools = (
+        ["lcm_search", "semantic_search"]
+        if mode == "hybrid"
+        else (["lcm_search"] if mode == "lexical" else ["semantic_search"])
+    )
+    return blob[:_MAX_CONTEXT_CHARS], tools
+
+
 async def _retrieve_lcm_search_packed(
     session: AsyncSession,
     *,
@@ -637,38 +721,146 @@ async def _retrieve_for_mode(
     mode: LCMEvalMode,
     fresh_tail_count: int,
 ) -> tuple[str, list[str]]:
-    """Dispatch table for retrieval modes — keeps :func:`run_eval` flat."""
-    if mode is LCMEvalMode.BASELINE:
-        return await _retrieve_baseline(
-            session,
-            conversation_id=conversation_id,
-            fresh_tail_count=fresh_tail_count,
-        )
-    if mode is LCMEvalMode.LCM_ASSEMBLED:
-        return await _retrieve_lcm_assembled(
-            session,
-            conversation_id=conversation_id,
-            fresh_tail_count=fresh_tail_count,
-        )
-    if mode is LCMEvalMode.LCM_GREP:
-        return await _retrieve_lcm_grep(
-            session,
-            conversation_id=conversation_id,
-            question=scenario.question,
-        )
-    if mode is LCMEvalMode.LCM_SEARCH:
-        return await _retrieve_lcm_search(
-            session,
-            conversation_id=conversation_id,
-            question=scenario.question,
-        )
-    if mode is LCMEvalMode.LCM_SEARCH_PACKED:
-        return await _retrieve_lcm_search_packed(
-            session,
-            conversation_id=conversation_id,
-            question=scenario.question,
-        )
-    raise ValueError(f"unsupported eval mode: {mode!r}")
+    """Dispatch table for retrieval modes — keeps :func:`run_eval` flat.
+
+    The function is intentionally a flat lookup over the supported
+    modes; adding a new mode means appending another ``async def
+    _retrieve_*`` and a single line in :data:`_MODE_RETRIEVERS`.
+    """
+    retriever = _MODE_RETRIEVERS.get(mode)
+    if retriever is None:
+        raise ValueError(f"unsupported eval mode: {mode!r}")
+    return await retriever(
+        session,
+        conversation_id=conversation_id,
+        scenario=scenario,
+        fresh_tail_count=fresh_tail_count,
+    )
+
+
+async def _adapt_baseline(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    scenario: LCMEvalScenario,
+    fresh_tail_count: int,
+) -> tuple[str, list[str]]:
+    """Wrap the baseline retriever in the dispatch signature."""
+    del scenario  # unused
+    return await _retrieve_baseline(
+        session,
+        conversation_id=conversation_id,
+        fresh_tail_count=fresh_tail_count,
+    )
+
+
+async def _adapt_lcm_assembled(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    scenario: LCMEvalScenario,
+    fresh_tail_count: int,
+) -> tuple[str, list[str]]:
+    """Wrap the LCM-assembled retriever in the dispatch signature."""
+    del scenario
+    return await _retrieve_lcm_assembled(
+        session,
+        conversation_id=conversation_id,
+        fresh_tail_count=fresh_tail_count,
+    )
+
+
+async def _adapt_lcm_grep(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    scenario: LCMEvalScenario,
+    fresh_tail_count: int,
+) -> tuple[str, list[str]]:
+    """Wrap the lcm_grep retriever in the dispatch signature."""
+    del fresh_tail_count
+    return await _retrieve_lcm_grep(
+        session,
+        conversation_id=conversation_id,
+        question=scenario.question,
+    )
+
+
+async def _adapt_lcm_search(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    scenario: LCMEvalScenario,
+    fresh_tail_count: int,
+) -> tuple[str, list[str]]:
+    """Wrap the ranked lcm_search retriever in the dispatch signature."""
+    del fresh_tail_count
+    return await _retrieve_lcm_search(
+        session,
+        conversation_id=conversation_id,
+        question=scenario.question,
+    )
+
+
+async def _adapt_lcm_search_packed(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    scenario: LCMEvalScenario,
+    fresh_tail_count: int,
+) -> tuple[str, list[str]]:
+    """Wrap the packed-search retriever in the dispatch signature."""
+    del fresh_tail_count
+    return await _retrieve_lcm_search_packed(
+        session,
+        conversation_id=conversation_id,
+        question=scenario.question,
+    )
+
+
+async def _adapt_semantic(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    scenario: LCMEvalScenario,
+    fresh_tail_count: int,
+) -> tuple[str, list[str]]:
+    """Wrap semantic-only hybrid_search in the dispatch signature."""
+    del fresh_tail_count
+    return await _retrieve_hybrid(
+        session,
+        conversation_id=conversation_id,
+        question=scenario.question,
+        mode="semantic",
+    )
+
+
+async def _adapt_hybrid(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    scenario: LCMEvalScenario,
+    fresh_tail_count: int,
+) -> tuple[str, list[str]]:
+    """Wrap full hybrid_search in the dispatch signature."""
+    del fresh_tail_count
+    return await _retrieve_hybrid(
+        session,
+        conversation_id=conversation_id,
+        question=scenario.question,
+        mode="hybrid",
+    )
+
+
+_MODE_RETRIEVERS = {
+    LCMEvalMode.BASELINE: _adapt_baseline,
+    LCMEvalMode.LCM_ASSEMBLED: _adapt_lcm_assembled,
+    LCMEvalMode.LCM_GREP: _adapt_lcm_grep,
+    LCMEvalMode.LCM_SEARCH: _adapt_lcm_search,
+    LCMEvalMode.LCM_SEARCH_PACKED: _adapt_lcm_search_packed,
+    LCMEvalMode.LCM_SEMANTIC: _adapt_semantic,
+    LCMEvalMode.LCM_HYBRID: _adapt_hybrid,
+}
 
 
 async def run_eval_matrix(

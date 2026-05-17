@@ -397,6 +397,57 @@ class LCMContextItem(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
 
 
+class LCMEmbedding(Base):
+    """Vector index entry for a single LCM-searchable item.
+
+    Issue #254 (hybrid retrieval) needs a place to store one embedding
+    per ``ChatMessage`` or ``LCMSummary`` so semantic search can run
+    alongside the lexical scorer.  We keep the vectors as JSON arrays
+    rather than introducing a pgvector dependency; that decision is
+    documented in the issue and revisitable if production workloads
+    demand it.  The ``content_hash`` column lets ingest skip
+    re-embedding unchanged content; the ``UniqueConstraint`` ensures
+    we only ever have one embedding per ``(conversation_id, item_kind,
+    item_id, embedding_model)`` tuple.
+    """
+
+    __tablename__ = "lcm_embeddings"
+    __table_args__ = (
+        UniqueConstraint(
+            "conversation_id",
+            "item_kind",
+            "item_id",
+            "embedding_model",
+            name="uq_lcm_embeddings_conv_kind_item_model",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    conversation_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid,
+        ForeignKey("conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    # "message" | "summary" - mirrors LCMContextItem.item_kind so a
+    # search hit can be joined back to either source table.
+    item_kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    item_id: Mapped[uuid.UUID] = mapped_column(Uuid, nullable=False, index=True)
+    # Identifier of the embedding provider that produced this vector.
+    # Stored so a future migration to a stronger model can re-embed
+    # in place without dropping the table.
+    embedding_model: Mapped[str] = mapped_column(String(128), nullable=False)
+    # The embedding itself - stored as a JSON array of floats.  Length
+    # is fixed per ``embedding_model`` but the database does not
+    # enforce that; the ingest pipeline checks it.
+    embedding: Mapped[list[float]] = mapped_column(JSON, nullable=False, default=list)
+    # Content hash used to skip re-embedding when the underlying text
+    # has not changed.  SHA-256 hex digest of the embedded text.
+    content_hash: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+
 # ---------------------------------------------------------------------------
 # Governance + ops platform (PRs 01-12)
 #
@@ -471,6 +522,7 @@ __all__ = [
     "Conversation",
     "CostLedger",
     "LCMContextItem",
+    "LCMEmbedding",
     "LCMSummary",
     "LCMSummarySource",
     "McpServer",
