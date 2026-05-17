@@ -29,15 +29,20 @@ FROM python:3.13-slim AS runtime
 WORKDIR /app
 
 # Install the official Notion CLI (``ntn``) used by the Notion plugin.
-# The plugin subprocesses ``ntn`` per tool call with the workspace`s
+# The plugin subprocesses ``ntn`` per tool call with the workspace's
 # token injected via ``NOTION_API_TOKEN``; see
 # ``app/integrations/notion/ntn_client.py``.  Pinned by date so the
 # install layer is reproducible — bump the env var to refresh.
+#
+# The upstream installer (https://ntn.dev) writes ``ntn`` directly to
+# ``/usr/local/bin/ntn`` when run as root (the container build case),
+# so no follow-up ``mv`` is needed.  Earlier versions of this Dockerfile
+# tried to ``mv /root/.ntn/bin/ntn /usr/local/bin/ntn`` and crashed the
+# build with "No such file or directory" — bean ``pawrrtal-ntn``.
 ENV NTN_INSTALL_DATE=2026-05-15
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl ca-certificates \
  && curl -fsSL https://ntn.dev | bash \
- && mv /root/.ntn/bin/ntn /usr/local/bin/ntn \
  && chmod +x /usr/local/bin/ntn \
  && apt-get purge -y curl \
  && apt-get autoremove -y \
