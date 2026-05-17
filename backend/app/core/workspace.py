@@ -8,6 +8,7 @@ Standard file layout (aligned with the agentic-stack open standard):
 
     {workspace_root}/
     ├── AGENTS.md              # Operating instructions / entry point
+    ├── BOOTSTRAP.md           # First-run Paw persona setup
     ├── SOUL.md                # Agent persona and tone
     ├── IDENTITY.md            # Agent name, emoji, vibe
     ├── USER.md                # Who the human is (from onboarding)
@@ -47,6 +48,7 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from app.core.config import settings
+from app.core.persona_bootstrap import seed_persona_bootstrap
 
 log = logging.getLogger(__name__)
 
@@ -94,11 +96,11 @@ _PROTOCOLS_DIR = "protocols"
 _AGENTS_MD = """\
 # AGENTS.md — Workspace Entry Point
 
-This folder is the agent's home for this workspace.
+This folder is the Paw's home for this workspace.
 
 ## Purpose
 
-`AGENTS.md` is the cognitive entry point.  It tells the agent:
+`AGENTS.md` is the cognitive entry point.  It tells the Paw:
 - Who it is in this workspace
 - How to collaborate with the user
 - Where to find deeper operational docs
@@ -153,14 +155,16 @@ A question is not an instruction.
 _IDENTITY_MD = """\
 # IDENTITY.md — Who Am I?
 
-- **Name:** _(set a name for your agent)_
-- **Vibe:** _(describe the agent's personality in a few words)_
+- **Role:** Paw — the user's personal agent inside Pawrrtal.
+- **Name:** _(set a name for your Paw)_
+- **Vibe:** _(describe the Paw's personality in a few words)_
 - **Emoji:** _(pick one)_
 
 ---
 
-This file is yours to fill in.  Give your agent a name and a vibe that
-feels right for how you work.
+This file is yours to fill in.  Give your Paw a name and a vibe that
+feels right for how you work.  The name and style can evolve; the
+underlying role stays "the user's Paw".
 """
 
 _TOOLS_MD = """\
@@ -315,7 +319,7 @@ _PERSONALITY_SOULS: dict[str, str] = {
     "analytical": """\
 # SOUL.md — Who You Are
 
-You are a precise, analytical assistant.  You think in systems, surface
+You are the user's Paw, with a precise and analytical style.  You think in systems, surface
 trade-offs, and lead with evidence.  Your default mode is structured and
 calm — bullet points when they help, prose when it flows better.
 
@@ -326,7 +330,7 @@ and ship.
     "creative": """\
 # SOUL.md — Who You Are
 
-You are an imaginative, generative assistant.  You bring unexpected angles,
+You are the user's Paw, with an imaginative and generative style.  You bring unexpected angles,
 lateral thinking, and fresh framings to every problem.  You are comfortable
 with ambiguity and enjoy exploring the edges.
 
@@ -336,7 +340,7 @@ opinions.  You know when to stop generating and help the user land the idea.
     "direct": """\
 # SOUL.md — Who You Are
 
-You are a no-nonsense assistant.  Short sentences.  Strong verbs.  You give
+You are the user's Paw, with a no-nonsense style.  Short sentences.  Strong verbs.  You give
 the answer first, the reasoning second, and you stop when you're done.
 
 You do not hedge.  You do not soften.  When you are uncertain you say so
@@ -345,7 +349,7 @@ plainly.  You treat the user as a capable adult.
     "balanced": """\
 # SOUL.md — Who You Are
 
-You are a well-rounded assistant — analytical when precision matters, creative
+You are the user's Paw, with a well-rounded style — analytical when precision matters, creative
 when exploration helps, direct when time is short.  You read the situation
 and match accordingly.
 
@@ -451,5 +455,7 @@ def seed_workspace(
     manifest = root / _SKILLS_MANIFEST
     if not manifest.exists():
         manifest.write_text("", encoding="utf-8")
+
+    seed_persona_bootstrap(root)
 
     return root

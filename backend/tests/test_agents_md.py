@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from app.core.persona_bootstrap import BOOTSTRAP_STATE_PATH
 from app.core.tools.agents_md import (
     PROTECTED_FILENAMES,
     assemble_workspace_prompt,
@@ -54,6 +55,28 @@ class TestAssembleWorkspacePrompt:
         assert parts[0] == "SOUL_CONTENT"
         assert parts[1] == "AGENTS_CONTENT"
         assert parts[2] == "INDEX_CONTENT"
+
+    def test_includes_pending_bootstrap_after_agents(self, tmp_path: Path) -> None:
+        (tmp_path / "SOUL.md").write_text("SOUL_CONTENT", encoding="utf-8")
+        (tmp_path / "AGENTS.md").write_text("AGENTS_CONTENT", encoding="utf-8")
+        (tmp_path / "BOOTSTRAP.md").write_text("BOOTSTRAP_CONTENT", encoding="utf-8")
+
+        result = assemble_workspace_prompt(tmp_path)
+
+        assert result is not None
+        parts = result.split("\n\n---\n\n")
+        assert parts == ["SOUL_CONTENT", "AGENTS_CONTENT", "BOOTSTRAP_CONTENT"]
+
+    def test_omits_bootstrap_after_completion_marker(self, tmp_path: Path) -> None:
+        (tmp_path / "AGENTS.md").write_text("AGENTS_CONTENT", encoding="utf-8")
+        (tmp_path / "BOOTSTRAP.md").write_text("BOOTSTRAP_CONTENT", encoding="utf-8")
+        state_path = tmp_path / BOOTSTRAP_STATE_PATH
+        state_path.parent.mkdir()
+        state_path.write_text('{"version": 1, "completed": true}', encoding="utf-8")
+
+        result = assemble_workspace_prompt(tmp_path)
+
+        assert result == "AGENTS_CONTENT"
 
     def test_skills_index_only_returns_non_none(self, tmp_path: Path) -> None:
         skills_dir = tmp_path / "skills"

@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.channels._turn_cost import record_turn_cost_if_enabled
+from app.core.agent_system_prompt import compose_agent_system_prompt
 from app.core.chat_aggregator import ChatTurnAggregator, should_emit_event
 from app.core.config import settings
 from app.core.event_bus import TurnCompletedEvent, publish_if_available
@@ -29,6 +30,7 @@ from app.core.observability import (
     turn_span,
     workshop_event_hook,
 )
+from app.core.persona_bootstrap import ensure_persona_bootstrap_seeded
 from app.core.tools.agents_md import assemble_workspace_prompt
 from app.crud.chat_message import (
     append_assistant_placeholder,
@@ -373,11 +375,12 @@ def _workspace_system_prompt(workspace_root: Path | None) -> str | None:
     their AGENTS.md content.
     """
     if workspace_root is None:
-        return None
+        return compose_agent_system_prompt(None)
+    ensure_persona_bootstrap_seeded(workspace_root)
     workspace_ctx = load_workspace_context(workspace_root)
     if workspace_ctx.system_prompt is not None:
-        return workspace_ctx.system_prompt
-    return assemble_workspace_prompt(workspace_root)
+        return compose_agent_system_prompt(workspace_ctx.system_prompt)
+    return compose_agent_system_prompt(assemble_workspace_prompt(workspace_root))
 
 
 async def _finalize_turn(
