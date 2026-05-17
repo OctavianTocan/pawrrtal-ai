@@ -32,18 +32,23 @@ dependencies = [
     "opentelemetry-instrumentation-logging>=0.50b0",
     "markitdown[all]>=0.1.1",
     "xai-sdk>=1.12.0",
+    # ``openai`` is a core dependency now that the OpenCode Go provider
+    # ships in-tree (``app.core.providers.opencode_go_provider`` —
+    # OpenAI-compatible gateway at https://opencode.ai/zen/go/v1).  The
+    # LiteLLM provider also depends on it transitively for the
+    # OpenAI-compat protocol.  Listing here means the voice-via-openai
+    # path piggybacks on the same install instead of being a separate
+    # optional extra.
+    "openai>=1.0.0",
 ]
 
 # Optional voice transcription backends (PR 14). The ``api/stt.py``
-# xAI proxy is in the core dependencies; these are needed only when
-# ``VOICE_PROVIDER`` is ``mistral`` or ``openai``. Local whisper.cpp
-# uses subprocess calls and needs no Python package.
-# Chat is served via the official ``xai-sdk`` (gRPC) — declared above
-# under core dependencies alongside the other provider SDKs.
+# xAI proxy is in the core dependencies; ``mistralai`` is the only
+# voice-only package. Local whisper.cpp uses subprocess calls and
+# needs no Python package.
 [project.optional-dependencies]
 voice = [
     "mistralai>=1.0.0",
-    "openai>=1.0.0",
 ]
 
 [dependency-groups]

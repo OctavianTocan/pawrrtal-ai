@@ -56,6 +56,16 @@ class Settings(BaseSettings):
     # to disable those models; chat requests resolved to an OpenAI model
     # surface a clear "not configured" error.
     openai_api_key: str = ""
+    # API key for the OpenCode Go gateway (https://opencode.ai/docs/zen),
+    # SST's hosted OpenAI-compatible endpoint serving open-weight coding
+    # models (GLM-5.1, Kimi K2.6). Leave empty to disable; resolving a
+    # GLM/Kimi model with no key surfaces a clear "not configured" error.
+    opencode_api_key: str = ""
+    # Base URL for the OpenCode Go gateway. Override only when running
+    # against a self-hosted proxy; the SST-managed endpoint is the
+    # default and matches the upstream catalogue at
+    # https://github.com/sst/models.dev/blob/dev/providers/opencode-go/provider.toml.
+    opencode_go_base_url: str = "https://opencode.ai/zen/go/v1"
     # CORS
     cors_origins: list[str]
     cors_origin_regex: str | None = r"^https:\/\/.*\.vercel\.app$"

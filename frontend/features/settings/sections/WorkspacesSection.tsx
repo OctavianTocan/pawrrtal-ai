@@ -80,6 +80,14 @@ const KEY_METAS: readonly WorkspaceEnvKeyMeta[] = [
 		placeholder: 'ntn_...',
 		url: 'https://www.notion.so/profile/integrations',
 	},
+	{
+		key: 'OPENCODE_API_KEY',
+		label: 'OpenCode API Key',
+		description:
+			'OpenCode Go gateway — open-weight coding models (GLM, Kimi). Get a key from opencode.ai.',
+		placeholder: 'Your OpenCode API key',
+		url: 'https://opencode.ai/docs/zen',
+	},
 ];
 
 /** Empty record with every overridable key seeded to the empty string. */

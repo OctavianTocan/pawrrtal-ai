@@ -58,6 +58,7 @@ async def test_get_returns_all_keys_empty_for_new_user(
         "OPENAI_API_KEY",
         "OPENAI_CODEX_OAUTH_TOKEN",
         "NOTION_API_KEY",
+        "OPENCODE_API_KEY",
     }
     assert set(body["vars"].keys()) == expected_keys
     assert all(v == "" for v in body["vars"].values())

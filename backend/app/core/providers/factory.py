@@ -24,12 +24,14 @@ from .claude_provider import ClaudeLLM, ClaudeLLMConfig
 from .gemini_provider import GeminiLLM
 from .litellm_provider import LiteLLMLLM
 from .model_id import Host, ParsedModelId, parse_model_id
+from .opencode_go_provider import OpencodeGoLLM, OpencodeGoLLMConfig
 from .xai_provider import XaiLLM
 
 HOST_TO_PROVIDER: dict[Host, type[AILLM]] = {
     Host.agent_sdk: ClaudeLLM,
     Host.google_ai: GeminiLLM,
     Host.litellm: LiteLLMLLM,
+    Host.opencode_go: OpencodeGoLLM,
     Host.xai: XaiLLM,
 }
 """Map of host enum to the concrete provider class that serves it.
@@ -103,4 +105,33 @@ def resolve_llm(
         # API-key workspace name to resolve and which LiteLLM provider
         # prefix to prepend at request time.
         return LiteLLMLLM(parsed.model, parsed.vendor, workspace_id=workspace_id)
+    if provider_cls is OpencodeGoLLM:
+        return _build_opencode_go(parsed, workspace_id)
     raise KeyError(f"no provider class registered for host {parsed.host!r}")
+
+
+def _build_opencode_go(parsed: ParsedModelId, workspace_id: uuid.UUID | None) -> OpencodeGoLLM:
+    """Construct an ``OpencodeGoLLM`` with rates pulled from the catalog.
+
+    The provider stays catalog-agnostic by accepting per-model rates +
+    base URL via :class:`OpencodeGoLLMConfig`; the factory is the one
+    place that crosses the catalog/provider boundary. Raising
+    ``UnknownModelId`` here surfaces a clean 422 to the caller for
+    ``opencode-go:<vendor>/<unknown>`` strings that parsed but aren't
+    in the catalog.
+    """
+    # Local import: prevents the import cycle catalog→model_id→factory
+    # by matching the pattern already used for ``default_model``.
+    from .catalog import find  # noqa: PLC0415
+
+    entry = find(parsed)
+    if entry is None:
+        from .model_id import UnknownModelId  # noqa: PLC0415
+
+        raise UnknownModelId(f"model not in catalog: {parsed.id}")
+    config = OpencodeGoLLMConfig(
+        cost_per_mtok_in_usd=entry.cost_per_mtok_in_usd,
+        cost_per_mtok_out_usd=entry.cost_per_mtok_out_usd,
+        base_url=settings.opencode_go_base_url,
+    )
+    return OpencodeGoLLM(parsed.model, config=config, workspace_id=workspace_id)
