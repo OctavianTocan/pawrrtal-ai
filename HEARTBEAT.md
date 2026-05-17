@@ -1,43 +1,48 @@
 ---
-# Tracer-bullet heartbeat config — single check, fixed interval.
+# Tracer-bullet heartbeat config — single check.
 #
-# The runtime reads this file from the path in HEARTBEAT_MD_PATH (defaults
-# to <repo>/HEARTBEAT.md when running locally).  Each item under `checks`
-# is registered as an APScheduler interval job in
-# `backend/app/api/heartbeat.py::heartbeat_lifespan`.
+# The runtime reads this file from the path in HEARTBEAT_MD_PATH
+# (defaults to <repo>/HEARTBEAT.md when running locally). Each item
+# under `checks` is parsed into a `HeartbeatCheck` and is reachable via
+# `POST /api/v1/heartbeat/run` (see backend/app/api/heartbeat.py).
 checks:
   - name: pulse
-    # Interval between runs.  Kept short for the tracer so an operator can
-    # see the wiring fire without waiting.  Tune per-check once the LLM
-    # call lands (see the inline TODO in `run_heartbeat`).
+    # Interval the future JobScheduler-driven registrar will use. Not
+    # consumed by the manual endpoint that ships in this slice, but
+    # validated at parse time so misconfigs surface early.
     interval_seconds: 1800
     prompt: |
-      Heartbeat: confirm I'm still alive.  Report the wall-clock time and
+      Heartbeat: confirm I'm still alive. Report the wall-clock time and
       that the conversation pipeline is reachable.
 ---
 
 # Heartbeat
 
 Pawrrtal's heartbeat is a periodic background turn that re-enters a
-conversation on a schedule and surfaces anything noteworthy.  It mirrors
+conversation on a schedule and surfaces anything noteworthy. It mirrors
 [openclaw's heartbeat](https://docs.openclaw.ai/gateway/heartbeat): the
 YAML front matter above defines the checks, and the body is free-form
 context the future LLM-backed runner will read alongside the prompt.
 
-## Current scope
+## Current scope (this slice)
 
-Tracer-bullet vertical slice — proves the whole pipeline end-to-end with
-the smallest honest implementation:
+Manual-trigger vertical slice that proves the runner end-to-end:
 
-1. APScheduler boots inside the FastAPI lifespan when
-   `HEARTBEAT_ENABLED=true` and a target user + conversation are
-   configured.
-2. Each check registered above gets an `IntervalTrigger` job.
-3. The job opens an async session, reads this file, and writes a
-   heartbeat-tagged assistant message into the configured conversation.
-4. The existing chat UI picks the message up via the usual
-   `GET /api/v1/conversations/{id}/messages` poll/refresh path.
+1. `POST /api/v1/heartbeat/run` loads this file, picks the named (or
+   first) check, and writes a heartbeat-tagged assistant message into
+   the requested conversation.
+2. The existing chat UI surfaces the message via the same
+   `GET /api/v1/conversations/{id}/messages` path it already polls, so
+   no frontend change is needed to see the result.
 
-The LLM-backed run (real agent turn, tool access, thinking-and-tooluse
-timeline) is the next slice — see the TODO in
-`backend/app/api/heartbeat.py::run_heartbeat`.
+## Out of scope (follow-up)
+
+- **Scheduled invocation.** `TODO(heartbeat-scheduler)` —
+  pawrrtal already ships a higher-level `JobScheduler` (see
+  `backend/app/core/scheduler.py`) that runs cron-style work and
+  integrates with the EventBus. The follow-up registers
+  `run_heartbeat` there rather than booting a parallel APScheduler.
+- **Real LLM-backed run.** `TODO(heartbeat-llm)` — feed `check.prompt`
+  through the agent loop with the configured tools and persist the
+  streamed timeline. The current runner just echoes the check name +
+  prompt into the assistant message so the wiring is observable.
