@@ -60,14 +60,13 @@ RUN mkdir -p /data/workspaces
 
 EXPOSE 8000
 
-# Start the server. ``alembic upgrade head`` is NOT in the prod CMD
-# because the migration history currently has multiple heads (orphan
-# ``000_initial_schema`` from PR #166 + ``013_notion_operation_logs``
-# sibling of ``013_governance_and_jobs`` from PR #261) and would
-# error out before uvicorn ever ran. Migrations are applied manually
-# by the operator until the chain is consolidated to a single head.
+# Run Alembic migrations then start the server.  The graph is
+# single-head as of ``016_merge_notion_into_lcm_lineage`` so
+# ``alembic upgrade head`` resolves unambiguously.  The advisory
+# lock in ``alembic/env.py`` serialises concurrent invocations
+# across rolling-deploy replicas.
 #
 # In the docker-compose dev stack this CMD is overridden by the
 # compose command so --reload is active and the source volume mount
 # is writable.
-CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
