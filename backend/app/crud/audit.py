@@ -136,4 +136,7 @@ async def purge_expired_audit_events(
     cutoff = datetime.now(UTC) - timedelta(days=retention_days)
     result = await session.execute(delete(AuditEvent).where(AuditEvent.created_at < cutoff))
     await session.commit()
-    return result.rowcount or 0
+    # DML ``execute`` returns a ``CursorResult`` with ``rowcount``; the
+    # statically-declared ``Result`` base doesn't expose it.
+    rowcount: int = getattr(result, "rowcount", 0)
+    return rowcount or 0

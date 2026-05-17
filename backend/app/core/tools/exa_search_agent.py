@@ -17,6 +17,7 @@ Usage::
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from app.core.agent_loop.types import AgentTool
 from app.core.keys import resolve_api_key
@@ -39,7 +40,7 @@ _TOOL_DESCRIPTION = (
 
 # JSON Schema for the tool's parameters — the agent loop passes this to
 # the LLM so it knows how to call the tool.
-_PARAMETERS: dict = {
+_PARAMETERS: dict[str, Any] = {
     "type": "object",
     "properties": {
         "query": {
@@ -89,7 +90,8 @@ def make_exa_search_tool(*, user_id: uuid.UUID | None = None) -> AgentTool:
     async def _execute(tool_call_id: str, **kwargs: object) -> str:
         """Call Exa and return formatted Markdown for the LLM."""
         query = str(kwargs.get("query") or "")
-        num_results = int(kwargs.get("num_results") or 5)
+        raw_num_results = kwargs.get("num_results")
+        num_results = int(raw_num_results) if isinstance(raw_num_results, int | float | str) else 5
         include_full_text = bool(kwargs.get("include_full_text") or False)
         api_key = None
         if user_id:

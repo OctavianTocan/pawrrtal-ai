@@ -25,6 +25,7 @@ import json
 import re
 import uuid
 from pathlib import Path
+from typing import Any
 
 from app.core.agent_loop.types import AgentTool
 from app.core.keys import resolve_api_key
@@ -42,7 +43,7 @@ Use descriptive, detailed prompts for best results. \
 Requires an active Codex OAuth session — no separate OpenAI API key needed.\
 """
 
-_PARAMETERS: dict = {
+_PARAMETERS: dict[str, Any] = {
     "type": "object",
     "properties": {
         "prompt": {

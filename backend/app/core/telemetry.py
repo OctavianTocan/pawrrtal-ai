@@ -71,11 +71,13 @@ logger = logging.getLogger(__name__)
 
 # Module-level flag so a duplicate lifespan boot is a clean no-op.
 _initialised = False
-_tracer_provider = None  # type: ignore[assignment]
+_tracer_provider: TracerProvider | None = None
 
 
 if TYPE_CHECKING:
     from fastapi import FastAPI
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.trace import Tracer
 
 
 def _otel_enabled() -> bool:
@@ -197,7 +199,7 @@ def shutdown_tracing() -> None:
         _initialised = False
 
 
-def get_tracer(name: str | None = None):
+def get_tracer(name: str | None = None) -> Tracer:
     """Return an OTel ``Tracer`` for the given name.
 
     Convenience so call sites don't all import ``opentelemetry.trace``

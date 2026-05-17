@@ -57,8 +57,11 @@ def function_call_content_for(chunk: Any) -> gtypes.Content | None:
     """
     for candidate in chunk.candidates or []:
         content = getattr(candidate, "content", None)
-        if content is None or not getattr(content, "parts", None):
+        if not isinstance(content, gtypes.Content):
             continue
-        if any(part.function_call for part in content.parts):
+        parts = content.parts
+        if not parts:
+            continue
+        if any(part.function_call for part in parts):
             return content
     return None

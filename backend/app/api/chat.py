@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import uuid
 from collections.abc import AsyncGenerator
 from pathlib import Path
 
@@ -106,7 +107,7 @@ def _maybe_artifact_event(event: StreamEvent) -> StreamEvent | None:
 
 async def _require_workspace_root(
     *,
-    user_id: object,
+    user_id: uuid.UUID,
     session: AsyncSession,
     request_id: str,
 ) -> Path:

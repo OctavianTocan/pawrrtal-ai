@@ -7,6 +7,7 @@ for its dependency chain.
 
 import asyncio
 import logging
+import uuid
 from collections.abc import AsyncGenerator
 
 from fastapi import Depends
@@ -76,6 +77,19 @@ async def get_async_session() -> AsyncGenerator[AsyncSession]:
         yield session
 
 
-async def get_user_db(session: AsyncSession = Depends(get_async_session)):
+async def get_user_db(
+    session: AsyncSession = Depends(get_async_session),
+) -> AsyncGenerator[SQLAlchemyUserDatabase[User, uuid.UUID]]:
     """FastAPI dependency that yields a fastapi-users database adapter."""
     yield SQLAlchemyUserDatabase(session, User)
+
+
+__all__ = [
+    "Base",
+    "User",
+    "async_session_maker",
+    "create_db_and_tables",
+    "engine",
+    "get_async_session",
+    "get_user_db",
+]

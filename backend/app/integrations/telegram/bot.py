@@ -83,11 +83,15 @@ async def _send_one_typing_action(
     thread_id: int | None,
 ) -> None:
     """Best-effort single ``sendChatAction`` — log and swallow on failure."""
-    kwargs: dict[str, object] = {"chat_id": chat_id, "action": "typing"}
-    if thread_id is not None:
-        kwargs["message_thread_id"] = thread_id
     try:
-        await bot.send_chat_action(**kwargs)
+        if thread_id is not None:
+            await bot.send_chat_action(
+                chat_id=chat_id,
+                action="typing",
+                message_thread_id=thread_id,
+            )
+        else:
+            await bot.send_chat_action(chat_id=chat_id, action="typing")
     except Exception:
         logger.debug(
             "TELEGRAM_TYPING_FAILED chat_id=%s thread_id=%s",
