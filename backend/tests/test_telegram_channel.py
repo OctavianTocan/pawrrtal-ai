@@ -294,6 +294,59 @@ class TestTelegramChannelDeliver:
         assert "Partial answer." in last_text
         assert "max_iterations" in last_text
 
+    async def test_thinking_event_renders_markdown_bold_inside_italic(self) -> None:
+        """Thinking deltas with Markdown emphasis render formatted, not literal (#287)."""
+        bot = _make_bot()
+        msg = _make_channel_message(bot)
+        channel = TelegramChannel()
+
+        events: list[StreamEvent] = [
+            {"type": "thinking", "content": "weighing **bold** and *italic* options"},
+            {"type": "delta", "content": "done"},
+        ]
+        async for _ in channel.deliver(_stream(*events), msg):
+            pass
+
+        first_send = bot.send_message.await_args_list[0].kwargs["text"]
+        # The literal ``**`` markers must not leak into the rendered
+        # thinking message — they should be converted to Telegram's
+        # ``<b>`` tag while the surrounding italic envelope is preserved.
+        assert "**bold**" not in first_send
+        assert "<i>" in first_send and "</i>" in first_send
+        assert "<b>bold</b>" in first_send
+
+    async def test_tool_only_turn_surfaces_fallback_reply(self) -> None:
+        """Tool calls without any answer text must produce a closing message (#293).
+
+        Previously the channel would render the tool trace into the
+        placeholder and return without sending a final reply, leaving
+        the user staring at tool calls and silence. The fix sends the
+        empty-stream fallback so every turn ends with a visible
+        closing message.
+        """
+        bot = _make_bot()
+        msg = _make_channel_message(bot, chat_id=42, message_id=99)
+        channel = TelegramChannel()
+
+        events: list[StreamEvent] = [
+            {
+                "type": "tool_use",
+                "name": "read_file",
+                "input": {"path": "memory/USER.md"},
+            },
+        ]
+        async for _ in channel.deliver(_stream(*events), msg):
+            pass
+
+        # Placeholder is repurposed for the tool trace (not deleted, not
+        # replaced with the warning).
+        bot.delete_message.assert_not_called()
+        # A separate fallback reply is sent so the user knows the turn
+        # ended.  The exact wording lives in the channel constant.
+        bot.send_message.assert_awaited_once()
+        text = bot.send_message.await_args.kwargs["text"]
+        assert "agent finished without producing any text" in text
+
     async def test_error_event_replaces_placeholder(self) -> None:
         """A bare ``error`` event must surface the error text as final reply."""
         bot = _make_bot()

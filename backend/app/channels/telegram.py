@@ -223,6 +223,12 @@ class TelegramChannel:
             terminal_message=terminal_message,
             terminal_prefix=terminal_prefix,
         )
+        # Decide what to do with the editable placeholder.  When there's a
+        # tool_trace we keep that view in place (the placeholder becomes the
+        # tool-call log).  When we have a real answer or thinking message we
+        # delete the placeholder so the chat doesn't have a stray ⏳.
+        # When the stream produced absolutely nothing we edit the placeholder
+        # into the empty-stream warning.
         if tool_trace:
             await safe_edit_html(bot, chat_id, message_id, plain_html(tool_trace))
         elif final_text or thinking_text:
@@ -242,6 +248,27 @@ class TelegramChannel:
                 final_text,
                 reply_to_message_id=reply_to_message_id,
                 message_thread_id=message_thread_id,
+            )
+        elif tool_trace and not thinking_text:
+            # Tool-only turn: the model called tools and then stopped without
+            # producing an answer or thinking trace (often a Session Startup
+            # ritual that ate the entire turn — see #290 / #293).  Without
+            # this branch the user is left staring at the tool trace with no
+            # closing message; the chat reads as silence.  Surface the same
+            # ⚠️ copy used for fully empty streams so the user always knows
+            # the turn has ended.
+            await safe_send_text(
+                bot,
+                chat_id,
+                _EMPTY_RESPONSE_FALLBACK,
+                reply_to_message_id=reply_to_message_id,
+                message_thread_id=message_thread_id,
+            )
+            logger.warning(
+                "TELEGRAM_TOOL_ONLY_TURN chat_id=%s message_id=%s tool_trace_len=%d",
+                chat_id,
+                message_id,
+                len(tool_trace),
             )
 
         # No bytes to yield — delivery is a side-effect only.
