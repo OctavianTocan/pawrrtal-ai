@@ -11,9 +11,11 @@ import logging
 import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.keys import resolve_api_key
-from app.db import User
+from app.crud.workspace import get_default_workspace
+from app.db import User, get_async_session
 from app.users import get_allowed_user
 
 logger = logging.getLogger(__name__)
@@ -45,6 +47,7 @@ def get_stt_router() -> APIRouter:  # noqa: C901 — single cohesive STT route +
         language: str | None = Form(default=None),
         format: bool = Form(default=True),  # noqa: A002
         user: User = Depends(get_allowed_user),
+        session: AsyncSession = Depends(get_async_session),
     ) -> JSONResponse:
         """Forward an uploaded audio file to xAI and return the transcript JSON.
 
@@ -56,7 +59,6 @@ def get_stt_router() -> APIRouter:  # noqa: C901 — single cohesive STT route +
         Returns the upstream JSON response unmodified so the frontend has
         access to ``text``, ``duration``, and the optional ``words`` array.
         """
-        # `resolve_api_key` already falls back to `settings.xai_api_key`, so
         # PR 14: when the operator selected a non-xAI backend, dispatch
         # to the configured ``Transcriber`` (Mistral / OpenAI / local
         # whisper.cpp).  The xAI proxy below is the historical default
@@ -83,7 +85,13 @@ def get_stt_router() -> APIRouter:  # noqa: C901 — single cohesive STT route +
                 raise HTTPException(status_code=502, detail=str(exc)) from exc
             return JSONResponse(content={"text": text})
 
-        api_key = resolve_api_key(user.id, "XAI_API_KEY")
+        # STT runs against the user's default workspace's configured key —
+        # there's no concept of "STT for workspace X" in the UI yet, so the
+        # default is the only sensible choice.  `resolve_api_key` already
+        # falls back to `settings.xai_api_key`, so the caller doesn't need a
+        # manual `or settings.x` suffix.
+        workspace = await get_default_workspace(user.id, session)
+        api_key = resolve_api_key(workspace.id, "XAI_API_KEY") if workspace is not None else None
         if not api_key:
             raise HTTPException(
                 status_code=503,

@@ -173,6 +173,7 @@ async def _run_llm_turn(*, message: Message, context: TelegramTurnContext) -> No
         build_agent_tools(
             workspace_root=Path(workspace.path),
             user_id=context.nexus_user_id,
+            workspace_id=workspace.id,
             send_fn=tg_sender,
             surface="telegram",
         )
@@ -180,7 +181,9 @@ async def _run_llm_turn(*, message: Message, context: TelegramTurnContext) -> No
         else []
     )
 
-    provider, warning = await resolve_provider_with_auto_clear(context)
+    provider, warning = await resolve_provider_with_auto_clear(
+        context, workspace_id=workspace.id if workspace is not None else None
+    )
     if warning is not None:
         await message.answer(warning, reply_parameters=_reply_parameters(message.message_id))
 

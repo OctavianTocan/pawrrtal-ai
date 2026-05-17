@@ -1,13 +1,15 @@
-"""Per-user workspace environment variable resolution.
+"""Per-workspace environment variable resolution.
 
 A workspace `.env` file is encrypted at rest under
-``{settings.workspace_base_dir}/{user_id}/.env``.  Users supply their own
+``{settings.workspace_base_dir}/{workspace_id}/.env``.  Users supply their own
 provider keys (e.g. their own ``GEMINI_API_KEY``) without ever editing the
-server-wide global ``.env``.
+server-wide global ``.env``.  Keying is per-workspace, not per-user — a user
+with multiple workspaces configures each independently.  The settings global
+remains the gateway-level fallback for any key the workspace doesn't override.
 
 Resolution order for any overridable key:
 
-  1. **Workspace override** — read from the per-user encrypted file.
+  1. **Workspace override** — read from the per-workspace encrypted file.
   2. **Gateway global** — fall back to the corresponding ``Settings`` field.
   3. ``None`` — neither is configured.
 
@@ -21,6 +23,13 @@ because it is a cross-cutting helper imported by HTTP routes, tools, and
 agent factories — none of which are providers.  ``providers/`` is
 reserved for SDK-specific bridges (see
 ``.claude/rules/architecture/no-tools-in-providers.md``).
+
+Note on the historical user-keyed layout (prior to the workspace_id
+migration): old ``{workspace_base_dir}/{user_id}/.env`` files are moved to
+``{workspace_base_dir}/{default_workspace_id}/.env`` by
+:func:`migrate_user_keyed_env_files` on application startup.  After
+migration the source file is renamed with a ``.migrated-<timestamp>``
+suffix rather than deleted, so the move is reversible.
 """
 
 from __future__ import annotations
@@ -50,6 +59,10 @@ OVERRIDABLE_KEYS: frozenset[str] = frozenset(
         "EXA_API_KEY",
         "XAI_API_KEY",
         "OPENAI_CODEX_OAUTH_TOKEN",
+        # Notion plugin (see backend/app/integrations/notion/).  The plugin
+        # registry declares the same key via its EnvKeySpec; this central
+        # allowlist remains the source of truth for the HTTP layer.
+        "NOTION_API_KEY",
     }
 )
 
@@ -76,13 +89,20 @@ _SETTINGS_ATTR_MAP: dict[str, str] = {
 VALUE_FORBIDDEN_CHARS = re.compile(r"[\r\n]")
 
 
-def _workspace_env_path(user_id: uuid.UUID) -> Path:
-    """Return the absolute path to a user's encrypted workspace .env file.
+def _workspace_env_path(workspace_id: uuid.UUID) -> Path:
+    """Return the absolute path to a workspace's encrypted ``.env`` file.
 
     Computed on every call so that test code can monkeypatch
     ``settings.workspace_base_dir`` without restarting the import graph.
+
+    The path matches the canonical workspace directory shape produced by
+    :func:`app.core.workspace.seed_workspace` — i.e. the env file is a
+    sibling of ``AGENTS.md`` / ``SOUL.md`` and lives inside the workspace
+    root.  This keeps the per-workspace state self-contained so a single
+    rsync of the workspace directory moves the agent state and its
+    credentials together.
     """
-    return Path(settings.workspace_base_dir) / str(user_id) / ".env"
+    return Path(settings.workspace_base_dir) / str(workspace_id) / ".env"
 
 
 @lru_cache(maxsize=1)
@@ -153,16 +173,16 @@ def _quarantine_corrupt_file(path: Path) -> None:
         )
 
 
-def load_workspace_env(user_id: uuid.UUID) -> dict[str, str]:
-    """Decrypt and parse the user's workspace .env file.
+def load_workspace_env(workspace_id: uuid.UUID) -> dict[str, str]:
+    """Decrypt and parse the workspace's ``.env`` file.
 
     Returns an empty dict when:
-      * No file exists yet (first-time user).
+      * No file exists yet (first-time workspace).
       * The file exists but cannot be decrypted (corrupt or key-rotated);
         in this case the bad file is quarantined to a sibling path and a
         WARNING is logged.
     """
-    path = _workspace_env_path(user_id)
+    path = _workspace_env_path(workspace_id)
     if not path.exists():
         return {}
     try:
@@ -173,18 +193,18 @@ def load_workspace_env(user_id: uuid.UUID) -> dict[str, str]:
     return _parse_env_lines(plaintext)
 
 
-def save_workspace_env(user_id: uuid.UUID, env: dict[str, str]) -> None:
-    """Encrypt and persist the user's workspace .env file.
+def save_workspace_env(workspace_id: uuid.UUID, env: dict[str, str]) -> None:
+    """Encrypt and persist the workspace's ``.env`` file.
 
-    Permissions: the user directory is created with mode 0o700 and the file
-    is chmod'd to 0o600 after write so no other OS user can read it. This
-    is defence-in-depth — the file contents are already encrypted.
+    Permissions: the workspace directory is created with mode 0o700 and
+    the file is chmod'd to 0o600 after write so no other OS user can read
+    it. This is defence-in-depth — the file contents are already encrypted.
 
     Empty-string values are stripped during serialisation; saving an empty
     string for a key is the documented way for a user to "clear" the
     override and fall back to the gateway default.
     """
-    path = _workspace_env_path(user_id)
+    path = _workspace_env_path(workspace_id)
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     plaintext = _serialize_env_lines(env)
     ciphertext = _fernet().encrypt(plaintext.encode())
@@ -192,18 +212,18 @@ def save_workspace_env(user_id: uuid.UUID, env: dict[str, str]) -> None:
     path.chmod(0o600)
 
 
-def resolve_api_key(user_id: uuid.UUID, workspace_key: str) -> str | None:
-    """Resolve an env key for the given user with workspace -> settings fallback.
+def resolve_api_key(workspace_id: uuid.UUID, workspace_key: str) -> str | None:
+    """Resolve an env key for the given workspace with workspace → settings fallback.
 
     Args:
-        user_id: Authenticated user UUID. Used to locate the encrypted
-            .env file.
+        workspace_id: The active workspace UUID. Used to locate the
+            encrypted ``.env`` file.
         workspace_key: One of :data:`OVERRIDABLE_KEYS`, e.g.
             ``"GEMINI_API_KEY"``.
 
     Returns:
         The first non-empty value found, in this order:
-          1. The user's workspace override.
+          1. The workspace's override.
           2. The corresponding ``Settings`` field
              (``_SETTINGS_ATTR_MAP[workspace_key]``).
           3. ``None`` if neither is configured.
@@ -213,7 +233,7 @@ def resolve_api_key(user_id: uuid.UUID, workspace_key: str) -> str | None:
     settings fallback via :data:`_SETTINGS_ATTR_MAP`. A second fallback
     at the call site is dead code that drifts when the map is extended.
     """
-    workspace = load_workspace_env(user_id)
+    workspace = load_workspace_env(workspace_id)
     override = workspace.get(workspace_key)
     if override:
         return override
@@ -222,3 +242,57 @@ def resolve_api_key(user_id: uuid.UUID, workspace_key: str) -> str | None:
         return None
     value = getattr(settings, settings_attr, None)
     return value or None
+
+
+# ---------------------------------------------------------------------------
+# One-time migration: user-keyed → workspace-keyed
+# ---------------------------------------------------------------------------
+
+
+def migrate_user_keyed_env_file(
+    *,
+    user_id: uuid.UUID,
+    default_workspace_id: uuid.UUID,
+) -> bool:
+    """Move a legacy ``{base}/{user_id}/.env`` to ``{base}/{workspace_id}/.env``.
+
+    Returns ``True`` when a file was migrated, ``False`` when there was
+    nothing to do. Idempotent — calling again after a successful run is
+    a no-op (the source no longer exists).
+
+    The migration is non-destructive: after copying the encrypted bytes
+    to the new path the source file is renamed to
+    ``.env.migrated-<timestamp>`` rather than deleted. Operators can
+    recover the original value by renaming the suffix back.
+
+    Args:
+        user_id: The user whose legacy env file we're migrating.
+        default_workspace_id: The workspace that inherits the user's
+            keys.  Only the default workspace is seeded — secondary
+            workspaces start blank, on the principle that "isolated
+            workspace" means a fresh credentials slate.
+    """
+    base = Path(settings.workspace_base_dir)
+    src = base / str(user_id) / ".env"
+    if not src.exists():
+        return False
+
+    dst = base / str(default_workspace_id) / ".env"
+    if dst.exists():
+        # Already-migrated workspace; quarantine the legacy source so a
+        # second run cannot accidentally overwrite the newer file.
+        _quarantine_corrupt_file(src)
+        return False
+
+    dst.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    dst.write_bytes(src.read_bytes())
+    dst.chmod(0o600)
+
+    migrated_suffix = f".migrated-{int(time.time())}"
+    src.rename(src.with_name(src.name + migrated_suffix))
+    logger.info(
+        "workspace_env: migrated user-keyed env file user_id=%s -> workspace_id=%s",
+        user_id,
+        default_workspace_id,
+    )
+    return True

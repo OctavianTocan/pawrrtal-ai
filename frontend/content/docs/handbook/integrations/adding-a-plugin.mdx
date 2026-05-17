@@ -1,0 +1,169 @@
+---
+title: Adding a Plugin
+description: How to add a tools-only integration to Pawrrtal via the plugin registry.
+---
+
+# Adding a Plugin
+
+Plugins are additive integrations that contribute agent tools at runtime.
+The Notion plugin
+(`backend/app/integrations/notion/`) is the canonical example; this page
+captures the moving parts so the next integration is mechanical.
+
+The design rationale is in
+[`2026-05-15-plugin-system-and-notion-integration.mdx`](../decisions/2026-05-15-plugin-system-and-notion-integration).
+Read that first if you're new to the codebase — this page focuses on the
+how, not the why.
+
+## The shape
+
+A plugin is a Python package under
+`backend/app/integrations/<plugin_id>/`. The package exports a single
+`Plugin` object built from
+[`app.core.plugins.types`](../../../../../backend/app/core/plugins/types.py):
+
+```python
+# backend/app/integrations/my_plugin/plugin.py
+from app.core.plugins import EnvKeySpec, Plugin, register_plugin
+from app.integrations.my_plugin.tools import factories
+
+my_plugin = Plugin(
+    id="my_plugin",
+    name="My Plugin",
+    description="One-sentence summary.",
+    env_keys=(
+        EnvKeySpec(
+            name="MY_API_KEY",
+            label="My API Key",
+            help_url="https://example.com/get-a-key",
+            required=True,
+        ),
+    ),
+    tool_factories=factories,
+)
+
+register_plugin(my_plugin)
+```
+
+Importing the plugin package runs `register_plugin(...)` as a side
+effect. Make `backend/app/integrations/__init__.py` import your
+subpackage so the side effect fires at app startup.
+
+## Tool factories
+
+Each entry in `tool_factories` is a function that takes a
+[`ToolContext`](../../../../../backend/app/core/plugins/types.py) and
+returns an
+[`AgentTool`](../../../../../backend/app/core/agent_loop/types.py).
+`ToolContext` carries the active workspace ID, workspace root, user
+ID, and (optionally) the channel send callback. Use it for env-key
+resolution and per-call audit logging.
+
+```python
+# backend/app/integrations/my_plugin/tools/__init__.py
+from app.integrations.my_plugin.tools.search import make_search_tool
+
+factories = (make_search_tool,)
+```
+
+A tool factory looks like this:
+
+```python
+def make_search_tool(ctx: ToolContext) -> AgentTool:
+    async def execute(_tool_call_id: str, **kwargs: object) -> str:
+        # 1. Resolve the workspace's API key.
+        token = resolve_api_key(ctx.workspace_id, "MY_API_KEY")
+        if token is None:
+            return json.dumps({"error": "My Plugin is not configured."})
+
+        # 2. Do the actual work.
+        result = await my_search(token=token, query=str(kwargs["query"]))
+
+        # 3. Return JSON for the agent to consume.
+        return json.dumps(result)
+
+    return AgentTool(
+        name="my_search",
+        description="Search My Plugin.",
+        parameters={
+            "type": "object",
+            "properties": {"query": {"type": "string"}},
+            "required": ["query"],
+        },
+        execute=execute,
+    )
+```
+
+## Activation gating
+
+By default, a plugin's tools only reach the agent when every
+`required=True` env key in `env_keys` resolves to a non-empty value for
+the active workspace. This is what makes a not-configured plugin
+invisible to the LLM.
+
+If you need a custom predicate (e.g. "activate only when the workspace
+has both an API key *and* a saved profile"), pass `is_activated` on
+the `Plugin` object:
+
+```python
+my_plugin = Plugin(
+    id="my_plugin",
+    ...,
+    is_activated=lambda ctx: my_check(ctx),
+)
+```
+
+## Env keys + Settings UI
+
+Adding `EnvKeySpec(name="MY_API_KEY", ...)` is not enough on its own
+(yet — auto-rendering from the registry is a v1.1 follow-up). Three
+parallel places need the key today:
+
+1. **Backend allowlist** —
+   `backend/app/core/keys.py:OVERRIDABLE_KEYS`. Without this the PUT
+   endpoint rejects the key with 400.
+2. **Frontend mirror** —
+   `frontend/features/settings/workspace-env/use-workspace-env.ts:WORKSPACE_ENV_KEY_IDS`.
+   Drives the type union of valid keys.
+3. **Settings row** —
+   `frontend/features/settings/sections/WorkspacesSection.tsx:KEY_METAS`.
+   Provides the label, description, placeholder, and help URL the user
+   sees.
+
+Forgetting any of the three produces a silent failure: the user sets
+the value, the backend rejects (or never reads) it, and the plugin
+gates out at activation time with no UI clue.
+
+## Audit logging
+
+Notion's plugin runs every tool call through
+[`with_audit`](../../../../../backend/app/integrations/notion/audit.py)
+to write a row to a dedicated `*_operation_logs` table.  This is
+optional but recommended for any plugin where "what did this
+workspace do recently?" is a useful question (Notion, Slack, Linear).
+The same workspace-scoped + soft-FK + indexed
+`(workspace_id, tool_name, created_at)` shape works for most.
+
+## Testing
+
+Plugins follow the project-wide
+[ScriptedStreamFn pattern](../../../.claude/rules/testing/agent-loop-testing-philosophy.md)
+for full agent-loop scenarios.  Unit tests for individual tool
+factories monkeypatch the network seam (subprocess / HTTP client) and
+call `tool.execute()` directly.  See
+`backend/tests/test_notion_plugin.py` for a complete example covering
+registration, the subprocess wrapper, success path, error path, and
+the audit-log shape.
+
+## Checklist
+
+When you're done, the following should all be true:
+
+- `app.core.plugins.all_plugins()` includes your plugin id.
+- Your env key appears in `OVERRIDABLE_KEYS` + the frontend list +
+  the settings KEY_METAS array.
+- The plugin's tools appear in the chat agent's tool list *only when*
+  the workspace has the env key set (verified with a logged-in user
+  who configures the key in Settings → Workspace).
+- A pytest covers registration, one happy-path tool call, and one
+  error-path tool call.

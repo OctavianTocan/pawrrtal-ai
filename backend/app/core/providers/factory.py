@@ -37,7 +37,7 @@ this table must always agree.
 def resolve_llm(
     model_id: str | ParsedModelId | None,
     *,
-    user_id: uuid.UUID | None = None,
+    workspace_id: uuid.UUID | None = None,
 ) -> AILLM:
     """Return the correct :class:`AILLM` for ``model_id``.
 
@@ -45,8 +45,9 @@ def resolve_llm(
         model_id: Canonical wire string (``host:vendor/model``) or a
             pre-parsed identifier. ``None`` defaults to the catalog's
             default model.
-        user_id: Authenticated user UUID, used to resolve per-workspace
-            API-key overrides. ``None`` falls back to the global key.
+        workspace_id: Active workspace UUID, used to resolve
+            per-workspace API-key overrides.  ``None`` falls back
+            to the global gateway key.
 
     Returns:
         A provider instance ready to ``stream()``.
@@ -76,7 +77,7 @@ def resolve_llm(
         config = ClaudeLLMConfig(
             oauth_token=settings.claude_code_oauth_token or None,
         )
-        return ClaudeLLM(parsed.model, config=config, user_id=user_id)
+        return ClaudeLLM(parsed.model, config=config, workspace_id=workspace_id)
     if provider_cls is GeminiLLM:
-        return GeminiLLM(parsed.model, user_id=user_id)
+        return GeminiLLM(parsed.model, workspace_id=workspace_id)
     raise KeyError(f"no provider class registered for host {parsed.host!r}")
