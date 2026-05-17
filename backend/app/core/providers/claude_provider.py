@@ -63,6 +63,7 @@ from app.core.agent_system_prompt import (
 )
 from app.core.config import settings as _settings
 from app.core.keys import resolve_api_key
+from app.core.tools.display import tool_display_map
 
 from ._claude_tool_bridge import (
     MCP_SERVER_NAME as AGENT_TOOL_MCP_SERVER_NAME,
@@ -70,6 +71,7 @@ from ._claude_tool_bridge import (
 from ._claude_tool_bridge import (
     allowed_tool_ids,
     build_mcp_server,
+    claude_tool_id,
     make_can_use_tool,
 )
 from .base import ReasoningEffort, StreamEvent
@@ -268,6 +270,7 @@ class ClaudeLLM:
         attempt = 0
         max_attempts = max(1, _settings.claude_retry_max_attempts)
         used_resume = _session_exists(str(conversation_id), self._config.cwd)
+        display_by_name = _claude_display_map(list(tools or []))
 
         while True:
             attempt += 1
@@ -283,6 +286,7 @@ class ClaudeLLM:
                 async for event in _stream_events_for_attempt(
                     prompt=_aiter_user_prompt(question, images),
                     options=options,
+                    display_by_name=display_by_name,
                 ):
                     any_event_yielded = True
                     yield event
@@ -554,10 +558,20 @@ def _merge_agent_tools_into_whitelist(
     return deduped
 
 
+def _claude_display_map(agent_tools: list[AgentTool]) -> dict[str, Any]:
+    """Return display metadata keyed by bare and Claude MCP-prefixed names."""
+    bare = tool_display_map(agent_tools)
+    mapped: dict[str, Any] = dict(bare)
+    for name, display in bare.items():
+        mapped[claude_tool_id(name)] = display
+    return mapped
+
+
 async def _stream_events_for_attempt(
     *,
     prompt: AsyncIterator[dict[str, Any]],
     options: ClaudeAgentOptions,
+    display_by_name: dict[str, Any] | None = None,
 ) -> AsyncIterator[StreamEvent]:
     """Stream ``StreamEvent``s from one ``query()`` call.
 
@@ -567,7 +581,7 @@ async def _stream_events_for_attempt(
     depth 4, one over the cap). The two loops live here instead.
     """
     async for message in query(prompt=prompt, options=options):
-        for event in _events_from_message(message):
+        for event in _events_from_message(message, display_by_name or {}):
             yield event
 
 

@@ -40,6 +40,7 @@ def agent_event_to_stream_event(event: Any) -> StreamEvent | None:
             name=event["name"],
             input=event["arguments"],
             tool_use_id=event["tool_call_id"],
+            display=event.get("display"),
         )
     if event_type == "tool_result":
         return StreamEvent(

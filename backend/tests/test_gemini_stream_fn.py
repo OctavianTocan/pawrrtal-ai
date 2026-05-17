@@ -131,6 +131,7 @@ async def test_gemini_provider_emits_tool_use_and_result_events(
         return f"echoed: {kwargs.get('value', '')}"
 
     from app.core.agent_loop.types import AgentTool
+    from app.core.tools.display import make_tool_display
 
     echo = AgentTool(
         name="echo",
@@ -141,6 +142,12 @@ async def test_gemini_provider_emits_tool_use_and_result_events(
             "required": ["value"],
         },
         execute=echo_execute,
+        display=make_tool_display(
+            icon="🔁",
+            label="Echo",
+            present=lambda args: f"🔁 Echoing {args['value']}",
+            compact=lambda args: f"Echo -> {args['value']}",
+        ),
     )
 
     provider = GeminiLLM("gemini-test")
@@ -172,6 +179,12 @@ async def test_gemini_provider_emits_tool_use_and_result_events(
     # All three event types appeared in the SSE stream.
     tool_use = next(e for e in events if e["type"] == "tool_use")
     assert tool_use["input"] == {"value": "hi"}
+    assert tool_use["display"] == {
+        "icon": "🔁",
+        "label": "Echo",
+        "present": "🔁 Echoing hi",
+        "compact": "Echo -> hi",
+    }
     assert any(e["type"] == "tool_result" for e in events)
     assert any(e["type"] == "delta" and "Done!" in e.get("content", "") for e in events)
 

@@ -25,6 +25,7 @@ from app.core.tools.artifact import (
     build_artifact,
     llm_summary_for,
 )
+from app.core.tools.display import make_tool_display, summarize_title
 
 # Re-export artifact helpers so callers (e.g. app.api.chat) only need
 # one internal import instead of two, keeping that file under the fan-out
@@ -118,4 +119,14 @@ def make_artifact_tool() -> AgentTool:
         description=_ARTIFACT_TOOL_DESCRIPTION,
         parameters=_PARAMETERS,
         execute=_execute,
+        display=make_tool_display(
+            icon="🧩",
+            label="Render artifact",
+            present=lambda args: (
+                f"🧩 Rendering artifact {summarize_title(args.get('title'), 'preview')}"
+            ),
+            compact=lambda args: (
+                f"Render artifact -> {summarize_title(args.get('title'), 'preview')}"
+            ),
+        ),
     )

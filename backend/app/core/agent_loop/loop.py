@@ -24,6 +24,7 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 from app.core.observability.workshop import tool_span
+from app.core.tools.display import render_display_from_map, tool_display_map
 
 from .types import (
     AgentContext,
@@ -534,6 +535,7 @@ async def _stream_with_retry(
     backoff = max(safety.llm_retry_backoff_seconds, 0.0)
     max_errors = safety.max_consecutive_llm_errors
     attempts = 0
+    display_by_name = tool_display_map(tools)
 
     while True:
         attempts += 1
@@ -544,6 +546,7 @@ async def _stream_with_retry(
                 stream_fn(llm_messages, tools),
                 outcome,
                 attempt_state,
+                display_by_name,
             ):
                 yield event
         except Exception as exc:
@@ -590,11 +593,12 @@ async def _stream_attempt_events(
     stream: AsyncIterator[LLMEvent],
     outcome: _StreamOutcome,
     attempt_state: _StreamAttemptState,
+    display_by_name: dict[str, Any],
 ) -> AsyncIterator[AgentEvent]:
     """Yield translated events for one provider stream attempt."""
     async for llm_event in stream:
         events: list[AgentEvent] = []
-        done = _consume_llm_event(llm_event, events)
+        done = _consume_llm_event(llm_event, events, display_by_name)
         if events:
             attempt_state.emitted_event = True
             outcome.events.extend(events)
@@ -679,6 +683,7 @@ def _stream_interrupted_after_events(exc: Exception) -> AgentTerminatedEvent:
 def _consume_llm_event(
     llm_event: LLMEvent,
     events: list[AgentEvent],
+    display_by_name: dict[str, Any] | None = None,
 ) -> dict[str, Any] | None:
     """Translate one LLMEvent into AgentEvents and append to ``events``.
 
@@ -695,6 +700,11 @@ def _consume_llm_event(
         events.append(ThinkingDeltaEvent(type="thinking_delta", text=llm_event["text"]))
         return None
     if llm_event["type"] == "tool_call":
+        display = render_display_from_map(
+            display_by_name or {},
+            llm_event["name"],
+            llm_event["arguments"],
+        )
         events.append(
             ToolCallStartEvent(
                 type="tool_call_start",
@@ -708,6 +718,7 @@ def _consume_llm_event(
                 tool_call_id=llm_event["tool_call_id"],
                 name=llm_event["name"],
                 arguments=llm_event["arguments"],
+                display=display,
             )
         )
         return None

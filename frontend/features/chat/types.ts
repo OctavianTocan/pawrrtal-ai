@@ -23,10 +23,17 @@ import type {
 	ChatTimelineEntry,
 	ChatToolCallBase,
 	ChatToolCallStatus,
+	ToolDisplayPayload,
 } from '@/lib/types';
 import type { CalendarEventInfo, MemoryResultInfo, WebSourceInfo } from './tool-result-parsers';
 
-export type { AssistantMessageStatus, ChatArtifactPayload, ChatTimelineEntry, ChatToolCallStatus };
+export type {
+	AssistantMessageStatus,
+	ChatArtifactPayload,
+	ChatTimelineEntry,
+	ChatToolCallStatus,
+	ToolDisplayPayload,
+};
 
 /** Plain text chunk from the assistant's main response. */
 export interface ChatDeltaEvent {
@@ -46,6 +53,7 @@ export interface ChatToolUseEvent {
 	tool_use_id: string;
 	name: string;
 	input: Record<string, unknown>;
+	display?: ToolDisplayPayload;
 }
 
 /** Result returned for a previously emitted tool use. */

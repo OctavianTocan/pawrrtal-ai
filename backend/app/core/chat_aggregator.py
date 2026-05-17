@@ -36,6 +36,7 @@ class _ToolCall:
     id: str
     name: str
     input: dict[str, Any]
+    display: dict[str, Any] | None = None
     status: str = "pending"
     result: str | None = None
 
@@ -47,6 +48,8 @@ class _ToolCall:
             "input": self.input,
             "status": self.status,
         }
+        if self.display is not None:
+            payload["display"] = self.display
         if self.result is not None:
             payload["result"] = self.result
         return payload
@@ -149,6 +152,7 @@ class ChatTurnAggregator:
                     id=tool_use_id,
                     name=str(event.get("name", "")),
                     input=safe_input,
+                    display=dict(event.get("display", {}) or {}) or None,
                 )
             )
             self.timeline.append({"kind": "tool", "toolCallId": tool_use_id})

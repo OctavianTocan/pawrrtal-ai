@@ -30,7 +30,8 @@ from typing import Any
 
 import anyio
 
-from app.core.agent_loop.types import AgentTool
+from app.core.agent_loop.types import AgentTool, ToolDisplay
+from app.core.tools.display import make_tool_display, summarize_path
 from app.core.tools.errors import ToolError, ToolErrorCode
 
 log = logging.getLogger(__name__)
@@ -187,6 +188,7 @@ def _wrap_workspace_tool(
     body: WorkspaceToolBody,
     root: Path,
     path_required: bool,
+    display: ToolDisplay | None = None,
 ) -> AgentTool:
     """Build an AgentTool that resolves ``path`` safely before calling *body*.
 
@@ -218,6 +220,7 @@ def _wrap_workspace_tool(
         description=description,
         parameters=parameters,
         execute=execute,
+        display=display,
     )
 
 
@@ -343,6 +346,12 @@ def make_workspace_tools(workspace_root: Path) -> list[AgentTool]:
             body=_read_file_body,
             root=root,
             path_required=True,
+            display=make_tool_display(
+                icon="📖",
+                label="Read file",
+                present=lambda args: f"📖 Reading {summarize_path(args.get('path'))}",
+                compact=lambda args: f"Read file -> {summarize_path(args.get('path'))}",
+            ),
         ),
         _wrap_workspace_tool(
             name="write_file",
@@ -369,6 +378,12 @@ def make_workspace_tools(workspace_root: Path) -> list[AgentTool]:
             body=_write_file_body,
             root=root,
             path_required=True,
+            display=make_tool_display(
+                icon="✍️",
+                label="Write file",
+                present=lambda args: f"✍️ Writing {summarize_path(args.get('path'))}",
+                compact=lambda args: f"Write file -> {summarize_path(args.get('path'))}",
+            ),
         ),
         _wrap_workspace_tool(
             name="list_dir",
@@ -396,5 +411,11 @@ def make_workspace_tools(workspace_root: Path) -> list[AgentTool]:
             ),
             root=root,
             path_required=False,
+            display=make_tool_display(
+                icon="📁",
+                label="List folder",
+                present=lambda args: f"📁 Inspecting {summarize_path(args.get('path'))}",
+                compact=lambda args: f"List folder -> {summarize_path(args.get('path'))}",
+            ),
         ),
     ]

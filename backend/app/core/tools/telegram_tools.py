@@ -22,6 +22,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.core.agent_loop.types import AgentTool
+from app.core.tools.display import make_tool_display, summarize_path
 from app.core.tools.send_message import SendFn
 
 _IMAGE_EXTS: frozenset[str] = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".svg"})
@@ -89,6 +90,8 @@ def _build_specialized_send_tool(
     description: str,
     allowed_exts: frozenset[str],
     send_fn: SendFn,
+    icon: str,
+    label: str,
 ) -> AgentTool:
     """Build one specialized ``send_*_to_user`` tool."""
 
@@ -122,6 +125,12 @@ def _build_specialized_send_tool(
             "required": ["file_path"],
         },
         execute=execute,
+        display=make_tool_display(
+            icon=icon,
+            label=label,
+            present=lambda args: f"{icon} Sending {summarize_path(args.get('file_path'))}",
+            compact=lambda args: f"{label} -> {summarize_path(args.get('file_path'))}",
+        ),
     )
 
 
@@ -141,6 +150,8 @@ def make_telegram_capability_tools(send_fn: SendFn) -> list[AgentTool]:
             ),
             allowed_exts=_IMAGE_EXTS,
             send_fn=send_fn,
+            icon="🖼",
+            label="Send image",
         ),
         _build_specialized_send_tool(
             name="send_voice_to_user",
@@ -151,6 +162,8 @@ def make_telegram_capability_tools(send_fn: SendFn) -> list[AgentTool]:
             ),
             allowed_exts=_VOICE_EXTS,
             send_fn=send_fn,
+            icon="🎙",
+            label="Send voice",
         ),
         _build_specialized_send_tool(
             name="send_document_to_user",
@@ -160,5 +173,7 @@ def make_telegram_capability_tools(send_fn: SendFn) -> list[AgentTool]:
             ),
             allowed_exts=_DOCUMENT_EXTS,
             send_fn=send_fn,
+            icon="📎",
+            label="Send document",
         ),
     ]

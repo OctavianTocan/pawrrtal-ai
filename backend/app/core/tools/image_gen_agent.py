@@ -28,6 +28,7 @@ from pathlib import Path
 
 from app.core.agent_loop.types import AgentTool
 from app.core.keys import resolve_api_key
+from app.core.tools.display import make_tool_display, summarize_title
 from app.core.tools.image_gen import generate_image_via_codex, resolve_codex_oauth_token
 
 _TOOL_NAME = "generate_image"
@@ -176,4 +177,12 @@ def make_image_gen_tool(
         description=_TOOL_DESCRIPTION,
         parameters=_PARAMETERS,
         execute=_execute,
+        display=make_tool_display(
+            icon="🎨",
+            label="Generate image",
+            present=lambda args: (
+                f"🎨 Generating image {summarize_title(args.get('filename'), '')}".rstrip()
+            ),
+            compact=lambda args: "Generate image",
+        ),
     )

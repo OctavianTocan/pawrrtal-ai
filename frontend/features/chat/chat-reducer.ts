@@ -88,6 +88,7 @@ export function applyChatEvent(message: ChatMessage, event: ChatStreamEvent): Ch
 				id: event.tool_use_id,
 				name: event.name,
 				input: event.input,
+				display: event.display,
 				status: 'pending',
 			};
 			return {

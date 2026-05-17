@@ -205,7 +205,7 @@ class TestTelegramChannelDeliver:
         bot.send_message.assert_awaited_once_with(chat_id=1, text="Hello, world")
 
     async def test_tool_use_edits_detailed_trace_message(self) -> None:
-        """``tool_use`` edits the trace with glyph, name, argument keys, and JSON."""
+        """``tool_use`` edits the trace with friendly display metadata."""
         bot = _make_bot()
         msg = _make_channel_message(bot)
         channel = TelegramChannel()
@@ -216,6 +216,10 @@ class TestTelegramChannelDeliver:
                 "type": "tool_use",
                 "name": "search_files",
                 "input": {"pattern": "*", "target": "files", "path": "/data/workspace"},
+                "display": {
+                    "present": '🔎 Searching files for "TelegramChannel"',
+                    "compact": "Search files -> TelegramChannel",
+                },
             },
         ]
         async for _ in channel.deliver(_stream(*events), msg):
@@ -223,9 +227,8 @@ class TestTelegramChannelDeliver:
 
         last_call = bot.edit_message_text.call_args_list[-1]
         trace_text = last_call.kwargs["text"]
-        assert "🔎 search_files([" in trace_text
-        assert "pattern" in trace_text
-        assert "&quot;path&quot;: &quot;/data/workspace&quot;" in trace_text
+        assert "🔎 Searching files for &quot;TelegramChannel&quot;" in trace_text
+        assert "/data/workspace" not in trace_text
         bot.send_message.assert_awaited_once_with(chat_id=123, text="answer")
 
     async def test_thinking_event_renders_as_separate_italic_message(self) -> None:

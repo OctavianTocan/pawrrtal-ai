@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import html as html_lib
-import json
 import logging
 from typing import TYPE_CHECKING, Any
+
+from app.core.tools.display import fallback_tool_display
 
 from .telegram_html import md_to_telegram_html
 
@@ -20,15 +21,16 @@ MAX_MESSAGE_LEN = 4096
 
 
 def format_tool_use(event: StreamEvent) -> str:
-    """Render a tool call as ``icon name(['arg'])`` plus JSON input."""
-    from app.integrations.telegram.tool_icons import tool_icon  # noqa: PLC0415
-
+    """Render a tool call with shared display metadata or a safe fallback."""
     tool_name = str(event.get("name") or "tool")
+    raw_display = event.get("display")
+    if isinstance(raw_display, dict):
+        present = str(raw_display.get("present") or "").strip()
+        if present:
+            return present
     raw_input = event.get("input") or {}
-    input_obj = raw_input if isinstance(raw_input, dict) else {"input": raw_input}
-    keys = ", ".join(repr(str(key)) for key in input_obj)
-    payload = json.dumps(input_obj, ensure_ascii=False, default=str)
-    return f"{tool_icon(tool_name)} {tool_name}([{keys}])\n{payload}"
+    arguments = raw_input if isinstance(raw_input, dict) else {"input": raw_input}
+    return str(fallback_tool_display(tool_name, arguments).get("present") or tool_name)
 
 
 def final_reply_text(

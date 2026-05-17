@@ -7,7 +7,7 @@ from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any, Literal, Protocol, TypedDict
 
 if TYPE_CHECKING:
-    from app.core.agent_loop.types import AgentTool, PermissionCheckFn
+    from app.core.agent_loop.types import AgentTool, PermissionCheckFn, ToolDisplayPayload
 
 ReasoningEffort = Literal["low", "medium", "high", "extra-high"]
 """Reasoning-depth values accepted from the chat UI."""
@@ -25,6 +25,7 @@ class StreamEvent(TypedDict, total=False):
     content: str  # for delta and thinking
     name: str  # for tool_use
     input: dict[str, Any]  # for tool_use
+    display: ToolDisplayPayload  # for tool_use
     tool_use_id: str  # for tool_result
     artifact: dict[str, Any]  # for artifact (id, title, spec)
     # Token + cost accounting (PR 04). Emitted by every provider on the
