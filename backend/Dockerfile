@@ -29,15 +29,20 @@ FROM python:3.13-slim AS runtime
 WORKDIR /app
 
 # Install the official Notion CLI (``ntn``) used by the Notion plugin.
-# The plugin subprocesses ``ntn`` per tool call with the workspace`s
+# The plugin subprocesses ``ntn`` per tool call with the workspace's
 # token injected via ``NOTION_API_TOKEN``; see
 # ``app/integrations/notion/ntn_client.py``.  Pinned by date so the
 # install layer is reproducible — bump the env var to refresh.
+#
+# The upstream installer (https://ntn.dev) writes ``ntn`` directly to
+# ``/usr/local/bin/ntn`` when run as root (the container build case),
+# so no follow-up ``mv`` is needed.  Earlier versions of this Dockerfile
+# tried to ``mv /root/.ntn/bin/ntn /usr/local/bin/ntn`` and crashed the
+# build with "No such file or directory" — bean ``pawrrtal-ntn``.
 ENV NTN_INSTALL_DATE=2026-05-15
 RUN apt-get update \
  && apt-get install -y --no-install-recommends curl ca-certificates \
  && curl -fsSL https://ntn.dev | bash \
- && mv /root/.ntn/bin/ntn /usr/local/bin/ntn \
  && chmod +x /usr/local/bin/ntn \
  && apt-get purge -y curl \
  && apt-get autoremove -y \
@@ -60,14 +65,13 @@ RUN mkdir -p /data/workspaces
 
 EXPOSE 8000
 
-# Start the server. ``alembic upgrade head`` is NOT in the prod CMD
-# because the migration history currently has multiple heads (orphan
-# ``000_initial_schema`` from PR #166 + ``013_notion_operation_logs``
-# sibling of ``013_governance_and_jobs`` from PR #261) and would
-# error out before uvicorn ever ran. Migrations are applied manually
-# by the operator until the chain is consolidated to a single head.
+# Run Alembic migrations then start the server.  The graph is
+# single-head as of ``016_merge_notion_into_lcm_lineage`` so
+# ``alembic upgrade head`` resolves unambiguously.  The advisory
+# lock in ``alembic/env.py`` serialises concurrent invocations
+# across rolling-deploy replicas.
 #
 # In the docker-compose dev stack this CMD is overridden by the
 # compose command so --reload is active and the source volume mount
 # is writable.
-CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]

@@ -4,13 +4,12 @@
 # receives the literal string "$PORT", failing with:
 #   Error: Invalid value for '--port': '$PORT' is not a valid integer.
 #
-# Migrations are NOT run on boot here — the alembic history currently has
-# more than one head (the long-standing orphan ``000_initial_schema`` plus
-# the ``013_notion_operation_logs`` sibling of ``013_governance_and_jobs``
-# from PR #261). ``alembic upgrade head`` would error with "Multiple head
-# revisions are present" and uvicorn would never start. Until the chain is
-# consolidated to a single head, the operator applies migrations manually
-# via a Railway one-shot (``railway run -- alembic upgrade <rev>``).
-startCommand = "sh -c 'exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}'"
+# ``alembic upgrade head`` runs first; the graph is single-head as of
+# ``016_merge_notion_into_lcm_lineage`` (after PR #286 added the
+# 013-sibling merge and this PR reparented ``001`` onto
+# ``000_initial_schema``).  The advisory lock in ``alembic/env.py``
+# serialises concurrent invocations across rolling-deploy replicas.
+# Then ``exec uvicorn`` replaces sh so SIGTERM reaches uvicorn directly.
+startCommand = "sh -c 'alembic upgrade head && exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}'"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
