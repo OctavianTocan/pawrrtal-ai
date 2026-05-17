@@ -5,13 +5,30 @@ their own conversations.
 """
 
 import uuid
+from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
-from app.models import Conversation
+from app.governance_models import CostLedger
+from app.models import ChatMessage, Conversation
 from app.schemas import ConversationCreate, ConversationUpdate
+
+
+@dataclass(frozen=True, slots=True)
+class ConversationStatus:
+    """Aggregated read-only snapshot of a conversation for status displays."""
+
+    conversation_id: uuid.UUID
+    model_id: str | None
+    verbose_level: int | None
+    started_at: datetime
+    message_count: int
+    user_message_count: int
+    assistant_message_count: int
+    total_input_tokens: int
+    total_output_tokens: int
 
 
 async def create_conversation(
@@ -227,6 +244,56 @@ async def update_conversation_model(
     await session.commit()
     await session.refresh(conversation)
     return conversation
+
+
+async def get_conversation_status(
+    *,
+    conversation_id: uuid.UUID,
+    session: AsyncSession,
+) -> ConversationStatus | None:
+    """Return a read-only status snapshot for the given conversation.
+
+    Aggregates per-role message counts from ``chat_messages`` and per-turn
+    token totals from ``cost_ledger`` for the conversation. Returns ``None``
+    when the conversation does not exist.
+
+    Args:
+        conversation_id: The conversation to snapshot.
+        session: Async database session.
+
+    Returns:
+        A :class:`ConversationStatus` snapshot or ``None`` when not found.
+    """
+    conversation = await session.get(Conversation, conversation_id)
+    if conversation is None:
+        return None
+
+    role_counts_stmt = (
+        select(ChatMessage.role, func.count(ChatMessage.id))
+        .where(ChatMessage.conversation_id == conversation_id)
+        .group_by(ChatMessage.role)
+    )
+    role_counts = dict((await session.execute(role_counts_stmt)).all())
+    user_count = int(role_counts.get("user", 0))
+    assistant_count = int(role_counts.get("assistant", 0))
+
+    token_totals_stmt = select(
+        func.coalesce(func.sum(CostLedger.input_tokens), 0),
+        func.coalesce(func.sum(CostLedger.output_tokens), 0),
+    ).where(CostLedger.conversation_id == conversation_id)
+    total_input, total_output = (await session.execute(token_totals_stmt)).one()
+
+    return ConversationStatus(
+        conversation_id=conversation_id,
+        model_id=conversation.model_id,
+        verbose_level=conversation.verbose_level,
+        started_at=conversation.created_at,
+        message_count=user_count + assistant_count,
+        user_message_count=user_count,
+        assistant_message_count=assistant_count,
+        total_input_tokens=int(total_input),
+        total_output_tokens=int(total_output),
+    )
 
 
 async def delete_conversation(

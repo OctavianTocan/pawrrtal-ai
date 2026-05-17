@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -47,6 +48,7 @@ from app.integrations.telegram.handlers import (
     handle_new_command,
     handle_plain_message,
     handle_start_command,
+    handle_status_command,
     handle_stop_command,
     handle_verbose_command,
 )
@@ -63,7 +65,25 @@ _TELEGRAM_COMMANDS: tuple[tuple[str, str], ...] = (
     ("model", "Switch the model for this conversation"),
     ("verbose", "Set detail level: 0 quiet, 1 tools, 2 thinking"),
     ("stop", "Stop the active run"),
+    ("status", "Show gateway + conversation status"),
 )
+
+# Captured at module import so /status can report this worker's uptime
+# without reading the wall clock at boot. Process-local — multi-worker
+# deployments report only the worker that handled the command.
+_BOT_START_MONOTONIC: float = time.monotonic()
+
+
+def get_bot_uptime_seconds() -> float:
+    """Return seconds since this worker's process started."""
+    return time.monotonic() - _BOT_START_MONOTONIC
+
+
+def is_chat_run_active(chat_id: int) -> bool:
+    """Return whether an agent run is in flight for ``chat_id`` on this worker."""
+    task = _running_tasks.get(chat_id)
+    return task is not None and not task.done()
+
 
 # Active streaming tasks keyed by Telegram chat_id.  When a new message
 # arrives we cancel any existing task for that chat (preventing two parallel
@@ -335,6 +355,18 @@ def build_telegram_service() -> TelegramService:  # noqa: PLR0915 — single dis
         sender = _sender_from_message(message)
         async with async_session_maker() as session:
             reply = await handle_model_command(sender=sender, model_arg=model_arg, session=session)
+        await message.answer(reply)
+
+    @dispatcher.message(Command("status"))
+    async def _on_status(message: Message) -> None:
+        sender = _sender_from_message(message)
+        async with async_session_maker() as session:
+            reply = await handle_status_command(
+                sender=sender,
+                session=session,
+                bot_uptime_seconds=get_bot_uptime_seconds(),
+                is_chat_run_active=is_chat_run_active,
+            )
         await message.answer(reply)
 
     @dispatcher.message(Command("verbose"))
