@@ -422,3 +422,139 @@
 	place-items: center;
 	font-size: 12px;
 }
+
+/* ─── Interactive widgets (web/electron only) ───────────────────────── */
+/* Single button. */
+.artifact-action-button {
+	appearance: none;
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	padding: 8px 14px;
+	font-size: 13px;
+	font-weight: 600;
+	cursor: pointer;
+	transition:
+		background 0.15s ease,
+		transform 0.1s ease,
+		opacity 0.15s ease;
+}
+.artifact-action-button:hover:not(:disabled) {
+	transform: translateY(-1px);
+}
+.artifact-action-button:disabled,
+.artifact-action-button[aria-disabled="true"] {
+	opacity: 0.55;
+	cursor: not-allowed;
+}
+.artifact-action-button-primary {
+	background: linear-gradient(135deg, var(--a1), var(--a2));
+	color: var(--ink-on-accent);
+	border-color: transparent;
+}
+.artifact-action-button-secondary {
+	background: var(--background-elevated, var(--background));
+	color: var(--foreground);
+}
+
+/* Choice group — radio or checkbox set. */
+.artifact-choice-group {
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 12px 14px;
+	border-radius: 12px;
+	border: 1px solid var(--border);
+	background: var(--background-elevated, var(--background));
+}
+.artifact-choice-prompt {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--foreground);
+}
+.artifact-choice-options {
+	display: flex;
+	flex-direction: column;
+	gap: 6px;
+}
+.artifact-choice-option {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 13px;
+	color: var(--foreground);
+	cursor: pointer;
+	padding: 4px 0;
+}
+.artifact-choice-option input {
+	accent-color: var(--a1);
+	cursor: pointer;
+}
+
+/* Text input field. */
+.artifact-text-field {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 12px 14px;
+	border-radius: 12px;
+	border: 1px solid var(--border);
+	background: var(--background-elevated, var(--background));
+}
+.artifact-text-field-label {
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--foreground);
+}
+.artifact-text-field-control {
+	font-family: inherit;
+	font-size: 13px;
+	padding: 8px 10px;
+	border-radius: 8px;
+	border: 1px solid var(--border);
+	background: var(--background);
+	color: var(--foreground);
+	resize: vertical;
+}
+.artifact-text-field-control:focus-visible {
+	outline: 2px solid var(--a1);
+	outline-offset: -1px;
+}
+
+/* Numeric slider or input. */
+.artifact-number-field {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	padding: 12px 14px;
+	border-radius: 12px;
+	border: 1px solid var(--border);
+	background: var(--background-elevated, var(--background));
+}
+.artifact-number-field-label {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--foreground);
+}
+.artifact-number-field-value {
+	font-variant-numeric: tabular-nums;
+	font-weight: 700;
+	color: var(--a1);
+}
+.artifact-number-field-control {
+	font-family: inherit;
+	font-size: 13px;
+	padding: 6px 8px;
+	border-radius: 8px;
+	border: 1px solid var(--border);
+	background: var(--background);
+	color: var(--foreground);
+}
+.artifact-number-field-slider {
+	padding: 0;
+	border: none;
+	background: transparent;
+	accent-color: var(--a1);
+}

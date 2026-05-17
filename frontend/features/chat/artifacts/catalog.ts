@@ -147,5 +147,60 @@ export const artifactCatalog = defineCatalog(schema, {
 			}),
 			description: 'Numbered ordered-list of steps the user should take.',
 		},
+
+		// ─── Interactive widgets (web + electron only) ────────────────────
+		// All interactive widgets carry an `actionId` — a stable identifier
+		// the model uses to recognise the interaction in the follow-up user
+		// turn it triggers. Keep ids snake_case + meaningful (e.g.
+		// `accept_plan`, `pick_severity`) rather than generic (`button_1`).
+		ActionButton: {
+			props: z.object({
+				label: z.string(),
+				actionId: z.string(),
+				style: z.enum(['primary', 'secondary']).nullable(),
+			}),
+			description:
+				'Single button. Clicking sends a follow-up user message with `label` as text and `actionId` as a stable identifier you can match in your next turn.',
+		},
+		ChoiceGroup: {
+			props: z.object({
+				actionId: z.string(),
+				prompt: z.string().nullable(),
+				multi: z.boolean(),
+				options: z.array(
+					z.object({
+						value: z.string(),
+						label: z.string(),
+					})
+				),
+			}),
+			description:
+				'Radio (multi=false) or checkbox (multi=true) group. The user picks one or more options and the labels are sent back as a follow-up user message.',
+		},
+		TextField: {
+			props: z.object({
+				actionId: z.string(),
+				label: z.string(),
+				placeholder: z.string().nullable(),
+				multiline: z.boolean(),
+				submitLabel: z.string().nullable(),
+			}),
+			description:
+				'Free-text input the user submits with Enter (single line) or a button (multi-line). The typed string becomes the follow-up user message.',
+		},
+		NumberField: {
+			props: z.object({
+				actionId: z.string(),
+				label: z.string(),
+				min: z.number().nullable(),
+				max: z.number().nullable(),
+				step: z.number().nullable(),
+				defaultValue: z.number().nullable(),
+				kind: z.enum(['slider', 'input']),
+				submitLabel: z.string().nullable(),
+			}),
+			description:
+				'Numeric control (slider or text input). The user picks a number and submits; the value is sent back as a follow-up user message.',
+		},
 	},
 });

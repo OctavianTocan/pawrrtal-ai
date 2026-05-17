@@ -148,6 +148,76 @@ def test_agent_tool_execute_returns_corrective_string_on_bad_spec() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Surface-gated description — interactive widget catalog is web/electron only
+# ---------------------------------------------------------------------------
+
+
+def test_interactive_catalog_is_advertised_on_web_surface() -> None:
+    """Web surface sees the interactive components in the spec schema description
+    and the description blurb so the model knows it can emit them.
+    """
+    tool = make_artifact_tool(surface="web")
+    spec_desc = tool.parameters["properties"]["spec"]["description"]
+    # Read-only catalog is always present.
+    assert "Heading" in spec_desc
+    # Interactive components are advertised on web.
+    assert "ActionButton" in spec_desc
+    assert "ChoiceGroup" in spec_desc
+    assert "TextField" in spec_desc
+    assert "NumberField" in spec_desc
+    # The interactive blurb should appear in the tool description itself.
+    assert "INTERACTIVE" in tool.description
+
+
+def test_interactive_catalog_is_advertised_on_electron_surface() -> None:
+    """Electron mirrors web — the spec schema must mention interactive widgets."""
+    tool = make_artifact_tool(surface="electron")
+    spec_desc = tool.parameters["properties"]["spec"]["description"]
+    assert "ActionButton" in spec_desc
+
+
+def test_interactive_catalog_is_hidden_on_telegram_surface() -> None:
+    """Telegram is text-only — advertising interactive widgets would invite the
+    model to emit unrenderable controls.
+    """
+    tool = make_artifact_tool(surface="telegram")
+    spec_desc = tool.parameters["properties"]["spec"]["description"]
+    # Read-only catalog is still present.
+    assert "Heading" in spec_desc
+    # Interactive components are NOT mentioned.
+    assert "ActionButton" not in spec_desc
+    assert "ChoiceGroup" not in spec_desc
+    assert "TextField" not in spec_desc
+    assert "NumberField" not in spec_desc
+    assert "INTERACTIVE" not in tool.description
+
+
+def test_interactive_catalog_is_hidden_when_surface_unset() -> None:
+    """No surface (background jobs, tests) defaults to the conservative
+    read-only catalog so a stray usage never invites unrenderable widgets.
+    """
+    tool = make_artifact_tool()
+    spec_desc = tool.parameters["properties"]["spec"]["description"]
+    assert "ActionButton" not in spec_desc
+    assert "INTERACTIVE" not in tool.description
+
+
+def test_execute_validation_is_surface_independent() -> None:
+    """Validation lives in build_artifact, not the description — Telegram tools
+    must accept the same shapes as web tools so a workspace re-issued against
+    Telegram doesn't suddenly reject otherwise-valid specs.
+    """
+    web_tool = make_artifact_tool(surface="web")
+    tg_tool = make_artifact_tool(surface="telegram")
+
+    web_result = asyncio.run(web_tool.execute(tool_call_id="t", title="X", spec=_VALID_SPEC))
+    tg_result = asyncio.run(tg_tool.execute(tool_call_id="t", title="X", spec=_VALID_SPEC))
+
+    assert web_result.startswith("Artifact rendered")
+    assert tg_result.startswith("Artifact rendered")
+
+
+# ---------------------------------------------------------------------------
 # Chat-router helper
 # ---------------------------------------------------------------------------
 

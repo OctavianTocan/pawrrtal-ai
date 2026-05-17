@@ -9,6 +9,12 @@
 
 import type { BaseComponentProps } from '@json-render/react';
 import type { ReactNode } from 'react';
+import {
+	ActionButtonRenderer,
+	ChoiceGroupRenderer,
+	NumberFieldRenderer,
+	TextFieldRenderer,
+} from './interactive-components';
 
 const cls = (...names: (string | false | undefined | null)[]) => names.filter(Boolean).join(' ');
 
@@ -152,4 +158,12 @@ export const artifactComponents: RendererMap = {
 			))}
 		</ol>
 	),
+
+	// Interactive widgets live in their own file so this one stays small;
+	// each renderer reads `useArtifactInteraction()` to dispatch back to
+	// the chat surface.
+	ActionButton: ActionButtonRenderer,
+	ChoiceGroup: ChoiceGroupRenderer,
+	TextField: TextFieldRenderer,
+	NumberField: NumberFieldRenderer,
 };

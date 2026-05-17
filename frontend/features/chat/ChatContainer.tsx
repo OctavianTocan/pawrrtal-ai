@@ -9,7 +9,8 @@ import {
 	OPEN_ONBOARDING_SERVER_STEP_EVENT,
 } from '@/features/onboarding/v2/OnboardingFlow';
 import { usePersistedState } from '@/hooks/use-persisted-state';
-import type { ChatMessage } from '@/lib/types';
+import type { ChatArtifactInteractionPayload, ChatMessage } from '@/lib/types';
+import { ArtifactInteractionProvider } from './artifacts/interaction-context';
 import ChatView from './ChatView';
 import {
 	CHAT_REASONING_LEVELS,
@@ -352,31 +353,51 @@ export default function ChatContainer({
 		setComposerText(prompt);
 	}, []);
 
+	// Interactive-artifact dispatcher. v1 routes through the same
+	// `sendMessage` flow as typed input — the widget's human-readable label
+	// becomes the user message body, and the AI sees the interaction in
+	// its next turn alongside the previously-rendered artifact (so it can
+	// correlate which widget the user touched). When we add an in-place
+	// mode later, swap this handler; the renderer never imports
+	// `sendMessage` directly so widgets stay decoupled.
+	const handleArtifactInteraction = useCallback(
+		async (payload: ChatArtifactInteractionPayload): Promise<void> => {
+			if (gate.isComposerBlocked) return;
+			await chat.sendMessage({
+				content: payload.label,
+				files: [],
+			});
+		},
+		[chat.sendMessage, gate.isComposerBlocked]
+	);
+
 	useChatActivitySync(conversationId, chat.chatHistory, chat.isLoading);
 
 	return (
-		<ChatView
-			chatHistory={chat.chatHistory}
-			composerText={composerText}
-			copiedMessageId={chat.copiedId}
-			catalogStatus={
-				model.isCatalogLoading ? 'loading' : model.isCatalogError ? 'error' : 'ready'
-			}
-			isLoading={chat.isLoading}
-			models={model.models}
-			onChangeComposerText={setComposerText}
-			onCopy={chat.copyMessage}
-			onRegenerate={chat.regenerateMessage}
-			onSelectModel={model.selectModel}
-			onSelectReasoning={reasoning.selectReasoning}
-			onSelectSuggestion={handleSelectSuggestion}
-			isComposerBlocked={gate.isComposerBlocked}
-			composerBlockedMessage={gate.composerBlockedMessage}
-			onOpenOnboarding={gate.openSetup}
-			onSendMessage={handleSendMessage}
-			regeneratingIndex={chat.regeneratingIndex}
-			selectedModelId={model.selectedModelId}
-			selectedReasoning={reasoning.selectedReasoning}
-		/>
+		<ArtifactInteractionProvider handler={handleArtifactInteraction}>
+			<ChatView
+				chatHistory={chat.chatHistory}
+				composerText={composerText}
+				copiedMessageId={chat.copiedId}
+				catalogStatus={
+					model.isCatalogLoading ? 'loading' : model.isCatalogError ? 'error' : 'ready'
+				}
+				isLoading={chat.isLoading}
+				models={model.models}
+				onChangeComposerText={setComposerText}
+				onCopy={chat.copyMessage}
+				onRegenerate={chat.regenerateMessage}
+				onSelectModel={model.selectModel}
+				onSelectReasoning={reasoning.selectReasoning}
+				onSelectSuggestion={handleSelectSuggestion}
+				isComposerBlocked={gate.isComposerBlocked}
+				composerBlockedMessage={gate.composerBlockedMessage}
+				onOpenOnboarding={gate.openSetup}
+				onSendMessage={handleSendMessage}
+				regeneratingIndex={chat.regeneratingIndex}
+				selectedModelId={model.selectedModelId}
+				selectedReasoning={reasoning.selectedReasoning}
+			/>
+		</ArtifactInteractionProvider>
 	);
 }
