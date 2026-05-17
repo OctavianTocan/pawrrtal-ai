@@ -777,6 +777,67 @@ class TestRenderStatusMessage:
         assert "⚠️" not in rendered
         assert "Topic thread" not in rendered
 
+    def test_tokens_line_says_na_when_messages_exist_without_usage(self) -> None:
+        """When cost_ledger has no rows for a conversation but ChatMessages do.
+
+        This happens whenever a provider that doesn't emit ``usage`` events
+        is the only one talking on a conversation (e.g. Gemini today). The
+        token line must NOT render as "0 in / 0 out" since that implies a
+        measurement of zero rather than the absence of measurement.
+        """
+        from datetime import UTC
+        from datetime import datetime as _dt
+
+        status = ConversationStatus(
+            conversation_id=uuid.uuid4(),
+            model_id=default_model().id,
+            verbose_level=1,
+            started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),
+            message_count=48,
+            user_message_count=24,
+            assistant_message_count=24,
+            total_input_tokens=0,
+            total_output_tokens=0,
+        )
+        rendered = _render_status_message(
+            bot_uptime_seconds=60,
+            status=status,
+            run_active=False,
+            thread_id=None,
+            now=_dt(2026, 5, 17, 20, 0, tzinfo=UTC),
+        )
+        assert "n/a (provider did not report usage)" in rendered
+        assert "0 in / 0 out" not in rendered
+
+    def test_tokens_line_stays_zero_for_empty_conversation(self) -> None:
+        """An empty conversation (no messages yet) renders "0 in / 0 out".
+
+        Distinct from the "n/a" case above: here there's genuinely nothing
+        to measure, so the zero is honest.
+        """
+        from datetime import UTC
+        from datetime import datetime as _dt
+
+        status = ConversationStatus(
+            conversation_id=uuid.uuid4(),
+            model_id=default_model().id,
+            verbose_level=1,
+            started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),
+            message_count=0,
+            user_message_count=0,
+            assistant_message_count=0,
+            total_input_tokens=0,
+            total_output_tokens=0,
+        )
+        rendered = _render_status_message(
+            bot_uptime_seconds=60,
+            status=status,
+            run_active=False,
+            thread_id=None,
+            now=_dt(2026, 5, 17, 18, 1, tzinfo=UTC),
+        )
+        assert "0 in / 0 out" in rendered
+
     def test_renders_unknown_model_with_warning(self) -> None:
         from datetime import UTC
         from datetime import datetime as _dt

@@ -123,7 +123,7 @@ _STATUS_MESSAGE = (
     "💬 This conversation\n"
     "   • Started: {started_ago} ago\n"
     "   • Messages: {messages} ({user_messages} yours, {assistant_messages} assistant)\n"
-    "   • Tokens: {input_tokens} in / {output_tokens} out\n"
+    "   • Tokens: {tokens}\n"
     "   • Status: {run_status}"
 )
 _STATUS_THREAD_LINE = "\n🧵 Topic thread: <code>{thread_id}</code>"
@@ -583,6 +583,20 @@ def _render_status_message(
         started_at = started_at.replace(tzinfo=UTC)
     started_ago_seconds = (now - started_at).total_seconds()
 
+    # Tokens come from cost_ledger, which is only populated for providers
+    # that emit ``usage`` stream events. Gemini currently doesn't, so its
+    # turns land with zero tokens despite real activity. Render an honest
+    # placeholder rather than a misleading "0 in / 0 out" in that case.
+    has_messages = status.message_count > 0
+    has_usage = status.total_input_tokens > 0 or status.total_output_tokens > 0
+    if has_messages and not has_usage:
+        tokens_line = "n/a (provider did not report usage)"
+    else:
+        tokens_line = (
+            f"{_format_token_count(status.total_input_tokens)} in / "
+            f"{_format_token_count(status.total_output_tokens)} out"
+        )
+
     body = _STATUS_MESSAGE.format(
         uptime=_format_duration(bot_uptime_seconds),
         model_display=model_display,
@@ -594,8 +608,7 @@ def _render_status_message(
         messages=status.message_count,
         user_messages=status.user_message_count,
         assistant_messages=status.assistant_message_count,
-        input_tokens=_format_token_count(status.total_input_tokens),
-        output_tokens=_format_token_count(status.total_output_tokens),
+        tokens=tokens_line,
         run_status=_STATUS_RUN_RUNNING if run_active else _STATUS_RUN_IDLE,
     )
     if thread_id is not None:
