@@ -44,6 +44,7 @@ from app.core.tools.lcm_agents import (
     make_lcm_list_summaries_tool,
 )
 from app.core.tools.markitdown_convert import make_markitdown_tool
+from app.core.tools.now import make_now_tool
 from app.core.tools.python_exec import make_virtual_python_tool
 from app.core.tools.send_message import SendFn, make_send_message_tool
 from app.core.tools.workspace_files import make_workspace_tools
@@ -148,6 +149,13 @@ def build_agent_tools(
     # Document-to-Markdown conversion via markitdown.  Always present —
     # no external API key required; all conversion happens locally.
     tools.append(make_markitdown_tool(workspace_root=workspace_root))
+
+    # Current wall-clock time.  Pure stdlib, no network — always present
+    # so the model can re-query the clock mid-turn without burning
+    # iterations on an Exa search.  Pairs with the time block in the
+    # system prompt (see ``app.core.runtime_context``) — the block lands
+    # at turn start, the tool covers long-running multi-step turns.
+    tools.append(make_now_tool())
 
     # In-process Python execution.  Opt-in via
     # ``settings.virtual_python_enabled`` because the tool is *not*
