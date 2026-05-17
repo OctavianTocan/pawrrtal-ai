@@ -60,11 +60,14 @@ RUN mkdir -p /data/workspaces
 
 EXPOSE 8000
 
-# Run Alembic migrations then start the server.
-# `alembic upgrade head` is idempotent; if the DB is already current
-# it exits 0 immediately without making any changes.
-# In the docker-compose dev stack this CMD is overridden by the compose
-# command so --reload is active and the source volume mount is writable.
-# For production (Railway / plain Docker run) this CMD runs migrations
-# then starts uvicorn without reload.
-CMD ["sh", "-c", "alembic upgrade head && exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Start the server. ``alembic upgrade head`` is NOT in the prod CMD
+# because the migration history currently has multiple heads (orphan
+# ``000_initial_schema`` from PR #166 + ``013_notion_operation_logs``
+# sibling of ``013_governance_and_jobs`` from PR #261) and would
+# error out before uvicorn ever ran. Migrations are applied manually
+# by the operator until the chain is consolidated to a single head.
+#
+# In the docker-compose dev stack this CMD is overridden by the
+# compose command so --reload is active and the source volume mount
+# is writable.
+CMD ["sh", "-c", "exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
