@@ -56,7 +56,7 @@ HEARTBEAT_MESSAGE_STATUS = "complete"
 # row visually distinct in the existing chat UI without needing a new
 # message kind on the model.  Once we add a dedicated heartbeat surface
 # we can swap this for a structured marker on a new column.
-HEARTBEAT_MESSAGE_PREFIX = "�ude7c Heartbeat"
+HEARTBEAT_MESSAGE_PREFIX = "🫀 Heartbeat"
 
 
 class RunHeartbeatRequest(BaseModel):
