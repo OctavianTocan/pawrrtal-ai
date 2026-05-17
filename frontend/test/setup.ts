@@ -91,4 +91,11 @@ if (typeof window !== 'undefined' && typeof window.matchMedia !== 'function') {
 
 afterEach((): void => {
 	cleanup();
+	// Clear the in-memory localStorage polyfill so persisted state from one
+	// test (selected model, sidebar collapse, plan-mode flags, etc.) doesn't
+	// leak into the next. Without this, a test's breadcrumb becomes another
+	// test's mysterious goblin — passing in isolation, failing in the suite.
+	if (typeof window !== 'undefined') {
+		window.localStorage.clear();
+	}
 });
