@@ -22,7 +22,8 @@ import { ToolResultChipsRow } from './ToolResultChipsRow';
 function ToolStep({ call, chips }: { call: ChatToolCall; chips: ToolResultChips }): ReactNode {
 	const Icon = getToolIcon(call.name);
 	const isComplete = call.status === 'completed';
-	const label = isComplete ? getCompletedToolLabel(call.name) : getToolLabel(call.name);
+	const label = toolStepLabel(call, isComplete);
+	const emojiIcon = call.display?.icon;
 
 	return (
 		<div className="flex flex-col">
@@ -32,7 +33,16 @@ function ToolStep({ call, chips }: { call: ChatToolCall; chips: ToolResultChips 
 					'text-muted-foreground transition-colors hover:bg-muted/50'
 				)}
 			>
-				<Icon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground/80" />
+				{emojiIcon ? (
+					<span aria-hidden="true" className="w-3.5 shrink-0 text-center text-xs">
+						{emojiIcon}
+					</span>
+				) : (
+					<Icon
+						aria-hidden="true"
+						className="size-3.5 shrink-0 text-muted-foreground/80"
+					/>
+				)}
 				<span className="min-w-0 flex-1 truncate">
 					{isComplete ? (
 						<span className="text-foreground/85">{label}</span>
@@ -51,6 +61,19 @@ function ToolStep({ call, chips }: { call: ChatToolCall; chips: ToolResultChips 
 			<ToolResultChipsRow chips={chips} />
 		</div>
 	);
+}
+
+function toolStepLabel(call: ChatToolCall, isComplete: boolean): string {
+	const displayText = isComplete ? call.display?.compact : call.display?.present;
+	if (displayText) {
+		return stripLeadingIcon(displayText, call.display?.icon);
+	}
+	return isComplete ? getCompletedToolLabel(call.name) : getToolLabel(call.name);
+}
+
+function stripLeadingIcon(text: string, icon: string | undefined): string {
+	if (!icon || !text.startsWith(icon)) return text;
+	return text.slice(icon.length).trimStart();
 }
 
 /**

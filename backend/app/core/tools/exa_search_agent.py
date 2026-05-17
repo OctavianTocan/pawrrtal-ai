@@ -21,6 +21,7 @@ from typing import Any
 
 from app.core.agent_loop.types import AgentTool
 from app.core.keys import resolve_api_key
+from app.core.tools.display import make_tool_display, summarize_query
 from app.core.tools.exa_search import (
     MAX_NUM_RESULTS,
     exa_search,
@@ -75,11 +76,11 @@ _PARAMETERS: dict[str, Any] = {
 }
 
 
-def make_exa_search_tool(*, user_id: uuid.UUID | None = None) -> AgentTool:
+def make_exa_search_tool(*, workspace_id: uuid.UUID | None = None) -> AgentTool:
     """Return an :class:`AgentTool` wrapping the Exa web-search core.
 
     Args:
-        user_id: Authenticated user UUID, used to resolve per-workspace
+        workspace_id: Active workspace UUID, used to resolve per-workspace
             API key overrides. When ``None`` the global settings key is used.
 
     Returns:
@@ -94,8 +95,8 @@ def make_exa_search_tool(*, user_id: uuid.UUID | None = None) -> AgentTool:
         num_results = int(raw_num_results) if isinstance(raw_num_results, int | float | str) else 5
         include_full_text = bool(kwargs.get("include_full_text") or False)
         api_key = None
-        if user_id:
-            api_key = resolve_api_key(user_id, "EXA_API_KEY")
+        if workspace_id:
+            api_key = resolve_api_key(workspace_id, "EXA_API_KEY")
         result = await exa_search(
             query,
             num_results=num_results,
@@ -109,4 +110,10 @@ def make_exa_search_tool(*, user_id: uuid.UUID | None = None) -> AgentTool:
         description=_TOOL_DESCRIPTION,
         parameters=_PARAMETERS,
         execute=_execute,
+        display=make_tool_display(
+            icon="🌐",
+            label="Search web",
+            present=lambda args: f"🌐 Searching the web for {summarize_query(args.get('query'))}",
+            compact=lambda args: f"Search web -> {summarize_query(args.get('query'))}",
+        ),
     )

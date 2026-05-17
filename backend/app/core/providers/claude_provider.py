@@ -57,6 +57,7 @@ from claude_agent_sdk import (
     query,
 )
 
+from app.core.agent_loop.display import tool_display_map
 from app.core.agent_loop.types import AgentTool, PermissionCheckFn
 from app.core.agent_system_prompt import (
     DEFAULT_AGENT_SYSTEM_PROMPT as _DEFAULT_SYSTEM_PROMPT,
@@ -70,6 +71,7 @@ from ._claude_tool_bridge import (
 from ._claude_tool_bridge import (
     allowed_tool_ids,
     build_mcp_server,
+    claude_tool_id,
     make_can_use_tool,
 )
 from .base import ReasoningEffort, StreamEvent
@@ -186,7 +188,7 @@ class ClaudeLLM:
         model_id: str,
         *,
         config: ClaudeLLMConfig | None = None,
-        user_id: uuid.UUID | None = None,
+        workspace_id: uuid.UUID | None = None,
     ) -> None:
         """Construct a Claude provider bound to a specific model slug.
 
@@ -199,12 +201,13 @@ class ClaudeLLM:
             config: Optional Claude-specific config (OAuth token,
                 ``max_turns``, extra env). Defaults are read by the
                 factory from ``settings``.
-            user_id: App-level user UUID. When set, ``stream()`` resolves
-                per-workspace API-key overrides for this user.
+            workspace_id: Active workspace UUID. When set, ``stream()``
+                resolves per-workspace API-key overrides through
+                :func:`app.core.keys.resolve_api_key`.
         """
         self._model_id = model_id
         self._config = config or ClaudeLLMConfig()
-        self._user_id = user_id
+        self._workspace_id = workspace_id
         # PR 05: rolling buffer for the last few CLI stderr lines so a
         # ``ProcessError`` can surface useful diagnostic context.
         self._stderr_buffer: list[str] = []
@@ -268,6 +271,7 @@ class ClaudeLLM:
         attempt = 0
         max_attempts = max(1, _settings.claude_retry_max_attempts)
         used_resume = _session_exists(str(conversation_id), self._config.cwd)
+        display_by_name = _claude_display_map(list(tools or []))
 
         while True:
             attempt += 1
@@ -283,6 +287,7 @@ class ClaudeLLM:
                 async for event in _stream_events_for_attempt(
                     prompt=_aiter_user_prompt(question, images),
                     options=options,
+                    display_by_name=display_by_name,
                 ):
                     any_event_yielded = True
                     yield event
@@ -520,8 +525,8 @@ class ClaudeLLM:
     def _build_env(self) -> dict[str, str]:
         """Compose the env dict forwarded to the CLI subprocess."""
         env: dict[str, str] = dict(self._config.extra_env)
-        if self._user_id:
-            token = resolve_api_key(self._user_id, "CLAUDE_CODE_OAUTH_TOKEN")
+        if self._workspace_id:
+            token = resolve_api_key(self._workspace_id, "CLAUDE_CODE_OAUTH_TOKEN")
             if token:
                 env["CLAUDE_CODE_OAUTH_TOKEN"] = token
         elif self._config.oauth_token:
@@ -561,10 +566,20 @@ def _merge_agent_tools_into_whitelist(
     return deduped
 
 
+def _claude_display_map(agent_tools: list[AgentTool]) -> dict[str, Any]:
+    """Return display metadata keyed by bare and Claude MCP-prefixed names."""
+    bare = tool_display_map(agent_tools)
+    mapped: dict[str, Any] = dict(bare)
+    for name, display in bare.items():
+        mapped[claude_tool_id(name)] = display
+    return mapped
+
+
 async def _stream_events_for_attempt(
     *,
     prompt: AsyncIterator[dict[str, Any]],
     options: ClaudeAgentOptions,
+    display_by_name: dict[str, Any] | None = None,
 ) -> AsyncIterator[StreamEvent]:
     """Stream ``StreamEvent``s from one ``query()`` call.
 
@@ -574,7 +589,7 @@ async def _stream_events_for_attempt(
     depth 4, one over the cap). The two loops live here instead.
     """
     async for message in query(prompt=prompt, options=options):
-        for event in _events_from_message(message):
+        for event in _events_from_message(message, display_by_name or {}):
             yield event
 
 

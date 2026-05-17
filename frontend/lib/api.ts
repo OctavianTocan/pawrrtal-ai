@@ -316,11 +316,23 @@ export const API_ENDPOINTS = {
 		 * @param path - Workspace-relative POSIX path
 		 */
 		deleteFile: (id: string, path: string) => `/api/v1/workspaces/${id}/files/${path}`,
-	},
-	/** Per-user workspace environment variable overrides. */
-	workspace: {
-		/** Read the workspace env vars. */
-		env: '/api/v1/workspace/env',
+		/**
+		 * Per-workspace encrypted env-var overrides.
+		 *
+		 * Backed by `backend/app/api/workspace_env.py`. The path was workspace_id-keyed
+		 * in May 2026 (see ADR
+		 * `frontend/content/docs/handbook/decisions/2026-05-15-plugin-system-and-notion-integration.mdx`);
+		 * the legacy `/api/v1/workspace/env` shape was removed at the same time.
+		 *
+		 * @param id - Workspace UUID
+		 */
+		env: (id: string) => `/api/v1/workspaces/${id}/env`,
+		/**
+		 * Delete a single env-var override for a workspace.
+		 * @param id  - Workspace UUID
+		 * @param key - Override key (one of `WORKSPACE_ENV_KEY_IDS`)
+		 */
+		envKey: (id: string, key: string) => `/api/v1/workspaces/${id}/env/${key}`,
 		/** Read onboarding readiness (default workspace existence + metadata). */
 		onboardingStatus: '/api/v1/workspaces/onboarding-status',
 	},

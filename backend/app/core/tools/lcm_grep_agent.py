@@ -19,6 +19,7 @@ import uuid
 from typing import Any
 
 from app.core.agent_loop.types import AgentTool
+from app.core.tools.display import make_tool_display, summarize_query
 from app.core.tools.lcm_grep import _MAX_RESULTS_DEFAULT, lcm_grep
 from app.db import async_session_maker
 
@@ -92,4 +93,12 @@ def make_lcm_grep_tool(*, conversation_id: uuid.UUID) -> AgentTool:
         description=_TOOL_DESCRIPTION,
         parameters=_PARAMETERS,
         execute=_execute,
+        display=make_tool_display(
+            icon="🧠",
+            label="Search chat history",
+            present=lambda args: (
+                f"🧠 Searching chat history for {summarize_query(args.get('query'))}"
+            ),
+            compact=lambda args: f"Search chat history -> {summarize_query(args.get('query'))}",
+        ),
     )

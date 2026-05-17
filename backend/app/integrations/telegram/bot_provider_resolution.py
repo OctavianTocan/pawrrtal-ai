@@ -12,6 +12,7 @@ See ``_resolve_provider_with_auto_clear`` for the auto-clear contract
 from __future__ import annotations
 
 import logging
+import uuid
 from pathlib import Path
 
 from app.core.providers import resolve_llm
@@ -28,6 +29,7 @@ logger = logging.getLogger(__name__)
 async def resolve_provider_with_auto_clear(
     context: TelegramTurnContext,
     *,
+    workspace_id: uuid.UUID | None,
     workspace_root: Path | None = None,
 ) -> tuple[AILLM, str | None]:
     """Resolve a provider for ``context.model_id`` with an auto-clear safety net.
@@ -45,6 +47,11 @@ async def resolve_provider_with_auto_clear(
 
     Args:
         context: Resolved turn context with the stored ``model_id``.
+        workspace_id: The user's default workspace UUID, used to scope
+            provider API-key resolution (per the workspace-keyed env
+            migration).  ``None`` when no default workspace exists yet
+            (incomplete onboarding) — provider lookups fall through to
+            the gateway-global key.
         workspace_root: User's default workspace directory. Forwarded to
             ``resolve_llm`` so the Claude SDK subprocess writes its
             transcripts under the user workspace rather than the bot
@@ -62,7 +69,7 @@ async def resolve_provider_with_auto_clear(
         require_known(context.model_id)
         provider = resolve_llm(
             context.model_id,
-            user_id=context.nexus_user_id,
+            workspace_id=workspace_id,
             workspace_root=workspace_root,
         )
     except (InvalidModelId, UnknownModelId) as exc:
@@ -84,7 +91,7 @@ async def resolve_provider_with_auto_clear(
         )
         provider = resolve_llm(
             fallback_id,
-            user_id=context.nexus_user_id,
+            workspace_id=workspace_id,
             workspace_root=workspace_root,
         )
         return provider, warning

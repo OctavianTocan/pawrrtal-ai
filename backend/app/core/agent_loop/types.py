@@ -15,6 +15,8 @@ from collections.abc import AsyncIterator, Callable, Coroutine
 from dataclasses import dataclass, field
 from typing import Any, Literal, NotRequired, TypedDict
 
+from .display import ToolDisplay, ToolDisplayPayload
+
 # ---------------------------------------------------------------------------
 # Content blocks (inside messages)
 # ---------------------------------------------------------------------------
@@ -215,6 +217,7 @@ class ToolCallEndEvent(TypedDict):
     tool_call_id: str
     name: str
     arguments: dict[str, Any]
+    display: NotRequired[ToolDisplayPayload]
 
 
 class ToolResultEvent(TypedDict):
@@ -295,6 +298,7 @@ class AgentTool:
     description: str
     parameters: dict[str, Any]  # JSON schema object
     execute: Callable[..., Coroutine[Any, Any, str]]
+    display: ToolDisplay | None = None
 
 
 # ---------------------------------------------------------------------------

@@ -2,10 +2,15 @@
 
 from logging.config import fileConfig
 
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, pool, text
 
 from alembic import context
 from app.core.config import settings
+
+# Stable advisory-lock id so concurrent `alembic upgrade head` invocations
+# (e.g. Railway rolling deploys booting two replicas at once) serialise
+# instead of racing on schema mutation. Postgres-only; ignored on SQLite.
+ALEMBIC_MIGRATION_LOCK_ID = 0xA1EBAB1C
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -55,10 +60,23 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        is_postgres = connection.dialect.name == "postgresql"
+        if is_postgres:
+            connection.execute(
+                text("SELECT pg_advisory_lock(:lock_id)"),
+                {"lock_id": ALEMBIC_MIGRATION_LOCK_ID},
+            )
+        try:
+            context.configure(connection=connection, target_metadata=target_metadata)
 
-        with context.begin_transaction():
-            context.run_migrations()
+            with context.begin_transaction():
+                context.run_migrations()
+        finally:
+            if is_postgres:
+                connection.execute(
+                    text("SELECT pg_advisory_unlock(:lock_id)"),
+                    {"lock_id": ALEMBIC_MIGRATION_LOCK_ID},
+                )
 
 
 if context.is_offline_mode():

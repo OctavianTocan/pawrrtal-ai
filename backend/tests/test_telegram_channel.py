@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -57,25 +58,33 @@ async def _stream(*events: StreamEvent) -> AsyncIterator[StreamEvent]:
 
 
 def _make_channel_message(
-    bot: AsyncMock, chat_id: int = 123, message_id: int = 456
+    bot: AsyncMock,
+    chat_id: int = 123,
+    message_id: int = 456,
+    reply_to_message_id: int | None = None,
 ) -> ChannelMessage:
+    metadata = {
+        "bot": bot,
+        "chat_id": chat_id,
+        "message_id": message_id,
+    }
+    if reply_to_message_id is not None:
+        metadata["reply_to_message_id"] = reply_to_message_id
     return ChannelMessage(
         user_id=uuid.uuid4(),
         conversation_id=uuid.uuid4(),
         text="hello",
         surface="telegram",
         model_id=None,
-        metadata={
-            "bot": bot,
-            "chat_id": chat_id,
-            "message_id": message_id,
-        },
+        metadata=metadata,
     )
 
 
 def _make_bot() -> AsyncMock:
     bot = AsyncMock()
     bot.edit_message_text = AsyncMock()
+    bot.delete_message = AsyncMock()
+    bot.send_message = AsyncMock(return_value=SimpleNamespace(message_id=777))
     return bot
 
 
@@ -118,7 +127,7 @@ async def test_refresh_telegram_commands_sets_current_command_menu() -> None:
     bot.set_my_commands.assert_awaited_once()
     commands = bot.set_my_commands.await_args.args[0]
     names = [command.command for command in commands]
-    assert names == ["start", "new", "model", "verbose", "stop", "status"]
+    assert names == ["start", "new", "model", "models", "verbose", "stop", "status"]
     assert all(command.description for command in commands)
 
 
@@ -172,8 +181,8 @@ class TestTelegramChannelDeliver:
         assert call.kwargs["message_id"] == 456
         assert "agent finished without producing any text" in call.kwargs["text"]
 
-    async def test_final_edit_always_sent(self) -> None:
-        """Even a single small delta below the debounce threshold gets a final edit."""
+    async def test_final_reply_sent_as_separate_message(self) -> None:
+        """Plain answer text is sent as a final reply, not streamed into the trace."""
         bot = _make_bot()
         msg = _make_channel_message(bot, chat_id=7, message_id=99)
         channel = TelegramChannel()
@@ -181,14 +190,12 @@ class TestTelegramChannelDeliver:
         async for _ in channel.deliver(_stream({"type": "delta", "content": "hi"}), msg):
             pass
 
-        bot.edit_message_text.assert_called_once_with(
-            chat_id=7,
-            message_id=99,
-            text="hi",
-        )
+        bot.delete_message.assert_awaited_once_with(chat_id=7, message_id=99)
+        bot.send_message.assert_awaited_once_with(chat_id=7, text="hi")
+        bot.edit_message_text.assert_not_called()
 
-    async def test_accumulates_deltas(self) -> None:
-        """Multiple deltas below the debounce threshold collapse into one final edit."""
+    async def test_accumulates_deltas_into_final_reply(self) -> None:
+        """Multiple deltas collapse into one final Telegram reply."""
         bot = _make_bot()
         msg = _make_channel_message(bot, chat_id=1, message_id=2)
         channel = TelegramChannel()
@@ -201,32 +208,38 @@ class TestTelegramChannelDeliver:
         async for _ in channel.deliver(_stream(*events), msg):
             pass
 
-        # The final edit must contain the full accumulated text.
-        calls = bot.edit_message_text.call_args_list
-        last_call = calls[-1]
-        assert last_call.kwargs["text"] == "Hello, world"
+        bot.delete_message.assert_awaited_once_with(chat_id=1, message_id=2)
+        bot.send_message.assert_awaited_once_with(chat_id=1, text="Hello, world")
 
-    async def test_tool_use_injects_inline_glyph(self) -> None:
-        """``tool_use`` injects an inline glyph when verbose filtering lets it through."""
+    async def test_tool_use_edits_detailed_trace_message(self) -> None:
+        """``tool_use`` edits the trace with friendly display metadata."""
         bot = _make_bot()
         msg = _make_channel_message(bot)
         channel = TelegramChannel()
 
         events: list[StreamEvent] = [
             {"type": "delta", "content": "answer"},
-            {"type": "tool_use", "name": "search", "input": {}},
+            {
+                "type": "tool_use",
+                "name": "search_files",
+                "input": {"pattern": "*", "target": "files", "path": "/data/workspace"},
+                "display": {
+                    "present": '🔎 Searching files for "TelegramChannel"',
+                    "compact": "Search files -> TelegramChannel",
+                },
+            },
         ]
         async for _ in channel.deliver(_stream(*events), msg):
             pass
 
         last_call = bot.edit_message_text.call_args_list[-1]
-        # PR 07: tool_use surfaces a one-line glyph + tool name so the
-        # user can see what the agent is doing in real time.
-        assert last_call.kwargs["text"].startswith("answer")
-        assert "search" in last_call.kwargs["text"]
+        trace_text = last_call.kwargs["text"]
+        assert "🔎 Searching files for &quot;TelegramChannel&quot;" in trace_text
+        assert "/data/workspace" not in trace_text
+        bot.send_message.assert_awaited_once_with(chat_id=123, text="answer")
 
-    async def test_thinking_event_renders_when_verbose_filter_allows_it(self) -> None:
-        """Detailed Telegram verbosity surfaces thinking chunks inline."""
+    async def test_thinking_event_renders_as_separate_italic_message(self) -> None:
+        """Detailed Telegram verbosity surfaces thinking separately in italics."""
         bot = _make_bot()
         msg = _make_channel_message(bot)
         channel = TelegramChannel()
@@ -238,13 +251,13 @@ class TestTelegramChannelDeliver:
         async for _ in channel.deliver(_stream(*events), msg):
             pass
 
-        last_text = bot.edit_message_text.call_args_list[-1].kwargs["text"]
-        assert "Thinking:" in last_text
-        assert "checking the workspace" in last_text
-        assert "answer" in last_text
+        first_send = bot.send_message.await_args_list[0].kwargs
+        assert first_send["text"] == "<i>checking the workspace</i>"
+        final_send = bot.send_message.await_args_list[-1].kwargs
+        assert final_send["text"] == "answer"
 
     async def test_agent_terminated_replaces_placeholder(self) -> None:
-        """``agent_terminated`` without any text must show the warning to the user."""
+        """``agent_terminated`` without text must send a final warning reply."""
         bot = _make_bot()
         msg = _make_channel_message(bot, chat_id=11, message_id=22)
         channel = TelegramChannel()
@@ -258,16 +271,14 @@ class TestTelegramChannelDeliver:
         async for _ in channel.deliver(_stream(*events), msg):
             pass
 
-        bot.edit_message_text.assert_called_once()
-        text = bot.edit_message_text.call_args.kwargs["text"]
-        # The ⚠️ prefix is markdown-converted to HTML, so we check for the
-        # human-readable copy and the chat_id/message_id routing.
+        bot.delete_message.assert_awaited_once_with(chat_id=11, message_id=22)
+        bot.send_message.assert_awaited_once()
+        text = bot.send_message.await_args.kwargs["text"]
         assert "max_iterations" in text
-        assert bot.edit_message_text.call_args.kwargs["chat_id"] == 11
-        assert bot.edit_message_text.call_args.kwargs["message_id"] == 22
+        assert bot.send_message.await_args.kwargs["chat_id"] == 11
 
     async def test_agent_terminated_appended_after_partial_text(self) -> None:
-        """If the agent produced some text before termination, both are shown."""
+        """If the agent produced text before termination, final reply includes both."""
         bot = _make_bot()
         msg = _make_channel_message(bot)
         channel = TelegramChannel()
@@ -279,12 +290,12 @@ class TestTelegramChannelDeliver:
         async for _ in channel.deliver(_stream(*events), msg):
             pass
 
-        last_text = bot.edit_message_text.call_args_list[-1].kwargs["text"]
+        last_text = bot.send_message.await_args.kwargs["text"]
         assert "Partial answer." in last_text
         assert "max_iterations" in last_text
 
     async def test_error_event_replaces_placeholder(self) -> None:
-        """A bare ``error`` event must surface the error text in the chat."""
+        """A bare ``error`` event must surface the error text as final reply."""
         bot = _make_bot()
         msg = _make_channel_message(bot)
         channel = TelegramChannel()
@@ -295,28 +306,54 @@ class TestTelegramChannelDeliver:
         async for _ in channel.deliver(_stream(*events), msg):
             pass
 
-        bot.edit_message_text.assert_called_once()
-        assert "rate limited" in bot.edit_message_text.call_args.kwargs["text"]
+        bot.delete_message.assert_awaited_once()
+        assert "rate limited" in bot.send_message.await_args.kwargs["text"]
+
+    async def test_final_reply_uses_reply_parameters_when_available(self) -> None:
+        """Telegram final replies thread under the original user message."""
+        bot = _make_bot()
+        msg = _make_channel_message(bot, chat_id=1, message_id=2, reply_to_message_id=44)
+        channel = TelegramChannel()
+
+        async for _ in channel.deliver(_stream({"type": "delta", "content": "answer"}), msg):
+            pass
+
+        kwargs = bot.send_message.await_args.kwargs
+        assert kwargs["reply_parameters"].message_id == 44
 
     async def test_not_modified_error_swallowed(self) -> None:
         """TelegramBadRequest: message is not modified must not propagate."""
+        from aiogram.exceptions import TelegramBadRequest
+
         bot = _make_bot()
-        bot.edit_message_text.side_effect = Exception("TelegramBadRequest: message is not modified")
+        bot.edit_message_text.side_effect = TelegramBadRequest(
+            method=MagicMock(),
+            message="message is not modified",
+        )
         msg = _make_channel_message(bot)
         channel = TelegramChannel()
 
         # Should not raise.
-        async for _ in channel.deliver(_stream({"type": "delta", "content": "x"}), msg):
+        async for _ in channel.deliver(
+            _stream({"type": "tool_use", "name": "read_file", "input": {"path": "a.txt"}}), msg
+        ):
             pass
 
     async def test_other_errors_logged_not_raised(self) -> None:
         """Network or API errors should log a warning but not crash the turn."""
+        from aiogram.exceptions import TelegramNetworkError
+
         bot = _make_bot()
-        bot.edit_message_text.side_effect = Exception("network timeout")
+        bot.edit_message_text.side_effect = TelegramNetworkError(
+            method=MagicMock(),
+            message="network timeout",
+        )
         msg = _make_channel_message(bot)
         channel = TelegramChannel()
 
-        async for _ in channel.deliver(_stream({"type": "delta", "content": "x"}), msg):
+        async for _ in channel.deliver(
+            _stream({"type": "tool_use", "name": "read_file", "input": {"path": "a.txt"}}), msg
+        ):
             pass  # Must not raise
 
 
@@ -475,6 +512,25 @@ class TestHandleModelCommand:
             )
         assert isinstance(reply, str)
         assert "connect" in reply.lower() or "account" in reply.lower()
+
+    async def test_model_command_rejects_unknown_catalog_model(self) -> None:
+        """A structurally valid model outside the catalog is rejected before write."""
+        sender = TelegramSender(user_id=22, chat_id=22, username=None, full_name=None)
+        session = AsyncMock()
+        update_mock = AsyncMock(return_value=True)
+        with patch(
+            "app.integrations.telegram.handlers.update_conversation_model",
+            new=update_mock,
+        ):
+            reply = await handle_model_command(
+                sender=sender,
+                model_arg="google/not-a-real-model",
+                session=session,
+            )
+
+        assert "catalog" in reply.lower()
+        assert "/models" in reply
+        update_mock.assert_not_called()
 
     async def test_model_command_stores_canonical_form_for_well_formed_input(
         self,
@@ -667,7 +723,7 @@ class TestResolveProviderWithAutoClear:
                 new=fake_session_maker,
             ),
         ):
-            provider, warning = await _resolve_provider_with_auto_clear(context)
+            provider, warning = await _resolve_provider_with_auto_clear(context, workspace_id=None)
 
         # Warning was produced and mentions the bad ID + the default.
         assert warning is not None
@@ -711,7 +767,7 @@ class TestResolveProviderWithAutoClear:
                 new=update_mock,
             ),
         ):
-            provider, warning = await _resolve_provider_with_auto_clear(context)
+            provider, warning = await _resolve_provider_with_auto_clear(context, workspace_id=None)
 
         # Clean path: no warning, no clear.
         assert warning is None

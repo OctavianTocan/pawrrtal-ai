@@ -254,8 +254,44 @@ class TestEventsFromMessage:
                 "name": "Bash",
                 "input": {"cmd": "ls"},
                 "tool_use_id": "tu_1",
+                "display": {
+                    "icon": "🛠",
+                    "label": "Bash",
+                    "present": "🛠 Running Bash (cmd)",
+                    "compact": "Bash (cmd)",
+                },
             }
         ]
+
+    def test_assistant_tool_use_block_uses_display_map(self) -> None:
+        """Tool use blocks should prefer shared display metadata when available."""
+        from app.core.tools.display import make_tool_display
+
+        message = AssistantMessage(
+            content=[
+                ToolUseBlock(
+                    id="tu_1",
+                    name="mcp__pawrrtal__read_file",
+                    input={"path": "AGENTS.md"},
+                ),
+            ],
+            model="claude",
+        )
+        display = make_tool_display(
+            icon="📖",
+            label="Read file",
+            present=lambda args: f"📖 Reading {args['path']}",
+            compact=lambda args: f"Read file -> {args['path']}",
+        )
+
+        events = list(_events_from_message(message, {"mcp__pawrrtal__read_file": display}))
+
+        assert events[0]["display"] == {
+            "icon": "📖",
+            "label": "Read file",
+            "present": "📖 Reading AGENTS.md",
+            "compact": "Read file -> AGENTS.md",
+        }
 
     def test_assistant_tool_result_block_yields_tool_result(self) -> None:
         """Tool result blocks inside an assistant message should produce a ``tool_result`` event."""

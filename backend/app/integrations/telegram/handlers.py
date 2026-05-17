@@ -33,7 +33,7 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.providers.catalog import default_model
+from app.core.providers.catalog import default_model, find
 from app.core.providers.model_id import InvalidModelId, parse_model_id
 from app.crud.channel import (
     get_or_create_telegram_conversation_full,
@@ -80,6 +80,10 @@ _MODEL_MISSING_MESSAGE = (
 _MODEL_INVALID_MESSAGE = (
     "Couldn't parse <code>{raw}</code> as a model ID ({reason}).\n\n"
     "Expected structural form: <code>[host:]vendor/model</code>."
+)
+_MODEL_UNKNOWN_MESSAGE = (
+    "I don't have <code>{raw}</code> in the model catalog.\n\n"
+    "Use /models to pick one of the configured models."
 )
 _MODEL_NOT_BOUND_MESSAGE = "You need to connect your account first before switching models."
 _MODEL_OK_MESSAGE = "Model switched to <code>{model_id}</code> ✅"
@@ -364,10 +368,6 @@ async def handle_model_command(
     Returns:
         Reply string the bot should send immediately.
     """
-    # TODO(pawrrtal-yea3): proactive catalog validation via catalog.is_known()
-    # at /model time so unknown-but-well-formed IDs are rejected here instead
-    # of triggering the auto-clear path on the next chat turn.  For now the
-    # handler stays catalog-ignorant — only the structural parser runs.
     raw = model_arg.strip()
     if not raw:
         return _MODEL_MISSING_MESSAGE
@@ -376,6 +376,9 @@ async def handle_model_command(
         parsed = parse_model_id(raw)
     except InvalidModelId as exc:
         return _MODEL_INVALID_MESSAGE.format(raw=raw, reason=str(exc))
+    entry = find(parsed)
+    if entry is None:
+        return _MODEL_UNKNOWN_MESSAGE.format(raw=raw)
 
     nexus_user_id = await get_user_id_for_external(
         provider=PROVIDER,
@@ -394,7 +397,7 @@ async def handle_model_command(
     # Store the canonical, fully-qualified form ("host:vendor/model"), not
     # the raw user input — keeps stored model_ids consistent regardless of
     # whether the user typed the host prefix.
-    canonical_id = parsed.id
+    canonical_id = entry.id
     updated = await update_conversation_model(
         conversation_id=conversation.id,
         model_id=canonical_id,

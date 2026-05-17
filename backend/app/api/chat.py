@@ -105,13 +105,19 @@ def _maybe_artifact_event(event: StreamEvent) -> StreamEvent | None:
     )
 
 
-async def _require_workspace_root(
+async def _require_workspace(
     *,
     user_id: uuid.UUID,
     session: AsyncSession,
     request_id: str,
-) -> Path:
-    """Return the user's default workspace path or reject the chat turn."""
+) -> tuple[uuid.UUID, Path]:
+    """Return the user's default workspace ``(id, path)`` or reject the chat turn.
+
+    Returns the workspace UUID alongside the directory path so callers
+    can pass both into :func:`app.core.agent_tools.build_agent_tools` —
+    the UUID drives plugin activation (and, post-migration, env-key
+    resolution); the path drives the existing core workspace tools.
+    """
     workspace = await get_default_workspace(user_id, session)
     if workspace is None:
         raise HTTPException(
@@ -130,7 +136,7 @@ async def _require_workspace_root(
             status_code=412,
             detail="Workspace directory is missing on disk.  Re-run onboarding.",
         )
-    return root
+    return workspace.id, root
 
 
 def get_chat_router() -> APIRouter:
@@ -233,9 +239,9 @@ def get_chat_router() -> APIRouter:
         # into the Claude SDK as its ``cwd``. Without it, the SDK falls
         # back to the uvicorn process directory and writes its transcript
         # files there.
-        root = await _require_workspace_root(user_id=user.id, session=session, request_id=rid)
-
-        provider = resolve_llm(model_id, user_id=user.id, workspace_root=root)
+        workspace_id, root = await _require_workspace(
+            user_id=user.id, session=session, request_id=rid
+        )
         # Pre-flight per-user cost gate (PR 04).  Refuses with HTTP
         # 402 when the user's rolling-window spend + a small reservation
         # would exceed ``cost_max_per_user_daily_usd``.  This sits
@@ -250,6 +256,12 @@ def get_chat_router() -> APIRouter:
             rid=rid,
         )
 
+        # Provider construction must happen *after* workspace resolution so
+        # workspace-scoped API-key overrides (Gemini/Claude) take effect.
+        # ``workspace_root`` is also forwarded so the Claude SDK subprocess
+        # writes its transcripts under the user's workspace rather than
+        # the uvicorn process directory.
+        provider = resolve_llm(model_id, workspace_id=workspace_id, workspace_root=root)
         # Per-turn tool composition lives in `app.core.agent_tools` —
         # the chat router only decides *that* the agent gets tools,
         # not *which* (that's the builder's job, and where future
@@ -276,6 +288,7 @@ def get_chat_router() -> APIRouter:
         agent_tools = build_agent_tools(
             workspace_root=root,
             user_id=user.id,
+            workspace_id=workspace_id,
             send_fn=_web_send_fn,
             surface=surface,
             conversation_id=request.conversation_id,

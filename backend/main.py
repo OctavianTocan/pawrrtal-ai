@@ -28,6 +28,7 @@ from app.api.stt import get_stt_router
 from app.api.workspace import get_workspace_router
 from app.api.workspace_env import get_workspace_env_router
 from app.cli.admin_seed import seed_admin_user
+from app.cli.migrate_workspace_env import migrate_user_keyed_env_files_for_all_users
 from app.core.config import settings
 from app.core.event_bus import AgentHandler, EventBus, NotificationService
 from app.core.event_bus.global_bus import set_event_bus
@@ -65,6 +66,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     await create_db_and_tables()
     # This creates the admin user on every startup, but the UserManager will check if it already exists and skip creation if so, so it's idempotent and safe to run every time.
     await seed_admin_user()
+    # One-time migration of legacy user-keyed `.env` files to the new
+    # workspace-keyed layout.  Idempotent — when the source file is missing
+    # or the destination already exists, the helper returns without writing.
+    # See ADR 2026-05-15-plugin-system-and-notion-integration.mdx.
+    await migrate_user_keyed_env_files_for_all_users()
     # PR 10: spin up the event bus before any request can fire so the
     # consumer task is ready when the chat router or Telegram dispatcher
     # publishes the first ``TurnStartedEvent``.  Stashed on

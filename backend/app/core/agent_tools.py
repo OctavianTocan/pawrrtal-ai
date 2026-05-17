@@ -32,17 +32,19 @@ from pathlib import Path
 from app.core.agent_loop.types import AgentTool
 from app.core.config import settings
 from app.core.keys import resolve_api_key
+from app.core.plugins import ToolContext, all_plugins, is_activated_by_env_keys
 from app.core.providers.catalog import default_model
 from app.core.tools.artifact_agent import make_artifact_tool
 from app.core.tools.exa_search_agent import make_exa_search_tool
 from app.core.tools.image_gen_agent import make_image_gen_tool
-from app.core.tools.lcm_describe_agent import (
+from app.core.tools.lcm_agents import (
     make_lcm_describe_tool,
+    make_lcm_expand_query_tool,
+    make_lcm_grep_tool,
     make_lcm_list_summaries_tool,
 )
-from app.core.tools.lcm_expand_query_agent import make_lcm_expand_query_tool
-from app.core.tools.lcm_grep_agent import make_lcm_grep_tool
 from app.core.tools.markitdown_convert import make_markitdown_tool
+from app.core.tools.python_exec import make_virtual_python_tool
 from app.core.tools.send_message import SendFn, make_send_message_tool
 from app.core.tools.workspace_files import make_workspace_tools
 
@@ -51,6 +53,7 @@ def build_agent_tools(
     *,
     workspace_root: Path,
     user_id: uuid.UUID | None = None,
+    workspace_id: uuid.UUID | None = None,
     send_fn: SendFn | None = None,
     surface: str | None = None,
     conversation_id: uuid.UUID | None = None,
@@ -72,6 +75,12 @@ def build_agent_tools(
             under prompt pressure.
         user_id: Authenticated user UUID, used to resolve per-workspace
             API key overrides for tools that call external services.
+        workspace_id: Active workspace UUID.  When supplied alongside
+            ``user_id``, plugin tools (additive integrations registered
+            under :mod:`app.core.plugins`) are appended after the core
+            tools.  When ``None`` — including in legacy tests that
+            haven't been updated yet — plugin tools are skipped; core
+            tool composition is unaffected.
         send_fn: Optional channel delivery callback.  When supplied the
             ``send_message`` tool is added to the list so the agent can
             proactively push text and files back to the user.  Both the
@@ -95,9 +104,9 @@ def build_agent_tools(
         A fresh list of :class:`AgentTool` ready to hand to a provider.
         Order is **stable**: workspace tools first (the agent's default
         operating surface), then capability-gated tools (web search,
-        future capabilities).  Stable order matters for the Claude
-        bridge's ``allowed_tools`` whitelist construction and for
-        snapshot-style tests.
+        future capabilities), then any plugin-contributed tools.
+        Stable order matters for the Claude bridge's ``allowed_tools``
+        whitelist construction and for snapshot-style tests.
     """
     tools: list[AgentTool] = []
 
@@ -112,12 +121,12 @@ def build_agent_tools(
     # so a single call is sufficient. The unauthenticated fallback (no
     # `user_id` — e.g. background jobs) reads `settings.exa_api_key`
     # directly.
-    if user_id is not None:
-        exa_key = resolve_api_key(user_id, "EXA_API_KEY")
+    if workspace_id is not None:
+        exa_key = resolve_api_key(workspace_id, "EXA_API_KEY")
     else:
         exa_key = settings.exa_api_key or None
     if exa_key:
-        tools.append(make_exa_search_tool(user_id=user_id))
+        tools.append(make_exa_search_tool(workspace_id=workspace_id))
 
     # Artifact rendering.  Always present — the wire shape is purely
     # structural and the catalog of safe components is enforced on the
@@ -129,16 +138,29 @@ def build_agent_tools(
     # Image generation — pure tool: generates PNG, saves to workspace,
     # returns path.  The agent decides whether to send it via send_message.
     # Capability-gated on OPENAI_CODEX_OAUTH_TOKEN being resolvable.
-    if user_id is not None:
-        codex_token = resolve_api_key(user_id, "OPENAI_CODEX_OAUTH_TOKEN")
+    if workspace_id is not None:
+        codex_token = resolve_api_key(workspace_id, "OPENAI_CODEX_OAUTH_TOKEN")
     else:
         codex_token = None
     if codex_token:
-        tools.append(make_image_gen_tool(workspace_root=workspace_root, user_id=user_id))
+        tools.append(make_image_gen_tool(workspace_root=workspace_root, workspace_id=workspace_id))
 
     # Document-to-Markdown conversion via markitdown.  Always present —
     # no external API key required; all conversion happens locally.
     tools.append(make_markitdown_tool(workspace_root=workspace_root))
+
+    # In-process Python execution.  Opt-in via
+    # ``settings.virtual_python_enabled`` because the tool is *not*
+    # sandboxed — the deployment model assumes a single trusted
+    # operator (see ``app/core/tools/python_exec.py`` docstring).
+    if settings.virtual_python_enabled:
+        tools.append(
+            make_virtual_python_tool(
+                workspace_root=workspace_root,
+                timeout_seconds=settings.virtual_python_timeout_seconds,
+                output_cap_bytes=settings.virtual_python_output_cap_bytes,
+            )
+        )
 
     # Channel delivery — present for both web (asyncio-queue SSE drain)
     # and Telegram (MIME-aware bot API calls).  The mechanism differs;
@@ -180,4 +202,47 @@ def build_agent_tools(
                 )
             )
 
+    # Plugin-contributed tools.  Additive only — core tools above are
+    # unaffected.  Extracted into a helper so the main composition body
+    # stays under the project's branch-count ceiling.
+    tools.extend(
+        _build_plugin_tools(
+            workspace_root=workspace_root,
+            user_id=user_id,
+            workspace_id=workspace_id,
+            send_fn=send_fn,
+        )
+    )
+
     return tools
+
+
+def _build_plugin_tools(
+    *,
+    workspace_root: Path,
+    user_id: uuid.UUID | None,
+    workspace_id: uuid.UUID | None,
+    send_fn: SendFn | None,
+) -> list[AgentTool]:
+    """Walk the plugin registry and return every activated plugin's tools.
+
+    Skipped entirely when the workspace context isn't available (legacy
+    callers, background jobs): plugins gate on workspace-scoped env keys,
+    so they have nothing to resolve without a ``workspace_id + user_id``
+    pair.
+    """
+    if workspace_id is None or user_id is None:
+        return []
+    ctx = ToolContext(
+        workspace_id=workspace_id,
+        workspace_root=workspace_root,
+        user_id=user_id,
+        send_fn=send_fn,
+    )
+    out: list[AgentTool] = []
+    for plugin in all_plugins():
+        predicate = plugin.is_activated or is_activated_by_env_keys(plugin)
+        if not predicate(ctx):
+            continue
+        out.extend(factory(ctx) for factory in plugin.tool_factories)
+    return out

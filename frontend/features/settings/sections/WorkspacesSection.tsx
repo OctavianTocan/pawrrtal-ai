@@ -65,6 +65,14 @@ const KEY_METAS: readonly WorkspaceEnvKeyMeta[] = [
 		placeholder: 'Your xAI API key',
 		url: 'https://x.ai',
 	},
+	{
+		key: 'NOTION_API_KEY',
+		label: 'Notion API Key',
+		description:
+			'Unlocks the Notion plugin (search, read, write, sync). Create an Internal Integration and share the pages you want it to see.',
+		placeholder: 'ntn_...',
+		url: 'https://www.notion.so/profile/integrations',
+	},
 ];
 
 /** Empty record with every overridable key seeded to the empty string. */

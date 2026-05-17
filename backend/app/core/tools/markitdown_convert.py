@@ -20,6 +20,7 @@ import anyio
 from markitdown import MarkItDown
 
 from app.core.agent_loop.types import AgentTool
+from app.core.tools.display import make_tool_display, summarize_path
 from app.core.tools.errors import ToolError, ToolErrorCode
 
 log = logging.getLogger(__name__)
@@ -127,4 +128,10 @@ def make_markitdown_tool(*, workspace_root: Path) -> AgentTool:
             "required": ["path"],
         },
         execute=execute,
+        display=make_tool_display(
+            icon="📄",
+            label="Convert to Markdown",
+            present=lambda args: f"📄 Converting {summarize_path(args.get('path'))} to Markdown",
+            compact=lambda args: f"Convert to Markdown -> {summarize_path(args.get('path'))}",
+        ),
     )

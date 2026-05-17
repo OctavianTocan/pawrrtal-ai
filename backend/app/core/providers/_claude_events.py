@@ -33,28 +33,39 @@ from claude_agent_sdk import (
     UserMessage,
 )
 
+from app.core.agent_loop.display import ToolDisplay, render_display_from_map
+
 from .base import StreamEvent
 
 logger = logging.getLogger(__name__)
 
 
-def _events_from_message(message: Any) -> Iterator[StreamEvent]:
+def _events_from_message(
+    message: Any,
+    display_by_name: dict[str, ToolDisplay] | None = None,
+) -> Iterator[StreamEvent]:
     """Translate a single Claude SDK ``Message`` into zero or more ``StreamEvent``s.
 
     Dispatches on the message type through ``_MESSAGE_HANDLERS`` so the
     body stays at one level of nesting; each handler is a module-level
     helper that owns its own surface.
     """
+    if isinstance(message, AssistantMessage):
+        yield from _events_from_assistant(message, display_by_name or {})
+        return
     handler = _MESSAGE_HANDLERS.get(type(message))
     if handler is None:
         return
     yield from handler(message)
 
 
-def _events_from_assistant(message: AssistantMessage) -> Iterator[StreamEvent]:
+def _events_from_assistant(
+    message: AssistantMessage,
+    display_by_name: dict[str, ToolDisplay] | None = None,
+) -> Iterator[StreamEvent]:
     """Project an assistant message's content blocks into ``StreamEvent``s."""
     for block in message.content:
-        event = _event_from_block(block)
+        event = _event_from_block(block, display_by_name or {})
         if event is not None:
             yield event
     if message.error:
@@ -175,21 +186,30 @@ def _block_to_thinking(block: ThinkingBlock) -> StreamEvent:
     return StreamEvent(type="thinking", content=block.thinking)
 
 
-def _block_to_tool_use(block: ToolUseBlock) -> StreamEvent:
+def _block_to_tool_use(
+    block: ToolUseBlock,
+    display_by_name: dict[str, ToolDisplay] | None = None,
+) -> StreamEvent:
     return StreamEvent(
         type="tool_use",
         name=block.name,
         input=block.input,
         tool_use_id=block.id,
+        display=render_display_from_map(display_by_name or {}, block.name, block.input),
     )
 
 
-def _event_from_block(block: object) -> StreamEvent | None:
+def _event_from_block(
+    block: object,
+    display_by_name: dict[str, ToolDisplay] | None = None,
+) -> StreamEvent | None:
     """Dispatch a single content-block instance to its translator.
 
     Returns ``None`` for unknown block types so the caller can skip
     them without growing a branch.
     """
+    if isinstance(block, ToolUseBlock):
+        return _block_to_tool_use(block, display_by_name)
     handler = _BLOCK_HANDLERS.get(type(block))
     if handler is None:
         return None

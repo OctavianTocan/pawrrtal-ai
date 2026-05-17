@@ -23,6 +23,7 @@ import uuid
 from typing import Any
 
 from app.core.agent_loop.types import AgentTool
+from app.core.tools.display import make_tool_display, summarize_query
 from app.core.tools.lcm_expand_query import lcm_expand_query
 from app.db import async_session_maker
 
@@ -91,4 +92,12 @@ def make_lcm_expand_query_tool(
         description=_TOOL_DESCRIPTION,
         parameters=_PARAMETERS,
         execute=_execute,
+        display=make_tool_display(
+            icon="🧠",
+            label="Expand memory query",
+            present=lambda args: (
+                f"🧠 Expanding memory query for {summarize_query(args.get('prompt'))}"
+            ),
+            compact=lambda args: f"Expand memory query -> {summarize_query(args.get('prompt'))}",
+        ),
     )

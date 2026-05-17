@@ -28,6 +28,21 @@ FROM python:3.13-slim AS runtime
 
 WORKDIR /app
 
+# Install the official Notion CLI (``ntn``) used by the Notion plugin.
+# The plugin subprocesses ``ntn`` per tool call with the workspace`s
+# token injected via ``NOTION_API_TOKEN``; see
+# ``app/integrations/notion/ntn_client.py``.  Pinned by date so the
+# install layer is reproducible — bump the env var to refresh.
+ENV NTN_INSTALL_DATE=2026-05-15
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends curl ca-certificates \
+ && curl -fsSL https://ntn.dev | bash \
+ && mv /root/.ntn/bin/ntn /usr/local/bin/ntn \
+ && chmod +x /usr/local/bin/ntn \
+ && apt-get purge -y curl \
+ && apt-get autoremove -y \
+ && rm -rf /var/lib/apt/lists/* /root/.ntn
+
 # Grab the populated venv from the builder stage.
 COPY --from=builder /app/.venv /app/.venv
 
@@ -52,4 +67,4 @@ EXPOSE 8000
 # command so --reload is active and the source volume mount is writable.
 # For production (Railway / plain Docker run) this CMD runs migrations
 # then starts uvicorn without reload.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]

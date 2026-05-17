@@ -51,10 +51,17 @@ describe('applyChatEvent', () => {
 			tool_use_id: 't1',
 			name: 'web_search',
 			input: { q: 'foo' },
+			display: { icon: '🌐', present: '🌐 Searching the web for "foo"' },
 		});
 
 		expect(msg.tool_calls).toEqual([
-			{ id: 't1', name: 'web_search', input: { q: 'foo' }, status: 'pending' },
+			{
+				id: 't1',
+				name: 'web_search',
+				input: { q: 'foo' },
+				display: { icon: '🌐', present: '🌐 Searching the web for "foo"' },
+				status: 'pending',
+			},
 		]);
 		expect(msg.timeline).toEqual([{ kind: 'tool', toolCallId: 't1' }]);
 	});
