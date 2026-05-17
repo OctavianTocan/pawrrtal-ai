@@ -4,6 +4,7 @@ from .base import AILLM, ReasoningEffort, StreamEvent
 from .catalog import default_model
 from .claude_provider import ClaudeLLM, ClaudeLLMConfig
 from .factory import resolve_llm
+from .xai_provider import XaiLLM
 
 __all__ = [
     "AILLM",
@@ -11,6 +12,7 @@ __all__ = [
     "ClaudeLLMConfig",
     "ReasoningEffort",
     "StreamEvent",
+    "XaiLLM",
     "default_model",
     "resolve_llm",
 ]

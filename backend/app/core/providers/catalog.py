@@ -75,6 +75,11 @@ _GEMINI_3_FLASH_OUT_USD = 2.50
 _GEMINI_3_FLASH_LITE_IN_USD = 0.10
 _GEMINI_3_FLASH_LITE_OUT_USD = 0.40
 
+# xAI Grok pricing per https://docs.x.ai/docs/models.  Used by the xAI
+# provider's cost-ledger path (no SDK-reported total).
+_GROK_4_3_IN_USD = 1.25
+_GROK_4_3_OUT_USD = 2.50
+
 
 MODEL_CATALOG: tuple[ModelEntry, ...] = (
     ModelEntry(
@@ -131,6 +136,17 @@ MODEL_CATALOG: tuple[ModelEntry, ...] = (
         is_default=False,
         cost_per_mtok_in_usd=_GEMINI_3_FLASH_LITE_IN_USD,
         cost_per_mtok_out_usd=_GEMINI_3_FLASH_LITE_OUT_USD,
+    ),
+    ModelEntry(
+        host=Host.xai,
+        vendor=Vendor.xai,
+        model="grok-4.3",
+        display_name="Grok 4.3",
+        short_name="Grok 4.3",
+        description="xAI's frontier 1M-context model",
+        is_default=False,
+        cost_per_mtok_in_usd=_GROK_4_3_IN_USD,
+        cost_per_mtok_out_usd=_GROK_4_3_OUT_USD,
     ),
 )
 
