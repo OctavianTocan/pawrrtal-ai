@@ -514,21 +514,30 @@
 
     <!-- Hero -->
     <header class="hero">
-      <div class="hero-eyebrow">Project Overview · May 2026</div>
-      <h1>AI <em>Pawrrtal</em></h1>
+      <div class="hero-eyebrow">Project Overview · May 2026 (snapshot)</div>
+      <h1><em>Pawrrtal</em></h1>
       <p class="hero-desc">
-        A full-stack AI chat platform with real-time streaming responses, multi-model support,
+        A full-stack AI chat platform with real-time streaming responses, multi-provider support,
         persistent conversation history, Telegram channel integration, and a Craft Agents-inspired editorial UI.
       </p>
       <div class="badge-row">
         <span class="badge accent">Alpha</span>
         <span class="badge">Next.js 16</span>
         <span class="badge">FastAPI</span>
-        <span class="badge">Agno</span>
+        <span class="badge">Provider-agnostic agent loop</span>
         <span class="badge green">CI Active</span>
         <span class="badge">Self-hosted runner</span>
-        <span class="badge">release/1.0</span>
       </div>
+      <p style="margin-top:24px; padding:14px 18px; border:1px solid #d4cfc4; border-radius:8px; background:#f7f4ee; font-size:13px; color:#5a544a;">
+        <strong>Snapshot, not source of truth.</strong> This HTML overview is a styled snapshot
+        from May 2026 and predates the plugin system (Notion), LCM compaction,
+        the in-process <code>python</code> agent tool, the Workshop / OpenLLMetry
+        OTel integration, and the multi-provider agent loop refactor that replaced
+        the Agno SDK. For current architecture see the
+        <a href="https://github.com/OctavianTocan/pawrrtal/blob/development/README.md">README</a>
+        and the
+        <a href="https://github.com/OctavianTocan/pawrrtal/tree/development/frontend/content/docs/handbook">handbook</a>.
+      </p>
     </header>
 
     <!-- Tech Stack -->
