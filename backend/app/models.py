@@ -69,18 +69,19 @@ class Conversation(Base):
     project_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("projects.id", ondelete="SET NULL"), nullable=True
     )
-    # Channel that created this conversation (e.g. "telegram", "web").
-    origin_channel: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    # Telegram Bot API 9.3+ topic thread ID.  NULL for non-topic DMs.
-    telegram_thread_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # Lifecycle marker for the auto-title feature:
-    # NULL = not yet titled, "auto" = generated, "user" = user-edited.
-    title_set_by: Mapped[str | None] = mapped_column(String(16), nullable=True)
-    # Per-conversation verbose level for streaming UX (PR 07):
-    # 0 = quiet (only deltas + errors), 1 = normal (+ tool_use names),
-    # 2 = detailed (+ thinking + tool inputs). NULL inherits
-    # settings.telegram_verbose_default (or 1 if unset).
-    verbose_level: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # TODO(pawrrtal-j8o1): re-add four Mapped[...] columns here. The DB
+    #   columns still exist via migrations 007 + 011, but were dropped
+    #   from the ORM for the practice rebuild. Look at how migration 007
+    #   (origin_channel, telegram_thread_id, title_set_by) and the
+    #   verbose_level migration declare them, then mirror those shapes:
+    #
+    #     origin_channel:      String(32),  nullable=True   ("telegram"|"web"|...)
+    #     telegram_thread_id:  Integer,     nullable=True   (None = DM, not topic)
+    #     title_set_by:        String(16),  nullable=True   (None|"auto"|"user")
+    #     verbose_level:       Integer,     nullable=True   (None|0|1|2)
+    #
+    #   `app/core/exporters/json_export.py` serializes `origin_channel`
+    #   and was patched to skip it; re-add the read when this lands.
 
 
 class Project(Base):
@@ -175,58 +176,31 @@ class UserAppearance(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime)
 
 
-class ChannelLinkCode(Base):
-    """A short-lived one-time-use code for linking a Pawrrtal user to a third-party channel."""
-
-    __tablename__ = "channel_link_codes"
-
-    # HMAC-SHA-256 hex hash of the user-facing code. PK so lookups are
-    # by hash; the plaintext is never persisted.
-    code_hash: Mapped[str] = mapped_column(String(128), primary_key=True)
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    provider: Mapped[str] = mapped_column(String(32), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    # Indexed because the cleanup job scans on (expires_at, used_at IS NULL)
-    # to GC unredeemed codes; matches migration 007's ix_channel_link_codes_expires_at.
-    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
-    # NULL while the code is unredeemed; populated once the bot consumes it.
-    used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
-
-
-class ChannelBinding(Base):
-    """A binding between a Pawrrtal user and a third-party channel."""
-
-    __tablename__ = "channel_bindings"
-    __table_args__ = (
-        UniqueConstraint(
-            "provider",
-            "external_user_id",
-            name="uq_channel_bindings_provider_external_user",
-        ),
-    )
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    # The Pawrrtal user ID.
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
-    )
-    provider: Mapped[str] = mapped_column(String(32), nullable=False)
-    # Stable identity from the provider (Telegram user_id as text so the
-    # column type is the same across providers).
-    external_user_id: Mapped[str] = mapped_column(String(128), nullable=False)
-    # Default chat to push to. For Telegram direct chats this matches
-    # external_user_id; for groups it's the chat where the bind happened.
-    external_chat_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    # Display handle captured at bind time. Surfaced in the Settings UI
-    # connected-state ("@<display_handle>"); never trusted for auth.
-    display_handle: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    # Whether the Telegram chat has Topics (forum threads) enabled.
-    has_topics_enabled: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, server_default="false"
-    )
+# TODO(pawrrtal-j8o1): re-add `ChannelLinkCode` and `ChannelBinding` here
+#   once Phase 2 ships. Both DB tables already exist (migrations 007 + 011),
+#   so the ORM bodies must match the column shapes exactly:
+#
+#     channel_link_codes:
+#       code_hash    PK, String(128)        — HMAC hex, never the plaintext
+#       user_id      FK user.id CASCADE, indexed
+#       provider     String(32) NOT NULL
+#       created_at   DateTime NOT NULL
+#       expires_at   DateTime NOT NULL, indexed (cleanup job scans on it)
+#       used_at      DateTime nullable
+#
+#     channel_bindings:
+#       id                 PK Uuid (default uuid4)
+#       user_id            FK user.id CASCADE, indexed
+#       provider           String(32) NOT NULL
+#       external_user_id   String(128) NOT NULL
+#       external_chat_id   String(128) nullable
+#       display_handle     String(255) nullable   — surfaced in Settings UI
+#       created_at         DateTime NOT NULL
+#       has_topics_enabled Boolean NOT NULL default false
+#       __table_args__: UniqueConstraint(provider, external_user_id,
+#         name="uq_channel_bindings_provider_external_user")
+#
+#   Also update __all__ at the bottom of this file.
 
 
 class ChatMessage(Base):
@@ -414,8 +388,8 @@ from .governance_models import (  # noqa: E402
 
 __all__ = [
     "AuditEvent",
-    "ChannelBinding",
-    "ChannelLinkCode",
+    # TODO(pawrrtal-j8o1): re-add "ChannelBinding" and "ChannelLinkCode" here
+    #   once the classes are restored above.
     "ChatMessage",
     "Conversation",
     "CostLedger",

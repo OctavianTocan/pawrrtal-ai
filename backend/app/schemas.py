@@ -337,36 +337,21 @@ class ChatMessageRead(BaseModel):
 
 
 # --- Channel schemas ---------------------------------------------------------
-
-
-class ChannelBindingRead(BaseModel):
-    """Public shape returned by ``GET /api/v1/channels``."""
-
-    provider: str
-    external_user_id: str
-    # external_chat_id + display_handle remain on the read shape because
-    # the Settings UI renders the handle (``@{display_handle}``) on the
-    # connected-state dialog and the binding hook reads the chat id.
-    external_chat_id: str | None = None
-    display_handle: str | None = None
-    created_at: datetime
-
-    model_config = ConfigDict(from_attributes=True)
-
-
-class TelegramLinkCodeRead(BaseModel):
-    """Response shape from ``POST /api/v1/channels/telegram/link``.
-
-    Always constructed from scalar kwargs by the route — never
-    ``.model_validate(orm_row)``. The closest ORM row (``ChannelLinkCode``)
-    only stores ``code_hash``, never the plaintext ``code`` returned here,
-    so attribute-mode validation would be a bug, not a convenience.
-    """
-
-    code: str
-    expires_at: datetime
-    bot_username: str | None = None
-    deep_link: str | None = None
+#
+# TODO(pawrrtal-1irw): re-add `ChannelBindingRead` and `TelegramLinkCodeRead`
+#   here when Phase 4 ships the /api/v1/channels routes. The frontend already
+#   reads these shapes — see `frontend/lib/channels.ts` for the consumer side:
+#
+#     ChannelBindingRead:
+#       provider, external_user_id, external_chat_id?, display_handle?,
+#       created_at. Set `model_config = ConfigDict(from_attributes=True)`
+#       because the `GET /api/v1/channels` route does
+#       `ChannelBindingRead.model_validate(orm_row)`.
+#
+#     TelegramLinkCodeRead:
+#       code, expires_at, bot_username?, deep_link?. Always built from
+#       scalar kwargs in the route (never from the ORM row — the row only
+#       stores `code_hash`, not the plaintext `code`).
 
 
 # --- Workspace schemas --------------------------------------------------------

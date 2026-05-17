@@ -13,14 +13,16 @@ This package provides:
 from .base import Channel, ChannelMessage, ChannelResponse
 from .registry import registered_surfaces, resolve_channel
 from .sse import SSEChannel, surface_from_header
-from .telegram import TelegramChannel
+
+# TODO(pawrrtal-bn6c): re-export TelegramChannel from `.telegram` and add
+#   it to __all__ once Phase 5 lands. A few tests import it from
+#   `app.channels` directly.
 
 __all__ = [
     "Channel",
     "ChannelMessage",
     "ChannelResponse",
     "SSEChannel",
-    "TelegramChannel",
     "registered_surfaces",
     "resolve_channel",
     "surface_from_header",

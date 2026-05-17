@@ -44,7 +44,8 @@ def _serialize_conversation(conversation: Conversation) -> dict[str, Any]:
         "is_archived": conversation.is_archived,
         "is_flagged": conversation.is_flagged,
         "labels": list(conversation.labels or []),
-        "origin_channel": conversation.origin_channel,
+        # TODO(pawrrtal-j8o1): re-add `"origin_channel": conversation.origin_channel`
+        #   once the column is restored on the Conversation ORM model.
     }
 
 

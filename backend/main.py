@@ -13,7 +13,9 @@ from starlette.types import ASGIApp
 from app.api.appearance import get_appearance_router
 from app.api.audit import get_audit_router
 from app.api.auth import get_auth_router
-from app.api.channels import get_channels_router
+
+# TODO(pawrrtal-1irw): re-add `from app.api.channels import get_channels_router`
+#   here once Phase 4 ships, then re-include below in create_app.
 from app.api.chat import get_chat_router
 from app.api.conversations import get_conversations_router
 from app.api.cost import get_cost_router
@@ -37,7 +39,10 @@ from app.core.request_logging import RequestLoggingMiddleware
 from app.core.scheduler import JobScheduler
 from app.core.telemetry import setup_tracing, shutdown_tracing
 from app.db import create_db_and_tables
-from app.integrations.telegram import telegram_lifespan
+
+# TODO(pawrrtal-obsd): re-add `from app.integrations.telegram import telegram_lifespan`
+#   once Phase 11 rebuilds the bot service, then wrap the rest of the
+#   lifespan in `async with telegram_lifespan() as telegram_service:`.
 from app.integrations.webhooks import get_webhooks_router
 from app.logger_setup import (
     configure_logging,  # Set up logging configuration (this should be done before any loggers are used)
@@ -83,32 +88,27 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         app.state.scheduler = scheduler
     else:
         app.state.scheduler = None
-    # Bring the Telegram channel up alongside the HTTP server when a bot
-    # token is configured. The context manager yields None and is a no-op
-    # when the channel is disabled, so this stays safe for stripped-down
-    # deployments (CI, ephemeral previews, ...). Stash the service on
-    # `app.state` so the webhook route can hand updates to aiogram.
-    async with telegram_lifespan() as telegram_service:
-        app.state.telegram_service = telegram_service
-        # Follow-on: register the agent + notification subscribers AFTER the
-        # Telegram service is up so the notification service has a live
-        # bot instance.  Both are no-ops when the relevant pieces are
-        # disabled (no bot → notifications skip; no default user → agent
-        # handler logs + skips).
-        agent_handler = AgentHandler()
-        agent_handler.register(event_bus)
-        notification_service = NotificationService(
-            telegram_bot=telegram_service.bot if telegram_service is not None else None
-        )
-        notification_service.register(event_bus)
-        try:
-            yield
-        finally:
-            if scheduler is not None:
-                await scheduler.stop()
-            set_event_bus(None)
-            await event_bus.stop()
-            shutdown_tracing()
+    # TODO(pawrrtal-obsd): wrap the rest of this lifespan in
+    #   `async with telegram_lifespan() as telegram_service:` once Phase 11
+    #   ships. Stash the live service on `app.state.telegram_service` so
+    #   the webhook route can hand updates to aiogram, and pass
+    #   `telegram_bot=telegram_service.bot` to NotificationService below.
+    app.state.telegram_service = None
+    # Register agent + notification subscribers. While Telegram is stripped
+    # the notification service runs with `telegram_bot=None`; it logs and
+    # skips delivery when no bot is configured (see handlers.py).
+    agent_handler = AgentHandler()
+    agent_handler.register(event_bus)
+    notification_service = NotificationService(telegram_bot=None)
+    notification_service.register(event_bus)
+    try:
+        yield
+    finally:
+        if scheduler is not None:
+            await scheduler.stop()
+        set_event_bus(None)
+        await event_bus.stop()
+        shutdown_tracing()
 
 
 # --- App & Middleware --------------------------------------------------------
@@ -175,9 +175,9 @@ def create_app() -> FastAPI:
     fastapi_app.include_router(
         get_oauth_router(),
     )
-    fastapi_app.include_router(
-        get_channels_router(),
-    )
+    # TODO(pawrrtal-1irw): include `get_channels_router()` here once
+    #   Phase 4 ships the /api/v1/channels routes. Don't forget the
+    #   import at the top of this file.
     fastapi_app.include_router(
         get_workspace_router(),
     )
