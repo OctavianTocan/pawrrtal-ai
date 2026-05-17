@@ -39,9 +39,9 @@ FILE_TREE_MAX_DEPTH = 6
 
 def make_notion_search_tool(ctx: ToolContext) -> AgentTool:
     """Full-text search across the connected workspace."""
-    token = require_token(ctx)
 
     async def execute(_tool_call_id: str, params: dict[str, Any]) -> str:
+        token = require_token(ctx)
         if token is None:
             return missing_token_error()
         query = str(params.get("query") or "")
@@ -108,9 +108,9 @@ def make_notion_read_tool(ctx: ToolContext) -> AgentTool:
     form is dramatically smaller and easier for the LLM to consume.
     This raw shape exists for callers that need block-level metadata.
     """
-    token = require_token(ctx)
 
     async def execute(_tool_call_id: str, params: dict[str, Any]) -> str:
+        token = require_token(ctx)
         if token is None:
             return missing_token_error()
         page_id = str(params.get("page_id") or "")
@@ -156,9 +156,9 @@ def make_notion_read_tool(ctx: ToolContext) -> AgentTool:
 
 def make_notion_read_markdown_tool(ctx: ToolContext) -> AgentTool:
     """Return a page rendered as Markdown via ``ntn pages get``."""
-    token = require_token(ctx)
 
     async def execute(_tool_call_id: str, params: dict[str, Any]) -> str:
+        token = require_token(ctx)
         if token is None:
             return missing_token_error()
         page_id = str(params.get("page_id") or "")
@@ -209,9 +209,9 @@ def make_notion_file_tree_tool(ctx: ToolContext) -> AgentTool:
     :data:`FILE_TREE_MAX_DEPTH` levels.  Used for "give me a map of
     this section before I dive in" prompts.
     """
-    token = require_token(ctx)
 
     async def execute(_tool_call_id: str, params: dict[str, Any]) -> str:
+        token = require_token(ctx)
         if token is None:
             return missing_token_error()
         root_id = str(params.get("page_id") or "")

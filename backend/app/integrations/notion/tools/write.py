@@ -26,9 +26,9 @@ from app.integrations.notion.tools._helpers import (
 
 def make_notion_append_tool(ctx: ToolContext) -> AgentTool:
     """Append blocks to a page via ``v1/blocks/<id>/children`` PATCH."""
-    token = require_token(ctx)
 
     async def execute(_tool_call_id: str, params: dict[str, Any]) -> str:
+        token = require_token(ctx)
         if token is None:
             return missing_token_error()
         page_id = str(params.get("page_id") or "")
@@ -89,9 +89,9 @@ def make_notion_append_tool(ctx: ToolContext) -> AgentTool:
 
 def make_notion_create_tool(ctx: ToolContext) -> AgentTool:
     """Create a new page under a parent via ``ntn pages create``."""
-    token = require_token(ctx)
 
     async def execute(_tool_call_id: str, params: dict[str, Any]) -> str:
+        token = require_token(ctx)
         if token is None:
             return missing_token_error()
         parent_id = str(params.get("parent_page_id") or "")
@@ -165,9 +165,9 @@ def make_notion_create_tool(ctx: ToolContext) -> AgentTool:
 
 def make_notion_update_markdown_tool(ctx: ToolContext) -> AgentTool:
     """Replace a page's body with new Markdown via ``ntn pages update``."""
-    token = require_token(ctx)
 
     async def execute(_tool_call_id: str, params: dict[str, Any]) -> str:
+        token = require_token(ctx)
         if token is None:
             return missing_token_error()
         page_id = str(params.get("page_id") or "")
@@ -216,9 +216,9 @@ def make_notion_update_markdown_tool(ctx: ToolContext) -> AgentTool:
 
 def make_notion_update_page_tool(ctx: ToolContext) -> AgentTool:
     """Patch page-level properties (title, icon, cover, archive flag)."""
-    token = require_token(ctx)
 
     async def execute(_tool_call_id: str, params: dict[str, Any]) -> str:
+        token = require_token(ctx)
         if token is None:
             return missing_token_error()
         page_id = str(params.get("page_id") or "")

@@ -72,9 +72,9 @@ def make_notion_help_tool(ctx: ToolContext) -> AgentTool:
 
 def make_notion_doctor_tool(ctx: ToolContext) -> AgentTool:
     """Connectivity probe — calls ``v1/users/me`` to confirm auth works."""
-    token = require_token(ctx)
 
     async def execute(_tool_call_id: str, _params: dict[str, Any]) -> str:
+        token = require_token(ctx)
         if token is None:
             return missing_token_error()
 

@@ -23,9 +23,9 @@ MAX_COMMENT_PAGE_SIZE = 100
 
 def make_notion_comment_create_tool(ctx: ToolContext) -> AgentTool:
     """Post a comment to a Notion page."""
-    token = require_token(ctx)
 
     async def execute(_tool_call_id: str, params: dict[str, Any]) -> str:
+        token = require_token(ctx)
         if token is None:
             return missing_token_error()
         page_id = str(params.get("page_id") or "")
@@ -75,9 +75,9 @@ def make_notion_comment_create_tool(ctx: ToolContext) -> AgentTool:
 
 def make_notion_comment_list_tool(ctx: ToolContext) -> AgentTool:
     """List comments on a Notion page."""
-    token = require_token(ctx)
 
     async def execute(_tool_call_id: str, params: dict[str, Any]) -> str:
+        token = require_token(ctx)
         if token is None:
             return missing_token_error()
         page_id = str(params.get("page_id") or "")

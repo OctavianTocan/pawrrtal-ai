@@ -38,9 +38,9 @@ _FRONTMATTER_FENCE = "---"
 
 def make_notion_sync_tool(ctx: ToolContext) -> AgentTool:
     """Push or pull a workspace markdown file against a Notion page."""
-    token = require_token(ctx)
 
     async def execute(_tool_call_id: str, params: dict[str, Any]) -> str:
+        token = require_token(ctx)
         if token is None:
             return missing_token_error()
         rel_path = str(params.get("path") or "")

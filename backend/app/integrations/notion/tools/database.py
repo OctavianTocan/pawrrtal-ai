@@ -23,9 +23,9 @@ MAX_QUERY_PAGE_SIZE = 100
 
 def make_notion_query_tool(ctx: ToolContext) -> AgentTool:
     """Query a Notion database with optional filter / sort objects."""
-    token = require_token(ctx)
 
     async def execute(_tool_call_id: str, params: dict[str, Any]) -> str:
+        token = require_token(ctx)
         if token is None:
             return missing_token_error()
         database_id = str(params.get("database_id") or "")

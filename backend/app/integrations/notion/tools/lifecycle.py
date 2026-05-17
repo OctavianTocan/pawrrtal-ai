@@ -25,9 +25,9 @@ def make_notion_delete_tool(ctx: ToolContext) -> AgentTool:
     moved to Trash and can be restored from the Notion UI — matching
     openclaw-notion's contract.
     """
-    token = require_token(ctx)
 
     async def execute(_tool_call_id: str, params: dict[str, Any]) -> str:
+        token = require_token(ctx)
         if token is None:
             return missing_token_error()
         page_id = str(params.get("page_id") or "")
@@ -74,9 +74,9 @@ def make_notion_delete_tool(ctx: ToolContext) -> AgentTool:
 
 def make_notion_move_tool(ctx: ToolContext) -> AgentTool:
     """Re-parent a Notion page under a new parent page."""
-    token = require_token(ctx)
 
     async def execute(_tool_call_id: str, params: dict[str, Any]) -> str:
+        token = require_token(ctx)
         if token is None:
             return missing_token_error()
         page_id = str(params.get("page_id") or "")
@@ -130,9 +130,9 @@ def make_notion_publish_tool(ctx: ToolContext) -> AgentTool:
     page; PATCHing ``{"public_url": {"public": true}}`` flips it.
     Useful for "make this page public" agent prompts.
     """
-    token = require_token(ctx)
 
     async def execute(_tool_call_id: str, params: dict[str, Any]) -> str:
+        token = require_token(ctx)
         if token is None:
             return missing_token_error()
         page_id = str(params.get("page_id") or "")

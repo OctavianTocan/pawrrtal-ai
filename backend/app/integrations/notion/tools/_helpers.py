@@ -75,13 +75,16 @@ def build_tool(
 
 
 def require_token(ctx: ToolContext) -> str | None:
-    """Return the token or ``None``; tools surface a clean error on miss.
+    """Return the workspace's current token or ``None`` when unset.
 
     Activation gating already keeps tools off the list when
-    ``NOTION_API_KEY`` isn't configured, but a race (key cleared
-    mid-turn) could still produce a missing token at execute time.
-    Surfacing a friendly message beats letting ``ntn`` exit non-zero
-    with an opaque auth error.
+    ``NOTION_API_KEY`` isn't configured at build-time, but the key can
+    be rotated or cleared between ``build_agent_tools`` and a
+    subsequent tool call within the same turn.  Call this **inside
+    ``execute``** (not at factory body), so the resolution observes
+    the workspace's current state per call; on a miss surface
+    :func:`missing_token_error` instead of letting ``ntn`` exit with
+    an opaque auth error.
     """
     return resolve_workspace_token(ctx)
 

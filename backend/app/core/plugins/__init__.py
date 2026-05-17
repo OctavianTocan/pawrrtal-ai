@@ -31,7 +31,11 @@ See ``frontend/content/docs/handbook/decisions/2026-05-15-plugin-system-and-noti
 for the design rationale.
 """
 
-from app.core.plugins.registry import all_plugins, register_plugin
+from app.core.plugins.registry import (
+    all_plugins,
+    is_activated_by_env_keys,
+    register_plugin,
+)
 from app.core.plugins.types import EnvKeySpec, Plugin, ToolContext, ToolFactory
 
 __all__ = [
@@ -40,5 +44,6 @@ __all__ = [
     "ToolContext",
     "ToolFactory",
     "all_plugins",
+    "is_activated_by_env_keys",
     "register_plugin",
 ]

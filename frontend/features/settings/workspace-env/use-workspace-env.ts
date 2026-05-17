@@ -1,6 +1,11 @@
 'use client';
 
-import { type UseMutationResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+	type UseMutationResult,
+	useMutation,
+	useQuery,
+	useQueryClient,
+} from '@tanstack/react-query';
 import { useAuthedFetch } from '@/hooks/use-authed-fetch';
 import { useAuthedQuery } from '@/hooks/use-authed-query';
 import { API_ENDPOINTS } from '@/lib/api';
@@ -151,9 +156,7 @@ export function useUpsertWorkspaceEnv(): UseMutationResult<
 			vars: Partial<Record<WorkspaceEnvKey, string>>
 		): Promise<WorkspaceEnvResponse> => {
 			if (!workspaceId) {
-				throw new Error(
-					'Cannot save workspace env: default workspace has not loaded yet.'
-				);
+				throw new Error('Cannot save workspace env: default workspace has not loaded yet.');
 			}
 			const response = await fetcher(API_ENDPOINTS.workspaces.env(workspaceId), {
 				method: 'PUT',
