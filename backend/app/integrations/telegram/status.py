@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,8 +29,22 @@ from app.crud.channel import (
 )
 from app.crud.conversation import ConversationStatus, get_conversation_status
 
-if TYPE_CHECKING:
-    from app.integrations.telegram.handlers import TelegramSender
+
+class _TelegramSenderLike(Protocol):
+    """Structural type for the subset of ``TelegramSender`` /status needs.
+
+    Declared as a Protocol so this module does not import from
+    ``app.integrations.telegram.handlers`` — sentrux's ``max_cycles=0``
+    architecture rule forbids any handlers↔status import edge (even
+    under ``TYPE_CHECKING``).  The concrete ``TelegramSender``
+    dataclass in ``handlers.py`` already satisfies this shape, so
+    callers pass it unchanged.
+    """
+
+    user_id: int
+    chat_id: int
+    thread_id: int | None
+
 
 logger = logging.getLogger(__name__)
 
@@ -182,7 +196,7 @@ def _render_status_message(
 
 async def handle_status_command(
     *,
-    sender: TelegramSender,
+    sender: _TelegramSenderLike,
     session: AsyncSession,
     bot_uptime_seconds: float,
     is_chat_run_active: Callable[[int], bool],
