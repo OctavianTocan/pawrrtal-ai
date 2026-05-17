@@ -83,6 +83,15 @@ ignore_imports =
     app.core.tools.lcm_describe -> app.models
     app.core.tools.lcm_grep -> app.models
     app.core.tools.lcm_expand_query -> app.models
+    ; LCM Retrieval Lab (PR #258 / issues #251–#256) extends the same
+    ; substrate — observability, ranked search, eval harness, semantic
+    ; retrieval — and must read the same ORM tables (now plus
+    ; lcm_embeddings).  Grandfathered alongside the older LCM entries
+    ; until the entire LCM stack is flattened in one pass.
+    app.core.lcm.embeddings -> app.models
+    app.core.lcm.evals -> app.models
+    app.core.lcm.observe -> app.models
+    app.core.tools.lcm_search -> app.models
 
 ; --- Contract 2: the legacy db ↔ models cycle is the one cycle sentrux
 ; allows (max_cycles = 1). Pin it explicitly so any *new* cycle fails CI. -
