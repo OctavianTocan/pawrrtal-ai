@@ -20,7 +20,7 @@
 - Added startup refresh for Telegram slash commands so the bot menu matches the current server build.
 - Added verbose Telegram delivery for tool activity and thinking events.
 - Fixed default workspace creation races so losing inserts clean up their seeded directory asynchronously.
-- Renamed agent tool labels from `ai_nexus` to `pawrrtal`.
+- Renamed agent tool labels from `pawrrtal` to `pawrrtal`.
 - Fixed a **workspace-isolation gap in the Claude Agent SDK**: every chat turn was reading the backend repo's `CLAUDE.md`, `.claude/settings.json` (hooks!), and `.mcp.json` from the uvicorn cwd. Pinned `setting_sources=[]` unconditionally and plumbed per-user `workspace_root` into `ClaudeLLMConfig.cwd` so the SDK subprocess's transcript directory lands under the user workspace. The chat router, Telegram bot, and event-bus webhook handlers all forward `workspace_root`. (#259)
 - Cleared **60 strict-mypy errors across the backend (29 files → 0 across 138 files)**. Typing-only sweep — no runtime behaviour change. Caught one real latent bug along the way: `middleware.py` had three `# type: ignore[misc]` masking a wrong `call_next: object` annotation; replaced with `RequestResponseEndpoint` and dropped the ignores. (#259)
 - Fixed **Gemini `system_prompt` reaching the SDK**: `make_gemini_stream_fn` was hardcoding the module-level fallback on every `GenerateContentConfig.system_instruction`, ignoring the per-request prompt the chat router passed via `provider.stream(system_prompt=...)`. The workspace-assembled prompt (SOUL.md + AGENTS.md + CLAUDE.md + skills) now actually reaches Gemini. (#264)

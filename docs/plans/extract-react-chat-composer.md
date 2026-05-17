@@ -12,7 +12,7 @@ landed on `feat/extract-react-chat-composer`. Submodule is at main
 `0b076cc`; host imports flipped; in-tree composer code deleted.
 Branch in this repo: `feat/extract-react-chat-composer`
 (from `feat/react-overlay-submodule-create-project`)
-Pull request: [#166](https://github.com/OctavianTocan/ai-nexus/pull/166)
+Pull request: [#166](https://github.com/OctavianTocan/Pawrrtal-AI/pull/166)
 Submodule: <https://github.com/OctavianTocan/react-chat-composer>
 
 > **Historical document.** Everything below was the up-front plan written

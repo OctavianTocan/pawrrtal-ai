@@ -1,7 +1,7 @@
 /**
  * Single source of truth for the personalization profile that the
  * onboarding flow collects and the Settings → Personalization section
- * edits. Persisted to localStorage under `nexus:personalization` so both
+ * edits. Persisted to localStorage under `pawrrtal:personalization` so both
  * surfaces read/write the same shape.
  *
  * Backend wiring is deferred — once the agent factory threads custom
@@ -13,7 +13,7 @@
  */
 
 /** localStorage key — never rename without a migration. */
-export const PERSONALIZATION_STORAGE_KEY = 'nexus:personalization';
+export const PERSONALIZATION_STORAGE_KEY = 'pawrrtal:personalization';
 
 /** Personality preset IDs the onboarding flow + settings dropdown share. */
 export const PERSONALITY_OPTIONS = [
@@ -93,8 +93,8 @@ export interface PersonalizationProfile {
 	/** Custom instructions surfaced in the Personalization settings section. */
 	customInstructions?: string;
 	/**
-	 * Optional URL of a self-hosted AI Nexus backend, e.g.
-	 * `https://nexus.mycompany.com`. When set the frontend will prefer
+	 * Optional URL of a self-hosted Pawrrtal backend, e.g.
+	 * `https://pawrrtal.mycompany.com`. When set the frontend will prefer
 	 * this over the default same-origin API base. Empty or absent means
 	 * "use the hosted / same-origin server".
 	 */

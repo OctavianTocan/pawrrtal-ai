@@ -480,12 +480,12 @@ Frontend tests:
 
 ### 9. DB reset and deploy ordering
 
-`nexus.db` is wiped and recreated. Per the investigation, current
+`pawrrtal.db` is wiped and recreated. Per the investigation, current
 content is three rows of bare IDs only; no production data is at
 risk. Migration logic is not written.
 
 ```sh
-rm -f backend/nexus.db && cd backend && uv run alembic upgrade head
+rm -f backend/pawrrtal.db && cd backend && uv run alembic upgrade head
 ```
 
 The localStorage `selectedModelId` validator runs at hydration and

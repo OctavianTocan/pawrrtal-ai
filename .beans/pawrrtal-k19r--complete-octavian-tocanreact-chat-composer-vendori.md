@@ -32,7 +32,7 @@ This work happens entirely inside frontend/lib/react-chat-composer (the submodul
 - [x] Author CHAT_MODELS_2026 sample preset + defineChatModel helper in src/index.ts (or src/presets/)
 - [x] Verify package builds with tsup (pnpm run build) and emits dist/{index,primitives,hooks,types}.{js,cjs,d.ts} + dist/styles/{theme,animations}.css
 - [ ] Add Storybook covering all states (empty / with text / attachments / recording / transcribing / mic-disabled / model-selector with-and-without / footerActions / isLoading / mobile width). Wire lost-pixel.
-- [x] Bump submodule pointer in OctavianTocan/ai-nexus and unblock PR 3 (pawrrtal-3a64)
+- [x] Bump submodule pointer in OctavianTocan/Pawrrtal-AI and unblock PR 3 (pawrrtal-3a64)
 
 
 

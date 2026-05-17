@@ -27,7 +27,7 @@ export const OPEN_ONBOARDING_FLOW_EVENT = 'pawrrtal:open-onboarding-flow';
  * configuration step. Dispatched by the workspace-creation modal when the
  * user clicks "Connect to remote server".
  */
-export const OPEN_ONBOARDING_SERVER_STEP_EVENT = 'ai-nexus:open-onboarding-server-step';
+export const OPEN_ONBOARDING_SERVER_STEP_EVENT = 'pawrrtal:open-onboarding-server-step';
 
 /**
  * Localstorage flag + query-string param that suppress the auto-open

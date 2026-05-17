@@ -23,7 +23,7 @@ Before starting, make sure you have read:
    500-LOC file budget, conventional commits, Biome enforcement, the
    `bun run check` gate, beans-over-TodoWrite, and the "no pre-existing
    excuse" rule.
-3. The "How We Work on AI Nexus" rule at
+3. The "How We Work on Pawrrtal" rule at
    `.claude/rules/general/how-we-work-on-pawrrtal.md` — especially
    "read first, write second" and "run the toolchain after every file
    write."

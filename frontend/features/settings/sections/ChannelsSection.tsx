@@ -30,7 +30,7 @@ export function ChannelsSection(): React.JSX.Element {
 			<header className="flex flex-col gap-1">
 				<h2 className="text-lg font-semibold text-foreground">Channels</h2>
 				<p className="text-sm text-muted-foreground">
-					Connect a messaging surface so you can reach Nexus from anywhere. Each
+					Connect a messaging surface so you can reach Pawrrtal from anywhere. Each
 					connection is bound to your account and only you can use it.
 				</p>
 			</header>
@@ -64,7 +64,7 @@ export function ChannelsSection(): React.JSX.Element {
 												? handle
 													? `Connected as @${handle}`
 													: 'Connected'
-												: 'Chat with Nexus from your Telegram account'
+												: 'Chat with Pawrrtal from your Telegram account'
 											: 'Coming soon'}
 									</span>
 								</div>

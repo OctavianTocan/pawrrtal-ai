@@ -147,7 +147,7 @@ architecture; the rules at a glance:
 ## How We Work On Pawrrtal
 
 The session-derived working agreement lives in
-`.claude/rules/general/how-we-work-on-ai-nexus.md`. It encodes nine rules
+`.claude/rules/general/how-we-work-on-pawrrtal.md`. It encodes nine rules
 the team keeps re-discovering: read implementations before changing them,
 trace cause before fixing, update `DESIGN.md` when tokens change in code,
 reuse established patterns instead of inventing parallel ones, declare
@@ -163,7 +163,7 @@ The curated reading list for the highest-signal rules in this stack lives at [`d
 ## Learned User Preferences
 
 - When the user asks to log a technical or architectural decision, capture it in `frontend/content/docs/handbook/decisions/` (ADR-style) and tie it to task tracking (e.g. `beans`) when the flow already uses beans.
-- When adapting external UI references (screenshots, other products), use AI Nexus naming and the repo theme tokens rather than copying third-party branding or palettes from the reference.
+- When adapting external UI references (screenshots, other products), use Pawrrtal naming and the repo theme tokens rather than copying third-party branding or palettes from the reference.
 - The user may ask for extremely terse “caveman” explanations when digging into complex technical changes.
 - When a UI fix establishes a reusable pattern, or when a surface fetches data as soon as it appears (for example integration connection state), use a loader or skeleton until the result is known; capture the approach in `DESIGN.md` so the design system stays the single narrative for “how we do this,” not only inline code comments.
 - Prefer modal/backdrop (“scrim”) treatments that combine background blur with a subtle dark tint (for example a linear gradient around 10–15% black) instead of a flat uniform opacity overlay when aiming for depth or a glass-like feel.

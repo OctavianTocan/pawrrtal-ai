@@ -1,4 +1,4 @@
-# AI Nexus backend — Docker image
+# Pawrrtal backend — Docker image
 #
 # Multi-stage build:
 #   builder  — installs Python deps via uv into /app/.venv

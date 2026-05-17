@@ -1953,19 +1953,19 @@ EOF
 ### Task 11: Wipe the dev DB, run migrations, smoke-test end-to-end
 
 **Files:**
-- Delete + recreate: `backend/nexus.db`
+- Delete + recreate: `backend/pawrrtal.db`
 - No code change in this task
 
 **Steps:**
 
-- [ ] **Step 1: Confirm `nexus.db` is gitignored** (it is per CLAUDE.md's recent commits) and that wiping it locally won't affect any teammate.
+- [ ] **Step 1: Confirm `pawrrtal.db` is gitignored** (it is per CLAUDE.md's recent commits) and that wiping it locally won't affect any teammate.
 
 - [ ] **Step 2: Stop all running dev processes.**
 
 - [ ] **Step 3: Wipe and recreate.**
 
 ```bash
-rm -f backend/nexus.db
+rm -f backend/pawrrtal.db
 cd backend && uv run alembic upgrade head
 ```
 
@@ -2025,6 +2025,6 @@ Body should:
 
 - Every checkbox in tasks 1–11 ticked.
 - `just check` + `bun run typecheck` + `bun run test --run` + `uv run pytest` all green.
-- `nexus.db` recreated; manual smoke passes.
+- `pawrrtal.db` recreated; manual smoke passes.
 - Beans pawrrtal-5854 and pawrrtal-25yy updated.
 - PR opened.

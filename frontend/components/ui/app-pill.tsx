@@ -7,7 +7,7 @@
  *
  * @see DESIGN.md — Components — app-pill
  *
- * @fileoverview Pill and tag primitive for AI Nexus.
+ * @fileoverview Pill and tag primitive for Pawrrtal.
  */
 
 import type * as React from 'react';

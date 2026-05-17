@@ -728,7 +728,7 @@ wired like **`react-dropdown`**: root **`package.json`** **`workspace:*`** +
 Feature code composes through **`frontend/components/ui/app-dialog.tsx`**
 (`AppDialog`), which picks **`Modal`** on desktop and **`BottomSheet`** on narrow
 viewports. **`AppDialog`** is a thin shell over **`ResponsiveModal`**
-(`responsive-modal.tsx`) with the AI Nexus contract documented in this section.
+(`responsive-modal.tsx`) with the Pawrrtal contract documented in this section.
 
 **How modals become bottom sheets:** On viewports narrower than **768px** (same
 threshold as **`useIsMobile`**), the same

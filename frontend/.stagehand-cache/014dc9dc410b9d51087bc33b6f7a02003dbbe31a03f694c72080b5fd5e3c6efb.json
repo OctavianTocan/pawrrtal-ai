@@ -8,13 +8,13 @@
   "actions": [
     {
       "selector": "xpath=/html[1]/body[1]/div[3]/div[1]/div[1]/div[3]/div[1]/div[1]/div[1]/main[1]/div[1]/div[1]/div[1]/div[1]/form[1]/div[1]/div[1]/textarea[1]",
-      "description": "textbox: Ask AI Nexus anything. @ to mention context",
+      "description": "textbox: Ask Pawrrtal anything. @ to mention context",
       "method": "type",
       "arguments": [
         "%prompt%"
       ]
     }
   ],
-  "actionDescription": "textbox: Ask AI Nexus anything. @ to mention context",
+  "actionDescription": "textbox: Ask Pawrrtal anything. @ to mention context",
   "message": "Action [type] performed successfully on selector: xpath=/html[1]/body[1]/div[3]/div[1]/div[1]/div[3]/div[1]/div[1]/div[1]/main[1]/div[1]/div[1]/div[1]/div[1]/form[1]/div[1]/div[1]/textarea[1]"
 }

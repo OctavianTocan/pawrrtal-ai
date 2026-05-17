@@ -1,6 +1,6 @@
 """Channel abstraction — base protocol and shared message types.
 
-Every surface that can send a message to Nexus and receive a response is a
+Every surface that can send a message to Pawrrtal and receive a response is a
 Channel.  Channels are equal peers; there is no "default" channel.
 
 Architecture
@@ -51,10 +51,10 @@ class ChannelMessage(TypedDict):
     """
 
     user_id: uuid.UUID
-    """Nexus user UUID — resolved from auth token or channel binding."""
+    """Pawrrtal user UUID — resolved from auth token or channel binding."""
 
     conversation_id: uuid.UUID
-    """Nexus conversation UUID — created or looked up by the channel."""
+    """Pawrrtal conversation UUID — created or looked up by the channel."""
 
     text: str
     """The user's message text."""
@@ -95,7 +95,7 @@ class Channel(Protocol):
     """Streaming chat channel adapter.
 
     Implementations translate between a surface's native protocol and the
-    Nexus core pipeline.  Each implementation is responsible for:
+    Pawrrtal core pipeline.  Each implementation is responsible for:
 
     1. **Normalization** (``receive``): converting the raw inbound event
        into a ``ChannelMessage``.

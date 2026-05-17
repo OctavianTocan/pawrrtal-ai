@@ -26,4 +26,4 @@ Replace the current always-on onboarding modal with a 4-step flow that only open
 - Triggered from workspace selector → 4-step flow → close.
 - Personalization section in /settings reads/writes the same data.
 
-Done — gated existing modal behind workspace selector by removing always-on instance from (app)/page.tsx, and replaced 3-step OnboardingModal with new 4-step OnboardingFlow (Identity → Context → Personality → Connect Messaging). Profile persists to nexus:personalization localStorage and is round-tripped by the Settings → Personalization section.
+Done — gated existing modal behind workspace selector by removing always-on instance from (app)/page.tsx, and replaced 3-step OnboardingModal with new 4-step OnboardingFlow (Identity → Context → Personality → Connect Messaging). Profile persists to pawrrtal:personalization localStorage and is round-tripped by the Settings → Personalization section.

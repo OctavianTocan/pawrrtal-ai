@@ -6,7 +6,7 @@
  *
  * @see DESIGN.md — Components — app-dialog-callout
  *
- * @fileoverview Inline dialog callout primitive for AI Nexus.
+ * @fileoverview Inline dialog callout primitive for Pawrrtal.
  */
 
 import type * as React from 'react';

@@ -21,9 +21,9 @@ def upgrade() -> None:
     """Create the channel_bindings + channel_link_codes tables.
 
     `channel_bindings` is the persistent map from a third-party messaging
-    identity (Telegram user/chat, eventually Slack/WhatsApp) to a Nexus
+    identity (Telegram user/chat, eventually Slack/WhatsApp) to a Pawrrtal
     user. One row per (provider, external_user_id) pair so the same
-    Telegram account can never silently move between Nexus users.
+    Telegram account can never silently move between Pawrrtal users.
 
     `channel_link_codes` is the short-lived one-time-use handshake table
     used by the web → bot binding flow: the web app issues a code, the
