@@ -85,22 +85,144 @@ docker compose down
 
 ## Environment variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `AUTH_SECRET` | ✅ | JWT signing secret — generate with `openssl rand -hex 32` |
-| `WORKSPACE_ENCRYPTION_KEY` | ✅ | Fernet key for per-workspace encrypted `.env` files (32 random bytes, base64-encoded) |
-| `GOOGLE_API_KEY` | ⚠️ | Required if you want any Gemini model (default catalog entry uses one) |
-| `CLAUDE_CODE_OAUTH_TOKEN` | ⚠️ | Required for `claude-*` models |
-| `EXA_API_KEY` | Optional | Web search via `exa_search` |
-| `XAI_API_KEY` | Optional | xAI Grok models + voice STT |
-| `OPENAI_CODEX_OAUTH_TOKEN` | Optional | Image generation tool |
-| `NOTION_API_KEY` | Optional | Activates the Notion plugin (18 tools via `ntn`) |
-| `TELEGRAM_BOT_TOKEN` | Optional | Enables the Telegram channel |
+Every variable below maps to a field on
+[`backend/app/core/config.py::Settings`](../backend/app/core/config.py).
+`backend/.env.example` is the **full reference** (one entry per Settings
+field with inline docs); `backend/.env.docker.example` is the Compose
+quick-start subset. This page is the cheat-sheet view, grouped by
+concern.
 
-At least one of `GOOGLE_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN` is needed for the chat
-endpoint to do anything useful. The "optional" provider keys are also overridable
-**per workspace** via Settings → Environment (encrypted with `WORKSPACE_ENCRYPTION_KEY`);
-the gateway-global values in `.env` act as the fallback.
+### Required for any deploy
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | Postgres URL. Overridden by `docker-compose.yml` to point at the bundled service. |
+| `AUTH_SECRET` | JWT signing secret. Generate: `openssl rand -hex 32`. |
+| `WORKSPACE_ENCRYPTION_KEY` | Fernet key for per-workspace encrypted `.env` files. Generate: `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`. |
+| `GOOGLE_API_KEY` | Powers every Gemini model in the default catalog. |
+| `CORS_ORIGINS` | JSON array of allowed browser origins. |
+
+### LLM providers (at least one provider needed for chat to be useful)
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_API_KEY` | Gemini — default model uses it. |
+| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Agent SDK — required for any `claude-*` model. Generate: `claude setup-token`. |
+| `EXA_API_KEY` | Web search via the provider-agnostic `exa_search` tool. |
+| `XAI_API_KEY` | xAI; also powers voice STT when `VOICE_PROVIDER=xai`. |
+
+### Cookies, CORS, environment
+
+`ENV`, `COOKIE_DOMAIN`, `COOKIE_SAMESITE`, `COOKIE_SECURE`,
+`CORS_ORIGINS`, `CORS_ORIGIN_REGEX`, `WORKSPACE_BASE_DIR`.
+
+### Access control
+
+`BACKEND_API_KEY` (transport-level shared secret in `X-Pawrrtal-Key`
+header), `ALLOWED_EMAILS` (comma-separated email allowlist),
+`DEMO_MODE` (locks down public demo deploys).
+
+### Agent loop safety (defaults work for most deploys)
+
+`AGENT_MAX_ITERATIONS=25`, `AGENT_MAX_WALL_CLOCK_SECONDS=300`,
+`AGENT_MAX_CONSECUTIVE_LLM_ERRORS=3`,
+`AGENT_MAX_CONSECUTIVE_TOOL_ERRORS=5`,
+`AGENT_LLM_RETRY_BACKOFF_SECONDS=1.0`. Empty string disables a guard.
+
+### Claude SDK governance
+
+`CLAUDE_SANDBOX_ENABLED`, `CLAUDE_SANDBOX_AUTO_ALLOW_BASH`,
+`CLAUDE_SANDBOX_EXCLUDED_COMMANDS`, `CLAUDE_RETRY_MAX_ATTEMPTS`,
+`CLAUDE_RETRY_BASE_DELAY_SECONDS`, `CLAUDE_RETRY_MAX_DELAY_SECONDS`,
+`CLAUDE_RETRY_BACKOFF_FACTOR`.
+
+### Workspace context (CLAUDE.md / AGENTS.md / SOUL.md / skills / settings.json)
+
+`WORKSPACE_CONTEXT_ENABLED=true`,
+`WORKSPACE_SKILLS_DIR_NAME=.claude/skills`,
+`WORKSPACE_SETTINGS_FILENAME=.claude/settings.json`.
+
+### In-process `python` tool (opt-in, NOT sandboxed)
+
+`VIRTUAL_PYTHON_ENABLED=false`, `VIRTUAL_PYTHON_TIMEOUT_SECONDS=30`,
+`VIRTUAL_PYTHON_OUTPUT_CAP_BYTES=32000`. Single-tenant only — the
+code can reach `os.environ`, `subprocess`, sockets.
+
+### Chat rate limiting
+
+`CHAT_RATE_LIMIT_PER_MINUTE=0` (off by default; pick a value for
+public deploys).
+
+### Cost tracking + audit log + redaction
+
+`COST_TRACKER_ENABLED`, `COST_MAX_PER_REQUEST_USD`,
+`COST_MAX_PER_USER_DAILY_USD`, `COST_RESET_WINDOW_HOURS`,
+`AUDIT_LOG_ENABLED`, `AUDIT_LOG_RETENTION_DAYS`,
+`SECRET_REDACTION_ENABLED`, `STRICT_CONVERSATION_READ_VALIDATION`.
+
+### Ops platform
+
+Webhooks: `WEBHOOK_API_ENABLED`, `WEBHOOK_API_SECRET`,
+`GITHUB_WEBHOOK_SECRET`. Scheduler: `SCHEDULER_ENABLED`,
+`SCHEDULER_PERSISTENT_JOBSTORE`.
+
+### OAuth
+
+Google: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`,
+`GOOGLE_OAUTH_REDIRECT_URI`. Apple: `APPLE_OAUTH_CLIENT_ID`,
+`APPLE_OAUTH_TEAM_ID`, `APPLE_OAUTH_KEY_ID`,
+`APPLE_OAUTH_PRIVATE_KEY`, `APPLE_OAUTH_REDIRECT_URI`. Shared:
+`OAUTH_POST_LOGIN_REDIRECT`.
+
+### Telegram channel
+
+`TELEGRAM_BOT_TOKEN` (empty = channel disabled),
+`TELEGRAM_BOT_USERNAME`, `TELEGRAM_MODE` (`polling`/`webhook`),
+`TELEGRAM_WEBHOOK_URL`, `TELEGRAM_WEBHOOK_SECRET`,
+`TELEGRAM_VERBOSE_DEFAULT`, `TELEGRAM_TYPING_REFRESH_SECONDS`,
+`TELEGRAM_USE_DRAFT_STREAMING`.
+
+### Voice / STT
+
+`VOICE_PROVIDER` (`xai` / `mistral` / `openai` / `local`),
+`VOICE_MISTRAL_API_KEY`, `VOICE_OPENAI_API_KEY`,
+`VOICE_WHISPER_CPP_BINARY`, `VOICE_WHISPER_CPP_MODEL`,
+`VOICE_MAX_SIZE_MB`.
+
+### Lossless Context Management (LCM)
+
+`LCM_ENABLED`, `LCM_FRESH_TAIL_COUNT`, `LCM_LEAF_CHUNK_TOKENS`,
+`LCM_CONTEXT_THRESHOLD`, `LCM_INCREMENTAL_MAX_DEPTH`,
+`LCM_SUMMARY_MODEL`.
+
+### Plugins (per-workspace BYOK)
+
+Plugins declare their own env keys in `<plugin>/plugin.py`. They are
+**not** read from the gateway `.env` — each workspace's encrypted
+`.env` carries them and tools resolve via
+`resolve_api_key(workspace_id, …)`.
+
+| Plugin | Key | Notes |
+|--------|-----|-------|
+| Notion | `NOTION_API_KEY` | 18 tools via the `ntn` subprocess. Get from https://www.notion.so/profile/integrations |
+
+POST to `/api/v1/workspaces/{workspace_id}/env` to set these without
+the UI.
+
+### Observability (OpenTelemetry, read directly by the OTel SDK)
+
+`OTEL_EXPORTER_OTLP_ENDPOINT` (setting this enables the whole stack
+— leave unset for no-op), `OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+`OTEL_SERVICE_NAME=pawrrtal-backend`, `OTEL_EXPORTER_OTLP_HEADERS`.
+
+### Dev admin login
+
+`ADMIN_EMAIL`, `ADMIN_PASSWORD` (seeded account for the dev login
+shortcut; disabled when `ENV=prod`).
+
+> **Per-workspace overrides.** Every provider key above also lives in
+> the workspace's encrypted `.env` (Settings → Environment in the UI).
+> Tools resolve in priority order: workspace key → gateway `.env` key.
 
 `DATABASE_URL` is **overridden** by `docker-compose.yml` to point at the
 bundled postgres service — you don't need to change it in `.env`.

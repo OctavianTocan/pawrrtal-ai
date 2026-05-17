@@ -131,65 +131,145 @@ tail -f backend/app.log
 
 ## Configuration
 
-Settings live in `backend/app/core/config.py` (pydantic-settings). Highlights:
+Every setting lives on `backend/app/core/config.py::Settings`. The
+**full annotated reference** is [`backend/.env.example`](backend/.env.example);
+[`backend/.env.docker.example`](backend/.env.docker.example) is the
+Compose quick-start subset; [`docs/docker.md`](docs/docker.md) groups
+them by concern with one-line descriptions.
+
+Required-at-minimum: `DATABASE_URL`, `AUTH_SECRET`,
+`WORKSPACE_ENCRYPTION_KEY`, `GOOGLE_API_KEY`, `CORS_ORIGINS`.
+
+Highlights of what's tunable:
 
 ```bash
-# Auth
+# Auth + access
 AUTH_SECRET=                # JWT signing key (required)
+WORKSPACE_ENCRYPTION_KEY=   # Fernet key for per-workspace .env
+BACKEND_API_KEY=            # X-Pawrrtal-Key transport gate (optional)
 ALLOWED_EMAILS=             # CSV allowlist; empty = open
+DEMO_MODE=false             # locks down public demo deploys
 
 # Database
 DATABASE_URL=postgresql+psycopg://...   # or sqlite+aiosqlite:///./app.db
 
 # Workspace
 WORKSPACE_BASE_DIR=/data/workspaces
-WORKSPACE_ENCRYPTION_KEY=   # base64-encoded 32-byte Fernet key
 
 # Providers (gateway fallbacks; per-workspace overrides win)
 GOOGLE_API_KEY=
 CLAUDE_CODE_OAUTH_TOKEN=
 EXA_API_KEY=
 XAI_API_KEY=
-OPENAI_CODEX_OAUTH_TOKEN=
-NOTION_API_KEY=
 
-# Telegram
+# CORS / cookies
+CORS_ORIGINS=["http://localhost:3001"]
+CORS_ORIGIN_REGEX=^https:\/\/.*\.vercel\.app$    # regex applied in addition
+COOKIE_DOMAIN=
+COOKIE_SAMESITE=lax
+COOKIE_SECURE=false
+
+# Channels: Telegram
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_BOT_USERNAME=
 TELEGRAM_MODE=polling                  # or webhook
 TELEGRAM_WEBHOOK_URL=
+TELEGRAM_WEBHOOK_SECRET=
 TELEGRAM_VERBOSE_DEFAULT=1             # 0=quiet, 1=tools, 2=thinking
+TELEGRAM_TYPING_REFRESH_SECONDS=2.5
+TELEGRAM_USE_DRAFT_STREAMING=false
 
-# Safety
+# Agent loop safety
 AGENT_MAX_ITERATIONS=25
 AGENT_MAX_WALL_CLOCK_SECONDS=300
 AGENT_MAX_CONSECUTIVE_LLM_ERRORS=3
 AGENT_MAX_CONSECUTIVE_TOOL_ERRORS=5
+AGENT_LLM_RETRY_BACKOFF_SECONDS=1.0
 
-# Cost
+# Claude SDK governance
+CLAUDE_SANDBOX_ENABLED=false
+CLAUDE_SANDBOX_AUTO_ALLOW_BASH=true
+CLAUDE_SANDBOX_EXCLUDED_COMMANDS=sudo,ssh,scp,rsync
+CLAUDE_RETRY_MAX_ATTEMPTS=3
+CLAUDE_RETRY_BASE_DELAY_SECONDS=1.0
+CLAUDE_RETRY_MAX_DELAY_SECONDS=30.0
+CLAUDE_RETRY_BACKOFF_FACTOR=2.0
+
+# Workspace context assembly
+WORKSPACE_CONTEXT_ENABLED=true
+WORKSPACE_SKILLS_DIR_NAME=.claude/skills
+WORKSPACE_SETTINGS_FILENAME=.claude/settings.json
+
+# Chat rate limiting
+CHAT_RATE_LIMIT_PER_MINUTE=0           # 0 = off
+
+# Cost + audit + redaction
 COST_TRACKER_ENABLED=true
 COST_MAX_PER_REQUEST_USD=1.0
 COST_MAX_PER_USER_DAILY_USD=10.0
+COST_RESET_WINDOW_HOURS=24
+AUDIT_LOG_ENABLED=true
+AUDIT_LOG_RETENTION_DAYS=90
+SECRET_REDACTION_ENABLED=true
+STRICT_CONVERSATION_READ_VALIDATION=true
+
+# Ops platform
+WEBHOOK_API_ENABLED=false
+WEBHOOK_API_SECRET=
+GITHUB_WEBHOOK_SECRET=
+SCHEDULER_ENABLED=false
+SCHEDULER_PERSISTENT_JOBSTORE=true
+
+# OAuth (Google + Apple — empty = button hidden)
+GOOGLE_OAUTH_CLIENT_ID=
+GOOGLE_OAUTH_CLIENT_SECRET=
+GOOGLE_OAUTH_REDIRECT_URI=http://localhost:8000/api/v1/auth/oauth/google/callback
+APPLE_OAUTH_CLIENT_ID=
+APPLE_OAUTH_TEAM_ID=
+APPLE_OAUTH_KEY_ID=
+APPLE_OAUTH_PRIVATE_KEY=
+APPLE_OAUTH_REDIRECT_URI=
+OAUTH_POST_LOGIN_REDIRECT=http://localhost:3001/
+
+# Voice / STT
+VOICE_PROVIDER=xai                     # xai | mistral | openai | local
+VOICE_MISTRAL_API_KEY=
+VOICE_OPENAI_API_KEY=
+VOICE_WHISPER_CPP_BINARY=              # auto-detected when empty
+VOICE_WHISPER_CPP_MODEL=base
+VOICE_MAX_SIZE_MB=25
 
 # LCM (lossless context management)
 LCM_ENABLED=false
 LCM_FRESH_TAIL_COUNT=64
 LCM_LEAF_CHUNK_TOKENS=20000
 LCM_CONTEXT_THRESHOLD=0.75
+LCM_INCREMENTAL_MAX_DEPTH=1
 LCM_SUMMARY_MODEL=
 
-# Python tool (UNSANDBOXED — single-tenant only)
+# In-process `python` agent tool (UNSANDBOXED — single-tenant only)
 VIRTUAL_PYTHON_ENABLED=false
+VIRTUAL_PYTHON_TIMEOUT_SECONDS=30
+VIRTUAL_PYTHON_OUTPUT_CAP_BYTES=32000
 
-# Observability
+# Observability (OpenTelemetry — read directly by the OTel SDK)
 OTEL_EXPORTER_OTLP_ENDPOINT=
+OTEL_EXPORTER_OTLP_PROTOCOL=http/json
 OTEL_SERVICE_NAME=pawrrtal-backend
+OTEL_EXPORTER_OTLP_HEADERS=
+
+# Dev admin login (disabled when ENV=prod)
+ADMIN_EMAIL=admin@pawrrtal-ai.dev
+ADMIN_PASSWORD=admin1234
 ```
 
 ### Per-workspace API keys
-Six keys are overridable per workspace (file: `{base}/{workspace_id}/.env`, Fernet-encrypted, `chmod 0o600`):
-`GEMINI_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, `EXA_API_KEY`, `XAI_API_KEY`, `OPENAI_CODEX_OAUTH_TOKEN`, `NOTION_API_KEY`.
-Frontend exposes them via **Settings → Environment**. Empty values fall back to the gateway global.
+Every provider key above also lives in the workspace's encrypted `.env`
+(file: `{base}/{workspace_id}/.env`, Fernet-encrypted with
+`WORKSPACE_ENCRYPTION_KEY`, `chmod 0o600`). Plugin keys (e.g.
+`NOTION_API_KEY` for the Notion plugin) are workspace-only by design.
+The frontend exposes them via **Settings → Environment**; tools resolve
+in priority order **workspace key → gateway `.env` key**.
 
 ---
 
