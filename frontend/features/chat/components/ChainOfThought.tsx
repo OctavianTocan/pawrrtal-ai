@@ -146,15 +146,28 @@ export const ChainOfThought = memo(function ChainOfThought({
 	chipsByToolId,
 }: ChainOfThoughtProps) {
 	const items = useMemo(() => {
+		// Keys are baked into each item at flatten time so the JSX `key=`
+		// expression is a stable string lookup, not a render-time index
+		// derivation.  Historical conversations whose tool_call_ids collided
+		// before backend PR #292 (which appended a uuid4 suffix to Gemini
+		// tool ids) still produce unique React keys via the flatten counter
+		// — but the counter lives on the data, not on the render call.
 		type Item =
-			| { kind: 'thinking'; title: string; content: string }
-			| { kind: 'tool'; call: ChatToolCall; chips: ToolResultChips };
+			| { kind: 'thinking'; key: string; title: string; content: string }
+			| { kind: 'tool'; key: string; call: ChatToolCall; chips: ToolResultChips };
 		const flat: Item[] = [];
+		let counter = 0;
 		for (const entry of timeline) {
 			if (entry.kind === 'thinking') {
 				const sections = parseThinkingSections(entry.text);
 				for (const section of sections) {
-					flat.push({ kind: 'thinking', title: section.title, content: section.content });
+					flat.push({
+						kind: 'thinking',
+						key: `thinking-${counter}-${section.title}`,
+						title: section.title,
+						content: section.content,
+					});
+					counter += 1;
 				}
 				continue;
 			}
@@ -162,9 +175,11 @@ export const ChainOfThought = memo(function ChainOfThought({
 			if (!call) continue;
 			flat.push({
 				kind: 'tool',
+				key: `tool-${counter}-${call.id}`,
 				call,
 				chips: chipsByToolId.get(entry.toolCallId) ?? EMPTY_CHIPS,
 			});
+			counter += 1;
 		}
 		return flat;
 	}, [timeline, toolCallsById, chipsByToolId]);
@@ -182,29 +197,11 @@ export const ChainOfThought = memo(function ChainOfThought({
 
 	return (
 		<div className="flex flex-col gap-0.5">
-			{items.map((item, index) => {
-				// Prefix the timeline index so historical conversations whose
-				// tool_call_ids collided before backend PR #292 (Gemini
-				// provider now appends a uuid4 suffix) still produce unique
-				// React keys when their messages are reloaded from the DB.
-				// Index is stable here because items are append-only for the
-				// lifetime of the parent message.
+			{items.map((item) => {
 				if (item.kind === 'tool') {
-					return (
-						<ToolStep
-							call={item.call}
-							chips={item.chips}
-							key={`tool-${index}-${item.call.id}`}
-						/>
-					);
+					return <ToolStep call={item.call} chips={item.chips} key={item.key} />;
 				}
-				return (
-					<ThinkingStep
-						content={item.content}
-						key={`thinking-${index}-${item.title}`}
-						title={item.title}
-					/>
-				);
+				return <ThinkingStep content={item.content} key={item.key} title={item.title} />;
 			})}
 		</div>
 	);
