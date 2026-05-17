@@ -215,7 +215,11 @@ def _tool_calls_from_chunk(chunk: Any, start_index: int) -> list[dict[str, Any]]
     return calls
 
 
-def make_gemini_stream_fn(model_id: str, user_id: uuid.UUID | None = None) -> StreamFn:
+def make_gemini_stream_fn(
+    model_id: str,
+    user_id: uuid.UUID | None = None,
+    system_prompt: str = _FALLBACK_SYSTEM_PROMPT,
+) -> StreamFn:
     """Build a StreamFn backed by the google-genai SDK.
 
     Args:
@@ -225,6 +229,13 @@ def make_gemini_stream_fn(model_id: str, user_id: uuid.UUID | None = None) -> St
             ``settings.google_api_key`` is used directly, matching
             ``ClaudeLLM``'s optional ``user_id`` contract for unauthenticated
             background work (e.g. utility agents).
+        system_prompt: The system prompt for this StreamFn.  Captured into the
+            returned closure and bound to ``GenerateContentConfig.system_instruction``
+            on every call.  ``GeminiLLM.stream`` builds a fresh StreamFn per
+            request so the per-request prompt (assembled from the workspace's
+            SOUL.md + AGENTS.md + CLAUDE.md + skills by the chat router) is
+            what the model sees; defaulting to ``_FALLBACK_SYSTEM_PROMPT`` keeps
+            direct-script callers (a few unit tests) working without ceremony.
 
     Returns:
         An async generator factory that yields ``LLMEvent``s. The generator
@@ -234,7 +245,6 @@ def make_gemini_stream_fn(model_id: str, user_id: uuid.UUID | None = None) -> St
     async def stream_fn(
         messages: list[AgentMessage],
         tools: list[AgentTool],
-        system_prompt: str,
     ) -> AsyncIterator[LLMEvent]:
         client = genai.Client(api_key=_resolve_gemini_api_key(user_id))
         contents = _build_gemini_contents(messages)
@@ -244,13 +254,7 @@ def make_gemini_stream_fn(model_id: str, user_id: uuid.UUID | None = None) -> St
         # rather than make the helper return the wide type.
         gemini_tools: list[Any] | None = _build_gemini_tool_declarations(tools)
         config = gtypes.GenerateContentConfig(
-            # ``system_prompt`` is plumbed in from ``AgentContext.system_prompt``
-            # via ``_stream_with_retry`` so the workspace-assembled prompt
-            # (SOUL.md + AGENTS.md + CLAUDE.md + skills) reaches the model.
-            # An empty string is treated as "no caller-supplied prompt" and
-            # falls back to ``_FALLBACK_SYSTEM_PROMPT`` so direct-script
-            # callers (a few unit tests) still get a sensible default.
-            system_instruction=system_prompt or _FALLBACK_SYSTEM_PROMPT,
+            system_instruction=system_prompt,
             # Pass None (not []) when there are no tools — some SDK versions raise on empty list.
             tools=gemini_tools or None,
             # TODO(pawrrtal-1qlk): Set automatic_function_calling disable=True
@@ -380,7 +384,16 @@ class GeminiLLM:
                 ``ClaudeLLM``'s contract for unauthenticated callers.
         """
         self._model_id = model_id
-        self._stream_fn = make_gemini_stream_fn(model_id, user_id)
+        self._user_id = user_id
+        # ``_stream_fn`` defaults to ``None`` because the production system
+        # prompt isn't known until ``stream()`` is called — ``stream()``
+        # builds a fresh StreamFn per request via ``make_gemini_stream_fn``
+        # so the workspace-assembled prompt (SOUL.md + AGENTS.md +
+        # CLAUDE.md + skills) is baked into the closure that turn.  Tests
+        # monkeypatch this attribute to inject a deterministic
+        # ``ScriptedStreamFn``; when set, ``stream()`` honours the
+        # injection as-is.  See ``.claude/rules/testing/agent-loop-testing-philosophy.md``.
+        self._stream_fn: StreamFn | None = None
 
     async def stream(
         self,
@@ -464,8 +477,19 @@ class GeminiLLM:
             permission_check=permission_check,
         )
 
+        # In production ``_stream_fn`` is ``None`` and we build a fresh
+        # StreamFn per request so the captured ``system_prompt`` matches
+        # what the chat router assembled this turn.  Tests monkeypatch
+        # ``_stream_fn`` with a ``ScriptedStreamFn``; when set we honour
+        # the injection (the script doesn't care about the prompt).
+        stream_fn = self._stream_fn or make_gemini_stream_fn(
+            self._model_id,
+            self._user_id,
+            system_prompt=context.system_prompt,
+        )
+
         try:
-            async for event in agent_loop([prompt], context, config, self._stream_fn):
+            async for event in agent_loop([prompt], context, config, stream_fn):
                 stream_event = agent_event_to_stream_event(event)
                 if stream_event is not None:
                     yield stream_event

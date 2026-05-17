@@ -206,7 +206,6 @@ async def test_stream_config_disables_sdk_automatic_function_calling(
         async for event in stream_fn(
             [UserMessage(role="user", content="Search the docs.")],
             [_make_search_tool()],
-            "",
         )
     ]
 
@@ -223,13 +222,15 @@ async def test_stream_config_disables_sdk_automatic_function_calling(
 async def test_stream_threads_system_prompt_into_gemini_config(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The per-call ``system_prompt`` lands on ``GenerateContentConfig.system_instruction``.
+    """The factory-captured ``system_prompt`` lands on ``GenerateContentConfig.system_instruction``.
 
-    Workspace-assembled prompts (SOUL.md + AGENTS.md + CLAUDE.md + skills) are
-    threaded through ``AgentContext.system_prompt`` → ``_stream_with_retry`` →
-    the Gemini ``StreamFn``.  If this wiring breaks, the model silently runs
-    on the bare provider fallback and the workspace identity is lost — so
-    this test asserts on the SDK-bound value, not just the call shape.
+    ``GeminiLLM.stream()`` builds a fresh StreamFn per request via
+    ``make_gemini_stream_fn(..., system_prompt=context.system_prompt)`` so the
+    workspace-assembled prompt (SOUL.md + AGENTS.md + CLAUDE.md + skills) is
+    baked into the closure and reaches the SDK.  If this wiring breaks, the
+    model silently runs on the bare provider fallback and the workspace
+    identity is lost — so this test asserts on the SDK-bound value, not just
+    the call shape.
     """
     captured_models = _CapturingModels()
 
@@ -242,11 +243,13 @@ async def test_stream_threads_system_prompt_into_gemini_config(
     monkeypatch.setattr(gemini_provider, "_resolve_gemini_api_key", lambda _user_id: "test-key")
 
     workspace_prompt = "You are PAWRRTAL, the assistant for octavian's workspace."
-    stream_fn = gemini_provider.make_gemini_stream_fn("gemini-test")
+    stream_fn = gemini_provider.make_gemini_stream_fn(
+        "gemini-test",
+        system_prompt=workspace_prompt,
+    )
     async for _ in stream_fn(
         [UserMessage(role="user", content="hi")],
         [],
-        workspace_prompt,
     ):
         pass
 

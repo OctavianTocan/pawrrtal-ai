@@ -217,21 +217,13 @@ async def agent_loop(
         yield MessageStartEvent(type="message_start", message=prompt)
         yield MessageEndEvent(type="message_end", message=prompt)
 
-    async for event in _run_loop(
-        current_messages,
-        context.tools,
-        context.system_prompt,
-        new_messages,
-        config,
-        stream_fn,
-    ):
+    async for event in _run_loop(current_messages, context.tools, new_messages, config, stream_fn):
         yield event
 
 
 async def _run_loop(
     messages: list[AgentMessage],
     tools: list[AgentTool],
-    system_prompt: str,
     new_messages: list[AgentMessage],
     config: AgentLoopConfig,
     stream_fn: StreamFn,
@@ -268,7 +260,6 @@ async def _run_loop(
             stream_fn=stream_fn,
             llm_messages=llm_messages,
             tools=tools,
-            system_prompt=system_prompt,
             safety=safety,
             consecutive_llm_errors=consecutive_llm_errors,
         )
@@ -520,7 +511,6 @@ async def _stream_with_retry(
     stream_fn: StreamFn,
     llm_messages: list[AgentMessage],
     tools: list[AgentTool],
-    system_prompt: str,
     safety: AgentSafetyConfig,
     consecutive_llm_errors: int,
 ) -> _StreamOutcome:
@@ -547,7 +537,7 @@ async def _stream_with_retry(
         provider_state: dict[str, Any] | None = None
 
         try:
-            async for llm_event in stream_fn(llm_messages, tools, system_prompt):
+            async for llm_event in stream_fn(llm_messages, tools):
                 done = _consume_llm_event(llm_event, events)
                 # `done` is non-None only on the terminal ``done`` event;
                 # we keep iterating in case the SDK emits trailers, but
