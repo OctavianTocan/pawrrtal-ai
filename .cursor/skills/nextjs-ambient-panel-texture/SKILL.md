@@ -1,6 +1,6 @@
 ---
 name: nextjs-ambient-panel-texture
-description: Ports Telegram-style tileable SVG preset masks plus a procedural SVG tile generator into a Next.js App Router app as an ambient CSS-mask texture on panels (chat/main shell), with a small customization UI and idempotent install steps. Bundles 33 preset SVGs under bundled-patterns/ for direct copy to public/. Use when adding subtle panel textures, “Telegram-style” chat backgrounds, mask-based overlays, or onboarding a host repo to match the AI Nexus whimsy feature without backend persistence.
+description: Ports Telegram-style tileable SVG preset masks plus a procedural SVG tile generator into a Next.js App Router app as an ambient CSS-mask texture on panels (chat/main shell), with a small customization UI and idempotent install steps. Bundles 33 preset SVGs under bundled-patterns/ for direct copy to public/. Use when adding subtle panel textures, “Telegram-style” chat backgrounds, mask-based overlays, or onboarding a host repo to match the Pawrrtal whimsy feature without backend persistence.
 disable-model-invocation: true
 ---
 

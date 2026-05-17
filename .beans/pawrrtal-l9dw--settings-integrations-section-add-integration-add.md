@@ -18,7 +18,7 @@ Add a fully visual Integrations section to /settings.
 - AddCustomMCPModal: Server URL input + warning + Continue button
 
 ## Wiring
-- All visual; persist toggled "connected" state to localStorage under nexus:integrations
+- All visual; persist toggled "connected" state to localStorage under pawrrtal:integrations
 - New SettingsSection 'integrations' added to nav rail
 
 Done — Integrations rail entry, Your Integrations list, Add Integration modal, Add Custom MCP modal.

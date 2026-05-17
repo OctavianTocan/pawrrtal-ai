@@ -61,7 +61,7 @@ _NOT_BOUND_MESSAGE = (
     "click 'Connect Telegram', and either tap the deep link or send me "
     "the code you'll see there."
 )
-_BIND_OK_MESSAGE = "Connected ✅ — you can now chat with Nexus from here."
+_BIND_OK_MESSAGE = "Connected ✅ — you can now chat with Pawrrtal from here."
 _BIND_BAD_CODE_MESSAGE = (
     "That code didn't work. It may have expired (codes live for 10 minutes) "
     "or already been used. Generate a fresh one from Settings → Channels."
@@ -137,10 +137,10 @@ class TelegramTurnContext:
     """
 
     nexus_user_id: uuid.UUID
-    """Nexus user UUID resolved from the channel binding."""
+    """Pawrrtal user UUID resolved from the channel binding."""
 
     conversation_id: uuid.UUID
-    """Stable Nexus conversation for this Telegram user."""
+    """Stable Pawrrtal conversation for this Telegram user."""
 
     model_id: str
     """Model to use for this turn (default or conversation override)."""

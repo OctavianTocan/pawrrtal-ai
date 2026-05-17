@@ -11,7 +11,7 @@
  * {@link ModalDescription}, etc. from the package.
  *
  * Feature code should prefer **`AppDialog`** (`app-dialog.tsx`), which wraps this
- * component with the AI Nexus application shell contract — see DESIGN.md.
+ * component with the Pawrrtal application shell contract — see DESIGN.md.
  *
  * @fileoverview Responsive Modal/BottomSheet implementation layer (use AppDialog in features).
  */

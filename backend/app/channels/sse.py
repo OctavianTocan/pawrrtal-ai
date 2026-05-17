@@ -36,7 +36,7 @@ SURFACE_ELECTRON = "electron"
 
 # HTTP header the frontend sets to identify itself.
 # If absent, the channel defaults to SURFACE_WEB.
-NEXUS_SURFACE_HEADER = "X-Nexus-Surface"
+NEXUS_SURFACE_HEADER = "X-Pawrrtal-Surface"
 
 
 def _frame(event: StreamEvent) -> bytes:
@@ -84,7 +84,7 @@ class SSEChannel(Channel):
 
 
 def surface_from_header(header_value: str | None) -> str:
-    """Resolve the surface name from the ``X-Nexus-Surface`` request header.
+    """Resolve the surface name from the ``X-Pawrrtal-Surface`` request header.
 
     Accepts ``"web"`` and ``"electron"``; defaults to ``"web"`` for any
     unrecognized or absent value so existing clients that don't send the

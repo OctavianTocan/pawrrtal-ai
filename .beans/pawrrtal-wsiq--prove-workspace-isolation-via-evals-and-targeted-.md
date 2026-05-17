@@ -1,5 +1,5 @@
 ---
-# ai-nexus-wsiq
+# pawrrtal-wsiq
 title: 'Prove workspace isolation via evals and targeted escape tests'
 status: todo
 type: task

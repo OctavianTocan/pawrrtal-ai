@@ -7,7 +7,7 @@ Two responsibilities live here:
    (or, in the future, Slack workspace, WhatsApp number, ...).
 2. Reading + writing the persistent `channel_bindings` rows that the
    inbound message path uses to resolve a third-party identity into
-   a Nexus user.
+   a Pawrrtal user.
 
 Codes are stored hashed; the user-facing plaintext is only ever
 returned from `issue_link_code` and never persisted as-is. All lookups
@@ -222,7 +222,7 @@ async def get_user_id_for_external(
     external_user_id: str,
     session: AsyncSession,
 ) -> uuid.UUID | None:
-    """Resolve a third-party identity to its bound Nexus ``user_id``.
+    """Resolve a third-party identity to its bound Pawrrtal ``user_id``.
 
     Returns ``None`` when no binding exists; the inbound bot path uses
     that signal to send the onboarding nudge ("send me your code or
@@ -251,7 +251,7 @@ async def get_or_create_telegram_conversation(
     the web UI would.
 
     Args:
-        user_id: Nexus user who owns the conversation.
+        user_id: Pawrrtal user who owns the conversation.
         session: Async database session.
 
     Returns:
@@ -273,7 +273,7 @@ async def get_or_create_telegram_conversation_full(
     model overrides set by ``/model`` without a second round-trip.
 
     Args:
-        user_id: Nexus user who owns the conversation.
+        user_id: Pawrrtal user who owns the conversation.
         session: Async database session.
         thread_id: Telegram topic thread ID (Bot API 9.3+).  When set,
             the query scopes to conversations with a matching

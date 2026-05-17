@@ -1,10 +1,10 @@
 # Reference: source map and port checklist
 
-## Canonical implementation (AI Nexus)
+## Canonical implementation (Pawrrtal)
 
 Use these paths when aligning behavior; rename public APIs to **ambient panel texture** in the host app.
 
-| Concern | Path in ai-nexus |
+| Concern | Path in pawrrtal |
 |--------|-------------------|
 | Feature barrel + integration notes | `frontend/features/whimsy/index.tsx` |
 | Config schema, bounds, optional persistence hook | `frontend/features/whimsy/config.ts` |

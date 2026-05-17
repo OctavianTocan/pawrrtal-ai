@@ -18,7 +18,7 @@ Three small but visible defects reported together. (1) GET /api/v1/conversations
 
 3. frontend/lib/react-chat-composer/src/model-selector/ModelSelectorPopoverView.tsx — non-active provider rows no longer render ChevronRightIcon; only the active row shows a CheckIcon. Removed the now-unused ChevronRightIcon import. Submenu still opens on hover/ArrowRight.
 
-Dev DB at repo root (nexus.db) was migrated successfully: 5 conversations now have NULL model_id, the rest are canonical. backend/nexus.db was created accidentally during alembic stamping (relative ./nexus.db) and should be deleted by the operator — the auto-mode classifier blocked me from removing it.
+Dev DB at repo root (pawrrtal.db) was migrated successfully: 5 conversations now have NULL model_id, the rest are canonical. backend/pawrrtal.db was created accidentally during alembic stamping (relative ./pawrrtal.db) and should be deleted by the operator — the auto-mode classifier blocked me from removing it.
 
 Verification: bun run check passes (Biome + tsc + file-lines + nesting + view-container all clean apart from the same pre-existing MONOLITH advisories).
 

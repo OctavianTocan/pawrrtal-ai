@@ -62,7 +62,7 @@ const dispatchProfileChange = (): void => {
 /**
  * Personalization settings section.
  *
- * Reads + writes the same `nexus:personalization` localStorage profile
+ * Reads + writes the same `pawrrtal:personalization` localStorage profile
  * that the v2 onboarding flow collects, so a personality picked in
  * onboarding shows up here pre-selected (and edits here flow back to
  * the profile).

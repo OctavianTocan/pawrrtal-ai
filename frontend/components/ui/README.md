@@ -1,6 +1,6 @@
-# UI primitives (AI Nexus)
+# UI primitives (Pawrrtal)
 
-Canonical behavior and tokens live in repo-root **`DESIGN.md`**. This folder holds shadcn-style building blocks plus **AI Nexus shells** over vendored packages.
+Canonical behavior and tokens live in repo-root **`DESIGN.md`**. This folder holds shadcn-style building blocks plus **Pawrrtal shells** over vendored packages.
 
 ## Responsive overlays
 

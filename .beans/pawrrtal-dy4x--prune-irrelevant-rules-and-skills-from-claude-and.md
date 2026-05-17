@@ -84,7 +84,7 @@ Researched how Claude Code loads .claude/rules/ files. Findings:
 This repo's CLAUDE.md is 456 lines (≈2× recommended ceiling). Largest hidden cost is the always-on CLAUDE.md content, not the rule files themselves.
 
 ### Done in follow-up
-- Deleted general/how-we-work-on-pawrrtal.md (pure duplicate of how-we-work-on-ai-nexus.md; ~120 lines saved per session).
+- Deleted general/how-we-work-on-pawrrtal.md (pure duplicate of how-we-work-on-pawrrtal.md; ~120 lines saved per session).
 
 ### Open follow-ups (pending user decision)
 - Move 'Agent-Loop Testing Philosophy' section (~80 lines in CLAUDE.md) to .claude/rules/testing/ with paths: ['backend/**/*.py'].
@@ -97,7 +97,7 @@ Executed remaining follow-ups:
 1. Extracted CLAUDE.md 'Agent-Loop Testing Philosophy' section (~95 lines) → .claude/rules/testing/agent-loop-testing-philosophy.md with paths: ['backend/**/*.py', 'backend/tests/**']. Now loads only when editing backend Python.
 2. Extracted CLAUDE.md 'Curated Claude rules (Pawrrtal)' citation list (~80 lines, including Monorepo/Biome, Git/PRs, AI review subsections, and Vendored Cursor rules notes) → docs/curated-claude-rules.md.
 3. Replaced both sections in CLAUDE.md (via AGENTS.md symlink target) with a single 'Claude rules index' paragraph (1 line of prose + 2 markdown links).
-4. Fixed stale citation to deleted how-we-work-on-pawrrtal.md → now points to how-we-work-on-ai-nexus.md.
+4. Fixed stale citation to deleted how-we-work-on-pawrrtal.md → now points to how-we-work-on-pawrrtal.md.
 
 ### Results
 - AGENTS.md/CLAUDE.md: 456 → 283 lines (≈38% smaller, still 80 over the 200-line target).

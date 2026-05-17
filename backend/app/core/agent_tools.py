@@ -70,7 +70,7 @@ def build_agent_tools(
             this is the load-bearing word — *scoped*, not *proven
             unescapable*.  We have unit tests for the resolver, not
             adversarial evals against a real model trying to escape.
-            Until those land (see bean ``ai-nexus-wsiq``), treat the
+            Until those land (see bean ``pawrrtal-wsiq``), treat the
             boundary as a strong invariant we haven't yet proved
             under prompt pressure.
         user_id: Authenticated user UUID, used to resolve per-workspace

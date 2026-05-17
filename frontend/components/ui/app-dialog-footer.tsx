@@ -7,7 +7,7 @@
  *
  * @see DESIGN.md — Components — app-dialog-footer
  *
- * @fileoverview Dialog footer layout primitive for AI Nexus.
+ * @fileoverview Dialog footer layout primitive for Pawrrtal.
  */
 
 import type * as React from 'react';

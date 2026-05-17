@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Install an AI Nexus/Pawrrtal self-hosted GitHub Actions runner on the VPS.
+# Install an Pawrrtal/Pawrrtal self-hosted GitHub Actions runner on the VPS.
 #
 # Matches the existing convention used by the other runners on the box
 # (openclaw-vps-01..04): a system-level systemd service running as the
@@ -9,7 +9,7 @@
 # Steps:
 #   1. Asks GitHub for a one-shot registration token using the GH_TOKEN
 #      env var.
-#   2. Creates `/srv/github-runners/ai-nexus/<runner-name>/actions-runner/`
+#   2. Creates `/srv/github-runners/pawrrtal/<runner-name>/actions-runner/`
 #      owned by gha
 #      (creates the gha user if missing).
 #   3. Downloads the latest `actions-runner` tarball into that directory.
@@ -28,10 +28,10 @@
 
 set -euo pipefail
 
-REPO="${REPO:-OctavianTocan/ai-nexus}"
+REPO="${REPO:-OctavianTocan/Pawrrtal-AI}"
 RUNNER_USER="${RUNNER_USER:-gha}"
 RUNNER_BASE="${RUNNER_BASE:-/srv/github-runners}"
-RUNNER_REPO_DIR="${RUNNER_REPO_DIR:-${RUNNER_BASE}/ai-nexus}"
+RUNNER_REPO_DIR="${RUNNER_REPO_DIR:-${RUNNER_BASE}/pawrrtal}"
 LABELS="${LABELS:-self-hosted,openclaw-mini,pawrrtal}"
 
 if [[ $EUID -ne 0 ]]; then

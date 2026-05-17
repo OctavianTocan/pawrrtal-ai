@@ -1,4 +1,4 @@
-# Running AI Nexus with Docker Compose
+# Running Pawrrtal with Docker Compose
 
 The `docker-compose.yml` at the repo root spins up PostgreSQL 16 and the
 FastAPI backend together. The Next.js frontend is left out intentionally —
@@ -13,8 +13,8 @@ you run it with the normal dev server so hot-reload keeps working.
 
 ```bash
 # 1. Clone the repo (use --recurse-submodules for vendored frontend packages)
-git clone --recurse-submodules https://github.com/OctavianTocan/ai-nexus.git
-cd ai-nexus
+git clone --recurse-submodules https://github.com/OctavianTocan/Pawrrtal-AI.git
+cd pawrrtal
 
 # Plain clone? Run: git submodule update --init --recursive
 
@@ -27,7 +27,7 @@ docker compose up --build
 ```
 
 The backend will be live at **http://localhost:8000** and PostgreSQL will be
-exposed at **localhost:5432** (credentials: `nexus` / `nexus_dev`, database `nexus`).
+exposed at **localhost:5432** (credentials: `pawrrtal` / `nexus_dev`, database `pawrrtal`).
 
 Database migrations run automatically on every backend start via
 `alembic upgrade head` (with a retry loop in case postgres isn't
@@ -43,7 +43,7 @@ without a rebuild.
 In a separate terminal:
 
 ```bash
-cd ai-nexus
+cd pawrrtal
 bun install          # or npm install
 bun dev              # or npm run dev
 ```
@@ -58,7 +58,7 @@ on port 8000 by default.
 docker compose logs -f backend
 
 # Open a psql shell against the local postgres
-docker compose exec postgres psql -U nexus -d nexus
+docker compose exec postgres psql -U pawrrtal -d pawrrtal
 
 # Run Alembic migrations manually (useful after pulling new code)
 docker compose exec backend alembic upgrade head

@@ -1,5 +1,5 @@
 ---
-# ai-nexus-pgte
+# pawrrtal-pgte
 title: 'Per-agent / per-user / per-conversation tool-permission gating'
 status: todo
 type: task

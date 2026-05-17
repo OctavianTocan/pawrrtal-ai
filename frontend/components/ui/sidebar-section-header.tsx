@@ -7,7 +7,7 @@
  *
  * @see DESIGN.md — Components — sidebar-section-header
  *
- * @fileoverview Sidebar section header primitive for AI Nexus.
+ * @fileoverview Sidebar section header primitive for Pawrrtal.
  */
 
 import { ChevronRight } from 'lucide-react';

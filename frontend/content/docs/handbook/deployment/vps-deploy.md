@@ -116,7 +116,7 @@ Fill it in.  Annotated template:
 ```bash
 # ── Core ─────────────────────────────────────────────────────────
 ENV=prod                                  # cookies become secure-only
-DATABASE_URL=postgresql://nexus:<POSTGRES_PASSWORD>@postgres:5432/nexus
+DATABASE_URL=postgresql://pawrrtal:<POSTGRES_PASSWORD>@postgres:5432/pawrrtal
 SECRET_KEY=<from step 3>
 AUTH_SECRET=<from step 3>
 BACKEND_API_KEY=<from step 3>             # X-Pawrrtal-Key header gate
@@ -152,9 +152,9 @@ EXA_API_KEY=...                           # web search; leave blank to disable
 XAI_API_KEY=...                           # voice/STT proxy; leave blank to disable
 
 # ── Postgres ─────────────────────────────────────────────────────
-POSTGRES_USER=nexus
+POSTGRES_USER=pawrrtal
 POSTGRES_PASSWORD=<from step 3>
-POSTGRES_DB=nexus
+POSTGRES_DB=pawrrtal
 
 # ── Telegram (optional — see section 9) ──────────────────────────
 TELEGRAM_BOT_TOKEN=
@@ -452,7 +452,7 @@ docker volume create pawrrtal_postgres_data
 docker compose up -d postgres
 sleep 10
 zcat /var/backups/pawrrtal/postgres_<latest>.sql.gz | \
-    docker compose exec -T postgres psql -U nexus -d nexus
+    docker compose exec -T postgres psql -U pawrrtal -d pawrrtal
 # 4. Boot the rest
 docker compose up -d
 ```

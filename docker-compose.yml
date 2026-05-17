@@ -1,4 +1,4 @@
-# AI Nexus — base Compose file (service definitions shared by all environments)
+# Pawrrtal — base Compose file (service definitions shared by all environments)
 #
 # This file defines service topology only — no published ports.
 # Use an overlay for ports and dev-only settings:
@@ -23,14 +23,14 @@ services:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_USER: nexus
+      POSTGRES_USER: pawrrtal
       POSTGRES_PASSWORD: nexus_dev
-      POSTGRES_DB: nexus
+      POSTGRES_DB: pawrrtal
     # No `ports` here — publish on the host only in docker-compose.dev.yml.
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nexus -d nexus"]
+      test: ["CMD-SHELL", "pg_isready -U pawrrtal -d pawrrtal"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -49,7 +49,7 @@ services:
     environment:
       # Override the DATABASE_URL from .env so it points at the compose
       # postgres service regardless of what the user typed in .env.
-      DATABASE_URL: "postgresql://nexus:nexus_dev@postgres:5432/nexus"
+      DATABASE_URL: "postgresql://pawrrtal:nexus_dev@postgres:5432/pawrrtal"
       # watchfiles uses kernel inotify by default, which doesn't fire
       # reliably for changes made on the host through a Docker bind mount.
       # Force polling so uvicorn --reload actually reloads on every save.

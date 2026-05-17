@@ -14,7 +14,7 @@ Add AppDialog wrapper, expand DESIGN.md for modal→sheet pattern, update overla
 
 ## Summary of Changes
 
-- Added `frontend/components/ui/app-dialog.tsx` (`AppDialog`) as the AI Nexus application shell over `ResponsiveModal`.
+- Added `frontend/components/ui/app-dialog.tsx` (`AppDialog`) as the Pawrrtal application shell over `ResponsiveModal`.
 - Expanded DESIGN.md (Modal / sheet overlays): modal→bottom-sheet behavior, header/footer/body pattern, variants guidance.
 - Updated `.claude/rules/react/use-octavian-overlay-for-modals.md`, `.claude/CLAUDE.md`, and how-we-work rules to prefer `AppDialog`.
 - Migrated feature dialogs from `ResponsiveModal` to `AppDialog`.

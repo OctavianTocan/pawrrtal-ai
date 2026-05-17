@@ -7,7 +7,7 @@
  *
  * @see DESIGN.md — Components — app-empty-state
  *
- * @fileoverview AI Nexus empty-state primitive.
+ * @fileoverview Pawrrtal empty-state primitive.
  */
 
 import type * as React from 'react';

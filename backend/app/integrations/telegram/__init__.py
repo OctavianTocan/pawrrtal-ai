@@ -1,6 +1,6 @@
 """Telegram channel adapter.
 
-Bridges the Telegram Bot API to Nexus. Everything provider-specific
+Bridges the Telegram Bot API to Pawrrtal. Everything provider-specific
 (aiogram dispatcher, message formatting, polling/webhook split) lives
 here; the rest of the codebase stays Telegram-agnostic.
 """

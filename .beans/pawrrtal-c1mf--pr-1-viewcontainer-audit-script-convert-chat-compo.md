@@ -28,7 +28,7 @@ First PR in the react-chat-composer extraction. Lands the View/Container audit s
 
 ## Summary of Changes
 
-Opened https://github.com/OctavianTocan/ai-nexus/pull/166 covering:
+Opened https://github.com/OctavianTocan/Pawrrtal-AI/pull/166 covering:
 
 - New scripts/check-view-container.mjs (TS compiler API; IMPURE_VIEW + MONOLITH checks; advisory default; STRICT_VC=1 strict). Wired into bun run check.
 - Four chat composer files converted to View/Container in-place:

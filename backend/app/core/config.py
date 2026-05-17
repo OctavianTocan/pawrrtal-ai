@@ -375,7 +375,7 @@ class Settings(BaseSettings):
         """Return the configured database URL in a normalized form."""
         url = self.database_url.strip()
         if not url:
-            return "sqlite:///./nexus.db"
+            return "sqlite:///./pawrrtal.db"
 
         parsed = urlparse(url)
         if parsed.scheme.startswith(("postgresql", "sqlite")):

@@ -5,7 +5,7 @@ onboarding step-server "Verify" button.  It must be:
 
 1. Publicly accessible — no authentication required.  The verify button
    is clicked *before* the user has a session (they're checking that the
-   remote URL resolves to a real Nexus server).
+   remote URL resolves to a real Pawrrtal server).
 2. Always fast — no database round-trips, no network calls.
 3. Structurally stable — the exact JSON shape ``{"status": "ok"}`` is
    what the frontend pings; changing it is a breaking wire change.

@@ -8,7 +8,7 @@
  *
  * @see DESIGN.md — Components — app-form-row
  *
- * @fileoverview Dialog-scoped form row primitive for AI Nexus.
+ * @fileoverview Dialog-scoped form row primitive for Pawrrtal.
  */
 
 import type * as React from 'react';

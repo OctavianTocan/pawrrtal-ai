@@ -16,7 +16,7 @@ Implementation bean for **Path B** of the privileged-ops decision. Pursue **only
 1. Add `pyinstaller` to backend `[tool.uv]` dev-deps. Spec file pinning hidden imports for `sqlalchemy.dialects.sqlite`, `tiktoken_ext.openai_public`, `fastapi_users.authentication.strategy`, etc.
 2. Build target per platform: `backend-macos-arm64`, `backend-macos-x64`, `backend-linux-x64`, `backend-win-x64`. Output to `backend/dist/`.
 3. `electron/package.json` `extraResources` bundles the matching binary per `electron-builder` `${arch}` token.
-4. `electron/src/backend.ts` spawns the binary on a free port; passes db URL pointing at `app.getPath('userData')/nexus.db`; on `before-quit` kills it cleanly.
+4. `electron/src/backend.ts` spawns the binary on a free port; passes db URL pointing at `app.getPath('userData')/pawrrtal.db`; on `before-quit` kills it cleanly.
 5. CI job per platform builds the matching binary so the desktop installer is fully self-contained.
 
 **Risks.**

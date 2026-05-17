@@ -1,5 +1,5 @@
 /**
- * AI Nexus application dialog shell — the standard entry point for modal UI.
+ * Pawrrtal application dialog shell — the standard entry point for modal UI.
  *
  * This component delegates to {@link ResponsiveModal}: a centered {@link Modal}
  * on desktop and a draggable {@link BottomSheet} on narrow viewports (same
@@ -21,7 +21,7 @@
  * @see DESIGN.md — Components — Modal / sheet overlays (application shell)
  * @see `.claude/rules/react/use-octavian-overlay-for-modals.md`
  *
- * @fileoverview Application-level responsive dialog primitive for AI Nexus.
+ * @fileoverview Application-level responsive dialog primitive for Pawrrtal.
  */
 
 'use client';
