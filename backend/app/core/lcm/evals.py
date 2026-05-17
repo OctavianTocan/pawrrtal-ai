@@ -49,6 +49,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.lcm import assemble_context
 from app.core.tools.lcm_grep import lcm_grep
+from app.core.tools.lcm_search import format_results as format_search_results
+from app.core.tools.lcm_search import lcm_search
 from app.models import (
     ChatMessage,
     Conversation,
@@ -98,6 +100,7 @@ class LCMEvalMode(StrEnum):
     BASELINE = "baseline"
     LCM_ASSEMBLED = "lcm_assembled"
     LCM_GREP = "lcm_grep"
+    LCM_SEARCH = "lcm_search"
 
 
 @dataclass(frozen=True)
@@ -479,6 +482,22 @@ async def _retrieve_lcm_grep(
     return blob[:_MAX_CONTEXT_CHARS], ["lcm_grep"]
 
 
+async def _retrieve_lcm_search(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    question: str,
+) -> tuple[str, list[str]]:
+    """Ranked lexical retrieval via :func:`lcm_search`."""
+    results = await lcm_search(
+        session,
+        conversation_id=conversation_id,
+        query=question,
+    )
+    blob = format_search_results(question, results)
+    return blob[:_MAX_CONTEXT_CHARS], ["lcm_search"]
+
+
 def _extract_search_terms(question: str) -> list[str]:
     """Pull a handful of content-bearing words out of a question."""
     stopwords = {
@@ -593,6 +612,12 @@ async def _retrieve_for_mode(
         )
     if mode is LCMEvalMode.LCM_GREP:
         return await _retrieve_lcm_grep(
+            session,
+            conversation_id=conversation_id,
+            question=scenario.question,
+        )
+    if mode is LCMEvalMode.LCM_SEARCH:
+        return await _retrieve_lcm_search(
             session,
             conversation_id=conversation_id,
             question=scenario.question,
