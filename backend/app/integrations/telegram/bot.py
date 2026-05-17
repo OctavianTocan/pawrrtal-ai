@@ -48,10 +48,10 @@ from app.integrations.telegram.handlers import (
     handle_new_command,
     handle_plain_message,
     handle_start_command,
-    handle_status_command,
     handle_stop_command,
     handle_verbose_command,
 )
+from app.integrations.telegram.status import handle_status_command
 
 if TYPE_CHECKING:
     from aiogram import Bot, Dispatcher

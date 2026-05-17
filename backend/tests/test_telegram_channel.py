@@ -35,13 +35,15 @@ from app.integrations.telegram.bot_provider_resolution import (
 from app.integrations.telegram.handlers import (
     TelegramSender,
     TelegramTurnContext,
+    handle_model_command,
+    handle_plain_message,
+    handle_stop_command,
+)
+from app.integrations.telegram.status import (
     _format_duration,
     _format_token_count,
     _render_status_message,
-    handle_model_command,
-    handle_plain_message,
     handle_status_command,
-    handle_stop_command,
 )
 
 # ---------------------------------------------------------------------------
@@ -915,7 +917,7 @@ class TestHandleStatusCommand:
         sender = TelegramSender(user_id=1, chat_id=1, username=None, full_name=None)
         session = AsyncMock()
         with patch(
-            "app.integrations.telegram.handlers.get_user_id_for_external",
+            "app.integrations.telegram.status.get_user_id_for_external",
             new=AsyncMock(return_value=None),
         ):
             reply = await handle_status_command(
@@ -952,15 +954,15 @@ class TestHandleStatusCommand:
 
         with (
             patch(
-                "app.integrations.telegram.handlers.get_user_id_for_external",
+                "app.integrations.telegram.status.get_user_id_for_external",
                 new=AsyncMock(return_value=nexus_uid),
             ),
             patch(
-                "app.integrations.telegram.handlers.get_or_create_telegram_conversation_full",
+                "app.integrations.telegram.status.get_or_create_telegram_conversation_full",
                 new=AsyncMock(return_value=fake_conv),
             ),
             patch(
-                "app.integrations.telegram.handlers.get_conversation_status",
+                "app.integrations.telegram.status.get_conversation_status",
                 new=AsyncMock(return_value=fake_status),
             ),
         ):
