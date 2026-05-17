@@ -316,8 +316,13 @@ class TestTelegramChannelDeliver:
 
     async def test_not_modified_error_swallowed(self) -> None:
         """TelegramBadRequest: message is not modified must not propagate."""
+        from aiogram.exceptions import TelegramBadRequest
+
         bot = _make_bot()
-        bot.edit_message_text.side_effect = Exception("TelegramBadRequest: message is not modified")
+        bot.edit_message_text.side_effect = TelegramBadRequest(
+            method=MagicMock(),
+            message="message is not modified",
+        )
         msg = _make_channel_message(bot)
         channel = TelegramChannel()
 
@@ -329,8 +334,13 @@ class TestTelegramChannelDeliver:
 
     async def test_other_errors_logged_not_raised(self) -> None:
         """Network or API errors should log a warning but not crash the turn."""
+        from aiogram.exceptions import TelegramNetworkError
+
         bot = _make_bot()
-        bot.edit_message_text.side_effect = Exception("network timeout")
+        bot.edit_message_text.side_effect = TelegramNetworkError(
+            method=MagicMock(),
+            message="network timeout",
+        )
         msg = _make_channel_message(bot)
         channel = TelegramChannel()
 

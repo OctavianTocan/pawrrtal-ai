@@ -17,7 +17,28 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# Telegram SDK error tuple — narrow ``except`` from ``Exception``.
+# Imported lazily inside the helpers (the SDK's exception module is
+# only needed when the helpers are actually called) so ``aiogram``
+# remains an optional dependency for non-telegram pytest runs.
+
 MAX_MESSAGE_LEN = 4096
+
+
+def _aiogram_errors() -> tuple[type[BaseException], ...]:
+    """Return the aiogram exception types we treat as recoverable.
+
+    ``TelegramAPIError`` is the base class for every server-side error
+    aiogram surfaces (bad request, throttling, deletion of a message
+    we no longer own, etc.); ``TelegramNetworkError`` covers connection
+    failures.  We log+swallow these so a single edit/delete glitch
+    doesn't abort the agent turn — anything else (config error, type
+    error, our own bugs) is *not* caught here and propagates as a real
+    exception.
+    """
+    from aiogram.exceptions import TelegramAPIError, TelegramNetworkError  # noqa: PLC0415
+
+    return (TelegramAPIError, TelegramNetworkError)
 
 
 def format_tool_use(event: StreamEvent) -> str:
@@ -89,7 +110,7 @@ async def safe_edit_html(
             message_id=message_id,
             text=html,
         )
-    except Exception as exc:
+    except _aiogram_errors() as exc:
         err_str = str(exc).lower()
         if "not modified" in err_str:
             return
@@ -139,7 +160,7 @@ async def safe_send_html(
                 message_thread_id=message_thread_id,
             ),
         )
-    except Exception as exc:
+    except _aiogram_errors() as exc:
         logger.warning("TELEGRAM_SEND_FAILED chat_id=%s error=%s", chat_id, exc)
         return None
     message_id = getattr(sent, "message_id", None)
@@ -150,7 +171,7 @@ async def safe_delete(bot: Bot, chat_id: int | str, message_id: int) -> None:
     """Delete an unused placeholder, logging but not raising on failure."""
     try:
         await bot.delete_message(chat_id=chat_id, message_id=message_id)
-    except Exception as exc:
+    except _aiogram_errors() as exc:
         logger.warning(
             "TELEGRAM_DELETE_FAILED chat_id=%s message_id=%s error=%s",
             chat_id,
