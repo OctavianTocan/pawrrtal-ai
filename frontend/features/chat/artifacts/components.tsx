@@ -55,8 +55,8 @@ export const artifactComponents: RendererMap = {
 
 	CardRow: ({ props }) => (
 		<div className="artifact-cards">
-			{props.cards.map((c: { icon: string; title: string; body: string }, index: number) => (
-				<div className="artifact-card" key={`card-${index}`}>
+			{props.cards.map((c: { icon: string; title: string; body: string }) => (
+				<div className="artifact-card" key={`${c.icon}-${c.title}-${c.body}`}>
 					<div className="artifact-card-icon">{c.icon}</div>
 					<h3>{c.title}</h3>
 					<p>{c.body}</p>
@@ -88,8 +88,8 @@ export const artifactComponents: RendererMap = {
 				{props.title}
 			</h3>
 			<ul>
-				{props.items.map((it: string, index: number) => (
-					<li key={`col-${index}`}>{it}</li>
+				{props.items.map((it: string) => (
+					<li key={it}>{it}</li>
 				))}
 			</ul>
 		</div>
@@ -117,8 +117,8 @@ export const artifactComponents: RendererMap = {
 				</tr>
 			</thead>
 			<tbody>
-				{props.rows.map((r: { from: string; to: string }, index: number) => (
-					<tr key={`route-${index}`}>
+				{props.rows.map((r: { from: string; to: string }) => (
+					<tr key={`${r.from}-${r.to}`}>
 						<td>
 							<code>{r.from}</code>
 						</td>
@@ -133,27 +133,22 @@ export const artifactComponents: RendererMap = {
 
 	RiskGrid: ({ props }) => (
 		<div className="artifact-risks">
-			{props.items.map(
-				(
-					it: { kind: 'ok' | 'warn' | 'bad'; title: string; body: string },
-					index: number
-				) => (
-					<div
-						className={cls('artifact-risk', `artifact-risk-${it.kind}`)}
-						key={`risk-${index}`}
-					>
-						<h4>{it.title}</h4>
-						<p>{it.body}</p>
-					</div>
-				)
-			)}
+			{props.items.map((it: { kind: 'ok' | 'warn' | 'bad'; title: string; body: string }) => (
+				<div
+					className={cls('artifact-risk', `artifact-risk-${it.kind}`)}
+					key={`${it.kind}-${it.title}-${it.body}`}
+				>
+					<h4>{it.title}</h4>
+					<p>{it.body}</p>
+				</div>
+			))}
 		</div>
 	),
 
 	Steps: ({ props }) => (
 		<ol className="artifact-steps">
-			{props.items.map((s: { body: string }, index: number) => (
-				<li key={`step-${index}`}>{s.body}</li>
+			{props.items.map((s: { body: string }) => (
+				<li key={s.body}>{s.body}</li>
 			))}
 		</ol>
 	),

@@ -5,7 +5,7 @@ status: completed
 type: bug
 priority: normal
 created_at: 2026-05-17T16:42:29Z
-updated_at: 2026-05-17T16:56:27Z
+updated_at: 2026-05-17T16:48:18Z
 ---
 
 ChatView builds message keys from role + thinking_started_at + content slice. Persisted messages have no thinking_started_at, so the key falls back to 'role:saved:<content>', which collides whenever the same content recurs (e.g. user sends 'Yo' twice). Fix by including the array index for saved messages so each row gets a unique key.
@@ -29,22 +29,3 @@ Same warning class also fired from `ChainOfThought.tsx` with keys like `tool-cal
 2. **Defense in depth (frontend):** `ChainOfThought.tsx:162` now suffixes every step key with the map index. Thinking steps had no id at all (content-derived key), and old persisted history was written with the colliding counter ids and would still render duplicates without a DB backfill.
 
 Verified: `bunx biome check` clean, `bunx tsc --noEmit` clean, `ruff check` clean, `pytest tests/test_gemini_stream_fn.py tests/test_provider_native_replay_state.py` 9/9 passed.
-
-## Project-wide audit (via Serena)
-
-Searched all of `frontend/` for the same content-derived-key pattern. One more file was affected, hit five times:
-
-`frontend/features/chat/artifacts/components.tsx` — artifact renderers (CardRow, ColumnList, RouteTable, RiskGrid, Steps) all built keys from the LLM-generated content itself (`\`\${c.icon}-\${c.title}-\${c.body}\``, `\`\${r.from}-\${r.to}\``, `{s.body}`, etc.). Since artifact payloads come from the model, duplicate strings are entirely plausible — and would surface the same duplicate-key warning class. All five switched to index-based keys.
-
-Other `key=` patterns audited and judged safe:
-- `AppearanceSection / WhimsySettingsCard / WorkspacesSectionView / step-identity / step-personality` — keys from const enum/Set values, unique by design.
-- `AppearanceRows / ChatComposer` — `key={value}` used intentionally to force remount on value change (animation/draft reset patterns).
-- `NavChatsContent` — composite `\${conversation.id}-\${labelKey}` with a unique server id prefix.
-- `*.stories.tsx` — static `Array.from({length:N})` demos, `key={i}` is appropriate.
-
-Verified: `bunx biome check` clean, `bunx tsc --noEmit` clean across the project.
-
-## Prevention rule added
-
-- Created `.claude/rules/react/list-key-uniqueness-fallbacks-and-synthesized-ids.md` (path-scoped to `**/*.{ts,tsx}` and `backend/app/core/providers/**/*.py`). Covers both halves of this incident: index-based fallback when no stable id exists, and UUID-backed ids for backend-synthesized values that become React keys downstream.
-- Cross-referenced from `AGENTS.md` (React Rules bullet) so it surfaces alongside the existing `stable-keys.md` rule.
