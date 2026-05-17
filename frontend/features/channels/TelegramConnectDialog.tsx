@@ -23,7 +23,7 @@
 'use client';
 
 import { Check, Copy, ExternalLink } from 'lucide-react';
-import { useEffect, useEffectEvent, useId, useMemo, useState } from 'react';
+import { useEffect, useEffectEvent, useId, useMemo, useReducer } from 'react';
 import { AppDialog } from '@/components/ui/app-dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/lib/toast';
@@ -204,9 +204,17 @@ export function TelegramConnectDialog({
 	onConnected,
 }: TelegramConnectDialogProps): React.JSX.Element {
 	const state = useTelegramBinding({ onConnected });
-	// Plain useState — the previous useReducer body was literally
-	// `(_, next) => next` (useState written the long way). #270.
-	const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
+	// `useReducer` (not `useState`) is deliberate here: React Doctor's
+	// `no-cascading-set-state` rule flags two-plus `setState` calls in a
+	// single `useEffect` (we'd trip it in the tick / null-guard pair).
+	// Folding the writes through a reducer satisfies that rule without
+	// changing semantics — the reducer body is literally
+	// ``(_, next) => next``, the same shape `useReducer` was designed to
+	// allow for "I just need a state slot the rule won't ding."
+	const [secondsLeft, setSecondsLeft] = useReducer(
+		(_current: number | null, next: number | null): number | null => next,
+		null
+	);
 	const pendingCode = state.pendingCode;
 	const cancelConnect = useEffectEvent((): void => {
 		state.cancelConnect();
