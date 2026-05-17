@@ -44,21 +44,11 @@ from .base import ReasoningEffort, StreamEvent
 
 logger = logging.getLogger(__name__)
 
-# `_FALLBACK_SYSTEM_PROMPT` is the system prompt this provider uses
-# when *no caller supplies one*.  In production the chat router
-# always supplies one (assembled from the workspace's SOUL.md +
-# AGENTS.md per PR #113), so this fallback only fires for unit tests
-# and direct-script callers that don't wire up the assembly
-# pipeline.
-#
-# It's imported from `app.core.agent_system_prompt` instead of being
-# a string literal here so that the Gemini and Claude providers fall
-# back to the **same** constant.  Otherwise the agent's identity
-# would silently change when the user switched models — which is the
-# behaviour AGENTS.md was meant to make impossible.
-#
-# The local alias is kept for grep continuity with the previous
-# in-file constant of the same name.
+# ``_FALLBACK_SYSTEM_PROMPT`` is only used when no caller supplies a
+# system prompt (unit tests, direct scripts).  Imported from
+# ``app.core.agent_system_prompt`` so Gemini and Claude fall back to
+# the same constant — otherwise the agent's identity would silently
+# change when the user switched models.
 
 
 def _build_gemini_tool_declarations(
