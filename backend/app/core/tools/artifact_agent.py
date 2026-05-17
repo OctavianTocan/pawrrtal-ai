@@ -20,6 +20,11 @@ from __future__ import annotations
 from typing import Any
 
 from app.core.agent_loop.types import AgentTool
+
+# Re-export artifact helpers so callers (e.g. app.api.chat) only need
+# one internal import instead of two, keeping that file under the fan-out
+# budget enforced by sentrux's no_god_files rule. ``__all__`` makes
+# these public re-exports for mypy without tripping ruff's PLC0414.
 from app.core.tools.artifact import (
     ArtifactValidationError,
     build_artifact,
@@ -27,9 +32,6 @@ from app.core.tools.artifact import (
 )
 from app.core.tools.display import make_tool_display, summarize_title
 
-# Re-export artifact helpers so callers (e.g. app.api.chat) only need
-# one internal import instead of two, keeping that file under the fan-out
-# budget enforced by sentrux's no_god_files rule.
 ARTIFACT_TOOL_NAME = "render_artifact"
 
 _ARTIFACT_TOOL_DESCRIPTION = (
@@ -130,3 +132,12 @@ def make_artifact_tool() -> AgentTool:
             ),
         ),
     )
+
+
+__all__ = [
+    "ARTIFACT_TOOL_NAME",
+    "ArtifactValidationError",
+    "build_artifact",
+    "llm_summary_for",
+    "make_artifact_tool",
+]

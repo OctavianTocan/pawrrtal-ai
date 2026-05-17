@@ -21,6 +21,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
+import time
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -55,6 +56,7 @@ from app.integrations.telegram.model_picker_runtime import (
     answer_model_picker,
     handle_model_picker_callback,
 )
+from app.integrations.telegram.status import handle_status_command
 
 if TYPE_CHECKING:
     from aiogram import Bot, Dispatcher
@@ -69,7 +71,25 @@ _TELEGRAM_COMMANDS: tuple[tuple[str, str], ...] = (
     ("models", "Browse available models"),
     ("verbose", "Set detail level: 0 quiet, 1 tools, 2 thinking"),
     ("stop", "Stop the active run"),
+    ("status", "Show gateway + conversation status"),
 )
+
+# Captured at module import so /status can report this worker's uptime
+# without reading the wall clock at boot. Process-local — multi-worker
+# deployments report only the worker that handled the command.
+_BOT_START_MONOTONIC: float = time.monotonic()
+
+
+def get_bot_uptime_seconds() -> float:
+    """Return seconds since this worker's process started."""
+    return time.monotonic() - _BOT_START_MONOTONIC
+
+
+def is_chat_run_active(chat_id: int) -> bool:
+    """Return whether an agent run is in flight for ``chat_id`` on this worker."""
+    task = _running_tasks.get(chat_id)
+    return task is not None and not task.done()
+
 
 # Active streaming tasks keyed by Telegram chat_id.  When a new message
 # arrives we cancel any existing task for that chat (preventing two parallel
@@ -89,11 +109,15 @@ async def _send_one_typing_action(
     thread_id: int | None,
 ) -> None:
     """Best-effort single ``sendChatAction`` — log and swallow on failure."""
-    kwargs: dict[str, object] = {"chat_id": chat_id, "action": "typing"}
-    if thread_id is not None:
-        kwargs["message_thread_id"] = thread_id
     try:
-        await bot.send_chat_action(**kwargs)
+        if thread_id is not None:
+            await bot.send_chat_action(
+                chat_id=chat_id,
+                action="typing",
+                message_thread_id=thread_id,
+            )
+        else:
+            await bot.send_chat_action(chat_id=chat_id, action="typing")
     except Exception:
         logger.debug(
             "TELEGRAM_TYPING_FAILED chat_id=%s thread_id=%s",
@@ -182,7 +206,9 @@ async def _run_llm_turn(*, message: Message, context: TelegramTurnContext) -> No
     )
 
     provider, warning = await resolve_provider_with_auto_clear(
-        context, workspace_id=workspace.id if workspace is not None else None
+        context,
+        workspace_id=workspace.id if workspace is not None else None,
+        workspace_root=Path(workspace.path) if workspace is not None else None,
     )
     if warning is not None:
         await message.answer(warning, reply_parameters=_reply_parameters(message.message_id))
@@ -362,6 +388,18 @@ def _register_telegram_command_handlers(dispatcher: Dispatcher) -> None:
     @dispatcher.message(Command("models"))
     async def _on_models(message: Message) -> None:
         await answer_model_picker(message=message)
+
+    @dispatcher.message(Command("status"))
+    async def _on_status(message: Message) -> None:
+        sender = _sender_from_message(message)
+        async with async_session_maker() as session:
+            reply = await handle_status_command(
+                sender=sender,
+                session=session,
+                bot_uptime_seconds=get_bot_uptime_seconds(),
+                is_chat_run_active=is_chat_run_active,
+            )
+        await message.answer(reply)
 
     @dispatcher.message(Command("verbose"))
     async def _on_verbose(message: Message) -> None:

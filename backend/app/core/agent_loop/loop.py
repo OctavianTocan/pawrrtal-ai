@@ -751,7 +751,10 @@ def _carry_provider_state(
     the slot.
     """
     if done is not None and "provider_state" in done:
-        return done["provider_state"]
+        state = done["provider_state"]
+        # ``done`` is a TypedDict-shaped dict — narrow the dynamic value
+        # back to the declared return type so mypy doesn't infer ``Any``.
+        return state if isinstance(state, dict) else None
     return current
 
 
@@ -765,7 +768,7 @@ def _terminated(
 
     Centralised so every termination path uses the same dict shape.
     """
-    return AgentTerminatedEvent(  # type: ignore[typeddict-item]
+    return AgentTerminatedEvent(
         type="agent_terminated",
         reason=reason,  # type: ignore[typeddict-item]
         details=details,

@@ -16,6 +16,7 @@ Usage::
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from app.core.agent_loop.types import AgentTool
 from app.core.tools.display import make_tool_display, summarize_query
@@ -34,7 +35,7 @@ _TOOL_DESCRIPTION = (
     " terms (1-3 words) for best recall."
 )
 
-_PARAMETERS: dict = {
+_PARAMETERS: dict[str, Any] = {
     "type": "object",
     "properties": {
         "query": {
@@ -76,7 +77,8 @@ def make_lcm_grep_tool(*, conversation_id: uuid.UUID) -> AgentTool:
 
     async def _execute(tool_call_id: str, **kwargs: object) -> str:
         query = str(kwargs.get("query") or "")
-        limit = int(kwargs.get("limit") or _MAX_RESULTS_DEFAULT)
+        raw_limit = kwargs.get("limit")
+        limit = int(raw_limit) if isinstance(raw_limit, int | float | str) else _MAX_RESULTS_DEFAULT
         limit = max(1, min(50, limit))
         async with async_session_maker() as session:
             return await lcm_grep(

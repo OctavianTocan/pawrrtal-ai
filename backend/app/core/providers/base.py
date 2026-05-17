@@ -21,13 +21,17 @@ class StreamEvent(TypedDict, total=False):
     carries ``name`` + ``input``).
     """
 
-    type: str  # "delta" | "thinking" | "tool_use" | "tool_result" | "error" | "artifact" | "usage"
+    type: str  # "delta" | "thinking" | "tool_use" | "tool_result" | "error" | "artifact" | "message" | "usage"
     content: str  # for delta and thinking
     name: str  # for tool_use
     input: dict[str, Any]  # for tool_use
     display: ToolDisplayPayload  # for tool_use
     tool_use_id: str  # for tool_result
     artifact: dict[str, Any]  # for artifact (id, title, spec)
+    # ``message`` events emitted by the chat router's ``send_fn`` for
+    # mid-turn pushes (text + optional file attachment back to the user).
+    attachment: str  # for message — workspace-relative path
+    mime: str | None  # for message — MIME type of the attachment, if any
     # Token + cost accounting (PR 04). Emitted by every provider on the
     # terminal message of a turn so the chat aggregator + cost ledger
     # have one canonical shape to consume regardless of model.

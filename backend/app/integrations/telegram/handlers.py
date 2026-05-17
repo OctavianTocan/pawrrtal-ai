@@ -29,6 +29,7 @@ import logging
 import re
 import uuid
 from dataclasses import dataclass
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -101,12 +102,13 @@ _VERBOSE_NOT_BOUND_MESSAGE = "Connect your account first before changing the ver
 _VERBOSE_OK_MESSAGE = "Verbose level set to {level} ({label})."
 _VERBOSE_FAIL_MESSAGE = "Couldn't update verbose level — please try again."
 
-# Human-readable labels used in the /verbose reply.
-_VERBOSE_LABELS: dict[int, str] = {
-    0: "quiet",
-    1: "normal",
-    2: "detailed",
-}
+# The ``/status`` feature (formatters + handler + its copy constants)
+# lives in :mod:`app.integrations.telegram.status` to keep this file
+# under the file-line budget.  Re-exported below so existing callers
+# (``bot.py``, tests) keep importing from ``handlers``.
+from app.integrations.telegram.status import (  # noqa: E402
+    _VERBOSE_LABELS,
+)
 
 
 @dataclass(frozen=True)
@@ -299,8 +301,6 @@ async def handle_new_command(
     if nexus_user_id is None:
         return _NEW_NOT_BOUND_MESSAGE
 
-    from datetime import datetime  # noqa: PLC0415 — already imported by callers
-
     from app.models import Conversation  # noqa: PLC0415
 
     conversation = Conversation(
@@ -484,3 +484,8 @@ async def handle_verbose_command(
         level,
     )
     return _VERBOSE_OK_MESSAGE.format(level=level, label=_VERBOSE_LABELS[level])
+
+
+# ``handle_status_command`` + ``_render_status_message`` are imported
+# at the top of this module from ``app.integrations.telegram.status``
+# and re-exported, so historical call sites keep working.

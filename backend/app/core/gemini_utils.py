@@ -30,8 +30,14 @@ async def generate_text_once(prompt: str, model_id: str | None = None) -> str:
     """
     resolved_model_id = model_id if model_id is not None else default_model().model
     client = _get_client()
+    # Annotate as the published union so the literal isn't inferred as
+    # ``list[Content]`` (which the SDK's overloaded ``contents=`` param
+    # type rejects even though it accepts it at runtime).
+    contents: list[types.ContentUnion] = [
+        types.Content(role="user", parts=[types.Part.from_text(text=prompt)])
+    ]
     response = await client.aio.models.generate_content(
         model=resolved_model_id,
-        contents=[types.Content(role="user", parts=[types.Part.from_text(text=prompt)])],
+        contents=contents,
     )
     return (response.text or "").strip()

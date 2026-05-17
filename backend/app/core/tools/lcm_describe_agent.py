@@ -22,6 +22,7 @@ Usage::
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from app.core.agent_loop.types import AgentTool
 from app.core.tools.display import make_tool_display
@@ -41,7 +42,7 @@ _LIST_TOOL_DESCRIPTION = (
     " ``lcm_describe`` to read one in full."
 )
 
-_LIST_PARAMETERS: dict = {
+_LIST_PARAMETERS: dict[str, Any] = {
     "type": "object",
     "properties": {},
     "required": [],
@@ -89,7 +90,7 @@ _DESCRIBE_TOOL_DESCRIPTION = (
     " context without the overhead of a full expand_query sub-agent."
 )
 
-_DESCRIBE_PARAMETERS: dict = {
+_DESCRIBE_PARAMETERS: dict[str, Any] = {
     "type": "object",
     "properties": {
         "summary_id": {

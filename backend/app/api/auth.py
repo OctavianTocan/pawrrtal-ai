@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app.core.config import settings
@@ -12,7 +13,7 @@ def get_auth_router() -> APIRouter:
     @router.post("/auth/dev-login")
     async def dev_login(
         user_manager: UserManager = Depends(get_user_manager),
-    ):
+    ) -> Response:
         """Log in with the seeded admin account without exposing its password to the client."""
         if settings.is_production:
             raise HTTPException(

@@ -429,15 +429,22 @@ class ClaudeLLM:
         # AGENTS.md loader) wins over ``self._config.system_prompt``.
         effective_system_prompt = system_prompt or self._config.system_prompt
 
-        # PR 06: when the cross-provider WorkspaceContext loader is
-        # enabled, flip `setting_sources` to ``['project']`` so the
-        # Claude SDK reads CLAUDE.md / .claude/settings.json natively
-        # in addition to our injected system prompt.  Defence in
-        # depth — both surfaces agree on the same source files.
-        # The default stays ``[]`` (full isolation) so a deployment
-        # that hasn't opted into WorkspaceContext sees no behaviour
-        # change.
-        setting_sources: list[str] = ["project"] if _settings.workspace_context_enabled else []
+        # Full SDK isolation: ``setting_sources=[]`` disables every
+        # filesystem-driven source the bundled CLI would otherwise
+        # read from cwd — ``CLAUDE.md``, ``.claude/settings.json``
+        # (hooks!), and the project's ``.mcp.json`` MCP-server
+        # registration. Without this, an unset ``cwd`` falls back to
+        # the uvicorn process directory, and the SDK ingests the
+        # *host repo's* files instead of the user workspace.
+        #
+        # We do not lose the workspace ``CLAUDE.md`` by doing this:
+        # ``channels.turn_runner._workspace_system_prompt`` already
+        # injects it via ``system_prompt=`` from the user's actual
+        # workspace root, which is the only directory we should be
+        # reading. The previous ``["project"]`` branch was reading
+        # the wrong project (the backend repo) — not "defence in
+        # depth", just a leak.
+        setting_sources: list[str] = []
         kwargs: dict[str, Any] = {
             "model": _resolve_sdk_model(self._model_id),
             "tools": local_tools,

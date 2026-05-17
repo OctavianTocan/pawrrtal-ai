@@ -28,6 +28,7 @@ import json
 import logging
 import os
 from pathlib import Path
+from typing import Any
 
 import httpx
 
@@ -67,7 +68,7 @@ def resolve_codex_oauth_token(override: str | None = None) -> str:
         try:
             data = json.loads(auth_file.read_text())
             token = data.get("tokens", {}).get("access_token", "")
-            if token:
+            if isinstance(token, str) and token:
                 logger.debug("image_gen: loaded Codex OAuth token from %s", auth_file)
                 return token
         except Exception as exc:
@@ -80,11 +81,12 @@ def resolve_codex_oauth_token(override: str | None = None) -> str:
     )
 
 
-def _find_image_b64(output: list) -> str | None:
+def _find_image_b64(output: list[dict[str, Any]]) -> str | None:
     """Extract base64 PNG data from a Codex Responses output array."""
     for item in output:
         if item.get("type") == "image_generation_call":
-            return item.get("result")
+            result = item.get("result")
+            return result if isinstance(result, str) else None
     return None
 
 
@@ -136,7 +138,7 @@ async def generate_image_via_codex(
         httpx.HTTPStatusError: On non-2xx response from the Codex backend.
         ValueError: When the stream completes without yielding image data.
     """
-    payload: dict = {
+    payload: dict[str, Any] = {
         "model": _CODEX_BACKEND_MODEL,
         "input": [{"role": "user", "content": prompt}],
         "tools": [

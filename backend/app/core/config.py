@@ -421,4 +421,4 @@ class Settings(BaseSettings):
         return url
 
 
-settings = Settings()  # type: ignore[call-arg]
+settings = Settings()

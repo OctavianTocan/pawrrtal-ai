@@ -107,7 +107,7 @@ def _maybe_artifact_event(event: StreamEvent) -> StreamEvent | None:
 
 async def _require_workspace(
     *,
-    user_id: object,
+    user_id: uuid.UUID,
     session: AsyncSession,
     request_id: str,
 ) -> tuple[uuid.UUID, Path]:
@@ -234,6 +234,11 @@ def get_chat_router() -> APIRouter:
         # that flow yet — the agent should not run at all in that state.
         # Refuse with 412 (Precondition Failed) so the frontend can route to
         # onboarding instead of pretending we shipped a degraded reply.
+        #
+        # Hoisted above ``resolve_llm`` so we can pass ``workspace_root``
+        # into the Claude SDK as its ``cwd``. Without it, the SDK falls
+        # back to the uvicorn process directory and writes its transcript
+        # files there.
         workspace_id, root = await _require_workspace(
             user_id=user.id, session=session, request_id=rid
         )
@@ -253,7 +258,10 @@ def get_chat_router() -> APIRouter:
 
         # Provider construction must happen *after* workspace resolution so
         # workspace-scoped API-key overrides (Gemini/Claude) take effect.
-        provider = resolve_llm(model_id, workspace_id=workspace_id)
+        # ``workspace_root`` is also forwarded so the Claude SDK subprocess
+        # writes its transcripts under the user's workspace rather than
+        # the uvicorn process directory.
+        provider = resolve_llm(model_id, workspace_id=workspace_id, workspace_root=root)
         # Per-turn tool composition lives in `app.core.agent_tools` —
         # the chat router only decides *that* the agent gets tools,
         # not *which* (that's the builder's job, and where future

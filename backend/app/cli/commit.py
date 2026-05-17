@@ -71,9 +71,14 @@ async def generate_message(stat: str, diff: str) -> str:
     """Send the diff to Gemini and return the commit message."""
     client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
     prompt = COMMIT_PROMPT.format(stat=stat, diff=diff)
+    # See ``app/core/gemini_utils.py`` — same reason for the explicit
+    # ``ContentUnion`` annotation here.
+    contents: list[types.ContentUnion] = [
+        types.Content(role="user", parts=[types.Part.from_text(text=prompt)])
+    ]
     response = await client.aio.models.generate_content(
         model=COMMIT_AGENT_MODEL,
-        contents=[types.Content(role="user", parts=[types.Part.from_text(text=prompt)])],
+        contents=contents,
     )
     text = (response.text or "").strip()
     if not text:

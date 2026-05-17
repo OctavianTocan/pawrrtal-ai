@@ -25,6 +25,7 @@ from app.channels.base import ChannelMessage
 from app.channels.telegram import SURFACE_TELEGRAM, TelegramChannel
 from app.core.providers.base import StreamEvent
 from app.core.providers.catalog import default_model
+from app.crud.conversation import ConversationStatus
 from app.integrations.telegram.bot import (
     _refresh_telegram_commands_best_effort,
     refresh_telegram_commands,
@@ -38,6 +39,12 @@ from app.integrations.telegram.handlers import (
     handle_model_command,
     handle_plain_message,
     handle_stop_command,
+)
+from app.integrations.telegram.status import (
+    _format_duration,
+    _format_token_count,
+    _render_status_message,
+    handle_status_command,
 )
 
 # ---------------------------------------------------------------------------
@@ -120,7 +127,7 @@ async def test_refresh_telegram_commands_sets_current_command_menu() -> None:
     bot.set_my_commands.assert_awaited_once()
     commands = bot.set_my_commands.await_args.args[0]
     names = [command.command for command in commands]
-    assert names == ["start", "new", "model", "models", "verbose", "stop"]
+    assert names == ["start", "new", "model", "models", "verbose", "stop", "status"]
     assert all(command.description for command in commands)
 
 
@@ -770,3 +777,259 @@ class TestResolveProviderWithAutoClear:
         assert resolve_mock.call_count == 1
         assert resolve_mock.call_args.args[0] == default_model().id
         assert provider is fake_default_provider
+
+
+# ---------------------------------------------------------------------------
+# handle_status_command + formatter helpers
+# ---------------------------------------------------------------------------
+
+
+class TestStatusFormatters:
+    def test_format_duration_buckets(self) -> None:
+        assert _format_duration(0) == "0s"
+        assert _format_duration(45) == "45s"
+        assert _format_duration(125) == "2m 5s"
+        assert _format_duration(4 * 3600 + 12 * 60) == "4h 12m"
+        assert _format_duration(3 * 86_400 + 3600) == "3d 1h"
+
+    def test_format_duration_clamps_negative(self) -> None:
+        assert _format_duration(-1) == "0s"
+
+    def test_format_token_count(self) -> None:
+        assert _format_token_count(0) == "0"
+        assert _format_token_count(18_420) == "18,420"
+        assert _format_token_count(-5) == "0"
+
+
+class TestRenderStatusMessage:
+    def _status(self) -> ConversationStatus:
+        from datetime import UTC
+        from datetime import datetime as _dt
+
+        return ConversationStatus(
+            conversation_id=uuid.uuid4(),
+            model_id=default_model().id,
+            verbose_level=1,
+            started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),
+            message_count=14,
+            user_message_count=7,
+            assistant_message_count=7,
+            total_input_tokens=18_420,
+            total_output_tokens=6_108,
+        )
+
+    def test_renders_known_model_without_warning(self) -> None:
+        from datetime import UTC
+        from datetime import datetime as _dt
+
+        rendered = _render_status_message(
+            bot_uptime_seconds=4 * 3600 + 12 * 60,
+            status=self._status(),
+            run_active=False,
+            thread_id=None,
+            now=_dt(2026, 5, 17, 20, 3, tzinfo=UTC),
+        )
+        assert "4h 12m" in rendered
+        assert "18,420 in / 6,108 out" in rendered
+        assert "idle" in rendered
+        assert "⚠️" not in rendered
+        assert "Topic thread" not in rendered
+
+    def test_tokens_line_says_na_when_messages_exist_without_usage(self) -> None:
+        """When cost_ledger has no rows for a conversation but ChatMessages do.
+
+        This happens whenever a provider that doesn't emit ``usage`` events
+        is the only one talking on a conversation (e.g. Gemini today). The
+        token line must NOT render as "0 in / 0 out" since that implies a
+        measurement of zero rather than the absence of measurement.
+        """
+        from datetime import UTC
+        from datetime import datetime as _dt
+
+        status = ConversationStatus(
+            conversation_id=uuid.uuid4(),
+            model_id=default_model().id,
+            verbose_level=1,
+            started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),
+            message_count=48,
+            user_message_count=24,
+            assistant_message_count=24,
+            total_input_tokens=0,
+            total_output_tokens=0,
+        )
+        rendered = _render_status_message(
+            bot_uptime_seconds=60,
+            status=status,
+            run_active=False,
+            thread_id=None,
+            now=_dt(2026, 5, 17, 20, 0, tzinfo=UTC),
+        )
+        assert "n/a (provider did not report usage)" in rendered
+        assert "0 in / 0 out" not in rendered
+
+    def test_tokens_line_stays_zero_for_empty_conversation(self) -> None:
+        """An empty conversation (no messages yet) renders "0 in / 0 out".
+
+        Distinct from the "n/a" case above: here there's genuinely nothing
+        to measure, so the zero is honest.
+        """
+        from datetime import UTC
+        from datetime import datetime as _dt
+
+        status = ConversationStatus(
+            conversation_id=uuid.uuid4(),
+            model_id=default_model().id,
+            verbose_level=1,
+            started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),
+            message_count=0,
+            user_message_count=0,
+            assistant_message_count=0,
+            total_input_tokens=0,
+            total_output_tokens=0,
+        )
+        rendered = _render_status_message(
+            bot_uptime_seconds=60,
+            status=status,
+            run_active=False,
+            thread_id=None,
+            now=_dt(2026, 5, 17, 18, 1, tzinfo=UTC),
+        )
+        assert "0 in / 0 out" in rendered
+
+    def test_renders_unknown_model_with_warning(self) -> None:
+        from datetime import UTC
+        from datetime import datetime as _dt
+
+        status = ConversationStatus(
+            conversation_id=uuid.uuid4(),
+            model_id="agent-sdk:anthropic/claude-removed-from-catalog",
+            verbose_level=None,
+            started_at=_dt(2026, 5, 17, 19, 0, tzinfo=UTC),
+            message_count=2,
+            user_message_count=1,
+            assistant_message_count=1,
+            total_input_tokens=100,
+            total_output_tokens=50,
+        )
+        rendered = _render_status_message(
+            bot_uptime_seconds=60,
+            status=status,
+            run_active=True,
+            thread_id=None,
+            now=_dt(2026, 5, 17, 19, 1, tzinfo=UTC),
+        )
+        assert "⚠️" in rendered
+        assert "running" in rendered
+        # Verbose level falls back to settings default (1 = normal) when None.
+        assert "Verbose: 1" in rendered
+
+    def test_handles_tz_naive_started_at_from_db(self) -> None:
+        """Regression: ``Conversation.created_at`` is tz-naive in the DB.
+
+        Before normalization the renderer raised ``TypeError: can't subtract
+        offset-naive and offset-aware datetimes`` against any real prod row.
+        """
+        from datetime import UTC
+        from datetime import datetime as _dt
+
+        status = ConversationStatus(
+            conversation_id=uuid.uuid4(),
+            model_id=default_model().id,
+            verbose_level=1,
+            started_at=_dt(2026, 5, 17, 18, 0),  # tz-naive, matches DB
+            message_count=1,
+            user_message_count=1,
+            assistant_message_count=0,
+            total_input_tokens=10,
+            total_output_tokens=5,
+        )
+        rendered = _render_status_message(
+            bot_uptime_seconds=60,
+            status=status,
+            run_active=False,
+            thread_id=None,
+            now=_dt(2026, 5, 17, 20, 12, tzinfo=UTC),
+        )
+        assert "Started: 2h 12m ago" in rendered
+
+    def test_topic_thread_line_appears_when_set(self) -> None:
+        from datetime import UTC
+        from datetime import datetime as _dt
+
+        rendered = _render_status_message(
+            bot_uptime_seconds=10,
+            status=self._status(),
+            run_active=False,
+            thread_id=42,
+            now=_dt(2026, 5, 17, 20, 0, tzinfo=UTC),
+        )
+        assert "Topic thread" in rendered
+        assert "42" in rendered
+
+
+@pytest.mark.anyio
+class TestHandleStatusCommand:
+    async def test_unbound_user_returns_connect_nudge(self) -> None:
+        sender = TelegramSender(user_id=1, chat_id=1, username=None, full_name=None)
+        session = AsyncMock()
+        with patch(
+            "app.integrations.telegram.status.get_user_id_for_external",
+            new=AsyncMock(return_value=None),
+        ):
+            reply = await handle_status_command(
+                sender=sender,
+                session=session,
+                bot_uptime_seconds=0.0,
+                is_chat_run_active=lambda _: False,
+            )
+        assert "connect" in reply.lower()
+
+    async def test_bound_user_renders_status_with_run_state(self) -> None:
+        nexus_uid = uuid.uuid4()
+        conv_id = uuid.uuid4()
+        sender = TelegramSender(user_id=9, chat_id=9, username="t", full_name="T")
+        session = AsyncMock()
+
+        fake_conv = MagicMock()
+        fake_conv.id = conv_id
+
+        from datetime import UTC
+        from datetime import datetime as _dt
+
+        fake_status = ConversationStatus(
+            conversation_id=conv_id,
+            model_id=default_model().id,
+            verbose_level=2,
+            started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),
+            message_count=3,
+            user_message_count=2,
+            assistant_message_count=1,
+            total_input_tokens=900,
+            total_output_tokens=200,
+        )
+
+        with (
+            patch(
+                "app.integrations.telegram.status.get_user_id_for_external",
+                new=AsyncMock(return_value=nexus_uid),
+            ),
+            patch(
+                "app.integrations.telegram.status.get_or_create_telegram_conversation_full",
+                new=AsyncMock(return_value=fake_conv),
+            ),
+            patch(
+                "app.integrations.telegram.status.get_conversation_status",
+                new=AsyncMock(return_value=fake_status),
+            ),
+        ):
+            reply = await handle_status_command(
+                sender=sender,
+                session=session,
+                bot_uptime_seconds=125.0,
+                is_chat_run_active=lambda chat_id: chat_id == 9,
+            )
+
+        assert "2m 5s" in reply
+        assert "running" in reply
+        assert "Verbose: 2 (detailed)" in reply
+        assert "900 in / 200 out" in reply

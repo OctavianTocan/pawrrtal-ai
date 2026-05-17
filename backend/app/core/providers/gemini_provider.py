@@ -104,7 +104,7 @@ def _tool_result_content(msg: ToolResultMessage) -> gtypes.Content:
     )
 
 
-def _build_gemini_contents(messages: list[AgentMessage]) -> list[gtypes.Content]:
+def _build_gemini_contents(messages: list[AgentMessage]) -> list[gtypes.ContentUnion]:
     """Convert AgentMessages to Gemini Contents, oldest-first.
 
     Args:
@@ -113,7 +113,10 @@ def _build_gemini_contents(messages: list[AgentMessage]) -> list[gtypes.Content]
     Returns:
         The list of Gemini Contents.
     """
-    contents: list[gtypes.Content] = []
+    # ``ContentUnion`` matches the SDK's overloaded ``contents=`` param —
+    # ``list[Content]`` alone is rejected by mypy even though it works at
+    # runtime. See ``app/core/gemini_utils.py`` for the same workaround.
+    contents: list[gtypes.ContentUnion] = []
 
     for msg in messages:
         if msg["role"] == "user":

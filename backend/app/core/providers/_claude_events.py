@@ -240,8 +240,9 @@ def _render_content_item(item: object) -> str:
     if not isinstance(item, dict):
         return str(item)
     # Anthropic's tool-result format uses ``{"type": "text", "text": "..."}``.
-    if item.get("type") == "text" and isinstance(item.get("text"), str):
-        return item["text"]
+    text = item.get("text")
+    if item.get("type") == "text" and isinstance(text, str):
+        return text
     return str(item)
 
 

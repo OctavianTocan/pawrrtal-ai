@@ -20,6 +20,7 @@ Usage::
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from app.core.agent_loop.types import AgentTool
 from app.core.tools.display import make_tool_display, summarize_query
@@ -40,7 +41,7 @@ _TOOL_DESCRIPTION = (
     " the answer."
 )
 
-_PARAMETERS: dict = {
+_PARAMETERS: dict[str, Any] = {
     "type": "object",
     "properties": {
         "prompt": {

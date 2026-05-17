@@ -431,12 +431,13 @@ class TestProviderOptions:
         assert captured, "query() must be invoked exactly once"
         options = captured[0]
         assert options.tools == []
-        # PR 06: when ``workspace_context_enabled`` (default True), the
-        # provider opts into the SDK's ``project`` setting source so a
-        # workspace's CLAUDE.md / .claude/settings.json is read by the
-        # SDK natively (defense in depth alongside our system-prompt
-        # injection).  Disabled deployments still see ``[]``.
-        assert options.setting_sources == ["project"]
+        # Full isolation: setting_sources must be ``[]`` so the SDK
+        # subprocess never reads CLAUDE.md, .claude/settings.json
+        # (hooks), or .mcp.json from whatever directory it happens
+        # to be running in. The workspace's CLAUDE.md is injected
+        # via system_prompt= by ``turn_runner._workspace_system_prompt``
+        # from the *correct* user workspace root.
+        assert options.setting_sources == []
         assert options.permission_mode == "default"
         assert options.max_turns == 1
         # Default falls back to the shared `DEFAULT_AGENT_SYSTEM_PROMPT`

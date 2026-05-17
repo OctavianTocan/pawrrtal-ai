@@ -150,6 +150,36 @@ def test_resolve_llm_claude_provider_stores_workspace_id() -> None:
     assert provider._workspace_id == uid
 
 
+def test_resolve_llm_claude_propagates_workspace_root_to_cwd(tmp_path) -> None:
+    """``workspace_root`` must flow through to ``ClaudeLLMConfig.cwd``.
+
+    Without this, the Claude SDK subprocess runs in the backend's own
+    cwd and writes transcript files there — and, under any non-empty
+    ``setting_sources``, ingests the host repo's ``CLAUDE.md`` /
+    ``.claude/settings.json`` / ``.mcp.json``. The chat router must
+    be able to isolate every session by passing the per-user workspace.
+    """
+    provider = resolve_llm(
+        "anthropic/claude-sonnet-4-6",
+        workspace_id=uuid4(),
+        workspace_root=tmp_path,
+    )
+    assert isinstance(provider, ClaudeLLM)
+    assert provider._config.cwd == str(tmp_path)
+
+
+def test_resolve_llm_claude_workspace_root_none_leaves_cwd_unset() -> None:
+    """Non-chat callers (LCM, event bus) without a workspace_root see ``cwd=None``.
+
+    They rely on the provider's unconditional ``setting_sources=[]`` to
+    keep filesystem sources off — ``cwd`` is just the transcript
+    location for them.
+    """
+    provider = resolve_llm("anthropic/claude-sonnet-4-6", workspace_id=uuid4())
+    assert isinstance(provider, ClaudeLLM)
+    assert provider._config.cwd is None
+
+
 # ---------------------------------------------------------------------------
 # resolve_api_key end-to-end: workspace override beats settings
 # ---------------------------------------------------------------------------

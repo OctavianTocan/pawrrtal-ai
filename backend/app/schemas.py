@@ -437,7 +437,7 @@ class SkillRead(BaseModel):
 # existing imports (``from app.schemas import AuditEventRead``) keep
 # working.
 
-from .governance_schemas import (  # noqa: E402,F401
+from .governance_schemas import (  # noqa: E402
     DEFAULT_GOVERNANCE_PAGE_SIZE,
     MAX_GOVERNANCE_PAGE_SIZE,
     AuditEventRead,
@@ -448,3 +448,18 @@ from .governance_schemas import (  # noqa: E402,F401
     ScheduledJobUpdate,
     WebhookEventRead,
 )
+
+# Re-export so callers can ``from app.schemas import AuditEventRead`` —
+# mypy treats names in ``__all__`` as PEP 484 public re-exports without
+# tripping ruff's PLC0414 (which rejects the ``X as X`` alias idiom).
+__all__ = [
+    "DEFAULT_GOVERNANCE_PAGE_SIZE",
+    "MAX_GOVERNANCE_PAGE_SIZE",
+    "AuditEventRead",
+    "CostLedgerRead",
+    "CostSummaryRead",
+    "ScheduledJobCreate",
+    "ScheduledJobRead",
+    "ScheduledJobUpdate",
+    "WebhookEventRead",
+]

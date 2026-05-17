@@ -71,7 +71,10 @@ class MistralVoxtralTranscriber:
         if self._client is not None:
             return self._client
         try:
-            from mistralai import Mistral  # noqa: PLC0415 — optional voice extra
+            # ``mistralai`` lives behind the optional ``[voice]`` extra,
+            # so its stubs are not installed in the default environment.
+            # The ModuleNotFoundError below is the load-bearing guard.
+            from mistralai import Mistral  # type: ignore[import-not-found]  # noqa: PLC0415
         except ModuleNotFoundError as exc:
             raise TranscriptionError(
                 "Optional dependency 'mistralai' is missing.  "
@@ -109,7 +112,10 @@ class OpenAIWhisperTranscriber:
         if self._client is not None:
             return self._client
         try:
-            from openai import AsyncOpenAI  # noqa: PLC0415 — optional voice extra
+            # ``openai`` lives behind the optional ``[voice]`` extra,
+            # so its stubs are not installed in the default environment.
+            # The ModuleNotFoundError below is the load-bearing guard.
+            from openai import AsyncOpenAI  # type: ignore[import-not-found]  # noqa: PLC0415
         except ModuleNotFoundError as exc:
             raise TranscriptionError(
                 "Optional dependency 'openai' is missing.  "

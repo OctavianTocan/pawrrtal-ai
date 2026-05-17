@@ -133,7 +133,7 @@ async def _exchange_google_code(code: str) -> str:
         userinfo: dict[str, Any] = userinfo_response.json()
 
     email = userinfo.get("email")
-    if not email:
+    if not isinstance(email, str) or not email:
         raise HTTPException(status_code=502, detail="Google account has no verified email.")
     return email
 

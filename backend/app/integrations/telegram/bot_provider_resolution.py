@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from pathlib import Path
 
 from app.core.providers import resolve_llm
 from app.core.providers.base import AILLM
@@ -29,6 +30,7 @@ async def resolve_provider_with_auto_clear(
     context: TelegramTurnContext,
     *,
     workspace_id: uuid.UUID | None,
+    workspace_root: Path | None = None,
 ) -> tuple[AILLM, str | None]:
     """Resolve a provider for ``context.model_id`` with an auto-clear safety net.
 
@@ -50,6 +52,12 @@ async def resolve_provider_with_auto_clear(
             migration).  ``None`` when no default workspace exists yet
             (incomplete onboarding) — provider lookups fall through to
             the gateway-global key.
+        workspace_root: User's default workspace directory. Forwarded to
+            ``resolve_llm`` so the Claude SDK subprocess writes its
+            transcripts under the user workspace rather than the bot
+            process directory. ``None`` for users without a workspace
+            (pre-onboarding); the provider still runs isolated via
+            ``setting_sources=[]`` regardless.
 
     Returns:
         A tuple of ``(provider, warning_text_or_None)``. When the auto-clear
@@ -59,7 +67,11 @@ async def resolve_provider_with_auto_clear(
     """
     try:
         require_known(context.model_id)
-        provider = resolve_llm(context.model_id, workspace_id=workspace_id)
+        provider = resolve_llm(
+            context.model_id,
+            workspace_id=workspace_id,
+            workspace_root=workspace_root,
+        )
     except (InvalidModelId, UnknownModelId) as exc:
         fallback_id = default_model().id
         warning = (
@@ -77,6 +89,10 @@ async def resolve_provider_with_auto_clear(
             context.conversation_id,
             context.model_id,
         )
-        provider = resolve_llm(fallback_id, workspace_id=workspace_id)
+        provider = resolve_llm(
+            fallback_id,
+            workspace_id=workspace_id,
+            workspace_root=workspace_root,
+        )
         return provider, warning
     return provider, None

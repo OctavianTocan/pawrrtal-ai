@@ -7,7 +7,7 @@ Currently provides:
 
 import secrets
 
-from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
@@ -37,16 +37,16 @@ class BackendApiKeyMiddleware(BaseHTTPMiddleware):
     comparing the supplied key against the configured value.
     """
 
-    async def dispatch(self, request: Request, call_next: object) -> Response:  # type: ignore[override]
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
         """Validate the configured backend API key before routing the request."""
         # If no key is configured, the middleware is effectively disabled.
         if not settings.backend_api_key:
-            return await call_next(request)  # type: ignore[misc]
+            return await call_next(request)
 
         # Exempt paths bypass the key check.
         path = request.url.path
         if any(path.startswith(prefix) for prefix in _EXEMPT_PREFIXES):
-            return await call_next(request)  # type: ignore[misc]
+            return await call_next(request)
 
         provided = request.headers.get("X-Pawrrtal-Key", "")
         # compare_digest requires both operands to be the same type and
@@ -66,4 +66,4 @@ class BackendApiKeyMiddleware(BaseHTTPMiddleware):
                 },
             )
 
-        return await call_next(request)  # type: ignore[misc]
+        return await call_next(request)

@@ -12,6 +12,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Any
 
 log = logging.getLogger(__name__)
 
@@ -32,7 +33,7 @@ class SkillEntry:
     trigger: str
     summary: str
     has_skill_md: bool
-    extra: dict = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
 
 def read_skill_manifest(workspace_root: Path) -> list[SkillEntry]:
@@ -79,7 +80,7 @@ def read_skill_manifest(workspace_root: Path) -> list[SkillEntry]:
     return entries
 
 
-def _load_manifest(workspace_root: Path) -> dict[str, dict]:
+def _load_manifest(workspace_root: Path) -> dict[str, dict[str, Any]]:
     """Parse ``skills/_manifest.jsonl`` into a name → metadata dict.
 
     Skips lines that exceed ``_MAX_MANIFEST_LINE_BYTES`` or fail JSON parsing.
@@ -89,7 +90,7 @@ def _load_manifest(workspace_root: Path) -> dict[str, dict]:
     if not manifest_path.is_file():
         return {}
 
-    lookup: dict[str, dict] = {}
+    lookup: dict[str, dict[str, Any]] = {}
     try:
         text = manifest_path.read_text(encoding="utf-8")
     except OSError:

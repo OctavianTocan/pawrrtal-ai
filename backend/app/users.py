@@ -2,7 +2,6 @@
 
 import uuid
 from collections.abc import AsyncGenerator
-from typing import cast
 
 from fastapi import Depends, HTTPException, Request, Response
 from fastapi_users import (
@@ -73,9 +72,9 @@ cookie_transport = CookieTransport(
 )
 
 
-def get_jwt_strategy() -> JWTStrategy:
+def get_jwt_strategy() -> JWTStrategy[User, uuid.UUID]:
     """Create a JWT strategy with a 1-hour lifetime."""
-    return JWTStrategy(secret=cast(str, settings.auth_secret), lifetime_seconds=3600)
+    return JWTStrategy(secret=settings.auth_secret, lifetime_seconds=3600)
 
 
 auth_backend = AuthenticationBackend(

@@ -8,14 +8,16 @@ the cap while still emitting lifecycle events.
 
 from __future__ import annotations
 
+import uuid
+
 from app.core.event_bus import TurnStartedEvent
 from app.core.event_bus.global_bus import publish_if_available
 
 
 async def publish_turn_started(
     *,
-    user_id: object,
-    conversation_id: object,
+    user_id: uuid.UUID | None,
+    conversation_id: uuid.UUID | None,
     surface: str,
     model_id: str,
     source: str = "chat",
