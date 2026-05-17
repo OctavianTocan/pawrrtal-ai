@@ -1,13 +1,21 @@
 # Running Pawrrtal with Docker Compose
 
-The `docker-compose.yml` at the repo root spins up PostgreSQL 16 and the
-FastAPI backend together. The Next.js frontend is left out intentionally —
-you run it with the normal dev server so hot-reload keeps working.
+The repo ships four compose files:
+
+| File | Stack | Use case |
+|---|---|---|
+| `docker-compose.yml` | Postgres 16 + FastAPI backend | Base — same services every overlay extends |
+| `docker-compose.dev.yml` | + ports `5432`, `8000` published locally; source bind-mount + `uvicorn --reload` | Local dev where you run the Next.js frontend with hot-reload from your host |
+| `docker-compose.prod.yml` | + Next.js service + nginx reverse proxy on `:80` + health checks + memory caps + log rotation | A production-shaped stack on a VPS (TLS terminated upstream by Tailscale Serve / Caddy / etc.) |
+| `docker-compose.demo.yml` | + `DEMO_MODE=true`, low rate limits, no Telegram, ephemeral workspace, outbound network blocked at the tool layer | Public demo deployments |
+
+The Next.js frontend is left out of the base/dev stacks intentionally —
+you run it on the host so hot-reload keeps working.
 
 ## Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine + Compose plugin)
-- A Google Gemini API key — everything else is optional
+- At least one of: `GOOGLE_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`. Everything else is optional.
 
 ## Quick start
 
@@ -22,17 +30,18 @@ cd pawrrtal
 cp backend/.env.docker backend/.env
 $EDITOR backend/.env   # set GOOGLE_API_KEY at minimum
 
-# 3. Build and start the stack
-docker compose up --build
+# 3. Build and start the stack (base + dev overlay)
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
 The backend will be live at **http://localhost:8000** and PostgreSQL will be
-exposed at **localhost:5432** (credentials: `pawrrtal` / `nexus_dev`, database `pawrrtal`).
+exposed at **localhost:5432** (credentials: `pawrrtal` / `pawrrtal_dev`, database `pawrrtal`).
 
 Database migrations run automatically on every backend start via
-`alembic upgrade head` (with a retry loop in case postgres isn't
-fully accepting connections right as the healthcheck passes) — no
-manual step needed.
+`alembic upgrade head`. The migration graph is single-head as of
+`016_merge_notion_into_lcm_lineage`, and a Postgres advisory lock in
+`alembic/env.py` serialises concurrent invocations across rolling-deploy
+replicas, so a stuck partial migration won't break the next replica.
 
 The dev stack starts uvicorn with `--reload` and mounts `./backend/app`
 into the container, so Python edits take effect on the next request
@@ -78,20 +87,36 @@ docker compose down
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `GOOGLE_API_KEY` | ✅ | Powers the default Gemini model |
 | `AUTH_SECRET` | ✅ | JWT signing secret — generate with `openssl rand -hex 32` |
-| `FERNET_KEY` | ✅ | Encryption key for stored API keys |
-| `CLAUDE_CODE_OAUTH_TOKEN` | Optional | Needed only for `claude-*` models |
-| `EXA_API_KEY` | Optional | Enables web search |
-| `XAI_API_KEY` | Optional | Enables voice / STT input |
+| `WORKSPACE_ENCRYPTION_KEY` | ✅ | Fernet key for per-workspace encrypted `.env` files (32 random bytes, base64-encoded) |
+| `GOOGLE_API_KEY` | ⚠️ | Required if you want any Gemini model (default catalog entry uses one) |
+| `CLAUDE_CODE_OAUTH_TOKEN` | ⚠️ | Required for `claude-*` models |
+| `EXA_API_KEY` | Optional | Web search via `exa_search` |
+| `XAI_API_KEY` | Optional | xAI Grok models + voice STT |
+| `OPENAI_CODEX_OAUTH_TOKEN` | Optional | Image generation tool |
+| `NOTION_API_KEY` | Optional | Activates the Notion plugin (18 tools via `ntn`) |
 | `TELEGRAM_BOT_TOKEN` | Optional | Enables the Telegram channel |
 
+At least one of `GOOGLE_API_KEY` / `CLAUDE_CODE_OAUTH_TOKEN` is needed for the chat
+endpoint to do anything useful. The "optional" provider keys are also overridable
+**per workspace** via Settings → Environment (encrypted with `WORKSPACE_ENCRYPTION_KEY`);
+the gateway-global values in `.env` act as the fallback.
+
 `DATABASE_URL` is **overridden** by `docker-compose.yml` to point at the
-bundled postgres service — you do not need to change it in `.env`.
+bundled postgres service — you don't need to change it in `.env`.
 
 ## Production / Railway
 
 For Railway or any other managed platform, set `DATABASE_URL` in your
 environment to the platform's connection string (Railway injects it
-automatically) and deploy the backend normally. The Docker setup is
-local-dev only.
+automatically) and deploy the backend normally. `backend/railway.toml`
+runs `alembic upgrade head && exec uvicorn …` on boot. Migrations are
+serialised across rolling-deploy replicas by a Postgres advisory lock
+in `alembic/env.py`.
+
+Production users typically also attach a Railway volume mounted at
+`/data/workspaces` so workspace contents (memory, skills, encrypted
+`.env`) survive redeploys.
+
+For VPS deploys (Docker Compose prod overlay + nginx), see
+[`frontend/content/docs/handbook/deployment/vps-deploy.md`](../frontend/content/docs/handbook/deployment/vps-deploy.md).

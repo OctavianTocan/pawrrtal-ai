@@ -177,7 +177,7 @@ OAUTH_POST_LOGIN_REDIRECT=https://pawrrtal.your-domain.com/
 
 Then update `docker-compose.yml`'s postgres service to read
 `POSTGRES_PASSWORD` from `.env` instead of the hardcoded
-`nexus_dev`:
+`pawrrtal_dev`:
 
 ```yaml
 postgres:
@@ -187,7 +187,7 @@ postgres:
     POSTGRES_DB: ${POSTGRES_DB}
 ```
 
-…or set `POSTGRES_PASSWORD=nexus_dev` in `.env` to keep the
+…or set `POSTGRES_PASSWORD=pawrrtal_dev` in `.env` to keep the
 compose file unchanged (NOT recommended for prod).
 
 ## 5. Set up the reverse proxy + TLS (REQUIRED)
