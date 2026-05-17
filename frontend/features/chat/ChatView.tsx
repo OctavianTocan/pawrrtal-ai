@@ -301,7 +301,14 @@ function ActiveConversationState({
 			<Conversation className="scrollbar-hide min-h-0 flex-1 overflow-y-auto" resize="smooth">
 				<ConversationContent className="scrollbar-hide mx-auto w-full max-w-[48.75rem] px-0 pt-12 pb-6">
 					{chatHistory.map((chatMessage, index) => {
+						// Index is the disambiguator: ChatMessage has no stable
+						// id (it's a render-shape type), and two user messages
+						// with the same body (e.g. two "Hey"s) otherwise produce
+						// identical keys. chatHistory is append-only within a
+						// conversation, so the index doesn't shift for prior
+						// messages during streaming.
 						const messageKey = [
+							index,
 							chatMessage.role,
 							chatMessage.thinking_started_at ?? 'saved',
 							chatMessage.content.slice(0, 80),

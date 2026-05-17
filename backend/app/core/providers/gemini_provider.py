@@ -197,7 +197,10 @@ def _tool_calls_from_chunk(chunk: Any, start_index: int) -> list[dict[str, Any]]
                 continue
             fc = part.function_call
             fn_name = fc.name or ""
-            tool_call_id = f"call-{fn_name}-{start_index + len(calls)}"
+            # uuid suffix keeps tool_call_ids unique across loop iterations
+            # (start_index resets each StreamFn call). Gemini matches calls
+            # to responses by ordinal position, so the suffix is invisible.
+            tool_call_id = f"call-{fn_name}-{start_index + len(calls)}-{uuid.uuid4().hex[:8]}"
             calls.append(
                 {
                     "tool_call_id": tool_call_id,

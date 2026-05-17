@@ -182,20 +182,26 @@ export const ChainOfThought = memo(function ChainOfThought({
 
 	return (
 		<div className="flex flex-col gap-0.5">
-			{items.map((item) => {
+			{items.map((item, index) => {
+				// Prefix the timeline index so historical conversations whose
+				// tool_call_ids collided before backend PR #292 (Gemini
+				// provider now appends a uuid4 suffix) still produce unique
+				// React keys when their messages are reloaded from the DB.
+				// Index is stable here because items are append-only for the
+				// lifetime of the parent message.
 				if (item.kind === 'tool') {
 					return (
 						<ToolStep
 							call={item.call}
 							chips={item.chips}
-							key={`tool-${item.call.id}`}
+							key={`tool-${index}-${item.call.id}`}
 						/>
 					);
 				}
 				return (
 					<ThinkingStep
 						content={item.content}
-						key={`thinking-${item.title}-${item.content.slice(0, 80)}`}
+						key={`thinking-${index}-${item.title}`}
 						title={item.title}
 					/>
 				);
