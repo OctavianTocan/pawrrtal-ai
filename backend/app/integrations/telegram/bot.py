@@ -50,14 +50,13 @@ from app.integrations.telegram.handlers import (
     handle_stop_command,
     handle_verbose_command,
 )
-from app.integrations.telegram.lcm_status import handle_lcm_command
 from app.integrations.telegram.model_picker import MODEL_CALLBACK_PREFIX
 from app.integrations.telegram.model_picker_runtime import (
     answer_model_command,
     answer_model_picker,
     handle_model_picker_callback,
 )
-from app.integrations.telegram.status import handle_status_command
+from app.integrations.telegram.status import handle_lcm_command, handle_status_command
 
 if TYPE_CHECKING:
     from aiogram import Bot, Dispatcher

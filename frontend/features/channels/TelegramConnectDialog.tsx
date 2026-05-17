@@ -23,9 +23,9 @@
 'use client';
 
 import { Check, Copy, ExternalLink } from 'lucide-react';
-import { useEffect, useEffectEvent, useMemo, useReducer } from 'react';
+import { useEffect, useEffectEvent, useId, useMemo, useState } from 'react';
+import { AppDialog } from '@/components/ui/app-dialog';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { toast } from '@/lib/toast';
 import { useTelegramBinding } from './use-telegram-binding';
 
@@ -126,7 +126,7 @@ function TelegramPendingCode({
 					<a
 						className="cursor-pointer font-medium text-foreground underline-offset-4 hover:underline"
 						href={pendingCode.deep_link ?? `https://t.me/${pendingCode.bot_username}`}
-						rel="noreferrer"
+						rel="noopener noreferrer"
 						target="_blank"
 					>
 						@{pendingCode.bot_username}
@@ -159,7 +159,7 @@ function TelegramPendingCode({
 			</div>
 			{pendingCode.deep_link && (
 				<Button asChild className="w-full" size="lg" type="button" variant="default">
-					<a href={pendingCode.deep_link} rel="noreferrer" target="_blank">
+					<a href={pendingCode.deep_link} rel="noopener noreferrer" target="_blank">
 						<ExternalLink aria-hidden="true" className="mr-2 size-4" />
 						Open Telegram
 					</a>
@@ -204,21 +204,21 @@ export function TelegramConnectDialog({
 	onConnected,
 }: TelegramConnectDialogProps): React.JSX.Element {
 	const state = useTelegramBinding({ onConnected });
-	const [secondsLeft, dispatchSecondsLeft] = useReducer(
-		(_current: number | null, next: number | null): number | null => next,
-		null
-	);
+	// Plain useState — the previous useReducer body was literally
+	// `(_, next) => next` (useState written the long way). #270.
+	const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
 	const pendingCode = state.pendingCode;
 	const cancelConnect = useEffectEvent((): void => {
 		state.cancelConnect();
 	});
+	const headingId = useId();
 
 	// Track the live countdown for the pending code. `expires_at` arrives
 	// as an ISO string so we recompute every second from the current time
 	// — cheaper and more accurate than decrementing a stored counter.
 	useEffect(() => {
 		if (pendingCode === null) {
-			dispatchSecondsLeft(null);
+			setSecondsLeft(null);
 			return undefined;
 		}
 		// Backend emits naive UTC ISO strings (no `Z`/offset). Per the
@@ -234,7 +234,7 @@ export function TelegramConnectDialog({
 		const expiresAt = new Date(normalizedExpiry).getTime();
 		const tick = (): void => {
 			const remaining = Math.max(0, Math.floor((expiresAt - Date.now()) / 1000));
-			dispatchSecondsLeft(remaining);
+			setSecondsLeft(remaining);
 			if (remaining === 0) {
 				cancelConnect();
 			}
@@ -266,25 +266,27 @@ export function TelegramConnectDialog({
 	};
 
 	return (
-		<Dialog
-			onOpenChange={(next) => {
-				if (!next) {
-					state.cancelConnect();
-				}
-				onOpenChange(next);
+		<AppDialog
+			ariaLabelledBy={headingId}
+			onDismiss={() => {
+				state.cancelConnect();
+				onOpenChange(false);
 			}}
 			open={open}
+			sheetTitle="Connect Telegram"
+			showDismissButton
+			size="md"
 		>
-			<DialogContent className="sm:max-w-md">
-				<DialogHeader>
-					<DialogTitle>Connect Telegram</DialogTitle>
-				</DialogHeader>
+			<div className="space-y-4 p-6">
+				<h2 className="text-lg font-semibold" id={headingId}>
+					Connect Telegram
+				</h2>
 				<TelegramConnectDialogBody
 					countdownLabel={countdownLabel}
 					onCopy={() => void handleCopy()}
 					state={state}
 				/>
-			</DialogContent>
-		</Dialog>
+			</div>
+		</AppDialog>
 	);
 }

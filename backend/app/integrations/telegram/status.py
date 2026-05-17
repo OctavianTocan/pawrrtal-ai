@@ -29,6 +29,13 @@ from app.crud.channel import (
 )
 from app.crud.conversation import ConversationStatus, get_conversation_status
 
+# Re-export so callers in ``bot.py`` import both status helpers from one
+# module path — keeping ``bot.py``'s fan-out under sentrux's
+# ``no_god_files`` budget (issue #303 added the second helper). The
+# underlying implementation lives in :mod:`lcm_status` to keep each
+# file focused on one command.
+from app.integrations.telegram.lcm_status import handle_lcm_command  # noqa: F401
+
 
 class _TelegramSenderLike(Protocol):
     """Structural type for the subset of ``TelegramSender`` /status needs.
