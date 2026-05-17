@@ -179,7 +179,7 @@ class TestTelegramChannelDeliver:
         call = bot.edit_message_text.call_args
         assert call.kwargs["chat_id"] == 123
         assert call.kwargs["message_id"] == 456
-        assert "agent finished without producing any text" in call.kwargs["text"]
+        assert "agent finished without producing a reply" in call.kwargs["text"]
 
     async def test_final_reply_sent_as_separate_message(self) -> None:
         """Plain answer text is sent as a final reply, not streamed into the trace."""
@@ -345,7 +345,7 @@ class TestTelegramChannelDeliver:
         # ended.  The exact wording lives in the channel constant.
         bot.send_message.assert_awaited_once()
         text = bot.send_message.await_args.kwargs["text"]
-        assert "agent finished without producing any text" in text
+        assert "agent finished without producing a reply" in text
 
     async def test_error_event_replaces_placeholder(self) -> None:
         """A bare ``error`` event must surface the error text as final reply."""

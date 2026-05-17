@@ -45,8 +45,11 @@ them in-chat:
 - ``error`` → placeholder is replaced with the error content prefixed by
   ``❌``.
 
-If neither text nor a terminal event arrives, a fallback message is shown
-pointing the user at the server log.
+A fallback message is shown when the turn closes without anything to say:
+
+- The stream produced no text and no terminal event ("empty stream").
+- The stream produced tool calls but no answer text and no thinking
+  trace ("tool-only turn" — see #293).
 
 Error handling
 --------------
@@ -106,10 +109,10 @@ _ERROR_PREFIX = "❌ "
 
 # Fallback copy used when a turn produces neither text nor a structured
 # termination/error event.  Without this the ⏳ placeholder would sit forever
-# and the user would never know the turn ended.
-_EMPTY_RESPONSE_FALLBACK = (
-    "⚠️ The agent finished without producing any text. Check `backend/app.log` for the turn trace."
-)
+# and the user would never know the turn ended.  Avoid mentioning server-side
+# paths here — this string is rendered directly into the user's Telegram chat
+# and shouldn't leak internal infrastructure.
+_EMPTY_RESPONSE_FALLBACK = "⚠️ The agent finished without producing a reply. Please try again."
 
 
 class TelegramChannel:
