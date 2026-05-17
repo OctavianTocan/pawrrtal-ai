@@ -72,12 +72,12 @@ jobs:
         working-directory: frontend
         run: bun run generate:docs
 
-      - name: Run Vitest
+      - name: Run Vitest (with coverage)
         id: test
         working-directory: frontend
         run: |
           set +e
-          bun run test 2>&1 | tee ../frontend-test-output.txt
+          bun run test:coverage 2>&1 | tee ../frontend-test-output.txt
           status=${PIPESTATUS[0]}
           {
             echo 'output<<EOF'
@@ -85,6 +85,20 @@ jobs:
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
           exit "$status"
+
+      - name: Upload coverage report
+        # Closes #274 — keep the v8 coverage report as a downloadable
+        # artifact so reviewers can see what's covered without running
+        # the suite locally.  We deliberately don't gate on a threshold
+        # yet; that ratchet lands in a follow-up once the baseline
+        # stabilises.
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Comment PR on failure
         if: failure() && github.event_name == 'pull_request'

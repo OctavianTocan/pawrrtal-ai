@@ -106,6 +106,15 @@ select = [
     "E", "W", "F", "I", "N", "B", "A", "C4", "C90", "UP", "SIM", "ASYNC",
     "PERF", "PL", "PT", "PTH", "RET", "RUF", "S", "T20", "TID", "TRY", "D",
 ]
+# Ruff's ``PLC2701`` (Pylint preview) would catch the cross-module
+# private-import pattern described in
+# ``.claude/rules/clean-code/python-module-privacy.md`` (issue #283).
+# Today the codebase has ~124 existing violations (mostly tests
+# importing module-level test helpers) so enabling the rule would
+# fail CI on every PR.  The rule is documented for human + agent
+# review; mechanical enforcement is a follow-up sweep, not this PR.
+# When enabling: add ``"PLC2701"`` to ``select`` above and turn
+# ``preview = true`` + ``explicit-preview-rules = true`` on.
 ignore = [
     "E501",     # line length — handled by formatter, soft cap only
     "D100",     # missing module docstring (too noisy on small modules)

@@ -50,6 +50,7 @@ from app.integrations.telegram.handlers import (
     handle_stop_command,
     handle_verbose_command,
 )
+from app.integrations.telegram.lcm_status import handle_lcm_command
 from app.integrations.telegram.model_picker import MODEL_CALLBACK_PREFIX
 from app.integrations.telegram.model_picker_runtime import (
     answer_model_command,
@@ -72,6 +73,7 @@ _TELEGRAM_COMMANDS: tuple[tuple[str, str], ...] = (
     ("verbose", "Set detail level: 0 quiet, 1 tools, 2 thinking"),
     ("stop", "Stop the active run"),
     ("status", "Show gateway + conversation status"),
+    ("lcm", "Show LCM (long-context memory) status for this conversation"),
 )
 
 # Captured at module import so /status can report this worker's uptime
@@ -399,6 +401,16 @@ def _register_telegram_command_handlers(dispatcher: Dispatcher) -> None:
                 bot_uptime_seconds=get_bot_uptime_seconds(),
                 is_chat_run_active=is_chat_run_active,
             )
+        await message.answer(reply)
+
+    @dispatcher.message(Command("lcm"))
+    async def _on_lcm(message: Message) -> None:
+        # Closes #303 — diagnostic surface for Lossless Context Management
+        # so the operator can spot disabled / empty / stuck memory state
+        # from Telegram without tailing the server log.
+        sender = _sender_from_message(message)
+        async with async_session_maker() as session:
+            reply = await handle_lcm_command(sender=sender, session=session)
         await message.answer(reply)
 
     @dispatcher.message(Command("verbose"))

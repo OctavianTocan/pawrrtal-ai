@@ -63,6 +63,7 @@ from typing import Any
 import anyio
 
 from app.core.agent_loop.types import AgentTool
+from app.core.tools.display import make_tool_display
 from app.core.tools.errors import ToolError, ToolErrorCode
 from app.core.tools.workspace_files import _resolve_safe
 
@@ -457,4 +458,55 @@ def make_virtual_python_tool(
             "required": ["code"],
         },
         execute=execute,
+        # Closes #302 — Telegram + web tool-trace surfaces previously showed
+        # only ``(code)`` (the argument key, not the value) so the exact
+        # code the agent attempted to run was invisible.  We now surface
+        # the first line as a one-line summary, and the full code in
+        # ``detail`` so the chain-of-thought view can render it as a
+        # fenced block.  Long programs are head-truncated to keep the
+        # inline preview from blowing past Telegram's message budget.
+        display=make_tool_display(
+            icon="🐍",
+            label="Run Python",
+            present=lambda args: f"🐍 Running Python: {_python_code_preview(args.get('code'))}",
+            compact=lambda args: f"python -c {_python_code_preview(args.get('code'))}",
+            detail=lambda args: _python_code_detail(args.get("code")),
+        ),
     )
+
+
+_PREVIEW_MAX_CHARS = 80
+_DETAIL_MAX_CHARS = 1500
+
+
+def _python_code_preview(code: object) -> str:
+    """Return a one-line summary of *code* for inline tool-trace rendering.
+
+    Returns the first non-blank line of source, truncated to
+    :data:`_PREVIEW_MAX_CHARS`. ``(empty)`` when nothing was supplied —
+    the model occasionally calls the tool with an empty body and the
+    fallback string keeps the trace readable.
+    """
+    text = str(code or "").strip()
+    if not text:
+        return "(empty)"
+    first_line = next((line for line in text.splitlines() if line.strip()), text)
+    if len(first_line) > _PREVIEW_MAX_CHARS:
+        return f"{first_line[: _PREVIEW_MAX_CHARS - 1]}…"
+    return first_line
+
+
+def _python_code_detail(code: object) -> str | None:
+    """Return a fenced-block detail rendering of *code* for the chain-of-thought view.
+
+    Truncates past :data:`_DETAIL_MAX_CHARS` so a runaway prompt
+    doesn't push out the rest of the trace. ``None`` when the model
+    didn't supply any code (the inline ``present`` field already
+    covers the empty case).
+    """
+    text = str(code or "").rstrip()
+    if not text.strip():
+        return None
+    if len(text) > _DETAIL_MAX_CHARS:
+        text = f"{text[: _DETAIL_MAX_CHARS - 1]}…"
+    return f"```python\n{text}\n```"

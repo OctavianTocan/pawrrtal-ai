@@ -317,3 +317,54 @@ async def test_tool_dispatches_through_agent_loop(workspace: Path) -> None:
     assert len(tool_results) == 1
     assert "4" in tool_results[0]["content"]
     assert tool_results[0]["is_error"] is False
+
+
+# ---------------------------------------------------------------------------
+# Display payload — closes #302
+# ---------------------------------------------------------------------------
+
+
+def test_display_present_surfaces_first_line_of_code(workspace: Path) -> None:
+    """``present`` shows the first non-blank line, not just ``(code)``."""
+    tool = _make_tool(workspace)
+    assert tool.display is not None
+    payload = tool.display.render({"code": "import os\nprint(os.environ.get('HOME'))"})
+    assert "import os" in payload["present"]
+    # The argument key alone (``(code)``) was the old behaviour — must not
+    # be the only thing surfaced.
+    assert payload["present"] != "🛠 Running Python (code)"
+
+
+def test_display_present_handles_empty_code(workspace: Path) -> None:
+    tool = _make_tool(workspace)
+    assert tool.display is not None
+    payload = tool.display.render({"code": ""})
+    assert "(empty)" in payload["present"]
+
+
+def test_display_present_truncates_long_first_line(workspace: Path) -> None:
+    tool = _make_tool(workspace)
+    assert tool.display is not None
+    long_line = "x = " + "1+" * 200 + "1"
+    payload = tool.display.render({"code": long_line})
+    # Truncation marker must appear; raw value must not leak full length.
+    assert "…" in payload["present"]
+    assert len(payload["present"]) < len(long_line) + 100
+
+
+def test_display_detail_renders_fenced_block(workspace: Path) -> None:
+    tool = _make_tool(workspace)
+    assert tool.display is not None
+    payload = tool.display.render({"code": "print('hi')"})
+    assert payload.get("detail", "").startswith("```python")
+    assert "print('hi')" in payload["detail"]
+
+
+def test_display_detail_truncates_oversized_code(workspace: Path) -> None:
+    tool = _make_tool(workspace)
+    assert tool.display is not None
+    huge = "# " + "x" * 5000
+    payload = tool.display.render({"code": huge})
+    detail = payload.get("detail", "")
+    assert "…" in detail
+    assert len(detail) < len(huge) + 100

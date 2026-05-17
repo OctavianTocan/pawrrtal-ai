@@ -127,7 +127,7 @@ async def test_refresh_telegram_commands_sets_current_command_menu() -> None:
     bot.set_my_commands.assert_awaited_once()
     commands = bot.set_my_commands.await_args.args[0]
     names = [command.command for command in commands]
-    assert names == ["start", "new", "model", "models", "verbose", "stop", "status"]
+    assert names == ["start", "new", "model", "models", "verbose", "stop", "status", "lcm"]
     assert all(command.description for command in commands)
 
 
