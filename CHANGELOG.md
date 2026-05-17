@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Added a live Telegram tool trace: tool calls now collect into one edited message with icons, argument-key previews, and JSON inputs, while thinking text and final replies stay in their own messages.
+- Added Telegram model browsing with `/models` and `/model list`, letting users pick providers and models from an inline keyboard instead of typing a model ID by hand.
+- Added first-run Paw persona bootstrap: each assistant now knows it is the user's Paw and can ask the user what name and personality it should grow into.
+- Changed Telegram replies so thinking, tool traces, and final answers reply to the user's original message when Telegram gives us a message id.
 - Added Lossless Context Management (LCM): a DAG-based conversation compaction system that summarises older turns into queryable `LCMSummary` nodes while preserving a verbatim fresh tail. Off by default behind `lcm_enabled`; opt-in via six new settings (`lcm_fresh_tail_count`, `lcm_leaf_chunk_tokens`, `lcm_context_threshold`, `lcm_incremental_max_depth`, `lcm_summary_model`).
 - Added four LCM agent tools (`lcm_grep`, `lcm_describe`, `lcm_list_summaries`, `lcm_expand_query`) so the agent can search, enumerate, inspect, and synthesise across compacted history when context grows past the fresh tail.
 - Added background leaf compaction after every chat turn, plus a condensation pass that folds same-depth summaries into deeper parent nodes (configurable up to an unlimited cascade).
