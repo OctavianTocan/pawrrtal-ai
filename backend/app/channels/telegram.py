@@ -153,11 +153,30 @@ class TelegramChannel:
         message_thread_id = optional_int(meta.get("message_thread_id"))
 
         tool_trace = ""
+        # ``tool_message_id`` starts as the placeholder so the FIRST tools
+        # block consumes the ⏳; on a thinking→tools transition (issue #288)
+        # we open a fresh Telegram message for the new tools block and
+        # rebind this slot so subsequent edits land there.
+        tool_message_id: int = message_id
         answer_text = ""
         thinking_text = ""
         thinking_message_id: int | None = None
         chars_since_edit = 0
         last_edit_at = asyncio.get_event_loop().time()
+        # Block-transition tracking (#288). ``previous_block_kind`` is the
+        # kind of the most-recent block-emitting event (``"tools"`` /
+        # ``"thinking"``). When the incoming event's kind differs from the
+        # previous one (and we've already emitted at least one block), the
+        # active block is finalized — its last state stays in chat — and
+        # we open a new message for the incoming block so the chat reads
+        # as the natural ``thinking → tools → thinking`` sequence instead
+        # of two ever-growing blobs.
+        previous_block_kind: str | None = None
+        # ``first_block_kind`` records what the placeholder was used for,
+        # so the post-stream cleanup can tell whether ⏳ holds real content
+        # (first block was tools — keep it) or is still the dangling
+        # placeholder (first block was thinking — delete it).
+        first_block_kind: str | None = None
 
         # Captured terminal outcomes — flushed after the stream ends so they
         # don't race the in-flight debounced edits for ``delta`` chunks.
@@ -168,11 +187,29 @@ class TelegramChannel:
             etype = event.get("type")
 
             if etype == "tool_use":
+                first_block_kind = first_block_kind or "tools"
+                (
+                    tool_trace,
+                    tool_message_id,
+                    chars_since_edit,
+                    last_edit_at,
+                ) = await _prepare_tools_block(
+                    previous_block_kind=previous_block_kind,
+                    bot=bot,
+                    chat_id=chat_id,
+                    tool_trace=tool_trace,
+                    tool_message_id=tool_message_id,
+                    chars_since_edit=chars_since_edit,
+                    last_edit_at=last_edit_at,
+                    reply_to_message_id=reply_to_message_id,
+                    message_thread_id=message_thread_id,
+                )
+                previous_block_kind = "tools"
                 tool_trace, chars_since_edit, last_edit_at = await _handle_tool_use(
                     event=event,
                     bot=bot,
                     chat_id=chat_id,
-                    message_id=message_id,
+                    message_id=tool_message_id,
                     tool_trace=tool_trace,
                     chars_since_edit=chars_since_edit,
                     last_edit_at=last_edit_at,
@@ -180,6 +217,13 @@ class TelegramChannel:
                 continue
 
             if etype == "thinking":
+                first_block_kind = first_block_kind or "thinking"
+                thinking_text, thinking_message_id = _prepare_thinking_block(
+                    previous_block_kind=previous_block_kind,
+                    thinking_text=thinking_text,
+                    thinking_message_id=thinking_message_id,
+                )
+                previous_block_kind = "thinking"
                 thinking_text, thinking_message_id = await _handle_thinking(
                     event=event,
                     bot=bot,
@@ -226,53 +270,18 @@ class TelegramChannel:
             terminal_message=terminal_message,
             terminal_prefix=terminal_prefix,
         )
-        # Decide what to do with the editable placeholder.  When there's a
-        # tool_trace we keep that view in place (the placeholder becomes the
-        # tool-call log).  When we have a real answer or thinking message we
-        # delete the placeholder so the chat doesn't have a stray ⏳.
-        # When the stream produced absolutely nothing we edit the placeholder
-        # into the empty-stream warning.
-        if tool_trace:
-            await safe_edit_html(bot, chat_id, message_id, plain_html(tool_trace))
-        elif final_text or thinking_text:
-            await safe_delete(bot, chat_id, message_id)
-        else:
-            await safe_edit(bot, chat_id, message_id, _EMPTY_RESPONSE_FALLBACK)
-            logger.warning(
-                "TELEGRAM_EMPTY_STREAM chat_id=%s message_id=%s",
-                chat_id,
-                message_id,
-            )
-
-        if final_text:
-            await safe_send_text(
-                bot,
-                chat_id,
-                final_text,
-                reply_to_message_id=reply_to_message_id,
-                message_thread_id=message_thread_id,
-            )
-        elif tool_trace and not thinking_text:
-            # Tool-only turn: the model called tools and then stopped without
-            # producing an answer or thinking trace (often a Session Startup
-            # ritual that ate the entire turn — see #290 / #293).  Without
-            # this branch the user is left staring at the tool trace with no
-            # closing message; the chat reads as silence.  Surface the same
-            # ⚠️ copy used for fully empty streams so the user always knows
-            # the turn has ended.
-            await safe_send_text(
-                bot,
-                chat_id,
-                _EMPTY_RESPONSE_FALLBACK,
-                reply_to_message_id=reply_to_message_id,
-                message_thread_id=message_thread_id,
-            )
-            logger.warning(
-                "TELEGRAM_TOOL_ONLY_TURN chat_id=%s message_id=%s tool_trace_len=%d",
-                chat_id,
-                message_id,
-                len(tool_trace),
-            )
+        await _finalize_turn_delivery(
+            bot=bot,
+            chat_id=chat_id,
+            placeholder_message_id=message_id,
+            first_block_kind=first_block_kind,
+            previous_block_kind=previous_block_kind,
+            tool_trace=tool_trace,
+            thinking_text=thinking_text,
+            final_text=final_text,
+            reply_to_message_id=reply_to_message_id,
+            message_thread_id=message_thread_id,
+        )
 
         # No bytes to yield — delivery is a side-effect only.
         return
@@ -281,6 +290,129 @@ class TelegramChannel:
         # signature), so callers can ``async for`` over it even though we
         # only ever side-effect through ``edit_message_text``.
         yield
+
+
+async def _finalize_turn_delivery(
+    *,
+    bot: Bot,
+    chat_id: int | str,
+    placeholder_message_id: int,
+    first_block_kind: str | None,
+    previous_block_kind: str | None,
+    tool_trace: str,
+    thinking_text: str,
+    final_text: str,
+    reply_to_message_id: int | None,
+    message_thread_id: int | None,
+) -> None:
+    """Resolve the ⏳ placeholder and send the closing reply (#288, #293).
+
+    Three concerns folded together so the caller's per-event loop stays
+    under the project's complexity ceiling:
+
+    1. **Placeholder disposition.** Depending on what the first block
+       was, the placeholder either holds real tools content (keep,
+       commit final edit), is still ``⏳`` after thinking blocks
+       lived elsewhere (delete), is dead weight after a delta-only
+       turn (delete), or never got real content (replace with the
+       empty-stream warning).
+    2. **Final answer.** If the model produced text, send it as a
+       fresh message so it sits at the bottom of the chat.
+    3. **Tool-only fallback (#293).** A turn that called tools and
+       stopped without any answer or thinking trace gets the
+       empty-response copy as a closing message so the user
+       doesn't read silence.
+    """
+    if first_block_kind == "tools":
+        await safe_edit_html(bot, chat_id, placeholder_message_id, plain_html(tool_trace))
+    elif first_block_kind == "thinking" or final_text:
+        await safe_delete(bot, chat_id, placeholder_message_id)
+    else:
+        await safe_edit(bot, chat_id, placeholder_message_id, _EMPTY_RESPONSE_FALLBACK)
+        logger.warning(
+            "TELEGRAM_EMPTY_STREAM chat_id=%s message_id=%s",
+            chat_id,
+            placeholder_message_id,
+        )
+
+    if final_text:
+        await safe_send_text(
+            bot,
+            chat_id,
+            final_text,
+            reply_to_message_id=reply_to_message_id,
+            message_thread_id=message_thread_id,
+        )
+        return
+
+    if previous_block_kind == "tools" and not thinking_text:
+        await safe_send_text(
+            bot,
+            chat_id,
+            _EMPTY_RESPONSE_FALLBACK,
+            reply_to_message_id=reply_to_message_id,
+            message_thread_id=message_thread_id,
+        )
+        logger.warning(
+            "TELEGRAM_TOOL_ONLY_TURN chat_id=%s message_id=%s tool_trace_len=%d",
+            chat_id,
+            placeholder_message_id,
+            len(tool_trace),
+        )
+
+
+async def _prepare_tools_block(
+    *,
+    previous_block_kind: str | None,
+    bot: Bot,
+    chat_id: int | str,
+    tool_trace: str,
+    tool_message_id: int,
+    chars_since_edit: int,
+    last_edit_at: float,
+    reply_to_message_id: int | None,
+    message_thread_id: int | None,
+) -> tuple[str, int, int, float]:
+    """Open a fresh tools message on a ``thinking → tools`` transition (#288).
+
+    Returns the (possibly updated) tuple
+    ``(tool_trace, tool_message_id, chars_since_edit, last_edit_at)``.
+    No-op when this is the first block of either kind, or when the
+    previous block was already ``tools``.
+
+    Pulled out of :meth:`TelegramChannel.deliver` to keep that method
+    under the project's cyclomatic-complexity ceiling.
+    """
+    if previous_block_kind in (None, "tools"):
+        return tool_trace, tool_message_id, chars_since_edit, last_edit_at
+    new_id = await safe_send_html(
+        bot,
+        chat_id,
+        plain_html("⏳"),
+        reply_to_message_id=reply_to_message_id,
+        message_thread_id=message_thread_id,
+    )
+    if new_id is not None:
+        tool_message_id = new_id
+    return "", tool_message_id, 0, asyncio.get_event_loop().time()
+
+
+def _prepare_thinking_block(
+    *,
+    previous_block_kind: str | None,
+    thinking_text: str,
+    thinking_message_id: int | None,
+) -> tuple[str, int | None]:
+    """Reset the thinking slot on a ``tools → thinking`` transition (#288).
+
+    Returns the (possibly cleared) tuple
+    ``(thinking_text, thinking_message_id)`` — the cleared form forces
+    :func:`_handle_thinking` to send a brand-new Telegram message
+    instead of editing the previous one.
+    """
+    if previous_block_kind in (None, "thinking"):
+        return thinking_text, thinking_message_id
+    return "", None
 
 
 async def _handle_tool_use(

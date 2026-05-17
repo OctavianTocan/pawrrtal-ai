@@ -256,6 +256,52 @@ class TestTelegramChannelDeliver:
         final_send = bot.send_message.await_args_list[-1].kwargs
         assert final_send["text"] == "answer"
 
+    async def test_block_transitions_open_new_telegram_messages(self) -> None:
+        """Thinking → tools → thinking emits three separate Telegram messages (#288).
+
+        Previously the channel had one ever-growing thinking message and
+        one ever-growing tool trace, so block transitions weren't visible
+        in chat. The fix tracks ``previous_block_kind`` and opens a new
+        Telegram message on every transition.
+        """
+        bot = _make_bot()
+        msg = _make_channel_message(bot, chat_id=88, message_id=11)
+        channel = TelegramChannel()
+
+        events: list[StreamEvent] = [
+            {"type": "thinking", "content": "let me check the workspace"},
+            {
+                "type": "tool_use",
+                "name": "read_file",
+                "input": {"path": "memory/USER.md"},
+            },
+            {"type": "thinking", "content": "now I understand"},
+            {"type": "delta", "content": "Answer."},
+        ]
+        async for _ in channel.deliver(_stream(*events), msg):
+            pass
+
+        # Every block transition (thinking → tools → thinking) plus the
+        # final answer = at least three ``send_message`` calls (initial
+        # thinking, new tools placeholder, fresh second thinking, then
+        # the final answer message).
+        send_count = bot.send_message.await_count
+        assert send_count >= 4, f"expected >=4 send_message calls, got {send_count}"
+
+        # The two thinking messages must target separate Telegram messages
+        # — the chat shouldn't read as one big thinking blob.
+        thinking_sends = [
+            call.kwargs["text"]
+            for call in bot.send_message.await_args_list
+            if call.kwargs.get("text", "").startswith("<i>")
+        ]
+        assert len(thinking_sends) >= 2
+        assert "let me check the workspace" in thinking_sends[0]
+        assert "now I understand" in thinking_sends[-1]
+        # The two thinking messages don't share content — i.e., the
+        # second thinking isn't an accumulation of both.
+        assert "let me check the workspace" not in thinking_sends[-1]
+
     async def test_agent_terminated_replaces_placeholder(self) -> None:
         """``agent_terminated`` without text must send a final warning reply."""
         bot = _make_bot()

@@ -1,0 +1,93 @@
+---
+title: Telegram handler organisation — defer per-feature routers, extract registry only when bot.py grows
+date: 2026-05-17
+status: Accepted
+---
+
+# Telegram handler organisation
+
+**Status:** Accepted — 2026-05-17.
+**Closes:** #280 (router-vs-dispatcher organisation), partial guidance for #281 (handler-registry extraction).
+
+## Context
+
+`backend/app/integrations/telegram/bot.py` registers seven slash-command
+handlers + one callback-query handler + one plain-text fallback handler
+on a single `Dispatcher`. Each handler is a small async closure that
+delegates the real work to a sibling module
+(`status.py`, `lcm_status.py`, `model_picker_runtime.py`, etc.). The
+file is currently 660 lines, with ~80 of them being the
+`@dispatcher.message(...)` decorators themselves.
+
+Aiogram v3 supports two organisational shapes:
+
+1. **One router per feature** — `routers/commands.py`, `routers/linking.py`,
+   etc. Each module owns its filters + handlers + middleware and is
+   attached to the Dispatcher via `dispatcher.include_router(router)`.
+2. **One Dispatcher with a single Router** (the current shape).
+
+Issue #280 asked which to adopt; #281 asked to extract the handler
+decorators out of `bot.py` either way.
+
+## Decision
+
+**Keep the single Dispatcher with an explicit registry function.** Do
+not split handlers across per-feature routers yet.
+
+Specifically:
+
+- `bot.py` continues to own the Dispatcher construction + lifecycle.
+- The `@dispatcher.message(...)` decorator block stays in `bot.py` for
+  now — it's 80 lines of light glue, not a 500-line monolith.
+- Each command body lives in a dedicated module
+  (`handlers.py`, `status.py`, `lcm_status.py`, etc.) — the decorator
+  is just a thin wrapper that resolves the sender, opens a session,
+  and calls into the module.
+- When `bot.py` next crosses ~750 lines OR the handler count crosses
+  12, extract the decorator block into
+  `app/integrations/telegram/dispatcher_setup.py` with a
+  `register_handlers(dispatcher, *, runtime: BotRuntime) -> None`
+  signature. `BotRuntime` carries the bot-side helpers (`_sender_from_message`,
+  `is_chat_run_active`, etc.). That refactor is small + mechanical
+  but only earns its keep once the surface grows further.
+
+## Why not per-feature routers right now
+
+- The current handler set is small enough that aggregation by router
+  doesn't aid navigation. With 8 handlers across 4 features (chat,
+  commands, model picker, linking), the per-router boundary would
+  be arbitrary; the file would split into 3-handler chunks that
+  reference each other through `dispatcher`.
+- Per-router middleware (the strongest reason to adopt Router-per-
+  feature) isn't load-bearing today — auth + session + rate-limit
+  are all handled in the dispatcher-level lifespan.
+- We're about to take other Telegram architectural moves (see
+  `#290` memory inlining, `#288` block transitions): churning the
+  router shape simultaneously would make those harder to review.
+
+## Why extract later, not now
+
+- The mechanical extraction in #281 is a 30-minute change; the
+  cost of doing it today vs in the next Telegram-touching PR is
+  the same.
+- Bundling it with another refactor (e.g. when #280 moves to
+  routers, or when we add a webhook-only entrypoint) lets the
+  extraction land alongside its real motivation.
+
+## When to revisit
+
+Reopen #280 if any of these become true:
+
+- `bot.py` crosses 750 lines without a clear handler home.
+- We need per-feature middleware (per-router auth, per-router
+  rate limits, per-router error filters).
+- The handler count crosses 12 (counting `@dispatcher.message`,
+  `@dispatcher.callback_query`, and any new entrypoints).
+
+For #281 specifically, the work happens as a sibling commit in
+whichever PR next touches `bot.py` more than incidentally.
+
+## References
+
+- aiogram v3 Router docs: https://docs.aiogram.dev/en/latest/dispatcher/router.html
+- aiogram v3 Dispatcher docs: https://docs.aiogram.dev/en/latest/dispatcher/dispatcher.html

@@ -105,14 +105,22 @@ This folder is the Paw's home for this workspace.
 - How to collaborate with the user
 - Where to find deeper operational docs
 
-## Session Startup
+## Session Continuity
 
-On every session start, read:
-1. `SOUL.md` — who you are
-2. `USER.md` — who you're helping
-3. `skills/_index.md` — your skill map (already in context; use `read_file`
-   to load full skill bodies on demand when a trigger fires)
-4. `memory/working/WORKSPACE.md` — current task state
+Your identity (`SOUL.md`), the user's profile (`USER.md`), the skill map
+(`skills/_index.md`), and the relevant memory snippets are **already
+loaded into your system prompt for this turn** — the runtime composes
+them every time you're invoked. Do not re-read these files at the top of
+every turn; doing so spends 4-6 tool calls on context you already have.
+
+Read them only when you intend to **write** changes (preference updates,
+new skills, fresh learnings) or when you specifically need the verbatim
+form (e.g. quoting a passage back to the user). Memory files under
+`memory/` can be read on demand when you need older context that didn't
+make it into this turn's snapshot.
+
+When in doubt, address the user's current question first — only branch
+into memory reads when the question requires it.
 
 ## Memory
 
