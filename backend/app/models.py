@@ -175,66 +175,58 @@ class UserAppearance(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime)
 
 
-class ChannelBinding(Base):
-    """Persistent map from a third-party messaging identity to a Nexus user.
-
-    One row per (provider, external_user_id) — enforced by a unique
-    constraint so a Telegram account can never silently move between
-    Nexus users. Created when a user successfully redeems a one-time
-    code via the bot's `/start <code>` (or manual paste) flow.
-
-    The `provider` column is open-ended on purpose: today only
-    `"telegram"` is wired up, but the same table will host Slack,
-    WhatsApp, iMessage, etc. as those adapters land.
-    """
-
-    __tablename__ = "channel_bindings"
-
-    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("user.id", ondelete="CASCADE"), index=True
-    )
-    provider: Mapped[str] = mapped_column(String(32))
-    # Provider identities can be ints (Telegram user_id) or strings
-    # (Slack user IDs, WhatsApp phone numbers). Normalize to text so
-    # the column shape stays the same across providers.
-    external_user_id: Mapped[str] = mapped_column(String(128))
-    # Default chat to push to. For Telegram direct chats this matches
-    # external_user_id; for groups it's the chat where the bind happened.
-    external_chat_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    # Display handle captured at bind time. Stored for admin/debug only,
-    # never used for authentication.
-    display_handle: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    # True when this Telegram chat has Bot API 9.3+ Topics enabled.
-    # Drives the routing branch in the inbound message handler.
-    has_topics_enabled: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False, server_default="false"
-    )
-    created_at: Mapped[datetime] = mapped_column(DateTime)
-
-
 class ChannelLinkCode(Base):
-    """Short-lived one-time-use code that brokers a channel bind.
-
-    The web app issues a code (server-side; user only sees the plaintext
-    once), the user sends it to the bot, and the bot consumes the row to
-    create the matching `ChannelBinding`. We persist an HMAC of the code
-    rather than the plaintext so a DB leak cannot be replayed against
-    the bot. Lookups are always by `code_hash`, which is therefore the
-    primary key.
-    """
+    """A short-lived one-time-use code for linking a Pawrrtal user to a third-party channel."""
 
     __tablename__ = "channel_link_codes"
 
+    # HMAC-SHA-256 hex hash of the user-facing code. PK so lookups are
+    # by hash; the plaintext is never persisted.
     code_hash: Mapped[str] = mapped_column(String(128), primary_key=True)
     user_id: Mapped[uuid.UUID] = mapped_column(
-        Uuid, ForeignKey("user.id", ondelete="CASCADE"), index=True
+        Uuid, ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    provider: Mapped[str] = mapped_column(String(32))
-    created_at: Mapped[datetime] = mapped_column(DateTime)
-    expires_at: Mapped[datetime] = mapped_column(DateTime, index=True)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    # Indexed because the cleanup job scans on (expires_at, used_at IS NULL)
+    # to GC unredeemed codes; matches migration 007's ix_channel_link_codes_expires_at.
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, index=True)
     # NULL while the code is unredeemed; populated once the bot consumes it.
     used_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class ChannelBinding(Base):
+    """A binding between a Pawrrtal user and a third-party channel."""
+
+    __tablename__ = "channel_bindings"
+    __table_args__ = (
+        UniqueConstraint(
+            "provider",
+            "external_user_id",
+            name="uq_channel_bindings_provider_external_user",
+        ),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
+    # The Pawrrtal user ID.
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        Uuid, ForeignKey("user.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    # Stable identity from the provider (Telegram user_id as text so the
+    # column type is the same across providers).
+    external_user_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    # Default chat to push to. For Telegram direct chats this matches
+    # external_user_id; for groups it's the chat where the bind happened.
+    external_chat_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # Display handle captured at bind time. Surfaced in the Settings UI
+    # connected-state ("@<display_handle>"); never trusted for auth.
+    display_handle: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    # Whether the Telegram chat has Topics (forum threads) enabled.
+    has_topics_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
 
 
 class ChatMessage(Base):

@@ -24,7 +24,7 @@ from app.crud.channel import (
     list_bindings,
 )
 from app.db import User, get_async_session
-from app.schemas import ChannelBindingRead, ChannelLinkCodeResponse
+from app.schemas import ChannelBindingRead, TelegramLinkCodeRead
 from app.users import get_allowed_user
 
 _TELEGRAM = "telegram"
@@ -62,24 +62,15 @@ def get_channels_router() -> APIRouter:
     ) -> list[ChannelBindingRead]:
         """List every channel the authenticated user has currently bound."""
         rows = await list_bindings(user_id=user.id, session=session)
-        return [
-            ChannelBindingRead(
-                provider=row.provider,
-                external_user_id=row.external_user_id,
-                external_chat_id=row.external_chat_id,
-                display_handle=row.display_handle,
-                created_at=row.created_at,
-            )
-            for row in rows
-        ]
+        return [ChannelBindingRead.model_validate(row) for row in rows]
 
     # --- Telegram ------------------------------------------------------------
 
-    @router.post("/telegram/link", response_model=ChannelLinkCodeResponse)
+    @router.post("/telegram/link", response_model=TelegramLinkCodeRead)
     async def link_telegram(
         user: User = Depends(get_allowed_user),
         session: AsyncSession = Depends(get_async_session),
-    ) -> ChannelLinkCodeResponse:
+    ) -> TelegramLinkCodeRead:
         """Issue a fresh one-time code the user can redeem in the bot.
 
         The plaintext code is returned exactly once. The DB only stores
@@ -100,7 +91,7 @@ def get_channels_router() -> APIRouter:
             provider=_TELEGRAM,
             session=session,
         )
-        return ChannelLinkCodeResponse(
+        return TelegramLinkCodeRead(
             code=code,
             expires_at=expires_at,
             bot_username=settings.telegram_bot_username or None,

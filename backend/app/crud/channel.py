@@ -167,10 +167,32 @@ async def list_bindings(
     user_id: uuid.UUID,
     session: AsyncSession,
 ) -> list[ChannelBinding]:
-    """Return all channel bindings owned by ``user_id``."""
-    stmt = select(ChannelBinding).where(ChannelBinding.user_id == user_id)
+    """Return all channel bindings owned by ``user_id``, newest first."""
+    stmt = (
+        select(ChannelBinding)
+        .where(ChannelBinding.user_id == user_id)
+        .order_by(ChannelBinding.created_at.desc())
+    )
     result = await session.execute(stmt)
     return list(result.scalars().all())
+
+
+async def get_binding(
+    *,
+    user_id: uuid.UUID,
+    provider: str,
+    session: AsyncSession,
+) -> ChannelBinding | None:
+    """Return the user's binding for ``provider`` if one exists, else ``None``.
+
+    Useful as an exists-check before issuing a fresh link code or for
+    surfacing the connected state in the Settings UI.
+    """
+    stmt = select(ChannelBinding).where(
+        ChannelBinding.user_id == user_id,
+        ChannelBinding.provider == provider,
+    )
+    return (await session.execute(stmt)).scalar_one_or_none()
 
 
 async def delete_binding(
@@ -182,14 +204,11 @@ async def delete_binding(
     """Remove the user's binding for ``provider`` if one exists.
 
     Returns ``True`` when a row was deleted, ``False`` when the user
-    had no binding for that provider. Callers translate to 200/404 as
-    needed.
+    had no binding for that provider. The Settings UI calls the
+    matching route unconditionally — translating the ``False`` to a
+    204 keeps the click idempotent.
     """
-    stmt = select(ChannelBinding).where(
-        ChannelBinding.user_id == user_id,
-        ChannelBinding.provider == provider,
-    )
-    row = (await session.execute(stmt)).scalar_one_or_none()
+    row = await get_binding(user_id=user_id, provider=provider, session=session)
     if row is None:
         return False
     await session.delete(row)
