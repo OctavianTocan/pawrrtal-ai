@@ -48,6 +48,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.lcm import assemble_context
+from app.core.lcm.pack import PackCandidate, pack_context
 from app.core.tools.lcm_grep import lcm_grep
 from app.core.tools.lcm_search import format_results as format_search_results
 from app.core.tools.lcm_search import lcm_search
@@ -101,6 +102,7 @@ class LCMEvalMode(StrEnum):
     LCM_ASSEMBLED = "lcm_assembled"
     LCM_GREP = "lcm_grep"
     LCM_SEARCH = "lcm_search"
+    LCM_SEARCH_PACKED = "lcm_search_packed"
 
 
 @dataclass(frozen=True)
@@ -498,6 +500,44 @@ async def _retrieve_lcm_search(
     return blob[:_MAX_CONTEXT_CHARS], ["lcm_search"]
 
 
+async def _retrieve_lcm_search_packed(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    question: str,
+) -> tuple[str, list[str]]:
+    """Ranked search routed through the issue-#255 context packer."""
+    raw_results = await lcm_search(
+        session,
+        conversation_id=conversation_id,
+        query=question,
+    )
+    candidates: list[PackCandidate] = [
+        PackCandidate(
+            item_kind=row["item_kind"],
+            item_id=row["item_id"],
+            ordinal=row.get("ordinal"),
+            role=row.get("role"),
+            summary_depth=row.get("summary_depth"),
+            summary_kind=row.get("summary_kind"),
+            source_ids=list(row.get("source_ids") or []),
+            lexical_score=row.get("score"),
+            final_score=row.get("score"),
+            excerpt=row.get("excerpt", ""),
+            content=row.get("excerpt", ""),
+            token_count=max(1, len(row.get("excerpt", "")) // _CHARS_PER_TOKEN),
+        )
+        for row in raw_results
+    ]
+    packed = pack_context(candidates, query=question)
+    rendered_parts = [
+        f"[{item['item_kind'].upper()} reason={item['packed_reason']}]\n{item['content']}"
+        for item in packed["kept"]
+    ]
+    blob = "\n\n".join(rendered_parts)
+    return blob[:_MAX_CONTEXT_CHARS], ["lcm_search", "pack_context"]
+
+
 def _extract_search_terms(question: str) -> list[str]:
     """Pull a handful of content-bearing words out of a question."""
     stopwords = {
@@ -618,6 +658,12 @@ async def _retrieve_for_mode(
         )
     if mode is LCMEvalMode.LCM_SEARCH:
         return await _retrieve_lcm_search(
+            session,
+            conversation_id=conversation_id,
+            question=scenario.question,
+        )
+    if mode is LCMEvalMode.LCM_SEARCH_PACKED:
+        return await _retrieve_lcm_search_packed(
             session,
             conversation_id=conversation_id,
             question=scenario.question,

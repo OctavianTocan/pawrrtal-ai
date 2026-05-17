@@ -210,6 +210,27 @@ async def test_eval_matrix_runs_every_scenario_for_every_mode(
 
 
 @pytest.mark.anyio
+async def test_search_packed_mode_carries_pack_tool_in_trace(
+    db_session: AsyncSession, test_user: User
+) -> None:
+    """LCM_SEARCH_PACKED routes lcm_search results through the issue-#255 packer."""
+    scenario = next(s for s in all_scenarios() if s.id == "pinpoint_summary_model")
+    conv = await seed_scenario(db_session, user_id=test_user.id, scenario=scenario)
+    await db_session.commit()
+
+    result = await run_eval(
+        db_session,
+        conversation_id=conv.id,
+        scenario=scenario,
+        mode=LCMEvalMode.LCM_SEARCH_PACKED,
+        fresh_tail_count=4,
+    )
+    assert "lcm_search" in result.tools_called
+    assert "pack_context" in result.tools_called
+    assert result.fact_pass is True
+
+
+@pytest.mark.anyio
 async def test_result_records_cost_and_latency_fields(
     db_session: AsyncSession, test_user: User
 ) -> None:
