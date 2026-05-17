@@ -28,20 +28,34 @@ FROM python:3.13-slim AS runtime
 
 WORKDIR /app
 
-# Install the official Notion CLI (``ntn``) used by the Notion plugin.
-# The plugin subprocesses ``ntn`` per tool call with the workspace's
-# token injected via ``NOTION_API_TOKEN``; see
-# ``app/integrations/notion/ntn_client.py``.  Pinned by date so the
-# install layer is reproducible — bump the env var to refresh.
+# Install runtime OS deps:
 #
-# The upstream installer (https://ntn.dev) writes ``ntn`` directly to
-# ``/usr/local/bin/ntn`` when run as root (the container build case),
-# so no follow-up ``mv`` is needed.  Earlier versions of this Dockerfile
-# tried to ``mv /root/.ntn/bin/ntn /usr/local/bin/ntn`` and crashed the
-# build with "No such file or directory" — bean ``pawrrtal-ntn``.
+#   * ``libpq5`` — the Postgres client library.  ``psycopg`` (we depend on
+#     plain ``psycopg``, not ``psycopg[binary]``) loads ``libpq`` via
+#     ctypes at import time.  Without it the container crashes at startup
+#     with ``ImportError: no pq wrapper available`` from
+#     ``psycopg.pq.import_from_libpq`` — every ``alembic upgrade head``
+#     and every ``uvicorn`` boot fails because ``app/db.py`` imports
+#     ``psycopg`` transitively through SQLAlchemy.  ``python:3.13-slim``
+#     does not include ``libpq`` so we install it explicitly.
+#   * ``ntn`` — the official Notion CLI used by the Notion plugin.
+#     The plugin subprocesses ``ntn`` per tool call with the workspace's
+#     token injected via ``NOTION_API_TOKEN``; see
+#     ``app/integrations/notion/ntn_client.py``.  Pinned by date so the
+#     install layer is reproducible — bump the env var to refresh.
+#     The upstream installer (https://ntn.dev) writes ``ntn`` directly to
+#     ``/usr/local/bin/ntn`` when run as root (the container build case),
+#     so no follow-up ``mv`` is needed.  Earlier versions of this
+#     Dockerfile tried to ``mv /root/.ntn/bin/ntn /usr/local/bin/ntn`` and
+#     crashed the build with "No such file or directory" — bean
+#     ``pawrrtal-ntn``.
+#
+# ``curl`` and ``ca-certificates`` are only needed for the ``ntn``
+# installer, so we install them and ``apt-get purge`` curl afterwards
+# to keep the runtime image small.  ``libpq5`` must NOT be purged.
 ENV NTN_INSTALL_DATE=2026-05-15
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl ca-certificates \
+ && apt-get install -y --no-install-recommends libpq5 curl ca-certificates \
  && curl -fsSL https://ntn.dev | bash \
  && chmod +x /usr/local/bin/ntn \
  && apt-get purge -y curl \
