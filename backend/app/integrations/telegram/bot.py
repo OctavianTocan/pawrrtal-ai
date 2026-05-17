@@ -163,7 +163,10 @@ async def _run_llm_turn(*, message: Message, context: TelegramTurnContext) -> No
         else []
     )
 
-    provider, warning = await resolve_provider_with_auto_clear(context)
+    provider, warning = await resolve_provider_with_auto_clear(
+        context,
+        workspace_root=Path(workspace.path) if workspace is not None else None,
+    )
     if warning is not None:
         await message.answer(warning)
 

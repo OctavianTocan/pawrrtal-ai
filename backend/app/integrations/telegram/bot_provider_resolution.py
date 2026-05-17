@@ -12,6 +12,7 @@ See ``_resolve_provider_with_auto_clear`` for the auto-clear contract
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from app.core.providers import resolve_llm
 from app.core.providers.base import AILLM
@@ -26,6 +27,8 @@ logger = logging.getLogger(__name__)
 
 async def resolve_provider_with_auto_clear(
     context: TelegramTurnContext,
+    *,
+    workspace_root: Path | None = None,
 ) -> tuple[AILLM, str | None]:
     """Resolve a provider for ``context.model_id`` with an auto-clear safety net.
 
@@ -42,6 +45,12 @@ async def resolve_provider_with_auto_clear(
 
     Args:
         context: Resolved turn context with the stored ``model_id``.
+        workspace_root: User's default workspace directory. Forwarded to
+            ``resolve_llm`` so the Claude SDK subprocess writes its
+            transcripts under the user workspace rather than the bot
+            process directory. ``None`` for users without a workspace
+            (pre-onboarding); the provider still runs isolated via
+            ``setting_sources=[]`` regardless.
 
     Returns:
         A tuple of ``(provider, warning_text_or_None)``. When the auto-clear
@@ -51,7 +60,11 @@ async def resolve_provider_with_auto_clear(
     """
     try:
         require_known(context.model_id)
-        provider = resolve_llm(context.model_id, user_id=context.nexus_user_id)
+        provider = resolve_llm(
+            context.model_id,
+            user_id=context.nexus_user_id,
+            workspace_root=workspace_root,
+        )
     except (InvalidModelId, UnknownModelId) as exc:
         fallback_id = default_model().id
         warning = (
@@ -69,6 +82,10 @@ async def resolve_provider_with_auto_clear(
             context.conversation_id,
             context.model_id,
         )
-        provider = resolve_llm(fallback_id, user_id=context.nexus_user_id)
+        provider = resolve_llm(
+            fallback_id,
+            user_id=context.nexus_user_id,
+            workspace_root=workspace_root,
+        )
         return provider, warning
     return provider, None
