@@ -52,4 +52,4 @@ EXPOSE 8000
 # command so --reload is active and the source volume mount is writable.
 # For production (Railway / plain Docker run) this CMD runs migrations
 # then starts uvicorn without reload.
-CMD ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000"]
+CMD ["sh", "-c", "alembic upgrade head && exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
