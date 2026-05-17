@@ -7,17 +7,20 @@ handshake; (2) the persistent identity map plus the conversation routing
 the bot reads on every inbound message.
 """
 
+import hashlib
+import hmac
+import secrets
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.ext.asyncio.session import AsyncSession
 from sqlalchemy.sql import select
 
+from app.core.config import settings
 from app.models import ChannelBinding, ChannelLinkCode
 
 
-async def get_channel_bindings_service(
-    user_id: uuid.UUID, session: AsyncSession
-) -> list[ChannelBinding]:
+async def get_channel_bindings(user_id: uuid.UUID, session: AsyncSession) -> list[ChannelBinding]:
     """Return all channel bindings owned by the user, oldest first."""
     result = await session.execute(
         select(ChannelBinding)
@@ -27,7 +30,7 @@ async def get_channel_bindings_service(
     return list(result.scalars().all())
 
 
-async def get_binding_service(
+async def get_binding(
     user_id: uuid.UUID, session: AsyncSession, provider: str
 ) -> ChannelBinding | None:
     """Get a channel binding for a given user and provider. Useful to check if a binding exists for a given provider for a given user."""
@@ -39,9 +42,9 @@ async def get_binding_service(
     return result.scalar_one_or_none()
 
 
-async def delete_binding_service(user_id: uuid.UUID, session: AsyncSession, provider: str) -> bool:
+async def delete_binding(user_id: uuid.UUID, session: AsyncSession, provider: str) -> bool:
     """Delete a channel binding for a given user and provider. Useful to unlink a channel for a given user."""
-    binding = await get_binding_service(user_id=user_id, session=session, provider=provider)
+    binding = await get_binding(user_id=user_id, session=session, provider=provider)
     # Return False if the binding does not exist.
     if binding is None:
         return False
@@ -52,42 +55,42 @@ async def delete_binding_service(user_id: uuid.UUID, session: AsyncSession, prov
     return True
 
 
-async def issue_link_code_service(
+async def issue_link_code(
     user_id: uuid.UUID, session: AsyncSession, provider: str
-) -> ChannelLinkCode:
-    """Issue a link code for a given user and provider. Useful to link a channel for a given user."""
-    # Generate a random code.
+) -> tuple[str, datetime]:
+    """Consume a code and create the matching ``ChannelBinding``.
 
-    # TODO: need to actually generate the code and pass the properties.
-    link_code: ChannelLinkCode = ChannelLinkCode()
-    return link_code
+    Returns the newly created (or pre-existing rebinding) row when the
+    code was valid, else ``None``. The caller (the bot adapter) maps
+    ``None`` to a generic "code not recognized or already used"
+    message — never leak which case it was.
 
+    On a successful redemption the code row is marked used so it can
+    never be replayed, even within its TTL.
+    """
+    # 1. Generate a plain text code.
+    code = "".join(secrets.choice("ABCDEFGHJKMNPQRSTUVWXYZ23456789") for _ in range(8))
+    # 2. Hash the code using HMAC-SHA-256.
+    code_hash = hmac.new(
+        settings.auth_secret.encode("utf-8"), code.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+    # 3. Calculate expiry time, by taking the current time and adding 10min or a constant of some sort TODO: What is the tzinfo here?
+    now: datetime = datetime.now(UTC).replace(tzinfo=None)
+    expires_at: datetime = now + timedelta(minutes=10)
 
-# TODO(pawrrtal-ei4l): codes are short and from a small alphabet — short
-#   enough to type, small enough to brute-force offline if you store
-#   them naively. Pick the storage primitive that defeats offline
-#   grinding even with a leaked DB.
+    # Create the link code object.
+    link_code: ChannelLinkCode = ChannelLinkCode(
+        code_hash=code_hash,
+        user_id=user_id,
+        provider=provider,
+        created_at=now,
+        expires_at=expires_at,
+        used_at=None,
+    )
+    # Add the link code to the session and commit.
+    # TODO: How does the session know where to put the link code?
+    session.add(link_code)
+    await session.commit()
 
-# TODO(pawrrtal-ei4l): the code alphabet matters. Think about what
-#   happens at a support ticket when someone insists they typed it
-#   correctly.
-
-# TODO(pawrrtal-ei4l): redemption has multiple failure modes (missing,
-#   expired, already used, wrong provider). The bot sees all of them
-#   as the same reply. Why?
-
-# TODO(pawrrtal-ei4l): what happens if a user unbinds and rebinds the
-#   same Telegram account? Two rows in the bindings table would race for
-#   "which Nexus user is this Telegram user?". Plan the merge path.
-
-# TODO(pawrrtal-ei4l): the get-or-create for the Telegram conversation
-#   has two branches — Telegram forum topics get their own row per
-#   thread, plain DMs reuse one row. The "find existing" query for DMs
-#   is non-obvious once the auto-title bean overwrites the title.
-
-# TODO(pawrrtal-ei4l): one of the helpers is hit on every inbound
-#   message — it should be a single indexed lookup, not a row fetch.
-
-# TODO(pawrrtal-ei4l): there's a helper for clearing the per-conversation
-#   model override. The auto-clear safety net in Phase 11 needs it; the
-#   /model handler needs to set it. Same signature, both directions.
+    # Return the plain text code and the expiry time.
+    return code, expires_at
