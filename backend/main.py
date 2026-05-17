@@ -11,35 +11,26 @@ from fastapi.middleware.cors import CORSMiddleware
 from starlette.types import ASGIApp
 
 from app.api.appearance import get_appearance_router
-from app.api.audit import get_audit_router
 from app.api.auth import get_auth_router
 from app.api.channels import get_channels_router
 from app.api.chat import get_chat_router
 from app.api.conversations import get_conversations_router
-from app.api.cost import get_cost_router
-from app.api.exports import get_exports_router
 from app.api.health import get_health_router
+from app.api.heartbeat import get_heartbeat_router, heartbeat_lifespan
 from app.api.models import get_models_router
 from app.api.oauth import get_oauth_router
 from app.api.personalization import get_personalization_router
 from app.api.projects import get_projects_router
-from app.api.scheduled_jobs import get_scheduled_jobs_router
 from app.api.stt import get_stt_router
 from app.api.workspace import get_workspace_router
 from app.api.workspace_env import get_workspace_env_router
 from app.cli.admin_seed import seed_admin_user
-from app.cli.migrate_workspace_env import migrate_user_keyed_env_files_for_all_users
 from app.core.config import settings
-from app.core.event_bus import AgentHandler, EventBus, NotificationService
-from app.core.event_bus.global_bus import set_event_bus
-from app.core.middleware import BackendApiKeyMiddleware
 from app.core.rate_limit import ChatRateLimitMiddleware
 from app.core.request_logging import RequestLoggingMiddleware
-from app.core.scheduler import JobScheduler
 from app.core.telemetry import setup_tracing, shutdown_tracing
 from app.db import create_db_and_tables
 from app.integrations.telegram import telegram_lifespan
-from app.integrations.webhooks import get_webhooks_router
 from app.logger_setup import (
     configure_logging,  # Set up logging configuration (this should be done before any loggers are used)
 )
@@ -66,54 +57,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     await create_db_and_tables()
     # This creates the admin user on every startup, but the UserManager will check if it already exists and skip creation if so, so it's idempotent and safe to run every time.
     await seed_admin_user()
-    # One-time migration of legacy user-keyed `.env` files to the new
-    # workspace-keyed layout.  Idempotent — when the source file is missing
-    # or the destination already exists, the helper returns without writing.
-    # See ADR 2026-05-15-plugin-system-and-notion-integration.mdx.
-    await migrate_user_keyed_env_files_for_all_users()
-    # PR 10: spin up the event bus before any request can fire so the
-    # consumer task is ready when the chat router or Telegram dispatcher
-    # publishes the first ``TurnStartedEvent``.  Stashed on
-    # ``app.state`` for handlers that want to publish from inside a route.
-    event_bus = EventBus()
-    await event_bus.start()
-    app.state.event_bus = event_bus
-    set_event_bus(event_bus)
-    # PR 12: spin up the cron scheduler after the bus so re-hydrated
-    # jobs that fire on startup have a publisher to land on.  No-op
-    # when ``SCHEDULER_ENABLED=false``.
-    scheduler: JobScheduler | None = None
-    if settings.scheduler_enabled:
-        scheduler = JobScheduler()
-        await scheduler.start()
-        app.state.scheduler = scheduler
-    else:
-        app.state.scheduler = None
-    # Bring the Telegram channel up alongside the HTTP server when a bot
-    # token is configured. The context manager yields None and is a no-op
-    # when the channel is disabled, so this stays safe for stripped-down
-    # deployments (CI, ephemeral previews, ...). Stash the service on
-    # `app.state` so the webhook route can hand updates to aiogram.
-    async with telegram_lifespan() as telegram_service:
+    # Bring the Telegram channel and heartbeat scheduler up alongside the
+    # HTTP server. Both context managers yield None when their feature is
+    # disabled, so this stays safe in stripped-down deployments (CI,
+    # ephemeral previews, ...). Stash both on `app.state` so future ops
+    # endpoints can introspect them without re-importing.
+    async with (
+        telegram_lifespan() as telegram_service,
+        heartbeat_lifespan() as heartbeat_scheduler,
+    ):
         app.state.telegram_service = telegram_service
-        # Follow-on: register the agent + notification subscribers AFTER the
-        # Telegram service is up so the notification service has a live
-        # bot instance.  Both are no-ops when the relevant pieces are
-        # disabled (no bot → notifications skip; no default user → agent
-        # handler logs + skips).
-        agent_handler = AgentHandler()
-        agent_handler.register(event_bus)
-        notification_service = NotificationService(
-            telegram_bot=telegram_service.bot if telegram_service is not None else None
-        )
-        notification_service.register(event_bus)
+        app.state.heartbeat_scheduler = heartbeat_scheduler
         try:
             yield
         finally:
-            if scheduler is not None:
-                await scheduler.stop()
-            set_event_bus(None)
-            await event_bus.stop()
             shutdown_tracing()
 
 
@@ -136,9 +93,6 @@ def create_app() -> FastAPI:
     # (the default), so registering it unconditionally costs nothing in
     # dev but is wired up for prod just by flipping the env var.
     fastapi_app.add_middleware(ChatRateLimitMiddleware)
-    # Added last so Starlette wraps it outermost: invalid deployment API keys
-    # are rejected before route/auth work. Disabled when BACKEND_API_KEY is unset.
-    fastapi_app.add_middleware(BackendApiKeyMiddleware)
     fastapi_app.include_router(
         fastapi_users.get_auth_router(auth_backend), prefix="/auth/jwt", tags=["auth"]
     )
@@ -191,22 +145,10 @@ def create_app() -> FastAPI:
         get_workspace_env_router(),
     )
     fastapi_app.include_router(
-        get_audit_router(),
-    )
-    fastapi_app.include_router(
-        get_cost_router(),
-    )
-    fastapi_app.include_router(
-        get_exports_router(),
-    )
-    fastapi_app.include_router(
-        get_webhooks_router(),
-    )
-    fastapi_app.include_router(
-        get_scheduled_jobs_router(),
-    )
-    fastapi_app.include_router(
         get_health_router(),
+    )
+    fastapi_app.include_router(
+        get_heartbeat_router(),
     )
 
     return fastapi_app
