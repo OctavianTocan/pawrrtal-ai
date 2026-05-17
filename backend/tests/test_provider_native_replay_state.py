@@ -172,7 +172,10 @@ async def test_gemini_stream_done_preserves_native_model_content(
 
     monkeypatch.setattr(gemini_provider.genai, "Client", CapturingClient)
     monkeypatch.setattr(gemini_provider, "_resolve_gemini_api_key", lambda _user_id: "test-key")
-    stream_fn = gemini_provider.make_gemini_stream_fn("gemini-test")
+    stream_fn = gemini_provider.make_gemini_stream_fn(
+        "gemini-test",
+        system_prompt="test-prompt",
+    )
     events = [
         event
         async for event in stream_fn(

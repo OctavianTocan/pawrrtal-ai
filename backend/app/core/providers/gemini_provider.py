@@ -218,7 +218,8 @@ def _tool_calls_from_chunk(chunk: Any, start_index: int) -> list[dict[str, Any]]
 def make_gemini_stream_fn(
     model_id: str,
     user_id: uuid.UUID | None = None,
-    system_prompt: str = _FALLBACK_SYSTEM_PROMPT,
+    *,
+    system_prompt: str,
 ) -> StreamFn:
     """Build a StreamFn backed by the google-genai SDK.
 
@@ -234,8 +235,10 @@ def make_gemini_stream_fn(
             on every call.  ``GeminiLLM.stream`` builds a fresh StreamFn per
             request so the per-request prompt (assembled from the workspace's
             SOUL.md + AGENTS.md + CLAUDE.md + skills by the chat router) is
-            what the model sees; defaulting to ``_FALLBACK_SYSTEM_PROMPT`` keeps
-            direct-script callers (a few unit tests) working without ceremony.
+            what the model sees.  Required and keyword-only — there is no
+            sensible "factory default" because every production caller already
+            has the request prompt in scope and unit tests should be explicit
+            about what they bind.
 
     Returns:
         An async generator factory that yields ``LLMEvent``s. The generator
