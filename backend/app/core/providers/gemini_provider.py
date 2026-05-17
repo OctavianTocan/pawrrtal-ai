@@ -180,7 +180,7 @@ def _split_chunk_text(chunk: Any) -> tuple[str, str]:
     return "".join(thinking_parts), "".join(response_parts)
 
 
-def _tool_calls_from_chunk(chunk: Any) -> list[dict[str, Any]]:
+def _tool_calls_from_chunk(chunk: Any, start_index: int) -> list[dict[str, Any]]:
     """Extract Gemini function-call parts from a streaming chunk.
 
     Only the name + args are surfaced to the agent loop; the enclosing
@@ -197,12 +197,7 @@ def _tool_calls_from_chunk(chunk: Any) -> list[dict[str, Any]]:
                 continue
             fc = part.function_call
             fn_name = fc.name or ""
-            # A short uuid suffix guarantees uniqueness across the entire agent
-            # loop session. Counter-based ids (call-{name}-{N}) restarted at 0
-            # on each `stream()` call, so the same tool invoked in multiple
-            # iterations collided — visible to the frontend as duplicate React
-            # keys in ChainOfThought.
-            tool_call_id = f"call-{fn_name}-{uuid.uuid4().hex[:12]}"
+            tool_call_id = f"call-{fn_name}-{start_index + len(calls)}"
             calls.append(
                 {
                     "tool_call_id": tool_call_id,
@@ -302,7 +297,7 @@ def make_gemini_stream_fn(
                     yield LLMTextDeltaEvent(type="text_delta", text=response_text)
                     full_text += response_text
 
-                chunk_tool_calls = _tool_calls_from_chunk(chunk)
+                chunk_tool_calls = _tool_calls_from_chunk(chunk, len(tool_calls))
                 if chunk_tool_calls:
                     # Capture the original Gemini ``ModelContent`` so
                     # follow-up turns can replay ``thought_signature``

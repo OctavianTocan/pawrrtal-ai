@@ -301,11 +301,11 @@ function ActiveConversationState({
 			<Conversation className="scrollbar-hide min-h-0 flex-1 overflow-y-auto" resize="smooth">
 				<ConversationContent className="scrollbar-hide mx-auto w-full max-w-[48.75rem] px-0 pt-12 pb-6">
 					{chatHistory.map((chatMessage, index) => {
-						// `thinking_started_at` is only set during live streaming; persisted
-						// history has neither it nor a stable server id, so fall back to the
-						// row index. Without this, two messages with identical content (e.g.
-						// the user typing "Yo" twice) would produce duplicate React keys.
-						const messageKey = `${chatMessage.role}:${chatMessage.thinking_started_at ?? `saved-${index}`}`;
+						const messageKey = [
+							chatMessage.role,
+							chatMessage.thinking_started_at ?? 'saved',
+							chatMessage.content.slice(0, 80),
+						].join(':');
 						return (
 							<ConversationRow
 								chatMessage={chatMessage}

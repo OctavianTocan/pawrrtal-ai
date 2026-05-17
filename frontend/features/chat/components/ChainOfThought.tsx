@@ -159,25 +159,20 @@ export const ChainOfThought = memo(function ChainOfThought({
 
 	return (
 		<div className="flex flex-col gap-0.5">
-			{items.map((item, index) => {
-				// Suffix every key with the row index. Tool call ids are now
-				// globally unique going forward, but older persisted history was
-				// written with counter-based ids that restarted per turn; thinking
-				// steps have no id at all and are content-derived. Indexing keeps
-				// React happy in both cases without requiring a backfill.
+			{items.map((item) => {
 				if (item.kind === 'tool') {
 					return (
 						<ToolStep
 							call={item.call}
 							chips={item.chips}
-							key={`tool-${item.call.id}-${index}`}
+							key={`tool-${item.call.id}`}
 						/>
 					);
 				}
 				return (
 					<ThinkingStep
 						content={item.content}
-						key={`thinking-${index}`}
+						key={`thinking-${item.title}-${item.content.slice(0, 80)}`}
 						title={item.title}
 					/>
 				);
