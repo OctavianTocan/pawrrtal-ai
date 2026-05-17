@@ -84,6 +84,30 @@ class Settings(BaseSettings):
     # Base backoff (seconds) between LLM retries; doubles each retry,
     # capped at 30s inside the loop.  Set 0 for instant retry.
     agent_llm_retry_backoff_seconds: float = 1.0
+
+    # ── Heartbeat (manual-trigger slice) ─────────────────────────────────
+    # Periodic background turns modelled on openclaw's heartbeat. This
+    # slice exposes the runner via POST /api/v1/heartbeat/run only —
+    # scheduled invocation is a follow-up that plugs into the existing
+    # JobScheduler (see app.core.scheduler) rather than booting a
+    # parallel APScheduler. Settings are kept here so the follow-up can
+    # consume them without churn.
+
+    # Master gate. When the scheduler integration lands, the registrar
+    # only runs when this is true. Currently informational.
+    heartbeat_enabled: bool = False
+    # Owner of the heartbeat-authored messages once the scheduler fires
+    # them. The manual endpoint takes the user from the auth session,
+    # so this is only consulted by the follow-up scheduler hook.
+    heartbeat_user_id: str = ""
+    # Default conversation for scheduler-driven heartbeats. The manual
+    # endpoint takes the conversation_id from the request body.
+    heartbeat_conversation_id: str = ""
+    # Absolute path to the markdown config. Empty falls back to
+    # `<repo>/HEARTBEAT.md` (resolved relative to this module so it
+    # works regardless of process CWD).
+    heartbeat_md_path: str = ""
+
     # Admin user credentials (for testing).
     admin_email: str | None = None
     admin_password: str | None = None
