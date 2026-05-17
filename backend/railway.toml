@@ -5,6 +5,6 @@
 #   Error: Invalid value for '--port': '$PORT' is not a valid integer.
 # Migrations are idempotent — `alembic upgrade head` exits 0 immediately when
 # the DB is already current.
-startCommand = "sh -c 'alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}'"
+startCommand = "sh -c 'alembic upgrade head && exec uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}'"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 3
