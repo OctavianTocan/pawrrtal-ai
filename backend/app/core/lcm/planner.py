@@ -35,6 +35,8 @@ from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from app.core.tools.lcm_search import LCM_STOPWORDS
+
 Intent = Literal[
     "exact_fact",
     "source_lookup",
@@ -228,35 +230,11 @@ _TIME_HINT_PATTERNS = (
     "after",
 )
 
-_STOPWORDS = frozenset(
-    {
-        "what",
-        "which",
-        "when",
-        "where",
-        "who",
-        "why",
-        "how",
-        "did",
-        "does",
-        "have",
-        "had",
-        "the",
-        "and",
-        "for",
-        "from",
-        "with",
-        "that",
-        "this",
-        "into",
-        "about",
-        "would",
-        "should",
-        "could",
-        "ever",
-        "still",
-    }
-)
+# Reuse the retrieval-stack stopword set so the planner tokenises
+# identically to ``lcm_search`` and the eval harness.  Diverging
+# lists caused inconsistent extraction between layers (Greptile P2
+# review).
+_STOPWORDS = LCM_STOPWORDS
 
 
 def _normalise(text: str) -> str:

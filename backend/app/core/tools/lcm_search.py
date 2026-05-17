@@ -88,10 +88,15 @@ _COVERAGE_BONUS_PER_EXTRA_TOKEN = 0.25
 # to read; the saturation effect we want shows up by ~3 hits.
 _TF_SATURATION = 3
 
-# Stopwords intentionally narrow.  Removing common English filler
-# words keeps the scorer signal high; keeping the list small avoids
-# stripping useful domain terms that happen to be everyday English.
-_STOPWORDS = frozenset(
+# Stopwords shared across the LCM retrieval stack
+# (``lcm_search``, ``planner``, ``evals``).  Removing common English
+# filler keeps the scorer signal high; keeping the list narrow avoids
+# stripping useful domain terms.  Exported as ``LCM_STOPWORDS`` so
+# the planner + eval harness use the *same* set as the retrieval
+# scorer - otherwise the modules tokenise inconsistently and the
+# eval harness measures a different surface than retrieval sees
+# (Greptile P2 review).
+LCM_STOPWORDS: frozenset[str] = frozenset(
     {
         "the",
         "and",
@@ -137,8 +142,14 @@ _STOPWORDS = frozenset(
         "not",
         "yes",
         "yet",
+        "ever",
+        "still",
+        "decide",
+        "decided",
+        "decision",
     }
 )
+_STOPWORDS = LCM_STOPWORDS  # module-local alias retained for clarity
 
 
 SearchItemKind = Literal["message", "summary"]

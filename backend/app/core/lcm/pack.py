@@ -220,11 +220,19 @@ def _candidate_tokens(candidate: PackCandidate) -> int:
 
 
 def _ordinal_for_sort(candidate: PackCandidate) -> int:
-    """Chronological sort key. Summaries float to the top of their bucket."""
+    """Chronological sort key.  Summaries float to the top of their bucket.
+
+    Summaries get an even slot (``ordinal * 2``); raw messages get the
+    odd slot (``ordinal * 2 + 1``) so when both share the same ordinal
+    the summary always sorts first.  This is the behaviour the
+    surrounding docstring describes; without the kind offset both kinds
+    landed on the same key and the documented ordering never fired
+    (Greptile P2 review).
+    """
     ordinal = candidate.get("ordinal")
     if ordinal is not None:
-        # Floats summaries above messages at the same ordinal slot.
-        return int(ordinal) * 2
+        kind_offset = 0 if candidate.get("item_kind") == "summary" else 1
+        return int(ordinal) * 2 + kind_offset
     # Summaries without explicit ordinal sort to the very front.
     return -1
 

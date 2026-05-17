@@ -56,8 +56,8 @@ from app.core.lcm.embeddings import (
 )
 from app.core.lcm.pack import PackCandidate, pack_context
 from app.core.tools.lcm_grep import lcm_grep
+from app.core.tools.lcm_search import LCM_STOPWORDS, lcm_search
 from app.core.tools.lcm_search import format_results as format_search_results
-from app.core.tools.lcm_search import lcm_search
 from app.models import (
     ChatMessage,
     Conversation,
@@ -623,40 +623,17 @@ async def _retrieve_lcm_search_packed(
 
 
 def _extract_search_terms(question: str) -> list[str]:
-    """Pull a handful of content-bearing words out of a question."""
-    stopwords = {
-        "what",
-        "which",
-        "when",
-        "where",
-        "who",
-        "why",
-        "how",
-        "did",
-        "does",
-        "have",
-        "the",
-        "and",
-        "for",
-        "from",
-        "with",
-        "that",
-        "this",
-        "into",
-        "about",
-        "would",
-        "should",
-        "ever",
-        "still",
-        "decide",
-        "decided",
-        "decision",
-    }
+    """Pull a handful of content-bearing words out of a question.
+
+    Uses the shared :data:`app.core.tools.lcm_search.LCM_STOPWORDS`
+    set so the eval harness tokenises identically to the retrieval
+    scorer it benchmarks.
+    """
     raw_tokens = re.findall(r"[a-zA-Z][a-zA-Z\-]{2,}", question.lower())
     seen: set[str] = set()
     terms: list[str] = []
     for token in raw_tokens:
-        if token in stopwords:
+        if token in LCM_STOPWORDS:
             continue
         if token in seen:
             continue
@@ -682,9 +659,13 @@ async def run_eval(
 ) -> LCMEvalResult:
     """Run one (scenario, mode) pair and return the structured result.
 
-    The function never raises on retrieval failure — the eval is a
-    measurement, so a missing tool or empty context should surface as
-    ``fact_pass=False`` not a test exception.
+    Retrieval failures for *known* modes never raise - the eval is a
+    measurement, so a missing tool or empty context surfaces as
+    ``fact_pass=False`` rather than a test exception.  An unknown
+    ``mode`` (one absent from :data:`_MODE_RETRIEVERS`) raises
+    ``ValueError`` so callers discover missing registrations
+    immediately, rather than silently scoring against an empty
+    context.
     """
     started = time.perf_counter()
     blob, tools_called = await _retrieve_for_mode(

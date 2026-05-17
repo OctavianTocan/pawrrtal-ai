@@ -33,6 +33,7 @@ import re
 import uuid
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from typing import Literal, Protocol, TypedDict
 
 from sqlalchemy import select
@@ -271,6 +272,10 @@ async def upsert_embedding(
     else:
         existing.embedding = vector
         existing.content_hash = new_hash
+        # Bump updated_at so downstream auditors can see which rows
+        # were re-embedded - the column would otherwise pin to the
+        # original creation timestamp forever (Greptile P2 review).
+        existing.updated_at = datetime.now(UTC)
         row = existing
     await session.flush()
     return row
