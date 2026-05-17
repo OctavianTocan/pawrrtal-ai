@@ -152,3 +152,55 @@ def test_tool_error_render_uses_stable_prefix() -> None:
     rendered = err.render()
     assert rendered.startswith(f"[{ToolErrorCode.PERMISSION_DENIED.value}]")
     assert "denied by mode" in rendered
+
+
+# ---------------------------------------------------------------------------
+# Resolver hardening (sibling-prefix + symlink-on-read)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_read_file_rejects_sibling_directory_prefix(tmp_path: Path) -> None:
+    """A sibling whose name shares a string prefix with the workspace
+    root must NOT be reachable via path traversal — string-prefix
+    comparison (the previous behaviour) accepted ``abc-evil`` when the
+    root was ``abc``.
+    """
+    root = tmp_path / "abc"
+    root.mkdir()
+    sibling = tmp_path / "abc-evil"
+    sibling.mkdir()
+    (sibling / "secret.txt").write_text("leak", encoding="utf-8")
+    (root / "AGENTS.md").write_text("ok", encoding="utf-8")
+
+    read = _tools(root)["read_file"]
+    out = await read.execute(  # type: ignore[attr-defined]
+        "sibling-1", path="../abc-evil/secret.txt"
+    )
+    assert out.startswith(f"[{ToolErrorCode.OUT_OF_ROOT.value}]")
+
+
+@pytest.mark.anyio
+async def test_read_file_refuses_to_follow_symlinks(tmp_path: Path) -> None:
+    """A symlink placed *inside* the workspace pointing outside must
+    not exfiltrate the target.  ``O_NOFOLLOW`` at open time closes the
+    TOCTOU window between ``resolve()`` and the actual read.
+    """
+    root = tmp_path / "workspace"
+    root.mkdir()
+    (root / "AGENTS.md").write_text("ok", encoding="utf-8")
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    secret = outside / "secret.txt"
+    secret.write_text("leak", encoding="utf-8")
+    link = root / "peek.txt"
+    link.symlink_to(secret)
+
+    read = _tools(root)["read_file"]
+    out = await read.execute("symlink-1", path="peek.txt")  # type: ignore[attr-defined]
+    # The resolver containment check rejects it (resolved path is outside
+    # the workspace).  This test pins the behaviour so a regression that
+    # only fixes the prefix check but re-enables symlink-following gets
+    # caught.
+    assert out.startswith(f"[{ToolErrorCode.OUT_OF_ROOT.value}]")
