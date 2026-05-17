@@ -24,6 +24,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.persona_bootstrap import BOOTSTRAP_STATE_PATH
 from app.core.workspace import (
     _build_soul_md,
     _build_user_md,
@@ -197,6 +198,32 @@ class TestSeedWorkspace:
 
         assert (root / "IDENTITY.md").exists()
         assert (root / "TOOLS.md").exists()
+
+    def test_seeds_persona_bootstrap_files(self, tmp_path: Path) -> None:
+        ws_id = uuid.uuid4()
+        with patch("app.core.workspace.settings") as mock_settings:
+            mock_settings.workspace_base_dir = str(tmp_path)
+            root = seed_workspace(ws_id)
+
+        bootstrap = (root / "BOOTSTRAP.md").read_text()
+        assert "First-Run Paw Setup" in bootstrap
+        assert (root / ".pawrrtal").is_dir()
+
+    def test_completed_bootstrap_state_prevents_reseed(self, tmp_path: Path) -> None:
+        ws_id = uuid.uuid4()
+        with patch("app.core.workspace.settings") as mock_settings:
+            mock_settings.workspace_base_dir = str(tmp_path)
+            root = seed_workspace(ws_id)
+
+        (root / "BOOTSTRAP.md").unlink()
+        state_path = root / BOOTSTRAP_STATE_PATH
+        state_path.write_text('{"version": 1, "completed": true}', encoding="utf-8")
+
+        with patch("app.core.workspace.settings") as mock_settings:
+            mock_settings.workspace_base_dir = str(tmp_path)
+            seed_workspace(ws_id)
+
+        assert not (root / "BOOTSTRAP.md").exists()
 
     def test_does_not_overwrite_existing_files(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()

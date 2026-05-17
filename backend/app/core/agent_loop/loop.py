@@ -256,20 +256,25 @@ async def _run_loop(
         iteration += 1
 
         llm_messages = await _prepare_llm_messages(messages, config)
-        stream_outcome = await _stream_with_retry(
+        stream_outcome = _StreamOutcome(
+            events=[],
+            assistant_content=[],
+            stop_reason="stop",
+            consecutive_llm_errors_after=consecutive_llm_errors,
+            terminated_event=None,
+        )
+        async for ev in _stream_with_retry(
             stream_fn=stream_fn,
             llm_messages=llm_messages,
             tools=tools,
             safety=safety,
             consecutive_llm_errors=consecutive_llm_errors,
-        )
+            outcome=stream_outcome,
+        ):
+            yield ev
 
         if stream_outcome.terminated_event is not None:
-            yield stream_outcome.terminated_event
             break
-
-        for ev in stream_outcome.events:
-            yield ev
 
         consecutive_llm_errors = stream_outcome.consecutive_llm_errors_after
         assistant_msg = AssistantMessage(
@@ -507,45 +512,46 @@ class _StreamOutcome:
         self.provider_state = provider_state
 
 
+class _StreamAttemptState:
+    """Mutable state for one provider stream attempt."""
+
+    __slots__ = ("emitted_event", "provider_state")
+
+    def __init__(self) -> None:
+        self.emitted_event = False
+        self.provider_state: dict[str, Any] | None = None
+
+
 async def _stream_with_retry(
     stream_fn: StreamFn,
     llm_messages: list[AgentMessage],
     tools: list[AgentTool],
     safety: AgentSafetyConfig,
     consecutive_llm_errors: int,
-) -> _StreamOutcome:
-    """Stream one assistant turn, retrying transient provider errors.
-
-    The retry budget is ``safety.max_consecutive_llm_errors`` — the
-    cumulative count of failures since the last successful stream, not
-    per-call.  This avoids the bug where two transient failures in two
-    different turns silently consume the same budget.
-
-    On success we reset the counter to 0.  On exhaustion we return a
-    :class:`_StreamOutcome` carrying the terminal event so the caller
-    can yield it cleanly.
-    """
+    outcome: _StreamOutcome,
+) -> AsyncIterator[AgentEvent]:
+    """Stream one assistant turn, updating ``outcome`` with final state."""
     backoff = max(safety.llm_retry_backoff_seconds, 0.0)
     max_errors = safety.max_consecutive_llm_errors
     attempts = 0
 
     while True:
         attempts += 1
-        events: list[AgentEvent] = []
-        assistant_content: list[TextContent | ToolCallContent] = []
-        stop_reason = "stop"
-        provider_state: dict[str, Any] | None = None
+        attempt_state = _StreamAttemptState()
 
         try:
-            async for llm_event in stream_fn(llm_messages, tools):
-                done = _consume_llm_event(llm_event, events)
-                # `done` is non-None only on the terminal ``done`` event;
-                # we keep iterating in case the SDK emits trailers, but
-                # the assignments here capture the final state.
-                assistant_content = done["content"] if done else assistant_content
-                stop_reason = done["stop_reason"] if done else stop_reason
-                provider_state = _carry_provider_state(done, provider_state)
+            async for event in _stream_attempt_events(
+                stream_fn(llm_messages, tools),
+                outcome,
+                attempt_state,
+            ):
+                yield event
         except Exception as exc:
+            if attempt_state.emitted_event:
+                outcome.terminated_event = _stream_interrupted_after_events(exc)
+                yield outcome.terminated_event
+                return
+
             consecutive_llm_errors += 1
             _log.warning(
                 "agent_loop: provider stream failed (attempt %d, consecutive=%d/%s): %s",
@@ -560,21 +566,54 @@ async def _stream_with_retry(
                 exc=exc,
             )
             if exhausted is not None:
-                return exhausted
+                _copy_stream_outcome(exhausted, outcome)
+                yield outcome.terminated_event
+                return
 
-            if backoff > 0:
-                wait = min(backoff * (2 ** (attempts - 1)), 30.0)
-                await asyncio.sleep(wait)
+            await _sleep_before_retry(backoff, attempts)
             continue
 
-        return _StreamOutcome(
-            events=events,
-            assistant_content=assistant_content,
-            stop_reason=stop_reason,
-            consecutive_llm_errors_after=0,
-            terminated_event=None,
-            provider_state=provider_state,
-        )
+        outcome.consecutive_llm_errors_after = 0
+        outcome.provider_state = attempt_state.provider_state
+        return
+
+
+async def _sleep_before_retry(backoff: float, attempts: int) -> None:
+    """Sleep for exponential retry backoff when configured."""
+    if backoff <= 0:
+        return
+    wait = min(backoff * (2 ** (attempts - 1)), 30.0)
+    await asyncio.sleep(wait)
+
+
+async def _stream_attempt_events(
+    stream: AsyncIterator[LLMEvent],
+    outcome: _StreamOutcome,
+    attempt_state: _StreamAttemptState,
+) -> AsyncIterator[AgentEvent]:
+    """Yield translated events for one provider stream attempt."""
+    async for llm_event in stream:
+        events: list[AgentEvent] = []
+        done = _consume_llm_event(llm_event, events)
+        if events:
+            attempt_state.emitted_event = True
+            outcome.events.extend(events)
+        _apply_done_event(done, outcome, attempt_state)
+        for event in events:
+            yield event
+
+
+def _apply_done_event(
+    done: dict[str, Any] | None,
+    outcome: _StreamOutcome,
+    attempt_state: _StreamAttemptState,
+) -> None:
+    """Capture the final provider state from a terminal ``done`` event."""
+    if done is None:
+        return
+    outcome.assistant_content = done["content"]
+    outcome.stop_reason = done["stop_reason"]
+    attempt_state.provider_state = _carry_provider_state(done, attempt_state.provider_state)
 
 
 def _retry_budget_exhausted(
@@ -612,6 +651,28 @@ def _retry_budget_exhausted(
         stop_reason="error",
         consecutive_llm_errors_after=consecutive_llm_errors,
         terminated_event=terminated,
+    )
+
+
+def _copy_stream_outcome(source: _StreamOutcome, target: _StreamOutcome) -> None:
+    """Copy final stream state into the caller-owned outcome object."""
+    target.events = source.events
+    target.assistant_content = source.assistant_content
+    target.stop_reason = source.stop_reason
+    target.consecutive_llm_errors_after = source.consecutive_llm_errors_after
+    target.terminated_event = source.terminated_event
+    target.provider_state = source.provider_state
+
+
+def _stream_interrupted_after_events(exc: Exception) -> AgentTerminatedEvent:
+    """Build the no-retry termination used after partial output was emitted."""
+    return _terminated(
+        reason="stream_interrupted_after_events",
+        message=(
+            "Agent stopped: provider stream failed after partial output was "
+            f"already emitted. Last error: {exc}"
+        ),
+        last_error=str(exc),
     )
 
 

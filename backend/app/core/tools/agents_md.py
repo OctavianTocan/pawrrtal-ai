@@ -6,6 +6,7 @@ The agent's system prompt is built by concatenating, in order:
      file is editable by the agent itself, so the system prompt always
      reflects the agent's current self-description.
   2. ``AGENTS.md`` — operating rules + workspace-specific guidance.
+  3. ``BOOTSTRAP.md`` — first-run persona setup, only until completed.
 
 Both files live at the workspace root.  Each load returns ``None`` on
 failure so the caller can fall back to a hard-coded default per file.
@@ -21,6 +22,7 @@ import logging
 from pathlib import Path
 
 from app.core.fs import read_capped_utf8
+from app.core.persona_bootstrap import read_persona_bootstrap
 
 log = logging.getLogger(__name__)
 
@@ -64,23 +66,27 @@ def read_skills_index(workspace_root: Path) -> str | None:
 
 
 def assemble_workspace_prompt(workspace_root: Path) -> str | None:
-    """Return SOUL.md + AGENTS.md + skills/_index.md, or ``None`` if all missing.
+    """Return workspace prompt files, or ``None`` if all are missing.
 
-    Order: SOUL.md ("who you are"), AGENTS.md ("how to operate here"), then
-    skills/_index.md ("what skills are available").  Any section may be absent
-    independently; missing sections are omitted with no placeholder text so the
-    agent doesn't see "(file missing)" noise.
+    Order: SOUL.md ("who you are"), AGENTS.md ("how to operate here"),
+    BOOTSTRAP.md (only while first-run setup is pending), then skills/_index.md
+    ("what skills are available").  Any section may be absent independently;
+    missing sections are omitted with no placeholder text so the agent doesn't
+    see "(file missing)" noise.
     """
     soul = read_soul_md(workspace_root)
     agents = read_agents_md(workspace_root)
+    bootstrap = read_persona_bootstrap(workspace_root)
     skills_index = read_skills_index(workspace_root)
-    if soul is None and agents is None and skills_index is None:
+    if soul is None and agents is None and bootstrap is None and skills_index is None:
         return None
     parts: list[str] = []
     if soul is not None:
         parts.append(soul)
     if agents is not None:
         parts.append(agents)
+    if bootstrap is not None:
+        parts.append(bootstrap)
     if skills_index is not None:
         parts.append(skills_index)
     return "\n\n---\n\n".join(parts)

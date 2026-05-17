@@ -170,7 +170,8 @@ async def test_gemini_provider_emits_tool_use_and_result_events(
     assert executed == ["hi"]
 
     # All three event types appeared in the SSE stream.
-    assert any(e["type"] == "tool_use" for e in events)
+    tool_use = next(e for e in events if e["type"] == "tool_use")
+    assert tool_use["input"] == {"value": "hi"}
     assert any(e["type"] == "tool_result" for e in events)
     assert any(e["type"] == "delta" and "Done!" in e.get("content", "") for e in events)
 

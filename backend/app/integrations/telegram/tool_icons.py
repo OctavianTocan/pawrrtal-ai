@@ -42,6 +42,8 @@ _TOOL_ICONS: dict[str, str] = {
     "TaskOutput": "\U0001f9e0",
     "WebFetch": "\U0001f310",
     "WebSearch": "\U0001f310",
+    "terminal": "\U0001f4bb",
+    "search_files": "\U0001f50e",
     "NotebookRead": "\U0001f4d3",
     "NotebookEdit": "\U0001f4d3",
     "TodoRead": "☑️",
@@ -50,8 +52,10 @@ _TOOL_ICONS: dict[str, str] = {
     # ``app/core/tools/...``).  Each lands here when the chat router
     # composes them via ``build_agent_tools``.
     "workspace_read": "\U0001f4d6",
+    "read_file": "\U0001f4d6",
     "workspace_write": "✏️",
     "workspace_list": "\U0001f4c2",
+    "list_dir": "\U0001f4c2",
     "exa_search": "\U0001f310",
     "render_artifact": "\U0001f9e9",
     "image_gen": "\U0001f3a8",

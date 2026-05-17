@@ -12,6 +12,7 @@ What we read
      :func:`app.core.tools.agents_md.assemble_workspace_prompt` covers
      this and AGENTS.md; we add CLAUDE.md compatibility on top).
    * ``AGENTS.md`` — operating rules.
+   * ``BOOTSTRAP.md`` — first-run Paw persona setup, only until completed.
    * ``CLAUDE.md`` — Claude Code-native operating manual.  Loaded so
      a workspace authored against the Claude Code CLI works the same
      against our Gemini path.
@@ -49,6 +50,7 @@ from pathlib import Path
 
 from app.core.config import settings
 from app.core.fs import read_capped_utf8
+from app.core.persona_bootstrap import is_persona_bootstrap_pending
 from app.core.tools.agents_md import (
     assemble_workspace_prompt,
 )
@@ -155,9 +157,14 @@ def load_workspace_context(root: Path) -> WorkspaceContext:
     loaded: list[Path] = []
     base_prompt = assemble_workspace_prompt(root)
     if base_prompt is not None:
-        # ``assemble_workspace_prompt`` already concatenates SOUL.md +
-        # AGENTS.md; we record the two source paths if they exist.
+        # ``assemble_workspace_prompt`` already concatenates SOUL.md,
+        # AGENTS.md, pending BOOTSTRAP.md, and skills/_index.md; we
+        # record the source paths if they exist.
         loaded.extend(root / name for name in ("SOUL.md", "AGENTS.md") if (root / name).exists())
+        if is_persona_bootstrap_pending(root):
+            loaded.append(root / "BOOTSTRAP.md")
+        if (root / "skills/_index.md").exists():
+            loaded.append(root / "skills/_index.md")
 
     claude_md = read_capped_utf8(root / _CLAUDE_MD, max_bytes=_MAX_BYTES)
     if claude_md is not None:

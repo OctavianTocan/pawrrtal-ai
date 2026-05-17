@@ -68,6 +68,19 @@ from app.core.providers.base import StreamEvent
 from app.core.tools.send_message import SendFn
 
 from .base import ChannelMessage
+from .telegram_delivery import (
+    final_reply_text,
+    format_tool_use,
+    optional_int,
+    plain_html,
+    routing_kwargs,
+    safe_delete,
+    safe_edit,
+    safe_edit_html,
+    safe_send_html,
+    safe_send_text,
+    thinking_html,
+)
 from .telegram_html import md_to_telegram_html
 
 if TYPE_CHECKING:
@@ -84,10 +97,6 @@ _EDIT_DEBOUNCE_CHARS = 40
 # Hard upper bound between edits in wall-clock seconds.  Ensures the user
 # sees *something* change even when the model emits many tiny tokens.
 _MAX_EDIT_INTERVAL_S = 3.0
-
-# Maximum Telegram message length.  We truncate rather than split for now;
-# splitting is a future concern.
-_MAX_MESSAGE_LEN = 4096
 
 # Prefix glyphs for non-text outcomes so the user can spot terminations and
 # errors at a glance in their chat.  These are deliberately short so they
@@ -118,7 +127,7 @@ class TelegramChannel:
         stream: AsyncIterator[StreamEvent],
         message: ChannelMessage,
     ) -> AsyncIterator[bytes]:
-        """Consume LLM events and edit the Telegram placeholder progressively.
+        """Consume LLM events and deliver the Telegram turn as separate messages.
 
         Expected ``message["metadata"]`` keys:
 
@@ -126,7 +135,7 @@ class TelegramChannel:
         - ``chat_id`` (``int | str``): target Telegram chat.
         - ``message_id`` (``int``): placeholder message to overwrite.
 
-        Yields nothing — all delivery is via side-effect (``edit_message_text``).
+        Yields nothing — all delivery is via side-effects.
 
         Args:
             stream: Async iterator of ``StreamEvent`` dicts from the LLM.
@@ -137,8 +146,13 @@ class TelegramChannel:
         bot: Bot = meta["bot"]
         chat_id = meta["chat_id"]
         message_id: int = meta["message_id"]
+        reply_to_message_id = optional_int(meta.get("reply_to_message_id"))
+        message_thread_id = optional_int(meta.get("message_thread_id"))
 
-        accumulated = ""
+        tool_trace = ""
+        answer_text = ""
+        thinking_text = ""
+        thinking_message_id: int | None = None
         chars_since_edit = 0
         last_edit_at = asyncio.get_event_loop().time()
 
@@ -151,44 +165,32 @@ class TelegramChannel:
             etype = event.get("type")
 
             if etype == "tool_use":
-                accumulated, chars_since_edit, last_edit_at = await _handle_tool_use(
+                tool_trace, chars_since_edit, last_edit_at = await _handle_tool_use(
                     event=event,
                     bot=bot,
                     chat_id=chat_id,
                     message_id=message_id,
-                    accumulated=accumulated,
+                    tool_trace=tool_trace,
                     chars_since_edit=chars_since_edit,
                     last_edit_at=last_edit_at,
                 )
                 continue
 
             if etype == "thinking":
-                accumulated, chars_since_edit, last_edit_at = await _handle_thinking(
+                thinking_text, thinking_message_id = await _handle_thinking(
                     event=event,
                     bot=bot,
                     chat_id=chat_id,
-                    message_id=message_id,
-                    accumulated=accumulated,
-                    chars_since_edit=chars_since_edit,
-                    last_edit_at=last_edit_at,
+                    thinking_text=thinking_text,
+                    thinking_message_id=thinking_message_id,
+                    reply_to_message_id=reply_to_message_id,
+                    message_thread_id=message_thread_id,
                 )
                 continue
 
             if etype == "delta":
                 chunk: str = event.get("content", "")
-                accumulated += chunk
-                chars_since_edit += len(chunk)
-
-                now = asyncio.get_event_loop().time()
-                elapsed = now - last_edit_at
-
-                should_edit = (
-                    chars_since_edit >= _EDIT_DEBOUNCE_CHARS or elapsed >= _MAX_EDIT_INTERVAL_S
-                )
-                if should_edit and accumulated:
-                    await _safe_edit(bot, chat_id, message_id, accumulated)
-                    chars_since_edit = 0
-                    last_edit_at = now
+                answer_text += chunk
                 continue
 
             if etype == "agent_terminated":
@@ -216,26 +218,31 @@ class TelegramChannel:
                 )
                 continue
 
-        # Decide what to flush onto the placeholder.  Priority:
-        #   1. Text + terminal notice — append notice as a second paragraph.
-        #   2. Text only — flush text.
-        #   3. Terminal notice only — show the notice in place of the ⏳.
-        #   4. Nothing — fallback so the placeholder never stays stuck.
-        if accumulated and terminal_message:
-            final_text = f"{accumulated}\n\n{terminal_prefix}{terminal_message}"
-        elif accumulated:
-            final_text = accumulated
-        elif terminal_message:
-            final_text = f"{terminal_prefix}{terminal_message}"
+        final_text = final_reply_text(
+            answer_text=answer_text,
+            terminal_message=terminal_message,
+            terminal_prefix=terminal_prefix,
+        )
+        if tool_trace:
+            await safe_edit_html(bot, chat_id, message_id, plain_html(tool_trace))
+        elif final_text or thinking_text:
+            await safe_delete(bot, chat_id, message_id)
         else:
-            final_text = _EMPTY_RESPONSE_FALLBACK
+            await safe_edit(bot, chat_id, message_id, _EMPTY_RESPONSE_FALLBACK)
             logger.warning(
                 "TELEGRAM_EMPTY_STREAM chat_id=%s message_id=%s",
                 chat_id,
                 message_id,
             )
 
-        await _safe_edit(bot, chat_id, message_id, final_text)
+        if final_text:
+            await safe_send_text(
+                bot,
+                chat_id,
+                final_text,
+                reply_to_message_id=reply_to_message_id,
+                message_thread_id=message_thread_id,
+            )
 
         # No bytes to yield — delivery is a side-effect only.
         return
@@ -252,38 +259,28 @@ async def _handle_tool_use(
     bot: Bot,
     chat_id: int | str,
     message_id: int,
-    accumulated: str,
+    tool_trace: str,
     chars_since_edit: int,
     last_edit_at: float,
 ) -> tuple[str, int, float]:
-    """Inject a one-line glyph + tool name into the in-flight Telegram edit.
+    """Inject a detailed tool-call row into the editable Telegram trace.
 
     Extracted from :meth:`TelegramChannel.deliver` to keep that method
     under the team's per-function statement budget while preserving PR 07's
-    real-time tool-call surfacing. The tool input is intentionally omitted
-    — it can be large or sensitive; only the name + glyph reaches the user.
+    real-time tool-call surfacing.
 
-    Returns the updated ``(accumulated, chars_since_edit, last_edit_at)``
+    Returns the updated ``(tool_trace, chars_since_edit, last_edit_at)``
     triple so the caller can flow it into the next iteration unchanged.
     """
-    # Lazy import: ``app.integrations.telegram.tool_icons`` lives inside the
-    # Telegram package whose ``__init__`` eagerly imports ``bot.py``, which
-    # in turn imports ``app.channels``. Importing at module scope creates a
-    # circular import during ``app.channels`` init.
-    from app.integrations.telegram.tool_icons import tool_icon  # noqa: PLC0415
-
-    tool_name = event.get("name", "tool")
-    line = f"\n{tool_icon(tool_name)} {tool_name}…"
-    accumulated += line
+    line = format_tool_use(event)
+    tool_trace = f"{tool_trace}\n{line}" if tool_trace else line
     chars_since_edit += len(line)
     now = asyncio.get_event_loop().time()
     elapsed = now - last_edit_at
-    if accumulated and (
-        chars_since_edit >= _EDIT_DEBOUNCE_CHARS or elapsed >= _MAX_EDIT_INTERVAL_S
-    ):
-        await _safe_edit(bot, chat_id, message_id, accumulated)
-        return accumulated, 0, now
-    return accumulated, chars_since_edit, last_edit_at
+    if tool_trace and (chars_since_edit >= _EDIT_DEBOUNCE_CHARS or elapsed >= _MAX_EDIT_INTERVAL_S):
+        await safe_edit_html(bot, chat_id, message_id, plain_html(tool_trace))
+        return tool_trace, 0, now
+    return tool_trace, chars_since_edit, last_edit_at
 
 
 async def _handle_thinking(
@@ -291,65 +288,28 @@ async def _handle_thinking(
     event: StreamEvent,
     bot: Bot,
     chat_id: int | str,
-    message_id: int,
-    accumulated: str,
-    chars_since_edit: int,
-    last_edit_at: float,
-) -> tuple[str, int, float]:
-    """Inject a compact thinking line for detailed Telegram verbosity."""
+    thinking_text: str,
+    thinking_message_id: int | None,
+    reply_to_message_id: int | None,
+    message_thread_id: int | None,
+) -> tuple[str, int | None]:
+    """Send or edit the separate italic thinking message."""
     chunk = str(event.get("content") or "").strip()
     if not chunk:
-        return accumulated, chars_since_edit, last_edit_at
-    line = f"\n🧠 Thinking: {chunk}"
-    accumulated += line
-    chars_since_edit += len(line)
-    now = asyncio.get_event_loop().time()
-    elapsed = now - last_edit_at
-    if accumulated and (
-        chars_since_edit >= _EDIT_DEBOUNCE_CHARS or elapsed >= _MAX_EDIT_INTERVAL_S
-    ):
-        await _safe_edit(bot, chat_id, message_id, accumulated)
-        return accumulated, 0, now
-    return accumulated, chars_since_edit, last_edit_at
-
-
-async def _safe_edit(
-    bot: Bot,
-    chat_id: int | str,
-    message_id: int,
-    text: str,
-) -> None:
-    """Call ``edit_message_text``, swallowing benign Telegram errors.
-
-    Args:
-        bot: Live aiogram Bot instance.
-        chat_id: Target Telegram chat ID.
-        message_id: ID of the message to edit.
-        text: Full text to set (not a delta — always the accumulated string).
-    """
-    html = md_to_telegram_html(text)
-
-    # Truncate to Telegram's hard limit; future work can paginate.
-    if len(html) > _MAX_MESSAGE_LEN:
-        html = html[: _MAX_MESSAGE_LEN - 1] + "…"
-
-    try:
-        await bot.edit_message_text(
-            chat_id=chat_id,
-            message_id=message_id,
-            text=html,
-        )
-    except Exception as exc:
-        err_str = str(exc).lower()
-        if "not modified" in err_str:
-            # Benign — model emitted an empty delta, nothing changed.
-            return
-        logger.warning(
-            "TELEGRAM_EDIT_FAILED chat_id=%s message_id=%s error=%s",
+        return thinking_text, thinking_message_id
+    thinking_text = f"{thinking_text}\n{chunk}" if thinking_text else chunk
+    html = thinking_html(thinking_text)
+    if thinking_message_id is None:
+        message_id = await safe_send_html(
+            bot,
             chat_id,
-            message_id,
-            exc,
+            html,
+            reply_to_message_id=reply_to_message_id,
+            message_thread_id=message_thread_id,
         )
+        return thinking_text, message_id
+    await safe_edit_html(bot, chat_id, thinking_message_id, html)
+    return thinking_text, thinking_message_id
 
 
 # ---------------------------------------------------------------------------
@@ -362,6 +322,7 @@ def make_telegram_sender(
     chat_id: int | str,
     *,
     message_thread_id: int | None = None,
+    reply_to_message_id: int | None = None,
 ) -> SendFn:
     """Return a :data:`~app.core.tools.send_message.SendFn` for Telegram.
 
@@ -377,13 +338,15 @@ def make_telegram_sender(
     Text-only calls (no file) fall through to ``bot.send_message``.
 
     When *message_thread_id* is set every call includes it so the reply
-    lands in the correct Telegram topic thread.
+    lands in the correct Telegram topic thread. When *reply_to_message_id*
+    is set, every sent payload threads under the triggering user message.
 
     Args:
         bot: Live aiogram ``Bot`` instance.
         chat_id: Target Telegram chat ID.
         message_thread_id: Optional topic thread ID (Bot API 9.3+).
             Pass ``None`` (the default) for DMs without topics enabled.
+        reply_to_message_id: Optional inbound message id to reply to.
 
     Returns:
         An async :data:`~app.core.tools.send_message.SendFn` callback ready
@@ -395,16 +358,17 @@ def make_telegram_sender(
         file_path: Path | None,
         mime: str | None,
     ) -> None:
-        thread_kwargs: dict[str, Any] = {}
-        if message_thread_id is not None:
-            thread_kwargs["message_thread_id"] = message_thread_id
+        route_kwargs = routing_kwargs(
+            reply_to_message_id=reply_to_message_id,
+            message_thread_id=message_thread_id,
+        )
 
         if file_path is None:
             # Text-only delivery.
             await bot.send_message(
                 chat_id=chat_id,
                 text=md_to_telegram_html(text or ""),
-                **thread_kwargs,
+                **route_kwargs,
             )
             return
 
@@ -419,7 +383,7 @@ def make_telegram_sender(
                 chat_id=chat_id,
                 photo=file,
                 caption=caption,
-                **thread_kwargs,
+                **route_kwargs,
             )
             return
         if m in ("audio/ogg", "audio/opus"):
@@ -428,7 +392,7 @@ def make_telegram_sender(
                 chat_id=chat_id,
                 voice=file,
                 caption=caption,
-                **thread_kwargs,
+                **route_kwargs,
             )
             return
         if m.startswith("audio/"):
@@ -436,7 +400,7 @@ def make_telegram_sender(
                 chat_id=chat_id,
                 audio=file,
                 caption=caption,
-                **thread_kwargs,
+                **route_kwargs,
             )
             return
         if m.startswith("video/"):
@@ -444,7 +408,7 @@ def make_telegram_sender(
                 chat_id=chat_id,
                 video=file,
                 caption=caption,
-                **thread_kwargs,
+                **route_kwargs,
             )
             return
         # Fallback — send as a downloadable document.
@@ -452,7 +416,7 @@ def make_telegram_sender(
             chat_id=chat_id,
             document=file,
             caption=caption,
-            **thread_kwargs,
+            **route_kwargs,
         )
 
     return _send
