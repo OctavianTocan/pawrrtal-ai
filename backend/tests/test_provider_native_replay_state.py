@@ -74,7 +74,9 @@ async def test_agent_loop_carries_provider_state_to_followup_turn() -> None:
     async def stream_fn(
         messages: list[AgentMessage],
         tools: list[AgentTool],
+        system_prompt: str = "",
     ) -> AsyncIterator[LLMEvent]:
+        del tools, system_prompt
         nonlocal calls
         calls += 1
         if calls == 1:
@@ -178,6 +180,7 @@ async def test_gemini_stream_done_preserves_native_model_content(
         async for event in stream_fn(
             [UserMessage(role="user", content="List files.")],
             [_make_tool()],
+            "",
         )
     ]
 

@@ -206,6 +206,7 @@ async def test_stream_config_disables_sdk_automatic_function_calling(
         async for event in stream_fn(
             [UserMessage(role="user", content="Search the docs.")],
             [_make_search_tool()],
+            "",
         )
     ]
 
@@ -216,3 +217,38 @@ async def test_stream_config_disables_sdk_automatic_function_calling(
     automatic_function_calling = captured_models.configs[0].automatic_function_calling
     assert automatic_function_calling is not None
     assert automatic_function_calling.disable is True
+
+
+@pytest.mark.anyio
+async def test_stream_threads_system_prompt_into_gemini_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The per-call ``system_prompt`` lands on ``GenerateContentConfig.system_instruction``.
+
+    Workspace-assembled prompts (SOUL.md + AGENTS.md + CLAUDE.md + skills) are
+    threaded through ``AgentContext.system_prompt`` → ``_stream_with_retry`` →
+    the Gemini ``StreamFn``.  If this wiring breaks, the model silently runs
+    on the bare provider fallback and the workspace identity is lost — so
+    this test asserts on the SDK-bound value, not just the call shape.
+    """
+    captured_models = _CapturingModels()
+
+    class CapturingClient:
+        def __init__(self, *, api_key: str) -> None:
+            self.api_key = api_key
+            self.aio = SimpleNamespace(models=captured_models)
+
+    monkeypatch.setattr(gemini_provider.genai, "Client", CapturingClient)
+    monkeypatch.setattr(gemini_provider, "_resolve_gemini_api_key", lambda _user_id: "test-key")
+
+    workspace_prompt = "You are PAWRRTAL, the assistant for octavian's workspace."
+    stream_fn = gemini_provider.make_gemini_stream_fn("gemini-test")
+    async for _ in stream_fn(
+        [UserMessage(role="user", content="hi")],
+        [],
+        workspace_prompt,
+    ):
+        pass
+
+    assert len(captured_models.configs) == 1
+    assert captured_models.configs[0].system_instruction == workspace_prompt

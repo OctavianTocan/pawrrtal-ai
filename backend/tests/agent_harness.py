@@ -282,7 +282,13 @@ class ScriptedStreamFn:
         self,
         messages: list[AgentMessage],
         tools: list[AgentTool],
+        system_prompt: str = "",
     ) -> AsyncIterator[LLMEvent]:
+        # ``system_prompt`` is part of the ``StreamFn`` contract but
+        # scripted scenarios assert on message flow, not the prompt itself
+        # — the dedicated coverage for prompt threading lives in
+        # ``test_gemini_stream_fn.py``.
+        del system_prompt
         self._record_messages(messages)
         idx = self.call_count
         self.call_count += 1

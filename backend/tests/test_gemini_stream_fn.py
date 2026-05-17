@@ -77,8 +77,11 @@ async def test_gemini_provider_passes_history_to_loop(
     seen_messages: list[list[AgentMessage]] = []
 
     async def recording_stream_fn(
-        messages: list[AgentMessage], tools: list[AgentTool]
+        messages: list[AgentMessage],
+        tools: list[AgentTool],
+        system_prompt: str = "",
     ) -> AsyncIterator[LLMEvent]:
+        del tools, system_prompt
         seen_messages.append(list(messages))
         yield LLMTextDeltaEvent(type="text_delta", text="ok")
         yield LLMDoneEvent(
@@ -317,8 +320,11 @@ async def test_gemini_provider_accumulates_tool_result_in_context(
     turn_counter: list[int] = [0]
 
     async def recording_fn(
-        messages: list[AgentMessage], tools: list[AgentTool]
+        messages: list[AgentMessage],
+        tools: list[AgentTool],
+        system_prompt: str = "",
     ) -> AsyncIterator[LLMEvent]:
+        del tools, system_prompt
         idx = turn_counter[0]
         turn_counter[0] += 1
         seen_per_call.append(len(messages))

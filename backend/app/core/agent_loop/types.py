@@ -312,9 +312,16 @@ class AgentContext:
 
 
 # StreamFn: what each provider implements.
-# Takes messages (after transform + convert) and tools; yields LLMEvents.
+# Takes the per-turn LLM-call inputs and yields LLMEvents:
+#   - messages: history (after transform + convert)
+#   - tools:    available tools this turn
+#   - system_prompt: the request's system prompt (provider passes it to its
+#     SDK's dedicated system field, e.g. Gemini ``system_instruction``).  The
+#     agent loop sources this from ``AgentContext.system_prompt`` so the
+#     prompt the chat router assembled (SOUL.md + AGENTS.md + CLAUDE.md +
+#     skills) actually reaches the model.
 StreamFn = Callable[
-    [list[AgentMessage], list[AgentTool]],
+    [list[AgentMessage], list[AgentTool], str],
     AsyncIterator[LLMEvent],
 ]
 

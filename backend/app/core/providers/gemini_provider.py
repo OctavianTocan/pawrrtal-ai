@@ -234,6 +234,7 @@ def make_gemini_stream_fn(model_id: str, user_id: uuid.UUID | None = None) -> St
     async def stream_fn(
         messages: list[AgentMessage],
         tools: list[AgentTool],
+        system_prompt: str,
     ) -> AsyncIterator[LLMEvent]:
         client = genai.Client(api_key=_resolve_gemini_api_key(user_id))
         contents = _build_gemini_contents(messages)
@@ -243,9 +244,13 @@ def make_gemini_stream_fn(model_id: str, user_id: uuid.UUID | None = None) -> St
         # rather than make the helper return the wide type.
         gemini_tools: list[Any] | None = _build_gemini_tool_declarations(tools)
         config = gtypes.GenerateContentConfig(
-            # TODO(pawrrtal-df2v): Thread the request system prompt into this
-            # StreamFn instead of always using the provider fallback.
-            system_instruction=_FALLBACK_SYSTEM_PROMPT,
+            # ``system_prompt`` is plumbed in from ``AgentContext.system_prompt``
+            # via ``_stream_with_retry`` so the workspace-assembled prompt
+            # (SOUL.md + AGENTS.md + CLAUDE.md + skills) reaches the model.
+            # An empty string is treated as "no caller-supplied prompt" and
+            # falls back to ``_FALLBACK_SYSTEM_PROMPT`` so direct-script
+            # callers (a few unit tests) still get a sensible default.
+            system_instruction=system_prompt or _FALLBACK_SYSTEM_PROMPT,
             # Pass None (not []) when there are no tools — some SDK versions raise on empty list.
             tools=gemini_tools or None,
             # TODO(pawrrtal-1qlk): Set automatic_function_calling disable=True

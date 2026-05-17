@@ -88,7 +88,9 @@ def make_mock_stream(*responses: AssistantMessage):
     async def stream_fn(
         messages: list[AgentMessage],
         tools: list[AgentTool],
+        system_prompt: str = "",
     ) -> AsyncIterator[LLMEvent]:
+        del messages, tools, system_prompt
         nonlocal call_count
         msg = responses[min(call_count, len(responses) - 1)]
         call_count += 1
@@ -193,8 +195,11 @@ async def test_agent_loop_applies_transform_context_before_convert() -> None:
     seen_by_llm: list[list[AgentMessage]] = []
 
     async def recording_stream_fn(
-        messages: list[AgentMessage], tools: list[AgentTool]
+        messages: list[AgentMessage],
+        tools: list[AgentTool],
+        system_prompt: str = "",
     ) -> AsyncIterator[LLMEvent]:
+        del tools, system_prompt
         seen_by_llm.append(list(messages))
         msg = make_assistant_message([make_text_content("response")])
         yield LLMTextDeltaEvent(type="text_delta", text="response")
@@ -328,8 +333,11 @@ async def test_agent_loop_includes_existing_context_messages() -> None:
     messages_seen_by_llm: list[list[AgentMessage]] = []
 
     async def recording_stream_fn(
-        messages: list[AgentMessage], tools: list[AgentTool]
+        messages: list[AgentMessage],
+        tools: list[AgentTool],
+        system_prompt: str = "",
     ) -> AsyncIterator[LLMEvent]:
+        del tools, system_prompt
         messages_seen_by_llm.append(list(messages))
         msg = make_assistant_message([make_text_content("6")])
         yield LLMTextDeltaEvent(type="text_delta", text="6")
