@@ -15,11 +15,10 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.channels._turn_cost import record_turn_cost_if_enabled
-from app.core.agent_system_prompt import compose_agent_system_prompt
+from app.channels._turn_workspace import workspace_system_prompt
 from app.core.chat_aggregator import ChatTurnAggregator, should_emit_event
 from app.core.config import settings
 from app.core.event_bus import TurnCompletedEvent, publish_if_available
-from app.core.governance.workspace_context import load_workspace_context
 from app.core.lcm import assemble_context as lcm_assemble_context
 from app.core.lcm import ingest_message as lcm_ingest_message
 from app.core.lcm.background import schedule_lcm_compaction
@@ -30,8 +29,6 @@ from app.core.observability import (
     turn_span,
     workshop_event_hook,
 )
-from app.core.persona_bootstrap import ensure_persona_bootstrap_seeded
-from app.core.tools.agents_md import assemble_workspace_prompt
 from app.crud.chat_message import (
     append_assistant_placeholder,
     append_user_message,
@@ -127,7 +124,7 @@ async def run_turn(
     """
     started_at = time.perf_counter()
     history, assistant_message_id = await _load_history_and_persist(turn_input)
-    system_prompt = _workspace_system_prompt(turn_input.workspace_root)
+    system_prompt = workspace_system_prompt(turn_input.workspace_root)
     aggregator = ChatTurnAggregator()
     counter = _EventCounter()
     model_id = _channel_model_id(turn_input.channel_message)
@@ -365,22 +362,8 @@ async def _turn_session(turn_input: ChatTurnInput) -> AsyncIterator[AsyncSession
 
 
 def _workspace_system_prompt(workspace_root: Path | None) -> str | None:
-    """Load workspace prompt files when a workspace root is available.
-
-    PR 06 — uses :func:`load_workspace_context` so SOUL.md / AGENTS.md /
-    CLAUDE.md and ``.claude/skills/`` are merged into one provider-
-    neutral system prompt. Falls back to the legacy
-    :func:`assemble_workspace_prompt` builder when WorkspaceContext is
-    disabled or returns nothing so existing deployments don't lose
-    their AGENTS.md content.
-    """
-    if workspace_root is None:
-        return compose_agent_system_prompt(None)
-    ensure_persona_bootstrap_seeded(workspace_root)
-    workspace_ctx = load_workspace_context(workspace_root)
-    if workspace_ctx.system_prompt is not None:
-        return compose_agent_system_prompt(workspace_ctx.system_prompt)
-    return compose_agent_system_prompt(assemble_workspace_prompt(workspace_root))
+    """Compatibility wrapper for tests and older internal imports."""
+    return workspace_system_prompt(workspace_root)
 
 
 async def _finalize_turn(
