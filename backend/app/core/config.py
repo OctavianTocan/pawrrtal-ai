@@ -84,6 +84,32 @@ class Settings(BaseSettings):
     # Base backoff (seconds) between LLM retries; doubles each retry,
     # capped at 30s inside the loop.  Set 0 for instant retry.
     agent_llm_retry_backoff_seconds: float = 1.0
+
+    # ── Subagents ────────────────────────────────────────────────────────
+    # Master switch for the subagent system (persona loader, spawn/check/
+    # list/wait/cancel tools, background runner).  Default OFF so the PRs
+    # can land and migrations run without changing chat behaviour.  See
+    # backend/app/core/subagents/ and backend/app/agents/*.md.
+    subagents_enabled: bool = False
+
+    # Hard cap on subagent recursion depth.  A depth-0 parent can spawn
+    # children up to and including depth == subagent_max_depth.  Even
+    # if a parent grants ``spawn_subagent`` to its child, the system
+    # rejects further spawns once the cap is reached.
+    subagent_max_depth: int = 2
+
+    # Maximum live (status="running") subagents per conversation at any
+    # time.  Protects the asyncio scheduler and the cost ledger from a
+    # runaway parent fan-out.  ``spawn_subagent`` denies new spawns once
+    # the cap is reached and instructs the model to wait/cancel.
+    subagent_max_concurrent_per_conversation: int = 8
+
+    # Ceiling on the per-call ``wait_for_subagents.timeout_seconds`` the
+    # parent agent can request.  300s is the conservative default that
+    # survives most reverse-proxy idle limits; 600s requires a
+    # well-configured proxy.  Per-call requests above this are clamped.
+    subagent_wait_max_seconds: float = 600.0
+
     # Admin user credentials (for testing).
     admin_email: str | None = None
     admin_password: str | None = None
