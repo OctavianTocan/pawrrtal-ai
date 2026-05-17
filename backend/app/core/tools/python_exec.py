@@ -48,6 +48,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import errno
 import io
 import logging
 import os
@@ -73,6 +74,36 @@ _TRUNCATION_MARKER = "[truncated — output exceeded {cap} bytes]"
 # Length cap on the ``code`` argument logged at INFO so spammy code
 # blobs don't blow up the log stream.
 _MAX_LOGGED_CODE_LEN = 500
+# Default mode for files created via ``WorkspaceFS.write`` /
+# ``write_bytes`` / ``append``.  Same as ``open(..., 'w')`` default
+# under a 0o022 umask.
+_WRITE_FILE_MODE = 0o644
+
+# Module-level lock so concurrent ``python`` tool calls from
+# different requests share one serialisation point.  ``redirect_stdout``
+# and the process-state snapshot in ``_isolate_process_state`` are
+# process-global, not contextvar-safe — a per-instance lock would let
+# two requests on the same worker race on stdout capture and
+# ``os.environ`` snapshot/restore.
+_EXEC_LOCK = asyncio.Lock()
+
+
+def _open_workspace_file(target: Path, flags: int, mode: int = 0) -> int:
+    """``os.open`` *target* with ``O_NOFOLLOW`` added to *flags*.
+
+    Maps the kernel's ``ELOOP`` (symlink encountered with
+    ``O_NOFOLLOW`` set) to a ``PermissionError`` shaped like the
+    workspace's ``OUT_OF_ROOT`` rejection so the model sees the same
+    error shape whether it tries via the tool or via ``fs``.
+    """
+    try:
+        return os.open(target, flags | os.O_NOFOLLOW, mode)
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise PermissionError(
+                f"'{target}' is a symlink and cannot be opened for safety."
+            ) from exc
+        raise
 
 
 # ---------------------------------------------------------------------------
@@ -114,34 +145,66 @@ class WorkspaceFS:
 
     def read(self, path: str, *, encoding: str = "utf-8") -> str:
         """Return the file's text content; raises if the file is missing."""
-        return self._resolve(path).read_text(encoding=encoding)
+        target = self._resolve(path)
+        fd = _open_workspace_file(target, os.O_RDONLY)
+        with os.fdopen(fd, "rb") as fh:
+            return fh.read().decode(encoding)
 
     def read_bytes(self, path: str) -> bytes:
         """Return the file's raw bytes."""
-        return self._resolve(path).read_bytes()
+        target = self._resolve(path)
+        fd = _open_workspace_file(target, os.O_RDONLY)
+        with os.fdopen(fd, "rb") as fh:
+            return fh.read()
 
     def write(self, path: str, content: str, *, encoding: str = "utf-8") -> int:
         """Write text content, overwriting; returns bytes written.
 
         Parent directories are created automatically — same as
-        ``write_file``.
+        ``write_file``.  Symlinks at *path* are rejected so a
+        prior-turn ``os.symlink`` cannot let this call escape the jail.
         """
         target = self._resolve(path)
         target.parent.mkdir(parents=True, exist_ok=True)
-        return target.write_text(content, encoding=encoding)
+        encoded = content.encode(encoding)
+        fd = _open_workspace_file(
+            target,
+            os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+            _WRITE_FILE_MODE,
+        )
+        with os.fdopen(fd, "wb") as fh:
+            return fh.write(encoded)
 
     def write_bytes(self, path: str, content: bytes) -> int:
-        """Write raw bytes, overwriting; returns bytes written."""
+        """Write raw bytes, overwriting; returns bytes written.
+
+        Symlinks at *path* are rejected (see :meth:`write`).
+        """
         target = self._resolve(path)
         target.parent.mkdir(parents=True, exist_ok=True)
-        return target.write_bytes(content)
+        fd = _open_workspace_file(
+            target,
+            os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
+            _WRITE_FILE_MODE,
+        )
+        with os.fdopen(fd, "wb") as fh:
+            return fh.write(content)
 
     def append(self, path: str, content: str, *, encoding: str = "utf-8") -> int:
-        """Append text content; returns bytes written this call."""
+        """Append text content; returns bytes written this call.
+
+        Symlinks at *path* are rejected (see :meth:`write`).
+        """
         target = self._resolve(path)
         target.parent.mkdir(parents=True, exist_ok=True)
-        with target.open("a", encoding=encoding) as fh:
-            return fh.write(content)
+        encoded = content.encode(encoding)
+        fd = _open_workspace_file(
+            target,
+            os.O_WRONLY | os.O_CREAT | os.O_APPEND,
+            _WRITE_FILE_MODE,
+        )
+        with os.fdopen(fd, "wb") as fh:
+            return fh.write(encoded)
 
     def exists(self, path: str) -> bool:
         """Return ``True`` when the resolved path exists."""
@@ -166,13 +229,20 @@ class WorkspaceFS:
         ]
 
     def glob(self, pattern: str) -> list[str]:
-        """Glob *pattern* against the workspace root; does NOT recurse.
+        """Glob *pattern* against the workspace root.
 
         Returns workspace-relative string paths.  Use ``"**/*.py"`` to
-        recurse; ``Path.glob`` semantics apply.  Does not follow
-        symlinks for the same TOCTOU reason ``read_file`` doesn't.
+        recurse; ``Path.glob`` semantics apply.  Symlinks are excluded
+        from results — ``read`` / ``write`` / ``write_bytes`` /
+        ``append`` reject symlinks at syscall time via ``O_NOFOLLOW``,
+        so listing them here would only produce paths the model can't
+        act on.
         """
-        return [str(p.relative_to(self._root)) for p in sorted(self._root.glob(pattern))]
+        return [
+            str(p.relative_to(self._root))
+            for p in sorted(self._root.glob(pattern))
+            if not p.is_symlink()
+        ]
 
     def mkdir(self, path: str, *, parents: bool = True) -> None:
         """Create a directory; ``parents=True`` mirrors ``mkdir -p``."""
@@ -274,7 +344,11 @@ def _exec_sync(code: str, fs: WorkspaceFS, cap_bytes: int) -> str:
         globals_ns: dict[str, Any] = {"__name__": "__virtual_python__", "fs": fs}
         try:
             compiled = compile(code, "<python tool>", "exec")
-            exec(compiled, globals_ns)  # noqa: S102 — exec is the entire point
+            # ``# noqa: S102`` silences ruff/flake8-bandit; ``# nosec B102``
+            # silences the pre-commit bandit hook.  Both flag ``exec()`` —
+            # which is the documented entire purpose of this tool (see the
+            # module docstring + the ``virtual_python_enabled`` settings gate).
+            exec(compiled, globals_ns)  # noqa: S102  # nosec B102
         except SystemExit as exit_exc:
             buf.write(f"\n[SystemExit: {exit_exc.code}]\n")
         except BaseException:
@@ -310,9 +384,6 @@ def make_virtual_python_tool(
             stdout + stderr.
     """
     fs = WorkspaceFS(workspace_root)
-    # Serialise concurrent calls in one worker: ``redirect_stdout`` and
-    # the state-snapshot context are process-global, not contextvar-safe.
-    lock = asyncio.Lock()
 
     async def execute(tool_call_id: str, **kwargs: Any) -> str:
         code = str(kwargs.get("code") or "")
@@ -326,7 +397,7 @@ def make_virtual_python_tool(
             tool_call_id,
             code[:_MAX_LOGGED_CODE_LEN],
         )
-        async with lock:
+        async with _EXEC_LOCK:
             try:
                 result = await asyncio.wait_for(
                     anyio.to_thread.run_sync(

@@ -162,6 +162,60 @@ async def test_fs_read_outside_workspace_raises_permission_error(workspace: Path
     assert ToolErrorCode.OUT_OF_ROOT.value in out
 
 
+@pytest.mark.anyio
+async def test_fs_write_refuses_to_follow_symlinks(tmp_path: Path) -> None:
+    """A symlink at the write path must surface ``PermissionError`` and
+    leave the symlink target untouched.  Closes the same TOCTOU window
+    ``write_file`` does, but for the ``fs`` helper exposed inside the
+    ``python`` tool — without it, agent code calling ``os.symlink``
+    earlier in the same turn could overwrite an arbitrary file via a
+    subsequent ``fs.write`` call.
+    """
+    root = tmp_path / "workspace"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    target_outside = outside / "secret.txt"
+    target_outside.write_text("original", encoding="utf-8")
+    (root / "peek.txt").symlink_to(target_outside)
+
+    tool = make_virtual_python_tool(
+        workspace_root=root,
+        timeout_seconds=_TEST_TIMEOUT_SECONDS,
+        output_cap_bytes=_TEST_OUTPUT_CAP_BYTES,
+    )
+    out = await tool.execute(
+        "c-write-symlink",
+        code="fs.write('peek.txt', 'OVERWRITTEN')",
+    )
+    assert "PermissionError" in out
+    assert target_outside.read_text(encoding="utf-8") == "original"
+
+
+@pytest.mark.anyio
+async def test_fs_glob_excludes_symlinks(tmp_path: Path) -> None:
+    """``fs.glob`` filters symlinks so the model never sees paths it
+    can't safely read or write (``O_NOFOLLOW`` would reject them
+    later).
+    """
+    root = tmp_path / "workspace"
+    root.mkdir()
+    (root / "real.txt").write_text("hi", encoding="utf-8")
+    (root / "link.txt").symlink_to(root / "real.txt")
+
+    tool = make_virtual_python_tool(
+        workspace_root=root,
+        timeout_seconds=_TEST_TIMEOUT_SECONDS,
+        output_cap_bytes=_TEST_OUTPUT_CAP_BYTES,
+    )
+    out = await tool.execute(
+        "c-glob-symlink",
+        code="print(sorted(fs.glob('*.txt')))",
+    )
+    assert "real.txt" in out
+    assert "link.txt" not in out
+
+
 # ---------------------------------------------------------------------------
 # Timeout and output cap
 # ---------------------------------------------------------------------------

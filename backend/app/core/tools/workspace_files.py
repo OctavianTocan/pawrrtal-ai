@@ -287,7 +287,28 @@ def _write_file_sync(target: Path, raw_path: str, content: str) -> str:
             f"'{raw_path}' is a directory.",
         )
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.write_text(content, encoding="utf-8")
+    # Open with ``O_NOFOLLOW`` so a symlink swapped in between
+    # ``_resolve_safe`` and this write can't escape the jail. Mirrors the
+    # protection ``read_file`` already has — without it, an attacker (or
+    # the agent itself, via the ``python`` tool's ``os.symlink``) could
+    # plant a symlink inside the workspace pointing at e.g. ``/etc/cron.d``
+    # and have us overwrite it.
+    encoded = content.encode("utf-8")
+    try:
+        fd = os.open(
+            target,
+            os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW,
+            0o644,
+        )
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise ToolError(
+                ToolErrorCode.OUT_OF_ROOT,
+                f"'{raw_path}' is a symlink and cannot be written for safety.",
+            ) from exc
+        raise
+    with os.fdopen(fd, "wb") as fh:
+        fh.write(encoded)
     return f"Written {len(content)} characters to '{raw_path}'."
 
 

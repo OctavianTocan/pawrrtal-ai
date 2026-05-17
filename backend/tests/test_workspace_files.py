@@ -204,3 +204,29 @@ async def test_read_file_refuses_to_follow_symlinks(tmp_path: Path) -> None:
     # only fixes the prefix check but re-enables symlink-following gets
     # caught.
     assert out.startswith(f"[{ToolErrorCode.OUT_OF_ROOT.value}]")
+
+
+@pytest.mark.anyio
+async def test_write_file_refuses_to_follow_symlinks(tmp_path: Path) -> None:
+    """``write_file`` must not overwrite a file outside the workspace
+    via a symlink planted inside the workspace.  Closes the write-side
+    of the TOCTOU window that the read-side ``O_NOFOLLOW`` already
+    covered.
+    """
+    root = tmp_path / "workspace"
+    root.mkdir()
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    target_outside = outside / "secret.txt"
+    target_outside.write_text("original", encoding="utf-8")
+    link = root / "peek.txt"
+    link.symlink_to(target_outside)
+
+    write = _tools(root)["write_file"]
+    out = await write.execute(  # type: ignore[attr-defined]
+        "symlink-write-1", path="peek.txt", content="OVERWRITTEN"
+    )
+    assert out.startswith(f"[{ToolErrorCode.OUT_OF_ROOT.value}]")
+    # And the outside target was NOT modified.
+    assert target_outside.read_text(encoding="utf-8") == "original"
