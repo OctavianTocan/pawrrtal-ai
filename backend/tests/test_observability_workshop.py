@@ -29,6 +29,7 @@ from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
 from app.core.observability import workshop as workshop_module
+from app.core.observability._recorders import TurnSpanRecorder
 from app.core.observability.workshop import (
     llm_span,
     tool_span,
@@ -564,3 +565,212 @@ async def test_run_turn_passes_history_into_llm_span(
     assert payload[0]["parts"][0]["content"] == "what's 2+2?"
     assert payload[1]["parts"][0]["content"] == "4"
     assert payload[2]["parts"][0]["content"] == "and 3+3?"
+
+
+# ---------------------------------------------------------------------------
+# Latency: TTFT + duration on LLM and turn spans
+# ---------------------------------------------------------------------------
+
+
+def test_llm_recorder_stamps_duration_and_ttft_after_delta(
+    span_exporter: InMemorySpanExporter,
+) -> None:
+    """A delta-bearing turn stamps both ``pawrrtal.llm.duration_ms`` and ``...ttft_ms``."""
+    with llm_span(model_id="m", messages=[], system_prompt=None) as recorder:
+        recorder.record_text_delta("hi")
+        recorder.record_text_delta("there")
+
+    attrs = _attrs(_span_by_name(span_exporter, "pawrrtal.llm.chat"))
+    ttft = attrs.get("pawrrtal.llm.ttft_ms")
+    duration = attrs.get("pawrrtal.llm.duration_ms")
+    assert isinstance(ttft, (int, float))
+    assert isinstance(duration, (int, float))
+    # ttft <= duration is the only safe assertion — wall-clock readings
+    # otherwise vary too much to pin a numeric bound.
+    assert ttft <= duration
+    assert duration >= 0.0
+
+
+def test_llm_recorder_omits_ttft_when_no_delta(
+    span_exporter: InMemorySpanExporter,
+) -> None:
+    """A turn that streams no token stamps duration but not TTFT.
+
+    Protects the invariant that ``pawrrtal.llm.ttft_ms`` only appears
+    when an actual first token was observed.  Without it, a provider
+    error before any token would show a misleading sub-millisecond TTFT
+    in dashboards that just plot the attribute.
+    """
+    with llm_span(model_id="m", messages=[], system_prompt=None):
+        pass
+
+    attrs = _attrs(_span_by_name(span_exporter, "pawrrtal.llm.chat"))
+    assert "pawrrtal.llm.duration_ms" in attrs
+    assert "pawrrtal.llm.ttft_ms" not in attrs
+
+
+def test_llm_recorder_ttft_set_on_thinking_delta_first(
+    span_exporter: InMemorySpanExporter,
+) -> None:
+    """Reasoning models that emit ``thinking`` before ``text`` still get TTFT.
+
+    Otherwise a long reasoning preamble (Claude with extended thinking,
+    OpenAI o1) would log a TTFT that excludes the visible-but-pre-text
+    wait — exactly the latency a user is feeling.
+    """
+    with llm_span(model_id="m", messages=[], system_prompt=None) as recorder:
+        recorder.record_thinking_delta("planning")
+        recorder.record_text_delta("answer")
+
+    attrs = _attrs(_span_by_name(span_exporter, "pawrrtal.llm.chat"))
+    assert "pawrrtal.llm.ttft_ms" in attrs
+
+
+def test_turn_recorder_record_first_event_is_idempotent() -> None:
+    """Only the first ``record_first_event`` call captures TTFT.
+
+    Direct recorder test — bypasses the OTel span machinery to pin the
+    idempotency contract that ``workshop_event_hook`` relies on (it
+    calls ``record_first_event`` on every event without tracking
+    whether it's already fired).
+    """
+    tracer = trace.get_tracer("test")
+    with tracer.start_as_current_span("test") as span:
+        recorder = TurnSpanRecorder(span)
+        assert recorder.ttft_ms is None
+        recorder.record_first_event()
+        first_value = recorder.ttft_ms
+        assert first_value is not None
+        # Burning a tiny bit of wall-clock — if the second call wasn't
+        # idempotent, this would overwrite ``_ttft_ms`` with a larger
+        # number, so equality is a meaningful assertion.
+        for _ in range(100):
+            recorder.record_first_event()
+        assert recorder.ttft_ms == first_value
+
+
+def test_turn_span_stamps_duration_and_ttft_when_first_event_recorded(
+    span_exporter: InMemorySpanExporter,
+) -> None:
+    """``turn_span`` flushes ``pawrrtal.turn.*`` latency attributes on exit."""
+    with turn_span(
+        conversation_id=uuid.uuid4(),
+        user_id=uuid.uuid4(),
+        surface="WEB",
+        request_id="req-1",
+        model_id="m",
+    ) as turn_recorder:
+        turn_recorder.record_first_event()
+
+    attrs = _attrs(_span_by_name(span_exporter, "pawrrtal.turn"))
+    assert "pawrrtal.turn.duration_ms" in attrs
+    assert "pawrrtal.turn.ttft_ms" in attrs
+
+
+def test_turn_span_omits_ttft_when_no_event(span_exporter: InMemorySpanExporter) -> None:
+    """A turn that never produced an event stamps duration but not TTFT."""
+    with turn_span(
+        conversation_id=uuid.uuid4(),
+        user_id=uuid.uuid4(),
+        surface="WEB",
+        request_id="req-1",
+        model_id="m",
+    ):
+        pass
+
+    attrs = _attrs(_span_by_name(span_exporter, "pawrrtal.turn"))
+    assert "pawrrtal.turn.duration_ms" in attrs
+    assert "pawrrtal.turn.ttft_ms" not in attrs
+
+
+def test_workshop_event_hook_marks_turn_ttft(span_exporter: InMemorySpanExporter) -> None:
+    """When provided, ``turn_recorder`` gets pinged by the LLM event hook."""
+    with (
+        turn_span(
+            conversation_id=uuid.uuid4(),
+            user_id=uuid.uuid4(),
+            surface="WEB",
+            request_id="req-1",
+            model_id="m",
+        ) as turn_recorder,
+        llm_span(model_id="m", messages=[], system_prompt=None) as llm_recorder,
+    ):
+        hook = workshop_event_hook(llm_recorder, turn_recorder=turn_recorder)
+        assert hook({"type": "delta", "content": "hi"}) == []
+
+    turn_attrs = _attrs(_span_by_name(span_exporter, "pawrrtal.turn"))
+    assert "pawrrtal.turn.ttft_ms" in turn_attrs
+
+
+@pytest.mark.anyio
+async def test_run_turn_stamps_latency_attributes_on_turn_span(
+    span_exporter: InMemorySpanExporter,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``run_turn`` populates both ``pawrrtal.turn.*`` latency attributes.
+
+    Integration check that the hook plumbing in ``_stream_with_llm_span``
+    actually wires ``turn_recorder`` through ``workshop_event_hook``.
+    Without this, a refactor that drops the kwarg would silently break
+    TTFT capture for every chat turn.
+    """
+    import uuid as _uuid
+
+    from app.channels.turn_runner import ChatTurnInput, run_turn
+
+    class _FakeProvider:
+        async def stream(self, *_args: object, **_kwargs: object):
+            yield {"type": "delta", "content": "hello"}
+            yield {
+                "type": "usage",
+                "input_tokens": 3,
+                "output_tokens": 1,
+                "cost_usd": 0.0,
+            }
+
+    class _FakeChannel:
+        surface = "test"
+
+        async def deliver(self, stream, _message):
+            async for event in stream:
+                yield str(event).encode()
+
+    channel_message = {
+        "user_id": _uuid.uuid4(),
+        "conversation_id": _uuid.uuid4(),
+        "text": "hi",
+        "surface": "test",
+        "model_id": "test:fake",
+        "metadata": {},
+    }
+
+    async def _persist(_turn_input):
+        return [], _uuid.uuid4()
+
+    async def _noop_finalize(**_kwargs):
+        # Capture the kwargs the runner forwards so the test can also
+        # assert that the latency value flows into the log / event
+        # plumbing, not only the span.
+        _noop_finalize.last_kwargs = _kwargs  # type: ignore[attr-defined]
+
+    monkeypatch.setattr("app.channels.turn_runner._load_history_and_persist", _persist)
+    monkeypatch.setattr("app.channels.turn_runner._finalize_turn", _noop_finalize)
+
+    turn_input = ChatTurnInput(
+        conversation_id=channel_message["conversation_id"],
+        user_id=channel_message["user_id"],
+        question="hi",
+        provider=_FakeProvider(),  # type: ignore[arg-type]
+        channel=_FakeChannel(),  # type: ignore[arg-type]
+        channel_message=channel_message,  # type: ignore[arg-type]
+    )
+
+    async for _chunk in run_turn(turn_input):
+        pass
+
+    turn_attrs = _attrs(_span_by_name(span_exporter, "pawrrtal.turn"))
+    assert "pawrrtal.turn.duration_ms" in turn_attrs
+    assert "pawrrtal.turn.ttft_ms" in turn_attrs
+    forwarded = _noop_finalize.last_kwargs  # type: ignore[attr-defined]
+    assert forwarded["ttft_ms"] is not None
+    assert forwarded["ttft_ms"] >= 0.0

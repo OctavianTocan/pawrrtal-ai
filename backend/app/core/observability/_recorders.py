@@ -9,6 +9,7 @@ module stays inside the project's file-line budget
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from opentelemetry.trace import Span, Status, StatusCode
@@ -21,6 +22,10 @@ from app.core.observability._schema import (
     ATTR_GENAI_OUTPUT_TOKENS,
     ATTR_GENAI_RESPONSE_MODEL,
     ATTR_OTEL_STATUS_MESSAGE,
+    ATTR_PAWRRTAL_LLM_DURATION_MS,
+    ATTR_PAWRRTAL_LLM_TTFT_MS,
+    ATTR_PAWRRTAL_TURN_DURATION_MS,
+    ATTR_PAWRRTAL_TURN_TTFT_MS,
     ATTR_TRACELOOP_OUTPUT,
     EVENT_ATTR_CONTENT_TEXT,
     EVENT_ATTR_THINKING_TEXT,
@@ -28,6 +33,8 @@ from app.core.observability._schema import (
     EVENT_THINKING_DELTA,
     json_dumps,
 )
+
+_MS_PER_SECOND = 1000.0
 
 
 class LLMSpanRecorder:
@@ -52,11 +59,31 @@ class LLMSpanRecorder:
         self._thinking_parts: list[str] = []
         self._tool_calls: list[dict[str, Any]] = []
         self._finalised = False
+        # Latency clocks — wall-clock perf_counter at recorder build time
+        # (i.e. when the provider stream is about to start) and the
+        # elapsed time to the first user-visible chunk.  ``_ttft_ms`` is
+        # only stamped on the span when it's actually been observed —
+        # an LLM span that errored before any token must not lie about
+        # having a sub-zero TTFT.
+        self._started_at = time.perf_counter()
+        self._ttft_ms: float | None = None
+
+    def _mark_first_token(self) -> None:
+        """Capture wall-clock elapsed at the first streamed token.
+
+        Idempotent — only the first call wins.  Called from both
+        ``record_text_delta`` and ``record_thinking_delta`` so reasoning
+        models that emit thinking before any text still get a TTFT.
+        """
+        if self._ttft_ms is not None:
+            return
+        self._ttft_ms = (time.perf_counter() - self._started_at) * _MS_PER_SECOND
 
     def record_text_delta(self, text: str) -> None:
         """Append a streamed text chunk and emit a span event."""
         if not text:
             return
+        self._mark_first_token()
         self._text_parts.append(text)
         self._span.add_event(EVENT_CONTENT_DELTA, {EVENT_ATTR_CONTENT_TEXT: text})
 
@@ -64,6 +91,7 @@ class LLMSpanRecorder:
         """Append a streamed reasoning chunk and emit a span event."""
         if not text:
             return
+        self._mark_first_token()
         self._thinking_parts.append(text)
         self._span.add_event(EVENT_THINKING_DELTA, {EVENT_ATTR_THINKING_TEXT: text})
 
@@ -112,12 +140,19 @@ class LLMSpanRecorder:
         self._span.set_status(Status(StatusCode.ERROR, message))
         self._span.set_attribute(ATTR_OTEL_STATUS_MESSAGE, message)
 
+    @property
+    def ttft_ms(self) -> float | None:
+        """Time to first token in milliseconds, or ``None`` if no token streamed."""
+        return self._ttft_ms
+
     def flush(self) -> None:
         """Stamp ``gen_ai.output.messages`` + ``gen_ai.response.model``.
 
         Idempotent — the LLM span context-manager calls this in its
         ``finally`` block so an exception path still gets a partial
-        output stamped (the text accumulated up to the failure).
+        output stamped (the text accumulated up to the failure).  The
+        same call also stamps the ``pawrrtal.llm.*`` latency attributes
+        so a failed turn still gets its observed latency on the span.
         """
         if self._finalised:
             return
@@ -131,6 +166,63 @@ class LLMSpanRecorder:
             ATTR_GENAI_OUTPUT_MESSAGES,
             json_dumps([{"role": "assistant", "parts": parts}]),
         )
+        duration_ms = (time.perf_counter() - self._started_at) * _MS_PER_SECOND
+        self._span.set_attribute(ATTR_PAWRRTAL_LLM_DURATION_MS, float(duration_ms))
+        if self._ttft_ms is not None:
+            self._span.set_attribute(ATTR_PAWRRTAL_LLM_TTFT_MS, float(self._ttft_ms))
+
+
+class TurnSpanRecorder:
+    """Tracks turn-level latency and stamps it on the turn span.
+
+    Mirrors :class:`LLMSpanRecorder`'s contract for the outer
+    ``pawrrtal.turn`` span: the recorder is constructed when the turn
+    starts, callers ping :meth:`record_first_event` as soon as the
+    first user-visible chunk is produced, and :meth:`flush` stamps the
+    final ``pawrrtal.turn.duration_ms`` (always) and
+    ``pawrrtal.turn.ttft_ms`` (when a first event was observed).
+    Workshop's UI ignores attributes it doesn't recognise, so this is
+    safe to emit alongside the existing turn-span attributes.
+    """
+
+    def __init__(self, span: Span) -> None:
+        """Bind the recorder to *span* and start the latency clock."""
+        self._span = span
+        self._started_at = time.perf_counter()
+        self._ttft_ms: float | None = None
+        self._finalised = False
+
+    def record_first_event(self) -> None:
+        """Mark the moment the first user-visible event was emitted.
+
+        Idempotent — only the first call wins.  Called from the turn
+        runner's event hook so any event type (delta, thinking,
+        tool_use, message, error) counts as "first byte to the user".
+        """
+        if self._ttft_ms is not None:
+            return
+        self._ttft_ms = (time.perf_counter() - self._started_at) * _MS_PER_SECOND
+
+    @property
+    def ttft_ms(self) -> float | None:
+        """Time to first user-visible event in milliseconds, or ``None``."""
+        return self._ttft_ms
+
+    def flush(self) -> None:
+        """Stamp ``pawrrtal.turn.duration_ms`` and ``pawrrtal.turn.ttft_ms``.
+
+        Idempotent — repeated calls are no-ops so a caller can safely
+        invoke this in a ``finally`` block.  The recorder computes its
+        own duration from the wall-clock captured at construction so it
+        doesn't need to be threaded through the turn runner.
+        """
+        if self._finalised:
+            return
+        self._finalised = True
+        duration_ms = (time.perf_counter() - self._started_at) * _MS_PER_SECOND
+        self._span.set_attribute(ATTR_PAWRRTAL_TURN_DURATION_MS, float(duration_ms))
+        if self._ttft_ms is not None:
+            self._span.set_attribute(ATTR_PAWRRTAL_TURN_TTFT_MS, float(self._ttft_ms))
 
 
 class ToolSpanRecorder:
