@@ -1,4 +1,5 @@
-import { fireEvent, render } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { StepMessaging } from './step-messaging';
 
@@ -46,8 +47,9 @@ describe('StepMessaging', () => {
 		).toBe(false);
 	});
 
-	it('toggles a channel on Connect click and emits the new connectedChannels list', () => {
+	it('toggles a channel on Connect click and emits the new connectedChannels list', async () => {
 		const onPatch = vi.fn();
+		const user = userEvent.setup();
 		const { getAllByRole } = render(
 			<StepMessaging
 				onFinish={vi.fn()}
@@ -58,12 +60,13 @@ describe('StepMessaging', () => {
 		const buttons = getAllByRole('button', { name: 'Connect' });
 		const first = buttons[0];
 		if (!first) throw new Error('expected at least one Connect button');
-		fireEvent.click(first);
+		await user.click(first);
 		expect(onPatch).toHaveBeenCalledWith({ connectedChannels: ['slack'] });
 	});
 
-	it('fires onFinish when Continue is clicked while at least one channel is connected', () => {
+	it('fires onFinish when Continue is clicked while at least one channel is connected', async () => {
 		const onFinish = vi.fn();
+		const user = userEvent.setup();
 		const { getByRole } = render(
 			<StepMessaging
 				onFinish={onFinish}
@@ -71,7 +74,7 @@ describe('StepMessaging', () => {
 				profile={{ connectedChannels: ['slack'] }}
 			/>
 		);
-		fireEvent.click(getByRole('button', { name: 'Finish messaging setup' }));
+		await user.click(getByRole('button', { name: 'Finish messaging setup' }));
 		expect(onFinish).toHaveBeenCalled();
 	});
 });

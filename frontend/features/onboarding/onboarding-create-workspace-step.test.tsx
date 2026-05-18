@@ -1,4 +1,5 @@
-import { fireEvent, render } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Dialog } from '@/components/ui/dialog';
 import { OnboardingCreateWorkspaceStep } from './onboarding-create-workspace-step';
@@ -32,12 +33,13 @@ describe('OnboardingCreateWorkspaceStep', () => {
 		expect((createNew as HTMLButtonElement).disabled).toBe(true);
 	});
 
-	it('fires onPickLocal when the enabled "Open folder" button is clicked', () => {
+	it('fires onPickLocal when the enabled "Open folder" button is clicked', async () => {
 		const onPickLocal = vi.fn();
+		const user = userEvent.setup();
 		const { getByText } = render(
 			wrap(<OnboardingCreateWorkspaceStep onPickLocal={onPickLocal} />)
 		);
-		fireEvent.click(getByText('Open folder'));
+		await user.click(getByText('Open folder'));
 		expect(onPickLocal).toHaveBeenCalled();
 	});
 });
