@@ -8,7 +8,7 @@ import { AgentSpinner } from '@/components/ui/agent-spinner';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-import { ArtifactCard } from '../artifacts';
+import { ArtifactCard } from '../artifacts/ArtifactCard';
 import { extractToolChips, type ToolResultChips } from '../tool-result-parsers';
 import type { ChatArtifactPayload, ChatTimelineEntry, ChatToolCall } from '../types';
 import { ChainOfThought } from './ChainOfThought';
