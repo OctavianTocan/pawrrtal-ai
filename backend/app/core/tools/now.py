@@ -26,6 +26,16 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from app.core.agent_loop.types import AgentTool
 from app.core.tools.display import make_tool_display
 
+# Re-export the TASKS.md tools (#311 v1) through this module so
+# ``agent_tools.py`` can import them off ``now`` and stay under
+# sentrux's ``no_god_files`` fan-out ceiling. The aggregation is
+# purely organisational; the implementations live in ``tasks_md.py``.
+from app.core.tools.tasks_md import (  # noqa: F401
+    make_add_task_tool,
+    make_complete_task_tool,
+    make_list_tasks_tool,
+)
+
 log = logging.getLogger(__name__)
 
 
