@@ -1,4 +1,5 @@
-import { fireEvent, render } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { LoginFormView } from './LoginFormView';
 
@@ -36,12 +37,13 @@ describe('LoginFormView', () => {
 		expect(queryByRole('button', { name: 'Dev Admin' })).toBeNull();
 	});
 
-	it('shows the dev-admin button when allowed and fires onDevAdminLogin', () => {
+	it('shows the dev-admin button when allowed and fires onDevAdminLogin', async () => {
 		const onDevAdminLogin = vi.fn();
+		const user = userEvent.setup();
 		const { getByRole } = render(
 			<LoginFormView {...baseProps} canUseDevAdminLogin onDevAdminLogin={onDevAdminLogin} />
 		);
-		fireEvent.click(getByRole('button', { name: 'Dev Admin' }));
+		await user.click(getByRole('button', { name: 'Dev Admin' }));
 		expect(onDevAdminLogin).toHaveBeenCalled();
 	});
 
@@ -50,9 +52,10 @@ describe('LoginFormView', () => {
 		expect((getByRole('button', { name: 'Login' }) as HTMLButtonElement).disabled).toBe(true);
 	});
 
-	it('fires onEmailChange/onPasswordChange when fields are typed into', () => {
+	it('fires onEmailChange/onPasswordChange when fields are typed into', async () => {
 		const onEmailChange = vi.fn();
 		const onPasswordChange = vi.fn();
+		const user = userEvent.setup();
 		const { getByLabelText } = render(
 			<LoginFormView
 				{...baseProps}
@@ -60,8 +63,13 @@ describe('LoginFormView', () => {
 				onPasswordChange={onPasswordChange}
 			/>
 		);
-		fireEvent.change(getByLabelText('Email'), { target: { value: 'me@x.com' } });
-		fireEvent.change(getByLabelText('Password'), { target: { value: 'secret' } });
+		// LoginFormView is uncontrolled at the view level — each keystroke
+		// emits its own onChange.  Use paste() to fire one full-string
+		// change per field instead of per-character events.
+		await user.click(getByLabelText('Email'));
+		await user.paste('me@x.com');
+		await user.click(getByLabelText('Password'));
+		await user.paste('secret');
 		expect(onEmailChange).toHaveBeenCalledWith('me@x.com');
 		expect(onPasswordChange).toHaveBeenCalledWith('secret');
 	});
