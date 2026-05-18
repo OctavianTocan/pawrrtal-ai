@@ -18,7 +18,8 @@ from app.core.config import settings
 from app.core.providers.claude_provider import ClaudeLLM
 from app.core.providers.factory import resolve_llm
 from app.core.providers.gemini_provider import GeminiLLM
-from app.core.providers.model_id import InvalidModelId
+from app.core.providers.litellm_provider import LiteLLMLLM
+from app.core.providers.model_id import InvalidModelId, Vendor
 from app.schemas import ConversationCreate, ConversationUpdate, UserCreate
 
 
@@ -47,6 +48,35 @@ def test_resolve_llm_routes_google_via_host_table() -> None:
     provider = resolve_llm("google/gemini-3-flash-preview")
     assert isinstance(provider, GeminiLLM)
     assert provider._model_id == "gemini-3-flash-preview"
+
+
+def test_resolve_llm_routes_openai_via_litellm_host_table() -> None:
+    """``openai/<model>`` routes to LiteLLM via the HOST_TO_PROVIDER table.
+
+    Without the LiteLLM branch in :func:`resolve_llm`, this raises
+    ``KeyError: "no provider class registered for host <Host.litellm>"``
+    at runtime on every OpenAI chat — the HOST_TO_PROVIDER table entry
+    is unreachable without the narrowing branch.
+    """
+    provider = resolve_llm("openai/gpt-4o")
+    assert isinstance(provider, LiteLLMLLM)
+    assert provider._model == "gpt-4o"
+    assert provider._vendor is Vendor.openai
+
+
+def test_resolve_llm_routes_explicit_litellm_xai_via_host_table() -> None:
+    """Explicit ``litellm:xai/<model>`` form routes via LiteLLM.
+
+    The bare ``xai/<model>`` form canonicalises to ``Host.xai`` (the
+    native xAI provider, PRs #314/#324) because that path supports
+    full reasoning + Live Search.  Callers that need LiteLLM routing
+    for xAI specifically must opt in via the fully-qualified
+    ``litellm:xai/<model>`` form — this test guards that branch.
+    """
+    provider = resolve_llm("litellm:xai/grok-3-latest")
+    assert isinstance(provider, LiteLLMLLM)
+    assert provider._model == "grok-3-latest"
+    assert provider._vendor is Vendor.xai
 
 
 def test_resolve_llm_none_uses_catalog_default() -> None:
