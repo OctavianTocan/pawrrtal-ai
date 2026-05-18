@@ -43,8 +43,8 @@ from app.core.tools.lcm_agents import (
     make_lcm_expand_query_tool,
     make_lcm_grep_tool,
     make_lcm_list_summaries_tool,
+    make_lcm_search_tool,
 )
-from app.core.tools.lcm_search_agent import make_lcm_search_tool
 from app.core.tools.markitdown_convert import make_markitdown_tool
 from app.core.tools.now import (
     build_external_mcp_tools,
