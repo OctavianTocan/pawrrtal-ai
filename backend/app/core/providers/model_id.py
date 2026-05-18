@@ -26,6 +26,7 @@ class Vendor(StrEnum):
 
     anthropic = "anthropic"
     google = "google"
+    openai = "openai"
     xai = "xai"
 
 
@@ -33,17 +34,27 @@ class Host(StrEnum):
     """Where the model runs.
 
     One vendor's model can be served by many hosts (e.g. Claude via
-    Agent SDK, Bedrock, Copilot).
+    Agent SDK, Bedrock, Copilot).  ``litellm`` is the in-process
+    LiteLLM SDK gateway — any vendor it can route to lives behind
+    this single host enum.
     """
 
     agent_sdk = "agent-sdk"
     google_ai = "google-ai"
+    litellm = "litellm"
     xai = "xai"
 
 
 CANONICAL_HOST: dict[Vendor, Host] = {
     Vendor.anthropic: Host.agent_sdk,
     Vendor.google: Host.google_ai,
+    # OpenAI is gateway-only — there is no native Host.openai (yet).
+    # LiteLLM handles the openai-compat protocol for any GPT model.
+    Vendor.openai: Host.litellm,
+    # xAI has a native Host.xai (gRPC SDK via xai-sdk in PR #324) with
+    # full reasoning + Live Search support. LiteLLM can also route xAI
+    # but is feature-incomplete; keep the native host as the canonical
+    # so ``xai/<model>`` defaults to the full-featured path.
     Vendor.xai: Host.xai,
 }
 """Per-vendor canonical host used when the input omits ``host:``.

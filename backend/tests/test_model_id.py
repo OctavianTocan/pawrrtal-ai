@@ -37,12 +37,46 @@ def test_parse_google_canonical_host() -> None:
 
 
 def test_parse_xai_canonical_host() -> None:
-    """``xai/grok-4.3`` canonicalises to ``xai:xai/grok-4.3``."""
+    """``xai/grok-4.3`` canonicalises to ``xai:xai/grok-4.3``.
+
+    xAI defaults to the native ``Host.xai`` provider (PRs #314/#324)
+    not the LiteLLM gateway — ``Host.xai`` has full reasoning and
+    Live Search support, LiteLLM does not.  Override via the
+    fully-qualified ``litellm:xai/<model>`` form if needed.
+    """
     parsed = parse_model_id("xai/grok-4.3")
     assert parsed.host is Host.xai
     assert parsed.vendor is Vendor.xai
     assert parsed.model == "grok-4.3"
     assert parsed.id == "xai:xai/grok-4.3"
+
+
+def test_parse_openai_canonical_host_is_litellm() -> None:
+    """``openai/<model>`` defaults to ``litellm`` — no native OpenAI host."""
+    parsed = parse_model_id("openai/gpt-4o")
+    assert parsed.host is Host.litellm
+    assert parsed.vendor is Vendor.openai
+
+
+def test_parse_fully_qualified_litellm_openai_id() -> None:
+    """Explicit ``litellm:openai/<model>`` form parses identically to the bare form."""
+    parsed = parse_model_id("litellm:openai/gpt-4o")
+    assert parsed.host is Host.litellm
+    assert parsed.vendor is Vendor.openai
+    assert parsed.model == "gpt-4o"
+
+
+def test_parse_fully_qualified_litellm_xai_id() -> None:
+    """``litellm:xai/<model>`` is the explicit opt-in to route xAI via LiteLLM.
+
+    Without the ``litellm:`` prefix, the canonical host for xAI is the
+    native ``Host.xai`` provider — this test guards the opt-out path
+    for callers that need LiteLLM routing for xAI specifically.
+    """
+    parsed = parse_model_id("litellm:xai/grok-4.3")
+    assert parsed.host is Host.litellm
+    assert parsed.vendor is Vendor.xai
+    assert parsed.model == "grok-4.3"
 
 
 def test_id_property_round_trips_through_parse() -> None:

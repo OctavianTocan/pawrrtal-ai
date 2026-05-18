@@ -49,7 +49,13 @@ class Settings(BaseSettings):
     # browser's MediaRecorder, uploads the blob, and the backend forwards
     # it to https://api.x.ai/v1/stt. Leave empty to disable voice input
     # (the endpoint returns 503 with a clear "not configured" message).
+    # Also consumed by the LiteLLM provider for Grok chat models.
     xai_api_key: str = ""
+    # API key for OpenAI (https://platform.openai.com).  Consumed by the
+    # LiteLLM provider for GPT-4o / o-series chat models.  Leave empty
+    # to disable those models; chat requests resolved to an OpenAI model
+    # surface a clear "not configured" error.
+    openai_api_key: str = ""
     # CORS
     cors_origins: list[str]
     cors_origin_regex: str | None = r"^https:\/\/.*\.vercel\.app$"

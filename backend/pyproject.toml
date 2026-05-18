@@ -15,6 +15,7 @@ dependencies = [
     "fastapi-users[sqlalchemy]>=15.0.3",
     "fastapi[standard]>=0.136.0",
     "google-genai>=2.3.0",
+    "litellm>=1.55.0",
     "mcp>=1.27.0",
     "psycopg>=3.3.3",
     "pydantic>=2.12.5,<2.14",

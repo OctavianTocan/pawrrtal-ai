@@ -75,10 +75,24 @@ _GEMINI_3_FLASH_OUT_USD = 2.50
 _GEMINI_3_FLASH_LITE_IN_USD = 0.10
 _GEMINI_3_FLASH_LITE_OUT_USD = 0.40
 
-# xAI Grok pricing per https://docs.x.ai/docs/models.  Used by the xAI
-# provider's cost-ledger path (no SDK-reported total).
+# xAI Grok pricing per https://docs.x.ai/docs/models.  Used by the
+# native xAI provider's cost-ledger path (no SDK-reported total).
 _GROK_4_3_IN_USD = 1.25
 _GROK_4_3_OUT_USD = 2.50
+
+# OpenAI cost rates published at https://openai.com/api/pricing/.
+# Routed via LiteLLM so the cost ledger uses these directly (no
+# SDK-reported total).  Update on each price change.
+_OPENAI_GPT_4O_IN_USD = 2.50
+_OPENAI_GPT_4O_OUT_USD = 10.00
+_OPENAI_GPT_4O_MINI_IN_USD = 0.15
+_OPENAI_GPT_4O_MINI_OUT_USD = 0.60
+_OPENAI_O1_IN_USD = 15.00
+_OPENAI_O1_OUT_USD = 60.00
+_OPENAI_O1_MINI_IN_USD = 3.00
+_OPENAI_O1_MINI_OUT_USD = 12.00
+_OPENAI_O3_MINI_IN_USD = 1.10
+_OPENAI_O3_MINI_OUT_USD = 4.40
 
 
 MODEL_CATALOG: tuple[ModelEntry, ...] = (
@@ -147,6 +161,70 @@ MODEL_CATALOG: tuple[ModelEntry, ...] = (
         is_default=False,
         cost_per_mtok_in_usd=_GROK_4_3_IN_USD,
         cost_per_mtok_out_usd=_GROK_4_3_OUT_USD,
+    ),
+    # OpenAI — routed through LiteLLM in-process SDK gateway.  Tool use
+    # is intentionally text-only for v1 (provider rejects non-empty
+    # ``tools=`` with a debug log); revisit once the OpenAI function-
+    # calling bridge lands.
+    #
+    # NOTE: xAI catalog entries via LiteLLM were intentionally dropped
+    # in favour of the native ``Host.xai`` provider (PRs #314/#324)
+    # which has full reasoning + Live Search support.  If Grok 3 needs
+    # to be available again, add it under ``Host.xai`` in this catalog.
+    ModelEntry(
+        host=Host.litellm,
+        vendor=Vendor.openai,
+        model="gpt-4o",
+        display_name="GPT-4o",
+        short_name="GPT-4o",
+        description="OpenAI's flagship multimodal",
+        is_default=False,
+        cost_per_mtok_in_usd=_OPENAI_GPT_4O_IN_USD,
+        cost_per_mtok_out_usd=_OPENAI_GPT_4O_OUT_USD,
+    ),
+    ModelEntry(
+        host=Host.litellm,
+        vendor=Vendor.openai,
+        model="gpt-4o-mini",
+        display_name="GPT-4o mini",
+        short_name="GPT-4o mini",
+        description="Cheap and fast OpenAI",
+        is_default=False,
+        cost_per_mtok_in_usd=_OPENAI_GPT_4O_MINI_IN_USD,
+        cost_per_mtok_out_usd=_OPENAI_GPT_4O_MINI_OUT_USD,
+    ),
+    ModelEntry(
+        host=Host.litellm,
+        vendor=Vendor.openai,
+        model="o1",
+        display_name="OpenAI o1",
+        short_name="o1",
+        description="Deep reasoning, slow",
+        is_default=False,
+        cost_per_mtok_in_usd=_OPENAI_O1_IN_USD,
+        cost_per_mtok_out_usd=_OPENAI_O1_OUT_USD,
+    ),
+    ModelEntry(
+        host=Host.litellm,
+        vendor=Vendor.openai,
+        model="o1-mini",
+        display_name="OpenAI o1 mini",
+        short_name="o1 mini",
+        description="Lightweight reasoning",
+        is_default=False,
+        cost_per_mtok_in_usd=_OPENAI_O1_MINI_IN_USD,
+        cost_per_mtok_out_usd=_OPENAI_O1_MINI_OUT_USD,
+    ),
+    ModelEntry(
+        host=Host.litellm,
+        vendor=Vendor.openai,
+        model="o3-mini",
+        display_name="OpenAI o3 mini",
+        short_name="o3 mini",
+        description="Newer reasoning, balanced",
+        is_default=False,
+        cost_per_mtok_in_usd=_OPENAI_O3_MINI_IN_USD,
+        cost_per_mtok_out_usd=_OPENAI_O3_MINI_OUT_USD,
     ),
 )
 

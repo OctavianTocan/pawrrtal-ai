@@ -35,6 +35,7 @@ const EMPTY_VALUES = {
 	CLAUDE_CODE_OAUTH_TOKEN: '',
 	EXA_API_KEY: '',
 	XAI_API_KEY: '',
+	OPENAI_API_KEY: '',
 	NOTION_API_KEY: '',
 } as const;
 
