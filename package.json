@@ -20,7 +20,7 @@
 		"@google/design.md": "^0.1.1",
 		"@tanstack/react-query-devtools": "^5.100.9",
 		"@types/bun": "latest",
-		"mcporter": "^0.10.2"
+		"mcporter": "^0.11.1"
 	},
 	"peerDependencies": {
 		"typescript": "^5.9.3"
