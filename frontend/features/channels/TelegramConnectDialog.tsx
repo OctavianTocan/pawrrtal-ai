@@ -221,12 +221,21 @@ export function TelegramConnectDialog({
 	});
 	const headingId = useId();
 
+	// Reset the countdown when the pending code is cleared (cancel/reset/
+	// connected). Splitting this out keeps the interval effect below to
+	// a single setState call — React Doctor's no-cascading-set-state
+	// rule trips when one useEffect has two-plus state writes.
+	useEffect(() => {
+		if (pendingCode === null) {
+			setSecondsLeft(null);
+		}
+	}, [pendingCode]);
+
 	// Track the live countdown for the pending code. `expires_at` arrives
 	// as an ISO string so we recompute every second from the current time
 	// — cheaper and more accurate than decrementing a stored counter.
 	useEffect(() => {
 		if (pendingCode === null) {
-			setSecondsLeft(null);
 			return undefined;
 		}
 		// Backend emits naive UTC ISO strings (no `Z`/offset). Per the
