@@ -36,6 +36,8 @@ from app.core.providers._xai_stream import parse_tool_arguments
 from app.core.providers.xai_provider import (
     XAI_BASE_URL,
     XaiLLM,
+    _build_xai_extra_body,
+    _map_reasoning_effort,
     _resolve_xai_api_key,
     make_xai_stream_fn,
 )
@@ -332,6 +334,10 @@ async def test_stream_fn_request_payload_includes_system_and_tools(
     assert kwargs["stream"] is True
     assert kwargs["messages"][0] == {"role": "system", "content": "custom-sys"}
     assert kwargs["tools"] is not None
+    # Live Search must be disabled by default: pawrrtal uses exa_search
+    # as the canonical web tool and we don't want xAI double-billing or
+    # ghost-searching every turn.  See ``_LIVE_SEARCH_DISABLED``.
+    assert kwargs["extra_body"]["search_parameters"] == {"mode": "off"}
     assert kwargs["tools"][0]["function"]["name"] == "ping"
 
 
@@ -406,3 +412,98 @@ async def test_done_assistant_blocks_include_unstreamed_text_and_tool_calls(
     assert len(tool_blocks) == 1
     assert tool_blocks[0]["name"] == "echo"
     assert tool_blocks[0]["arguments"] == {"value": "hi"}
+
+
+# ---------------------------------------------------------------------------
+# xAI-specific extensions: reasoning_effort + reasoning_content + Live Search
+# ---------------------------------------------------------------------------
+
+
+def test_map_reasoning_effort_collapses_four_levels_to_two() -> None:
+    """Pawrrtal's four-level UI knob → grok-4.3's two-level enum.
+
+    grok-4.3 rejects anything other than ``"low"`` or ``"high"``
+    (https://docs.x.ai/docs/models/grok-4-3), so the mapper has to
+    collapse ``medium``/``extra-high`` rather than pass them through.
+    """
+    assert _map_reasoning_effort(None) is None
+    assert _map_reasoning_effort("low") == "low"
+    assert _map_reasoning_effort("medium") == "low"
+    assert _map_reasoning_effort("high") == "high"
+    assert _map_reasoning_effort("extra-high") == "high"
+
+
+def test_build_xai_extra_body_always_disables_live_search() -> None:
+    """search_parameters.mode is always ``off`` regardless of effort."""
+    assert _build_xai_extra_body(None) == {"search_parameters": {"mode": "off"}}
+    assert _build_xai_extra_body("low") == {
+        "search_parameters": {"mode": "off"},
+        "reasoning_effort": "low",
+    }
+    assert _build_xai_extra_body("high") == {
+        "search_parameters": {"mode": "off"},
+        "reasoning_effort": "high",
+    }
+
+
+@pytest.mark.anyio
+async def test_stream_fn_forwards_mapped_reasoning_effort(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``reasoning_effort='extra-high'`` lands as ``'high'`` in extra_body."""
+    fake = _FakeClient([_delta(finish="stop")])
+    monkeypatch.setattr("app.core.providers.xai_provider.AsyncOpenAI", lambda **_kwargs: fake)
+
+    stream_fn = make_xai_stream_fn(
+        "grok-4.3", None, system_prompt="sys", reasoning_effort="extra-high"
+    )
+    async for _ in stream_fn([], []):
+        pass
+
+    kwargs = fake.chat.completions.last_kwargs
+    assert kwargs is not None
+    assert kwargs["extra_body"]["reasoning_effort"] == "high"
+    assert kwargs["extra_body"]["search_parameters"] == {"mode": "off"}
+
+
+@pytest.mark.anyio
+async def test_stream_fn_emits_thinking_deltas_from_reasoning_content(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """xAI's ``delta.reasoning_content`` surfaces as ``thinking_delta`` events.
+
+    Mirrors the Gemini regression test for issue #98 — without this
+    wiring the frontend's thinking pane is empty for Grok even though
+    grok-4.3 streams its chain-of-thought back on every reasoning turn.
+    """
+    # ``ChoiceDelta`` has ``extra='allow'``; the openai SDK preserves
+    # ``reasoning_content`` on unknown-field deltas via Pydantic.  We
+    # mimic that here so the test stays decoupled from the SDK's
+    # internal mutation API.
+    thinking_chunk = SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                delta=SimpleNamespace(
+                    content=None,
+                    tool_calls=None,
+                    reasoning_content="Let me think... 2 + 2 = 4.",
+                ),
+                finish_reason=None,
+                index=0,
+            )
+        ]
+    )
+    answer_chunk = _delta(content="4", finish="stop")
+    fake = _FakeClient([thinking_chunk, answer_chunk])
+    monkeypatch.setattr("app.core.providers.xai_provider.AsyncOpenAI", lambda **_kwargs: fake)
+
+    stream_fn = make_xai_stream_fn("grok-4.3", None, system_prompt="sys")
+    events = [event async for event in stream_fn([], [])]
+
+    thinking_events = [e for e in events if e["type"] == "thinking_delta"]
+    text_events = [e for e in events if e["type"] == "text_delta"]
+    assert any("2 + 2 = 4" in e["text"] for e in thinking_events)
+    # Reasoning content must NOT bleed into the regular text stream — the
+    # frontend renders text_delta in the assistant transcript.
+    assert not any("Let me think" in e["text"] for e in text_events)
+    assert any(e["text"] == "4" for e in text_events)

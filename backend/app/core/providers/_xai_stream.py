@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from dataclasses import dataclass
 from typing import Any
 
 from app.core.agent_loop.types import (
@@ -25,6 +26,20 @@ logger = logging.getLogger(__name__)
 # Finish reason emitted by xAI / OpenAI-compatible endpoints when the
 # model produced one or more tool calls.  Mirrors OpenAI's vocabulary.
 FINISH_REASON_TOOL_CALLS = "tool_calls"
+
+
+@dataclass(frozen=True, slots=True)
+class ChunkDeltas:
+    """The user-visible deltas extracted from a single streaming chunk.
+
+    ``text`` is the regular assistant content delta; ``thinking`` is the
+    reasoning-trace delta (xAI's ``reasoning_content`` field on grok-4.3
+    reasoning turns).  Either or both may be ``None`` for a chunk that
+    only contributed to tool-call accumulation or to ``finish_reason``.
+    """
+
+    text: str | None = None
+    thinking: str | None = None
 
 
 class ToolCallAccumulator:
@@ -105,25 +120,36 @@ class ChunkAggregate:
         self.finish_reason: str | None = None
 
 
-def absorb_chunk(chunk: Any, aggregate: ChunkAggregate) -> str | None:
-    """Update *aggregate* with one streaming chunk.
+def absorb_chunk(chunk: Any, aggregate: ChunkAggregate) -> ChunkDeltas:
+    """Update *aggregate* with one streaming chunk and report the user-visible deltas.
 
-    Returns any text delta to forward upstream, or ``None`` when the
-    chunk only contributed to tool-call accumulation.  Extracted from
-    the StreamFn closure so the factory stays inside the ruff complexity
-    cap; the branch shape mirrors the OpenAI SDK's
-    :class:`ChatCompletionChunk` shape exactly.
+    Returns :class:`ChunkDeltas` carrying any text and / or
+    ``reasoning_content`` delta to forward upstream.  Both fields are
+    ``None`` when the chunk only contributed to tool-call accumulation
+    or to ``finish_reason``.  Extracted from the StreamFn closure so
+    the factory stays inside the ruff complexity cap; the branch shape
+    mirrors the OpenAI SDK's :class:`ChatCompletionChunk` exactly, plus
+    xAI's ``reasoning_content`` extra (allowed because
+    :class:`ChoiceDelta` is configured with ``extra='allow'``).
     """
     if not chunk.choices:
-        return None
+        return ChunkDeltas()
     choice = chunk.choices[0]
     delta = choice.delta
     if delta is None:
-        return None
+        return ChunkDeltas()
     text_delta: str | None = None
     if delta.content:
         text_delta = delta.content
         aggregate.full_text += delta.content
+    # xAI's grok-4.3 reasoning turn surfaces chain-of-thought in
+    # ``reasoning_content`` on each delta.  The openai SDK preserves
+    # unknown fields on :class:`ChoiceDelta` via ``extra='allow'`` so a
+    # plain ``getattr`` is enough — no SDK upgrade required when xAI
+    # changes their schema, and the field stays ``None`` for non-Grok
+    # OpenAI-compat providers that never emit it.
+    thinking_value = getattr(delta, "reasoning_content", None)
+    thinking_delta = thinking_value if isinstance(thinking_value, str) and thinking_value else None
     for tc_delta in getattr(delta, "tool_calls", None) or []:
         idx = getattr(tc_delta, "index", 0) or 0
         buffer = aggregate.tool_buffers.get(idx)
@@ -133,7 +159,7 @@ def absorb_chunk(chunk: Any, aggregate: ChunkAggregate) -> str | None:
         buffer.apply(tc_delta)
     if choice.finish_reason:
         aggregate.finish_reason = choice.finish_reason
-    return text_delta
+    return ChunkDeltas(text=text_delta, thinking=thinking_delta)
 
 
 def finalize_tool_calls(aggregate: ChunkAggregate) -> list[dict[str, Any]]:

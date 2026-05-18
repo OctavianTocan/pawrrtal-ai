@@ -20,12 +20,26 @@ Design parity with :mod:`app.core.providers.gemini_provider`:
   the same path as Gemini — the provider stays tool-agnostic per
   ``.claude/rules/architecture/no-tools-in-providers.md``.
 
-Reasoning effort is accepted for protocol parity but ignored: Grok 4.3
-does not surface a reasoning-effort knob via the OpenAI-compatible
-endpoint at the time of writing (the dedicated reasoning variants are
-separate model IDs).  Multimodal image inputs are accepted and logged
-but not yet bridged — the chat router can still pass them
-conditionally without a runtime error.
+xAI-specific extensions the openai SDK doesn't model natively all flow
+in via ``extra_body``; see :func:`_build_xai_extra_body` for the single
+source of truth:
+
+* ``reasoning_effort`` — collapsed from Pawrrtal's four-level UI knob
+  (``low | medium | high | extra-high``) into grok-4.3's two-level enum
+  via :func:`_map_reasoning_effort`.  grok-4.3 400s on any other value
+  (https://docs.x.ai/docs/models/grok-4-3).
+* ``search_parameters`` — forced to ``{"mode": "off"}`` so xAI's
+  built-in Live Search never fires.  Pawrrtal's canonical web tool is
+  ``exa_search`` (gated by ``EXA_API_KEY``); leaving xAI's search on
+  the default ``"on"`` would silently double-search every Grok turn.
+
+Reasoning-trace deltas (``delta.reasoning_content``) are forwarded as
+:class:`LLMThinkingDeltaEvent` so the frontend's existing "thinking"
+pane (already wired for Gemini) lights up for Grok too.
+
+Multimodal image inputs are accepted and logged but not yet bridged —
+the chat router can still pass them conditionally without a runtime
+error.
 
 Request- and response-shape helpers live in ``_xai_messages`` and
 ``_xai_stream`` so this module stays under the project's 500-line
@@ -55,6 +69,7 @@ from app.core.agent_loop import (
     LLMDoneEvent,
     LLMEvent,
     LLMTextDeltaEvent,
+    LLMThinkingDeltaEvent,
     LLMToolCallEvent,
     StreamFn,
     UserMessage,
@@ -89,6 +104,14 @@ logger = logging.getLogger(__name__)
 # https://docs.x.ai/docs/api-reference.
 XAI_BASE_URL = "https://api.x.ai/v1"
 
+# xAI's Live Search is enabled by default (``mode="on"``) on every
+# chat-completions request — see https://docs.x.ai/docs/guides/live-search.
+# Pawrrtal does its own web search through the explicit ``exa_search``
+# tool (gated by ``EXA_API_KEY``), so we turn xAI's built-in search off
+# at the SDK seam.  Otherwise every Grok turn would silently consult the
+# web, doubling up with exa_search and surprise-billing the workspace.
+_LIVE_SEARCH_DISABLED: dict[str, Any] = {"mode": "off"}
+
 
 def _resolve_xai_api_key(workspace_id: uuid.UUID | None) -> str:
     """Resolve the xAI API key for this request.
@@ -102,12 +125,49 @@ def _resolve_xai_api_key(workspace_id: uuid.UUID | None) -> str:
     return settings.xai_api_key
 
 
+def _map_reasoning_effort(effort: ReasoningEffort | None) -> str | None:
+    """Map the four-level UI knob onto xAI's two-level enum.
+
+    Grok 4.3 accepts ``"low"`` or ``"high"``
+    (https://docs.x.ai/docs/models/grok-4-3) and 400s on anything else,
+    including the values OpenAI's o-series uses.  The Pawrrtal UI
+    surfaces ``low | medium | high | extra-high`` — we collapse the
+    lower two to ``low`` and the upper two to ``high`` so the user gets
+    a meaningful difference without overshooting xAI's schema.
+    ``None`` means "let xAI pick the model default".
+    """
+    if effort is None:
+        return None
+    if effort in ("low", "medium"):
+        return "low"
+    return "high"
+
+
+def _build_xai_extra_body(reasoning_effort: ReasoningEffort | None) -> dict[str, Any]:
+    """Assemble the xAI-only kwargs forwarded via ``extra_body``.
+
+    ``extra_body`` is the openai SDK's escape hatch for non-OpenAI
+    fields.  We use it for the two xAI-specific concerns:
+
+    * ``reasoning_effort`` for grok-4.3 (passed only when the caller
+      supplied one — the model picks its own default otherwise).
+    * ``search_parameters`` to opt out of xAI's built-in Live Search
+      (see :data:`_LIVE_SEARCH_DISABLED` for the why).
+    """
+    body: dict[str, Any] = {"search_parameters": _LIVE_SEARCH_DISABLED}
+    mapped_effort = _map_reasoning_effort(reasoning_effort)
+    if mapped_effort is not None:
+        body["reasoning_effort"] = mapped_effort
+    return body
+
+
 async def _open_xai_stream(
     *,
     client: AsyncOpenAI,
     model_id: str,
     messages: list[dict[str, Any]],
     tools: list[dict[str, Any]] | None,
+    reasoning_effort: ReasoningEffort | None,
 ) -> AsyncStream[ChatCompletionChunk]:
     """Open the streaming chat-completions call against xAI.
 
@@ -118,13 +178,20 @@ async def _open_xai_stream(
     ``Any`` (forbidden by the project mypy config).  Splitting the
     ``stream=True`` overload into two literal branches keeps mypy from
     widening the return to ``ChatCompletion | AsyncStream[...]``.
+
+    xAI-specific fields (``reasoning_effort``, ``search_parameters``)
+    flow in via ``extra_body`` so the openai SDK passes them through
+    unchanged — :func:`_build_xai_extra_body` is the single source of
+    truth for what we forward.
     """
     typed_messages = cast("list[ChatCompletionMessageParam]", messages)
+    extra_body = _build_xai_extra_body(reasoning_effort)
     if tools is None:
         return await client.chat.completions.create(
             model=model_id,
             messages=typed_messages,
             stream=True,
+            extra_body=extra_body,
         )
     typed_tools = cast("list[ChatCompletionToolUnionParam]", tools)
     return await client.chat.completions.create(
@@ -132,6 +199,7 @@ async def _open_xai_stream(
         messages=typed_messages,
         tools=typed_tools,
         stream=True,
+        extra_body=extra_body,
     )
 
 
@@ -140,6 +208,7 @@ def make_xai_stream_fn(
     workspace_id: uuid.UUID | None = None,
     *,
     system_prompt: str,
+    reasoning_effort: ReasoningEffort | None = None,
 ) -> StreamFn:
     """Build a :data:`StreamFn` backed by xAI's OpenAI-compatible API.
 
@@ -154,6 +223,10 @@ def make_xai_stream_fn(
             entry on every call.  ``XaiLLM.stream`` builds a fresh
             StreamFn per request so the workspace-assembled prompt
             (SOUL.md + AGENTS.md + skills) is what the model sees.
+        reasoning_effort: Optional reasoning-depth knob for grok-4.3.
+            Mapped onto xAI's two-level enum (``low`` / ``high``) via
+            :func:`_map_reasoning_effort` and forwarded through
+            ``extra_body``.  ``None`` lets xAI pick the model default.
 
     Returns:
         An async generator factory that yields ``LLMEvent`` instances.
@@ -177,11 +250,14 @@ def make_xai_stream_fn(
                 model_id=model_id,
                 messages=request_messages,
                 tools=xai_tools,
+                reasoning_effort=reasoning_effort,
             )
             async for chunk in stream:
-                text_delta = absorb_chunk(chunk, aggregate)
-                if text_delta:
-                    yield LLMTextDeltaEvent(type="text_delta", text=text_delta)
+                deltas = absorb_chunk(chunk, aggregate)
+                if deltas.thinking:
+                    yield LLMThinkingDeltaEvent(type="thinking_delta", text=deltas.thinking)
+                if deltas.text:
+                    yield LLMTextDeltaEvent(type="text_delta", text=deltas.text)
         except Exception as exc:
             logger.error("xAI streaming error model=%s: %s", model_id, exc, exc_info=True)
             error_text = f"xAI error: {exc}"
@@ -269,9 +345,12 @@ class XaiLLM:
             system_prompt: System prompt for this turn.  ``None`` falls
                 back to :data:`DEFAULT_AGENT_SYSTEM_PROMPT` so bare
                 unit tests still work.
-            reasoning_effort: Accepted for protocol parity.  Grok 4.3
-                does not surface a reasoning-effort knob via the
-                OpenAI-compatible endpoint, so the value is ignored.
+            reasoning_effort: Optional reasoning-depth knob.  Mapped onto
+                grok-4.3's two-level enum (``low`` / ``high``) via
+                :func:`_map_reasoning_effort` and forwarded to xAI via
+                ``extra_body``.  The model's chain-of-thought streams
+                back as ``reasoning_content`` deltas and surfaces as
+                :class:`StreamEvent` ``thinking`` events for the UI.
             permission_check: Optional cross-provider permission gate
                 (PR 03b).  Threaded straight into
                 :class:`AgentLoopConfig` so denial flows through the
@@ -286,12 +365,6 @@ class XaiLLM:
                 "XAI_IMAGES_IGNORED conversation_id=%s count=%d",
                 conversation_id,
                 len(images),
-            )
-        if reasoning_effort is not None:
-            logger.debug(
-                "XAI_REASONING_EFFORT_IGNORED conversation_id=%s value=%s",
-                conversation_id,
-                reasoning_effort,
             )
 
         prior: list[AgentMessage] = []
@@ -325,6 +398,7 @@ class XaiLLM:
             self._model_id,
             self._workspace_id,
             system_prompt=context.system_prompt,
+            reasoning_effort=reasoning_effort,
         )
 
         try:
