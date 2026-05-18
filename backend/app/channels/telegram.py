@@ -48,7 +48,6 @@ from .telegram_html import md_to_telegram_html
 from .telegram_progress import (
     ProgressState,
     render_initial,
-    render_starting,
     render_working,
 )
 
@@ -175,32 +174,22 @@ class TelegramChannel:
         terminal_message: str | None = None
         terminal_prefix: str = ""
 
-        # Workstream 2: content-preview-in-placeholder state machine.
-        # We update the ⏳ placeholder progressively before real content
-        # arrives so the user always sees a meaningful status string.
-        # ``progress_state`` tracks which transition has already fired;
-        # ``progress_model`` and ``progress_tool_count`` are set by the
-        # metadata block at the top (when available) or lazily from events.
+        # Content-preview-in-placeholder state machine. The placeholder
+        # opens with ``render_initial()`` and advances to WORKING when
+        # the first text delta arrives so the user sees the answer
+        # forming inside the placeholder. Tool turns let
+        # ``handle_tool_use`` overwrite the placeholder with the tools
+        # header directly — no intermediate "Starting…" banner.
         progress_state: ProgressState = ProgressState.INITIAL
-        progress_model: str = str(message.get("model_id") or "")
-        progress_tool_count: int = 0
-        # Emit the initial placeholder content immediately so the ⏳ is
-        # replaced with a friendlier string before the first event lands.
+        # Re-paint the placeholder defensively. The caller (bot.py) creates
+        # it with the same text, so Telegram returns "message not modified"
+        # which ``safe_edit_html`` silently swallows. This keeps deliver()
+        # self-sufficient if the placeholder is ever opened with a different
+        # text (e.g. a future caller, tests).
         await safe_edit_html(bot, chat_id, message_id, render_initial())
 
         async for event in stream:
             etype = event.get("type")
-
-            # Workstream 2: advance placeholder to STARTING on the first
-            # real event when we haven't emitted the tools block yet.
-            if progress_state == ProgressState.INITIAL and first_block_kind is None:
-                progress_state = ProgressState.STARTING
-                await safe_edit_html(
-                    bot,
-                    chat_id,
-                    message_id,
-                    render_starting(progress_model, progress_tool_count),
-                )
 
             if etype == "tool_use":
                 first_block_kind = first_block_kind or "tools"
@@ -268,17 +257,32 @@ class TelegramChannel:
             if etype == "delta":
                 chunk: str = event.get("content", "")
                 answer_text += chunk
-                # Workstream 2: show a content preview while streaming into
-                # the placeholder (pure-text turns where no tool/thinking
-                # block has consumed the placeholder yet).
-                if progress_state == ProgressState.STARTING and first_block_kind is None and chunk:
-                    progress_state = ProgressState.WORKING
-                    await safe_edit_html(
-                        bot,
-                        chat_id,
-                        message_id,
-                        render_working(answer_text),
-                    )
+                # Content-preview: when the placeholder hasn't yet been
+                # consumed by a tool or thinking block, edit it to show
+                # the assistant's emerging answer (truncated, italic).
+                # Debounced by the same chars/time budget as text edits
+                # so we don't hammer Telegram's rate limit.
+                # Skipped in draft mode — the animated draft already
+                # shows the streaming answer.
+                if first_block_kind is None and chunk and draft_state is None:
+                    preview_now = asyncio.get_event_loop().time()
+                    if progress_state == ProgressState.INITIAL:
+                        progress_state = ProgressState.WORKING
+                        await safe_edit_html(bot, chat_id, message_id, render_working(answer_text))
+                        text_last_edit_at = preview_now
+                        text_chars_since_edit = 0
+                    else:
+                        text_chars_since_edit += len(chunk)
+                        elapsed = preview_now - text_last_edit_at
+                        if (
+                            text_chars_since_edit >= _EDIT_DEBOUNCE_CHARS
+                            or elapsed >= _MAX_EDIT_INTERVAL_S
+                        ):
+                            await safe_edit_html(
+                                bot, chat_id, message_id, render_working(answer_text)
+                            )
+                            text_last_edit_at = preview_now
+                            text_chars_since_edit = 0
                 (
                     text_buffer,
                     text_message_id,
@@ -298,9 +302,17 @@ class TelegramChannel:
                     message_thread_id=message_thread_id,
                     draft_state=draft_state,
                 )
-                if rendered:
+                if rendered and draft_state is None:
+                    # Legacy interleaved-text path: the chunk landed in a
+                    # separate Telegram message, so the placeholder is now
+                    # "consumed" and the next tool/thinking block must open
+                    # a fresh message.
                     first_block_kind = first_block_kind or "text"
                     previous_block_kind = "text"
+                # Draft mode: rendered=True but the text went to a separate
+                # ephemeral draft, NOT the placeholder. Don't update block-
+                # kind tracking — leave the placeholder available for the
+                # tools/thinking flow.
                 continue
 
             captured = capture_terminal_event(
@@ -314,15 +326,14 @@ class TelegramChannel:
                 terminal_message, terminal_prefix = captured
                 continue
 
-        # #306: when text was already rendered progressively, skip the
-        # closing answer_text duplicate. Any terminal_message (error /
-        # agent_terminated) still flushes — those are not part of the
-        # in-band text stream.
-        # In draft mode text_message_id is always None; use the draft's
-        # accumulated buffer to skip duplicating the text in final_reply_text.
-        has_draft_content = draft_state is not None and draft_state.last_html
+        # #306: when text was already rendered progressively into an
+        # interleaved text message, skip the closing answer_text duplicate.
+        # Drafts (Bot API 9.3+) are ephemeral and auto-expire — they do NOT
+        # persist as a chat message, so even in draft mode we still send the
+        # full answer via ``safe_send_text`` to persist the conversation.
+        # Any terminal_message (error / agent_terminated) flushes regardless.
         final_text = final_reply_text(
-            answer_text="" if (text_message_id is not None or has_draft_content) else answer_text,
+            answer_text="" if text_message_id is not None else answer_text,
             terminal_message=terminal_message,
             terminal_prefix=terminal_prefix,
         )

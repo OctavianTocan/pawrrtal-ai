@@ -1,13 +1,12 @@
-"""Tests for Workstream 2 — content-preview-in-placeholder state machine.
+"""Tests for the content-preview-in-placeholder state machine.
 
 Verifies that:
 - On stream open, placeholder is updated to render_initial() content.
-- On first event, placeholder transitions to render_starting().
 - On first text delta (pure-text turn), placeholder transitions to render_working().
 - Preview is truncated to PREVIEW_MAX_CHARS + ellipsis.
 - HTML special chars in delta are escaped in the preview.
-- State transitions do NOT fire when the first block consumed the placeholder
-  (tools/thinking path — those have their own placeholder usage).
+- The spurious "🚀 Starting …" banner (formerly rendered on every first event
+  regardless of context) does NOT fire.
 """
 
 from __future__ import annotations
@@ -22,7 +21,21 @@ import pytest
 from app.channels.base import ChannelMessage
 from app.channels.telegram import TelegramChannel
 from app.channels.telegram_progress import PREVIEW_MAX_CHARS
+from app.core.config import settings
 from app.core.providers.base import StreamEvent
+
+
+@pytest.fixture
+def _legacy_streaming(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Force legacy editMessageText streaming for the placeholder-preview tests.
+
+    The placeholder content-preview only fires in legacy mode — in draft
+    mode (Bot API 9.3+) the animated draft already shows the streaming
+    answer, so we deliberately skip re-painting the placeholder.
+    These tests target the legacy preview flow specifically.
+    """
+    monkeypatch.setattr(settings, "telegram_use_draft_streaming", False)
+
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -63,6 +76,7 @@ def _make_channel_message(bot: AsyncMock, model_id: str = "test-model") -> Chann
 
 
 @pytest.mark.anyio
+@pytest.mark.usefixtures("_legacy_streaming")
 class TestContentPreviewPlaceholder:
     async def test_initial_state_sent_on_stream_open(self) -> None:
         """Placeholder is updated to render_initial() before any event."""
@@ -79,19 +93,24 @@ class TestContentPreviewPlaceholder:
             f"Expected initial progress state in edit calls, got: {all_texts}"
         )
 
-    async def test_starting_state_on_first_event(self) -> None:
-        """On the first event the placeholder advances to STARTING state."""
+    async def test_no_spurious_starting_banner_on_first_event(self) -> None:
+        """The placeholder must NOT flash a "🚀 Starting …" banner.
+
+        The original implementation flashed this on every first event,
+        with an empty model name and a zero tool count — surfacing a
+        confusing half-message ("🚀 Starting ") to the user every turn.
+        That state was removed; this test guards against regressions.
+        """
         bot = _make_bot()
         msg = _make_channel_message(bot, model_id="claude-sonnet")
         channel = TelegramChannel()
 
-        # Single delta — enough to trigger INITIAL → STARTING → WORKING
         async for _ in channel.deliver(_stream({"type": "delta", "content": "hi"}), msg):
             pass
 
         all_texts = [c.kwargs.get("text", "") for c in bot.edit_message_text.call_args_list]
-        assert any("Starting" in t or "🚀" in t for t in all_texts), (
-            f"Expected STARTING state in edit calls, got: {all_texts}"
+        assert all("Starting" not in t and "🚀" not in t for t in all_texts), (
+            f"Unexpected STARTING-state edit found: {all_texts}"
         )
 
     async def test_working_state_contains_preview_text(self) -> None:

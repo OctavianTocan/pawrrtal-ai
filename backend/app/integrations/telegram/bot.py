@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING
 from app.channels import resolve_channel
 from app.channels.base import ChannelMessage
 from app.channels.telegram import SURFACE_TELEGRAM, make_telegram_sender
+from app.channels.telegram_progress import render_initial
 from app.channels.turn_runner import ChatTurnInput, run_turn
 from app.core.agent_tools import build_agent_tools
 from app.core.config import settings
@@ -201,7 +202,7 @@ async def _run_llm_turn(
     if message.bot is None:
         raise RuntimeError("Telegram message has no bot; refusing to stream.")
     thinking_msg = await message.answer(
-        "⏳",
+        render_initial(),
         reply_parameters=_reply_parameters(message.message_id),
     )
 

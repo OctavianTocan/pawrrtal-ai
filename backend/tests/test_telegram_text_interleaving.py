@@ -21,9 +21,23 @@ import pytest
 
 from app.channels.base import ChannelMessage
 from app.channels.telegram import TelegramChannel
+from app.core.config import settings
 from app.core.providers.base import StreamEvent
 
 pytestmark = pytest.mark.anyio
+
+
+@pytest.fixture(autouse=True)
+def _legacy_streaming(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Force legacy editMessageText streaming for the interleaving tests.
+
+    These tests validate the legacy "one Telegram message per text
+    segment" behavior. In draft mode (Bot API 9.3+) text segments
+    stream into a single animated draft and are persisted as one
+    closing ``sendMessage`` — different but valid behavior, covered
+    by ``test_telegram_drafts.py``.
+    """
+    monkeypatch.setattr(settings, "telegram_use_draft_streaming", False)
 
 
 async def _stream(*events: StreamEvent) -> AsyncIterator[StreamEvent]:

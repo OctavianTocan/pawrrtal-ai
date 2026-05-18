@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import html as html_lib
 import logging
 import time
 from dataclasses import dataclass, field
@@ -35,7 +36,6 @@ from ._telegram_draft import (
 )
 from .telegram_delivery import (
     format_tool_use,
-    plain_html,
     safe_delete,
     safe_edit,
     safe_edit_html,
@@ -111,11 +111,13 @@ def _render_tools_block(
 ) -> str:
     """Render the full tools trace from per-tool state.
 
-    Completed tools show their success/error line; pending tools show
-    the in-flight display string. A summary header is prepended when
-    tools are still running.
+    In-flight tools appear in the summary header (HTML-escaped).
+    Completed tools appear as their success/error line below.  We
+    deliberately do NOT also list in-flight tools as raw display lines
+    in the body — that would (a) duplicate the header, and (b) leak
+    unescaped ``display`` text into Telegram's HTML parser.
     """
-    lines = [state.rendered_line for state in tool_states.values()]
+    lines = [s.result_line for s in tool_states.values() if s.result_line is not None]
     if in_flight_names:
         header = render_tools_in_flight(in_flight_names)
         lines = [header, *lines]
@@ -146,7 +148,7 @@ async def prepare_tools_block(
     new_id = await safe_send_html(
         bot,
         chat_id,
-        plain_html("⏳"),
+        render_tools_in_flight([]),
         reply_to_message_id=reply_to_message_id,
         message_thread_id=message_thread_id,
     )
@@ -190,18 +192,29 @@ async def handle_tool_use(
     call_id = str(event.get("id") or event.get("tool_use_id") or "")
     line = format_tool_use(event)
 
+    # Track whether this event introduces a NEW tool so we can flush
+    # the trace immediately — single short tool names never reach the
+    # 40-char debounce threshold otherwise.
     if tool_states is not None and call_id:
+        is_new_tool = call_id not in tool_states
         tool_states[call_id] = ToolLineState(call_id=call_id, display=line)
         in_flight = [s.display for s in tool_states.values() if s.result_line is None]
         tool_trace = _render_tools_block(tool_states, in_flight)
     else:
-        tool_trace = f"{tool_trace}\n{line}" if tool_trace else line
+        # Legacy / missing-call_id branch: escape the raw display string
+        # before appending to the (HTML-rendered) tool_trace.
+        is_new_tool = not tool_trace
+        escaped_line = html_lib.escape(line)
+        tool_trace = f"{tool_trace}\n{escaped_line}" if tool_trace else escaped_line
 
     chars_since_edit += len(line)
     now = asyncio.get_event_loop().time()
     elapsed = now - last_edit_at
-    if tool_trace and (chars_since_edit >= _EDIT_DEBOUNCE_CHARS or elapsed >= _MAX_EDIT_INTERVAL_S):
-        await safe_edit_html(bot, chat_id, message_id, plain_html(tool_trace))
+    should_flush = (
+        is_new_tool or chars_since_edit >= _EDIT_DEBOUNCE_CHARS or elapsed >= _MAX_EDIT_INTERVAL_S
+    )
+    if tool_trace and should_flush:
+        await safe_edit_html(bot, chat_id, message_id, tool_trace)
         return tool_trace, 0, now
     return tool_trace, chars_since_edit, last_edit_at
 
@@ -245,7 +258,7 @@ async def handle_tool_result(
     tool_trace = _render_tools_block(tool_states, in_flight)
 
     now = asyncio.get_event_loop().time()
-    await safe_edit_html(bot, chat_id, message_id, plain_html(tool_trace))
+    await safe_edit_html(bot, chat_id, message_id, tool_trace)
     return tool_trace, 0, now
 
 
@@ -330,8 +343,35 @@ async def dispatch_text_delta(
     * ``rendered=False`` for the legacy accumulate path — when no thinking
       or tool block has rendered yet we keep "send the final answer at
       the end" UX.
-    * ``rendered=True`` when an interleaved text block was opened or edited.
+    * ``rendered=True`` when an interleaved text block was opened or edited
+      OR the chunk was streamed to a Bot API 9.3+ ``sendMessageDraft``.
     """
+    # Draft mode: every delta streams into the same draft regardless of
+    # the previous block kind. The draft animates updates in place and is
+    # persisted by ``finalize_turn_delivery`` via a separate ``sendMessage``.
+    if draft_state is not None:
+        (
+            text_buffer,
+            text_message_id,
+            chars_since_edit,
+            last_edit_at,
+        ) = await handle_text_delta(
+            chunk=chunk,
+            bot=bot,
+            chat_id=chat_id,
+            text_buffer=text_buffer,
+            text_message_id=text_message_id,
+            chars_since_edit=chars_since_edit,
+            last_edit_at=last_edit_at,
+            reply_to_message_id=reply_to_message_id,
+            message_thread_id=message_thread_id,
+            draft_state=draft_state,
+        )
+        return text_buffer, text_message_id, chars_since_edit, last_edit_at, True
+
+    # Legacy editMessageText path: only open / continue an interleaved text
+    # message on a block transition. Pure-text or same-block deltas keep
+    # accumulating into ``answer_text`` for the closing reply.
     if previous_block_kind in (None, "text"):
         return text_buffer, text_message_id, chars_since_edit, last_edit_at, False
     if previous_block_kind != "text":
@@ -442,7 +482,7 @@ async def finalize_turn_delivery(
             await draft_state.keepalive_task
 
     if first_block_kind == "tools":
-        await safe_edit_html(bot, chat_id, placeholder_message_id, plain_html(tool_trace))
+        await safe_edit_html(bot, chat_id, placeholder_message_id, tool_trace)
     elif first_block_kind in ("thinking", "text") or final_text:
         await safe_delete(bot, chat_id, placeholder_message_id)
     else:

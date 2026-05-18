@@ -109,13 +109,18 @@ class TestHandleTextDeltaDraft:
             draft_state=draft_state,
         )
 
-    async def test_accumulates_text_buffer(self) -> None:
-        """text_buffer is returned (not reset) across calls."""
+    async def test_text_buffer_returned_unchanged(self) -> None:
+        """Caller is responsible for appending chunks — helper returns buffer as-is.
+
+        ``handle_text_delta`` (the caller) appends ``chunk`` to ``text_buffer``
+        before invoking this draft helper, so the helper just renders /
+        debounces what the caller passed in.
+        """
         bot = _make_bot()
         state = _draft_state()
         now = asyncio.get_event_loop().time()
 
-        buf, msg_id, _cse, _ = await self._call(bot, "Hello", " world", 5, now, state)
+        buf, msg_id, _cse, _ = await self._call(bot, "Hello world", " world", 5, now, state)
         assert buf == "Hello world"
         assert msg_id is None  # draft mode never returns a message_id
 
@@ -128,16 +133,22 @@ class TestHandleTextDeltaDraft:
         assert msg_id is None
 
     async def test_under_debounce_opens_draft_with_empty_text(self) -> None:
-        """First chunk under debounce threshold opens draft with empty text (native placeholder)."""
+        """First chunk under debounce threshold opens draft with empty text (native placeholder).
+
+        ``chars_since_edit`` is passed as 0 to simulate the very first chunk
+        of a turn — the helper increments it by ``len(chunk)``, and the
+        ``chars_since_edit == len(chunk)`` guard fires the open-empty-draft
+        side-effect exactly once.
+        """
         bot = _make_bot()
         state = _draft_state()
         now = asyncio.get_event_loop().time()
 
         with patch(
-            "app.channels._telegram_draft.safe_send_draft", new_callable=AsyncMock
+            "app.channels.telegram_delivery.safe_send_draft", new_callable=AsyncMock
         ) as mock_draft:
             mock_draft.return_value = True
-            await self._call(bot, "a", "a", 1, now, state)  # chars < 40, elapsed < 3s
+            await self._call(bot, "a", "a", 0, now, state)  # first chunk, chars < 40, elapsed < 3s
             # Should have been called with empty text for native "Thinking…" placeholder
             mock_draft.assert_awaited_once()
             call_kwargs = mock_draft.await_args
@@ -150,7 +161,7 @@ class TestHandleTextDeltaDraft:
         now = asyncio.get_event_loop().time() - 10.0  # old timestamp → elapsed > 3s
 
         with patch(
-            "app.channels._telegram_draft.safe_send_draft", new_callable=AsyncMock
+            "app.channels.telegram_delivery.safe_send_draft", new_callable=AsyncMock
         ) as mock_draft:
             mock_draft.return_value = True
             _buf, _, cse, _ = await self._call(bot, "A" * 39, "B", 39, now, state)
@@ -169,7 +180,7 @@ class TestHandleTextDeltaDraft:
         now = asyncio.get_event_loop().time() - 10.0  # force elapsed > threshold
 
         with patch(
-            "app.channels._telegram_draft.safe_send_draft", new_callable=AsyncMock
+            "app.channels.telegram_delivery.safe_send_draft", new_callable=AsyncMock
         ) as mock_draft:
             mock_draft.return_value = True
             await self._call(bot, "A" * 39, "B", 39, now, state)
@@ -187,7 +198,7 @@ class TestHandleTextDeltaDraft:
         past = asyncio.get_event_loop().time() - 10.0
 
         with patch(
-            "app.channels._telegram_draft.safe_send_draft", new_callable=AsyncMock
+            "app.channels.telegram_delivery.safe_send_draft", new_callable=AsyncMock
         ) as mock_draft:
             mock_draft.return_value = True
             # First flush

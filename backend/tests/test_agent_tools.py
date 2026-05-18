@@ -75,7 +75,12 @@ class TestVirtualPythonGate:
     """``python`` tool only appears when ``virtual_python_enabled`` is True."""
 
     def test_python_absent_by_default(self, tmp_workspace: Path) -> None:
-        with patch("app.core.keys.resolve_api_key", return_value=None):
+        # Force the gate to its schema default (False) so the test passes
+        # regardless of any local .env override.
+        with (
+            patch("app.core.keys.resolve_api_key", return_value=None),
+            patch("app.core.agent_tools.settings.virtual_python_enabled", False),
+        ):
             tools = build_agent_tools(workspace_root=tmp_workspace)
 
         names = [t.name for t in tools]

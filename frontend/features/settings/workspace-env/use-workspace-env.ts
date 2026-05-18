@@ -160,7 +160,6 @@ export function useUpsertWorkspaceEnv(): UseMutationResult<
 			if (!workspaceId) {
 				throw new Error('Cannot save workspace env: default workspace has not loaded yet.');
 			}
-			console.log('Sending Vars:', vars);
 			const response = await fetcher(API_ENDPOINTS.workspaces.env(workspaceId), {
 				method: 'PUT',
 				headers: { 'content-type': 'application/json' },
