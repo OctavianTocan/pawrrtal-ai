@@ -6,7 +6,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.crud.workspace import ensure_default_workspace
+from app.crud.workspace import ensure_dev_admin_workspace
 from app.db import get_async_session
 from app.users import UserManager, auth_backend, get_jwt_strategy, get_user_manager
 
@@ -31,8 +31,10 @@ def get_auth_router() -> APIRouter:
         the onboarding wizard instead of the home shell. Personalization
         upsert still creates one for real users via
         :func:`app.crud.workspace.ensure_default_workspace` — this call
-        just hits the same idempotent path earlier so dev-login is enough
-        to land on a fully rendered app.
+        hits the dev-admin-specific seed path so the workspace folder is
+        pinned to a stable location on disk (``{workspace_base_dir}/dev-admin``).
+        That keeps a developer's working files in the same directory across
+        DB resets, so wiping Postgres doesn't force a file copy.
         """
         if settings.is_production:
             raise HTTPException(
@@ -67,13 +69,14 @@ def get_auth_router() -> APIRouter:
             )
 
         # Idempotent — returns the existing workspace if one is already
-        # present. ``create_workspace`` (called inside) does not commit,
+        # present, otherwise creates one pinned to the stable dev-admin
+        # folder. ``create_workspace`` (called inside) does not commit,
         # so we commit the outer transaction ourselves before returning
         # the login response. Errors are logged + swallowed: a failed
         # seed must never block dev-login (the user can still personalise
         # via the UI to get a workspace).
         try:
-            await ensure_default_workspace(user.id, session)
+            await ensure_dev_admin_workspace(user.id, session)
             await session.commit()
         except Exception:
             logger.exception("DEV_LOGIN_WORKSPACE_SEED_FAILED user_id=%s", user.id)

@@ -23,6 +23,12 @@ from app.core.workspace import seed_workspace
 
 log = logging.getLogger(__name__)
 
+# Stable folder name reserved for the seeded dev-admin user.  Using a fixed
+# directory (instead of the random UUID layout the rest of the app uses)
+# keeps the dev admin's workspace files in the same place across DB resets,
+# so a developer can wipe Postgres without re-copying their working files.
+DEV_ADMIN_WORKSPACE_DIRNAME = "dev-admin"
+
 if TYPE_CHECKING:
     from app.models import UserPersonalization, Workspace
 
@@ -64,18 +70,24 @@ async def create_workspace(
     slug: str = "main",
     is_default: bool = True,
     personalization: UserPersonalization | None = None,
+    *,
+    path: Path | None = None,
 ) -> Workspace:
     """Create a new workspace row in the DB and seed its directory.
 
     Does NOT commit — the caller is responsible for committing the session so
     this can participate in larger transactions.
+
+    Pass ``path`` to pin the workspace directory to a caller-supplied
+    location instead of the default ``{workspace_base_dir}/{uuid}`` layout.
+    Reserved for the dev-admin stable-folder flow.
     """
     from app.models import Workspace  # noqa: PLC0415
 
     workspace_id = uuid.uuid4()
 
     # Seed filesystem first so we can capture the canonical path.
-    root = seed_workspace(workspace_id, personalization)
+    root = seed_workspace(workspace_id, personalization, path=path)
 
     ws = Workspace(
         id=workspace_id,
@@ -144,6 +156,58 @@ async def ensure_default_workspace(
             # Should never happen: the constraint fired but no row exists.
             raise RuntimeError(
                 f"ensure_default_workspace: could not find default workspace "
+                f"for user {user_id} after IntegrityError"
+            ) from None
+        return result
+
+
+async def ensure_dev_admin_workspace(
+    user_id: uuid.UUID,
+    session: AsyncSession,
+    personalization: UserPersonalization | None = None,
+) -> Workspace:
+    """Return the dev admin's default workspace, creating it at a stable path.
+
+    Mirrors :func:`ensure_default_workspace` but pins the on-disk directory
+    to ``{workspace_base_dir}/dev-admin`` so the folder survives DB resets.
+    Filesystem seeding is idempotent — :func:`seed_workspace` only writes
+    files and directories that do not already exist, so a developer's
+    working files in ``dev-admin/`` are preserved when the DB row is
+    recreated.
+
+    Reserved for the dev-login endpoint (which is itself gated to non-prod);
+    real users should keep going through :func:`ensure_default_workspace`.
+    """
+    existing = await get_default_workspace(user_id, session)
+    if existing is not None:
+        return existing
+
+    stable_path = Path(settings.workspace_base_dir) / DEV_ADMIN_WORKSPACE_DIRNAME
+    try:
+        async with session.begin_nested():
+            ws = await create_workspace(
+                user_id=user_id,
+                session=session,
+                name="Main",
+                slug="main",
+                is_default=True,
+                personalization=personalization,
+                path=stable_path,
+            )
+        return ws
+    except IntegrityError:
+        # Same concurrent-insert recovery as ensure_default_workspace; the
+        # stable directory is left in place because the winning row points
+        # at it too.
+        log.warning(
+            "ensure_dev_admin_workspace: IntegrityError for user %s — "
+            "concurrent insert detected, re-fetching existing row.",
+            user_id,
+        )
+        result = await get_default_workspace(user_id, session)
+        if result is None:
+            raise RuntimeError(
+                f"ensure_dev_admin_workspace: could not find default workspace "
                 f"for user {user_id} after IntegrityError"
             ) from None
         return result

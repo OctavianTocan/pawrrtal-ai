@@ -31,8 +31,10 @@ from app.core.workspace import (
     seed_workspace,
 )
 from app.crud.workspace import (
+    DEV_ADMIN_WORKSPACE_DIRNAME,
     create_workspace,
     ensure_default_workspace,
+    ensure_dev_admin_workspace,
     get_default_workspace,
     list_workspaces,
 )
@@ -396,6 +398,68 @@ class TestWorkspaceService:
             await db_session.commit()
 
         assert ws1.id == ws2.id
+
+    @pytest.mark.anyio
+    async def test_ensure_dev_admin_workspace_uses_stable_path(
+        self, db_session: AsyncSession, test_user: User, tmp_path: Path
+    ) -> None:
+        with (
+            patch("app.core.workspace.settings") as mock_core_settings,
+            patch("app.crud.workspace.settings") as mock_crud_settings,
+        ):
+            mock_core_settings.workspace_base_dir = str(tmp_path)
+            mock_crud_settings.workspace_base_dir = str(tmp_path)
+            ws = await ensure_dev_admin_workspace(test_user.id, db_session)
+            await db_session.commit()
+
+        assert ws.path == str(tmp_path / DEV_ADMIN_WORKSPACE_DIRNAME)
+        assert (Path(ws.path) / "AGENTS.md").exists()
+
+    @pytest.mark.anyio
+    async def test_ensure_dev_admin_workspace_preserves_existing_files(
+        self, db_session: AsyncSession, test_user: User, tmp_path: Path
+    ) -> None:
+        """Simulates a DB-reset run: the dev-admin folder already has user
+        files; the helper must reuse the folder without overwriting them.
+        """
+        stable_root = tmp_path / DEV_ADMIN_WORKSPACE_DIRNAME
+        (stable_root / "artifacts").mkdir(parents=True)
+        user_file = stable_root / "artifacts" / "my-notes.md"
+        user_file.write_text("important user content", encoding="utf-8")
+        # Pre-existing seed file with edited content must not be clobbered.
+        edited_agents = stable_root / "AGENTS.md"
+        edited_agents.write_text("hand-edited", encoding="utf-8")
+
+        with (
+            patch("app.core.workspace.settings") as mock_core_settings,
+            patch("app.crud.workspace.settings") as mock_crud_settings,
+        ):
+            mock_core_settings.workspace_base_dir = str(tmp_path)
+            mock_crud_settings.workspace_base_dir = str(tmp_path)
+            ws = await ensure_dev_admin_workspace(test_user.id, db_session)
+            await db_session.commit()
+
+        assert ws.path == str(stable_root)
+        assert user_file.read_text(encoding="utf-8") == "important user content"
+        assert edited_agents.read_text(encoding="utf-8") == "hand-edited"
+
+    @pytest.mark.anyio
+    async def test_ensure_dev_admin_workspace_is_idempotent(
+        self, db_session: AsyncSession, test_user: User, tmp_path: Path
+    ) -> None:
+        with (
+            patch("app.core.workspace.settings") as mock_core_settings,
+            patch("app.crud.workspace.settings") as mock_crud_settings,
+        ):
+            mock_core_settings.workspace_base_dir = str(tmp_path)
+            mock_crud_settings.workspace_base_dir = str(tmp_path)
+            ws1 = await ensure_dev_admin_workspace(test_user.id, db_session)
+            await db_session.commit()
+            ws2 = await ensure_dev_admin_workspace(test_user.id, db_session)
+            await db_session.commit()
+
+        assert ws1.id == ws2.id
+        assert ws1.path == ws2.path
 
     @pytest.mark.anyio
     async def test_list_workspaces_empty_for_new_user(
