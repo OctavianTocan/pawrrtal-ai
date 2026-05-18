@@ -418,15 +418,22 @@ def _workspace_path(workspace_id: uuid.UUID) -> Path:
 def seed_workspace(
     workspace_id: uuid.UUID,
     personalization: PersonalizationFields | None = None,
+    *,
+    path: Path | None = None,
 ) -> Path:
     """Create the workspace directory tree and write seed files.
 
     Idempotent — existing files are not overwritten, so re-running after a
     partial seed is safe.  New directories are always created.
 
+    Pass ``path`` to override the default ``{workspace_base_dir}/{uuid}``
+    location with a caller-supplied root (used by the dev-admin shortcut so
+    its workspace folder stays stable across DB resets).  When omitted, the
+    UUID-based path is used as before.
+
     Returns the workspace root path.
     """
-    root = _workspace_path(workspace_id)
+    root = path if path is not None else _workspace_path(workspace_id)
 
     # Create four-layer memory directories, skills, artifacts, and protocols.
     for subdir in (*_MEMORY_LAYERS, _SKILLS_DIR, "artifacts", _PROTOCOLS_DIR):
