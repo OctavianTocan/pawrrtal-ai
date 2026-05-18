@@ -43,6 +43,7 @@ from app.core.tools.lcm_agents import (
     make_lcm_expand_query_tool,
     make_lcm_grep_tool,
     make_lcm_list_summaries_tool,
+    make_lcm_search_tool,
 )
 from app.core.tools.markitdown_convert import make_markitdown_tool
 from app.core.tools.now import (
@@ -244,6 +245,7 @@ def build_agent_tools(
     # and a conversation_id being present.
     if settings.lcm_enabled and conversation_id is not None:
         tools.append(make_lcm_grep_tool(conversation_id=conversation_id))
+        tools.append(make_lcm_search_tool(conversation_id=conversation_id))
         tools.append(make_lcm_list_summaries_tool(conversation_id=conversation_id))
         tools.append(make_lcm_describe_tool(conversation_id=conversation_id))
         if user_id is not None:
