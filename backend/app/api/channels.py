@@ -6,6 +6,7 @@ The frontend depends on the response shapes here. Don't ship from
 imagination; look at what ``frontend/lib/channels.ts`` reads.
 """
 
+import logging
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -20,8 +21,11 @@ from app.crud.channel import (
     issue_link_code,
 )
 from app.db import User, get_async_session
+from app.models import ChannelBinding
 from app.schemas import ChannelBindingRead, TelegramLinkCodeRead
 from app.users import get_allowed_user
+
+logger = logging.getLogger(__name__)
 
 
 def build_deep_link(code: str) -> str | None:
@@ -55,15 +59,19 @@ def get_channels_router() -> APIRouter:
         session: AsyncSession = Depends(get_async_session),
     ) -> TelegramLinkCodeRead:
         """Issue a fresh one-time Telegram link code for the authenticated user."""
-        binding = await get_binding(user_id=user.id, session=session, provider=SURFACE_TELEGRAM)
+        binding: ChannelBinding | None = await get_binding(
+            user_id=user.id, session=session, provider=SURFACE_TELEGRAM
+        )
         # Return an error if the binding already exists.
         if binding:
             raise HTTPException(status_code=400, detail="Binding already exists")
+        logger.debug("Issuing new Telegram link code for user %s", user.id)
 
         # We create a new link code for the user.
         code, expires_at = await issue_link_code(
-            user_id=user.id, session=session, provider=SURFACE_TELEGRAM
+            user_id=user.id, provider=SURFACE_TELEGRAM, session=session
         )
+        logger.debug("New Telegram link code issued for user %s: %s", user.id, code)
         return TelegramLinkCodeRead(
             code=code,
             expires_at=expires_at,
