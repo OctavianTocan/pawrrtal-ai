@@ -24,7 +24,34 @@ MAX_RETRIES = 5
 RETRY_DELAY_SECONDS = 5
 
 
-engine_kwargs = {"connect_args": {"check_same_thread": False}} if settings.is_sqlite else {}
+if settings.is_sqlite:
+    engine_kwargs: dict[str, object] = {"connect_args": {"check_same_thread": False}}
+else:
+    # Managed Postgres (Railway, Neon, etc.) silently evicts idle TCP
+    # connections well before libpq's default keepalive (~2h) kicks in.
+    # Without pre-ping / recycle, the pool hands a dead SSL socket to the
+    # first checkout after an idle window and the query fails with
+    # ``SSL SYSCALL error: EOF detected``. Three layers, in priority order:
+    #   1. ``pool_pre_ping`` — ping on checkout, reconnect transparently on
+    #      a dead socket. This alone fixes the failure mode.
+    #   2. ``pool_recycle`` — proactively tear down connections older than
+    #      30 min so they never reach the provider's internal lifetime.
+    #   3. ``keepalives*`` — keep the socket warm on the wire so idle
+    #      middleboxes (proxies, NAT) never evict it in the first place.
+    # ``connect_timeout`` / ``pool_timeout`` bound recovery so a stuck
+    # handshake or pool exhaustion fails fast instead of hanging the caller.
+    engine_kwargs = {
+        "pool_pre_ping": True,
+        "pool_recycle": 1800,
+        "pool_timeout": 10,
+        "connect_args": {
+            "connect_timeout": 10,
+            "keepalives": 1,
+            "keepalives_idle": 30,
+            "keepalives_interval": 10,
+            "keepalives_count": 5,
+        },
+    }
 
 
 class User(SQLAlchemyBaseUserTableUUID, Base):
