@@ -1,0 +1,196 @@
+---
+title: xAI (Grok) provider — start on openai-compat, swap to official xai-sdk
+description: ADR — add Grok 4.3 as a chat provider via OpenAI-compatible chat-completions, then swap to the first-party xai-sdk (gRPC) once xAI-only surfaces and Live Search deprecation forced the issue.
+---
+
+# ADR: xAI (Grok) provider — start on openai-compat, swap to official xai-sdk
+
+- **Date:** 2026-05-18
+- **Owners:** OctavianTocan
+- **PRs:** [#314](https://github.com/OctavianTocan/pawrrtal/pull/314) (initial integration), [#324](https://github.com/OctavianTocan/pawrrtal/pull/324) (SDK swap)
+
+<Callout type="info" title="Status: Accepted">
+Grok 4.3 ships as a Pawrrtal chat provider. After landing on the
+OpenAI-compatible chat-completions surface, the provider was rebuilt on
+xAI's official `xai-sdk` (gRPC). Each chat provider in Pawrrtal now sits
+on its vendor's first-party SDK: Claude → `claude-agent-sdk`, Gemini →
+`google-genai`, xAI → `xai-sdk`.
+</Callout>
+
+## Context
+
+Pawrrtal's chat-provider abstraction (`backend/app/core/providers/`)
+hides each vendor behind an `AILLM` class that builds a per-request
+`StreamFn` for `agent_loop`. Adding Grok meant adding a fourth class
+alongside `ClaudeLLM`, `GeminiLLM`, and `LiteLLMLLM`.
+
+The obvious first move was xAI's **OpenAI-compatible chat-completions
+endpoint** at `https://api.x.ai/v1`. That's the path xAI's docs lead
+with, and the `openai` Python SDK was already available in the voice
+extras for the Whisper transcriber. PR #314 went out on that surface.
+
+Three problems surfaced almost immediately, all involving xAI-only
+fields the openai SDK does not model:
+
+1. **`reasoning_effort`.** Grok 4.3 accepts `"low"` or `"high"` and
+   400s on anything else. The openai SDK has no first-class field
+   for this; the only way through is `extra_body={"reasoning_effort": ...}`,
+   which is a stringly-typed escape hatch.
+2. **`reasoning_content` deltas.** Grok streams chain-of-thought in
+   `delta.reasoning_content` on every reasoning turn. The openai
+   SDK's `ChoiceDelta` doesn't declare the field, so reading it
+   requires configuring `ChoiceDelta` with `extra='allow'` and then
+   `getattr`-ing. The initial PR dropped these deltas entirely —
+   the frontend's existing thinking pane (wired for Gemini) never
+   lit up for Grok until a follow-up commit fixed it.
+3. **Cost.** xAI streams a terminal `usage` chunk with token counts
+   plus `cost_in_usd_ticks` (where one tick = `1e-10` USD), but
+   only if you ask for it with `stream_options={"include_usage": True}`
+   — another openai-side knob that xAI's docs only mention in passing.
+   Pawrrtal's per-user cost ledger saw zero spend on every Grok
+   turn until a third follow-up commit wired this up.
+
+Each fix-forward in #314 worked, but the pattern was telling: every
+xAI-specific behaviour required reaching past the openai SDK's type
+system. Then the deciding constraint landed: **xAI deprecated Live
+Search on the chat-completions endpoint** (May 2026). Live Search
+only survives on the Responses API surface, which the openai SDK
+does not model at all. Continuing to drive Grok through `openai`
+meant being on a sunset track *and* paying the `extra_body` /
+`extra='allow'` tax forever.
+
+## Decision
+
+**Swap the xAI provider onto the official `xai-sdk` (gRPC) library.**
+Concretely:
+
+- `backend/pyproject.toml` — drop `openai` from core deps (back to
+  the `voice` extras where it stays for Whisper), add
+  `xai-sdk>=1.12.0`. Add an `xai_sdk.*` mypy override (matching the
+  `mcp.*` / `markitdown.*` pattern) because the SDK ships generated
+  protobuf classes without a `py.typed` marker.
+- `backend/app/core/providers/xai_provider.py` — rebuild on
+  `xai_sdk.AsyncClient`. Each `stream()` call runs through an
+  `async with AsyncClient(api_key=...) as client:` block so the gRPC
+  channel closes deterministically after every request and we don't
+  leak file descriptors on long-running uvicorn workers.
+- Split into `_xai_messages.py` (request shaping), `_xai_stream.py`
+  (chunk → `LLMEvent` translation, usage accumulation), and
+  `_xai_events.py` (`AgentEvent` → `StreamEvent`). Keeps the public
+  provider module under the 500-line file budget enforced by
+  `scripts/check-file-lines.mjs`.
+- **System prompt as `ROLE_DEVELOPER`.** xai-sdk exposes
+  `chat_pb2.Role.ROLE_DEVELOPER` as the modern role for system
+  instructions on grok-4.1+; the server downgrades to `ROLE_SYSTEM`
+  for older models, so we always render with the newer role.
+- **Tool calls emitted after the stream completes.** xai-sdk
+  accumulates tool calls into `Response.tool_calls` regardless of
+  whether the wire delivered each call atomically or fragmented
+  across chunks. Reading the accumulated response after the loop
+  sidesteps the chunk-stitching question the openai-compat path
+  would have to answer eventually. Assistant messages with
+  `tool_calls` build the proto directly because xai-sdk's
+  `assistant()` helper doesn't expose `tool_calls` (only text /
+  image / file `Content`).
+- **Typed `reasoning_effort`.** `_map_reasoning_effort` now produces
+  `chat_pb2.ReasoningEffort` enum values instead of strings for
+  `extra_body`. Pawrrtal's 4-level UI knob (`low | medium | high
+  | extra-high`) still collapses to Grok 4.3's 2 levels:
+  `low | medium → EFFORT_LOW`, `high | extra-high → EFFORT_HIGH`.
+- **Typed `reasoning_content`.** `Chunk.reasoning_content` is a
+  declared field, no `extra='allow'` needed. Surfaced as
+  `LLMThinkingDeltaEvent` so the existing thinking pane works for
+  Grok the same way it does for Gemini.
+- **Typed cost.** `Response.cost_usd` is already converted from
+  `cost_in_usd_ticks` per `xai_sdk/cost.py` (citing
+  `xai-proto/proto/xai/api/v1/usage.proto`). The `USD_PER_TICK = 1e-10`
+  constant the openai-compat path carried locally is gone — the
+  SDK does the conversion. The `UsageAccumulator` consumes a typed
+  `UsageRecord` and `XaiLLM.stream` emits the terminal
+  `StreamEvent(type="usage")` shape `agent_loop` already knows how
+  to fold into the cost ledger via `record_turn_cost_if_enabled`.
+
+The provider stays tool-agnostic per
+`.claude/rules/architecture/no-tools-in-providers.md`; tool
+composition lives in `backend/app/api/chat.py` exactly as it does
+for Gemini and Claude.
+
+### Speech-to-text is unaffected
+
+`xai-sdk` does not expose audio / speech-to-text. `backend/app/api/stt.py`
+continues to call `POST https://api.x.ai/v1/stt` over `httpx`, the
+same way it did before #314 — the swap is a no-op for STT.
+
+## Consequences
+
+### Good
+
+- One sentence we can now say honestly: *every Pawrrtal chat provider
+  sits on its vendor's first-party SDK*. Each provider evolves on its
+  vendor's release cadence; no shared HTTP-compat layer to abstract
+  over.
+- Typed access to every xAI-only surface — `reasoning_effort` proto
+  enum, `Chunk.reasoning_content`, `SearchParameters`,
+  `response.cost_usd` already tick-converted. The mypy seam is
+  cleaner; no `extra_body` / `extra='allow'` runtime escape hatches.
+- Survives upstream's Live-Search-on-Chat-Completions deprecation —
+  the SDK exposes `SearchParameters` on the Responses API and
+  related surfaces.
+- Opens the door to the Responses API (`web_search` server-tool,
+  deferred completion, multi-turn `previous_response_id`) as
+  follow-up PRs without another wire-library swap.
+- `openai` drops out of core dependencies. It returns to the `voice`
+  extras where the Whisper backend uses it, and the core-deps surface
+  stays vendor-aligned.
+
+### Bad / accepted tradeoffs
+
+- `xai-sdk` ships generated protobuf classes without a `py.typed`
+  marker. We add an `xai_sdk.*` mypy override and do narrow type
+  checking at the provider seam — the same pattern we use for
+  `mcp.*` and `markitdown.*`. Acceptable but worth noting if the SDK
+  ever surprises us.
+- gRPC is a heavier dependency surface than HTTP-over-`httpx`. The
+  `async with AsyncClient(...)` block per request is the explicit
+  guard against channel-leak issues on long-running workers.
+- Pawrrtal's 4-level reasoning UI is wider than Grok 4.3's 2-level
+  enum; users selecting `medium` or `extra-high` get `low` or `high`
+  on the wire. Documented in `_map_reasoning_effort` and in the
+  integration guide.
+
+### Open follow-ups
+
+- Migrate the xAI provider to the **Responses API** for `web_search`
+  server-tool, deferred completion, and multi-turn
+  `previous_response_id`. No wire-library swap needed — the same
+  `xai-sdk` client exposes the surface.
+- Bridge `xai_sdk.chat.image` for multimodal image inputs.
+  `XaiLLM.stream` currently accepts the `images` argument for
+  protocol parity and logs-and-drops a non-empty list.
+
+## Alternatives considered
+
+- **Stay on the openai-compat surface.** Loses typed access to every
+  xAI-only field and is on a deprecation track for Live Search. Each
+  new xAI surface would need another `extra_body` workaround. Rejected.
+- **Hand-roll a thin httpx client against xAI's REST surface.**
+  Would mean re-implementing tool-call accumulation, reasoning-content
+  parsing, and cost conversion locally. The official SDK already does
+  all three. Rejected on "check official tools first"
+  (`.claude/rules/general/check-official-docs-and-skills-first.md`).
+- **Route Grok through LiteLLM** (the same path the OpenAI provider
+  uses). LiteLLM's xAI support is feature-incomplete on reasoning
+  and search parameters. `model_id.CANONICAL_HOST` keeps the native
+  `Host.xai` as the canonical host for `Vendor.xai` for exactly this
+  reason; LiteLLM stays available as a fallback but isn't the
+  default route.
+
+## References
+
+- xai-sdk on GitHub: <https://github.com/xai-org/xai-sdk-python>
+- xAI docs index: <https://docs.x.ai>
+- Grok 4.3 model card: <https://docs.x.ai/docs/models/grok-4-3>
+- Canonical model-ID ADR:
+  [`2026-05-14-model-id-canonical-format-and-backend-catalog`](./2026-05-14-model-id-canonical-format-and-backend-catalog)
+- Architecture rule: `.claude/rules/architecture/no-tools-in-providers.md`
+- File-line budget: `scripts/check-file-lines.mjs`

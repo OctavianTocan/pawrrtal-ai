@@ -1,62 +1,15 @@
 """TelegramChannel — progressive message-edit delivery via aiogram.
 
-Unlike SSEChannel, which pushes bytes to an HTTP transport, TelegramChannel
-delivers by calling ``bot.edit_message_text`` as chunks arrive.  There is no
-byte stream to return — delivery is entirely a side-effect.  The method is
-still typed as ``AsyncIterator[bytes]`` (the Channel protocol's common
-denominator) and simply yields nothing.
+Delivers LLM stream events by calling ``bot.edit_message_text`` / aiogram
+methods as chunks arrive.  All delivery is a side-effect; the async iterator
+yields nothing.
 
-Delivery contract
------------------
-The caller (bot.py's ``_on_message`` dispatcher function) is responsible for:
+Debounce: edits fire when ``_EDIT_DEBOUNCE_CHARS`` new chars accumulate
+or ``_MAX_EDIT_INTERVAL_S`` seconds elapse.  Final edit always fires.
 
-1. Sending the initial placeholder message (``"⏳"``) and capturing its
-   ``message_id``.
-2. Building a ``ChannelMessage`` with the following ``metadata`` keys:
-
-   - ``bot``: the live ``aiogram.Bot`` instance.
-   - ``chat_id``: Telegram chat ID (int or str).
-   - ``message_id``: ID of the placeholder message to edit progressively.
-
-3. Calling ``channel.deliver(provider.stream(...), channel_msg)`` and
-   consuming the resulting async iterator to drive delivery:
-   ``async for _ in channel.deliver(...): pass``.
-
-Debounce
---------
-Telegram's flood control allows roughly 20 edits per minute per chat (one
-every ~3 seconds).  We debounce by *character growth*: an edit is sent when
-either ``_EDIT_DEBOUNCE_CHARS`` new characters have accumulated **or**
-``_MAX_EDIT_INTERVAL`` seconds have elapsed since the last edit.  A final
-edit is always sent after the stream ends to ensure the user sees the
-complete text.
-
-Non-text outcomes
------------------
-The stream may end without ever emitting a ``delta`` (e.g. the agent loop's
-safety layer tripped ``max_iterations`` because the model looped on tool
-calls, or the provider raised). In those cases the placeholder ⏳ would
-otherwise sit forever — the user has no signal the turn ended. To prevent
-that, the channel watches for two structured terminal events and reports
-them in-chat:
-
-- ``agent_terminated`` → placeholder is replaced with the loop's human copy
-  prefixed by ``⚠️``.
-- ``error`` → placeholder is replaced with the error content prefixed by
-  ``❌``.
-
-A fallback message is shown when the turn closes without anything to say:
-
-- The stream produced no text and no terminal event ("empty stream").
-- The stream produced tool calls but no answer text and no thinking
-  trace ("tool-only turn" — see #293).
-
-Error handling
---------------
-``TelegramBadRequest: message is not modified`` is swallowed — it's benign
-and happens when the model emits an empty delta between two flush points.
-All other errors are logged as warnings but do not raise; a partial response
-visible to the user is better than a silent failure.
+Non-text outcomes (agent_terminated, error) replace the ⏳ placeholder
+with a user-facing message.  "Empty stream" and "tool-only turn" (#293)
+also surface a closing reply so the user always knows the turn ended.
 """
 
 from __future__ import annotations
@@ -67,25 +20,37 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from app.core.config import settings
 from app.core.providers.base import StreamEvent
 from app.core.tools.send_message import SendFn
 
 from ._telegram_dispatch import (
+    DraftStreamState,
+    ToolLineState,
     capture_terminal_event,
     dispatch_text_delta,
     finalize_turn_delivery,
     handle_thinking,
+    handle_tool_result,
     handle_tool_use,
     prepare_thinking_block,
     prepare_tools_block,
 )
+from ._telegram_draft import _TEXT_DRAFT_ID
 from .base import ChannelMessage
 from .telegram_delivery import (
     final_reply_text,
     optional_int,
     routing_kwargs,
+    safe_edit_html,
 )
 from .telegram_html import md_to_telegram_html
+from .telegram_progress import (
+    ProgressState,
+    render_initial,
+    render_starting,
+    render_working,
+)
 
 if TYPE_CHECKING:
     from aiogram import Bot
@@ -126,7 +91,7 @@ class TelegramChannel:
 
     surface: str = SURFACE_TELEGRAM
 
-    async def deliver(
+    async def deliver(  # noqa: PLR0915
         self,
         stream: AsyncIterator[StreamEvent],
         message: ChannelMessage,
@@ -154,6 +119,21 @@ class TelegramChannel:
         message_thread_id = optional_int(meta.get("message_thread_id"))
 
         tool_trace = ""
+        # Per-tool state dict for Workstream 4 success/failure timing.
+        # Keyed by tool call_id; maps to ToolLineState so tool_result
+        # events can mutate in-flight lines to show timing/errors.
+        tool_states: dict[str, ToolLineState] = {}
+        # Workstream 1: draft streaming state. Created only when the flag
+        # is enabled so the legacy editMessageText path is unchanged.
+        draft_state: DraftStreamState | None = (
+            DraftStreamState(
+                chat_id=chat_id,
+                draft_id=_TEXT_DRAFT_ID,
+                message_thread_id=message_thread_id,
+            )
+            if settings.telegram_use_draft_streaming
+            else None
+        )
         # ``tool_message_id`` starts as the placeholder so the FIRST tools
         # block consumes the ⏳; on a thinking→tools transition (issue #288)
         # we open a fresh Telegram message for the new tools block and
@@ -195,8 +175,32 @@ class TelegramChannel:
         terminal_message: str | None = None
         terminal_prefix: str = ""
 
+        # Workstream 2: content-preview-in-placeholder state machine.
+        # We update the ⏳ placeholder progressively before real content
+        # arrives so the user always sees a meaningful status string.
+        # ``progress_state`` tracks which transition has already fired;
+        # ``progress_model`` and ``progress_tool_count`` are set by the
+        # metadata block at the top (when available) or lazily from events.
+        progress_state: ProgressState = ProgressState.INITIAL
+        progress_model: str = str(message.get("model_id") or "")
+        progress_tool_count: int = 0
+        # Emit the initial placeholder content immediately so the ⏳ is
+        # replaced with a friendlier string before the first event lands.
+        await safe_edit_html(bot, chat_id, message_id, render_initial())
+
         async for event in stream:
             etype = event.get("type")
+
+            # Workstream 2: advance placeholder to STARTING on the first
+            # real event when we haven't emitted the tools block yet.
+            if progress_state == ProgressState.INITIAL and first_block_kind is None:
+                progress_state = ProgressState.STARTING
+                await safe_edit_html(
+                    bot,
+                    chat_id,
+                    message_id,
+                    render_starting(progress_model, progress_tool_count),
+                )
 
             if etype == "tool_use":
                 first_block_kind = first_block_kind or "tools"
@@ -225,6 +229,20 @@ class TelegramChannel:
                     tool_trace=tool_trace,
                     chars_since_edit=chars_since_edit,
                     last_edit_at=last_edit_at,
+                    tool_states=tool_states,
+                )
+                continue
+
+            if etype == "tool_result":
+                tool_trace, chars_since_edit, last_edit_at = await handle_tool_result(
+                    event=event,
+                    bot=bot,
+                    chat_id=chat_id,
+                    message_id=tool_message_id,
+                    tool_trace=tool_trace,
+                    chars_since_edit=chars_since_edit,
+                    last_edit_at=last_edit_at,
+                    tool_states=tool_states,
                 )
                 continue
 
@@ -250,6 +268,17 @@ class TelegramChannel:
             if etype == "delta":
                 chunk: str = event.get("content", "")
                 answer_text += chunk
+                # Workstream 2: show a content preview while streaming into
+                # the placeholder (pure-text turns where no tool/thinking
+                # block has consumed the placeholder yet).
+                if progress_state == ProgressState.STARTING and first_block_kind is None and chunk:
+                    progress_state = ProgressState.WORKING
+                    await safe_edit_html(
+                        bot,
+                        chat_id,
+                        message_id,
+                        render_working(answer_text),
+                    )
                 (
                     text_buffer,
                     text_message_id,
@@ -267,6 +296,7 @@ class TelegramChannel:
                     last_edit_at=text_last_edit_at,
                     reply_to_message_id=reply_to_message_id,
                     message_thread_id=message_thread_id,
+                    draft_state=draft_state,
                 )
                 if rendered:
                     first_block_kind = first_block_kind or "text"
@@ -288,8 +318,11 @@ class TelegramChannel:
         # closing answer_text duplicate. Any terminal_message (error /
         # agent_terminated) still flushes — those are not part of the
         # in-band text stream.
+        # In draft mode text_message_id is always None; use the draft's
+        # accumulated buffer to skip duplicating the text in final_reply_text.
+        has_draft_content = draft_state is not None and draft_state.last_html
         final_text = final_reply_text(
-            answer_text="" if text_message_id is not None else answer_text,
+            answer_text="" if (text_message_id is not None or has_draft_content) else answer_text,
             terminal_message=terminal_message,
             terminal_prefix=terminal_prefix,
         )
@@ -306,6 +339,7 @@ class TelegramChannel:
             final_text=final_text,
             reply_to_message_id=reply_to_message_id,
             message_thread_id=message_thread_id,
+            draft_state=draft_state,
         )
 
         # No bytes to yield — delivery is a side-effect only.

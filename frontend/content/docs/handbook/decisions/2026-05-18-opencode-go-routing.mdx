@@ -1,0 +1,229 @@
+---
+title: Route GLM-5.1 and Kimi K2.6 through the OpenCode Go gateway
+description: ADR — adopt SST's hosted OpenAI-compatible gateway as the single path to z.ai (GLM) and Moonshot (Kimi) coding models, behind a thin async-OpenAI provider.
+---
+
+# ADR: Route GLM-5.1 and Kimi K2.6 through the OpenCode Go gateway
+
+- **Date:** 2026-05-18
+- **Owners:** OctavianTocan
+- **Tracking:** PR [#327](https://github.com/OctavianTocan/pawrrtal/pull/327), commit `83596b76`
+
+<Callout type="info" title="Status: Accepted">
+GLM-5.1 (`zai`) and Kimi K2.6 (`moonshot`) are served by SST's
+hosted OpenAI-compatible gateway at `https://opencode.ai/zen/go/v1`.
+A new `OpencodeGoLLM` provider — a thin `openai.AsyncOpenAI` adapter
+on the existing `StreamFn` seam — handles both. New `Vendor.zai`,
+`Vendor.moonshot`, and `Host.opencode_go` enum members slot into the
+canonical `[host:]vendor/model` wire format. `OPENCODE_API_KEY` is a
+workspace-overridable env key.
+</Callout>
+
+## Context
+
+The model surface in `MODEL_CATALOG` covers Anthropic (via
+`agent-sdk`), Google (via `google-ai`), OpenAI (via `litellm`), and
+xAI (via the native `xai` gRPC host). Two requests on the menu —
+**GLM-5.1** (z.ai) and **Kimi K2.6** (Moonshot) — are open-weight
+coding models that neither ship a first-party Python SDK we want to
+adopt nor sit behind one of the existing hosts. Wiring them up
+naively means picking a Python client per vendor, learning two more
+streaming-event shapes, and maintaining the translation glue forever.
+
+SST publishes a hosted gateway, **OpenCode Go**, at
+`https://opencode.ai/zen/go/v1` that fronts these open-weight models
+behind a plain OpenAI Chat Completions API. The upstream catalogue
+at
+[`sst/models.dev/providers/opencode-go/provider.toml`](https://github.com/sst/models.dev/blob/dev/providers/opencode-go/provider.toml)
+declares it as the standard OpenAI protocol — same request envelope,
+same SSE chunks, same `tool_calls` accumulator shape. It also
+carries one model on a different protocol (MiniMax M2.7 over the
+Anthropic wire), which is explicitly out of scope here.
+
+Constraint from the existing model-ID ADR
+([2026-05-14](./2026-05-14-model-id-canonical-format-and-backend-catalog)):
+every model has a single canonical `host:vendor/model` wire form and
+the dispatch happens via `HOST_TO_PROVIDER`. Adding GLM and Kimi
+needs to extend `Vendor`, `Host`, and the canonical-host table, not
+introduce a parallel routing concept.
+
+## Decision
+
+### 1. New host: `opencode-go`
+
+```python title="backend/app/core/providers/model_id.py"
+class Vendor(StrEnum):
+    anthropic = "anthropic"
+    google    = "google"
+    moonshot  = "moonshot"   # new
+    openai    = "openai"
+    xai       = "xai"
+    zai       = "zai"        # new
+
+class Host(StrEnum):
+    agent_sdk    = "agent-sdk"
+    google_ai    = "google-ai"
+    litellm      = "litellm"
+    opencode_go  = "opencode-go"   # new
+    xai          = "xai"
+
+CANONICAL_HOST: dict[Vendor, Host] = {
+    # ...existing entries...
+    Vendor.zai:      Host.opencode_go,
+    Vendor.moonshot: Host.opencode_go,
+}
+```
+
+`zai/glm-5.1` and `moonshot/kimi-k2.6` canonicalise to
+`opencode-go:zai/glm-5.1` and `opencode-go:moonshot/kimi-k2.6` on
+the way in. The wire format invariant from the May 14 ADR holds —
+there is exactly one canonical string per `(host, vendor, model)`
+triple.
+
+### 2. Provider: `OpencodeGoLLM`
+
+A new `backend/app/core/providers/opencode_go_provider.py` mirrors
+the `GeminiLLM` shape:
+
+- `make_opencode_go_stream_fn(...)` closes over the system prompt
+  and returns a `StreamFn` the agent loop drives one turn at a
+  time.
+- The StreamFn uses `openai.AsyncOpenAI` with `base_url` and
+  `api_key` overrides, opens a `chat.completions.create(...,
+  stream=True, stream_options={"include_usage": True})`, and maps
+  streamed deltas onto the loop's neutral `LLMEvent` shape via
+  helpers in `_opencode_go_events.py` (message/tool builders,
+  reasoning-content drain, tool-call buffer, cost computation).
+- `OpencodeGoLLM` translates the resulting `AgentEvent`s to wire
+  `StreamEvent`s via the existing `agent_event_to_stream_event`
+  helper (shared with Gemini) and emits one terminal
+  `StreamEvent(type="usage")` populated from the gateway's
+  `usage` chunk so the cost ledger aggregates per request.
+
+The provider stays catalog-agnostic. The factory hydrates a
+per-model `OpencodeGoLLMConfig(cost_per_mtok_in_usd,
+cost_per_mtok_out_usd, base_url)` from the catalogue entry, so
+adding a third OpenCode-Go-served model is a one-row catalogue
+edit — no provider change.
+
+```python title="backend/app/core/providers/factory.py"
+HOST_TO_PROVIDER: dict[Host, type[AILLM]] = {
+    Host.agent_sdk:   ClaudeLLM,
+    Host.google_ai:   GeminiLLM,
+    Host.litellm:     LiteLLMLLM,
+    Host.opencode_go: OpencodeGoLLM,   # new
+    Host.xai:         XaiLLM,
+}
+```
+
+### 3. Catalogue entries
+
+GLM-5.1 and Kimi K2.6 are added to `MODEL_CATALOG` with per-Mtok
+rates mirrored from upstream's `[cost]` blocks:
+
+| Wire ID | In ($/Mtok) | Out ($/Mtok) |
+|---|---:|---:|
+| `opencode-go:zai/glm-5.1` | 1.40 | 4.40 |
+| `opencode-go:moonshot/kimi-k2.6` | 0.95 | 4.00 |
+
+Neither is the catalogue default; the single-default invariant from
+the May 14 ADR is preserved.
+
+### 4. Settings + workspace env
+
+- `settings.opencode_api_key` (env: `OPENCODE_API_KEY`) — gateway
+  global, empty by default.
+- `settings.opencode_go_base_url` — defaults to
+  `https://opencode.ai/zen/go/v1`; override only for a self-hosted
+  proxy.
+- `OPENCODE_API_KEY` is added to
+  `backend/app/core/keys.py:OVERRIDABLE_KEYS` and the
+  `_SETTINGS_ATTR_MAP` so per-workspace overrides resolve through
+  the same encrypted-env path as `EXA_API_KEY`, `XAI_API_KEY`,
+  `OPENAI_API_KEY`. The Settings UI surfaces the new row via the
+  frontend label registry in
+  `frontend/features/settings/workspace-env/use-workspace-env.ts`
+  and `WorkspacesSection.tsx`.
+
+### 5. `openai>=1.0.0` becomes a core dependency
+
+The `openai` SDK was previously an optional voice extra in
+`backend/pyproject.toml`. It is promoted to a core dependency so a
+clean `uv sync` is enough to reach the gateway.
+
+## Consequences
+
+### Good
+
+- One canonical path to two open-weight coding models with no
+  vendor-specific Python SDK to maintain. The protocol is plain
+  OpenAI Chat Completions; the gateway absorbs differences upstream.
+- The `StreamFn` seam is unchanged. `ScriptedStreamFn`-based tests
+  cover the provider via
+  [`agent-loop-testing-philosophy.md`](../../../../../.claude/rules/testing/agent-loop-testing-philosophy.md)
+  the same way they cover Gemini.
+- Adding more OpenCode-Go-served models is a catalogue edit. No
+  provider change, no `HOST_TO_PROVIDER` change, no settings change.
+- Per-workspace `OPENCODE_API_KEY` slots into the existing
+  encrypted-env path. No new auth surface.
+
+### Bad / accepted tradeoffs
+
+- One more LLM class to maintain alongside Gemini, Claude, xAI,
+  LiteLLM. The duplication is bounded — message/tool builders,
+  reasoning drain, and cost computation are extracted into
+  `_opencode_go_events.py` and are unit-testable as pure functions.
+- The provider does not currently translate `reasoning_effort` to a
+  request parameter — the gateway exposes interleaved reasoning
+  unconditionally on these models. Protocol parity is preserved at
+  the `AILLM` signature; the knob is just inert.
+- GLM-5.1 advertises text-only inputs. Kimi K2.6 accepts images
+  upstream, but the chat router's image plumbing for this provider
+  is deferred — a non-empty `images` list is logged and ignored for
+  now.
+
+### Out of scope
+
+- **MiniMax M2.7.** The upstream catalogue declares it as
+  Anthropic-protocol on the same gateway. The streaming envelope,
+  tool-call shape, and reasoning-block format differ enough that it
+  belongs behind a separate adapter (likely a sibling
+  `OpencodeGoAnthropicLLM` or a flag on `ClaudeLLM`); not
+  attempted in this ADR.
+- OAuth or per-user gateway tokens. The Internal-key paste model
+  matches every other paid provider in the repo.
+
+## Alternatives considered
+
+- **First-party z.ai / Moonshot Python SDKs.** Neither vendor ships
+  a Python client we're confident maintaining. Adopting them means
+  learning two streaming shapes and writing two translation layers
+  for the same outcome.
+- **LiteLLM routing.** LiteLLM can target OpenAI-compatible
+  endpoints, and we already route OpenAI through it
+  (`Host.litellm`). It was considered for OpenCode Go but rejected
+  in line with the same reasoning that gave xAI a native host: the
+  feature surface (interleaved reasoning, gateway-specific usage
+  semantics, future Anthropic-protocol siblings) is easier to model
+  in a dedicated provider than behind a generic LiteLLM shim. If
+  the dedicated provider turns out to be pure boilerplate we can
+  collapse it later — the canonical wire format does not change.
+- **OpenRouter or Together AI.** Other multi-model gateways. The
+  commit picked OpenCode Go specifically because SST publishes a
+  versioned upstream catalogue
+  (`sst/models.dev/providers/opencode-go/provider.toml`) whose cost
+  table our `MODEL_CATALOG` can mirror line-for-line; the
+  competing gateways pull from less stable sources. <Callout type="note">TODO: confirm with author whether OpenRouter / Together were explicitly
+  weighed during the decision, or whether OpenCode Go was selected
+  on its own merits.</Callout>
+
+## Notes on what stays
+
+- The `no-tools-in-providers` rule
+  ([`architecture/no-tools-in-providers.md`](../../../../../.claude/rules/architecture/no-tools-in-providers.md))
+  is unchanged. `OpencodeGoLLM` accepts `tools` as a passthrough
+  argument; tool composition continues to live in the chat router.
+- The model-ID validator still owns the structural gate. Malformed
+  `opencode-go:bogus/...` strings 422 at the FastAPI boundary;
+  well-formed-but-unknown IDs raise `UnknownModelId` via
+  `_build_opencode_go`'s catalogue lookup.

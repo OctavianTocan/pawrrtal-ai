@@ -1,5 +1,15 @@
 # ![logo](assets/pawrrtal-icon.png "logo") Pawrrtal
 
+```
+▗▄▄▖  ▗▄▖ ▗▖ ▗▖▗▄▄▖ ▗▄▄▖▗▄▄▄▖▗▄▖ ▗▖        ▗▄▖ ▗▄▄▄▖
+▐▌ ▐▌▐▌ ▐▌▐▌ ▐▌▐▌ ▐▌▐▌ ▐▌ █ ▐▌ ▐▌▐▌       ▐▌ ▐▌  █  
+▐▛▀▘ ▐▛▀▜▌▐▌ ▐▌▐▛▀▚▖▐▛▀▚▖ █ ▐▛▀▜▌▐▌       ▐▛▀▜▌  █  
+▐▌   ▐▌ ▐▌▐▙█▟▌▐▌ ▐▌▐▌ ▐▌ █ ▐▌ ▐▌▐▙▄▄▖    ▐▌ ▐▌▗▄█▄▖
+
+
+
+```
+
 <p align="center">
   <a href="docs/assets/header.mp4" title="Click for the full-resolution MP4">
     <img src="docs/assets/header.gif" alt="Pawrrtal demo" width="100%" />
@@ -22,7 +32,7 @@ This README documents the current `development` branch feature surface. Some fea
 
 Always-on core: web chat, conversations, model catalog, workspaces, workspace file APIs, artifact rendering, MarkItDown conversion, current-time tool, task tools, skill discovery tools, cost/audit APIs, health probes, and settings sections that are wired in the frontend.
 
-Key-gated: Claude (`CLAUDE_CODE_OAUTH_TOKEN`), Gemini (`GEMINI_API_KEY`), Exa search (`EXA_API_KEY`), image generation (`OPENAI_CODEX_OAUTH_TOKEN`), xAI STT (`XAI_API_KEY`), Mistral/OpenAI voice backends, Notion (`NOTION_API_KEY`), Telegram (`TELEGRAM_BOT_TOKEN` + `TELEGRAM_BOT_USERNAME`), OAuth providers, and webhook secrets.
+Key-gated: Claude (`CLAUDE_CODE_OAUTH_TOKEN`), Gemini (`GEMINI_API_KEY`), xAI Grok (`XAI_API_KEY`), OpenAI chat via LiteLLM (`OPENAI_API_KEY`), OpenCode Go gateway (`OPENCODE_API_KEY`), Exa search (`EXA_API_KEY`), image generation (`OPENAI_CODEX_OAUTH_TOKEN`), xAI STT (`XAI_API_KEY`), Mistral/OpenAI voice backends, Notion (`NOTION_API_KEY`), Telegram (`TELEGRAM_BOT_TOKEN` + `TELEGRAM_BOT_USERNAME`), OAuth providers, and webhook secrets.
 
 Feature-flagged or off by default: LCM (`LCM_ENABLED=false`), scheduler (`SCHEDULER_ENABLED=false`), webhook receiver (`WEBHOOK_API_ENABLED=false`), chat rate limiting (`CHAT_RATE_LIMIT_PER_MINUTE=0`), Claude sandboxing (`CLAUDE_SANDBOX_ENABLED=false`), and in-process Python (`VIRTUAL_PYTHON_ENABLED=false`).
 
@@ -34,8 +44,8 @@ Known caveats: Apple OAuth callback is currently stubbed and returns 501. The ev
 
 ### Agent runtime
 
-- **Multi-provider model catalog**: Anthropic Claude through `claude-agent-sdk` and Google Gemini through `google-genai`, both behind one `AILLM` protocol.
-- **Current catalog entries**: Claude Opus 4.7, Claude Sonnet 4.6, Claude Haiku 4.5, Gemini 3 Flash Preview (default), and Gemini 3.1 Flash Lite Preview.
+- **Multi-provider model catalog**: Anthropic Claude through `claude-agent-sdk`, Google Gemini through `google-genai`, xAI Grok through the official `xai-sdk` (gRPC), OpenAI chat models routed through the in-process LiteLLM SDK, and SST's OpenCode Go gateway (OpenAI-compatible) fronting open-weight coding models — all behind one `AILLM` protocol.
+- **Current catalog entries**: Claude Opus 4.7, Claude Sonnet 4.6, Claude Haiku 4.5, Gemini 3 Flash Preview (default), Gemini 3.1 Flash Lite Preview, Grok 4.3, GPT-4o, GPT-4o mini, OpenAI o1, o1 mini, o3 mini, GLM-5.1 (z.ai, via OpenCode Go), and Kimi K2.6 (Moonshot, via OpenCode Go).
 - **Canonical model IDs**: `host:vendor/model` IDs are used across the API, DB, logs, frontend, and Telegram picker.
 - **Per-conversation model override**: Web and Telegram conversations can persist their own model choice.
 - **Reasoning effort selection**: Web chat forwards the selected reasoning level on each turn.
@@ -53,7 +63,7 @@ Known caveats: Apple OAuth callback is currently stubbed and returns 501. The ev
 - **Chat composer**: Controlled text composer with model picker, reasoning selector, image attachment handling, prompt suggestions, blocked-state messaging, and onboarding recovery.
 - **SSE event handling**: The frontend parses `delta`, `thinking`, `tool_use`, `tool_result`, `artifact`, `error`, and `agent_terminated` stream events.
 - **Conversation UI**: Shows assistant content, thinking, tool-call timeline, thinking duration, failed/streaming states, copy controls, and regenerate controls.
-- **Artifacts**: `render_artifact` tool calls are lifted into dedicated artifact SSE events for structural client rendering.
+- **Artifacts**: `render_artifact` tool calls are lifted into dedicated artifact SSE events for structural client rendering. The artifact catalog includes interactive widgets — `ActionButton`, `ChoiceGroup`, `TextField`, and `NumberField` — that submit back into chat as follow-up user messages, with a stable `actionId` so the model can match interactions deterministically. Interactive widgets are gated to the web/electron surfaces; Telegram receives the read-only catalog so the model never emits unrenderable widgets.
 - **Background recovery hooks**: In-flight prompts are tracked so interrupted streams can be recovered.
 - **Whimsy/appearance overlay**: Chat and settings surfaces react to appearance texture settings.
 
@@ -87,7 +97,8 @@ Telegram is a first-class channel, not just a notification bridge.
 - **Skill listing**: The workspace skill endpoint reads `skills/_manifest.jsonl` and falls back to directory discovery.
 - **Encrypted workspace env**: Each workspace has its own Fernet-encrypted `.env` file with `0600` permissions.
 - **Env resolution order**: workspace override, then gateway fallback where supported, then absent.
-- **Overridable keys**: `GEMINI_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, `EXA_API_KEY`, `XAI_API_KEY`, `OPENAI_CODEX_OAUTH_TOKEN`, and `NOTION_API_KEY`.
+- **Overridable keys**: `GEMINI_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, `OPENAI_API_KEY`, `XAI_API_KEY`, `OPENCODE_API_KEY`, `EXA_API_KEY`, `OPENAI_CODEX_OAUTH_TOKEN`, and `NOTION_API_KEY`.
+- **`HEARTBEAT.md`**: Workspace-authored YAML front-matter file that declares cron-scheduled "check" prompts. `POST /api/v1/heartbeat/sync` parses it, ensures a dedicated heartbeat conversation exists, and reconciles `scheduled_jobs` rows so each check fires an agent turn into that conversation (and fans out to Telegram when the channel is linked). Cron expressions are validated against APScheduler at parse time.
 
 ### Agent tools
 
@@ -211,7 +222,7 @@ Placeholder settings sections currently listed in the nav but not fully wired:
 | Frontend    | Next.js 16, React 19, Tailwind v4, TanStack Query, Fumadocs |
 | Backend     | FastAPI, Python 3.13, SQLAlchemy 2 async, Alembic, fastapi-users |
 | Database    | PostgreSQL (prod, Railway), SQLite + aiosqlite (tests / fresh dev) |
-| Providers   | `claude-agent-sdk` (Anthropic), `google-genai` (Gemini) |
+| Providers   | `claude-agent-sdk` (Anthropic), `google-genai` (Gemini), `xai-sdk` (Grok, gRPC), `litellm` (OpenAI chat), OpenCode Go gateway (GLM-5.1, Kimi K2.6) |
 | Channels    | aiogram (Telegram polling or webhook), SSE (web/electron) |
 | Voice        | xAI STT, Mistral Voxtral, OpenAI Whisper, local whisper.cpp |
 | Encryption  | Fernet (workspace `.env`) |
@@ -302,8 +313,11 @@ WORKSPACE_SETTINGS_FILENAME=.claude/settings.json
 # Providers and tool keys
 GEMINI_API_KEY=
 CLAUDE_CODE_OAUTH_TOKEN=
+OPENAI_API_KEY=                  # OpenAI chat via LiteLLM
+XAI_API_KEY=                     # Grok chat + xAI STT
+OPENCODE_API_KEY=                # SST OpenCode Go gateway (GLM-5.1, Kimi K2.6)
+OPENCODE_GO_BASE_URL=https://opencode.ai/zen/go/v1
 EXA_API_KEY=
-XAI_API_KEY=
 OPENAI_CODEX_OAUTH_TOKEN=        # workspace-only by default
 NOTION_API_KEY=                  # workspace-only plugin key
 
@@ -564,6 +578,7 @@ GET    /api/v1/audit/summary
 GET    /api/v1/scheduled-jobs/
 POST   /api/v1/scheduled-jobs/                  # scheduler enabled only
 DELETE /api/v1/scheduled-jobs/:id
+POST   /api/v1/heartbeat/sync                   # reconcile HEARTBEAT.md → scheduled_jobs
 POST   /webhooks/:provider                      # webhook API enabled only
 GET    /api/v1/health
 GET    /api/v1/health/ready

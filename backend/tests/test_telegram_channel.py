@@ -175,14 +175,23 @@ class TestTelegramChannelDeliver:
         channel = TelegramChannel()
         async for _ in channel.deliver(_stream(), msg):
             pass
-        bot.edit_message_text.assert_called_once()
-        call = bot.edit_message_text.call_args
-        assert call.kwargs["chat_id"] == 123
-        assert call.kwargs["message_id"] == 456
-        assert "agent finished without producing a reply" in call.kwargs["text"]
+        # The placeholder is now updated progressively (render_initial first,
+        # then the fallback on empty stream).  At least one call must land
+        # with the fallback text — check the last call.
+        assert bot.edit_message_text.call_count >= 1
+        last_call = bot.edit_message_text.call_args_list[-1]
+        assert last_call.kwargs["chat_id"] == 123
+        assert last_call.kwargs["message_id"] == 456
+        assert "agent finished without producing a reply" in last_call.kwargs["text"]
 
     async def test_final_reply_sent_as_separate_message(self) -> None:
-        """Plain answer text is sent as a final reply, not streamed into the trace."""
+        """Plain answer text is sent as a final reply, not streamed into the trace.
+
+        The placeholder is updated with progress states (render_initial →
+        render_starting → render_working) before the final delete, so
+        edit_message_text WILL be called — but those are progress updates,
+        not the trace. The key assertions are delete + single send.
+        """
         bot = _make_bot()
         msg = _make_channel_message(bot, chat_id=7, message_id=99)
         channel = TelegramChannel()
@@ -192,7 +201,6 @@ class TestTelegramChannelDeliver:
 
         bot.delete_message.assert_awaited_once_with(chat_id=7, message_id=99)
         bot.send_message.assert_awaited_once_with(chat_id=7, text="hi")
-        bot.edit_message_text.assert_not_called()
 
     async def test_accumulates_deltas_into_final_reply(self) -> None:
         """Multiple deltas collapse into one final Telegram reply."""

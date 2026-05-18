@@ -1,0 +1,225 @@
+---
+title: LiteLLM SDK as a third provider class behind AILLM
+description: ADR — add `Host.litellm` and a `LiteLLMLLM` class that runs the LiteLLM Python SDK in-process to serve OpenAI chat models, text-only for v1.
+---
+
+# ADR: LiteLLM SDK as a third provider class behind AILLM
+
+- **Date:** 2026-05-18
+- **Owners:** OctavianTocan
+- **Tracking:** [PR #323](https://github.com/OctavianTocan/pawrrtal/pull/323) (this ADR); [PR #324](https://github.com/OctavianTocan/pawrrtal/pull/324) split xAI back onto its own first-party SDK.
+- **Reference:** [`2026-05-14-model-id-canonical-format-and-backend-catalog.mdx`](./2026-05-14-model-id-canonical-format-and-backend-catalog) — defines the `Host` / `Vendor` / `HOST_TO_PROVIDER` seam this ADR extends.
+
+<Callout type="info" title="Status: Accepted">
+Add a third provider class — `LiteLLMLLM` — behind the existing `AILLM`
+seam. `Host.litellm` dispatches OpenAI chat models (GPT-4o, o-series)
+through the LiteLLM Python SDK running in-process. Text-only for v1:
+`tools=` is accepted for protocol parity but logged-and-dropped.
+</Callout>
+
+## Context
+
+Pawrrtal had two chat providers when this work landed: `ClaudeLLM`
+(via `claude-agent-sdk`) and `GeminiLLM` (via `google-genai`). Both
+sit behind the `AILLM` protocol and are dispatched out of
+`HOST_TO_PROVIDER: dict[Host, type[AILLM]]` in
+`backend/app/core/providers/factory.py`. The
+[canonical model-ID ADR](./2026-05-14-model-id-canonical-format-and-backend-catalog)
+already left room for new hosts to plug into that table without
+touching the chat router or the schemas.
+
+The next vendor we wanted to support was OpenAI — GPT-4o for cheap
+generalist work and the o-series for reasoning. The obvious shape
+was "import the `openai` SDK, write a third provider class." That
+shape is fine for one vendor, but it doesn't scale: every additional
+vendor (Mistral, Cohere, Together, Groq, Fireworks, OpenRouter…)
+becomes its own SDK class, its own translation layer between agent
+loop events and the SDK's stream chunks, and its own per-vendor
+quirks. LiteLLM (`https://docs.litellm.ai/`) collapses that into one
+call surface: `litellm.acompletion(model="<provider>/<model>", ...)`
+returns OpenAI-shaped chunks for every provider it routes.
+
+The choice for this PR was therefore between three shapes:
+
+1. **One SDK per vendor.** Vendor a third `openai`-backed provider
+   class today, then a fourth, fifth, sixth as we add vendors.
+2. **LiteLLM as a separate proxy service.** Run `litellm --config` as
+   a sidecar; the backend talks OpenAI-compatible HTTP to it.
+3. **LiteLLM as an in-process SDK.** `import litellm` inside one new
+   provider class, dispatch every LiteLLM-routed vendor through it.
+
+## Decision
+
+Take option 3: add `Host.litellm` and a single `LiteLLMLLM` class
+that wraps `litellm.acompletion` in the agent-loop `StreamFn`
+pattern already used by `GeminiLLM`. Concretely:
+
+- **`Host.litellm`** added to the `Host` enum in
+  `backend/app/core/providers/model_id.py`. `Vendor.openai` (and,
+  initially, `Vendor.xai`) point at it through `CANONICAL_HOST`.
+- **`LiteLLMLLM`** in
+  `backend/app/core/providers/litellm_provider.py` — implements the
+  `AILLM` protocol by composing `make_litellm_stream_fn(...)` with
+  the shared `agent_loop`. Reuses `agent_event_to_stream_event` and
+  `identity_convert` from the Gemini provider's translation layer.
+- **`HOST_TO_PROVIDER[Host.litellm] = LiteLLMLLM`** registers the new
+  class. `resolve_llm` adds a `LiteLLMLLM`-specific construction
+  branch that passes the parsed `vendor` through to the class so the
+  same provider can fan out to multiple LiteLLM-routed vendors.
+- **Catalog entries** for the launch models — GPT-4o, GPT-4o mini,
+  o1, o1 mini, o3-mini — land in
+  `backend/app/core/providers/catalog.py` under `Host.litellm` +
+  `Vendor.openai`.
+- **API key resolution** mirrors the existing Gemini path:
+  `OPENAI_API_KEY` is looked up via `resolve_api_key(workspace_id,
+  ...)` on the per-workspace encrypted `.env` first, falling back to
+  the gateway-global `Settings.openai_api_key` field. The key is
+  surfaced in the workspace env settings UI alongside the existing
+  Gemini and Claude keys.
+- **Text-only v1.** `make_litellm_stream_fn` accepts a `tools` list
+  on every call for `AILLM` protocol parity, but logs
+  `LITELLM_TOOLS_IGNORED model=… count=…` and drops them. Same for
+  `images` and `reasoning_effort` — accepted, ignored, debug-logged.
+  The full OpenAI function-calling bridge (AgentTool → OpenAI
+  `tools` schema → tool result roundtrip) is deferred to a follow-up.
+
+The choice of in-process SDK over a proxy service is the load-bearing
+piece. The proxy variant would mean a second long-running binary in
+every deployment, its own config file, its own health checks, and
+its own restart story. The SDK variant is one `pip install` and a
+function call. If a future requirement (centralised rate limiting,
+cost ledgering, key rotation across many services) makes the proxy
+worth running, the migration is a one-line `api_base=` swap on the
+`litellm.acompletion` call — every other line of `LiteLLMLLM` stays
+identical. We get to defer the operational complexity until we have
+the requirement that needs it.
+
+The choice of LiteLLM over a vendor-specific `openai` SDK class is
+the second piece. LiteLLM ships translation for ~100 vendors today.
+Once the tool-calling bridge lands, every additional vendor becomes
+one catalog entry + (if needed) one API-key entry — no new provider
+class, no new event-translation code, no new test scaffolding.
+That's the long-term payoff this ADR is buying.
+
+## Consequences
+
+### Good
+
+- **Single point of integration for "every vendor that speaks OpenAI
+  chat."** Adding Mistral, Cohere, Together, Groq, Fireworks, etc.
+  is catalog work, not provider work.
+- **No new operational surface.** The SDK runs in the same process
+  as FastAPI; no sidecar, no `litellm` binary to install, no proxy
+  health endpoint to monitor.
+- **`AILLM` protocol stays clean.** The provider classes still have
+  the same shape, the same `stream(...)` signature, the same
+  `_stream_fn` test seam (`ScriptedStreamFn` works against
+  `LiteLLMLLM` exactly like it does against `GeminiLLM`).
+- **Migration to a LiteLLM proxy is one line away** if we ever need
+  one — the call shape is identical between SDK and proxy modes.
+- **Catalog stays the source of truth.** New OpenAI models are a
+  catalog edit; the provider class doesn't know which specific model
+  it's running on this request.
+
+### Bad / accepted tradeoffs
+
+- **Tool calling is deferred.** OpenAI chat models can't yet run
+  workspace tools (filesystem, Exa, image-gen, send_message,
+  artifacts). For tool-driven flows the user has to pick a
+  Claude or Gemini model. The drop is intentional, logged, and
+  visible in tests via `test_litellm_provider.py`'s
+  tools-are-dropped assertion — but it is a real product gap until
+  the OpenAI function-calling bridge lands.
+- **One more transitive-dependency chain.** `litellm` brings in its
+  own subdependency tree. Acceptable; we offset the per-vendor SDK
+  count we *don't* need to add.
+- **Reasoning-effort plumbing is stubbed.** o-series models accept a
+  `reasoning_effort` knob today but `LiteLLMLLM.stream(...)` logs
+  and ignores it. Wire-through lands with the v2 tool-flow PR.
+- **xAI initially routed through LiteLLM, then split off.** This PR
+  landed with both `Vendor.openai` and `Vendor.xai` under
+  `Host.litellm`. The very next PR ([#324](https://github.com/OctavianTocan/pawrrtal/pull/324),
+  commit `a91cfafa`) moved xAI back onto the official `xai-sdk` to
+  get typed access to xAI-only surfaces (`reasoning_effort` proto
+  enum, typed `Chunk.reasoning_content`, `SearchParameters`,
+  pre-converted `response.cost_usd`) and to survive the upstream
+  deprecation of Live Search on the OpenAI-compat path. The
+  `_VENDOR_API_KEY_NAME` table inside `litellm_provider.py` still
+  carries the `XAI_API_KEY` entry for protocol completeness, but
+  no catalog entry routes there in the end state — `Host.xai` is
+  the live path.
+
+### Open follow-ups
+
+- OpenAI function-calling bridge in `LiteLLMLLM` so workspace tools
+  light up for GPT-4o and the o-series. Same shape as the Claude
+  and Gemini tool bridges, scoped to the OpenAI `tools` schema.
+- Wire `reasoning_effort` through `litellm.acompletion` for the
+  o-series (`o1`, `o1-mini`, `o3-mini`). Today it's accepted by the
+  provider and silently dropped.
+- Cost accounting. LiteLLM exposes per-call cost on the response;
+  catalog entries already carry per-Mtok rates so we can compute
+  it locally if we'd rather not depend on LiteLLM's number. ADR TBD.
+- Multimodal inputs. `images=` is accepted and dropped; lands with
+  the tool-flow PR since both flows touch the same message-shape
+  helper.
+
+## Alternatives considered
+
+### Add a `Host.openai` and write an `OpenAILLM` class against the `openai` SDK directly
+
+This is the path of least surprise: copy the shape of
+`ClaudeLLM` / `GeminiLLM`, swap in the `openai` SDK's streaming API,
+translate its chunks into agent-loop `LLMEvent`s. It works fine for
+one vendor. It does not scale — every additional OpenAI-compatible
+vendor becomes a brand-new provider class with its own translation
+layer, even though the underlying wire protocol is identical. The
+fan-out cost over the next year of expected vendor adds dominates
+the one-time saving of "one fewer transitive dependency today."
+
+We will still reach for a dedicated provider when a vendor has
+surfaces LiteLLM doesn't model well — that's exactly what happened
+with xAI in PR #324. The rule is: LiteLLM is the default for new
+OpenAI-compatible vendors; a dedicated provider is the escape hatch
+when the vendor has typed surfaces or streaming semantics worth
+preserving.
+
+### Run LiteLLM as a separate proxy service
+
+LiteLLM ships a `litellm --config` proxy that speaks OpenAI HTTP and
+routes to backend vendors. We could deploy it as a sidecar and have
+the backend talk plain OpenAI-compat HTTP to it.
+
+Reasons not to, today:
+
+- A second binary in every deploy, with its own config file, its own
+  release cadence, its own health check.
+- No upside that an in-process SDK doesn't already give us. LiteLLM
+  the proxy and LiteLLM the SDK share the same routing logic.
+- The proxy's value (cross-service rate limiting, centralised
+  cost ledger, key rotation visible to all services that talk to it)
+  is real, but we don't have multiple services hitting the same set
+  of LLM keys yet. When we do, the migration is a one-line
+  `api_base=` change in `make_litellm_stream_fn`.
+
+### Vendor the `openai` SDK directly into a provider that talks to LiteLLM-routed endpoints via `base_url`
+
+A middle option: use the `openai` SDK but point it at a LiteLLM
+proxy. This is what we'd end up with after a future "deploy the
+proxy" decision, but it requires running the proxy *and* writing
+the provider class against `openai` — strictly more code than
+either alternative. Rejected.
+
+## Scope boundaries
+
+- This ADR does **not** add a function-calling bridge. Workspace
+  tools cannot fire for LiteLLM-routed models until that PR lands.
+- This ADR does **not** wire reasoning-effort through to the o-series.
+  The provider accepts the parameter and drops it.
+- This ADR does **not** introduce a long-running LiteLLM proxy. The
+  SDK runs in-process; the proxy path is preserved as a one-line
+  future swap.
+- This ADR does **not** ship xAI under LiteLLM in the end state.
+  PR #323 landed with that wiring; PR #324 moved xAI back to its
+  own first-party SDK. The end state is: LiteLLM serves OpenAI
+  chat models; `Host.xai` serves Grok via `xai-sdk`.

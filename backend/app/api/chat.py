@@ -48,6 +48,7 @@ logger = logging.getLogger(__name__)
 _HISTORY_WINDOW = 20
 
 
+# TODO: This should probably not be here. This file is about the chat API, not observability.
 def _annotate_chat_span(
     *,
     user_id: object,
@@ -75,6 +76,7 @@ def _annotate_chat_span(
         logger.debug("OTEL_SPAN_ANNOTATE_FAILED", exc_info=True)
 
 
+# TODO: This should probably not be here. This file is about the chat API, not tool artifacts.
 def _maybe_artifact_event(event: StreamEvent) -> StreamEvent | None:
     """Build an ``artifact`` SSE event from a ``render_artifact`` tool_use.
 
@@ -134,7 +136,12 @@ async def _require_workspace(
     if not await anyio.Path(root).exists():
         # Workspace row exists but the directory is gone (manually
         # deleted, volume wipe, etc.).  Same outcome — do not run.
-        logger.error("CHAT_WORKSPACE_MISSING rid=%s user_id=%s path=%s", request_id, user_id, root)
+        logger.error(
+            "CHAT_WORKSPACE_MISSING rid=%s user_id=%s path=%s",
+            request_id,
+            user_id,
+            root,
+        )
         raise HTTPException(
             status_code=412,
             detail="Workspace directory is missing on disk.  Re-run onboarding.",

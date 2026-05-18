@@ -1,0 +1,224 @@
+---
+title: Heartbeat
+description: Declare recurring agent checks in a workspace's `HEARTBEAT.md`, sync them into the scheduler, and watch the responses land in your "🫀 Heartbeat" conversation (and Telegram, if linked).
+---
+
+# Heartbeat
+
+Heartbeat lets a workspace declare recurring agent turns in a plain
+markdown file. A morning pulse, a midweek inbox triage, a Friday
+status digest — anything you can phrase as a prompt and a cron
+expression.
+
+The design rationale lives in the ADR
+[`2026-05-18-heartbeat-job-scheduler-bridge`](../decisions/2026-05-18-heartbeat-job-scheduler-bridge);
+this page is the practical "how do I use it" reference.
+
+## How it works (one paragraph)
+
+Each workspace has a `HEARTBEAT.md` at its root. The YAML front
+matter lists `checks`, each with a `name`, `cron`, and `prompt`.
+When you `POST /api/v1/heartbeat/sync`, the backend reads the file,
+ensures a `"🫀 Heartbeat"` conversation exists for you, and
+registers one row in `scheduled_jobs` per check. From there, the
+existing scheduler pipeline does the work — cron fires, the agent
+runs the prompt, the response is persisted into the heartbeat
+conversation, and (if you've linked Telegram) it also fans out to
+your Telegram chat.
+
+## The `HEARTBEAT.md` schema
+
+The file is regular markdown with a YAML front matter block fenced
+by `---`. The body of the file is free-form prose — useful for
+project-specific instructions the agent can read alongside the
+prompt ("when checking email, ignore anything from `<vendor>`").
+
+```markdown
+---
+checks:
+  - name: pulse
+    cron: "0 9 * * *"
+    prompt: |
+      Daily heartbeat: summarise anything from the last 24 hours
+      that needs my attention.
+---
+
+# Heartbeat
+
+Free-form prose lives below the front matter. The agent reads this
+alongside each prompt, so put workspace-specific guidance here.
+```
+
+### Field reference
+
+Validated by `app.core.heartbeat.HeartbeatCheck`:
+
+| Field    | Type   | Required | Constraints                                                                                                   |
+| -------- | ------ | -------- | ------------------------------------------------------------------------------------------------------------- |
+| `name`   | string | yes      | 1–64 chars, **no whitespace** (the value lands in an APScheduler job id).                                     |
+| `cron`   | string | yes      | 5-field cron expression. Validated at parse time via `apscheduler.triggers.cron.CronTrigger.from_crontab`.    |
+| `prompt` | string | yes      | Non-empty. Fed verbatim to the agent loop when the job fires.                                                 |
+
+Invalid cron expressions raise during parse — they do **not** fail
+silently at fire time. A whitespace `name` is rejected the same way.
+
+If `HEARTBEAT.md` has no front matter, the file is treated as an
+empty config (no jobs registered). If the file is missing entirely
+(deleted, never seeded), the sync logs `HEARTBEAT_MD_MISSING` and
+the route returns with `jobs_created: 0`.
+
+## Triggering a sync
+
+```bash
+curl -X POST https://your-pawrrtal-host/api/v1/heartbeat/sync \
+  -H "Cookie: <your auth cookie>"
+```
+
+Response shape (`HeartbeatSyncResponse`):
+
+```json
+{
+  "workspace_id": "…",
+  "conversation_id": "…",
+  "jobs_created": 2,
+  "jobs_removed": 1,
+  "telegram_linked": true
+}
+```
+
+- `workspace_id` — your default workspace; the sync acts on its
+  `HEARTBEAT.md`.
+- `conversation_id` — the lazy-created `"🫀 Heartbeat"`
+  conversation. Cron-fired responses are written here.
+- `jobs_created` — number of checks in this sync (one row per check
+  in the file).
+- `jobs_removed` — heartbeat-prefixed rows that this workspace
+  previously synced but are no longer in the file.
+- `telegram_linked` — whether the route also wired the user's
+  Telegram chat into `target_chat_ids` so the response fans out
+  there in addition to the web conversation.
+
+Status codes worth knowing:
+
+| Status | Meaning                                                                                |
+| ------ | -------------------------------------------------------------------------------------- |
+| 200    | Sync ran. Use the `jobs_created` / `jobs_removed` to confirm.                          |
+| 409    | No default workspace; finish onboarding first.                                         |
+| 503    | `SCHEDULER_ENABLED=false` or the scheduler isn't running on this process.              |
+
+The sync is **not** automatic. The file on disk is the single source
+of truth — edit it, then call the sync endpoint (or let the Settings
+UI do it for you).
+
+## Idempotency
+
+The sync helper composes each job name as
+`heartbeat:<workspace_id>:<check_name>`, then reconciles
+`scheduled_jobs` against the file:
+
+- **New check** → new row, scheduler picks up the cron.
+- **Edited `cron` / `prompt`** → existing row is soft-deleted and
+  re-added in place. The job id rotates; the name stays stable.
+- **Removed check** → existing row is soft-deleted (counted in
+  `jobs_removed`).
+- **User-authored rows** (created through
+  `POST /api/v1/scheduled-jobs` or via the agent's cron tools) are
+  never touched — the heartbeat prefix carries the workspace UUID,
+  so the sync only reconciles its own rows.
+
+Re-running the sync is safe at any time. The endpoint is the only
+correct way to apply edits.
+
+## Conversation continuity
+
+Each workspace's heartbeat fires into one stable conversation rather
+than spawning a fresh one per tick:
+
+- The `"🫀 Heartbeat"` conversation is lazy-created on first sync.
+  It carries the `heartbeat` label, which the sidebar renders with a
+  pink pill (`NAV_CHATS_LABELS` → `heartbeat: #ec4899`) so you can
+  spot scheduler-authored rows at a glance.
+- The conversation is delete-protected on the server: `DELETE
+  /api/v1/conversations/{id}` returns 404 for any conversation whose
+  labels include `heartbeat`. The sidebar hides the delete
+  affordance separately.
+- When a job fires, `AgentHandler` writes the rendered response into
+  this conversation's `chat_messages` *before* publishing the
+  Telegram fan-out event. Both destinations come from the same
+  agent turn — they don't diverge.
+
+If you have Telegram linked, the same response also arrives in your
+Telegram chat via the existing `NotificationService`. No Telegram
+binding → web-only delivery, no other behaviour changes.
+
+## Worked examples
+
+### Minimal — one daily check
+
+```markdown
+---
+checks:
+  - name: morning_pulse
+    cron: "0 8 * * 1-5"
+    prompt: |
+      What changed in my workspace overnight? Highlight anything
+      that needs a reply or a decision today.
+---
+```
+
+`0 8 * * 1-5` fires at 08:00 every weekday. The agent runs the
+prompt, the response lands in `🫀 Heartbeat` (and Telegram, if
+linked).
+
+### Multiple checks
+
+```markdown
+---
+checks:
+  - name: morning_pulse
+    cron: "0 9 * * *"
+    prompt: |
+      Daily heartbeat: summarise anything from the last 24 hours
+      that needs my attention.
+  - name: weekly_retro
+    cron: "0 17 * * 5"
+    prompt: |
+      It's Friday afternoon. Summarise what shipped this week,
+      what slipped, and what's first up next week.
+---
+
+# Heartbeat
+
+When summarising my week, treat code review comments as work-in-
+progress, not blockers.
+```
+
+Each check becomes its own `scheduled_jobs` row. The free-form body
+below the front matter is workspace context the agent can read while
+running each prompt — useful for the "ignore X" / "treat Y as Z"
+instructions you'd otherwise repeat in every check.
+
+## Disabling a check
+
+Either:
+
+- Comment it out / delete it from `HEARTBEAT.md` and re-sync. The
+  row is soft-deleted; it stops firing immediately.
+- Delete the target conversation. The row's
+  `target_conversation_id` is set to `NULL` by the FK's `ON DELETE
+  SET NULL`. The job keeps firing into Telegram (if linked) but
+  stops persisting to the web conversation. Use this when you want
+  Telegram-only delivery for a specific workspace and don't mind
+  rebuilding the conversation manually on the next sync.
+
+## File locations
+
+- `backend/app/core/heartbeat.py` — parser, schema, cron validation.
+- `backend/app/core/heartbeat_template.py` — the seeded template
+  for new workspaces.
+- `backend/app/crud/heartbeat.py` — `sync_workspace_heartbeats`.
+- `backend/app/api/heartbeat.py` — `POST /api/v1/heartbeat/sync`.
+- `backend/alembic/versions/018_scheduled_jobs_target_conversation_id.py`
+  — schema migration.
+- `backend/tests/test_heartbeat.py` — parser, sync, delete-guard,
+  and conversation-helper tests (the executable spec).

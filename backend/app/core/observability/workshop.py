@@ -104,6 +104,15 @@ __all__ = [
 
 _tracer = trace.get_tracer(TRACER_NAME, TRACER_VERSION)
 
+# Per-conversation memory of the previous turn's span context so
+# successive turns in the same conversation are linked.  OTel span
+# links are the standard way to connect traces without forcing them
+# into a single parent-child tree — backends like Grafana and Jaeger
+# surface them as "related traces".  Bounded to avoid unbounded growth
+# in long-running processes; entries are evicted FIFO.
+_MAX_LINKED_CONVERSATIONS = 1024
+_previous_turn: dict[str, trace.SpanContext] = {}
+
 
 @contextmanager
 def turn_span(
@@ -139,14 +148,26 @@ def turn_span(
         A :class:`TurnSpanRecorder` so callers can mark TTFT and read
         it back for the canonical log line / event-bus payload.
     """
-    with _tracer.start_as_current_span("pawrrtal.turn") as span:
-        span.set_attribute(ATTR_CONVERSATION_ID, str(conversation_id))
+    conv_key = str(conversation_id)
+    # If this conversation had a previous turn, link to it so backends
+    # can chain the traces and Workshop shows "related runs".
+    prev_ctx = _previous_turn.get(conv_key)
+    links = [trace.Link(prev_ctx)] if prev_ctx is not None else None
+
+    with _tracer.start_as_current_span("pawrrtal.turn", links=links) as span:
+        span.set_attribute(ATTR_CONVERSATION_ID, conv_key)
         span.set_attribute(ATTR_USER_ID, str(user_id))
         span.set_attribute(ATTR_SURFACE, surface)
         span.set_attribute(ATTR_REQUEST_ID, request_id)
         if model_id:
             span.set_attribute(ATTR_GENAI_REQUEST_MODEL, model_id)
         recorder = TurnSpanRecorder(span)
+        # Remember this turn's context so the next turn in the same
+        # conversation can link back to it.
+        if span.is_recording():
+            if len(_previous_turn) >= _MAX_LINKED_CONVERSATIONS:
+                _previous_turn.pop(next(iter(_previous_turn)))
+            _previous_turn[conv_key] = span.get_span_context()
         try:
             yield recorder
         finally:

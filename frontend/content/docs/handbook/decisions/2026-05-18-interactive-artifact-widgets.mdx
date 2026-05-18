@@ -1,0 +1,205 @@
+---
+title: Interactive artifact widgets — extend `render_artifact` with widgets that emit a follow-up user message
+description: ADR — add `ActionButton`, `ChoiceGroup`, `TextField`, and `NumberField` to the artifact catalog, route user interactions through the existing `sendMessage` flow with a `mode: 'new_turn'` discriminator, and gate the catalog on a surface-aware `make_artifact_tool` so Telegram never sees widgets it can't render.
+---
+
+# ADR: Interactive artifact widgets
+
+- **Date:** 2026-05-18
+- **Owners:** OctavianTocan
+- **Tracking:** PR [#265](https://github.com/OctavianTocan/pawrrtal/pull/265)
+
+<Callout type="info" title="Status: Accepted — shipped in #265">
+Four interactive widgets (`ActionButton`, `ChoiceGroup`, `TextField`,
+`NumberField`) land in the artifact catalog. The agent can now author
+artifacts the user *acts on*, and the user's response arrives in the
+next turn as a regular `sendMessage` call — no special protocol, no
+sidecar event channel. Web + electron only.
+</Callout>
+
+## Context
+
+`render_artifact` already lets the agent attach a structured preview card
+to a turn (comparison tables, dashboards, route lists, step-by-step
+plans). It is read-only: the user can look at the artifact, scroll it,
+expand it in a dialog, and that is the whole interaction. Anything that
+needed a *response* — "do you accept this plan?", "pick a severity",
+"how many days?" — had to fall back to the plain text composer, which
+loses the visual context the artifact just established.
+
+Three concrete pressures pushed us to fix this:
+
+1. The composer-as-fallback breaks the model's mental model of the
+   exchange. The artifact says "pick one of A/B/C" and the model has no
+   guarantee the user's reply maps to one of those options. A free-form
+   reply means the next turn opens with a fuzzy NLU problem the model
+   shouldn't have to solve.
+2. Several emergent use cases (planning loops, onboarding wizards,
+   severity triage, "tune these parameters and re-run") want a single
+   well-typed answer back, not a paragraph of prose.
+3. We already have a chat send flow that handles streaming, history,
+   tool-call correlation, error handling, and rate gating. A bespoke
+   widget-event channel would re-implement all of that and immediately
+   drift.
+
+The job: pick the smallest set of widgets that covers the common
+"respond to an artifact" shapes, route their submissions through the
+existing chat pipeline, and keep the surface-rendering story honest so
+Telegram doesn't see widgets it can't draw.
+
+## Decision
+
+### 1. Four widgets, each carrying an `actionId`
+
+Add four catalog entries in
+`frontend/features/chat/artifacts/catalog.ts`. Each entry is a zod-
+validated `props` object plus a human-readable description fed to the
+model via the tool schema.
+
+| Widget | Props (excerpt) | Submitted value |
+|---|---|---|
+| `ActionButton` | `label`, `actionId`, `style: 'primary'\|'secondary'\|null` | `label` (string) |
+| `ChoiceGroup` | `actionId`, `prompt`, `multi: boolean`, `options: {value,label}[]` | selected `value` (single) or `value[]` (multi) |
+| `TextField` | `actionId`, `label`, `placeholder`, `multiline`, `submitLabel` | the typed string |
+| `NumberField` | `actionId`, `label`, `min/max/step/defaultValue`, `kind: 'slider'\|'input'`, `submitLabel` | the chosen number |
+
+Every widget carries an `actionId` — a stable, snake_case identifier the
+model picks when authoring the artifact (e.g. `accept_plan`,
+`pick_severity`, `days_to_wait`). This is the deterministic match the
+model needs on the next turn: the human-readable label ends up in chat
+history, but `actionId` is the join key the model trusts.
+
+### 2. Two-layer interaction context
+
+`frontend/features/chat/artifacts/interaction-context.tsx` exposes two
+providers, deliberately split:
+
+- **Outer — `ArtifactInteractionProvider`** is installed once by
+  `ChatContainer` and is bound to `sendMessage`. It accepts a fully-
+  shaped `ChatArtifactInteractionPayload` (artifact id + action id +
+  label + value + mode) and dispatches it however the surface wants.
+- **Inner — `ArtifactInteractionScope`** is installed per-artifact by
+  `ArtifactRenderer` and captures the artifact's `id`. Widgets only see
+  the inner context: a tight
+  `submit({ actionId, label, value })` API that auto-injects
+  `artifactId` and the default `mode`.
+
+Widgets never import `sendMessage`. They only see the inner submit API
+and a `hasHandler` flag that lets them render disabled when no outer
+provider is installed (read-only previews, isolated stories, tests).
+Context reads use React 19's `use()` so they can be read conditionally
+inside renderers without violating hook rules.
+
+### 3. Interactions are regular user messages
+
+`ChatContainer`'s outer handler does exactly one thing: call
+`chat.sendMessage({ content: payload.label, files: [] })`. The
+human-readable label becomes the user-visible message; the model
+correlates it with the still-attached artifact (and its `actionId`)
+because the artifact is right there in the recent history.
+
+The payload type carries a discriminator —
+`mode: ChatArtifactInteractionMode = 'new_turn'` — so a future
+in-place-mutation mode (artifact changes without consuming a turn) can
+land by swapping the handler. Widget code already speaks the
+discriminator, so nothing in the renderer tree has to change.
+
+`ArtifactDialog` calls back into the renderer with an
+`onInteractionSubmitted` prop; on success it closes itself so the user
+watches the chat answer instead of staring at the modal.
+
+### 4. Surface-aware tool factory
+
+`make_artifact_tool(surface=...)` in
+`backend/app/core/tools/artifact_agent.py` is the gate. The tool
+description, *not* the execute callback, is what changes per surface:
+
+- Surface in `{"web", "electron"}` → the catalog string sent to the
+  model includes the interactive widgets, and an extra blurb telling
+  the model how interactions come back (as a follow-up user message in
+  the next turn).
+- Any other surface (Telegram today, anything text-only tomorrow) → the
+  read-only catalog only.
+
+Validation is intentionally surface-independent. Even on Telegram, if
+the model emits an `ActionButton` (e.g. because it carried over context
+from a previous turn), it still validates — we just don't advertise it.
+This keeps the failure mode "model is asked not to do this" rather than
+"backend rejects this surface-by-surface".
+
+## Consequences
+
+### Wins
+
+- **No new wire protocol.** Interactions reuse `sendMessage`, history,
+  streaming, rate gating, and tool-call correlation. Existing chat
+  features (regenerate, copy, export) work on interaction-derived
+  messages with zero work.
+- **Deterministic match-back.** `actionId` gives the model a stable
+  join key independent of the user-visible label, so the model can
+  rename a button across rerenders without confusing itself.
+- **Surface honesty.** Telegram and other text-only surfaces get a
+  truthful tool description; the catalog adapts per channel from one
+  factory call.
+- **Forward compatibility.** The `mode` discriminator on the payload
+  means in-place mutation can land later without touching widget code.
+
+### Trade-offs
+
+- **One decision per artifact, by convention.** Nothing in the schema
+  stops the model from stacking ten buttons; the tool description tells
+  it not to. This is a docs-and-eval problem, not a typing one.
+- **Validation runs everywhere.** Telegram still has to know how to
+  not-render interactive widgets if the model emits one anyway. Today
+  that path renders a flat card without the widget; we accept that as
+  graceful degradation, not a correctness problem.
+- **Two-layer context costs a re-provider on every artifact render.**
+  The inner provider wraps json-render's tree per artifact, which means
+  every dialog-open and every inline preview installs its own
+  `ArtifactInteractionScope`. The overhead is negligible (one context
+  + memoised value) and it's what lets widgets be `artifactId`-aware
+  without prop-drilling.
+
+### Risks
+
+- **Model authors over-eager widgets.** Without prompt guidance the
+  model may put buttons on every artifact. Mitigation: the
+  surface-aware description tells it to keep widgets purposeful; we
+  watch usage and tighten the prompt if drift appears.
+- **In-place mode collides with `sendMessage` semantics.** When we add
+  it, the handler installed by `ChatContainer` will need to branch on
+  `mode` and decide whether to consume a turn. The discriminator is
+  there for this, but the actual mutation API doesn't exist yet.
+
+## Alternatives considered
+
+- **Dedicated WebSocket / event channel for widget interactions.**
+  Cleaner conceptually, far more code, breaks history (the user's
+  click vanishes unless we synthesize a sidecar event into the
+  transcript), and doesn't compose with regenerate / copy / export.
+  Rejected.
+- **Embed widgets in plain markdown (button-as-link, choice-as-list).**
+  No `actionId` determinism — the model has to NLU its own reply. No
+  type safety. Rejected.
+- **One mega-widget with a `kind` discriminator instead of four
+  catalog entries.** Less ergonomic for the model (one massive prop
+  union), worse description text, harder to evolve per widget.
+  Rejected.
+
+## Out of scope
+
+- In-place artifact mutation (`mode: 'in_place'` or similar). The
+  payload reserves the seam; implementation is future work.
+- Telegram interactive surfaces (e.g. inline keyboard equivalents).
+  When we add them, the tool factory grows another branch instead of
+  bypassing the gate.
+- Widget composition / cross-widget validation (e.g. "submit only when
+  both fields are filled"). Today each widget submits independently.
+
+## References
+
+- PR [#265](https://github.com/OctavianTocan/pawrrtal/pull/265) — implementation.
+- `backend/app/core/tools/artifact_agent.py` — surface-aware tool factory.
+- `frontend/features/chat/artifacts/catalog.ts` — widget schemas.
+- `frontend/features/chat/artifacts/interaction-context.tsx` — two-layer providers.
+- Feature doc: [`interactive-artifacts`](../features/interactive-artifacts).

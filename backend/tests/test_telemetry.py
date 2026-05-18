@@ -112,10 +112,145 @@ def test_setup_tracing_handles_missing_optional_packages_gracefully(
 @pytest.mark.usefixtures("_clean_telemetry_state")
 def test_otel_enabled_reads_endpoint_env_var(monkeypatch: pytest.MonkeyPatch) -> None:
     """The enabled gate is purely the standard endpoint env var."""
-    from app.core.telemetry import _otel_enabled
+    from pathlib import Path
+    from tempfile import TemporaryDirectory
 
-    assert _otel_enabled() is False
-    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
-    assert _otel_enabled() is False
-    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4318")
-    assert _otel_enabled() is True
+    import app.core.telemetry as telemetry_module
+
+    with TemporaryDirectory() as tmp:
+        monkeypatch.setattr(telemetry_module, "_BACKEND_DIR", Path(tmp))
+        assert telemetry_module._otel_enabled() is False
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "")
+        assert telemetry_module._otel_enabled() is False
+        monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://collector:4318")
+        assert telemetry_module._otel_enabled() is True
+
+
+@pytest.mark.usefixtures("_clean_telemetry_state")
+def test_json_exporter_sends_valid_otlp_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The JSON exporter produces camelCase OTLP JSON that Workshop accepts."""
+    import json
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from threading import Thread
+
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+    import app.core.telemetry as telemetry_module
+
+    received: list[bytes] = []
+
+    class _Handler(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:
+            length = int(self.headers["Content-Length"])
+            received.append(self.rfile.read(length))
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'{"ok":true,"spansIngested":1}')
+
+        def log_message(self, *_: object) -> None:
+            pass
+
+    server = HTTPServer(("127.0.0.1", 0), _Handler)
+    port = server.server_address[1]
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+
+    monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", f"http://127.0.0.1:{port}/v1/traces")
+
+    exporter = telemetry_module._make_json_exporter()
+
+    provider = TracerProvider(resource=Resource.create({"service.name": "test"}))
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = provider.get_tracer("test")
+    with tracer.start_as_current_span("json-export-test") as span:
+        span.set_attribute("test.key", "value")
+
+    provider.shutdown()
+    server.shutdown()
+    thread.join(timeout=2)
+
+    assert len(received) == 1
+    body = json.loads(received[0])
+    assert "resourceSpans" in body
+    assert body["resourceSpans"][0]["scopeSpans"][0]["spans"][0]["name"] == "json-export-test"
+
+
+@pytest.mark.usefixtures("_clean_telemetry_state")
+def test_drop_grpc_connect_spans_filters_connect_names() -> None:
+    """The _drop_grpc_connect_spans wrapper discards spans named 'connect'."""
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+
+    import app.core.telemetry as telemetry_module
+
+    exported_names: list[str] = []
+
+    class _RecordingExporter:
+        def export(self, spans):
+            exported_names.extend(s.name for s in spans)
+            return 0
+
+        def shutdown(self):
+            pass
+
+        def force_flush(self, _timeout_millis=0):
+            return True
+
+    inner = _RecordingExporter()
+    filtered = telemetry_module._drop_grpc_connect_spans(inner)
+
+    provider = TracerProvider(resource=Resource.create({"service.name": "test"}))
+    provider.add_span_processor(SimpleSpanProcessor(filtered))
+    tracer = provider.get_tracer("test")
+
+    with tracer.start_as_current_span("connect"):
+        pass
+    with tracer.start_as_current_span("pawrrtal.turn"):
+        pass
+    with tracer.start_as_current_span("connect"):
+        pass
+    with tracer.start_as_current_span("chat.stream grok-4.3"):
+        pass
+
+    provider.shutdown()
+    assert exported_names == ["pawrrtal.turn", "chat.stream grok-4.3"]
+
+
+@pytest.mark.usefixtures("_clean_telemetry_state")
+def test_drop_grpc_connect_spans_passes_through_empty_batches() -> None:
+    """When all spans are filtered, the inner exporter is not called at all."""
+    from opentelemetry.sdk.resources import Resource
+    from opentelemetry.sdk.trace import TracerProvider
+    from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExportResult
+
+    import app.core.telemetry as telemetry_module
+
+    called = False
+
+    class _NeverCalledExporter:
+        def export(self, _spans):
+            nonlocal called
+            called = True
+            return SpanExportResult.SUCCESS
+
+        def shutdown(self):
+            pass
+
+        def force_flush(self, _timeout_millis=0):
+            return True
+
+    inner = _NeverCalledExporter()
+    filtered = telemetry_module._drop_grpc_connect_spans(inner)
+
+    provider = TracerProvider(resource=Resource.create({"service.name": "test"}))
+    provider.add_span_processor(SimpleSpanProcessor(filtered))
+    tracer = provider.get_tracer("test")
+
+    with tracer.start_as_current_span("connect"):
+        pass
+
+    provider.shutdown()
+    assert not called

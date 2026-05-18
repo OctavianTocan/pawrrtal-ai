@@ -1,0 +1,261 @@
+---
+title: Workspace HEARTBEAT.md as the user-authored bridge to JobScheduler
+description: ADR — let a workspace declare recurring checks in plain markdown with YAML front matter, sync them into `scheduled_jobs` on demand, and add a `target_conversation_id` column so cron-fired turns persist into a stable chat conversation in addition to Telegram fan-out.
+---
+
+# ADR: Heartbeat → JobScheduler bridge
+
+- **Date:** 2026-05-18
+- **Owners:** OctavianTocan
+- **Tracking:** PR #333 (`feat(heartbeat): workspace HEARTBEAT.md → JobScheduler bridge`).
+- **References:** openclaw's heartbeat shape (https://docs.openclaw.ai/gateway/heartbeat) inspired the file-as-source-of-truth model.
+
+<Callout type="info" title="Status: Accepted">
+Each workspace owns a user-authored `HEARTBEAT.md` whose YAML front matter
+declares cron-validated recurring checks. `POST /api/v1/heartbeat/sync`
+reads the file, ensures a `heartbeat` conversation exists, and
+registers / reconciles one `scheduled_jobs` row per check. A new
+nullable `scheduled_jobs.target_conversation_id` column lets the
+existing scheduler → EventBus → AgentHandler pipeline persist the
+agent turn into that conversation before Telegram fan-out, so web and
+Telegram receive the same response from the same turn.
+</Callout>
+
+## Context
+
+Pawrrtal already has every moving part needed to run a recurring
+agent turn and ship its output to Telegram: `JobScheduler` owns the
+cron rows in `scheduled_jobs`, the EventBus carries a
+`ScheduledEvent` when a job fires, `AgentHandler` runs the prompt as
+an agent turn, and `NotificationService` fans the response out to
+Telegram chats listed in `target_chat_ids`. Three gaps stopped this
+from being a usable feature for a person.
+
+1. **Authoring surface.** There is no obvious place for a user to
+   say "every weekday at 9, check email for things that need a
+   reply." `POST /api/v1/scheduled-jobs` exists, but writing JSON
+   payloads to an HTTP endpoint is not how the user iterates. A
+   workspace file the user can open and edit in the same agent UI
+   they already work in (alongside `SOUL.md` / `AGENTS.md` /
+   `BOOTSTRAP.md`) is a much shorter loop.
+2. **Cron validation.** Misconfigured cron strings should fail at
+   parse time, not on the first scheduled fire 12 hours later when
+   nobody's watching.
+3. **Web continuity.** Cron-fired turns vanish from the web UI. A
+   scheduled turn with no `target_conversation_id` writes to no chat
+   conversation, so the user only sees the response if Telegram is
+   linked. Even when Telegram is linked, the turn doesn't show up
+   anywhere on the web — there's no place to scroll back through
+   yesterday's checks.
+
+The job is therefore to bridge a plain-markdown user file into the
+existing scheduler without inventing a parallel cron system, validate
+cron expressions up front, and give the scheduler a way to name the
+chat conversation the response should mirror into.
+
+## Decision
+
+### 1. Workspace `HEARTBEAT.md` as the source of truth
+
+Each workspace's root has a `HEARTBEAT.md` seeded by
+`app.core.workspace.seed_workspace` (idempotent — existing files are
+preserved). The file's YAML front matter is the schema; the body is
+free-form prose context the user can write to themselves.
+
+```yaml
+---
+checks:
+  - name: pulse
+    cron: "0 9 * * *"
+    prompt: |
+      Daily heartbeat: summarise anything from the last 24 hours
+      that needs my attention.
+---
+```
+
+`app.core.heartbeat` owns the pure parser
+(`backend/app/core/heartbeat.py`):
+
+- `HeartbeatCheck` validates `name` (non-empty, ≤ 64 chars, no
+  whitespace — the value lands in an APScheduler job id), `cron` (5
+  fields, fed through `apscheduler.triggers.cron.CronTrigger.from_crontab`
+  at parse time so malformed expressions raise immediately), and
+  `prompt` (non-empty).
+- `parse_heartbeat_md` extracts the YAML between `---` fences;
+  files without front matter parse to an empty config and the sync
+  helper degrades gracefully (registers no jobs) rather than raising.
+- `load_heartbeat_md(path)` is the disk-facing wrapper. A missing
+  file logs `HEARTBEAT_MD_MISSING` and returns an empty config so a
+  workspace that hasn't been re-seeded doesn't break the sync route.
+
+Per the sentrux layering rule (`entry → api → crud → models → core`),
+this module is core-only — it imports neither `app.crud.*` nor
+`app.api.*`.
+
+### 2. Sync endpoint as the only runtime piece
+
+`POST /api/v1/heartbeat/sync` (`backend/app/api/heartbeat.py`) is
+auth-gated, looks up the user's default workspace + Telegram binding,
+and delegates to `sync_workspace_heartbeats`
+(`backend/app/crud/heartbeat.py`). It returns the heartbeat
+conversation id, the number of jobs created / removed, and whether
+Telegram fan-out is wired, so a Settings UI can render
+"Telegram: linked" without a second roundtrip. The route 503s when
+`SCHEDULER_ENABLED=false` rather than silently accepting work that
+would never fire.
+
+`sync_workspace_heartbeats` is the only heartbeat-specific runtime —
+everything else is the existing scheduler pipeline. It:
+
+1. Reads `<workspace.path>/HEARTBEAT.md`.
+2. Lazy-creates the workspace's `"🫀 Heartbeat"` conversation
+   (labelled `heartbeat`) via `get_or_create_heartbeat_conversation`.
+3. Selects existing `scheduled_jobs` rows whose `name` starts with
+   `heartbeat:<workspace_id>:` and soft-deletes (via
+   `scheduler.remove_job`) the ones whose check name is no longer
+   in the file.
+4. For each check, soft-deletes any pre-existing row with the same
+   name, then calls `scheduler.add_job` with `target_chat_ids`
+   (the user's linked Telegram chat, if any) and
+   `target_conversation_id` (the heartbeat conversation).
+
+The job name carries the workspace UUID
+(`heartbeat:<workspace_id>:<check_name>`) so user-authored rows in
+the same `scheduled_jobs` table — and other workspaces' heartbeat
+rows — are never disturbed. Re-running the sync is idempotent:
+cadence / prompt edits replace in place, deletions reconcile.
+
+The sync is deliberately not run automatically. The user edits the
+file, then triggers the route (or the Settings UI does it for them).
+That keeps the file on disk the single source of truth and avoids a
+watcher that would fight concurrent edits.
+
+### 3. `scheduled_jobs.target_conversation_id` for web continuity
+
+Migration `018_scheduled_jobs_target_conversation_id` adds a nullable
+`Uuid` column with a `FOREIGN KEY ... ON DELETE SET NULL` constraint
+and an index. The field flows through the full pipeline:
+
+- `ScheduledJobCreate` / `ScheduledJobRead` / `ScheduledJobUpdate`
+  carry it as `UUID | None`.
+- `JobScheduler.add_job` persists it on the row and serialises it
+  into the APScheduler kwargs as a string (UUIDs aren't picklable
+  by default in every store). `_fire_event` parses it back when the
+  job fires.
+- `ScheduledEvent` carries `target_conversation_id: uuid.UUID | None`.
+- `AgentHandler._run_and_publish` reads the field off the event. When
+  it's set, the rendered text is written into `chat_messages` as a
+  finalised assistant turn (via
+  `append_assistant_placeholder` + `finalize_assistant_message`)
+  *before* publishing `AgentResponseEvent` for Telegram fan-out.
+- The persist step is best-effort: failures log + continue so the
+  Telegram delivery still happens. `ON DELETE SET NULL` means
+  deleting the target conversation quietly disables persistence for
+  the job rather than cascading the deletion through to the job
+  row.
+
+The chat-message CRUD is lazy-imported inside
+`_persist_assistant_response` to keep the handler module's load
+graph clean. That edge is grandfathered in `.importlinter` alongside
+the existing `crud.workspace` grandfather — to be flattened in a
+follow-up by injecting a Protocol the caller satisfies or moving the
+side effect into `api/` / `crud/`.
+
+### 4. Conversation guard rails
+
+`delete_conversation` returns `False` (the route maps that to 404)
+when `heartbeat` is in the conversation's labels, so the lazy-
+created `"🫀 Heartbeat"` row can't be deleted out from under the
+scheduler. The sidebar hides the delete affordance separately —
+this is the server-side guard.
+
+## Consequences
+
+**Loop the user wants exists.** Edit `HEARTBEAT.md`, hit sync, watch
+the heartbeat conversation. Telegram fans out the same response if
+the user has linked it. Both destinations come from one agent turn.
+
+**Idempotent reconciliation.** The sync is safe to re-run any number
+of times. Adding a check creates a row; removing a check from the
+file removes the row; changing a cron or prompt replaces in place.
+Other producers writing into `scheduled_jobs` are untouched because
+the heartbeat prefix carries the workspace UUID.
+
+**Cron mistakes surface at parse time.** `CronTrigger.from_crontab`
+runs during pydantic validation, so the response to
+`POST /api/v1/heartbeat/sync` carries the offending expression
+instead of going quiet for 12 hours.
+
+**Migration is additive.** `scheduled_jobs.target_conversation_id` is
+nullable, defaults to `None`, and existing callers that don't set it
+pass `None` through unchanged. Existing scheduled jobs (Telegram-
+only) keep their exact behaviour.
+
+**Web mirror is best-effort.** A failed persist logs and continues
+so the Telegram delivery still happens. The cost is that the
+conversation can briefly diverge from Telegram on a CRUD error; the
+benefit is that the user's heartbeat doesn't fail closed.
+
+**Trade-off: file edits don't auto-sync.** The user (or the Settings
+UI on their behalf) has to call `POST /api/v1/heartbeat/sync` after
+editing the file. We rejected a filesystem watcher because watchers
+fight concurrent edits, run in process, and add a second source of
+truth (in-memory parsed state vs. what's on disk).
+
+## Alternatives considered
+
+**A Settings UI form for recurring checks.** Faster onboarding,
+slower iteration. Users editing a single markdown file alongside
+their other workspace context is consistent with the rest of the
+agent's authoring surface, and avoids building (and styling, and
+testing) a CRUD form for something that's textually trivial. The
+endpoint shape is also exactly what a Settings UI would call into,
+so this isn't a fork — the UI can land later without rework.
+
+**A separate cron file format (TOML, JSON).** More friction for the
+same payload. Markdown front matter is what the rest of the workspace
+already uses (`DESIGN.md`-style configs) and renders cleanly when the
+user opens the file.
+
+**Spawn a fresh conversation per scheduled fire.** No continuity.
+The user would have to scroll across N "Heartbeat 2026-05-18 09:00"
+conversations to see what the daily pulse said over the last week.
+A single labelled `🫀 Heartbeat` conversation keeps the history
+linear and the sidebar tidy.
+
+**A non-null `target_conversation_id` column with a synthetic default.**
+Considered briefly because nullable foreign keys complicate query
+shape. Rejected because other `ScheduledEvent` producers (future
+webhook jobs, ad-hoc admin scripts) shouldn't be forced to fabricate
+a conversation. Nullable + `ON DELETE SET NULL` keeps the column
+opt-in and avoids cascading deletes.
+
+## When to revisit
+
+- If the heartbeat surface picks up additional knobs (per-check
+  output channels, per-check skill names, per-check tool allow-lists),
+  evaluate moving the schema out of pydantic-on-YAML into a typed
+  config module so the field set has one source of truth.
+- If the `crud.chat_message` lazy import in
+  `_persist_assistant_response` survives more than one follow-up PR,
+  flatten the edge per the `.importlinter` grandfather note: inject
+  a Protocol the caller satisfies, or move the persist side effect
+  into the API or CRUD layer.
+- If users start running more than ~50 checks per workspace, revisit
+  the linear scan in `_remove_stale_jobs` (today the row count per
+  workspace is small enough that the prefix scan is fine).
+
+## References
+
+- `backend/app/core/heartbeat.py` — pure parser, schema, cron
+  validation.
+- `backend/app/core/heartbeat_template.py` — seeded
+  `HEARTBEAT.md` template.
+- `backend/app/crud/heartbeat.py` — sync helper, row reconciliation.
+- `backend/app/api/heartbeat.py` — `POST /api/v1/heartbeat/sync`.
+- `backend/alembic/versions/018_scheduled_jobs_target_conversation_id.py`
+  — migration.
+- `backend/app/core/event_bus/handlers.py` — `AgentHandler` persist
+  step.
+- [`features/heartbeat`](../features/heartbeat) — feature doc with
+  schema reference and worked examples.

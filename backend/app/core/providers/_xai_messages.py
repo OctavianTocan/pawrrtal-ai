@@ -93,8 +93,10 @@ def _assistant_proto(
     The xai-sdk helper :func:`xai_sdk.chat.assistant` only takes
     ``Content`` (text / image / file) and does not expose ``tool_calls``,
     so we construct the proto directly to preserve the agent loop's
-    tool-call history across iterations.  Empty text is allowed when
-    the turn is tool-calls-only — the proto handles it without complaint.
+    tool-call history across iterations.  When the turn has only tool
+    calls and no text, a single empty ``text("")`` element is included
+    because the xAI server requires at least one content element per
+    message (gRPC ``AioRpcError`` otherwise).
     """
     text_parts: list[str] = []
     tool_calls: list[chat_pb2.ToolCall] = []
@@ -112,7 +114,7 @@ def _assistant_proto(
             )
         )
     combined = "".join(text_parts)
-    proto_content = [text(combined)] if combined else []
+    proto_content = [text(combined)] if combined else [text("")]
     return chat_pb2.Message(
         role=chat_pb2.MessageRole.ROLE_ASSISTANT,
         content=proto_content,

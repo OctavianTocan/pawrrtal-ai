@@ -43,7 +43,6 @@ from app.core.providers._xai_stream import (
 )
 from app.core.providers.xai_provider import (
     XaiLLM,
-    _live_search_off,
     _map_reasoning_effort,
     _resolve_xai_api_key,
     make_xai_stream_fn,
@@ -252,8 +251,12 @@ def test_build_messages_translates_assistant_with_tool_calls() -> None:
     assert json.loads(call.function.arguments) == {"q": "pawrrtal"}
 
 
-def test_build_messages_assistant_tool_calls_only_keeps_empty_content() -> None:
-    """An assistant turn that's only tool_calls drops the text content array."""
+def test_build_messages_assistant_tool_calls_only_includes_empty_text() -> None:
+    """An assistant turn that's only tool_calls includes an empty text element.
+
+    The xAI server requires at least one content element per message,
+    so tool-calls-only turns get ``text("")`` instead of an empty list.
+    """
     assistant = AssistantMessage(
         role="assistant",
         content=[
@@ -263,7 +266,8 @@ def test_build_messages_assistant_tool_calls_only_keeps_empty_content() -> None:
     )
     msgs = build_xai_messages([assistant], system_prompt="sys")
     proto = msgs[1]
-    assert list(proto.content) == []
+    assert len(proto.content) == 1
+    assert proto.content[0].text == ""
     assert proto.tool_calls[0].function.name == "ping"
 
 
@@ -323,7 +327,7 @@ def test_resolve_api_key_workspace_override(
 
 
 # ---------------------------------------------------------------------------
-# _map_reasoning_effort + _live_search_off
+# _map_reasoning_effort
 # ---------------------------------------------------------------------------
 
 
@@ -334,14 +338,6 @@ def test_map_reasoning_effort_collapses_four_levels_to_two() -> None:
     assert _map_reasoning_effort("medium") == chat_pb2.ReasoningEffort.EFFORT_LOW
     assert _map_reasoning_effort("high") == chat_pb2.ReasoningEffort.EFFORT_HIGH
     assert _map_reasoning_effort("extra-high") == chat_pb2.ReasoningEffort.EFFORT_HIGH
-
-
-def test_live_search_off_returns_off_mode() -> None:
-    """The default Live Search guard sets ``mode="off"``."""
-    sp = _live_search_off()
-    # ``SearchParameters`` is the xai-sdk dataclass; the live wire mode
-    # is exposed via the ``mode`` attribute as a string literal.
-    assert sp.mode == "off"
 
 
 # ---------------------------------------------------------------------------
@@ -535,10 +531,10 @@ async def test_stream_fn_emits_tool_calls_after_stream(
 
 
 @pytest.mark.anyio
-async def test_stream_fn_request_carries_search_off_and_reasoning_effort(
+async def test_stream_fn_request_carries_reasoning_effort(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The create() kwargs always disable Live Search and forward the mapped effort."""
+    """The create() kwargs forward the mapped reasoning effort."""
     fake = _patch_async_client(
         monkeypatch, [(_fake_response(content="hi"), _fake_chunk(content="hi"))]
     )
@@ -552,13 +548,9 @@ async def test_stream_fn_request_carries_search_off_and_reasoning_effort(
     kwargs = fake.chat.last_create_kwargs
     assert kwargs is not None
     assert kwargs["model"] == "grok-4.3"
-    # First message is the system prompt rendered as ROLE_DEVELOPER.
     assert kwargs["messages"][0].role == chat_pb2.MessageRole.ROLE_DEVELOPER
     assert kwargs["messages"][0].content[0].text == "custom-sys"
-    # extra-high → EFFORT_HIGH (the upper bucket of grok-4.3's two-level enum).
     assert kwargs["reasoning_effort"] == chat_pb2.ReasoningEffort.EFFORT_HIGH
-    # Live Search forced off so xAI's built-in search doesn't fire.
-    assert kwargs["search_parameters"].mode == "off"
 
 
 @pytest.mark.anyio

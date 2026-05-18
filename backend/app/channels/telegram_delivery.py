@@ -186,6 +186,78 @@ async def safe_send_html(
     return message_id if isinstance(message_id, int) else None
 
 
+async def safe_send_draft(
+    bot: Bot,
+    chat_id: int | str,
+    draft_id: int,
+    html: str,
+    *,
+    message_thread_id: int | None = None,
+) -> bool:
+    """Call ``SendMessageDraft`` (Bot API 9.3+) for animated streaming.
+
+    The draft animates in chat without occupying a permanent message slot.
+    It auto-expires after 30 s if not refreshed. Pass an empty string for
+    ``html`` to show Telegram's native "Thinking…" animated placeholder.
+
+    Falls back gracefully when the aiogram binding for ``SendMessageDraft``
+    is not available (pre-3.27.0 builds or older servers). Returns ``True``
+    on success, ``False`` on any expected error.
+
+    Args:
+        bot: Live aiogram ``Bot`` instance.
+        chat_id: Target Telegram chat ID (private chats only).
+        draft_id: Stable non-zero int that identifies this draft — the
+            same ID animates updates in-place.
+        html: Pre-rendered Telegram HTML to show, or ``""`` for the native
+            "Thinking…" placeholder (Bot API 10.0+).
+        message_thread_id: Optional topic thread ID.
+
+    Returns:
+        ``True`` when the draft was sent successfully, ``False`` otherwise.
+    """
+    if len(html) > MAX_MESSAGE_LEN:
+        html = html[: MAX_MESSAGE_LEN - 1] + "..."
+    # Fall back to a non-empty placeholder when the caller requested an empty
+    # text (native "Thinking…") but the installed aiogram / Bot API version
+    # requires a non-empty ``text`` field.  The literal fallback is benign
+    # and will be overwritten on the next real chunk.
+    effective_text = html if html.strip() else "💭 Thinking…"
+    try:
+        # aiogram ≥ 3.27.0 ships SendMessageDraft as a native method.
+        from aiogram.methods import SendMessageDraft  # noqa: PLC0415
+
+        kwargs: dict[str, object] = {
+            "chat_id": chat_id,
+            "draft_id": draft_id,
+            "text": effective_text,
+        }
+        if message_thread_id is not None:
+            kwargs["message_thread_id"] = message_thread_id
+        result = await bot(SendMessageDraft(**kwargs))
+        return bool(result)
+    except ImportError:
+        # aiogram < 3.27.0 — SendMessageDraft not available; silently skip.
+        logger.debug("TELEGRAM_DRAFT_UNSUPPORTED bot_api_version=pre_9.3")
+        return False
+    except _aiogram_errors() as exc:
+        logger.warning(
+            "TELEGRAM_DRAFT_FAILED chat_id=%s draft_id=%s error=%s",
+            chat_id,
+            draft_id,
+            exc,
+        )
+        return False
+    except Exception as exc:
+        logger.warning(
+            "TELEGRAM_DRAFT_FAILED chat_id=%s draft_id=%s error=%s",
+            chat_id,
+            draft_id,
+            exc,
+        )
+        return False
+
+
 async def safe_delete(bot: Bot, chat_id: int | str, message_id: int) -> None:
     """Delete an unused placeholder, logging but not raising on failure."""
     try:

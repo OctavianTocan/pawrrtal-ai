@@ -58,8 +58,7 @@ def span_exporter() -> Iterator[InMemorySpanExporter]:
         yield exporter
     finally:
         workshop_module._tracer = previous_module_tracer
-        # set_tracer_provider on the global is technically one-shot;
-        # restoring it is best-effort so tests don't leak state.
+        workshop_module._previous_turn.clear()
         trace.set_tracer_provider(previous_provider)
         provider.shutdown()
 
@@ -774,3 +773,70 @@ async def test_run_turn_stamps_latency_attributes_on_turn_span(
     forwarded = _noop_finalize.last_kwargs  # type: ignore[attr-defined]
     assert forwarded["ttft_ms"] is not None
     assert forwarded["ttft_ms"] >= 0.0
+
+
+def test_turn_span_links_to_previous_turn_in_same_conversation(
+    span_exporter: InMemorySpanExporter,
+) -> None:
+    """Successive turns in the same conversation are linked via span links."""
+    conv_id = uuid.uuid4()
+
+    # First turn — no previous context, so no links expected.
+    with turn_span(
+        conversation_id=conv_id,
+        user_id=uuid.uuid4(),
+        surface="WEB",
+        request_id="r1",
+        model_id="test:model",
+    ):
+        pass
+    first_spans = span_exporter.get_finished_spans()
+    first_turn = first_spans[-1]
+    assert first_turn.links is None or len(first_turn.links) == 0
+    span_exporter.clear()
+
+    # Second turn — should link back to the first turn's span context.
+    with turn_span(
+        conversation_id=conv_id,
+        user_id=uuid.uuid4(),
+        surface="WEB",
+        request_id="r2",
+        model_id="test:model",
+    ):
+        pass
+    second_spans = span_exporter.get_finished_spans()
+    second_turn = second_spans[-1]
+    assert second_turn.links is not None
+    assert len(second_turn.links) == 1
+    assert second_turn.links[0].context.span_id == first_turn.context.span_id
+    assert second_turn.links[0].context.trace_id == first_turn.context.trace_id
+
+
+def test_turn_span_no_link_across_different_conversations(
+    span_exporter: InMemorySpanExporter,
+) -> None:
+    """Turns in different conversations must not be linked."""
+    conv_a = uuid.uuid4()
+    conv_b = uuid.uuid4()
+
+    with turn_span(
+        conversation_id=conv_a,
+        user_id=uuid.uuid4(),
+        surface="WEB",
+        request_id="r1",
+        model_id="test:model",
+    ):
+        pass
+    span_exporter.clear()
+
+    with turn_span(
+        conversation_id=conv_b,
+        user_id=uuid.uuid4(),
+        surface="WEB",
+        request_id="r2",
+        model_id="test:model",
+    ):
+        pass
+    second_spans = span_exporter.get_finished_spans()
+    second_turn = second_spans[-1]
+    assert second_turn.links is None or len(second_turn.links) == 0

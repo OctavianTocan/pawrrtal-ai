@@ -11,17 +11,28 @@ The split is along clean seams:
 * :func:`handle_tool_use` / :func:`handle_thinking` — per-event
   Telegram I/O that ``deliver`` delegates into.
 * :func:`finalize_turn_delivery` — post-stream cleanup of the
-  placeholder + final-answer message (#288, #293).
+  placeholder + final-answer message (#288, #293, #306).
+
+Draft streaming helpers (Workstream 1) live in
+:mod:`app.channels._telegram_draft`.
 """
 
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
+import time
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from app.core.providers.base import StreamEvent
 
+from ._telegram_draft import (
+    _TEXT_DRAFT_ID,
+    DraftStreamState,
+    handle_text_delta_draft,
+)
 from .telegram_delivery import (
     format_tool_use,
     plain_html,
@@ -32,17 +43,83 @@ from .telegram_delivery import (
     safe_send_text,
     thinking_html,
 )
+from .telegram_progress import (
+    render_tool_error,
+    render_tool_success,
+    render_tools_in_flight,
+)
 
 if TYPE_CHECKING:
     from aiogram import Bot
 
 logger = logging.getLogger(__name__)
 
+# Re-export for callers that import directly from this module.
+__all__ = [
+    "_TEXT_DRAFT_ID",
+    "DraftStreamState",
+    "ToolLineState",
+    "capture_terminal_event",
+    "dispatch_text_delta",
+    "finalize_turn_delivery",
+    "handle_text_delta",
+    "handle_thinking",
+    "handle_tool_result",
+    "handle_tool_use",
+    "prepare_thinking_block",
+    "prepare_tools_block",
+]
+
 # Mirror constants from ``telegram.py`` rather than import them, so the
 # module can be safely imported in either direction.
 _EDIT_DEBOUNCE_CHARS = 40
 _MAX_EDIT_INTERVAL_S = 3.0
 _EMPTY_RESPONSE_FALLBACK = "⚠️ The agent finished without producing a reply. Please try again."
+
+
+# ---------------------------------------------------------------------------
+# Per-tool state tracking (Workstream 4)
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class ToolLineState:
+    """State for a single tool call line in the tools-trace message.
+
+    Tracks display text and timing so we can mutate from in-flight
+    → success/failure once the ``tool_result`` event arrives.
+    """
+
+    call_id: str
+    display: str
+    """Formatted display string (icon + label) for the in-flight state."""
+    started_at: float = field(default_factory=time.monotonic)
+    result_line: str | None = None
+    """Set to the rendered success/error HTML when the result arrives."""
+
+    @property
+    def rendered_line(self) -> str:
+        """Current display line — result if available, else in-flight."""
+        if self.result_line is not None:
+            return self.result_line
+        return self.display
+
+
+def _render_tools_block(
+    tool_states: dict[str, ToolLineState],
+    in_flight_names: list[str],
+) -> str:
+    """Render the full tools trace from per-tool state.
+
+    Completed tools show their success/error line; pending tools show
+    the in-flight display string. A summary header is prepended when
+    tools are still running.
+    """
+    lines = [state.rendered_line for state in tool_states.values()]
+    if in_flight_names:
+        header = render_tools_in_flight(in_flight_names)
+        lines = [header, *lines]
+    return "\n".join(lines)
 
 
 async def prepare_tools_block(
@@ -99,14 +176,27 @@ async def handle_tool_use(
     tool_trace: str,
     chars_since_edit: int,
     last_edit_at: float,
+    tool_states: dict[str, ToolLineState] | None = None,
 ) -> tuple[str, int, float]:
     """Inject a detailed tool-call row into the editable Telegram trace.
 
+    When ``tool_states`` is provided (Workstream 4), the per-tool state
+    dict is updated so downstream ``tool_result`` events can update the
+    line in-place.
+
     Returns the updated ``(tool_trace, chars_since_edit, last_edit_at)``
-    triple so the caller can flow it into the next iteration unchanged.
+    triple.
     """
+    call_id = str(event.get("id") or event.get("tool_use_id") or "")
     line = format_tool_use(event)
-    tool_trace = f"{tool_trace}\n{line}" if tool_trace else line
+
+    if tool_states is not None and call_id:
+        tool_states[call_id] = ToolLineState(call_id=call_id, display=line)
+        in_flight = [s.display for s in tool_states.values() if s.result_line is None]
+        tool_trace = _render_tools_block(tool_states, in_flight)
+    else:
+        tool_trace = f"{tool_trace}\n{line}" if tool_trace else line
+
     chars_since_edit += len(line)
     now = asyncio.get_event_loop().time()
     elapsed = now - last_edit_at
@@ -114,6 +204,49 @@ async def handle_tool_use(
         await safe_edit_html(bot, chat_id, message_id, plain_html(tool_trace))
         return tool_trace, 0, now
     return tool_trace, chars_since_edit, last_edit_at
+
+
+async def handle_tool_result(
+    *,
+    event: StreamEvent,
+    bot: Bot,
+    chat_id: int | str,
+    message_id: int,
+    tool_trace: str,
+    chars_since_edit: int,
+    last_edit_at: float,
+    tool_states: dict[str, ToolLineState],
+) -> tuple[str, int, float]:
+    """Update the tool trace when a ``tool_result`` event arrives.
+
+    Computes elapsed time from the corresponding ``tool_use`` start,
+    renders the success/error line, and forces an edit.
+    """
+    call_id = str(event.get("tool_use_id") or event.get("id") or "")
+    state = tool_states.get(call_id)
+    if state is None:
+        logger.debug(
+            "TELEGRAM_TOOL_RESULT_NO_STATE call_id=%s chat_id=%s",
+            call_id,
+            chat_id,
+        )
+        return tool_trace, chars_since_edit, last_edit_at
+
+    elapsed_ms = int((time.monotonic() - state.started_at) * 1000)
+    is_error = bool(event.get("is_error"))
+
+    if is_error:
+        raw_error = str(event.get("content") or "Error")
+        state.result_line = render_tool_error(state.display, raw_error)
+    else:
+        state.result_line = render_tool_success(state.display, elapsed_ms)
+
+    in_flight = [s.display for s in tool_states.values() if s.result_line is None]
+    tool_trace = _render_tools_block(tool_states, in_flight)
+
+    now = asyncio.get_event_loop().time()
+    await safe_edit_html(bot, chat_id, message_id, plain_html(tool_trace))
+    return tool_trace, 0, now
 
 
 async def handle_thinking(
@@ -131,17 +264,17 @@ async def handle_thinking(
     if not chunk:
         return thinking_text, thinking_message_id
     thinking_text = f"{thinking_text}\n{chunk}" if thinking_text else chunk
-    html = thinking_html(thinking_text)
+    rendered = thinking_html(thinking_text)
     if thinking_message_id is None:
         message_id = await safe_send_html(
             bot,
             chat_id,
-            html,
+            rendered,
             reply_to_message_id=reply_to_message_id,
             message_thread_id=message_thread_id,
         )
         return thinking_text, message_id
-    await safe_edit_html(bot, chat_id, thinking_message_id, html)
+    await safe_edit_html(bot, chat_id, thinking_message_id, rendered)
     return thinking_text, thinking_message_id
 
 
@@ -153,12 +286,7 @@ def capture_terminal_event(
     agent_terminated_prefix: str,
     error_prefix: str,
 ) -> tuple[str | None, str] | None:
-    """Return ``(message, prefix)`` for a terminal event, or ``None`` otherwise.
-
-    Centralises the ``agent_terminated`` / ``error`` warning log + copy
-    selection so the main deliver loop stays under the project's
-    PLR0915 statement budget.
-    """
+    """Return ``(message, prefix)`` for a terminal event, or ``None`` otherwise."""
     etype = event.get("type")
     if etype == "agent_terminated":
         message = event.get("content", "Agent terminated.")
@@ -193,24 +321,20 @@ async def dispatch_text_delta(
     last_edit_at: float,
     reply_to_message_id: int | None,
     message_thread_id: int | None,
+    draft_state: DraftStreamState | None = None,
 ) -> tuple[str, int | None, int, float, bool]:
     """Apply the #306 fresh-block reset (if needed) and stream the chunk.
 
     Returns the updated text-buffer state plus a ``rendered`` flag:
 
-    * ``rendered=False`` for the legacy accumulate path — when no
-      thinking or tool block has rendered yet, we keep the original
-      "send the final answer at the end" UX for pure-text turns. The
-      caller should not update ``previous_block_kind`` in that case so
-      a later block still consumes the placeholder normally.
-    * ``rendered=True`` when an interleaved text block was opened or
-      edited in chat.
+    * ``rendered=False`` for the legacy accumulate path — when no thinking
+      or tool block has rendered yet we keep "send the final answer at
+      the end" UX.
+    * ``rendered=True`` when an interleaved text block was opened or edited.
     """
     if previous_block_kind in (None, "text"):
         return text_buffer, text_message_id, chars_since_edit, last_edit_at, False
     if previous_block_kind != "text":
-        # Fresh interleaved text block — reset the streaming slot so
-        # the new Telegram message starts clean.
         text_message_id = None
         text_buffer = ""
         chars_since_edit = 0
@@ -230,6 +354,7 @@ async def dispatch_text_delta(
         last_edit_at=last_edit_at,
         reply_to_message_id=reply_to_message_id,
         message_thread_id=message_thread_id,
+        draft_state=draft_state,
     )
     return text_buffer, text_message_id, chars_since_edit, last_edit_at, True
 
@@ -245,16 +370,28 @@ async def handle_text_delta(
     last_edit_at: float,
     reply_to_message_id: int | None,
     message_thread_id: int | None,
+    draft_state: DraftStreamState | None = None,
 ) -> tuple[str, int | None, int, float]:
     """Append ``chunk`` to the live text message — open one if needed (#306).
 
-    Mirrors :func:`handle_tool_use` debounce: only edits once we have
-    enough new chars or enough elapsed time so we don't hammer
-    Telegram with one ``edit_message_text`` per token.
+    When ``draft_state`` is provided (``telegram_use_draft_streaming=True``),
+    chunks route through ``sendMessageDraft`` instead of ``editMessageText``.
     """
     if not chunk:
         return text_buffer, text_message_id, chars_since_edit, last_edit_at
     text_buffer = f"{text_buffer}{chunk}"
+
+    if draft_state is not None:
+        return await handle_text_delta_draft(
+            bot=bot,
+            text_buffer=text_buffer,
+            chunk=chunk,
+            chars_since_edit=chars_since_edit,
+            last_edit_at=last_edit_at,
+            draft_state=draft_state,
+        )
+
+    # Legacy editMessageText path.
     if text_message_id is None:
         new_id = await safe_send_text(
             bot,
@@ -287,14 +424,23 @@ async def finalize_turn_delivery(
     final_text: str,
     reply_to_message_id: int | None,
     message_thread_id: int | None,
+    draft_state: DraftStreamState | None = None,
 ) -> None:
     """Resolve the ⏳ placeholder and send the closing reply (#288, #293, #306).
 
-    When ``text_message_id`` is set, an in-stream text message is
-    already on screen — we flush its final buffer in place and skip
-    the closing ``final_text`` send so the user doesn't see the
+    When ``draft_state`` is set, the keepalive task is cancelled and the
+    final text is persisted via ``sendMessage`` (drafts auto-expire and
+    never appear in the user's message history).
+
+    When ``text_message_id`` is set, we flush its final buffer in place
+    and skip the closing ``final_text`` send so the user doesn't see the
     answer twice.
     """
+    if draft_state is not None and draft_state.keepalive_task is not None:
+        draft_state.keepalive_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await draft_state.keepalive_task
+
     if first_block_kind == "tools":
         await safe_edit_html(bot, chat_id, placeholder_message_id, plain_html(tool_trace))
     elif first_block_kind in ("thinking", "text") or final_text:
@@ -308,8 +454,6 @@ async def finalize_turn_delivery(
         )
 
     if text_message_id is not None and text_buffer:
-        # Final flush so the last debounced chunk lands even if we
-        # were inside the debounce window when the stream ended.
         await safe_edit(bot, chat_id, text_message_id, text_buffer)
         return
 

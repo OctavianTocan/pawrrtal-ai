@@ -1,0 +1,245 @@
+---
+title: Interactive Artifacts
+description: How `render_artifact` widgets (button, choice, text, number) round-trip user input back to the model via the regular chat send flow.
+---
+
+# Interactive Artifacts
+
+`render_artifact` already gives the model a way to draw structured cards
+in chat (comparison tables, step lists, route grids). Interactive
+artifacts extend the catalog with four widgets the *user* can act on —
+each click, choice, or value submission becomes a follow-up user
+message in the next turn, with a deterministic identifier so the model
+knows which widget the user touched.
+
+This page is the how. The design rationale is in
+[`2026-05-18-interactive-artifact-widgets`](../decisions/2026-05-18-interactive-artifact-widgets).
+
+## The widgets
+
+All four widgets live in the artifact catalog
+(`frontend/features/chat/artifacts/catalog.ts`) and are validated by
+zod before render. The model authors them inside the same flat-spec
+shape as every other artifact element:
+
+```json
+{
+  "root": "page",
+  "elements": {
+    "page": { "type": "Page", "children": ["heading", "accept"] },
+    "heading": { "type": "Heading", "props": { "text": "Ready to commit?" } },
+    "accept": {
+      "type": "ActionButton",
+      "props": {
+        "label": "Accept and continue",
+        "actionId": "accept_plan",
+        "style": "primary"
+      }
+    }
+  }
+}
+```
+
+### `ActionButton`
+
+A single click target.
+
+| Prop | Type | Notes |
+|---|---|---|
+| `label` | `string` | Button text. Also the value sent on click. |
+| `actionId` | `string` | Stable id the model uses to recognise the click. |
+| `style` | `'primary' \| 'secondary' \| null` | Optional visual weight. |
+
+Use when there's a single decision to commit. Stacking many buttons is
+discouraged — `ChoiceGroup` is the right shape for "pick one of N".
+
+### `ChoiceGroup`
+
+Radio (`multi: false`) or checkbox (`multi: true`) group with optional
+prompt text.
+
+| Prop | Type | Notes |
+|---|---|---|
+| `actionId` | `string` | Stable id the model uses to recognise the response. |
+| `prompt` | `string \| null` | Optional headline shown above the options. |
+| `multi` | `boolean` | Radio (`false`) or checkbox (`true`). |
+| `options` | `{ value, label }[]` | `value` is the join key; `label` is what the user sees. |
+
+The submitted user message is the comma-joined list of selected
+*labels* (readable in chat history); the structured `value` carried on
+the payload is the selected option `value` (single) or `value[]`
+(multi). The model should match on `actionId` + the value(s), not on
+the user-visible label.
+
+### `TextField`
+
+Free-text input. Single-line submits on Enter; multi-line uses an
+explicit button to avoid trapping newline keystrokes.
+
+| Prop | Type | Notes |
+|---|---|---|
+| `actionId` | `string` | Stable id the model uses to recognise the response. |
+| `label` | `string` | Visible field label. |
+| `placeholder` | `string \| null` | Placeholder hint. |
+| `multiline` | `boolean` | Single line vs textarea. |
+| `submitLabel` | `string \| null` | Defaults to "Submit". |
+
+The trimmed text becomes both the user-visible message body and the
+structured value.
+
+### `NumberField`
+
+Slider or numeric input. The model picks the affordance with `kind`.
+
+| Prop | Type | Notes |
+|---|---|---|
+| `actionId` | `string` | Stable id the model uses to recognise the response. |
+| `label` | `string` | Visible field label. |
+| `min` / `max` / `step` | `number \| null` | Standard slider/input bounds. |
+| `defaultValue` | `number \| null` | Initial value; falls back to `min`, then `0`. |
+| `kind` | `'slider' \| 'input'` | Slider or number input. |
+| `submitLabel` | `string \| null` | Defaults to "Submit". |
+
+The submitted user message is `"<label>: <value>"` so the chat history
+reads naturally; the structured value is the bare number.
+
+## How `actionId` flows back to the model
+
+`actionId` is the join key the model trusts. The model picks it when
+authoring the artifact (snake_case, meaningful: `accept_plan`,
+`pick_severity`, `days_to_wait`). On the next turn the model sees:
+
+1. The artifact it just rendered, still attached to the previous
+   tool-call, with the `actionId` visible in the widget's props.
+2. A regular user message whose body is the human-readable label
+   (button text, joined choice labels, the typed string, or
+   `"<field-label>: <value>"` for numbers).
+
+That's it — there is no sidecar event, no special channel. The model
+matches "the user replied to artifact X, action `accept_plan`" by
+correlating the message with the artifact in recent history.
+
+## Surface-awareness
+
+The widget catalog only ships in tool descriptions on surfaces that
+can render it. `make_artifact_tool(surface=...)` in
+`backend/app/core/tools/artifact_agent.py` switches the catalog string
+the model sees:
+
+- `surface` in `{"web", "electron"}` → read-only catalog **+**
+  interactive widgets **+** the "interactions arrive as follow-up user
+  messages" blurb.
+- Any other surface (Telegram today) → read-only catalog only.
+
+**Validation is surface-independent.** If the model emits an
+`ActionButton` on Telegram anyway (e.g. carrying over context from a
+previous turn), it still validates — Telegram's text renderer
+gracefully degrades the artifact card. The surface gating is a prompt
+nudge, not a backend rejection.
+
+When you add a new surface, decide whether it renders widgets and add
+it to `_INTERACTIVE_SURFACES` in `artifact_agent.py`.
+
+## What's web/electron-only
+
+| Component | Where |
+|---|---|
+| Renderers — `ActionButtonRenderer`, `ChoiceGroupRenderer`, `TextFieldRenderer`, `NumberFieldRenderer` | `frontend/features/chat/artifacts/interactive-components.tsx` |
+| Catalog entries (zod schemas + descriptions) | `frontend/features/chat/artifacts/catalog.ts` |
+| Two-layer context | `frontend/features/chat/artifacts/interaction-context.tsx` |
+| Outer provider | `frontend/features/chat/ChatContainer.tsx` (`ArtifactInteractionProvider` wraps the chat tree) |
+| Inner provider | `frontend/features/chat/artifacts/ArtifactRenderer.tsx` (`ArtifactInteractionScope` wraps every rendered artifact) |
+| Dialog auto-close on submit | `frontend/features/chat/artifacts/ArtifactDialog.tsx` (passes `onInteractionSubmitted={onClose}`) |
+| CSS | `frontend/features/chat/artifacts/artifact.css` |
+
+Telegram and any other text-only surfaces never load these files —
+they're frontend-only.
+
+## How interactions become user messages
+
+1. User clicks / picks / types / drags inside a widget.
+2. The widget calls `useArtifactInteraction().submit({ actionId, label, value })`.
+3. The inner `ArtifactInteractionScope` injects the current
+   `artifactId` and the default `mode: 'new_turn'`, then forwards the
+   fully-shaped payload to the outer handler.
+4. The outer handler in `ChatContainer` calls
+   `chat.sendMessage({ content: payload.label, files: [] })`. From
+   that point it's a regular user message — streaming, history,
+   regenerate, and copy all work as usual.
+5. If the artifact was open in `ArtifactDialog`, the dialog closes so
+   the user sees the chat respond.
+
+The composer gate (`gate.isComposerBlocked`) applies to interactions
+too: if the user can't send a typed message, they can't submit a
+widget either. The widget renders disabled in that case rather than
+silently dropping the click.
+
+## Minimal example specs
+
+### "Accept or reject this plan"
+
+```json
+{
+  "root": "page",
+  "elements": {
+    "page": { "type": "Page", "children": ["h", "p", "actions"] },
+    "h":    { "type": "Heading", "props": { "text": "Migration plan" } },
+    "p":    { "type": "Paragraph", "props": { "text": "Move workspace env to per-workspace keying. Touches 4 callers." } },
+    "actions": { "type": "Section", "children": ["accept", "revise"] },
+    "accept":  { "type": "ActionButton", "props": { "label": "Accept and proceed", "actionId": "accept_plan",  "style": "primary"   } },
+    "revise":  { "type": "ActionButton", "props": { "label": "Revise the plan",    "actionId": "revise_plan",  "style": "secondary" } }
+  }
+}
+```
+
+The next user turn arrives as either `"Accept and proceed"` or
+`"Revise the plan"`; the model matches `actionId` to decide which
+branch to run.
+
+### "How many days?"
+
+```json
+{
+  "root": "page",
+  "elements": {
+    "page":  { "type": "Page", "children": ["q", "field"] },
+    "q":     { "type": "Heading", "props": { "text": "How many days should we wait?" } },
+    "field": {
+      "type": "NumberField",
+      "props": {
+        "actionId": "days_to_wait",
+        "label": "Days",
+        "min": 1, "max": 30, "step": 1, "defaultValue": 7,
+        "kind": "slider",
+        "submitLabel": "Use this value"
+      }
+    }
+  }
+}
+```
+
+The next user turn arrives as e.g. `"Days: 7"` and the structured
+value is the bare number `7`, joined back to the model via the
+`days_to_wait` action id.
+
+## Checklist when adding a new interactive widget
+
+- Add a catalog entry in
+  `frontend/features/chat/artifacts/catalog.ts` with zod-validated
+  props and a model-facing description.
+- Add a renderer in
+  `frontend/features/chat/artifacts/interactive-components.tsx`. The
+  renderer reads `useArtifactInteraction()` and calls
+  `submit({ actionId, label, value })` — never imports `sendMessage`
+  directly.
+- Wire the renderer into `artifactComponents` in
+  `frontend/features/chat/artifacts/components.tsx`.
+- Update `_INTERACTIVE_CATALOG` in
+  `backend/app/core/tools/artifact_agent.py` so the model is told the
+  widget exists on web/electron.
+- Add a vitest spec driving the widget through the catalog → renderer
+  → dispatched-payload pipeline (see existing tests in
+  `interactive-components.test.tsx`).
+- Add a pytest case confirming the new component name appears in the
+  interactive description on `web`/`electron` and not on `telegram`
+  (see `backend/tests/test_artifact_tool.py`).

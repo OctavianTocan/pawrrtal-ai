@@ -1,0 +1,161 @@
+---
+title: LiteLLM provider
+description: How OpenAI chat models route through the in-process LiteLLM SDK, how to configure `OPENAI_API_KEY`, and what's gated on the v1 surface.
+---
+
+# LiteLLM provider
+
+The LiteLLM provider is the third class behind Pawrrtal's `AILLM`
+seam (alongside `ClaudeLLM` and `GeminiLLM`). It uses the
+[LiteLLM Python SDK](https://docs.litellm.ai/) running in-process to
+serve OpenAI chat models — GPT-4o and the o-series — through the
+same agent-loop `StreamFn` plumbing as Gemini. There is no separate
+LiteLLM proxy service to operate.
+
+For the rationale (why LiteLLM, why SDK-not-proxy, why text-only for
+v1, why xAI lives elsewhere now) see
+[`2026-05-18-litellm-routing.mdx`](../decisions/2026-05-18-litellm-routing).
+This page is the operational guide.
+
+## Which models route through LiteLLM
+
+Today the catalog maps the following models to
+`Host.litellm` + `Vendor.openai`:
+
+| Catalog entry | Use case |
+|---|---|
+| `litellm:openai/gpt-4o` | General-purpose chat |
+| `litellm:openai/gpt-4o-mini` | Cheaper / faster generalist |
+| `litellm:openai/o1` | Reasoning, long-form planning |
+| `litellm:openai/o1-mini` | Cheaper reasoning |
+| `litellm:openai/o3-mini` | Newer reasoning baseline |
+
+The exact list is the source of truth in
+`backend/app/core/providers/catalog.py`; the model picker fetches
+it through `GET /api/v1/models`, so the frontend is automatically
+in sync.
+
+xAI / Grok models are **not** served by this provider. They live
+under `Host.xai` and run on the official `xai-sdk`. See the xAI
+swap [#324](https://github.com/OctavianTocan/pawrrtal/pull/324) and
+the routing ADR for why.
+
+## Configuring `OPENAI_API_KEY`
+
+`OPENAI_API_KEY` is the only credential the LiteLLM provider needs
+for the launch surface. Resolution order — the same shape as every
+other Pawrrtal env key, handled by
+`resolve_api_key(workspace_id, "OPENAI_API_KEY")`:
+
+1. **Per-workspace encrypted env** — set in **Settings → Workspaces
+   → API keys**. Stored as `OPENAI_API_KEY` inside the workspace's
+   encrypted `.env`. This is the recommended path; the key only
+   applies to that workspace, and a user with multiple workspaces
+   can use different keys per workspace.
+2. **Gateway-global setting** — `Settings.openai_api_key` from the
+   backend's `.env`. Used as the fallback when the workspace has
+   no override. Convenient for single-tenant deployments where one
+   operator key serves every workspace.
+
+If neither resolves, the provider yields a structured error event
+into the stream — `LiteLLM error: missing OPENAI_API_KEY — set it
+in the workspace env or as a gateway env var.` — and returns. No
+exception is raised through the provider boundary; the chat router
+ships the error event back to the client like any other failure.
+
+The workspace env settings UI (`WorkspacesSection.tsx` →
+`KEY_METAS`) shows the OpenAI key row alongside the Gemini and
+Claude rows. The frontend mirror lives in
+`use-workspace-env.ts` (`WORKSPACE_ENV_KEY_IDS`) and the backend
+allowlist lives in `backend/app/core/keys.py` (`OVERRIDABLE_KEYS`)
+— same three-place setup that the
+[plugin guide](./adding-a-plugin) describes for any new env key.
+
+## What's gated in v1
+
+The LiteLLM provider intentionally ships as **text-only**. The
+`AILLM` protocol stays uniform — `LiteLLMLLM.stream(...)` accepts
+every keyword argument the other providers do — but several
+features are accepted and dropped with a debug log rather than
+plumbed through. Don't reach for them yet:
+
+- **Workspace tools.** `tools=` is accepted on every call but
+  `make_litellm_stream_fn` logs
+  `LITELLM_TOOLS_IGNORED model=… count=…` and drops them. For
+  tool-driven flows (filesystem, Exa, image-gen, send_message,
+  artifacts) pick a Claude or Gemini model.
+- **Multimodal inputs.** `images=` is accepted and dropped with
+  `LITELLM_IMAGES_IGNORED conversation_id=… count=…`. Lands with
+  the tool-bridge PR since both touch the same message helper.
+- **Reasoning effort.** `reasoning_effort=` is accepted by the
+  o-series catalog entries and dropped at the provider boundary.
+  o-series models still run with their default effort.
+- **Cost accounting.** LiteLLM exposes per-call cost on the
+  response, but Pawrrtal does not surface it yet. Per-Mtok rates
+  live on the catalog entries; a cost ledger is a follow-up.
+- **`ToolResultMessage` in history.** The history converter drops
+  tool-result messages because there's no matching tool-call
+  message to roundtrip them. Roundtrip lands with the tool bridge.
+
+The drop list is the same drop list documented in the
+[ADR](../decisions/2026-05-18-litellm-routing). The provider
+docstring (`backend/app/core/providers/litellm_provider.py`) is
+the canonical reference if any of this drifts.
+
+## How the request flows
+
+A user message bound to a LiteLLM-routed model walks the same path
+every other chat does — the chat router doesn't special-case the
+provider:
+
+1. The chat router parses `model_id` into a `ParsedModelId`. For an
+   OpenAI model that lands on `Host.litellm` + `Vendor.openai`.
+2. `resolve_llm(parsed, workspace_id=...)` reads
+   `HOST_TO_PROVIDER[Host.litellm]` → `LiteLLMLLM` and constructs
+   the provider with the bare model slug, the vendor, and the
+   workspace ID.
+3. `LiteLLMLLM.stream(...)` assembles an `AgentContext`, builds a
+   `StreamFn` via `make_litellm_stream_fn(...)` (unless a test has
+   monkeypatched `_stream_fn`), and runs the shared `agent_loop`.
+4. The StreamFn resolves the API key, formats the model string as
+   `openai/<model>` for `litellm.acompletion(...)`, and yields
+   `LLMTextDeltaEvent` per chunk plus a final `LLMDoneEvent`.
+5. `agent_event_to_stream_event` (shared with the Gemini provider)
+   translates loop events into the SSE shape the frontend
+   consumes. No LiteLLM-specific code on the wire.
+
+The takeaway: the provider is a thin adapter. Most of what it does
+is shape-mapping; the agent loop, safety layer, and SSE pipeline
+are unchanged.
+
+## Testing
+
+Tests follow the
+[`ScriptedStreamFn` pattern](../../../.claude/rules/testing/agent-loop-testing-philosophy.md).
+`backend/tests/test_litellm_provider.py` covers the
+AgentEvent → StreamEvent translation, history wiring across turns,
+the tools-are-dropped contract, and the model-ID / catalog
+round-trips. The full backend suite passed when this provider
+landed (879 tests).
+
+When writing a new test against `LiteLLMLLM`, monkeypatch
+`_stream_fn` with a `ScriptedStreamFn` rather than patching
+`litellm.acompletion` directly — the rule above explains why.
+
+## Future moves
+
+These are the open follow-ups the ADR calls out, in priority order:
+
+- **OpenAI function-calling bridge.** Translate `AgentTool` into the
+  OpenAI `tools` schema, handle `tool_calls` deltas in the stream,
+  emit the matching `{"role": "tool", ...}` history entry. Unlocks
+  every workspace tool for LiteLLM-routed models.
+- **Wire `reasoning_effort` through to the o-series.** Today
+  accepted and dropped.
+- **Multimodal inputs** (lands with the tool bridge — same helper).
+- **Cost accounting.** Decide whether to read per-call cost off
+  the LiteLLM response or compute it locally from catalog rates.
+
+If you're picking one of these up, the
+[ADR's "Open follow-ups" section](../decisions/2026-05-18-litellm-routing#open-follow-ups)
+is the starting point.

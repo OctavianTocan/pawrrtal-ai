@@ -1,0 +1,149 @@
+---
+title: OpenCode Go gateway
+description: How GLM-5.1 and Kimi K2.6 are wired into Pawrrtal — what's on the gateway, how to configure the API key, and what the provider does and doesn't do today.
+---
+
+# OpenCode Go gateway
+
+**OpenCode Go** is SST's hosted OpenAI-compatible gateway at
+`https://opencode.ai/zen/go/v1`. Pawrrtal uses it to serve two
+open-weight coding models — **GLM-5.1** (z.ai) and **Kimi K2.6**
+(Moonshot) — behind a single thin async-OpenAI provider class.
+
+The design rationale lives in
+[`2026-05-18-opencode-go-routing.mdx`](../decisions/2026-05-18-opencode-go-routing).
+Read that first if you want to understand why the gateway sits
+under `Host.opencode_go` and not behind LiteLLM or a vendor-native
+SDK. This page is the operator-facing how.
+
+## What's on the gateway
+
+The upstream catalogue lives at
+[`sst/models.dev/providers/opencode-go/provider.toml`](https://github.com/sst/models.dev/blob/dev/providers/opencode-go/provider.toml).
+Pawrrtal mirrors a subset:
+
+| Canonical wire ID | Display name | In ($/Mtok) | Out ($/Mtok) | Notes |
+|---|---|---:|---:|---|
+| `opencode-go:zai/glm-5.1` | GLM-5.1 | 1.40 | 4.40 | Text-only inputs upstream |
+| `opencode-go:moonshot/kimi-k2.6` | Kimi K2.6 | 0.95 | 4.00 | Long-context coding model |
+
+Both surface in the model picker once `OPENCODE_API_KEY` is
+configured for the active workspace (or globally — see below).
+Rates are pulled from the catalogue entry; update them alongside
+upstream catalogue changes.
+
+## Configuring the API key
+
+`OPENCODE_API_KEY` is the gateway credential. Two ways to set it,
+matching every other paid provider in the repo:
+
+1. **Per-workspace (recommended).** Workspace Settings →
+   *Workspace Env* → paste the key into the **OpenCode API Key**
+   row. It is encrypted into `{workspace.path}/.env` and resolved
+   per-request via `resolve_api_key(workspace_id,
+   "OPENCODE_API_KEY")`. This is the same path used by
+   `EXA_API_KEY`, `XAI_API_KEY`, `NOTION_API_KEY`, etc.
+2. **Gateway-global fallback.** Set `OPENCODE_API_KEY` in the
+   backend process environment; `settings.opencode_api_key` reads
+   it via Pydantic Settings. The provider uses this only when the
+   active workspace has no per-workspace override (or for
+   background utility agents that run without a workspace).
+
+If neither is set, requests for `opencode-go:zai/glm-5.1` or
+`opencode-go:moonshot/kimi-k2.6` reach the gateway with an empty
+API key and the gateway returns an unauthenticated error — surfaced
+back to the chat as `"OpenCode Go error: ..."`.
+
+### Custom base URL
+
+`settings.opencode_go_base_url` (env: `OPENCODE_GO_BASE_URL`)
+defaults to `https://opencode.ai/zen/go/v1`. Override only when
+running against a self-hosted proxy — the SST-managed endpoint is
+the canonical address.
+
+## Capabilities and gates
+
+| Capability | Status |
+|---|---|
+| Streaming text + tool calls | Supported (OpenAI Chat Completions stream) |
+| Interleaved reasoning | Supported (gateway emits `reasoning_content` on each delta; provider yields `LLMThinkingDeltaEvent`) |
+| Cost tracking | Supported; provider emits one terminal `StreamEvent(type="usage")` with `cost_usd` computed from catalogue rates × token counts |
+| Per-workspace API key override | Supported via `OPENCODE_API_KEY` in workspace env |
+| Image inputs | **Not wired today** — GLM-5.1 is text-only upstream; Kimi K2.6 accepts images upstream but the chat router's image plumbing for this provider lands separately. Non-empty `images` lists are logged and ignored. |
+| `reasoning_effort` knob | Accepted for `AILLM` protocol parity but inert — the gateway exposes reasoning unconditionally |
+| MiniMax M2.7 | **Not supported.** Upstream advertises it as Anthropic protocol on the same gateway; needs a separate adapter |
+
+## How a request flows
+
+1. Frontend sends `model_id: "opencode-go:zai/glm-5.1"` (or a
+   bare `zai/glm-5.1`; the Pydantic validator canonicalises it).
+2. `parse_model_id` extracts host/vendor/model. The chat router
+   calls `resolve_llm(parsed, workspace_id=...)`.
+3. `factory.resolve_llm` dispatches on `Host.opencode_go` →
+   `_build_opencode_go(parsed, workspace_id)`, which looks the
+   model up in `MODEL_CATALOG`, builds an `OpencodeGoLLMConfig`
+   from the entry's per-Mtok rates plus
+   `settings.opencode_go_base_url`, and constructs an
+   `OpencodeGoLLM`.
+4. The chat router calls `provider.stream(question, ...,
+   tools=agent_tools, ...)`. `OpencodeGoLLM` walks the agent loop;
+   `make_opencode_go_stream_fn` opens an `openai.AsyncOpenAI`
+   stream against the gateway with the resolved API key.
+5. Streaming deltas land in `LLMTextDeltaEvent`,
+   `LLMThinkingDeltaEvent`, and `LLMToolCallEvent` shapes; the
+   terminal `usage` chunk feeds a final
+   `StreamEvent(type="usage")` so the cost ledger aggregates the
+   request.
+
+Provider source: `backend/app/core/providers/opencode_go_provider.py`.
+Helpers: `backend/app/core/providers/_opencode_go_events.py`.
+
+## Adding another OpenCode-Go-served model
+
+If SST lights up a new OpenAI-protocol model on the same gateway,
+adding it is a catalogue edit only:
+
+1. Append a `ModelEntry(host=Host.opencode_go, vendor=...,
+   model="...", cost_per_mtok_in_usd=..., cost_per_mtok_out_usd=...,
+   ...)` row to `MODEL_CATALOG` in
+   `backend/app/core/providers/catalog.py`.
+2. If the model's vendor isn't in `Vendor` yet, add it to the enum
+   in `backend/app/core/providers/model_id.py` and map it to
+   `Host.opencode_go` in `CANONICAL_HOST`.
+3. Ship.
+
+No provider, factory, settings, or keys change is required. The
+provider stays catalog-agnostic; rates flow through
+`OpencodeGoLLMConfig`.
+
+**Anthropic-protocol models on the same gateway** (currently just
+MiniMax M2.7) need a different adapter — `OpencodeGoLLM` only
+handles the OpenAI wire shape. That work is tracked separately;
+see the ADR's "Out of scope" section.
+
+## Testing
+
+The provider follows the
+[`ScriptedStreamFn` pattern](../../../../../.claude/rules/testing/agent-loop-testing-philosophy.md).
+`backend/tests/test_opencode_go_provider.py` covers:
+
+- Streaming text + tool-call paths through the real agent loop.
+- Cost computation via pure-function tests against
+  `_opencode_go_events.compute_cost_usd`.
+- Reasoning-content drain via
+  `_opencode_go_events.read_reasoning`.
+
+Do not patch `agent_loop` or `openai.AsyncOpenAI.chat.completions.create`
+in new tests — inject a `ScriptedStreamFn` at the
+`OpencodeGoLLM._stream_fn` seam.
+
+## Pointers
+
+- **Why this gateway, not LiteLLM / OpenRouter / vendor SDKs:**
+  [ADR 2026-05-18](../decisions/2026-05-18-opencode-go-routing).
+- **Canonical model-ID format and catalogue ownership:**
+  [ADR 2026-05-14](../decisions/2026-05-14-model-id-canonical-format-and-backend-catalog).
+- **Upstream catalogue (authoritative for rates + model list):**
+  [`sst/models.dev/providers/opencode-go/provider.toml`](https://github.com/sst/models.dev/blob/dev/providers/opencode-go/provider.toml).
+- **No-tools-in-providers rule:**
+  [`architecture/no-tools-in-providers.md`](../../../../../.claude/rules/architecture/no-tools-in-providers.md).

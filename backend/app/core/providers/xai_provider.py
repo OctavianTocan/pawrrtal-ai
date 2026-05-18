@@ -30,11 +30,10 @@ proto / SDK fields, not ``extra_body``):
   (``low | medium | high | extra-high``) is collapsed to xAI's
   two-level enum via :func:`_map_reasoning_effort`.  Grok 4.3 400s on
   anything else (https://docs.x.ai/docs/models/grok-4-3).
-* ``search_parameters`` — defaults to ``mode="off"`` so xAI's
-  built-in Live Search never fires; Pawrrtal's canonical web tool is
-  ``exa_search`` (gated by ``EXA_API_KEY``).  Toggling Grok-native
-  search on remains a future feature flag — when we land it the
-  knob will flow through here.
+* ``search_parameters`` — xAI deprecated Live Search (May 2026);
+  the field is no longer sent.  Pawrrtal's canonical web tool is
+  ``exa_search`` (gated by ``EXA_API_KEY``).  If xAI ships a
+  replacement search surface, the knob will flow through here.
 * ``response.cost_usd`` — the SDK does the
   ``cost_in_usd_ticks * 1e-10`` conversion for us via
   :mod:`xai_sdk.cost` (citing
@@ -61,7 +60,6 @@ from collections.abc import AsyncIterator
 
 from xai_sdk import AsyncClient
 from xai_sdk.proto import chat_pb2
-from xai_sdk.search import SearchParameters
 
 from app.core.agent_loop import (
     AgentContext,
@@ -133,18 +131,6 @@ def _map_reasoning_effort(
     if effort in ("low", "medium"):
         return chat_pb2.ReasoningEffort.EFFORT_LOW
     return chat_pb2.ReasoningEffort.EFFORT_HIGH
-
-
-def _live_search_off() -> SearchParameters:
-    """Return a ``SearchParameters`` that disables xAI's built-in Live Search.
-
-    Pawrrtal does its own web search through the explicit
-    ``exa_search`` tool (gated by ``EXA_API_KEY``).  Leaving xAI's
-    Live Search at its default ``"on"`` mode would silently consult
-    the web on every Grok turn, doubling up with ``exa_search`` and
-    surprise-billing the workspace.
-    """
-    return SearchParameters(mode="off")
 
 
 def make_xai_stream_fn(
@@ -245,7 +231,6 @@ async def _stream_one_request(
         messages=request_messages,
         tools=xai_tools,
         reasoning_effort=reasoning_effort,
-        search_parameters=_live_search_off(),
     )
 
     final_response = None
