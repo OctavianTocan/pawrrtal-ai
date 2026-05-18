@@ -47,6 +47,9 @@ from app.core.tools.markitdown_convert import make_markitdown_tool
 from app.core.tools.now import (
     make_add_task_tool,
     make_complete_task_tool,
+    make_cron_create_tool,
+    make_cron_delete_tool,
+    make_cron_list_tool,
     make_list_tasks_tool,
     make_now_tool,
 )
@@ -169,6 +172,17 @@ def build_agent_tools(
     tools.append(make_add_task_tool(workspace_root=workspace_root))
     tools.append(make_list_tasks_tool(workspace_root=workspace_root))
     tools.append(make_complete_task_tool(workspace_root=workspace_root))
+
+    # Cron scheduling (#313).  Three tools that wrap the live
+    # JobScheduler — registered via ``set_active_scheduler`` in
+    # ``backend/main.py``'s lifespan.  Gated on ``user_id`` so an
+    # unauthenticated background path doesn't get the cron surface.
+    # Tools handle the ``scheduler_enabled = False`` case themselves
+    # via ``get_active_scheduler() is None``.
+    if user_id is not None:
+        tools.append(make_cron_create_tool(user_id=user_id))
+        tools.append(make_cron_list_tool(user_id=user_id))
+        tools.append(make_cron_delete_tool(user_id=user_id))
 
     # In-process Python execution.  Opt-in via
     # ``settings.virtual_python_enabled`` because the tool is *not*
