@@ -106,6 +106,13 @@ class ScheduledEvent(Event):
     prompt: str = ""
     skill_name: str | None = None
     target_chat_ids: list[str] = field(default_factory=list)
+    # When set, AgentHandler persists the response as an assistant
+    # message in this conversation before publishing AgentResponseEvent.
+    # Used by the heartbeat sync to surface scheduled output in the
+    # web chat UI (the conversation is auto-created with a "heartbeat"
+    # label so the sidebar can pin it). Optional so general webhook +
+    # scheduled flows that only target Telegram stay unchanged.
+    target_conversation_id: uuid.UUID | None = None
     working_directory: Path | None = None
     user_id: uuid.UUID | None = None
     source: str = "scheduler"
