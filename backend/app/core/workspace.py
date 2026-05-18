@@ -48,6 +48,7 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from app.core.config import settings
+from app.core.heartbeat_template import HEARTBEAT_MD
 from app.core.persona_bootstrap import seed_persona_bootstrap
 
 log = logging.getLogger(__name__)
@@ -448,6 +449,7 @@ def seed_workspace(
     # Write seed files — skip if already present so edits are not clobbered.
     seed_files: dict[str, str] = {
         "AGENTS.md": _AGENTS_MD,
+        "HEARTBEAT.md": HEARTBEAT_MD,
         "IDENTITY.md": _IDENTITY_MD,
         "TOOLS.md": _TOOLS_MD,
         "SOUL.md": _build_soul_md(personalization),

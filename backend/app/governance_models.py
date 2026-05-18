@@ -173,6 +173,15 @@ class ScheduledJob(Base):
     # Telegram chat IDs the result is delivered to, persisted as a JSON
     # array of strings (chat IDs can exceed 32-bit signed range).
     target_chat_ids: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    # Optional conversation to persist the agent response into when the
+    # job fires. Cleared (NULL) when the conversation is deleted so the
+    # job keeps running and only the web-side mirror is lost.
+    target_conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        Uuid,
+        ForeignKey("conversations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     # Optional working-directory hint — defaults to the user's workspace.
     working_directory: Mapped[str | None] = mapped_column(String(4096), nullable=True)
     # Lifecycle: `pending` → `running` → `completed`|`failed`. NULL until

@@ -65,6 +65,12 @@ ignore_imports =
     app.core.governance.cost_tracker -> app.models
     app.core.scheduler.scheduler -> app.models
     app.core.event_bus.handlers -> app.crud.workspace
+    ; AgentHandler optionally persists scheduled-job responses into a
+    ; target conversation (e.g. the heartbeat sink). Lazy-imports the
+    ; chat_message CRUD inside the persistence helper so the bus
+    ; module stays decoupled at load time; flatten in a follow-up
+    ; alongside the workspace one above.
+    app.core.event_bus.handlers -> app.crud.chat_message
     ; LCM (Stack B / PRs #186–#196) owns three ORM tables
     ; (lcm_summaries, lcm_summary_sources, lcm_context_items) and must
     ; read/write them directly to assemble context, compact leaves, and

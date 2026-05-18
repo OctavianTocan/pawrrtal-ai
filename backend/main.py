@@ -19,6 +19,7 @@ from app.api.conversations import get_conversations_router
 from app.api.cost import get_cost_router
 from app.api.exports import get_exports_router
 from app.api.health import get_health_router
+from app.api.heartbeat import get_heartbeat_router
 from app.api.mcp_servers import get_mcp_servers_router
 from app.api.models import get_models_router
 from app.api.oauth import get_oauth_router
@@ -205,6 +206,9 @@ def create_app() -> FastAPI:
     )
     fastapi_app.include_router(
         get_scheduled_jobs_router(),
+    )
+    fastapi_app.include_router(
+        get_heartbeat_router(),
     )
     fastapi_app.include_router(
         get_mcp_servers_router(),

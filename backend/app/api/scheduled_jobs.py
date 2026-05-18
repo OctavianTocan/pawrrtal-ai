@@ -76,6 +76,7 @@ def get_scheduled_jobs_router() -> APIRouter:
                 prompt=payload.prompt,
                 skill_name=payload.skill_name,
                 target_chat_ids=payload.target_chat_ids,
+                target_conversation_id=payload.target_conversation_id,
                 working_directory=payload.working_directory,
             )
         except ValueError as exc:

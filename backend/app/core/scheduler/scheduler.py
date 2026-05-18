@@ -54,6 +54,7 @@ def _row_to_dict(row: ScheduledJob) -> dict[str, object]:
         "prompt": row.prompt,
         "skill_name": row.skill_name,
         "target_chat_ids": list(row.target_chat_ids or []),
+        "target_conversation_id": row.target_conversation_id,
         "working_directory": row.working_directory,
         "is_active": row.is_active,
         "created_at": row.created_at,
@@ -95,6 +96,7 @@ class JobScheduler:
         prompt: str,
         skill_name: str | None = None,
         target_chat_ids: list[str] | None = None,
+        target_conversation_id: uuid.UUID | None = None,
         working_directory: str | None = None,
     ) -> ScheduledJob:
         """Persist a job + register the cron trigger atomically.
@@ -102,6 +104,10 @@ class JobScheduler:
         Validates the cron expression up front (``CronTrigger.from_crontab``
         raises on malformed input) so a 422 surfaces at creation time
         instead of fire time.
+
+        ``target_conversation_id`` is optional; when set, every fire
+        persists the agent response into that conversation in addition
+        to Telegram fan-out via ``target_chat_ids``.
         """
         # Validate first; we don't want a row that the scheduler can't load.
         trigger = CronTrigger.from_crontab(cron_expression)
@@ -115,6 +121,7 @@ class JobScheduler:
             prompt=prompt,
             skill_name=skill_name,
             target_chat_ids=target_chat_ids or [],
+            target_conversation_id=target_conversation_id,
             working_directory=working_directory,
             is_active=True,
             created_at=now,
@@ -212,6 +219,7 @@ class JobScheduler:
 
     def _register_with_aps(self, row: ScheduledJob, *, trigger: CronTrigger) -> None:
         """Register one job with APScheduler — id matches the DB row's UUID."""
+        target_conversation = row.target_conversation_id
         self._scheduler.add_job(
             self._fire_event,
             trigger=trigger,
@@ -225,6 +233,9 @@ class JobScheduler:
                 "prompt": row.prompt,
                 "skill_name": row.skill_name,
                 "target_chat_ids": list(row.target_chat_ids or []),
+                "target_conversation_id": (
+                    str(target_conversation) if target_conversation is not None else None
+                ),
                 "working_directory": row.working_directory,
             },
         )
@@ -238,6 +249,7 @@ class JobScheduler:
         prompt: str,
         skill_name: str | None,
         target_chat_ids: list[str],
+        target_conversation_id: str | None,
         working_directory: str | None,
     ) -> None:
         """APScheduler trigger callback — publishes a ScheduledEvent."""
@@ -247,6 +259,9 @@ class JobScheduler:
             prompt=prompt,
             skill_name=skill_name,
             target_chat_ids=target_chat_ids,
+            target_conversation_id=(
+                uuid.UUID(target_conversation_id) if target_conversation_id else None
+            ),
             working_directory=Path(working_directory) if working_directory else None,
             user_id=uuid.UUID(user_id),
         )
