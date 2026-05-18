@@ -301,6 +301,13 @@ async def delete_conversation(
 ) -> bool:
     """Delete an existing conversation owned by the given user.
 
+    Heartbeat-labelled conversations are protected: the scheduler
+    persists into them and the user re-creates one by re-syncing,
+    so a casual delete from the sidebar would only confuse next sync.
+    The DELETE route translates ``False`` to a 404 (same as "not
+    yours"), which is the right surface for the protection — the UI
+    hides the delete affordance for heartbeat rows anyway.
+
     Returns:
         ``True`` when a conversation was deleted, otherwise ``False``.
     """
@@ -315,6 +322,66 @@ async def delete_conversation(
     if conversation is None:
         return False
 
+    if HEARTBEAT_LABEL in (conversation.labels or []):
+        return False
+
     await session.delete(conversation)
     await session.commit()
     return True
+
+
+# Label that marks a conversation as the heartbeat sink for a workspace.
+# The frontend's NAV_CHATS_LABELS includes a matching entry so the row
+# renders with the 🫀 colour and the sidebar can pin / group it without
+# a schema change.
+HEARTBEAT_LABEL = "heartbeat"
+# Conversation title used when the heartbeat sink is auto-created.
+# Kept verbatim so the UI can match on it for future "rename guard"
+# rules, but the user is free to rename — get_or_create only inspects
+# the label, not the title.
+HEARTBEAT_CONVERSATION_TITLE = "🫀 Heartbeat"
+
+
+async def get_or_create_heartbeat_conversation(
+    user_id: uuid.UUID, session: AsyncSession
+) -> Conversation:
+    """Return the user's heartbeat conversation, creating it on first call.
+
+    Lookup is by ``(user_id, HEARTBEAT_LABEL in labels)``. The newest
+    row wins when somehow there's more than one — the constraint is
+    soft (a user could manually label a second conversation), and the
+    sync helper only needs *a* destination, not the canonical one.
+
+    Caller owns the transaction; this helper flushes but does not
+    commit so it can participate in a larger transaction (e.g. the
+    workspace bootstrap that also writes the seeding row).
+    """
+    # JSON-column containment isn't portable across SQLite (tests) and
+    # Postgres (prod), so filter in Python over the user's rows. A user
+    # typically has < a few hundred conversations — well within budget
+    # for the once-per-sync lookup. Promote to a dialect-specific
+    # ``.where`` if this ever becomes hot.
+    stmt = (
+        select(Conversation)
+        .where(Conversation.user_id == user_id)
+        .order_by(Conversation.created_at.desc())
+    )
+    result = await session.execute(stmt)
+    for conv in result.scalars():
+        if HEARTBEAT_LABEL in (conv.labels or []):
+            return conv
+
+    from datetime import UTC  # noqa: PLC0415
+
+    now = datetime.now(UTC).replace(tzinfo=None)
+    conversation = Conversation(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        title=HEARTBEAT_CONVERSATION_TITLE,
+        created_at=now,
+        updated_at=now,
+        labels=[HEARTBEAT_LABEL],
+    )
+    session.add(conversation)
+    await session.flush()
+    return conversation
