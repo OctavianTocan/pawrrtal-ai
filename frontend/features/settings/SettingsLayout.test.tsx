@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import type * as React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -51,9 +52,10 @@ describe('SettingsLayout', () => {
 		expect(getByRole('heading', { name: 'General' })).toBeTruthy();
 	});
 
-	it('switches the right pane to Appearance when the rail item is clicked', () => {
+	it('switches the right pane to Appearance when the rail item is clicked', async () => {
+		const user = userEvent.setup();
 		const { getByRole, getAllByText } = renderWithQuery(<SettingsLayout />);
-		fireEvent.click(getByRole('button', { name: 'Appearance' }));
+		await user.click(getByRole('button', { name: 'Appearance' }));
 		// Multiple "Theme" labels render once the Appearance section mounts
 		// (section header + theme-mode toggle aria-label). Asserting at
 		// least one is present is enough to confirm the right pane swapped
@@ -61,9 +63,10 @@ describe('SettingsLayout', () => {
 		expect(getAllByText('Theme').length).toBeGreaterThan(0);
 	});
 
-	it('switches the right pane to Usage when the rail item is clicked', () => {
+	it('switches the right pane to Usage when the rail item is clicked', async () => {
+		const user = userEvent.setup();
 		const { getByRole } = renderWithQuery(<SettingsLayout />);
-		fireEvent.click(getByRole('button', { name: 'Usage' }));
+		await user.click(getByRole('button', { name: 'Usage' }));
 		expect(getByRole('heading', { name: 'Usage' })).toBeTruthy();
 	});
 });
