@@ -92,6 +92,20 @@ const EXEMPT_PATH_FRAGMENTS = [
 	'backend/app/core/agent_loop/loop.py',
 	'backend/app/core/providers/claude_provider.py',
 	'backend/app/integrations/telegram/bot.py',
+	// LCM retrieval lab (PR #258) — three files landed over budget with
+	// the agent reviewer flagging them as a follow-up split, not a
+	// blocker. ``evals.py`` is the largest (873 lines: harness + scenarios
+	// + answerer + retrievers all in one) and the natural split is into
+	// an ``evals/`` package (runner / seeding / answerer / retrievers).
+	// ``embeddings.py`` is storage + semantic + RRF; split semantic vs
+	// RRF blender. ``models.py`` was already 486 on dev and PR #258 added
+	// ``LCMEmbedding``; the established pattern (governance_models.py,
+	// mcp_models.py) is to extract a sibling ``lcm_models.py``.
+	// TODO(pawrrtal-lcm-split follow-up): land the three splits and
+	// remove this exemption.
+	'backend/app/core/lcm/evals.py',
+	'backend/app/core/lcm/embeddings.py',
+	'backend/app/models.py',
 ];
 
 /** Recursively yield every source file under `dir` that we should check. */
