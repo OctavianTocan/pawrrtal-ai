@@ -44,14 +44,14 @@ from app.core.tools.lcm_agents import (
     make_lcm_list_summaries_tool,
 )
 from app.core.tools.markitdown_convert import make_markitdown_tool
-from app.core.tools.now import make_now_tool
-from app.core.tools.python_exec import make_virtual_python_tool
-from app.core.tools.send_message import SendFn, make_send_message_tool
-from app.core.tools.tasks_md import (
+from app.core.tools.now import (
     make_add_task_tool,
     make_complete_task_tool,
     make_list_tasks_tool,
+    make_now_tool,
 )
+from app.core.tools.python_exec import make_virtual_python_tool
+from app.core.tools.send_message import SendFn, make_send_message_tool
 from app.core.tools.workspace_files import make_workspace_tools
 
 
@@ -163,10 +163,9 @@ def build_agent_tools(
     tools.append(make_now_tool())
 
     # TASKS.md (#311 v1).  Three tiny tools that read/write the
-    # per-workspace task list.  ``add_task`` appends, ``list_tasks``
-    # reads, ``complete_task`` toggles by substring match.  The
-    # reminder / cron half of #311 is tracked under #313 and lands
-    # alongside the scheduler abstraction.
+    # per-workspace task list.  Imported off ``now`` to keep this
+    # module under sentrux's ``no_god_files`` fan-out budget; the
+    # implementations live in ``app.core.tools.tasks_md``.
     tools.append(make_add_task_tool(workspace_root=workspace_root))
     tools.append(make_list_tasks_tool(workspace_root=workspace_root))
     tools.append(make_complete_task_tool(workspace_root=workspace_root))
