@@ -27,7 +27,7 @@
 
 ### Channels & surfaces
 - **Web** — Next.js 16 / React 19 chat with chain-of-thought, tool-call timeline, artifact rendering (`json-render`), file attachments, model picker.
-- **Telegram** — aiogram-backed bot. Link-code binding (`/start <code>`), `/new`, `/model`, `/models` (inline keyboard), `/verbose 0|1|2`, `/stop`, `/status`. Live tool-trace UI (thinking + tool calls + final answer as separate messages, all `reply_to` the user's turn).
+- **Telegram** — aiogram-backed bot. Link-code binding (`/start <code>`), `/new`, `/model`, `/models` (inline keyboard), `/verbose 0|1|2`, `/stop`, `/status`, `/lcm` (Lossless Context Management diagnostics). Live tool-trace UI with explicit block transitions — each `thinking → tools → thinking` sequence renders as separate Telegram messages, all `reply_to` the user's turn. Inbound photos forward to vision-capable models as multimodal inputs; voice / document attachments become bounded annotations the agent can act on.
 - **Electron + Electrobun** — desktop shells; all desktop-only IPC goes through `frontend/lib/desktop.ts` with web fallbacks so the frontend stays portable.
 
 ### Workspaces
@@ -43,6 +43,7 @@
 | `exa_search` (web search) | `EXA_API_KEY` |
 | `image_gen` (PNG into workspace) | `OPENAI_CODEX_OAUTH_TOKEN` |
 | `markitdown_convert` (PDF/Word/…→ Markdown) | always |
+| `now` (current UTC + local time + timezone, zero-network) | always |
 | `send_message` (channel-agnostic mid-turn push) | when surface supplies a `send_fn` |
 | `send_image_to_user` / `send_voice_to_user` / `send_document_to_user` | Telegram surface only |
 | `python` (in-process `exec()`, workspace-jailed `fs`) | `virtual_python_enabled` (off by default) |
