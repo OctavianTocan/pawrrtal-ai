@@ -107,6 +107,7 @@ class AgentHandler:
             prompt=prompt,
             user_id=event.user_id or self._default_user_id,
             target_chat_ids=list(event.target_chat_ids),
+            target_conversation_id=event.target_conversation_id,
             originating_event_id=event.id,
         )
 
@@ -116,9 +117,18 @@ class AgentHandler:
         prompt: str,
         user_id: uuid.UUID | None,
         target_chat_ids: list[str],
+        target_conversation_id: uuid.UUID | None = None,
         originating_event_id: str,
     ) -> None:
-        """Stream a turn, collect the text, publish an AgentResponseEvent."""
+        """Stream a turn, persist it, publish an AgentResponseEvent.
+
+        When ``target_conversation_id`` is provided, the rendered text is
+        written into ``chat_messages`` as a finalised assistant turn
+        *before* Telegram fan-out. The persist step is best-effort: if
+        the conversation has been deleted or the write fails, the
+        delivery to Telegram still happens so the user isn't silently
+        denied the heartbeat output.
+        """
         if user_id is None:
             logger.warning(
                 "AGENT_HANDLER_NO_USER originating_event_id=%s; skipping",
@@ -141,6 +151,13 @@ class AgentHandler:
                 user_id,
             )
             return
+        if target_conversation_id is not None:
+            await _persist_assistant_response(
+                conversation_id=target_conversation_id,
+                user_id=user_id,
+                text=text,
+                originating_event_id=originating_event_id,
+            )
         # Lazy import — keeps the handler module decoupled from the
         # bus-publish helper to avoid a circular import surface.
         from app.core.event_bus.global_bus import (  # noqa: PLC0415
@@ -386,3 +403,52 @@ async def _run_agent_turn(*, prompt: str, user_id: uuid.UUID) -> str:
         if stream_event.get("type") == "delta"
     ]
     return "".join(accumulated).strip()
+
+
+async def _persist_assistant_response(
+    *,
+    conversation_id: uuid.UUID,
+    user_id: uuid.UUID,
+    text: str,
+    originating_event_id: str,
+) -> None:
+    """Write the agent's response into a chat conversation as a finalised turn.
+
+    Lazy imports keep ``event_bus.handlers`` from pulling the
+    chat-message CRUD into its module-load graph — the sentrux layer
+    rule wants core code to avoid hard imports of ``app.crud.*``.
+
+    Failures are logged and swallowed: a persistence error must not
+    break the Telegram fan-out that follows in the caller. The row is
+    written via the same helpers the web chat router uses, so the
+    UI's existing ``GET .../messages`` path picks it up immediately.
+    """
+    from app.crud.chat_message import (  # noqa: PLC0415
+        append_assistant_placeholder,
+        finalize_assistant_message,
+    )
+
+    try:
+        async with async_session_maker() as session:
+            placeholder = await append_assistant_placeholder(
+                session,
+                conversation_id=conversation_id,
+                user_id=user_id,
+            )
+            await finalize_assistant_message(
+                session,
+                message_id=placeholder.id,
+                content=text,
+                thinking=None,
+                tool_calls=None,
+                timeline=None,
+                thinking_duration_seconds=None,
+                assistant_status="complete",
+            )
+            await session.commit()
+    except Exception:
+        logger.exception(
+            "AGENT_HANDLER_PERSIST_FAILED conversation_id=%s originating_event_id=%s",
+            conversation_id,
+            originating_event_id,
+        )
