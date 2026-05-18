@@ -10,6 +10,7 @@ from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
+from app.crud.subagent import cancel_running_subagents_for_conversation
 from app.models import Conversation
 from app.schemas import ConversationCreate, ConversationUpdate
 
@@ -234,6 +235,13 @@ async def delete_conversation(
 ) -> bool:
     """Delete an existing conversation owned by the given user.
 
+    Cascade-cancels every still-running subagent in the conversation
+    *before* the row is removed so the audit trail records why each
+    child died (``error="conversation deleted"``) rather than losing
+    them to the FK CASCADE.  The DB-level CASCADE on
+    ``subagents.conversation_id`` is the safety net for subagents
+    whose live ``asyncio.Task`` ref lives on a different worker.
+
     Returns:
         ``True`` when a conversation was deleted, otherwise ``False``.
     """
@@ -248,6 +256,9 @@ async def delete_conversation(
     if conversation is None:
         return False
 
+    await cancel_running_subagents_for_conversation(
+        session, conversation_id=conversation_id
+    )
     await session.delete(conversation)
     await session.commit()
     return True

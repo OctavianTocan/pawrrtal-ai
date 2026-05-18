@@ -420,7 +420,18 @@ from .governance_models import (  # noqa: E402
     WebhookEventRecord,
 )
 
+# Subagent registry — separate module to keep this file inside the 500-line
+# budget, same pattern as governance_models above.
+from .subagent_models import (  # noqa: E402
+    SUBAGENT_STATUSES,
+    SUBAGENT_TERMINAL_STATUSES,
+    Subagent,
+    SubagentStatus,
+)
+
 __all__ = [
+    "SUBAGENT_STATUSES",
+    "SUBAGENT_TERMINAL_STATUSES",
     "AuditEvent",
     "ChannelBinding",
     "ChannelLinkCode",
@@ -433,6 +444,8 @@ __all__ = [
     "Project",
     "ScheduledJob",
     "SenderType",
+    "Subagent",
+    "SubagentStatus",
     "UserAppearance",
     "UserPersonalization",
     "UserPreferences",
