@@ -66,6 +66,17 @@ ATTR_SURFACE = "pawrrtal.surface"
 ATTR_REQUEST_ID = "pawrrtal.request_id"
 ATTR_TOOL_CALL_ID = "pawrrtal.tool_call_id"
 
+# Latency attributes — Pawrrtal-namespaced rather than using OTel-GenAI
+# names (the semantic-conventions spec doesn't pin a TTFT attribute yet,
+# and our turn-level duration covers more than the LLM round-trip).
+# ``duration_ms`` is redundant with the span's natural duration but is
+# cheaper to query in log/metrics backends than computing
+# end_time - start_time per span.
+ATTR_PAWRRTAL_TURN_DURATION_MS = "pawrrtal.turn.duration_ms"
+ATTR_PAWRRTAL_TURN_TTFT_MS = "pawrrtal.turn.ttft_ms"
+ATTR_PAWRRTAL_LLM_DURATION_MS = "pawrrtal.llm.duration_ms"
+ATTR_PAWRRTAL_LLM_TTFT_MS = "pawrrtal.llm.ttft_ms"
+
 # Span event names — Workshop surfaces these in the live timeline.
 EVENT_CONTENT_DELTA = "gen_ai.content.delta"
 EVENT_THINKING_DELTA = "gen_ai.thinking.delta"

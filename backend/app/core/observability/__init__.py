@@ -16,6 +16,7 @@ from app.core.observability._turn_view import (
 from app.core.observability.workshop import (
     LLMSpanRecorder,
     ToolSpanRecorder,
+    TurnSpanRecorder,
     llm_span,
     tool_span,
     turn_span,
@@ -25,6 +26,7 @@ from app.core.observability.workshop import (
 __all__ = [
     "LLMSpanRecorder",
     "ToolSpanRecorder",
+    "TurnSpanRecorder",
     "aggregator_stop_reason",
     "build_llm_view_messages",
     "llm_span",

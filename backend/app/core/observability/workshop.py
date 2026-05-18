@@ -54,9 +54,13 @@ from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any
 
 from opentelemetry import trace
-from opentelemetry.trace import Span, Status, StatusCode
+from opentelemetry.trace import Status, StatusCode
 
-from app.core.observability._recorders import LLMSpanRecorder, ToolSpanRecorder
+from app.core.observability._recorders import (
+    LLMSpanRecorder,
+    ToolSpanRecorder,
+    TurnSpanRecorder,
+)
 from app.core.observability._schema import (
     ATTR_CONVERSATION_ID,
     ATTR_GENAI_INPUT_MESSAGES,
@@ -91,6 +95,7 @@ if TYPE_CHECKING:
 __all__ = [
     "LLMSpanRecorder",
     "ToolSpanRecorder",
+    "TurnSpanRecorder",
     "llm_span",
     "tool_span",
     "turn_span",
@@ -108,12 +113,18 @@ def turn_span(
     surface: str,
     request_id: str,
     model_id: str | None,
-) -> Iterator[Span]:
+) -> Iterator[TurnSpanRecorder]:
     """Root span for one chat turn.
 
     Every LLM and tool span emitted inside this context-manager inherits
     the same ``trace_id``, so Workshop groups them as one "run" (see
     workshop/src/server.ts → ``upsertRun`` keyed by trace_id).
+
+    The yielded :class:`TurnSpanRecorder` carries the latency clocks:
+    callers ping :meth:`TurnSpanRecorder.record_first_event` from the
+    event hook so ``pawrrtal.turn.ttft_ms`` lands on the span, and the
+    recorder ``flush()`` call (in the ``finally`` here) stamps
+    ``pawrrtal.turn.duration_ms``.
 
     Args:
         conversation_id: Pawrrtal conversation UUID.
@@ -125,8 +136,8 @@ def turn_span(
             (e.g. ``"gemini:gemini-2.0-flash-exp"``) when known.
 
     Yields:
-        The active ``Span`` so callers can attach further attributes
-        before the turn finishes.
+        A :class:`TurnSpanRecorder` so callers can mark TTFT and read
+        it back for the canonical log line / event-bus payload.
     """
     with _tracer.start_as_current_span("pawrrtal.turn") as span:
         span.set_attribute(ATTR_CONVERSATION_ID, str(conversation_id))
@@ -135,7 +146,11 @@ def turn_span(
         span.set_attribute(ATTR_REQUEST_ID, request_id)
         if model_id:
             span.set_attribute(ATTR_GENAI_REQUEST_MODEL, model_id)
-        yield span
+        recorder = TurnSpanRecorder(span)
+        try:
+            yield recorder
+        finally:
+            recorder.flush()
 
 
 @contextmanager
@@ -280,6 +295,8 @@ _HOOK_DISPATCH: dict[str, Callable[[LLMSpanRecorder, StreamEvent], None]] = {
 
 def workshop_event_hook(
     recorder: LLMSpanRecorder,
+    *,
+    turn_recorder: TurnSpanRecorder | None = None,
 ) -> Callable[[StreamEvent], list[StreamEvent]]:
     """Return a ``turn_runner.EventHook`` that mirrors stream events onto *recorder*.
 
@@ -293,15 +310,24 @@ def workshop_event_hook(
     Dispatch is via :data:`_HOOK_DISPATCH` so the closure stays flat —
     important for the project's nesting-depth gate.
 
+    When *turn_recorder* is supplied, every observed event also pings
+    :meth:`TurnSpanRecorder.record_first_event` so the outer turn span
+    gets its TTFT — including error / message / tool_use events that
+    don't carry through to :class:`LLMSpanRecorder`.
+
     Args:
         recorder: The LLM span recorder for the current turn.  Usually
             obtained from ``with llm_span(...) as recorder``.
+        turn_recorder: Optional outer-turn recorder.  When provided,
+            the hook also marks turn-level TTFT on first event.
 
     Returns:
         A pure function consumable by ``run_turn(event_hooks=...)``.
     """
 
     def hook(event: StreamEvent) -> list[StreamEvent]:
+        if turn_recorder is not None:
+            turn_recorder.record_first_event()
         handler = _HOOK_DISPATCH.get(event.get("type", ""))
         if handler is not None:
             handler(recorder, event)

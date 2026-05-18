@@ -61,6 +61,14 @@ class TurnCompletedEvent(Event):
     model_id: str | None = None
     status: str = "complete"
     duration_ms: float | None = None
+    # PR (latency metrics): wall-clock elapsed from turn start to the
+    # first user-visible event.  ``None`` when the turn produced no
+    # event (provider error before any token).  Surfaced so subscribers
+    # — metrics rollups, slow-request alerts — can compute provider
+    # responsiveness without re-deriving it from span exports.
+    ttft_ms: float | None = None
+    input_tokens: int = 0
+    output_tokens: int = 0
     cost_usd: float | None = None
     source: str = "chat"
 

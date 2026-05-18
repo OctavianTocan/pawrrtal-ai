@@ -24,6 +24,7 @@ from app.core.lcm import assemble_context as lcm_assemble_context
 from app.core.lcm import ingest_message as lcm_ingest_message
 from app.core.lcm.background import schedule_lcm_compaction
 from app.core.observability import (
+    TurnSpanRecorder,
     aggregator_stop_reason,
     build_llm_view_messages,
     llm_span,
@@ -53,6 +54,17 @@ EventHook = Callable[["StreamEvent"], list["StreamEvent"]]
 # any string here but a recognisable placeholder makes it obvious in the
 # UI that the model wasn't pinned for this turn.
 _MODEL_ID_UNKNOWN = "unknown"
+
+# Seconds → milliseconds for the canonical CHAT_OUT / TELEGRAM_OUT log
+# line and the ``TurnCompletedEvent.duration_ms`` payload.  Named so the
+# magnitude is self-documenting rather than a bare ``* 1000``.
+_MS_PER_SECOND_FOR_LOG = 1000
+
+# Placeholder used in the canonical log line when a turn finished
+# without ever producing a user-visible event (provider error before
+# any token).  Cheaper than a conditional format string and keeps the
+# field-position contract stable for log parsers.
+_TTFT_LOG_MISSING = "-"
 
 
 @dataclass(frozen=True)
@@ -145,7 +157,7 @@ async def run_turn(
         surface=turn_input.log_tag,
         request_id=_request_id_from_extras(turn_input.log_extras),
         model_id=model_id,
-    ):
+    ) as turn_recorder:
         try:
             async for chunk in _stream_with_llm_span(
                 turn_input=turn_input,
@@ -155,6 +167,7 @@ async def run_turn(
                 counter=counter,
                 event_hooks=event_hooks,
                 model_id=model_id,
+                turn_recorder=turn_recorder,
             ):
                 yield chunk
         finally:
@@ -165,6 +178,7 @@ async def run_turn(
                 started_at=started_at,
                 event_count=counter.value,
                 event_breakdown=counter.by_type,
+                ttft_ms=turn_recorder.ttft_ms,
             )
 
 
@@ -177,6 +191,7 @@ async def _stream_with_llm_span(
     counter: _EventCounter,
     event_hooks: list[EventHook] | None,
     model_id: str | None,
+    turn_recorder: TurnSpanRecorder,
 ) -> AsyncIterator[bytes]:
     """Yield channel chunks under one ``llm_span`` context manager.
 
@@ -199,7 +214,10 @@ async def _stream_with_llm_span(
         messages=build_llm_view_messages(history, turn_input.question),
         system_prompt=system_prompt,
     ) as llm_recorder:
-        hooks = [workshop_event_hook(llm_recorder), *(event_hooks or [])]
+        hooks = [
+            workshop_event_hook(llm_recorder, turn_recorder=turn_recorder),
+            *(event_hooks or []),
+        ]
         try:
             async for chunk in turn_input.channel.deliver(
                 _guarded_stream(
@@ -384,9 +402,10 @@ async def _finalize_turn(
     started_at: float,
     event_count: int,
     event_breakdown: Counter[str],
+    ttft_ms: float | None,
 ) -> None:
     """Patch the assistant placeholder with the final aggregated stream state."""
-    duration_ms = (time.perf_counter() - started_at) * 1000
+    duration_ms = (time.perf_counter() - started_at) * _MS_PER_SECOND_FOR_LOG
     final_status = "failed" if aggregator.error_text else "complete"
     snapshot = aggregator.to_persisted_shape(status=final_status)
     try:
@@ -425,12 +444,17 @@ async def _finalize_turn(
     breakdown = (
         " ".join(f"{name}={count}" for name, count in sorted(event_breakdown.items())) or "none"
     )
+    ttft_field = f"{ttft_ms:.1f}" if ttft_ms is not None else _TTFT_LOG_MISSING
     logger.info(
-        "%s_OUT conversation_id=%s events=%d duration_ms=%.1f breakdown=[%s] %s",
+        "%s_OUT conversation_id=%s events=%d duration_ms=%.1f ttft_ms=%s "
+        "input_tokens=%d output_tokens=%d breakdown=[%s] %s",
         turn_input.log_tag,
         turn_input.conversation_id,
         event_count,
         duration_ms,
+        ttft_field,
+        aggregator.total_input_tokens,
+        aggregator.total_output_tokens,
         breakdown,
         extras,
     )
@@ -451,6 +475,9 @@ async def _finalize_turn(
             model_id=model_id,
             status=final_status,
             duration_ms=duration_ms,
+            ttft_ms=ttft_ms,
+            input_tokens=aggregator.total_input_tokens,
+            output_tokens=aggregator.total_output_tokens,
             cost_usd=aggregator.total_cost_usd,
             source=turn_input.log_tag.lower(),
         )
