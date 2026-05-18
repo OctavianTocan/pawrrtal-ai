@@ -82,6 +82,7 @@ class ScheduledJobRead(BaseModel):
     prompt: str
     skill_name: str | None = None
     target_chat_ids: list[str] = []
+    target_conversation_id: uuid.UUID | None = None
     working_directory: str | None = None
     last_status: str | None = None
     last_fired_at: datetime | None = None
@@ -108,6 +109,7 @@ class ScheduledJobCreate(BaseModel):
     prompt: Annotated[str, StringConstraints(min_length=1)]
     skill_name: str | None = None
     target_chat_ids: list[str] = []
+    target_conversation_id: uuid.UUID | None = None
     working_directory: str | None = None
 
 
@@ -119,6 +121,7 @@ class ScheduledJobUpdate(BaseModel):
     prompt: str | None = None
     skill_name: str | None = None
     target_chat_ids: list[str] | None = None
+    target_conversation_id: uuid.UUID | None = None
     working_directory: str | None = None
     is_active: bool | None = None
 
