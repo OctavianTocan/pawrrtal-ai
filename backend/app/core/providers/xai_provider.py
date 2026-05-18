@@ -1,45 +1,52 @@
-"""xAI (Grok) provider — StreamFn adapter for the agent loop.
+"""xAI (Grok) provider — gRPC StreamFn adapter for the agent loop.
 
-Wraps the OpenAI-compatible HTTP API exposed at ``https://api.x.ai/v1``
-(docs: https://docs.x.ai/docs/api-reference) so the agent loop can drive
-Grok the same way it drives Gemini and Claude.  The xAI surface is
-intentionally OpenAI-compatible, so we use the upstream ``openai`` SDK
-configured with ``base_url="https://api.x.ai/v1"`` rather than rolling
-our own SSE parser — every streaming chunk, tool-call delta, and finish
-reason then matches the well-understood OpenAI vocabulary.
+Wraps the official xai-sdk gRPC client (https://docs.x.ai,
+https://github.com/xai-org/xai-sdk-python) so the agent loop can drive
+Grok the same way it drives Gemini (``google-genai``) and Claude
+(``claude-agent-sdk``).  Each provider is self-contained on its
+vendor's first-party SDK — no shared HTTP-compat abstraction.
 
 Design parity with :mod:`app.core.providers.gemini_provider`:
 
-* ``make_xai_stream_fn`` builds a per-request :data:`StreamFn` that
-  closes over ``model_id``, optional ``workspace_id`` (for per-workspace
-  ``XAI_API_KEY`` overrides), and the assembled ``system_prompt``.
+* ``make_xai_stream_fn`` builds a per-request :data:`StreamFn` closing
+  over ``model_id``, optional ``workspace_id`` (for per-workspace
+  ``XAI_API_KEY`` overrides), the assembled ``system_prompt``, a
+  caller-supplied :class:`UsageAccumulator`, and the reasoning-effort
+  knob.
 * ``XaiLLM.stream`` runs :func:`agent_loop` against that StreamFn and
   translates each :class:`AgentEvent` into a :class:`StreamEvent` via
-  :func:`_xai_events.agent_event_to_stream_event`.
+  :func:`_xai_events.agent_event_to_stream_event`.  After the loop
+  returns, ``XaiLLM.stream`` emits one terminal
+  ``StreamEvent(type="usage")`` carrying the per-turn totals the chat
+  aggregator folds into the cost ledger.
 * Tools, history, and the cross-provider permission gate flow through
   the same path as Gemini — the provider stays tool-agnostic per
   ``.claude/rules/architecture/no-tools-in-providers.md``.
 
-xAI-specific extensions the openai SDK doesn't model natively all flow
-in via ``extra_body``; see :func:`_build_xai_extra_body` for the single
-source of truth:
+xAI-specific surface this provider drives natively (via typed
+proto / SDK fields, not ``extra_body``):
 
-* ``reasoning_effort`` — collapsed from Pawrrtal's four-level UI knob
-  (``low | medium | high | extra-high``) into grok-4.3's two-level enum
-  via :func:`_map_reasoning_effort`.  grok-4.3 400s on any other value
-  (https://docs.x.ai/docs/models/grok-4-3).
-* ``search_parameters`` — forced to ``{"mode": "off"}`` so xAI's
-  built-in Live Search never fires.  Pawrrtal's canonical web tool is
-  ``exa_search`` (gated by ``EXA_API_KEY``); leaving xAI's search on
-  the default ``"on"`` would silently double-search every Grok turn.
+* ``reasoning_effort`` — Pawrrtal's four-level UI knob
+  (``low | medium | high | extra-high``) is collapsed to xAI's
+  two-level enum via :func:`_map_reasoning_effort`.  Grok 4.3 400s on
+  anything else (https://docs.x.ai/docs/models/grok-4-3).
+* ``search_parameters`` — defaults to ``mode="off"`` so xAI's
+  built-in Live Search never fires; Pawrrtal's canonical web tool is
+  ``exa_search`` (gated by ``EXA_API_KEY``).  Toggling Grok-native
+  search on remains a future feature flag — when we land it the
+  knob will flow through here.
+* ``response.cost_usd`` — the SDK does the
+  ``cost_in_usd_ticks * 1e-10`` conversion for us via
+  :mod:`xai_sdk.cost` (citing
+  ``xai-proto/proto/xai/api/v1/usage.proto``).  We don't carry the
+  constant locally.
+* ``reasoning_content`` deltas — surfaced as
+  :class:`LLMThinkingDeltaEvent` so the frontend's "thinking" pane
+  (already wired for Gemini) lights up for Grok.
 
-Reasoning-trace deltas (``delta.reasoning_content``) are forwarded as
-:class:`LLMThinkingDeltaEvent` so the frontend's existing "thinking"
-pane (already wired for Gemini) lights up for Grok too.
-
-Multimodal image inputs are accepted and logged but not yet bridged —
-the chat router can still pass them conditionally without a runtime
-error.
+Multimodal image inputs are accepted on the protocol but not yet
+bridged to xai-sdk's :func:`xai_sdk.chat.image`; the chat router can
+still pass them conditionally without a runtime error.
 
 Request- and response-shape helpers live in ``_xai_messages`` and
 ``_xai_stream`` so this module stays under the project's 500-line
@@ -51,15 +58,10 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import AsyncIterator
-from typing import Any, cast
 
-from openai import AsyncOpenAI, AsyncStream
-from openai.types.chat import (
-    ChatCompletionChunk,
-    ChatCompletionMessageParam,
-    ChatCompletionStreamOptionsParam,
-    ChatCompletionToolUnionParam,
-)
+from xai_sdk import AsyncClient
+from xai_sdk.proto import chat_pb2
+from xai_sdk.search import SearchParameters
 
 from app.core.agent_loop import (
     AgentContext,
@@ -71,7 +73,6 @@ from app.core.agent_loop import (
     LLMEvent,
     LLMTextDeltaEvent,
     LLMThinkingDeltaEvent,
-    LLMToolCallEvent,
     StreamFn,
     UserMessage,
     agent_loop,
@@ -88,31 +89,17 @@ from app.core.config import settings
 from app.core.keys import resolve_api_key
 
 from ._xai_events import agent_event_to_stream_event, identity_convert
-from ._xai_messages import build_xai_messages, build_xai_tool_declarations
+from ._xai_messages import build_xai_messages, build_xai_tools
 from ._xai_stream import (
-    ChunkAggregate,
     UsageAccumulator,
-    absorb_chunk,
-    done_event_for,
-    finalize_tool_calls,
+    deltas_from_chunk,
+    done_event_from_response,
+    tool_call_events_from_response,
+    usage_record_from_response,
 )
 from .base import ReasoningEffort, StreamEvent
 
 logger = logging.getLogger(__name__)
-
-# Public xAI endpoint — kept module-level so tests can monkeypatch it.
-# The OpenAI SDK appends ``/chat/completions`` when ``base_url`` ends
-# with ``/v1``, matching the path documented at
-# https://docs.x.ai/docs/api-reference.
-XAI_BASE_URL = "https://api.x.ai/v1"
-
-# xAI's Live Search is enabled by default (``mode="on"``) on every
-# chat-completions request — see https://docs.x.ai/docs/guides/live-search.
-# Pawrrtal does its own web search through the explicit ``exa_search``
-# tool (gated by ``EXA_API_KEY``), so we turn xAI's built-in search off
-# at the SDK seam.  Otherwise every Grok turn would silently consult the
-# web, doubling up with exa_search and surprise-billing the workspace.
-_LIVE_SEARCH_DISABLED: dict[str, Any] = {"mode": "off"}
 
 
 def _resolve_xai_api_key(workspace_id: uuid.UUID | None) -> str:
@@ -127,89 +114,37 @@ def _resolve_xai_api_key(workspace_id: uuid.UUID | None) -> str:
     return settings.xai_api_key
 
 
-def _map_reasoning_effort(effort: ReasoningEffort | None) -> str | None:
-    """Map the four-level UI knob onto xAI's two-level enum.
+def _map_reasoning_effort(
+    effort: ReasoningEffort | None,
+) -> chat_pb2.ReasoningEffort | None:
+    """Map Pawrrtal's four-level UI knob onto xAI's proto enum.
 
-    Grok 4.3 accepts ``"low"`` or ``"high"``
-    (https://docs.x.ai/docs/models/grok-4-3) and 400s on anything else,
-    including the values OpenAI's o-series uses.  The Pawrrtal UI
-    surfaces ``low | medium | high | extra-high`` — we collapse the
-    lower two to ``low`` and the upper two to ``high`` so the user gets
-    a meaningful difference without overshooting xAI's schema.
-    ``None`` means "let xAI pick the model default".
+    Grok 4.3 accepts ``EFFORT_LOW`` or ``EFFORT_HIGH``
+    (https://docs.x.ai/docs/models/grok-4-3) and 400s on anything
+    else, including ``EFFORT_MEDIUM`` and ``EFFORT_NONE``.  The
+    Pawrrtal UI surfaces ``low | medium | high | extra-high`` — we
+    collapse the lower two to ``EFFORT_LOW`` and the upper two to
+    ``EFFORT_HIGH`` so the user gets a meaningful difference without
+    overshooting xAI's schema.  ``None`` means "let xAI pick the
+    model default" and the field is omitted from the request.
     """
     if effort is None:
         return None
     if effort in ("low", "medium"):
-        return "low"
-    return "high"
+        return chat_pb2.ReasoningEffort.EFFORT_LOW
+    return chat_pb2.ReasoningEffort.EFFORT_HIGH
 
 
-def _build_xai_extra_body(reasoning_effort: ReasoningEffort | None) -> dict[str, Any]:
-    """Assemble the xAI-only kwargs forwarded via ``extra_body``.
+def _live_search_off() -> SearchParameters:
+    """Return a ``SearchParameters`` that disables xAI's built-in Live Search.
 
-    ``extra_body`` is the openai SDK's escape hatch for non-OpenAI
-    fields.  We use it for the two xAI-specific concerns:
-
-    * ``reasoning_effort`` for grok-4.3 (passed only when the caller
-      supplied one — the model picks its own default otherwise).
-    * ``search_parameters`` to opt out of xAI's built-in Live Search
-      (see :data:`_LIVE_SEARCH_DISABLED` for the why).
+    Pawrrtal does its own web search through the explicit
+    ``exa_search`` tool (gated by ``EXA_API_KEY``).  Leaving xAI's
+    Live Search at its default ``"on"`` mode would silently consult
+    the web on every Grok turn, doubling up with ``exa_search`` and
+    surprise-billing the workspace.
     """
-    body: dict[str, Any] = {"search_parameters": _LIVE_SEARCH_DISABLED}
-    mapped_effort = _map_reasoning_effort(reasoning_effort)
-    if mapped_effort is not None:
-        body["reasoning_effort"] = mapped_effort
-    return body
-
-
-async def _open_xai_stream(
-    *,
-    client: AsyncOpenAI,
-    model_id: str,
-    messages: list[dict[str, Any]],
-    tools: list[dict[str, Any]] | None,
-    reasoning_effort: ReasoningEffort | None,
-) -> AsyncStream[ChatCompletionChunk]:
-    """Open the streaming chat-completions call against xAI.
-
-    The openai SDK declares ``messages`` and ``tools`` as unions of
-    TypedDicts; our wire dicts match the runtime contract but mypy
-    can't narrow a dynamically-built ``dict[str, Any]`` into the
-    union variant.  We narrow at this single SDK seam — never to
-    ``Any`` (forbidden by the project mypy config).  Splitting the
-    ``stream=True`` overload into two literal branches keeps mypy from
-    widening the return to ``ChatCompletion | AsyncStream[...]``.
-
-    xAI-specific fields (``reasoning_effort``, ``search_parameters``)
-    flow in via ``extra_body`` so the openai SDK passes them through
-    unchanged — :func:`_build_xai_extra_body` is the single source of
-    truth for what we forward.
-    """
-    typed_messages = cast("list[ChatCompletionMessageParam]", messages)
-    extra_body = _build_xai_extra_body(reasoning_effort)
-    # ``include_usage=True`` makes xAI emit a terminal chunk carrying
-    # the request's ``usage`` block — that's where ``cost_in_usd_ticks``
-    # and the token counts live.  Without it, the cost ledger sees zero
-    # for every Grok turn.
-    stream_options: ChatCompletionStreamOptionsParam = {"include_usage": True}
-    if tools is None:
-        return await client.chat.completions.create(
-            model=model_id,
-            messages=typed_messages,
-            stream=True,
-            stream_options=stream_options,
-            extra_body=extra_body,
-        )
-    typed_tools = cast("list[ChatCompletionToolUnionParam]", tools)
-    return await client.chat.completions.create(
-        model=model_id,
-        messages=typed_messages,
-        tools=typed_tools,
-        stream=True,
-        stream_options=stream_options,
-        extra_body=extra_body,
-    )
+    return SearchParameters(mode="off")
 
 
 def make_xai_stream_fn(
@@ -220,35 +155,35 @@ def make_xai_stream_fn(
     reasoning_effort: ReasoningEffort | None = None,
     usage_sink: UsageAccumulator | None = None,
 ) -> StreamFn:
-    """Build a :data:`StreamFn` backed by xAI's OpenAI-compatible API.
+    """Build a :data:`StreamFn` backed by xai-sdk's gRPC ``AsyncClient``.
 
     Args:
         model_id: xAI model identifier (e.g. ``"grok-4.3"``).  Passed
-            straight through to the chat-completions endpoint.
+            straight through to ``client.chat.create(model=...)``.
         workspace_id: Active workspace UUID, used to honour a
             per-workspace ``XAI_API_KEY`` override.  ``None`` falls back
             to the gateway-global ``settings.xai_api_key``.
         system_prompt: System prompt for this StreamFn.  Captured into
-            the returned closure and prepended as a ``role="system"``
-            entry on every call.  ``XaiLLM.stream`` builds a fresh
+            the returned closure and prepended as a ``ROLE_DEVELOPER``
+            message on every call.  ``XaiLLM.stream`` builds a fresh
             StreamFn per request so the workspace-assembled prompt
             (SOUL.md + AGENTS.md + skills) is what the model sees.
         reasoning_effort: Optional reasoning-depth knob for grok-4.3.
-            Mapped onto xAI's two-level enum (``low`` / ``high``) via
-            :func:`_map_reasoning_effort` and forwarded through
-            ``extra_body``.  ``None`` lets xAI pick the model default.
+            Mapped onto xAI's two-level proto enum via
+            :func:`_map_reasoning_effort`.  ``None`` lets xAI pick the
+            model default.
         usage_sink: Optional mutable :class:`UsageAccumulator` the
-            StreamFn writes per-chunk usage into.  Shared across every
-            agent_loop iteration for a single ``XaiLLM.stream`` call so
-            multi-turn tool-using conversations sum their cost
+            StreamFn writes per-request usage into.  Shared across
+            every agent_loop iteration for a single ``XaiLLM.stream``
+            call so multi-turn tool-using conversations sum their cost
             correctly.  ``None`` skips usage capture entirely — useful
-            for unit tests and for utility callers that don't talk to
-            the cost ledger.
+            for unit tests and utility callers that don't talk to the
+            cost ledger.
 
     Returns:
         An async generator factory that yields ``LLMEvent`` instances.
-        The factory is provider-specific; the surrounding
-        :func:`agent_loop` is not.
+        The factory is xai-specific; the surrounding :func:`agent_loop`
+        stays provider-neutral.
     """
 
     async def stream_fn(
@@ -256,27 +191,24 @@ def make_xai_stream_fn(
         tools: list[AgentTool],
     ) -> AsyncIterator[LLMEvent]:
         api_key = _resolve_xai_api_key(workspace_id)
-        client = AsyncOpenAI(api_key=api_key, base_url=XAI_BASE_URL)
         request_messages = build_xai_messages(messages, system_prompt)
-        xai_tools = build_xai_tool_declarations(tools)
-        aggregate = ChunkAggregate()
+        xai_tools = build_xai_tools(tools)
+        effort = _map_reasoning_effort(reasoning_effort)
 
         try:
-            stream = await _open_xai_stream(
-                client=client,
-                model_id=model_id,
-                messages=request_messages,
-                tools=xai_tools,
-                reasoning_effort=reasoning_effort,
-            )
-            async for chunk in stream:
-                deltas = absorb_chunk(chunk, aggregate)
-                if usage_sink is not None:
-                    usage_sink.absorb(chunk)
-                if deltas.thinking:
-                    yield LLMThinkingDeltaEvent(type="thinking_delta", text=deltas.thinking)
-                if deltas.text:
-                    yield LLMTextDeltaEvent(type="text_delta", text=deltas.text)
+            # AsyncClient owns a gRPC channel; the context manager
+            # closes it after the request so we don't leak file
+            # descriptors on long-running uvicorn workers.
+            async with AsyncClient(api_key=api_key) as client:
+                async for event in _stream_one_request(
+                    client=client,
+                    model_id=model_id,
+                    request_messages=request_messages,
+                    xai_tools=xai_tools,
+                    reasoning_effort=effort,
+                    usage_sink=usage_sink,
+                ):
+                    yield event
         except Exception as exc:
             logger.error("xAI streaming error model=%s: %s", model_id, exc, exc_info=True)
             error_text = f"xAI error: {exc}"
@@ -286,26 +218,61 @@ def make_xai_stream_fn(
                 stop_reason="error",
                 content=[TextContent(type="text", text=error_text)],
             )
-            return
-
-        # Emit the assembled tool calls (if any) before the terminal
-        # ``done`` event so the agent loop can dispatch them.  Ordering
-        # by buffer index keeps the model's intended call sequence stable.
-        completed_tool_calls = finalize_tool_calls(aggregate)
-        for tc in completed_tool_calls:
-            yield LLMToolCallEvent(
-                type="tool_call",
-                tool_call_id=tc["tool_call_id"],
-                name=tc["name"],
-                arguments=tc["arguments"],
-            )
-        yield done_event_for(aggregate, completed_tool_calls)
 
     return stream_fn
 
 
+async def _stream_one_request(
+    *,
+    client: AsyncClient,
+    model_id: str,
+    request_messages: list[chat_pb2.Message],
+    xai_tools: object,
+    reasoning_effort: chat_pb2.ReasoningEffort | None,
+    usage_sink: UsageAccumulator | None,
+) -> AsyncIterator[LLMEvent]:
+    """Drive one ``chat.stream()`` round-trip through xai-sdk.
+
+    Yields LLMEvents in the order the agent loop expects: text /
+    thinking deltas during the stream, then any tool-call events
+    sourced from the accumulated :class:`Response`, then the terminal
+    :class:`LLMDoneEvent`.  Captures usage into ``usage_sink`` if
+    supplied — the SDK populates ``Response.usage`` and
+    ``Response.cost_usd`` once the stream completes.
+    """
+    chat = client.chat.create(
+        model=model_id,
+        messages=request_messages,
+        tools=xai_tools,
+        reasoning_effort=reasoning_effort,
+        search_parameters=_live_search_off(),
+    )
+
+    final_response = None
+    async for response, chunk in chat.stream():
+        deltas = deltas_from_chunk(chunk)
+        if deltas.thinking:
+            yield LLMThinkingDeltaEvent(type="thinking_delta", text=deltas.thinking)
+        if deltas.text:
+            yield LLMTextDeltaEvent(type="text_delta", text=deltas.text)
+        final_response = response
+
+    if final_response is None:
+        # Empty stream — yield a clean done so the loop exits.
+        yield LLMDoneEvent(type="done", stop_reason="stop", content=[])
+        return
+
+    for tool_event in tool_call_events_from_response(final_response):
+        yield tool_event
+
+    if usage_sink is not None:
+        usage_sink.absorb(usage_record_from_response(final_response))
+
+    yield done_event_from_response(final_response)
+
+
 class XaiLLM:
-    """AILLM backed by the agent_loop + an xAI StreamFn.
+    """AILLM backed by the agent_loop + an xai-sdk StreamFn.
 
     History is supplied by the caller (read from the Message table in
     ``api/chat.py``).  Tools are injected per-request via the
@@ -341,7 +308,7 @@ class XaiLLM:
         self,
         question: str,
         conversation_id: uuid.UUID,
-        user_id: uuid.UUID,
+        user_id: uuid.UUID,  # kept for AILLM protocol parity
         history: list[dict[str, str]] | None = None,
         tools: list[AgentTool] | None = None,
         system_prompt: str | None = None,
@@ -353,9 +320,10 @@ class XaiLLM:
 
         Args:
             question: The current user message.
-            conversation_id: Used for logging only; xAI's
-                OpenAI-compatible API has no native session concept.
-            user_id: Authenticated user UUID (used for logging).
+            conversation_id: Used for logging only; xAI's API has no
+                native session concept — the loop ships full history
+                on every request.
+            user_id: Authenticated user UUID (kept for protocol parity).
             history: Prior messages oldest-first as ``{role, content}``
                 dicts.  Mapped onto :class:`UserMessage` /
                 :class:`AssistantMessage` instances.
@@ -364,20 +332,21 @@ class XaiLLM:
             system_prompt: System prompt for this turn.  ``None`` falls
                 back to :data:`DEFAULT_AGENT_SYSTEM_PROMPT` so bare
                 unit tests still work.
-            reasoning_effort: Optional reasoning-depth knob.  Mapped onto
-                grok-4.3's two-level enum (``low`` / ``high``) via
-                :func:`_map_reasoning_effort` and forwarded to xAI via
-                ``extra_body``.  The model's chain-of-thought streams
-                back as ``reasoning_content`` deltas and surfaces as
+            reasoning_effort: Optional reasoning-depth knob.  Mapped
+                onto grok-4.3's two-level enum via
+                :func:`_map_reasoning_effort` and passed to xai-sdk.
+                The model's chain-of-thought streams back as
+                ``reasoning_content`` deltas and surfaces as
                 :class:`StreamEvent` ``thinking`` events for the UI.
             permission_check: Optional cross-provider permission gate
                 (PR 03b).  Threaded straight into
                 :class:`AgentLoopConfig` so denial flows through the
                 same code path Gemini and Claude use.
             images: Optional multimodal image inputs.  Accepted for
-                protocol parity; not yet bridged to xAI's image-input
-                shape (a non-empty list is logged and ignored so
-                callers can switch on it without a runtime error).
+                protocol parity; not yet bridged to xai-sdk's
+                :func:`xai_sdk.chat.image` content type (a non-empty
+                list is logged and ignored so callers can switch on it
+                without a runtime error).
         """
         if images:
             logger.debug(
@@ -437,9 +406,9 @@ class XaiLLM:
 
         # Terminal usage event — the chat aggregator folds it into the
         # cost ledger (see ``ChatTurnAggregator.apply`` and
-        # ``app.channels._turn_cost.record_turn_cost_if_enabled``).  Skip
-        # when no chunk reported usage (test scripts, error-only turns)
-        # so the ledger doesn't see spurious zero rows.
+        # ``app.channels._turn_cost.record_turn_cost_if_enabled``).
+        # Skip when no chunk reported usage (test scripts, error-only
+        # turns) so the ledger doesn't see spurious zero rows.
         if usage_sink.saw_any:
             yield StreamEvent(
                 type="usage",
