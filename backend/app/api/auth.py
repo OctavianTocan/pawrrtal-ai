@@ -67,13 +67,17 @@ def get_auth_router() -> APIRouter:
             )
 
         # Idempotent — returns the existing workspace if one is already
-        # present. Errors here are logged + swallowed: a failed seed
-        # must never block dev-login (the user can still personalise
+        # present. ``create_workspace`` (called inside) does not commit,
+        # so we commit the outer transaction ourselves before returning
+        # the login response. Errors are logged + swallowed: a failed
+        # seed must never block dev-login (the user can still personalise
         # via the UI to get a workspace).
         try:
             await ensure_default_workspace(user.id, session)
+            await session.commit()
         except Exception:
             logger.exception("DEV_LOGIN_WORKSPACE_SEED_FAILED user_id=%s", user.id)
+            await session.rollback()
 
         return await auth_backend.login(get_jwt_strategy(), user)
 
