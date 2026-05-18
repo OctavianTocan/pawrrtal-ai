@@ -48,6 +48,7 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from app.core.config import settings
+from app.core.heartbeat_template import HEARTBEAT_MD
 from app.core.persona_bootstrap import seed_persona_bootstrap
 
 log = logging.getLogger(__name__)
@@ -305,33 +306,6 @@ Defines what the agent may do autonomously vs what requires user confirmation.
 - Any call to a destructive external API.
 """
 
-_HEARTBEAT_MD = """\
----
-# Heartbeat checks for this workspace.
-#
-# Each entry is a periodic background turn that the scheduler fires
-# on its cron expression. The agent runs the `prompt` and the result
-# lands in your "🫀 Heartbeat" conversation (auto-created on first
-# sync) plus, when you've linked Telegram, your Telegram chat.
-#
-# Sync changes to this file with: POST /api/v1/heartbeat/sync.
-checks:
-  - name: pulse
-    cron: "0 9 * * *"
-    prompt: |
-      Daily heartbeat: summarise anything from the last 24 hours
-      that needs my attention.
----
-
-# Heartbeat
-
-Edit the YAML front matter above to change cadences or add checks.
-The body of this file is free-form context the agent reads alongside
-the prompt — useful for project-specific instructions ("when checking
-email, ignore anything from <vendor>", etc.).
-"""
-
-
 _PROTOCOLS_DELEGATION_MD = """\
 # delegation.md — Delegation & Escalation Protocol
 
@@ -475,7 +449,7 @@ def seed_workspace(
     # Write seed files — skip if already present so edits are not clobbered.
     seed_files: dict[str, str] = {
         "AGENTS.md": _AGENTS_MD,
-        "HEARTBEAT.md": _HEARTBEAT_MD,
+        "HEARTBEAT.md": HEARTBEAT_MD,
         "IDENTITY.md": _IDENTITY_MD,
         "TOOLS.md": _TOOLS_MD,
         "SOUL.md": _build_soul_md(personalization),
