@@ -35,6 +35,9 @@ from app.core.tools.cron_tools import (  # noqa: F401
     make_cron_list_tool,
 )
 from app.core.tools.display import make_tool_display
+from app.core.tools.external_mcp import (  # noqa: F401 — re-export keeps agent_tools fan-out under budget
+    build_external_mcp_tools,
+)
 from app.core.tools.skill_invocation import (  # noqa: F401 — re-export keeps agent_tools fan-out under budget
     make_invoke_skill_tool,
     make_list_skills_tool,

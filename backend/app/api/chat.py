@@ -17,8 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api._chat_cost_budget import enforce_cost_budget
 from app.api._chat_events import publish_turn_started
-from app.api._chat_external_mcp import load_external_mcp_configs
-from app.api._chat_permissions import build_chat_permission_check
+from app.api._chat_permissions import (
+    build_chat_permission_check,
+    load_external_mcp_configs,
+)
 from app.channels import resolve_channel, surface_from_header
 from app.channels.base import ChannelMessage
 from app.channels.turn_runner import ChatTurnInput, EventHook, run_turn

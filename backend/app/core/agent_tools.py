@@ -37,7 +37,6 @@ from app.core.plugins import ToolContext, all_plugins, is_activated_by_env_keys
 from app.core.providers.catalog import default_model
 from app.core.tools.artifact_agent import make_artifact_tool
 from app.core.tools.exa_search_agent import make_exa_search_tool
-from app.core.tools.external_mcp import build_external_mcp_tools
 from app.core.tools.image_gen_agent import make_image_gen_tool
 from app.core.tools.lcm_agents import (
     make_lcm_describe_tool,
@@ -47,6 +46,7 @@ from app.core.tools.lcm_agents import (
 )
 from app.core.tools.markitdown_convert import make_markitdown_tool
 from app.core.tools.now import (
+    build_external_mcp_tools,
     make_add_task_tool,
     make_complete_task_tool,
     make_cron_create_tool,
