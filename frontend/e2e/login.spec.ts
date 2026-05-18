@@ -26,23 +26,19 @@ test.describe('login page', () => {
 });
 
 test.describe('authenticated landing', () => {
-	test('dev-login + provisioned workspace lands on the home shell', async ({
-		page,
-		context,
-		request,
-	}) => {
-		const loginResponse = await context.request.post(
-			`${process.env.E2E_API_URL ?? 'http://localhost:8000'}/auth/dev-login`
-		);
+	test('dev-login + provisioned workspace lands on the home shell', async ({ page, context }) => {
+		const backend = process.env.E2E_API_URL ?? 'http://localhost:8000';
+		// ``context.request`` shares cookies with the browser context, so
+		// the dev-login session carries into the personalization upsert.
+		const loginResponse = await context.request.post(`${backend}/auth/dev-login`);
 		expect(loginResponse.ok()).toBe(true);
 		// The home shell only renders once the user has a provisioned
 		// workspace (see ``useOnboardingReadiness`` + ``AppShell``).
 		// Trigger the personalization upsert so onboarding-status reports
 		// has_workspace_ready=true before we navigate.
-		const provisionResponse = await request.put(
-			`${process.env.E2E_API_URL ?? 'http://localhost:8000'}/api/v1/personalization`,
-			{ data: { name: 'E2E Admin' } }
-		);
+		const provisionResponse = await context.request.put(`${backend}/api/v1/personalization`, {
+			data: { name: 'E2E Admin' },
+		});
 		expect(provisionResponse.ok()).toBe(true);
 
 		await page.goto('/');

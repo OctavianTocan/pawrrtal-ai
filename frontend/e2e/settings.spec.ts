@@ -6,18 +6,18 @@
 import { expect, test } from './fixtures';
 
 test.describe('settings page', () => {
-	test.beforeEach(async ({ context, request }) => {
-		const loginResponse = await context.request.post(
-			`${process.env.E2E_API_URL ?? 'http://localhost:8000'}/auth/dev-login`
-		);
+	test.beforeEach(async ({ context }) => {
+		const backend = process.env.E2E_API_URL ?? 'http://localhost:8000';
+		// ``context.request`` shares cookies with the browser context, so
+		// the dev-login session carries into the personalization upsert.
+		const loginResponse = await context.request.post(`${backend}/auth/dev-login`);
 		expect(loginResponse.ok()).toBe(true);
 		// Settings page sits under the app shell which gates rendering
 		// on a provisioned workspace. Trigger personalization upsert to
 		// satisfy ``useOnboardingReadiness.hasWorkspaceReady``.
-		const provisionResponse = await request.put(
-			`${process.env.E2E_API_URL ?? 'http://localhost:8000'}/api/v1/personalization`,
-			{ data: { name: 'E2E Admin' } }
-		);
+		const provisionResponse = await context.request.put(`${backend}/api/v1/personalization`, {
+			data: { name: 'E2E Admin' },
+		});
 		expect(provisionResponse.ok()).toBe(true);
 	});
 
