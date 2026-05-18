@@ -26,8 +26,10 @@ class Vendor(StrEnum):
 
     anthropic = "anthropic"
     google = "google"
+    moonshot = "moonshot"
     openai = "openai"
     xai = "xai"
+    zai = "zai"
 
 
 class Host(StrEnum):
@@ -42,6 +44,7 @@ class Host(StrEnum):
     agent_sdk = "agent-sdk"
     google_ai = "google-ai"
     litellm = "litellm"
+    opencode_go = "opencode-go"
     xai = "xai"
 
 
@@ -51,11 +54,16 @@ CANONICAL_HOST: dict[Vendor, Host] = {
     # OpenAI is gateway-only — there is no native Host.openai (yet).
     # LiteLLM handles the openai-compat protocol for any GPT model.
     Vendor.openai: Host.litellm,
-    # xAI has a native Host.xai (gRPC SDK via xai-sdk in PR #324) with
-    # full reasoning + Live Search support. LiteLLM can also route xAI
-    # but is feature-incomplete; keep the native host as the canonical
+    # xAI has a native Host.xai (gRPC SDK via xai-sdk) with full
+    # reasoning + Live Search support. LiteLLM can also route xAI but
+    # is feature-incomplete; keep the native host as the canonical
     # so ``xai/<model>`` defaults to the full-featured path.
     Vendor.xai: Host.xai,
+    # z.ai (GLM) and Moonshot (Kimi) are served by the OpenCode Go
+    # gateway (https://opencode.ai/docs/zen) — SST's hosted
+    # OpenAI-compatible endpoint for open-weight coding models.
+    Vendor.zai: Host.opencode_go,
+    Vendor.moonshot: Host.opencode_go,
 }
 """Per-vendor canonical host used when the input omits ``host:``.
 

@@ -14,7 +14,7 @@ import {
 	type KeyboardEventHandler,
 	type Ref,
 	type TextareaHTMLAttributes,
-	useState,
+	useRef,
 } from 'react';
 import { cn } from '../utils/cn';
 import { usePromptInputAttachments } from './promptInputContext';
@@ -46,11 +46,14 @@ export function PromptInputTextarea({
 	...props
 }: PromptInputTextareaProps): JSX.Element {
 		const attachments = usePromptInputAttachments();
-		const [isComposing, setIsComposing] = useState(false);
+		// IME composition state is only read inside the keydown handler,
+		// never in JSX — useRef avoids spurious re-renders during
+		// composition (react-doctor/rerender-state-only-in-handlers).
+		const isComposingRef = useRef(false);
 
 		const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
 			if (e.key === 'Enter') {
-				if (isComposing || e.nativeEvent.isComposing) return;
+				if (isComposingRef.current || e.nativeEvent.isComposing) return;
 				if (e.shiftKey) return;
 				e.preventDefault();
 				const form = e.currentTarget.form;
@@ -93,8 +96,12 @@ export function PromptInputTextarea({
 				)}
 				name={name}
 				onChange={onChange}
-				onCompositionEnd={() => setIsComposing(false)}
-				onCompositionStart={() => setIsComposing(true)}
+				onCompositionEnd={() => {
+					isComposingRef.current = false;
+				}}
+				onCompositionStart={() => {
+					isComposingRef.current = true;
+				}}
 				onKeyDown={handleKeyDown}
 				onPaste={handlePaste}
 				placeholder={placeholder}

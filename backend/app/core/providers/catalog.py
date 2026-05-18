@@ -94,6 +94,17 @@ _OPENAI_O1_MINI_OUT_USD = 12.00
 _OPENAI_O3_MINI_IN_USD = 1.10
 _OPENAI_O3_MINI_OUT_USD = 4.40
 
+# OpenCode Go gateway cost rates, mirrored from the upstream catalogue
+# at https://github.com/sst/models.dev/tree/dev/providers/opencode-go.
+# OpenCode Go is a hosted OpenAI-compatible gateway that fronts
+# open-weight coding models; the provider reports usage tokens on the
+# terminal stream chunk and the provider multiplies these rates to fill
+# the cost ledger.  Update alongside upstream catalogue changes.
+_OPENCODE_GO_GLM_5_1_IN_USD = 1.4
+_OPENCODE_GO_GLM_5_1_OUT_USD = 4.4
+_OPENCODE_GO_KIMI_K2_6_IN_USD = 0.95
+_OPENCODE_GO_KIMI_K2_6_OUT_USD = 4.0
+
 
 MODEL_CATALOG: tuple[ModelEntry, ...] = (
     ModelEntry(
@@ -225,6 +236,30 @@ MODEL_CATALOG: tuple[ModelEntry, ...] = (
         is_default=False,
         cost_per_mtok_in_usd=_OPENAI_O3_MINI_IN_USD,
         cost_per_mtok_out_usd=_OPENAI_O3_MINI_OUT_USD,
+    ),
+    # OpenCode Go gateway — SST's hosted OpenAI-compatible endpoint
+    # serving open-weight coding models (GLM-5.1, Kimi K2.6).
+    ModelEntry(
+        host=Host.opencode_go,
+        vendor=Vendor.zai,
+        model="glm-5.1",
+        display_name="GLM-5.1",
+        short_name="GLM-5.1",
+        description="Open coding model via OpenCode Go",
+        is_default=False,
+        cost_per_mtok_in_usd=_OPENCODE_GO_GLM_5_1_IN_USD,
+        cost_per_mtok_out_usd=_OPENCODE_GO_GLM_5_1_OUT_USD,
+    ),
+    ModelEntry(
+        host=Host.opencode_go,
+        vendor=Vendor.moonshot,
+        model="kimi-k2.6",
+        display_name="Kimi K2.6",
+        short_name="Kimi K2.6",
+        description="Long-context coding model via OpenCode Go",
+        is_default=False,
+        cost_per_mtok_in_usd=_OPENCODE_GO_KIMI_K2_6_IN_USD,
+        cost_per_mtok_out_usd=_OPENCODE_GO_KIMI_K2_6_OUT_USD,
     ),
 )
 

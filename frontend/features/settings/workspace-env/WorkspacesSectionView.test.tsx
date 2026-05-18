@@ -37,6 +37,7 @@ const EMPTY_VALUES = {
 	XAI_API_KEY: '',
 	OPENAI_API_KEY: '',
 	NOTION_API_KEY: '',
+	OPENCODE_API_KEY: '',
 } as const;
 
 describe('WorkspacesSectionView', () => {

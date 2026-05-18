@@ -26,6 +26,7 @@ export const WORKSPACE_ENV_KEY_IDS = [
 	'XAI_API_KEY',
 	'OPENAI_API_KEY',
 	'NOTION_API_KEY',
+	'OPENCODE_API_KEY',
 ] as const satisfies readonly string[];
 
 /** Union of valid workspace env key names. Derived from `WORKSPACE_ENV_KEY_IDS`. */

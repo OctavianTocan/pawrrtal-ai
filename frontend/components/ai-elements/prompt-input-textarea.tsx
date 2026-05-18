@@ -12,7 +12,6 @@ import {
 	type ComponentProps,
 	type KeyboardEventHandler,
 	useRef,
-	useState,
 } from 'react';
 import { InputGroupTextarea } from '@/components/ui/input-group';
 import { useScrollEdges } from '@/hooks/use-scroll-edges';
@@ -34,7 +33,10 @@ export const PromptInputTextarea = ({
 }: PromptInputTextareaProps) => {
 	const controller = useOptionalPromptInputController();
 	const attachments = usePromptInputAttachments();
-	const [isComposing, setIsComposing] = useState(false);
+	// IME composition state is only read inside the keydown handler, never
+	// in the render output — use a ref so toggling it during composition
+	// doesn't trigger spurious re-renders of the textarea.
+	const isComposingRef = useRef(false);
 	// Scroll-edge fade: when the textarea has more content above/below the
 	// visible area, render top/bottom mask gradients via data-attributes
 	// (CSS in globals.css → `[data-prompt-textarea]`).
@@ -43,7 +45,7 @@ export const PromptInputTextarea = ({
 
 	const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
 		if (e.key === 'Enter') {
-			if (isComposing || e.nativeEvent.isComposing) {
+			if (isComposingRef.current || e.nativeEvent.isComposing) {
 				return;
 			}
 			if (e.shiftKey) {
@@ -115,8 +117,12 @@ export const PromptInputTextarea = ({
 			data-scroll-up={canScrollUp ? 'true' : undefined}
 			data-scroll-down={canScrollDown ? 'true' : undefined}
 			name="message"
-			onCompositionEnd={() => setIsComposing(false)}
-			onCompositionStart={() => setIsComposing(true)}
+			onCompositionEnd={() => {
+				isComposingRef.current = false;
+			}}
+			onCompositionStart={() => {
+				isComposingRef.current = true;
+			}}
 			onKeyDown={handleKeyDown}
 			onPaste={handlePaste}
 			placeholder={placeholder}

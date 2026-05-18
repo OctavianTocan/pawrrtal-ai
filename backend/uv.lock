@@ -2427,6 +2427,7 @@ dependencies = [
     { name = "markdown-it-py" },
     { name = "markitdown", extra = ["all"] },
     { name = "mcp" },
+    { name = "openai" },
     { name = "opentelemetry-api" },
     { name = "opentelemetry-exporter-otlp-proto-http" },
     { name = "opentelemetry-instrumentation-fastapi" },
@@ -2446,7 +2447,6 @@ dependencies = [
 [package.optional-dependencies]
 voice = [
     { name = "mistralai" },
-    { name = "openai" },
 ]
 
 [package.dev-dependencies]
@@ -2476,7 +2476,7 @@ requires-dist = [
     { name = "markitdown", extras = ["all"], specifier = ">=0.1.1" },
     { name = "mcp", specifier = ">=1.27.0" },
     { name = "mistralai", marker = "extra == 'voice'", specifier = ">=1.0.0" },
-    { name = "openai", marker = "extra == 'voice'", specifier = ">=1.0.0" },
+    { name = "openai", specifier = ">=1.0.0" },
     { name = "opentelemetry-api", specifier = ">=1.29.0" },
     { name = "opentelemetry-exporter-otlp-proto-http", specifier = ">=1.29.0" },
     { name = "opentelemetry-instrumentation-fastapi", specifier = ">=0.50b0" },
