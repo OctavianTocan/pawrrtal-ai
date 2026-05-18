@@ -20,6 +20,12 @@ class Settings(BaseSettings):
 
     # The URL for the database connection.
     database_url: str = ""
+    # Filename used for the default SQLite database when ``database_url`` is
+    # empty. Lets parallel checkouts / experiments point at a different
+    # ``.db`` file without having to spell out a full ``sqlite:///...`` URL.
+    # An explicit ``DATABASE_URL`` always wins; this only controls the
+    # implicit ``sqlite:///./<name>`` fallback.
+    sqlite_db_filename: str = "pawrrtal.db"
     # The secret key used for signing authentication tokens. This should be set to a secure random value in production.
     auth_secret: str
     # The environment in which the application is running. Can be "dev" for development or "prod" for production.
@@ -375,7 +381,8 @@ class Settings(BaseSettings):
         """Return the configured database URL in a normalized form."""
         url = self.database_url.strip()
         if not url:
-            return "sqlite:///./pawrrtal.db"
+            filename = self.sqlite_db_filename.strip() or "pawrrtal.db"
+            return f"sqlite:///./{filename}"
 
         parsed = urlparse(url)
         if parsed.scheme.startswith(("postgresql", "sqlite")):

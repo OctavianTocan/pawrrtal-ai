@@ -76,8 +76,27 @@ def plain_html(text: str) -> str:
 
 
 def thinking_html(text: str) -> str:
-    """Render thinking text as italic Telegram HTML."""
-    return f"<i>{html_lib.escape(text)}</i>"
+    """Render thinking text as italic Telegram HTML with markdown applied.
+
+    The Paw's thinking stream may emit Markdown emphasis (``**bold**``,
+    ``_em_``, fenced code, etc.). Previously this helper only HTML-escaped
+    the text and wrapped it in ``<i>...</i>``, so users saw literal
+    ``**`` / ``_`` markers inside the thinking block. We now route the
+    text through :func:`md_to_telegram_html` first — same pipeline the
+    answer stream uses — then wrap the result in ``<i>`` so the whole
+    block still reads as a thinking aside. Telegram allows ``<b>`` /
+    ``<a>`` / etc. nested inside ``<i>``, so the combination renders
+    correctly even when the model emits formatting mid-trace.
+
+    Closes #287.
+    """
+    rendered = md_to_telegram_html(text)
+    # ``md_to_telegram_html`` falls back to the raw text when conversion
+    # produces nothing — re-escape in that case so we never emit unescaped
+    # ``<``/``&`` from the model into Telegram's HTML parser.
+    if rendered is text:
+        rendered = html_lib.escape(text)
+    return f"<i>{rendered}</i>"
 
 
 def optional_int(value: object) -> int | None:

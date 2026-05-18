@@ -113,9 +113,20 @@ arch: sentrux arch-be arch-fe
 check-docs *ARGS:
     bun run scripts/check-docs.ts {{ARGS}}
 
-# Run backend tests
-test:
+# Run backend pytest suite
+test-backend:
     uv run --project backend pytest backend/tests
+
+# Run frontend Vitest suite (CI-style, no watcher)
+test-frontend:
+    cd frontend && bun run test
+
+# Run frontend Vitest with v8 coverage; report drops under frontend/coverage/
+test-coverage:
+    cd frontend && bun run test:coverage
+
+# Run both suites. Use before pushing — local + CI parity (#271).
+test: test-backend test-frontend
 
 # Playwright E2E suite (frontend/e2e/). Requires backend + frontend dev
 # servers to be already running on the standard ports — start them with

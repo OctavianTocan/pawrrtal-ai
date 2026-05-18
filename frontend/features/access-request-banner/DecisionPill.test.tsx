@@ -1,4 +1,5 @@
-import { fireEvent, render } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { DecisionPill } from './DecisionPill';
 
@@ -34,8 +35,9 @@ describe('DecisionPill', () => {
 		expect(getByText('Approved')).toBeTruthy();
 	});
 
-	it('fires onApprove when the approve side is clicked from undecided', () => {
+	it('fires onApprove when the approve side is clicked from undecided', async () => {
 		const onApprove = vi.fn();
+		const user = userEvent.setup();
 		const { getByText } = render(
 			<DecisionPill
 				decision="undecided"
@@ -45,12 +47,13 @@ describe('DecisionPill', () => {
 				pillId="p1"
 			/>
 		);
-		fireEvent.click(getByText('Approve'));
+		await user.click(getByText('Approve'));
 		expect(onApprove).toHaveBeenCalled();
 	});
 
-	it('fires onReset when the active approved side is clicked again', () => {
+	it('fires onReset when the active approved side is clicked again', async () => {
 		const onReset = vi.fn();
+		const user = userEvent.setup();
 		const { getByText } = render(
 			<DecisionPill
 				decision="approved"
@@ -60,12 +63,13 @@ describe('DecisionPill', () => {
 				pillId="p1"
 			/>
 		);
-		fireEvent.click(getByText('Approved'));
+		await user.click(getByText('Approved'));
 		expect(onReset).toHaveBeenCalled();
 	});
 
-	it('fires onReject when the reject side is clicked from undecided', () => {
+	it('fires onReject when the reject side is clicked from undecided', async () => {
 		const onReject = vi.fn();
+		const user = userEvent.setup();
 		const { getByText } = render(
 			<DecisionPill
 				decision="undecided"
@@ -75,7 +79,7 @@ describe('DecisionPill', () => {
 				pillId="p1"
 			/>
 		);
-		fireEvent.click(getByText('Reject'));
+		await user.click(getByText('Reject'));
 		expect(onReject).toHaveBeenCalled();
 	});
 });

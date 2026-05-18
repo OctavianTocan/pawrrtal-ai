@@ -1,0 +1,96 @@
+---
+title: Folder structure review — current layout stands, four pending cleanups documented
+date: 2026-05-17
+status: Accepted
+---
+
+# Folder structure review (May 2026)
+
+**Status:** Accepted — 2026-05-17.
+**Closes:** #300 (folder structure review).
+
+## Context
+
+Periodic housekeeping check requested in #300: do the repo's
+folder boundaries still match how we navigate + modify code, or
+has the layout drifted?
+
+This ADR audits the current state and decides where to keep + where
+to clean up. Layout is otherwise frozen for non-trivial moves
+without a follow-up ADR.
+
+## Audit summary
+
+### Frontend (`frontend/`)
+
+| Folder | Verdict | Notes |
+|---|---|---|
+| `app/` | **Keep** | Next.js App Router idiom; no drift. |
+| `features/` | **Keep** | View/Container split is consistent across `chat/`, `channels/`, `nav-chats/`, `app-shell/`, etc. |
+| `components/` | **Keep** | Shadcn-style primitives under `components/ui/`; brand icons under `components/brand-icons/`; sidebar shell pieces under `components/app-*` / `nav-*`. |
+| `lib/` | **Keep** | Cross-feature helpers (toast, fetch wrappers, design-system bindings). Vendored monorepo packages live under `lib/react-{dropdown,overlay,chat-composer}/`. |
+| `hooks/` | **Keep** | Reusable hook primitives. |
+| `content/docs/handbook/` | **Keep** | Fumadocs site; ADRs live under `decisions/`. |
+| `e2e/` | **Keep** | Playwright suite + Stagehand AI sub-suite. |
+
+**No frontend moves.** The View/Container split + cursor rules + `AppDialog` primitive are all consistent.
+
+### Backend (`backend/app/`)
+
+| Folder | Verdict | Notes |
+|---|---|---|
+| `api/` | **Keep** | One file per domain (chat, conversations, channels, …). |
+| `crud/` | **Keep** | Pure SQLAlchemy helpers, no API plumbing. |
+| `channels/` | **Keep** | One file per surface (SSE, Telegram); the `_turn_*` helper modules keep `turn_runner.py` under sentrux's fan-out budget. |
+| `core/` | **Keep but watch** | Broad: governance, tools, providers, lcm, observability, plugins. Sub-grouping would aid discovery but every existing sub-folder earns its keep. Re-evaluate if `core/` directly contains >25 files. |
+| `core/tools/` | **Keep** | Provider-agnostic per `.claude/rules/architecture/no-tools-in-providers.md`. |
+| `core/providers/` | **Keep** | Two provider implementations + shared catalog. |
+| `integrations/` | **Keep** | One folder per external integration (Telegram, Notion); shape is consistent. |
+| `models.py` (single file) | **Keep for now** | Cycle considerations (`db.py` ↔ `models.py`) make a split risky. Re-evaluate if the file crosses ~600 lines. |
+
+**No backend moves.** `core/` is the only folder that needs ongoing
+discipline; the audit shows nothing currently misplaced.
+
+### Cross-cutting
+
+| Folder | Verdict | Notes |
+|---|---|---|
+| `docs/` | **Keep** | Migration plans + reference material. ADRs do NOT live here — they're in `frontend/content/docs/handbook/decisions/` so they're served by the Fumadocs handbook. |
+| `frontend/content/docs/handbook/` | **Keep** | Canonical home for ADRs + handbook docs. |
+| `notion-docs/` | **Audit later** | Mirrors of Notion pages; only useful when Notion is offline. Worth pruning if the mirror falls out of sync. Not blocking. |
+| `.claude/rules/` | **Keep** | One rule per file, organised by domain. Vendored from `OctavianTocan/claude-rules`. |
+| `.beans/` | **Keep** | Local task tracking; `beans` CLI is the canonical interface. |
+| `.sentrux/` | **Keep** | Architecture-gate rules + per-session baseline (gitignored). |
+| `electron/` | **Keep** | Desktop shell. Isolated from frontend per `electron/README.md` contract. |
+
+### Pending cleanups (low priority)
+
+1. `frontend/components/` orphan check — earlier investigation found
+   `nav-main.tsx`, `nav-projects.tsx`, `nav-secondary.tsx` were
+   unreferenced. Re-grep before next layout change; delete if still
+   orphaned.
+2. `notion-docs/` freshness — if a Notion page diverges from the
+   mirror by more than two weeks, either re-sync or drop the mirror.
+3. `.beans/` — the `ai-nexus-*` slugs were renamed during #292;
+   verify no `ai-nexus-*` files remain (none expected).
+4. `app/core/` sub-grouping — if direct children of `core/` cross
+   25 files, draft a follow-up ADR proposing `core/governance/`,
+   `core/observability/`, `core/providers/` (some of which already
+   exist) as the canonical pattern.
+
+## Decision
+
+**No structural moves in this PR.** The current layout is
+load-bearing and matches how navigation happens day-to-day.
+
+Re-run this audit:
+- Quarterly, OR
+- When `core/` directly contains >25 files, OR
+- After any major surface addition (a new integration, a new
+  channel, a new top-level frontend feature).
+
+## References
+
+- Original issue: #300.
+- Sentrux rules + baseline: `.sentrux/rules.toml`,
+  `frontend/content/docs/handbook/decisions/2026-05-03-adopt-sentrux-architecture-gating.mdx`.

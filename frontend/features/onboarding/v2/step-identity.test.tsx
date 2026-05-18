@@ -1,4 +1,5 @@
-import { fireEvent, render } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { StepIdentity } from './step-identity';
 
@@ -22,39 +23,45 @@ describe('StepIdentity', () => {
 		expect(getByDisplayValue('https://pawrrtal.dev')).toBeTruthy();
 	});
 
-	it('patches the profile when typing into the name field', () => {
+	it('patches the profile when typing into the name field', async () => {
 		const onPatch = vi.fn();
+		const user = userEvent.setup();
 		const { getByPlaceholderText } = render(
 			<StepIdentity onContinue={vi.fn()} onPatch={onPatch} profile={{}} />
 		);
-		fireEvent.change(getByPlaceholderText('Your name'), { target: { value: 'Octavian' } });
+		const nameInput = getByPlaceholderText('Your name');
+		await user.click(nameInput);
+		await user.paste('Octavian');
 		expect(onPatch).toHaveBeenCalledWith({ name: 'Octavian' });
 	});
 
-	it('toggles a goal chip on click and emits the new goals array', () => {
+	it('toggles a goal chip on click and emits the new goals array', async () => {
 		const onPatch = vi.fn();
+		const user = userEvent.setup();
 		const { getByText } = render(
 			<StepIdentity onContinue={vi.fn()} onPatch={onPatch} profile={{ goals: [] }} />
 		);
-		fireEvent.click(getByText('SEO / AEO'));
+		await user.click(getByText('SEO / AEO'));
 		expect(onPatch).toHaveBeenCalledWith({ goals: ['SEO / AEO'] });
 	});
 
-	it('un-toggles a goal already in the goals array', () => {
+	it('un-toggles a goal already in the goals array', async () => {
 		const onPatch = vi.fn();
+		const user = userEvent.setup();
 		const { getByText } = render(
 			<StepIdentity onContinue={vi.fn()} onPatch={onPatch} profile={{ goals: ['Writing'] }} />
 		);
-		fireEvent.click(getByText('Writing'));
+		await user.click(getByText('Writing'));
 		expect(onPatch).toHaveBeenCalledWith({ goals: [] });
 	});
 
-	it('fires onContinue when the footer button is clicked', () => {
+	it('fires onContinue when the footer button is clicked', async () => {
 		const onContinue = vi.fn();
+		const user = userEvent.setup();
 		const { getByRole } = render(
 			<StepIdentity onContinue={onContinue} onPatch={vi.fn()} profile={{}} />
 		);
-		fireEvent.click(getByRole('button', { name: /Continue/ }));
+		await user.click(getByRole('button', { name: /Continue/ }));
 		expect(onContinue).toHaveBeenCalled();
 	});
 });

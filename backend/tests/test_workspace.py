@@ -188,7 +188,7 @@ class TestSeedWorkspace:
 
         agents = (root / "AGENTS.md").read_text()
         assert "AGENTS.md" in agents
-        assert "Session Startup" in agents
+        assert "Session Continuity" in agents
 
     def test_writes_identity_and_tools_md(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()

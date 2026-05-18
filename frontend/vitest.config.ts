@@ -105,6 +105,12 @@ export default defineConfig({
 	},
 	test: {
 		environment: 'jsdom',
+		// Reset `.mock.calls` / `.mock.results` between tests so a spy from
+		// one test can't quietly satisfy an assertion in another. We
+		// deliberately don't enable `mockReset` / `restoreMocks` so test-
+		// scoped `vi.fn()` implementations and `vi.spyOn` stubs survive
+		// across assertions inside the same test. See #278 for context.
+		clearMocks: true,
 		exclude: [
 			'**/.next/**',
 			'**/node_modules/**',

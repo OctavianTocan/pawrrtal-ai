@@ -1,4 +1,5 @@
-import { fireEvent, render } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { IntegrationsSection } from './IntegrationsSection';
 
@@ -11,17 +12,19 @@ describe('IntegrationsSection', () => {
 		expect(getByText('No integrations connected yet.')).toBeTruthy();
 	});
 
-	it('opens the Add Integration modal when the trigger button is clicked', () => {
+	it('opens the Add Integration modal when the trigger button is clicked', async () => {
+		const user = userEvent.setup();
 		const { getByRole, queryByText, getByPlaceholderText } = render(<IntegrationsSection />);
 		expect(queryByText('Add integrations')).toBeNull();
-		fireEvent.click(getByRole('button', { name: /Add integration/ }));
+		await user.click(getByRole('button', { name: /Add integration/ }));
 		expect(getByPlaceholderText('Search integrations...')).toBeTruthy();
 	});
 
-	it('opens the Add MCP Server modal from the catalog Add custom button', () => {
+	it('opens the Add MCP Server modal from the catalog Add custom button', async () => {
+		const user = userEvent.setup();
 		const { getByRole, getByPlaceholderText } = render(<IntegrationsSection />);
-		fireEvent.click(getByRole('button', { name: /Add integration/ }));
-		fireEvent.click(getByRole('button', { name: /Add custom/ }));
+		await user.click(getByRole('button', { name: /Add integration/ }));
+		await user.click(getByRole('button', { name: /Add custom/ }));
 		expect(getByPlaceholderText('https://mcp.example.com/mcp')).toBeTruthy();
 	});
 });

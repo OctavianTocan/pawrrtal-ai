@@ -45,8 +45,11 @@ them in-chat:
 - ``error`` → placeholder is replaced with the error content prefixed by
   ``❌``.
 
-If neither text nor a terminal event arrives, a fallback message is shown
-pointing the user at the server log.
+A fallback message is shown when the turn closes without anything to say:
+
+- The stream produced no text and no terminal event ("empty stream").
+- The stream produced tool calls but no answer text and no thinking
+  trace ("tool-only turn" — see #293).
 
 Error handling
 --------------
@@ -67,19 +70,18 @@ from typing import TYPE_CHECKING, Any
 from app.core.providers.base import StreamEvent
 from app.core.tools.send_message import SendFn
 
+from ._telegram_dispatch import (
+    finalize_turn_delivery,
+    handle_thinking,
+    handle_tool_use,
+    prepare_thinking_block,
+    prepare_tools_block,
+)
 from .base import ChannelMessage
 from .telegram_delivery import (
     final_reply_text,
-    format_tool_use,
     optional_int,
-    plain_html,
     routing_kwargs,
-    safe_delete,
-    safe_edit,
-    safe_edit_html,
-    safe_send_html,
-    safe_send_text,
-    thinking_html,
 )
 from .telegram_html import md_to_telegram_html
 
@@ -106,10 +108,10 @@ _ERROR_PREFIX = "❌ "
 
 # Fallback copy used when a turn produces neither text nor a structured
 # termination/error event.  Without this the ⏳ placeholder would sit forever
-# and the user would never know the turn ended.
-_EMPTY_RESPONSE_FALLBACK = (
-    "⚠️ The agent finished without producing any text. Check `backend/app.log` for the turn trace."
-)
+# and the user would never know the turn ended.  Avoid mentioning server-side
+# paths here — this string is rendered directly into the user's Telegram chat
+# and shouldn't leak internal infrastructure.
+_EMPTY_RESPONSE_FALLBACK = "⚠️ The agent finished without producing a reply. Please try again."
 
 
 class TelegramChannel:
@@ -150,11 +152,30 @@ class TelegramChannel:
         message_thread_id = optional_int(meta.get("message_thread_id"))
 
         tool_trace = ""
+        # ``tool_message_id`` starts as the placeholder so the FIRST tools
+        # block consumes the ⏳; on a thinking→tools transition (issue #288)
+        # we open a fresh Telegram message for the new tools block and
+        # rebind this slot so subsequent edits land there.
+        tool_message_id: int = message_id
         answer_text = ""
         thinking_text = ""
         thinking_message_id: int | None = None
         chars_since_edit = 0
         last_edit_at = asyncio.get_event_loop().time()
+        # Block-transition tracking (#288). ``previous_block_kind`` is the
+        # kind of the most-recent block-emitting event (``"tools"`` /
+        # ``"thinking"``). When the incoming event's kind differs from the
+        # previous one (and we've already emitted at least one block), the
+        # active block is finalized — its last state stays in chat — and
+        # we open a new message for the incoming block so the chat reads
+        # as the natural ``thinking → tools → thinking`` sequence instead
+        # of two ever-growing blobs.
+        previous_block_kind: str | None = None
+        # ``first_block_kind`` records what the placeholder was used for,
+        # so the post-stream cleanup can tell whether ⏳ holds real content
+        # (first block was tools — keep it) or is still the dangling
+        # placeholder (first block was thinking — delete it).
+        first_block_kind: str | None = None
 
         # Captured terminal outcomes — flushed after the stream ends so they
         # don't race the in-flight debounced edits for ``delta`` chunks.
@@ -165,11 +186,29 @@ class TelegramChannel:
             etype = event.get("type")
 
             if etype == "tool_use":
-                tool_trace, chars_since_edit, last_edit_at = await _handle_tool_use(
+                first_block_kind = first_block_kind or "tools"
+                (
+                    tool_trace,
+                    tool_message_id,
+                    chars_since_edit,
+                    last_edit_at,
+                ) = await prepare_tools_block(
+                    previous_block_kind=previous_block_kind,
+                    bot=bot,
+                    chat_id=chat_id,
+                    tool_trace=tool_trace,
+                    tool_message_id=tool_message_id,
+                    chars_since_edit=chars_since_edit,
+                    last_edit_at=last_edit_at,
+                    reply_to_message_id=reply_to_message_id,
+                    message_thread_id=message_thread_id,
+                )
+                previous_block_kind = "tools"
+                tool_trace, chars_since_edit, last_edit_at = await handle_tool_use(
                     event=event,
                     bot=bot,
                     chat_id=chat_id,
-                    message_id=message_id,
+                    message_id=tool_message_id,
                     tool_trace=tool_trace,
                     chars_since_edit=chars_since_edit,
                     last_edit_at=last_edit_at,
@@ -177,7 +216,14 @@ class TelegramChannel:
                 continue
 
             if etype == "thinking":
-                thinking_text, thinking_message_id = await _handle_thinking(
+                first_block_kind = first_block_kind or "thinking"
+                thinking_text, thinking_message_id = prepare_thinking_block(
+                    previous_block_kind=previous_block_kind,
+                    thinking_text=thinking_text,
+                    thinking_message_id=thinking_message_id,
+                )
+                previous_block_kind = "thinking"
+                thinking_text, thinking_message_id = await handle_thinking(
                     event=event,
                     bot=bot,
                     chat_id=chat_id,
@@ -223,26 +269,18 @@ class TelegramChannel:
             terminal_message=terminal_message,
             terminal_prefix=terminal_prefix,
         )
-        if tool_trace:
-            await safe_edit_html(bot, chat_id, message_id, plain_html(tool_trace))
-        elif final_text or thinking_text:
-            await safe_delete(bot, chat_id, message_id)
-        else:
-            await safe_edit(bot, chat_id, message_id, _EMPTY_RESPONSE_FALLBACK)
-            logger.warning(
-                "TELEGRAM_EMPTY_STREAM chat_id=%s message_id=%s",
-                chat_id,
-                message_id,
-            )
-
-        if final_text:
-            await safe_send_text(
-                bot,
-                chat_id,
-                final_text,
-                reply_to_message_id=reply_to_message_id,
-                message_thread_id=message_thread_id,
-            )
+        await finalize_turn_delivery(
+            bot=bot,
+            chat_id=chat_id,
+            placeholder_message_id=message_id,
+            first_block_kind=first_block_kind,
+            previous_block_kind=previous_block_kind,
+            tool_trace=tool_trace,
+            thinking_text=thinking_text,
+            final_text=final_text,
+            reply_to_message_id=reply_to_message_id,
+            message_thread_id=message_thread_id,
+        )
 
         # No bytes to yield — delivery is a side-effect only.
         return
@@ -251,65 +289,6 @@ class TelegramChannel:
         # signature), so callers can ``async for`` over it even though we
         # only ever side-effect through ``edit_message_text``.
         yield
-
-
-async def _handle_tool_use(
-    *,
-    event: StreamEvent,
-    bot: Bot,
-    chat_id: int | str,
-    message_id: int,
-    tool_trace: str,
-    chars_since_edit: int,
-    last_edit_at: float,
-) -> tuple[str, int, float]:
-    """Inject a detailed tool-call row into the editable Telegram trace.
-
-    Extracted from :meth:`TelegramChannel.deliver` to keep that method
-    under the team's per-function statement budget while preserving PR 07's
-    real-time tool-call surfacing.
-
-    Returns the updated ``(tool_trace, chars_since_edit, last_edit_at)``
-    triple so the caller can flow it into the next iteration unchanged.
-    """
-    line = format_tool_use(event)
-    tool_trace = f"{tool_trace}\n{line}" if tool_trace else line
-    chars_since_edit += len(line)
-    now = asyncio.get_event_loop().time()
-    elapsed = now - last_edit_at
-    if tool_trace and (chars_since_edit >= _EDIT_DEBOUNCE_CHARS or elapsed >= _MAX_EDIT_INTERVAL_S):
-        await safe_edit_html(bot, chat_id, message_id, plain_html(tool_trace))
-        return tool_trace, 0, now
-    return tool_trace, chars_since_edit, last_edit_at
-
-
-async def _handle_thinking(
-    *,
-    event: StreamEvent,
-    bot: Bot,
-    chat_id: int | str,
-    thinking_text: str,
-    thinking_message_id: int | None,
-    reply_to_message_id: int | None,
-    message_thread_id: int | None,
-) -> tuple[str, int | None]:
-    """Send or edit the separate italic thinking message."""
-    chunk = str(event.get("content") or "").strip()
-    if not chunk:
-        return thinking_text, thinking_message_id
-    thinking_text = f"{thinking_text}\n{chunk}" if thinking_text else chunk
-    html = thinking_html(thinking_text)
-    if thinking_message_id is None:
-        message_id = await safe_send_html(
-            bot,
-            chat_id,
-            html,
-            reply_to_message_id=reply_to_message_id,
-            message_thread_id=message_thread_id,
-        )
-        return thinking_text, message_id
-    await safe_edit_html(bot, chat_id, thinking_message_id, html)
-    return thinking_text, thinking_message_id
 
 
 # ---------------------------------------------------------------------------

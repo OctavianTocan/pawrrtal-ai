@@ -127,7 +127,7 @@ async def test_refresh_telegram_commands_sets_current_command_menu() -> None:
     bot.set_my_commands.assert_awaited_once()
     commands = bot.set_my_commands.await_args.args[0]
     names = [command.command for command in commands]
-    assert names == ["start", "new", "model", "models", "verbose", "stop", "status"]
+    assert names == ["start", "new", "model", "models", "verbose", "stop", "status", "lcm"]
     assert all(command.description for command in commands)
 
 
@@ -179,7 +179,7 @@ class TestTelegramChannelDeliver:
         call = bot.edit_message_text.call_args
         assert call.kwargs["chat_id"] == 123
         assert call.kwargs["message_id"] == 456
-        assert "agent finished without producing any text" in call.kwargs["text"]
+        assert "agent finished without producing a reply" in call.kwargs["text"]
 
     async def test_final_reply_sent_as_separate_message(self) -> None:
         """Plain answer text is sent as a final reply, not streamed into the trace."""
@@ -256,6 +256,52 @@ class TestTelegramChannelDeliver:
         final_send = bot.send_message.await_args_list[-1].kwargs
         assert final_send["text"] == "answer"
 
+    async def test_block_transitions_open_new_telegram_messages(self) -> None:
+        """Thinking → tools → thinking emits three separate Telegram messages (#288).
+
+        Previously the channel had one ever-growing thinking message and
+        one ever-growing tool trace, so block transitions weren't visible
+        in chat. The fix tracks ``previous_block_kind`` and opens a new
+        Telegram message on every transition.
+        """
+        bot = _make_bot()
+        msg = _make_channel_message(bot, chat_id=88, message_id=11)
+        channel = TelegramChannel()
+
+        events: list[StreamEvent] = [
+            {"type": "thinking", "content": "let me check the workspace"},
+            {
+                "type": "tool_use",
+                "name": "read_file",
+                "input": {"path": "memory/USER.md"},
+            },
+            {"type": "thinking", "content": "now I understand"},
+            {"type": "delta", "content": "Answer."},
+        ]
+        async for _ in channel.deliver(_stream(*events), msg):
+            pass
+
+        # Every block transition (thinking → tools → thinking) plus the
+        # final answer = at least three ``send_message`` calls (initial
+        # thinking, new tools placeholder, fresh second thinking, then
+        # the final answer message).
+        send_count = bot.send_message.await_count
+        assert send_count >= 4, f"expected >=4 send_message calls, got {send_count}"
+
+        # The two thinking messages must target separate Telegram messages
+        # — the chat shouldn't read as one big thinking blob.
+        thinking_sends = [
+            call.kwargs["text"]
+            for call in bot.send_message.await_args_list
+            if call.kwargs.get("text", "").startswith("<i>")
+        ]
+        assert len(thinking_sends) >= 2
+        assert "let me check the workspace" in thinking_sends[0]
+        assert "now I understand" in thinking_sends[-1]
+        # The two thinking messages don't share content — i.e., the
+        # second thinking isn't an accumulation of both.
+        assert "let me check the workspace" not in thinking_sends[-1]
+
     async def test_agent_terminated_replaces_placeholder(self) -> None:
         """``agent_terminated`` without text must send a final warning reply."""
         bot = _make_bot()
@@ -293,6 +339,59 @@ class TestTelegramChannelDeliver:
         last_text = bot.send_message.await_args.kwargs["text"]
         assert "Partial answer." in last_text
         assert "max_iterations" in last_text
+
+    async def test_thinking_event_renders_markdown_bold_inside_italic(self) -> None:
+        """Thinking deltas with Markdown emphasis render formatted, not literal (#287)."""
+        bot = _make_bot()
+        msg = _make_channel_message(bot)
+        channel = TelegramChannel()
+
+        events: list[StreamEvent] = [
+            {"type": "thinking", "content": "weighing **bold** and *italic* options"},
+            {"type": "delta", "content": "done"},
+        ]
+        async for _ in channel.deliver(_stream(*events), msg):
+            pass
+
+        first_send = bot.send_message.await_args_list[0].kwargs["text"]
+        # The literal ``**`` markers must not leak into the rendered
+        # thinking message — they should be converted to Telegram's
+        # ``<b>`` tag while the surrounding italic envelope is preserved.
+        assert "**bold**" not in first_send
+        assert "<i>" in first_send and "</i>" in first_send
+        assert "<b>bold</b>" in first_send
+
+    async def test_tool_only_turn_surfaces_fallback_reply(self) -> None:
+        """Tool calls without any answer text must produce a closing message (#293).
+
+        Previously the channel would render the tool trace into the
+        placeholder and return without sending a final reply, leaving
+        the user staring at tool calls and silence. The fix sends the
+        empty-stream fallback so every turn ends with a visible
+        closing message.
+        """
+        bot = _make_bot()
+        msg = _make_channel_message(bot, chat_id=42, message_id=99)
+        channel = TelegramChannel()
+
+        events: list[StreamEvent] = [
+            {
+                "type": "tool_use",
+                "name": "read_file",
+                "input": {"path": "memory/USER.md"},
+            },
+        ]
+        async for _ in channel.deliver(_stream(*events), msg):
+            pass
+
+        # Placeholder is repurposed for the tool trace (not deleted, not
+        # replaced with the warning).
+        bot.delete_message.assert_not_called()
+        # A separate fallback reply is sent so the user knows the turn
+        # ended.  The exact wording lives in the channel constant.
+        bot.send_message.assert_awaited_once()
+        text = bot.send_message.await_args.kwargs["text"]
+        assert "agent finished without producing a reply" in text
 
     async def test_error_event_replaces_placeholder(self) -> None:
         """A bare ``error`` event must surface the error text as final reply."""

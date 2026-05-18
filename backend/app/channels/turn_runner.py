@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.channels._turn_cost import record_turn_cost_if_enabled
+from app.channels._turn_runtime_context import system_prompt_for_turn
 from app.channels._turn_workspace import workspace_system_prompt
 from app.core.chat_aggregator import ChatTurnAggregator, should_emit_event
 from app.core.config import settings
@@ -124,10 +125,19 @@ async def run_turn(
     """
     started_at = time.perf_counter()
     history, assistant_message_id = await _load_history_and_persist(turn_input)
-    system_prompt = workspace_system_prompt(turn_input.workspace_root)
     aggregator = ChatTurnAggregator()
     counter = _EventCounter()
     model_id = _channel_model_id(turn_input.channel_message)
+    # Compose the per-turn system prompt: workspace identity files +
+    # runtime metadata (current time, model/provider, iteration budget,
+    # tool inventory) appended on every turn so the model never has to
+    # guess at its environment.  See issues #289, #291, #294, #309 and
+    # ``app.channels._turn_runtime_context`` for the rationale.
+    system_prompt = system_prompt_for_turn(
+        turn_input.workspace_root,
+        model_id=model_id,
+        tools=turn_input.tools,
+    )
 
     with turn_span(
         conversation_id=turn_input.conversation_id,

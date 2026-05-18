@@ -63,7 +63,9 @@ from typing import Any
 import anyio
 
 from app.core.agent_loop.types import AgentTool
+from app.core.tools.display import make_tool_display
 from app.core.tools.errors import ToolError, ToolErrorCode
+from app.core.tools.python_exec_display import python_code_detail, python_code_preview
 from app.core.tools.workspace_files import _resolve_safe
 
 log = logging.getLogger(__name__)
@@ -457,4 +459,18 @@ def make_virtual_python_tool(
             "required": ["code"],
         },
         execute=execute,
+        # Closes #302 — Telegram + web tool-trace surfaces previously showed
+        # only ``(code)`` (the argument key, not the value) so the exact
+        # code the agent attempted to run was invisible.  We now surface
+        # the first line as a one-line summary, and the full code in
+        # ``detail`` so the chain-of-thought view can render it as a
+        # fenced block.  Long programs are head-truncated to keep the
+        # inline preview from blowing past Telegram's message budget.
+        display=make_tool_display(
+            icon="🐍",
+            label="Run Python",
+            present=lambda args: f"🐍 Running Python: {python_code_preview(args.get('code'))}",
+            compact=lambda args: f"python -c {python_code_preview(args.get('code'))}",
+            detail=lambda args: python_code_detail(args.get("code")),
+        ),
     )

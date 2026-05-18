@@ -9,6 +9,7 @@
 		"typecheck": "tsc --noEmit",
 		"test": "NODE_ENV=test vitest run",
 		"test:watch": "vitest",
+		"test:coverage": "NODE_ENV=test vitest run --coverage",
 		"e2e": "playwright test",
 		"e2e:stagehand": "playwright test --config=playwright.stagehand.config.ts",
 		"lint": "bunx --bun @biomejs/biome lint --write",

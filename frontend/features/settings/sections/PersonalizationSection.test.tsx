@@ -1,4 +1,5 @@
-import { fireEvent, render } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 function installMemoryStorage(): Map<string, string> {
@@ -61,10 +62,11 @@ describe('PersonalizationSection', () => {
 		expect(getByText('Reset memories')).toBeTruthy();
 	});
 
-	it('updates the custom instructions textarea when typed into', () => {
+	it('updates the custom instructions textarea when typed into', async () => {
+		const user = userEvent.setup();
 		const { getByPlaceholderText } = render(<PersonalizationSection />);
 		const textarea = getByPlaceholderText('Add your custom instructions...');
-		fireEvent.change(textarea, { target: { value: 'be terse' } });
+		await user.type(textarea, 'be terse');
 		expect((textarea as HTMLTextAreaElement).value).toBe('be terse');
 	});
 });

@@ -1,0 +1,185 @@
+name: Playwright E2E
+
+# Runs the regular Playwright suite under `frontend/e2e/` (the dev-admin
+# login flow + companion specs) against ephemeral frontend + backend
+# servers.  Mirrors `just e2e` so local + CI exercise the same path.
+#
+# Stagehand AI E2E (`stagehand-e2e.yml`) is a separate workflow because
+# it costs LLM tokens and runs on a different cadence.  This one is
+# token-free.
+#
+# Closes #273.
+
+on:
+  pull_request:
+    branches: [development, main]
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - '.github/workflows/playwright-e2e.yml'
+      - 'justfile'
+      - 'package.json'
+      - 'bun.lock'
+  push:
+    branches: [development, main]
+    paths:
+      - 'frontend/**'
+      - 'backend/**'
+      - '.github/workflows/playwright-e2e.yml'
+      - 'justfile'
+      - 'package.json'
+      - 'bun.lock'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: playwright-e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Playwright suite
+    if: >-
+      (github.actor == 'OctavianTocan' || github.actor == 'octagent') &&
+      (github.event_name != 'pull_request' ||
+        github.event.pull_request.head.repo.full_name == github.repository)
+    # Documented exception to the self-hosted-runner default per
+    # ``.claude/rules/github-actions/octaviantocan-only-and-self-hosted-runner.md``:
+    # Playwright's Chromium needs nss/dbus/asound system libraries that
+    # ``playwright install --with-deps`` installs via ``sudo apt-get``.
+    # The self-hosted runner has no passwordless sudo, so Chromium crashes
+    # mid-test (``Target page, context or browser has been closed``).
+    # ``ubuntu-latest`` has passwordless sudo and is the same runner the
+    # Stagehand workflow uses for the same reason.
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          submodules: recursive
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@735343b667d3e6f658f44d0eca948eb6282f2b76 # v2.0.2
+        with:
+          bun-version: latest
+
+      - name: Setup Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v6.0.0
+        with:
+          node-version: '20'
+
+      - name: Setup Python (for backend dev-login endpoint)
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v6.0.1
+
+      - name: Build local libs (frontend/lib/* submodules)
+        run: bash scripts/build-local-libs.sh
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: Generate Fumadocs source files
+        working-directory: frontend
+        run: bun run generate:docs
+
+      - name: Install Playwright Chromium
+        # On ``ubuntu-latest`` (see the ``runs-on`` comment for why we
+        # opted out of the self-hosted default), ``--with-deps`` shells
+        # out to ``sudo apt-get install`` for nss / dbus / asound / etc.
+        # That's required: without those libs Chromium crashes mid-test
+        # with "Target page, context or browser has been closed".
+        working-directory: frontend
+        run: bunx --bun playwright install --with-deps chromium
+
+      - name: Start backend (dev-login + chat endpoints)
+        working-directory: backend
+        env:
+          # Required pydantic-settings fields — dummy values are fine for E2E.
+          AUTH_SECRET: e2e-not-a-secret
+          GOOGLE_API_KEY: e2e-not-a-key
+          # Fernet expects a 32-byte url-safe base64 key.
+          FERNET_KEY: 'zG9KQK6sH0xLm4LJ4n8C9aD2vF3gN5pT7rE1yU8xKqM='
+          WORKSPACE_ENCRYPTION_KEY: 'zG9KQK6sH0xLm4LJ4n8C9aD2vF3gN5pT7rE1yU8xKqM='
+          CORS_ORIGINS: '["http://localhost:3001"]'
+          DATABASE_URL: 'sqlite+aiosqlite:///./e2e.db'
+          ADMIN_EMAIL: e2e-admin@example.com
+          ADMIN_PASSWORD: e2e-admin-password
+          COOKIE_SAMESITE: lax
+          COOKIE_SECURE: 'false'
+        run: |
+          uv run uvicorn main:app --host 127.0.0.1 --port 8000 &
+          echo $! > /tmp/backend.pid
+          # Fail fast if backend doesn't come up within 30s.
+          for i in $(seq 1 30); do
+            if curl -sSf http://127.0.0.1:8000/openapi.json > /dev/null 2>&1; then
+              echo "Backend ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Backend did not start within 30s"
+          exit 1
+
+      - name: Build frontend (Next.js)
+        working-directory: frontend
+        run: bun run build
+
+      - name: Start frontend
+        working-directory: frontend
+        env:
+          E2E_API_URL: http://127.0.0.1:8000
+        run: |
+          PORT=3001 bun run start &
+          echo $! > /tmp/frontend.pid
+          for i in $(seq 1 30); do
+            if curl -sSf http://127.0.0.1:3001 > /dev/null 2>&1; then
+              echo "Frontend ready after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::Frontend did not start within 30s"
+          exit 1
+
+      - name: Run Playwright suite
+        working-directory: frontend
+        env:
+          E2E_BASE_URL: http://127.0.0.1:3001
+          E2E_API_URL: http://127.0.0.1:8000
+        run: bunx --bun playwright test
+
+      # Always upload the HTML report so the trace is downloadable on failure.
+      - name: Upload Playwright HTML report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-e2e-report
+          path: frontend/playwright-report/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Upload per-test artifacts (trace, video, screenshot)
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: playwright-e2e-results
+          path: frontend/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Stop backend + frontend
+        if: always()
+        run: |
+          [ -f /tmp/backend.pid ] && kill -9 "$(cat /tmp/backend.pid)" 2>/dev/null || true
+          [ -f /tmp/frontend.pid ] && kill -9 "$(cat /tmp/frontend.pid)" 2>/dev/null || true

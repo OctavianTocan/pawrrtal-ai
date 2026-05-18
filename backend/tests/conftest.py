@@ -1,7 +1,6 @@
 """Shared backend test fixtures."""
 
 import sys
-import tempfile
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
 from uuid import uuid4
@@ -65,8 +64,8 @@ async def db_session(test_user: User) -> AsyncGenerator[AsyncSession]:
 
 @pytest.fixture
 async def seeded_default_workspace(
-    db_session: AsyncSession, test_user: User
-) -> AsyncGenerator[Workspace]:
+    db_session: AsyncSession, test_user: User, tmp_path: Path
+) -> Workspace:
     """Seed a default workspace for tests that need an onboarded user.
 
     Chat now refuses to run until the user has a default workspace (PR
@@ -74,8 +73,14 @@ async def seeded_default_workspace(
     this fixture so the gate doesn't 412 every request.  Tests that
     explicitly want the "no workspace yet" condition (workspace CRUD
     tests) skip this fixture.
+
+    The workspace root lives under pytest's per-test ``tmp_path`` so
+    pytest cleans it up automatically (fixes #275 — previously this
+    fixture allocated via ``tempfile.mkdtemp`` and leaked directories
+    every run).
     """
-    workspace_root = Path(tempfile.mkdtemp(prefix="ainexus-test-ws-"))
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir()
     workspace = Workspace(
         id=uuid4(),
         user_id=test_user.id,

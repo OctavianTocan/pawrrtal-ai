@@ -83,6 +83,23 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           exit "$status"
 
+      # #296 — gate the alembic migration graph so a sibling-head
+      # mistake fails the PR instead of being discovered at deploy.
+      # ``alembic heads`` lists every head; we want exactly one. The
+      # awk filter ignores blank lines + stderr noise so a noisy
+      # ``alembic`` output doesn't blow the count.
+      - name: Verify single alembic head
+        working-directory: backend
+        run: |
+          set -euo pipefail
+          HEADS=$(uv run alembic heads 2>&1 | awk 'NF' | wc -l)
+          if [ "$HEADS" -ne 1 ]; then
+            echo "::error::Expected exactly 1 alembic head, got $HEADS"
+            uv run alembic heads
+            exit 1
+          fi
+          echo "alembic heads: 1 (ok)"
+
       - name: Comment PR on failure
         if: failure() && github.event_name == 'pull_request'
         uses: actions/github-script@v9
