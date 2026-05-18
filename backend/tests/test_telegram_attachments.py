@@ -86,7 +86,7 @@ async def test_oversized_photo_is_skipped_with_annotation() -> None:
     assert any("too large" in line for line in attachments.text_annotations)
 
 
-async def test_voice_message_emits_annotation() -> None:
+async def test_voice_message_without_file_id_emits_metadata_annotation() -> None:
     message = _make_message(voice=SimpleNamespace(duration=7))
     attachments = await collect_attachments(message, AsyncMock())
     assert any(
@@ -94,7 +94,49 @@ async def test_voice_message_emits_annotation() -> None:
     )
 
 
-async def test_document_message_emits_annotation_with_filename() -> None:
+async def test_voice_message_transcribes_when_backend_configured(monkeypatch) -> None:
+    raw = b"OggS\x00fake-voice"
+    message = _make_message(
+        voice=SimpleNamespace(duration=4, file_id="voice-id", file_size=len(raw)),
+    )
+    bot = _make_bot_with_photo(raw)  # reuse the same download mock
+
+    async def fake_transcribe(_audio_bytes: bytes) -> str:
+        return "hello world"
+
+    fake_transcriber = SimpleNamespace(transcribe=fake_transcribe)
+    monkeypatch.setattr(
+        "app.integrations.voice.resolve_transcriber",
+        lambda: fake_transcriber,
+    )
+
+    attachments = await collect_attachments(message, bot)
+    annotation = next(iter(attachments.text_annotations), "")
+    assert "Transcription: hello world" in annotation
+
+
+async def test_voice_message_transcription_failure_falls_back(monkeypatch) -> None:
+    from app.integrations.voice import TranscriptionError
+
+    raw = b"OggS\x00fake-voice"
+    message = _make_message(
+        voice=SimpleNamespace(duration=2, file_id="voice-id", file_size=len(raw)),
+    )
+    bot = _make_bot_with_photo(raw)
+
+    async def explode(_audio_bytes: bytes) -> str:
+        raise TranscriptionError("backend down")
+
+    monkeypatch.setattr(
+        "app.integrations.voice.resolve_transcriber",
+        lambda: SimpleNamespace(transcribe=explode),
+    )
+
+    attachments = await collect_attachments(message, bot)
+    assert any("Transcription is not available" in line for line in attachments.text_annotations)
+
+
+async def test_document_message_without_file_id_falls_back_to_metadata() -> None:
     document = SimpleNamespace(file_name="report.pdf", mime_type="application/pdf", file_size=12345)
     message = _make_message(document=document)
     attachments = await collect_attachments(message, AsyncMock())
@@ -104,6 +146,44 @@ async def test_document_message_emits_annotation_with_filename() -> None:
     )
     assert annotation is not None
     assert "application/pdf" in annotation
+
+
+async def test_document_message_extracts_markdown(monkeypatch) -> None:
+    raw = b"hello, world\n"
+    document = SimpleNamespace(
+        file_id="doc-id",
+        file_name="note.txt",
+        mime_type="text/plain",
+        file_size=len(raw),
+    )
+    message = _make_message(document=document)
+    bot = _make_bot_with_photo(raw)
+
+    async def fake_extract(_raw: bytes, *, file_name: str) -> str:
+        assert file_name == "note.txt"
+        return "# Hello\n\nWorld."
+
+    monkeypatch.setattr(
+        "app.integrations.telegram._attachments._extract_markdown_from_bytes",
+        fake_extract,
+    )
+
+    attachments = await collect_attachments(message, bot)
+    annotation = next(iter(attachments.text_annotations), "")
+    assert "Extracted Markdown" in annotation
+    assert "# Hello" in annotation
+
+
+async def test_oversized_document_falls_back_to_metadata() -> None:
+    document = SimpleNamespace(
+        file_id="doc-id",
+        file_name="huge.pdf",
+        mime_type="application/pdf",
+        file_size=99_999_999,
+    )
+    message = _make_message(document=document)
+    attachments = await collect_attachments(message, AsyncMock())
+    assert any("Too large" in line for line in attachments.text_annotations)
 
 
 async def test_video_sticker_listed_as_unsupported() -> None:

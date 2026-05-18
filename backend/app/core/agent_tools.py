@@ -50,8 +50,11 @@ from app.core.tools.now import (
     make_cron_create_tool,
     make_cron_delete_tool,
     make_cron_list_tool,
+    make_invoke_skill_tool,
+    make_list_skills_tool,
     make_list_tasks_tool,
     make_now_tool,
+    make_read_skill_tool,
 )
 from app.core.tools.python_exec import make_virtual_python_tool
 from app.core.tools.send_message import SendFn, make_send_message_tool
@@ -172,6 +175,15 @@ def build_agent_tools(
     tools.append(make_add_task_tool(workspace_root=workspace_root))
     tools.append(make_list_tasks_tool(workspace_root=workspace_root))
     tools.append(make_complete_task_tool(workspace_root=workspace_root))
+
+    # Skill discovery + invocation (#315).  Always present so the
+    # Paw can reason about which skills the workspace exposes; the
+    # tools themselves do no work when the workspace has no
+    # ``skills/`` directory.  Re-exported off ``now`` to stay under
+    # the sentrux fan-out budget.
+    tools.append(make_list_skills_tool(workspace_root=workspace_root))
+    tools.append(make_read_skill_tool(workspace_root=workspace_root))
+    tools.append(make_invoke_skill_tool(workspace_root=workspace_root))
 
     # Cron scheduling (#313).  Three tools that wrap the live
     # JobScheduler — registered via ``set_active_scheduler`` in
