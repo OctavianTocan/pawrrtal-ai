@@ -65,6 +65,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     await create_db_and_tables()
     # This creates the admin user on every startup, but the UserManager will check if it already exists and skip creation if so, so it's idempotent and safe to run every time.
     await seed_admin_user()
+    # Subagent reaper: rows stuck at ``status="running"`` from a previous
+    # process (crash, deploy, scaled-down worker) are marked ``failed``
+    # with a stable reason so the daily cap + the list_subagents UI
+    # don't see phantom live tasks forever.  v1 limitation; v2 will
+    # delegate background work to a durable queue.  Gated on the
+    # feature flag so deployments without subagents skip the UPDATE.
+    if settings.subagents_enabled:
+        from app.core.subagents.startup import (  # noqa: PLC0415 — gated import keeps the runner module out of the import graph when subagents are disabled.
+            reap_orphaned_subagents,
+        )
+        from app.db import async_session_maker as _subagent_session_maker  # noqa: PLC0415
+
+        await reap_orphaned_subagents(_subagent_session_maker)
     # PR 10: spin up the event bus before any request can fire so the
     # consumer task is ready when the chat router or Telegram dispatcher
     # publishes the first ``TurnStartedEvent``.  Stashed on
