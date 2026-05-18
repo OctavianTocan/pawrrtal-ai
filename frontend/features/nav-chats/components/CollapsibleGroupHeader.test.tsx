@@ -1,4 +1,5 @@
-import { fireEvent, render } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { CollapsibleGroupHeader } from './CollapsibleGroupHeader';
 
@@ -29,12 +30,13 @@ describe('CollapsibleGroupHeader', () => {
 		expect(container.textContent?.includes('·')).toBe(false);
 	});
 
-	it('fires onToggle when clicked', () => {
+	it('fires onToggle when clicked', async () => {
 		const onToggle = vi.fn();
+		const user = userEvent.setup();
 		const { getByRole } = render(
 			<CollapsibleGroupHeader label="Today" isCollapsed itemCount={3} onToggle={onToggle} />
 		);
-		fireEvent.click(getByRole('button'));
+		await user.click(getByRole('button'));
 		expect(onToggle).toHaveBeenCalled();
 	});
 });

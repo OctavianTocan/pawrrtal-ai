@@ -7,7 +7,8 @@
  * that have to be right for the chat row to remain accessible.
  */
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { ChatArtifactPayload } from '../types';
 import { ArtifactCard } from './ArtifactCard';
@@ -42,9 +43,10 @@ describe('ArtifactCard', () => {
 		expect(screen.getByRole('button', { name: /open artifact/i })).toBeInTheDocument();
 	});
 
-	it('opens the dialog on click and shows a Close button', () => {
+	it('opens the dialog on click and shows a Close button', async () => {
+		const user = userEvent.setup();
 		render(<ArtifactCard artifact={_SAMPLE} />);
-		fireEvent.click(screen.getByRole('button', { name: /open artifact/i }));
+		await user.click(screen.getByRole('button', { name: /open artifact/i }));
 		// Dialog renders into a portal but still under document.body.
 		expect(screen.getByRole('dialog')).toBeInTheDocument();
 		expect(screen.getByRole('button', { name: /close artifact/i })).toBeInTheDocument();

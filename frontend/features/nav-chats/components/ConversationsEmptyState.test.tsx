@@ -1,4 +1,5 @@
-import { fireEvent, render } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { ConversationsEmptyState } from './ConversationsEmptyState';
 
@@ -22,8 +23,9 @@ describe('ConversationsEmptyState', () => {
 		expect(queryByRole('button')).toBeNull();
 	});
 
-	it('renders the CTA button and fires onAction when both props are supplied', () => {
+	it('renders the CTA button and fires onAction when both props are supplied', async () => {
 		const onAction = vi.fn();
+		const user = userEvent.setup();
 		const { getByRole } = render(
 			<ConversationsEmptyState
 				icon={<span />}
@@ -33,7 +35,7 @@ describe('ConversationsEmptyState', () => {
 				onAction={onAction}
 			/>
 		);
-		fireEvent.click(getByRole('button', { name: 'Start a chat' }));
+		await user.click(getByRole('button', { name: 'Start a chat' }));
 		expect(onAction).toHaveBeenCalled();
 	});
 });
