@@ -58,6 +58,7 @@ OVERRIDABLE_KEYS: frozenset[str] = frozenset(
         "CLAUDE_CODE_OAUTH_TOKEN",
         "EXA_API_KEY",
         "XAI_API_KEY",
+        "OPENAI_API_KEY",
         "OPENAI_CODEX_OAUTH_TOKEN",
         # Notion plugin (see backend/app/integrations/notion/).  The plugin
         # registry declares the same key via its EnvKeySpec; this central
@@ -75,6 +76,7 @@ _SETTINGS_ATTR_MAP: dict[str, str] = {
     "CLAUDE_CODE_OAUTH_TOKEN": "claude_code_oauth_token",
     "EXA_API_KEY": "exa_api_key",
     "XAI_API_KEY": "xai_api_key",
+    "OPENAI_API_KEY": "openai_api_key",
     # OPENAI_CODEX_OAUTH_TOKEN intentionally absent — workspace-only, no
     # global settings fallback.  resolve_api_key() returns None for keys
     # missing from this map after the workspace lookup fails.

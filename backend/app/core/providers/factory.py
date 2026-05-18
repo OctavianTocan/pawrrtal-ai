@@ -22,12 +22,14 @@ from app.core.config import settings
 from .base import AILLM
 from .claude_provider import ClaudeLLM, ClaudeLLMConfig
 from .gemini_provider import GeminiLLM
+from .litellm_provider import LiteLLMLLM
 from .model_id import Host, ParsedModelId, parse_model_id
 from .xai_provider import XaiLLM
 
 HOST_TO_PROVIDER: dict[Host, type[AILLM]] = {
     Host.agent_sdk: ClaudeLLM,
     Host.google_ai: GeminiLLM,
+    Host.litellm: LiteLLMLLM,
     Host.xai: XaiLLM,
 }
 """Map of host enum to the concrete provider class that serves it.
@@ -96,4 +98,9 @@ def resolve_llm(
         return GeminiLLM(parsed.model, workspace_id=workspace_id)
     if provider_cls is XaiLLM:
         return XaiLLM(parsed.model, workspace_id=workspace_id)
+    if provider_cls is LiteLLMLLM:
+        # LiteLLM is multi-vendor — the parsed vendor selects which
+        # API-key workspace name to resolve and which LiteLLM provider
+        # prefix to prepend at request time.
+        return LiteLLMLLM(parsed.model, parsed.vendor, workspace_id=workspace_id)
     raise KeyError(f"no provider class registered for host {parsed.host!r}")

@@ -61,9 +61,16 @@ const KEY_METAS: readonly WorkspaceEnvKeyMeta[] = [
 	{
 		key: 'XAI_API_KEY',
 		label: 'xAI API Key',
-		description: 'Speech-to-text. Get a key from xAI.',
+		description: 'Speech-to-text plus Grok chat models routed via LiteLLM. Get a key from xAI.',
 		placeholder: 'Your xAI API key',
 		url: 'https://x.ai',
+	},
+	{
+		key: 'OPENAI_API_KEY',
+		label: 'OpenAI API Key',
+		description: 'GPT-4o and o-series chat models routed via LiteLLM. Get a key from OpenAI.',
+		placeholder: 'sk-...',
+		url: 'https://platform.openai.com/api-keys',
 	},
 	{
 		key: 'NOTION_API_KEY',
