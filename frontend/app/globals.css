@@ -220,9 +220,13 @@
 	--foreground-rgb: 31, 31, 31;
 	--user-message-bubble: oklch(from var(--foreground) l c h / 0.05);
 	--user-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.03);
-	/* Mistral orange ~#fa520f — saturated brand CTA + active states. */
-	--accent: oklch(0.66 0.21 38);
-	--accent-rgb: 250, 82, 15;
+	/* Mistral orange ~#fa520f — saturated brand CTA + active states.
+	 * Lightness pulled down from 0.66 → 0.58 so white text on the
+	 * primary button passes WCAG AA (≥ 4.5:1) — the previous shade
+	 * computed to 3.4:1 on axe-core. The hue + chroma stay so the
+	 * brand identity reads identically. */
+	--accent: oklch(0.58 0.21 38);
+	--accent-rgb: 209, 65, 0;
 	/* Mistral sunshine ~#ff8105 — warm sunlight for "Ask" / warnings. */
 	--info: oklch(0.74 0.18 55);
 	--info-rgb: 255, 129, 5;
@@ -303,7 +307,12 @@
 	--secondary: oklch(from var(--foreground) l c h / 0.05);
 	--secondary-foreground: var(--foreground);
 	--muted: oklch(from var(--foreground) l c h / 0.05);
-	--muted-foreground: var(--foreground-50);
+	/* WCAG AA secondary text needs 4.5:1 contrast against ``--background``.
+	 * ``--foreground-50`` (50% mix of fg into bg) computes to ~3.34:1 on
+	 * the cream canvas — fails axe-core's color-contrast rule. ``--foreground-60``
+	 * pushes the mix darker (≥ 4.5:1) and keeps the same visual hierarchy.
+	 * Mirrors what dark mode already uses (see line ~504). */
+	--muted-foreground: var(--foreground-60);
 	--card: var(--background);
 	--card-foreground: var(--foreground);
 	--popover: var(--background);

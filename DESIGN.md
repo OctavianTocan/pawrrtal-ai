@@ -9,16 +9,16 @@ description: >
   @font-face rules in frontend/app/globals.css; token --font-sans-stack in
   frontend/app/globals.css).
 colors:
-  primary: "#FA520F"
+  primary: "#D14100"
   on-primary: "#FFFFFF"
   background: "#FFF8E0"
   foreground: "#1F1F1F"
-  accent: "#FA520F"
+  accent: "#D14100"
   info: "#FF8105"
   success: "#22783C"
   destructive: "#CC3A05"
   border: "#E8E0C9"
-  muted-foreground: "#8A8888"
+  muted-foreground: "#787570"
   user-message-bubble: "#F5EDD0"
   info-text: "#6F4419"
   success-text: "#1F4A30"

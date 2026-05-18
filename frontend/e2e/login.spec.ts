@@ -26,11 +26,25 @@ test.describe('login page', () => {
 });
 
 test.describe('authenticated landing', () => {
-	test('dev-login lands on the home shell', async ({ page, context }) => {
-		const response = await context.request.post(
+	test('dev-login + provisioned workspace lands on the home shell', async ({
+		page,
+		context,
+		request,
+	}) => {
+		const loginResponse = await context.request.post(
 			`${process.env.E2E_API_URL ?? 'http://localhost:8000'}/auth/dev-login`
 		);
-		expect(response.ok()).toBe(true);
+		expect(loginResponse.ok()).toBe(true);
+		// The home shell only renders once the user has a provisioned
+		// workspace (see ``useOnboardingReadiness`` + ``AppShell``).
+		// Trigger the personalization upsert so onboarding-status reports
+		// has_workspace_ready=true before we navigate.
+		const provisionResponse = await request.put(
+			`${process.env.E2E_API_URL ?? 'http://localhost:8000'}/api/v1/personalization`,
+			{ data: { name: 'E2E Admin' } }
+		);
+		expect(provisionResponse.ok()).toBe(true);
+
 		await page.goto('/');
 		// The chat composer is visible from the home page once authenticated.
 		await expect(

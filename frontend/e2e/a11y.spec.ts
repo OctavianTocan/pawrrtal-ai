@@ -36,11 +36,21 @@ test.describe('a11y smoke', () => {
 	test('authenticated home shell has no auto-detectable a11y violations', async ({
 		page,
 		context,
+		request,
 	}) => {
-		const response = await context.request.post(
+		const loginResponse = await context.request.post(
 			`${process.env.E2E_API_URL ?? 'http://localhost:8000'}/auth/dev-login`
 		);
-		expect(response.ok()).toBe(true);
+		expect(loginResponse.ok()).toBe(true);
+		// Home shell + settings render only when a default workspace
+		// exists (see ``useOnboardingReadiness``). Trigger the
+		// personalization upsert so onboarding-status reports
+		// has_workspace_ready=true before we navigate.
+		const provisionResponse = await request.put(
+			`${process.env.E2E_API_URL ?? 'http://localhost:8000'}/api/v1/personalization`,
+			{ data: { name: 'E2E Admin' } }
+		);
+		expect(provisionResponse.ok()).toBe(true);
 		await page.goto('/');
 		await expect(
 			page.getByPlaceholder(/^(Ask|Type|Send)/i).or(page.getByRole('textbox'))
@@ -54,11 +64,24 @@ test.describe('a11y smoke', () => {
 		expect(results.violations).toEqual([]);
 	});
 
-	test('settings page has no auto-detectable a11y violations', async ({ page, context }) => {
-		const response = await context.request.post(
+	test('settings page has no auto-detectable a11y violations', async ({
+		page,
+		context,
+		request,
+	}) => {
+		const loginResponse = await context.request.post(
 			`${process.env.E2E_API_URL ?? 'http://localhost:8000'}/auth/dev-login`
 		);
-		expect(response.ok()).toBe(true);
+		expect(loginResponse.ok()).toBe(true);
+		// Home shell + settings render only when a default workspace
+		// exists (see ``useOnboardingReadiness``). Trigger the
+		// personalization upsert so onboarding-status reports
+		// has_workspace_ready=true before we navigate.
+		const provisionResponse = await request.put(
+			`${process.env.E2E_API_URL ?? 'http://localhost:8000'}/api/v1/personalization`,
+			{ data: { name: 'E2E Admin' } }
+		);
+		expect(provisionResponse.ok()).toBe(true);
 		await page.goto('/settings');
 		// AxeBuilder's `Page` type comes from `playwright-core`'s d.ts; our
 		// fixture's `page` comes from `@playwright/test`. The two are
@@ -72,11 +95,21 @@ test.describe('a11y smoke', () => {
 	test('chat composer with a draft has no auto-detectable a11y violations', async ({
 		page,
 		context,
+		request,
 	}) => {
-		const response = await context.request.post(
+		const loginResponse = await context.request.post(
 			`${process.env.E2E_API_URL ?? 'http://localhost:8000'}/auth/dev-login`
 		);
-		expect(response.ok()).toBe(true);
+		expect(loginResponse.ok()).toBe(true);
+		// Home shell + settings render only when a default workspace
+		// exists (see ``useOnboardingReadiness``). Trigger the
+		// personalization upsert so onboarding-status reports
+		// has_workspace_ready=true before we navigate.
+		const provisionResponse = await request.put(
+			`${process.env.E2E_API_URL ?? 'http://localhost:8000'}/api/v1/personalization`,
+			{ data: { name: 'E2E Admin' } }
+		);
+		expect(provisionResponse.ok()).toBe(true);
 		await page.goto('/');
 		const composer = page
 			.getByPlaceholder(/^(Ask|Type|Send)/i)

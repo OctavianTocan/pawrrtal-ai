@@ -6,11 +6,19 @@
 import { expect, test } from './fixtures';
 
 test.describe('settings page', () => {
-	test.beforeEach(async ({ context }) => {
-		const response = await context.request.post(
+	test.beforeEach(async ({ context, request }) => {
+		const loginResponse = await context.request.post(
 			`${process.env.E2E_API_URL ?? 'http://localhost:8000'}/auth/dev-login`
 		);
-		expect(response.ok()).toBe(true);
+		expect(loginResponse.ok()).toBe(true);
+		// Settings page sits under the app shell which gates rendering
+		// on a provisioned workspace. Trigger personalization upsert to
+		// satisfy ``useOnboardingReadiness.hasWorkspaceReady``.
+		const provisionResponse = await request.put(
+			`${process.env.E2E_API_URL ?? 'http://localhost:8000'}/api/v1/personalization`,
+			{ data: { name: 'E2E Admin' } }
+		);
+		expect(provisionResponse.ok()).toBe(true);
 	});
 
 	test('General tab renders Profile / Preferences / Notifications groups', async ({ page }) => {
