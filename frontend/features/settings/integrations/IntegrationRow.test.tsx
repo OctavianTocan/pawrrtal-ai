@@ -1,4 +1,5 @@
-import { fireEvent, render } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { Calendar, Mail } from 'lucide-react';
 import { describe, expect, it } from 'vitest';
 import type { IntegrationDef } from './catalog';
@@ -45,13 +46,14 @@ describe('IntegrationRow', () => {
 		expect(getByLabelText('Settings for Apple Calendar')).toBeTruthy();
 	});
 
-	it('renders an expandable header + per-account list when accounts exist', () => {
+	it('renders an expandable header + per-account list when accounts exist', async () => {
+		const user = userEvent.setup();
 		const { getByText, queryByText } = render(<IntegrationRow integration={WITH_ACCOUNTS} />);
 		// Default expanded — accounts should be visible.
 		expect(getByText('tocan@example.com', { selector: 'span.truncate' })).toBeTruthy();
 		expect(getByText('Work')).toBeTruthy();
 		// Toggle collapsed — account rows should disappear.
-		fireEvent.click(getByText('Gmail'));
+		await user.click(getByText('Gmail'));
 		expect(queryByText('Add another account')).toBeNull();
 	});
 });

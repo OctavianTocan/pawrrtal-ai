@@ -1,4 +1,5 @@
-import { fireEvent, render } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { Dialog } from '@/components/ui/dialog';
 import { OnboardingWelcomeStep } from './onboarding-welcome-step';
@@ -17,10 +18,11 @@ describe('OnboardingWelcomeStep', () => {
 		expect(container.textContent).toContain('Run agents');
 	});
 
-	it('fires onContinue when the primary CTA is clicked', () => {
+	it('fires onContinue when the primary CTA is clicked', async () => {
 		const onContinue = vi.fn();
+		const user = userEvent.setup();
 		const { getByRole } = render(wrap(<OnboardingWelcomeStep onContinue={onContinue} />));
-		fireEvent.click(getByRole('button', { name: 'Get started' }));
+		await user.click(getByRole('button', { name: 'Get started' }));
 		expect(onContinue).toHaveBeenCalled();
 	});
 });
