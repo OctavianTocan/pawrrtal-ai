@@ -49,6 +49,11 @@ export const NAV_CHATS_LABELS = [
 	{ id: 'idea', name: 'Idea', color: '#a855f7' },
 	{ id: 'question', name: 'Question', color: '#eab308' },
 	{ id: 'reference', name: 'Reference', color: '#10b981' },
+	// Auto-applied by the backend when the user's heartbeat
+	// conversation is lazy-created on first `/api/v1/heartbeat/sync`.
+	// The row is undeletable server-side; pinning above the date
+	// groups in the sidebar is a frontend follow-up.
+	{ id: 'heartbeat', name: 'Heartbeat', color: '#ec4899' },
 ] as const satisfies ReadonlyArray<{ id: string; name: string; color: string }>;
 
 /** Union of every pre-defined label ID. Use as the storage shape on conversations. */
