@@ -6,8 +6,8 @@ rather than pulling in pgvector so the migration stays portable
 across SQLite (tests) and Postgres (production).  A future migration
 can drop in a real vector column without changing the row layout.
 
-Revision ID: 018_add_lcm_embeddings
-Revises: 017_add_mcp_servers
+Revision ID: 019_add_lcm_embeddings
+Revises: 018_scheduled_jobs_target_conversation_id
 """
 
 from __future__ import annotations
@@ -15,8 +15,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "018_add_lcm_embeddings"
-down_revision = "017_add_mcp_servers"
+revision = "019_add_lcm_embeddings"
+down_revision = "018_scheduled_jobs_target_conversation_id"
 branch_labels = None
 depends_on = None
 
