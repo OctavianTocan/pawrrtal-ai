@@ -16,8 +16,8 @@ Nullable + ``ON DELETE SET NULL`` so deleting the target conversation
 quietly disables persistence for the job — preferable to cascading
 the deletion through to the job row itself.
 
-Revision ID: 017_scheduled_jobs_target_conversation_id
-Revises: 016_merge_notion_into_lcm_lineage
+Revision ID: 018_scheduled_jobs_target_conversation_id
+Revises: 017_add_mcp_servers
 Create Date: 2026-05-17 22:45:00.000000
 """
 
@@ -26,8 +26,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "017_scheduled_jobs_target_conversation_id"
-down_revision = "016_merge_notion_into_lcm_lineage"
+revision = "018_scheduled_jobs_target_conversation_id"
+down_revision = "017_add_mcp_servers"
 branch_labels = None
 depends_on = None
 
