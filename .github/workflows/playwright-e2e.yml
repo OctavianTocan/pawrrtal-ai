@@ -45,7 +45,15 @@ jobs:
       (github.actor == 'OctavianTocan' || github.actor == 'octagent') &&
       (github.event_name != 'pull_request' ||
         github.event.pull_request.head.repo.full_name == github.repository)
-    runs-on: [self-hosted, pawrrtal]
+    # Documented exception to the self-hosted-runner default per
+    # ``.claude/rules/github-actions/octaviantocan-only-and-self-hosted-runner.md``:
+    # Playwright's Chromium needs nss/dbus/asound system libraries that
+    # ``playwright install --with-deps`` installs via ``sudo apt-get``.
+    # The self-hosted runner has no passwordless sudo, so Chromium crashes
+    # mid-test (``Target page, context or browser has been closed``).
+    # ``ubuntu-latest`` has passwordless sudo and is the same runner the
+    # Stagehand workflow uses for the same reason.
+    runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
       - name: Checkout repository
@@ -86,14 +94,13 @@ jobs:
         run: bun run generate:docs
 
       - name: Install Playwright Chromium
-        # ``--with-deps`` would shell out to ``sudo apt-get install`` for
-        # Chromium's system libraries; the self-hosted runner doesn't have
-        # passwordless sudo, so we install the browser binaries only and
-        # rely on the OS libs that the runner image already ships with.
-        # The Stagehand workflow targets ``ubuntu-latest`` and can use
-        # ``--with-deps``; this one stays on the self-hosted pool.
+        # On ``ubuntu-latest`` (see the ``runs-on`` comment for why we
+        # opted out of the self-hosted default), ``--with-deps`` shells
+        # out to ``sudo apt-get install`` for nss / dbus / asound / etc.
+        # That's required: without those libs Chromium crashes mid-test
+        # with "Target page, context or browser has been closed".
         working-directory: frontend
-        run: bunx --bun playwright install chromium
+        run: bunx --bun playwright install --with-deps chromium
 
       - name: Start backend (dev-login + chat endpoints)
         working-directory: backend
