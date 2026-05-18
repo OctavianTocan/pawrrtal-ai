@@ -93,7 +93,13 @@ interface ChoiceGroupProps {
 }
 
 function buildChoiceSummary(options: ChoiceOption[], selected: string[]): string {
-	const labels = options.filter((o) => selected.includes(o.value)).map((o) => o.label);
+	const selectedSet = new Set(selected);
+	const labels: string[] = [];
+	for (const option of options) {
+		if (selectedSet.has(option.value)) {
+			labels.push(option.label);
+		}
+	}
 	return labels.join(MULTI_CHOICE_JOINER);
 }
 
@@ -263,7 +269,7 @@ export function NumberFieldRenderer(raw: LooseProps): ReactNode {
 	const ctx = useArtifactInteraction();
 	const inputId = useId();
 	const initial = props.defaultValue ?? props.min ?? 0;
-	const [value, setValue] = useState<number>(clampNumber(initial, props.min, props.max));
+	const [value, setValue] = useState<number>(() => clampNumber(initial, props.min, props.max));
 	const step = props.step ?? DEFAULT_NUMBER_STEP;
 
 	const submit = (): void => {

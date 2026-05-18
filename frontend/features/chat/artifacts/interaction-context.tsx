@@ -20,7 +20,7 @@
  *    need to call `submit({ actionId, label, value })`.
  */
 
-import { createContext, type ReactNode, useCallback, useContext, useMemo } from 'react';
+import { createContext, type ReactNode, use, useCallback, useMemo } from 'react';
 import type {
 	ChatArtifactInteractionMode,
 	ChatArtifactInteractionPayload,
@@ -122,7 +122,7 @@ export function ArtifactInteractionScope({
 	onSubmitted,
 	children,
 }: ArtifactInteractionScopeProps): ReactNode {
-	const outer = useContext(OuterContext);
+	const outer = use(OuterContext);
 
 	const submit = useCallback(
 		async (input: {
@@ -158,5 +158,5 @@ export function ArtifactInteractionScope({
  * case rather than crashing (read-only previews, tests, etc.).
  */
 export function useArtifactInteraction(): InnerContextValue | null {
-	return useContext(InnerContext);
+	return use(InnerContext);
 }
