@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
+from typing import Any
 
 from app.core.agent_loop.types import AgentTool
 from app.core.config import settings
@@ -45,6 +46,7 @@ from app.core.tools.lcm_agents import (
 )
 from app.core.tools.markitdown_convert import make_markitdown_tool
 from app.core.tools.now import (
+    build_external_mcp_tools,
     make_add_task_tool,
     make_complete_task_tool,
     make_cron_create_tool,
@@ -70,6 +72,7 @@ def build_agent_tools(
     surface: str | None = None,
     conversation_id: uuid.UUID | None = None,
     model_id: str | None = None,
+    external_mcp_configs: list[dict[str, Any]] | None = None,
 ) -> list[AgentTool]:
     """Return the full ``AgentTool`` list for one chat turn.
 
@@ -111,6 +114,11 @@ def build_agent_tools(
         model_id: Active model id — used by ``lcm_expand_query`` to
             pick which provider to send the focused recall prompt to.
             Falls back to a sane default when not supplied.
+        external_mcp_configs: Optional list of user-configured external
+            MCP server entries (``{"name", "config"}``). Each entry's
+            tools are discovered and appended as cross-provider
+            :class:`AgentTool` instances. ``None`` / empty skips the
+            external MCP path entirely. Closes #317.
 
     Returns:
         A fresh list of :class:`AgentTool` ready to hand to a provider.
@@ -260,6 +268,13 @@ def build_agent_tools(
             send_fn=send_fn,
         )
     )
+
+    # External MCP servers (#317) — additive at the tail so the core
+    # tool surface is never destabilised by a slow or misbehaving
+    # remote server. Discovery is best-effort per server: a failed
+    # handshake is logged and the rest of the chat surface keeps
+    # working with whatever did handshake successfully.
+    tools.extend(build_external_mcp_tools(external_mcp_configs or []))
 
     return tools
 

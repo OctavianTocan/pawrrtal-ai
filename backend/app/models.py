@@ -411,6 +411,7 @@ from .governance_models import (  # noqa: E402
     ScheduledJob,
     WebhookEventRecord,
 )
+from .mcp_models import McpServer  # noqa: E402  (re-export — see mcp_models.py)
 
 
 class NotionOperationLog(Base):
@@ -472,6 +473,7 @@ __all__ = [
     "LCMContextItem",
     "LCMSummary",
     "LCMSummarySource",
+    "McpServer",
     "NotionOperationLog",
     "Project",
     "ScheduledJob",

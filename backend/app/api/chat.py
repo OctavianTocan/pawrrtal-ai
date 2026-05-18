@@ -17,7 +17,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api._chat_cost_budget import enforce_cost_budget
 from app.api._chat_events import publish_turn_started
-from app.api._chat_permissions import build_chat_permission_check
+from app.api._chat_permissions import (
+    build_chat_permission_check,
+    load_external_mcp_configs,
+)
 from app.channels import resolve_channel, surface_from_header
 from app.channels.base import ChannelMessage
 from app.channels.turn_runner import ChatTurnInput, EventHook, run_turn
@@ -285,6 +288,7 @@ def get_chat_router() -> APIRouter:
                 event["mime"] = mime
             await _web_send_queue.put(event)
 
+        external_mcp_configs = await load_external_mcp_configs(session=session, user_id=user.id)
         agent_tools = build_agent_tools(
             workspace_root=root,
             user_id=user.id,
@@ -293,6 +297,7 @@ def get_chat_router() -> APIRouter:
             surface=surface,
             conversation_id=request.conversation_id,
             model_id=model_id,
+            external_mcp_configs=external_mcp_configs,
         )
 
         def _artifact_hook(event: StreamEvent) -> list[StreamEvent]:
