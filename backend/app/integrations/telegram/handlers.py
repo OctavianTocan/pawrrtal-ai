@@ -43,6 +43,14 @@ from app.crud.channel import (
     update_conversation_verbose_level,
 )
 
+# Re-export so ``bot.py`` imports both ``handle_plain_message`` and
+# ``collect_attachments`` from the same module — keeps ``bot.py`` under
+# sentrux's ``no_god_files`` fan-out budget without forcing a registry
+# refactor in this PR (the long-term home is #281).
+from app.integrations.telegram._attachments import (  # noqa: F401
+    collect_attachments,
+)
+
 # Loose match for the link-code shape (8 chars from the look-alike-free
 # alphabet defined in app.crud.channel). Used to distinguish "user pasted
 # a code" from "user is talking to an unbound bot" so we can redeem the

@@ -44,6 +44,7 @@ from app.integrations.telegram.bot_provider_resolution import (
 from app.integrations.telegram.handlers import (
     TelegramSender,
     TelegramTurnContext,
+    collect_attachments,
     handle_new_command,
     handle_plain_message,
     handle_start_command,
@@ -462,11 +463,11 @@ def _register_telegram_message_handler(dispatcher: Dispatcher) -> None:
         # An image-only message (no text) is still a real turn now (#305).
         # Voice / documents become text annotations so the agent has
         # metadata to act on (partial #304 / #305 — full STT + markitdown
-        # extraction land in follow-up PRs).
-        from app.integrations.telegram._attachments import (  # noqa: PLC0415
-            collect_attachments,
-        )
-
+        # extraction land in follow-up PRs).  ``collect_attachments`` is
+        # re-exported through ``handlers`` so ``bot.py`` doesn't pick up
+        # an extra fan-out edge that would push it over sentrux's
+        # ``no_god_files`` ceiling — see #281's ADR for the long-term
+        # registry split.
         attachments = (
             await collect_attachments(message, message.bot) if message.bot is not None else None
         )
