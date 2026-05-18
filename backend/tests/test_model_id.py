@@ -36,6 +36,15 @@ def test_parse_google_canonical_host() -> None:
     assert parsed.host is Host.google_ai
 
 
+def test_parse_xai_canonical_host() -> None:
+    """``xai/grok-4.3`` canonicalises to ``xai:xai/grok-4.3``."""
+    parsed = parse_model_id("xai/grok-4.3")
+    assert parsed.host is Host.xai
+    assert parsed.vendor is Vendor.xai
+    assert parsed.model == "grok-4.3"
+    assert parsed.id == "xai:xai/grok-4.3"
+
+
 def test_id_property_round_trips_through_parse() -> None:
     canonical = "agent-sdk:anthropic/claude-sonnet-4-6"
     assert parse_model_id(canonical).id == canonical

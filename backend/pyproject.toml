@@ -30,16 +30,18 @@ dependencies = [
     "opentelemetry-instrumentation-sqlalchemy>=0.50b0",
     "opentelemetry-instrumentation-logging>=0.50b0",
     "markitdown[all]>=0.1.1",
+    "openai>=1.0.0",
 ]
 
 # Optional voice transcription backends (PR 14). The ``api/stt.py``
 # xAI proxy is in the core dependencies; these are needed only when
 # ``VOICE_PROVIDER`` is ``mistral`` or ``openai``. Local whisper.cpp
 # uses subprocess calls and needs no Python package.
+# ``openai`` itself is now a core dep (powers the xAI chat provider via
+# OpenAI-compatible base_url) so it's not listed here.
 [project.optional-dependencies]
 voice = [
     "mistralai>=1.0.0",
-    "openai>=1.0.0",
 ]
 
 [dependency-groups]

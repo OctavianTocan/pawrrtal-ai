@@ -26,6 +26,7 @@ class Vendor(StrEnum):
 
     anthropic = "anthropic"
     google = "google"
+    xai = "xai"
 
 
 class Host(StrEnum):
@@ -37,11 +38,13 @@ class Host(StrEnum):
 
     agent_sdk = "agent-sdk"
     google_ai = "google-ai"
+    xai = "xai"
 
 
 CANONICAL_HOST: dict[Vendor, Host] = {
     Vendor.anthropic: Host.agent_sdk,
     Vendor.google: Host.google_ai,
+    Vendor.xai: Host.xai,
 }
 """Per-vendor canonical host used when the input omits ``host:``.
 
