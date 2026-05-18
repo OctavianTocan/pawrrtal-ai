@@ -217,8 +217,7 @@ class ClaudeLLM:
         question: str,
         conversation_id: uuid.UUID,
         user_id: uuid.UUID,
-        history: list[dict[str, str]]
-        | None = None,  # ignored: Claude SDK handles session continuity via `resume`
+        history: list[dict[str, str]] | None = None,
         tools: list[AgentTool] | None = None,
         system_prompt: str | None = None,
         reasoning_effort: ReasoningEffort | None = None,
@@ -235,9 +234,15 @@ class ClaudeLLM:
             user_id: App-level user UUID. Currently unused by this
                 provider but kept in the protocol so future per-user
                 cwd / quota logic can wire in without a signature change.
-            history: Ignored — the Claude SDK manages session continuity
-                natively via ``resume``. Accepted for protocol parity
-                with other providers (e.g. ``GeminiLLM``).
+            history: Per-conversation message history loaded by the
+                chat router from ``chat_messages``. When the Claude
+                SDK already has a transcript for this ``conversation_id``
+                we rely on ``resume=`` (Claude's native continuity).
+                When the transcript is missing — typically because the
+                user previously chatted on a different provider
+                (Gemini, etc.) — we prepend a bounded summary of
+                ``history`` to the user's question so the model sees
+                the prior turns. Closes #308.
             tools: Optional list of cross-provider :class:`AgentTool`
                 instances. Bridged into a single in-process MCP server
                 by ``_claude_tool_bridge`` so the SDK can call them.
@@ -272,6 +277,14 @@ class ClaudeLLM:
         max_attempts = max(1, _settings.claude_retry_max_attempts)
         used_resume = _session_exists(str(conversation_id), self._config.cwd)
         display_by_name = _claude_display_map(list(tools or []))
+        # #308: when the user switches providers mid-conversation, the
+        # Claude SDK has no transcript for this conversation_id yet —
+        # but the app does. Replay it as a system-prompt addendum so
+        # the model sees the prior turns instead of starting blind.
+        # When the SDK already has a session (``used_resume``), we
+        # avoid duplicating context — Claude's own transcript wins.
+        history_prefix = _render_history_prefix(history) if not used_resume and history else None
+        effective_question = f"{history_prefix}\n\n{question}" if history_prefix else question
 
         while True:
             attempt += 1
@@ -285,7 +298,7 @@ class ClaudeLLM:
             )
             try:
                 async for event in _stream_events_for_attempt(
-                    prompt=_aiter_user_prompt(question, images),
+                    prompt=_aiter_user_prompt(effective_question, images),
                     options=options,
                     display_by_name=display_by_name,
                 ):
@@ -636,6 +649,47 @@ async def _aiter_user_prompt(
         "type": "user",
         "message": {"role": "user", "content": blocks},
     }
+
+
+# How many of the most recent rows from ``history`` we surface to the
+# model on a cold provider switch. The chat router caps ``history_window``
+# to 20 already, but the LCM path can balloon this list — bound it again
+# here so a giant history can't poison the first Claude turn.
+_HISTORY_PREFIX_MAX_ROWS = 20
+
+# Hard cap on the rendered prefix length. Long histories get truncated
+# at the head (oldest first) so the most recent turns are always preserved.
+_HISTORY_PREFIX_MAX_CHARS = 12_000
+
+
+def _render_history_prefix(history: list[dict[str, str]] | None) -> str | None:
+    """Render prior turns as a bounded recap the model can read.
+
+    Returns ``None`` when ``history`` is empty or carries no usable
+    ``user``/``assistant`` rows. The output is wrapped in clear
+    BEGIN/END markers so the model never confuses it with the user's
+    actual current message.
+
+    Closes #308.
+    """
+    if not history:
+        return None
+    rows = [
+        row
+        for row in history[-_HISTORY_PREFIX_MAX_ROWS:]
+        if row.get("role") in {"user", "assistant"} and (row.get("content") or "").strip()
+    ]
+    if not rows:
+        return None
+    lines = ["(Conversation context — earlier turns from this same conversation:)"]
+    for row in rows:
+        speaker = "User" if row["role"] == "user" else "Assistant"
+        content = (row.get("content") or "").strip()
+        lines.append(f"{speaker}: {content}")
+    body = "\n".join(lines)
+    if len(body) > _HISTORY_PREFIX_MAX_CHARS:
+        body = "…" + body[-_HISTORY_PREFIX_MAX_CHARS:]
+    return f"--- BEGIN PRIOR CONTEXT ---\n{body}\n--- END PRIOR CONTEXT ---"
 
 
 def _is_retryable_cli_connection(error: BaseException) -> bool:

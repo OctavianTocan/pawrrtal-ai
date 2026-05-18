@@ -115,6 +115,12 @@ jobs:
           DATABASE_URL: 'sqlite+aiosqlite:///./e2e.db'
           ADMIN_EMAIL: e2e-admin@example.com
           ADMIN_PASSWORD: e2e-admin-password
+          # ``workspace_base_dir`` defaults to ``/data/workspaces`` which
+          # the CI runner cannot write to. Point at a temp directory so
+          # the dev-login workspace seed (#317 follow-up) can succeed
+          # and the FE's onboarding-status endpoint reports a ready
+          # workspace, letting the sidebar render.
+          WORKSPACE_BASE_DIR: /tmp/pawrrtal-e2e-workspaces
           COOKIE_SAMESITE: lax
           COOKIE_SECURE: 'false'
         run: |
@@ -157,7 +163,15 @@ jobs:
         env:
           E2E_BASE_URL: http://127.0.0.1:3001
           E2E_API_URL: http://127.0.0.1:8000
-        run: bunx --bun playwright test
+        # ``--bun`` was making Playwright's request context lose the
+        # configured ``E2E_API_URL`` host on retries: the dev-login
+        # ``POST`` returned 204 cleanly, but a follow-up URL parse
+        # against just the path threw "/auth/dev-login cannot be
+        # parsed as a URL" and brought the browser context down.
+        # Running without ``--bun`` keeps env propagation straight
+        # and matches the local ``just e2e`` invocation. Was failing
+        # consistently on ``development`` before this change.
+        run: bunx playwright test
 
       # Always upload the HTML report so the trace is downloadable on failure.
       - name: Upload Playwright HTML report

@@ -71,6 +71,8 @@ from app.core.providers.base import StreamEvent
 from app.core.tools.send_message import SendFn
 
 from ._telegram_dispatch import (
+    capture_terminal_event,
+    dispatch_text_delta,
     finalize_turn_delivery,
     handle_thinking,
     handle_tool_use,
@@ -160,6 +162,17 @@ class TelegramChannel:
         answer_text = ""
         thinking_text = ""
         thinking_message_id: int | None = None
+        # #306/#307: interleaved text deltas open their own Telegram
+        # messages in chronological order. ``text_message_id`` tracks
+        # the open text message; ``text_chars_since_edit`` and
+        # ``text_last_edit_at`` drive the debounce mirroring the tools
+        # path. On a text → tools/thinking transition,
+        # ``prepare_text_block`` resets the slot so the next delta
+        # opens a fresh message.
+        text_buffer = ""
+        text_message_id: int | None = None
+        text_chars_since_edit = 0
+        text_last_edit_at = asyncio.get_event_loop().time()
         chars_since_edit = 0
         last_edit_at = asyncio.get_event_loop().time()
         # Block-transition tracking (#288). ``previous_block_kind`` is the
@@ -237,35 +250,46 @@ class TelegramChannel:
             if etype == "delta":
                 chunk: str = event.get("content", "")
                 answer_text += chunk
-                continue
-
-            if etype == "agent_terminated":
-                # Safety layer tripped (max_iterations, consecutive_tool_errors,
-                # wall_clock).  Keep the human-readable copy so the user sees
-                # *why* the turn ended instead of an eternal ⏳.
-                terminal_message = event.get("content", "Agent terminated.")
-                terminal_prefix = _AGENT_TERMINATED_PREFIX
-                logger.warning(
-                    "TELEGRAM_AGENT_TERMINATED chat_id=%s message_id=%s message=%s",
-                    chat_id,
-                    message_id,
-                    terminal_message,
+                (
+                    text_buffer,
+                    text_message_id,
+                    text_chars_since_edit,
+                    text_last_edit_at,
+                    rendered,
+                ) = await dispatch_text_delta(
+                    chunk=chunk,
+                    previous_block_kind=previous_block_kind,
+                    bot=bot,
+                    chat_id=chat_id,
+                    text_buffer=text_buffer,
+                    text_message_id=text_message_id,
+                    chars_since_edit=text_chars_since_edit,
+                    last_edit_at=text_last_edit_at,
+                    reply_to_message_id=reply_to_message_id,
+                    message_thread_id=message_thread_id,
                 )
+                if rendered:
+                    first_block_kind = first_block_kind or "text"
+                    previous_block_kind = "text"
                 continue
 
-            if etype == "error":
-                terminal_message = event.get("content", "Unknown error.")
-                terminal_prefix = _ERROR_PREFIX
-                logger.warning(
-                    "TELEGRAM_STREAM_ERROR chat_id=%s message_id=%s message=%s",
-                    chat_id,
-                    message_id,
-                    terminal_message,
-                )
+            captured = capture_terminal_event(
+                event,
+                chat_id=chat_id,
+                placeholder_message_id=message_id,
+                agent_terminated_prefix=_AGENT_TERMINATED_PREFIX,
+                error_prefix=_ERROR_PREFIX,
+            )
+            if captured is not None:
+                terminal_message, terminal_prefix = captured
                 continue
 
+        # #306: when text was already rendered progressively, skip the
+        # closing answer_text duplicate. Any terminal_message (error /
+        # agent_terminated) still flushes — those are not part of the
+        # in-band text stream.
         final_text = final_reply_text(
-            answer_text=answer_text,
+            answer_text="" if text_message_id is not None else answer_text,
             terminal_message=terminal_message,
             terminal_prefix=terminal_prefix,
         )
@@ -277,6 +301,8 @@ class TelegramChannel:
             previous_block_kind=previous_block_kind,
             tool_trace=tool_trace,
             thinking_text=thinking_text,
+            text_message_id=text_message_id,
+            text_buffer=text_buffer,
             final_text=final_text,
             reply_to_message_id=reply_to_message_id,
             message_thread_id=message_thread_id,

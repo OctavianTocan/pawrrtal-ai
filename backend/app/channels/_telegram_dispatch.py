@@ -145,6 +145,134 @@ async def handle_thinking(
     return thinking_text, thinking_message_id
 
 
+def capture_terminal_event(
+    event: StreamEvent,
+    *,
+    chat_id: int | str,
+    placeholder_message_id: int,
+    agent_terminated_prefix: str,
+    error_prefix: str,
+) -> tuple[str | None, str] | None:
+    """Return ``(message, prefix)`` for a terminal event, or ``None`` otherwise.
+
+    Centralises the ``agent_terminated`` / ``error`` warning log + copy
+    selection so the main deliver loop stays under the project's
+    PLR0915 statement budget.
+    """
+    etype = event.get("type")
+    if etype == "agent_terminated":
+        message = event.get("content", "Agent terminated.")
+        logger.warning(
+            "TELEGRAM_AGENT_TERMINATED chat_id=%s message_id=%s message=%s",
+            chat_id,
+            placeholder_message_id,
+            message,
+        )
+        return message, agent_terminated_prefix
+    if etype == "error":
+        message = event.get("content", "Unknown error.")
+        logger.warning(
+            "TELEGRAM_STREAM_ERROR chat_id=%s message_id=%s message=%s",
+            chat_id,
+            placeholder_message_id,
+            message,
+        )
+        return message, error_prefix
+    return None
+
+
+async def dispatch_text_delta(
+    *,
+    chunk: str,
+    previous_block_kind: str | None,
+    bot: Bot,
+    chat_id: int | str,
+    text_buffer: str,
+    text_message_id: int | None,
+    chars_since_edit: int,
+    last_edit_at: float,
+    reply_to_message_id: int | None,
+    message_thread_id: int | None,
+) -> tuple[str, int | None, int, float, bool]:
+    """Apply the #306 fresh-block reset (if needed) and stream the chunk.
+
+    Returns the updated text-buffer state plus a ``rendered`` flag:
+
+    * ``rendered=False`` for the legacy accumulate path — when no
+      thinking or tool block has rendered yet, we keep the original
+      "send the final answer at the end" UX for pure-text turns. The
+      caller should not update ``previous_block_kind`` in that case so
+      a later block still consumes the placeholder normally.
+    * ``rendered=True`` when an interleaved text block was opened or
+      edited in chat.
+    """
+    if previous_block_kind in (None, "text"):
+        return text_buffer, text_message_id, chars_since_edit, last_edit_at, False
+    if previous_block_kind != "text":
+        # Fresh interleaved text block — reset the streaming slot so
+        # the new Telegram message starts clean.
+        text_message_id = None
+        text_buffer = ""
+        chars_since_edit = 0
+        last_edit_at = asyncio.get_event_loop().time()
+    (
+        text_buffer,
+        text_message_id,
+        chars_since_edit,
+        last_edit_at,
+    ) = await handle_text_delta(
+        chunk=chunk,
+        bot=bot,
+        chat_id=chat_id,
+        text_buffer=text_buffer,
+        text_message_id=text_message_id,
+        chars_since_edit=chars_since_edit,
+        last_edit_at=last_edit_at,
+        reply_to_message_id=reply_to_message_id,
+        message_thread_id=message_thread_id,
+    )
+    return text_buffer, text_message_id, chars_since_edit, last_edit_at, True
+
+
+async def handle_text_delta(
+    *,
+    chunk: str,
+    bot: Bot,
+    chat_id: int | str,
+    text_buffer: str,
+    text_message_id: int | None,
+    chars_since_edit: int,
+    last_edit_at: float,
+    reply_to_message_id: int | None,
+    message_thread_id: int | None,
+) -> tuple[str, int | None, int, float]:
+    """Append ``chunk`` to the live text message — open one if needed (#306).
+
+    Mirrors :func:`handle_tool_use` debounce: only edits once we have
+    enough new chars or enough elapsed time so we don't hammer
+    Telegram with one ``edit_message_text`` per token.
+    """
+    if not chunk:
+        return text_buffer, text_message_id, chars_since_edit, last_edit_at
+    text_buffer = f"{text_buffer}{chunk}"
+    if text_message_id is None:
+        new_id = await safe_send_text(
+            bot,
+            chat_id,
+            text_buffer,
+            reply_to_message_id=reply_to_message_id,
+            message_thread_id=message_thread_id,
+        )
+        return text_buffer, new_id, 0, asyncio.get_event_loop().time()
+    chars_since_edit += len(chunk)
+    now = asyncio.get_event_loop().time()
+    elapsed = now - last_edit_at
+    if chars_since_edit >= _EDIT_DEBOUNCE_CHARS or elapsed >= _MAX_EDIT_INTERVAL_S:
+        await safe_edit(bot, chat_id, text_message_id, text_buffer)
+        return text_buffer, text_message_id, 0, now
+    return text_buffer, text_message_id, chars_since_edit, last_edit_at
+
+
 async def finalize_turn_delivery(
     *,
     bot: Bot,
@@ -154,14 +282,22 @@ async def finalize_turn_delivery(
     previous_block_kind: str | None,
     tool_trace: str,
     thinking_text: str,
+    text_message_id: int | None,
+    text_buffer: str,
     final_text: str,
     reply_to_message_id: int | None,
     message_thread_id: int | None,
 ) -> None:
-    """Resolve the ⏳ placeholder and send the closing reply (#288, #293)."""
+    """Resolve the ⏳ placeholder and send the closing reply (#288, #293, #306).
+
+    When ``text_message_id`` is set, an in-stream text message is
+    already on screen — we flush its final buffer in place and skip
+    the closing ``final_text`` send so the user doesn't see the
+    answer twice.
+    """
     if first_block_kind == "tools":
         await safe_edit_html(bot, chat_id, placeholder_message_id, plain_html(tool_trace))
-    elif first_block_kind == "thinking" or final_text:
+    elif first_block_kind in ("thinking", "text") or final_text:
         await safe_delete(bot, chat_id, placeholder_message_id)
     else:
         await safe_edit(bot, chat_id, placeholder_message_id, _EMPTY_RESPONSE_FALLBACK)
@@ -170,6 +306,12 @@ async def finalize_turn_delivery(
             chat_id,
             placeholder_message_id,
         )
+
+    if text_message_id is not None and text_buffer:
+        # Final flush so the last debounced chunk lands even if we
+        # were inside the debounce window when the stream ended.
+        await safe_edit(bot, chat_id, text_message_id, text_buffer)
+        return
 
     if final_text:
         await safe_send_text(
