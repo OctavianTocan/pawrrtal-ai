@@ -30,18 +30,19 @@ dependencies = [
     "opentelemetry-instrumentation-sqlalchemy>=0.50b0",
     "opentelemetry-instrumentation-logging>=0.50b0",
     "markitdown[all]>=0.1.1",
-    "openai>=1.0.0",
+    "xai-sdk>=1.12.0",
 ]
 
 # Optional voice transcription backends (PR 14). The ``api/stt.py``
 # xAI proxy is in the core dependencies; these are needed only when
 # ``VOICE_PROVIDER`` is ``mistral`` or ``openai``. Local whisper.cpp
 # uses subprocess calls and needs no Python package.
-# ``openai`` itself is now a core dep (powers the xAI chat provider via
-# OpenAI-compatible base_url) so it's not listed here.
+# Chat is served via the official ``xai-sdk`` (gRPC) — declared above
+# under core dependencies alongside the other provider SDKs.
 [project.optional-dependencies]
 voice = [
     "mistralai>=1.0.0",
+    "openai>=1.0.0",
 ]
 
 [dependency-groups]
@@ -217,7 +218,10 @@ disallow_untyped_defs = false  # test fixtures are fine without explicit types
 
 [[tool.mypy.overrides]]
 # Third-party packages without complete type stubs.
-module = ["sqlalchemy_utils.*", "mcp.*", "markitdown.*"]
+# xai_sdk ships generated protobuf classes without a ``py.typed`` marker;
+# mypy can't follow the .pyi files the SDK omits.  The provider does its
+# own narrow type-checking at the seam.
+module = ["sqlalchemy_utils.*", "mcp.*", "markitdown.*", "xai_sdk.*"]
 ignore_missing_imports = true
 
 # --- bandit: security scanner ------------------------------------------------

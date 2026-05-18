@@ -1,10 +1,15 @@
-"""xAI streaming-chunk accumulation helpers.
+"""xai-sdk streaming helpers — translate ``Chunk`` / ``Response`` → LLMEvents.
 
-Split out of ``xai_provider`` so that module stays under the 500-line
-file budget (``scripts/check-file-lines.mjs``).  The OpenAI / xAI
-chat-completions stream emits tool calls across many partial deltas,
-so the StreamFn closure needs running state per call — that state and
-its finalisation live here.  No I/O, no SDK constructor calls.
+Pulled out of ``xai_provider`` so the provider module stays under the
+500-line file budget.  All helpers are pure shape translation; the live
+gRPC client lives in ``xai_provider``.
+
+xai-sdk does the hard work for us: ``chat.stream()`` yields
+``(response, chunk)`` tuples where ``chunk`` carries the latest deltas
+and ``response`` carries the running-total accumulation, exposed via
+typed accessors (``content``, ``reasoning_content``, ``tool_calls``,
+``usage``, ``cost_usd``, ``finish_reason``).  See:
+https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/chat.py
 """
 
 from __future__ import annotations
@@ -15,185 +20,130 @@ import uuid
 from dataclasses import dataclass
 from typing import Any
 
+from xai_sdk.chat import Chunk, Response
+
 from app.core.agent_loop.types import (
     LLMDoneEvent,
+    LLMToolCallEvent,
     TextContent,
     ToolCallContent,
 )
 
 logger = logging.getLogger(__name__)
 
-# Finish reason emitted by xAI / OpenAI-compatible endpoints when the
-# model produced one or more tool calls.  Mirrors OpenAI's vocabulary.
-FINISH_REASON_TOOL_CALLS = "tool_calls"
-
-# xAI bills in "ticks" where ``1 tick = 1e-10 USD``.  Sourced from the
-# official xai-sdk Python package's ``cost.py``:
-# https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/cost.py
-# (citing
-# https://github.com/xai-org/xai-proto/blob/0c0f5353aa7ab2a4ffea310f9d9364ed5c424af2/proto/xai/api/v1/usage.proto#L45).
-# Field is opaque on the wire; keeping the constant here means future
-# divisor changes are a single-line edit.
-USD_PER_TICK = 1e-10
-
 
 @dataclass(frozen=True, slots=True)
 class ChunkDeltas:
-    """The user-visible deltas extracted from a single streaming chunk.
+    """The user-visible deltas extracted from one streaming chunk.
 
     ``text`` is the regular assistant content delta; ``thinking`` is the
     reasoning-trace delta (xAI's ``reasoning_content`` field on grok-4.3
-    reasoning turns).  Either or both may be ``None`` for a chunk that
-    only contributed to tool-call accumulation or to ``finish_reason``.
+    reasoning turns).  Either or both may be ``None`` when the chunk
+    only contributed tool-call payloads or terminal usage metadata.
     """
 
     text: str | None = None
     thinking: str | None = None
 
 
-class ToolCallAccumulator:
-    """Reassembles a single OpenAI tool-call from its streamed delta fragments.
+@dataclass(frozen=True, slots=True)
+class UsageRecord:
+    """Per-request usage snapshot read off the SDK's terminal :class:`Response`.
 
-    xAI's chat-completions stream emits each tool call across many
-    chunks: the first one sets ``id`` + ``function.name``, later ones
-    append slices of ``function.arguments``.  The accumulator collects
-    them per ``index`` so we can yield a complete
-    :class:`LLMToolCallEvent` once the stream ends.
+    Mirrors the shape Pawrrtal's chat aggregator expects on
+    ``StreamEvent(type="usage")`` so :class:`XaiLLM.stream` can yield
+    it without further translation.  ``cost_usd`` comes from the SDK's
+    ``Response.cost_usd`` property (server-reported, authoritative).
     """
 
-    __slots__ = ("arguments", "id", "name")
-
-    def __init__(self) -> None:
-        self.id: str = ""
-        self.name: str = ""
-        self.arguments: str = ""
-
-    def apply(self, delta: Any) -> None:
-        """Merge one OpenAI ``ChoiceDeltaToolCall`` fragment into the buffer."""
-        if delta.id:
-            self.id = delta.id
-        fn = getattr(delta, "function", None)
-        if fn is None:
-            return
-        if fn.name:
-            self.name = fn.name
-        if fn.arguments:
-            self.arguments += fn.arguments
+    input_tokens: int
+    output_tokens: int
+    cost_usd: float
 
 
-def parse_tool_arguments(raw: str, name: str) -> dict[str, Any]:
-    """Parse the accumulated tool-arguments JSON, tolerating empty strings.
+def deltas_from_chunk(chunk: Chunk) -> ChunkDeltas:
+    """Pull the text / reasoning deltas off one streaming chunk.
 
-    xAI streams ``arguments`` as raw JSON.  An empty / missing
-    arguments object is legitimate for tools that take no parameters,
-    so we treat ``""`` as ``{}``.  Malformed JSON is surfaced as an
-    empty dict with a WARNING — the agent loop will still dispatch the
-    tool, and the resulting error is more informative than a stream-
-    level exception.
+    Both fields can be empty strings when the chunk only carries
+    tool-call payloads or finish-reason metadata; we normalise empty
+    strings to ``None`` so the caller can branch on truthiness.
     """
-    if not raw:
-        return {}
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        logger.warning(
-            "xai_provider: tool '%s' returned non-JSON arguments (%s); falling back to empty dict",
-            name,
-            exc,
-        )
-        return {}
-    return parsed if isinstance(parsed, dict) else {}
+    text = chunk.content or None
+    thinking = chunk.reasoning_content or None
+    return ChunkDeltas(text=text, thinking=thinking)
 
 
-def _build_tool_call_id(name: str, fallback_id: str, ordinal: int) -> str:
-    """Return a stable tool_call_id even when the provider omitted ``id``."""
-    if fallback_id:
-        return fallback_id
-    return f"call-{name}-{ordinal}-{uuid.uuid4().hex[:8]}"
+def tool_call_events_from_response(response: Response) -> list[LLMToolCallEvent]:
+    """Translate the final ``Response.tool_calls`` into loop-shaped events.
 
-
-class ChunkAggregate:
-    """Cross-chunk streaming state for one ``chat.completions`` call.
-
-    Pulled out of the StreamFn closure so the outer factory stays under
-    the ruff complexity cap.  The aggregate owns the running text, the
-    per-index :class:`ToolCallAccumulator` map, and the most recent
-    ``finish_reason`` observed on the stream.
+    Reading from the accumulated :class:`Response` (rather than from
+    streamed chunks) sidesteps the question of whether xAI ships each
+    tool call in a single chunk or spread across several — the SDK
+    accumulates either way, and emitting once at end-of-stream is the
+    only point at which we know we have the complete list.
     """
-
-    __slots__ = ("finish_reason", "full_text", "tool_buffers")
-
-    def __init__(self) -> None:
-        self.full_text: str = ""
-        self.tool_buffers: dict[int, ToolCallAccumulator] = {}
-        self.finish_reason: str | None = None
-
-
-def absorb_chunk(chunk: Any, aggregate: ChunkAggregate) -> ChunkDeltas:
-    """Update *aggregate* with one streaming chunk and report the user-visible deltas.
-
-    Returns :class:`ChunkDeltas` carrying any text and / or
-    ``reasoning_content`` delta to forward upstream.  Both fields are
-    ``None`` when the chunk only contributed to tool-call accumulation
-    or to ``finish_reason``.  Extracted from the StreamFn closure so
-    the factory stays inside the ruff complexity cap; the branch shape
-    mirrors the OpenAI SDK's :class:`ChatCompletionChunk` exactly, plus
-    xAI's ``reasoning_content`` extra (allowed because
-    :class:`ChoiceDelta` is configured with ``extra='allow'``).
-    """
-    if not chunk.choices:
-        return ChunkDeltas()
-    choice = chunk.choices[0]
-    delta = choice.delta
-    if delta is None:
-        return ChunkDeltas()
-    text_delta: str | None = None
-    if delta.content:
-        text_delta = delta.content
-        aggregate.full_text += delta.content
-    # xAI's grok-4.3 reasoning turn surfaces chain-of-thought in
-    # ``reasoning_content`` on each delta.  The openai SDK preserves
-    # unknown fields on :class:`ChoiceDelta` via ``extra='allow'`` so a
-    # plain ``getattr`` is enough — no SDK upgrade required when xAI
-    # changes their schema, and the field stays ``None`` for non-Grok
-    # OpenAI-compat providers that never emit it.
-    thinking_value = getattr(delta, "reasoning_content", None)
-    thinking_delta = thinking_value if isinstance(thinking_value, str) and thinking_value else None
-    for tc_delta in getattr(delta, "tool_calls", None) or []:
-        idx = getattr(tc_delta, "index", 0) or 0
-        buffer = aggregate.tool_buffers.get(idx)
-        if buffer is None:
-            buffer = ToolCallAccumulator()
-            aggregate.tool_buffers[idx] = buffer
-        buffer.apply(tc_delta)
-    if choice.finish_reason:
-        aggregate.finish_reason = choice.finish_reason
-    return ChunkDeltas(text=text_delta, thinking=thinking_delta)
-
-
-def finalize_tool_calls(aggregate: ChunkAggregate) -> list[dict[str, Any]]:
-    """Drain buffered tool calls into ordered, JSON-decoded records.
-
-    Skips fragments that never carried a function name (treated as a
-    streaming bug on the upstream side and logged) and returns one
-    entry per dispatched tool call in the order the model produced them.
-    """
-    completed: list[dict[str, Any]] = []
-    for ordinal, idx in enumerate(sorted(aggregate.tool_buffers.keys())):
-        buffer = aggregate.tool_buffers[idx]
-        if not buffer.name:
-            logger.warning(
-                "xai_provider: dropping tool_call index=%d with empty name (id=%r)",
-                idx,
-                buffer.id,
+    events: list[LLMToolCallEvent] = []
+    for ordinal, call in enumerate(response.tool_calls):
+        events.append(
+            LLMToolCallEvent(
+                type="tool_call",
+                tool_call_id=_stable_tool_call_id(call, ordinal),
+                name=call.function.name,
+                arguments=_parse_arguments(call.function.arguments, call.function.name),
             )
-            continue
-        tool_call_id = _build_tool_call_id(buffer.name, buffer.id, ordinal)
-        arguments = parse_tool_arguments(buffer.arguments, buffer.name)
-        completed.append(
-            {"tool_call_id": tool_call_id, "name": buffer.name, "arguments": arguments}
         )
-    return completed
+    return events
+
+
+def done_event_from_response(response: Response) -> LLMDoneEvent:
+    """Assemble the terminal ``LLMDoneEvent`` from the accumulated response.
+
+    The loop uses ``stop_reason`` purely as a string discriminator
+    (``"tool_use"`` vs ``"stop"`` vs ``"error"``) — see
+    ``app.core.agent_loop.loop._should_stop``.  We map xAI's
+    ``REASON_TOOL_CALLS`` to ``"tool_use"`` so a tool-using turn
+    triggers the loop's tool-dispatch path, and everything else falls
+    through to ``"stop"``.
+    """
+    content: list[TextContent | ToolCallContent] = []
+    if response.content:
+        content.append(TextContent(type="text", text=response.content))
+    for ordinal, call in enumerate(response.tool_calls):
+        content.append(
+            ToolCallContent(
+                type="toolCall",
+                tool_call_id=_stable_tool_call_id(call, ordinal),
+                name=call.function.name,
+                arguments=_parse_arguments(call.function.arguments, call.function.name),
+            )
+        )
+    finish = (response.finish_reason or "").upper()
+    stop_reason = "tool_use" if response.tool_calls or finish == "REASON_TOOL_CALLS" else "stop"
+    return LLMDoneEvent(type="done", stop_reason=stop_reason, content=content)
+
+
+def usage_record_from_response(response: Response) -> UsageRecord | None:
+    """Read token + cost totals off the SDK's accumulated response.
+
+    Returns ``None`` when the server reported nothing useful (token
+    counts all zero and cost missing) — the chat aggregator then
+    treats the turn as a free no-op rather than logging a zero-cost
+    ledger row.  ``response.cost_usd`` is the authoritative
+    server-reported figure (the SDK does the ``cost_in_usd_ticks``
+    conversion for us via :mod:`xai_sdk.cost`), so we don't carry
+    the constant locally.
+    """
+    usage = response.usage
+    input_tokens = int(getattr(usage, "prompt_tokens", 0))
+    output_tokens = int(getattr(usage, "completion_tokens", 0))
+    cost = response.cost_usd
+    if input_tokens == 0 and output_tokens == 0 and cost is None:
+        return None
+    return UsageRecord(
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+        cost_usd=float(cost) if cost is not None else 0.0,
+    )
 
 
 class UsageAccumulator:
@@ -201,11 +151,10 @@ class UsageAccumulator:
 
     The agent loop calls the StreamFn once per assistant turn (LLM →
     tool → LLM round-trip), so a single user prompt can drive several
-    chat-completions requests.  Each request returns its own ``usage``
-    block on the terminal streaming chunk (when
-    ``stream_options.include_usage=True``); we sum them so the chat
-    aggregator sees the total for the whole turn, matching how Claude
-    reports its per-turn cost.
+    chat-completions requests.  Each request finishes with its own
+    :class:`Response` that carries usage; we sum them so the chat
+    aggregator sees the total for the whole turn (same shape Claude
+    emits via ``_build_usage_event``).
 
     Mutable on purpose: the StreamFn closure owns one and writes into
     it from inside the stream; :class:`XaiLLM.stream` reads the totals
@@ -221,65 +170,49 @@ class UsageAccumulator:
         self.cost_usd: float = 0.0
         self.saw_any: bool = False
 
-    def absorb(self, chunk: Any) -> None:
-        """Fold one chunk's ``usage`` block into the running totals.
-
-        No-op when the chunk has no usage payload — only the final chunk
-        of a ``stream_options.include_usage=True`` stream carries it.
-        Reads ``prompt_tokens``/``completion_tokens`` (OpenAI naming)
-        AND ``input_tokens``/``output_tokens`` (xAI naming) defensively
-        because the two endpoints have historically disagreed on which
-        names land in the REST envelope.
-        """
-        usage = getattr(chunk, "usage", None)
-        if usage is None:
+    def absorb(self, record: UsageRecord | None) -> None:
+        """Fold a per-request :class:`UsageRecord` into the running totals."""
+        if record is None:
             return
         self.saw_any = True
-        prompt = _read_usage_int(usage, "prompt_tokens", "input_tokens")
-        completion = _read_usage_int(usage, "completion_tokens", "output_tokens")
-        self.input_tokens += prompt
-        self.output_tokens += completion
-        ticks = _read_usage_int(usage, "cost_in_usd_ticks")
-        if ticks > 0:
-            self.cost_usd += ticks * USD_PER_TICK
+        self.input_tokens += record.input_tokens
+        self.output_tokens += record.output_tokens
+        self.cost_usd += record.cost_usd
 
 
-def _read_usage_int(usage: Any, *names: str) -> int:
-    """Read the first non-zero integer field from ``usage``.
+def _stable_tool_call_id(call: Any, ordinal: int) -> str:
+    """Return the server-provided tool_call_id, or synthesise a stable one.
 
-    Tries each name in order using ``getattr`` (Pydantic models from
-    the openai SDK preserve unknown xAI fields via ``extra='allow'``,
-    so the xAI-specific names land on the model alongside the
-    OpenAI-standard ones).  Returns 0 when none of the names are
-    present or carry a usable integer.
+    xai-sdk always populates ``call.id``, but synthesising a fallback
+    keeps the helper robust if a future SDK version emits empty ids
+    on partial / dropped streams.
     """
-    for name in names:
-        value = getattr(usage, name, None)
-        if isinstance(value, int) and value > 0:
-            return value
-    return 0
+    server_id = getattr(call, "id", "") or ""
+    if server_id:
+        return server_id
+    name = getattr(call.function, "name", "") or "unknown"
+    return f"call-{name}-{ordinal}-{uuid.uuid4().hex[:8]}"
 
 
-def done_event_for(
-    aggregate: ChunkAggregate,
-    completed_tool_calls: list[dict[str, Any]],
-) -> LLMDoneEvent:
-    """Assemble the terminal ``LLMDoneEvent`` from the streamed turn."""
-    stop_reason = (
-        "tool_use"
-        if completed_tool_calls or aggregate.finish_reason == FINISH_REASON_TOOL_CALLS
-        else "stop"
-    )
-    content: list[TextContent | ToolCallContent] = []
-    if aggregate.full_text:
-        content.append(TextContent(type="text", text=aggregate.full_text))
-    content.extend(
-        ToolCallContent(
-            type="toolCall",
-            tool_call_id=tc["tool_call_id"],
-            name=tc["name"],
-            arguments=tc["arguments"],
+def _parse_arguments(raw: str, name: str) -> dict[str, Any]:
+    """Parse a tool call's ``arguments`` JSON string into a dict.
+
+    xai-sdk ships ``arguments`` as a JSON string for OpenAI
+    compatibility.  An empty / missing arguments object is legitimate
+    for tools that take no parameters, so ``""`` becomes ``{}``.
+    Malformed JSON is logged at WARNING and surfaced as an empty dict
+    — the agent loop will dispatch the tool and surface the resulting
+    error, which is more informative than crashing the stream.
+    """
+    if not raw:
+        return {}
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        logger.warning(
+            "xai_provider: tool '%s' returned non-JSON arguments (%s); falling back to {}",
+            name,
+            exc,
         )
-        for tc in completed_tool_calls
-    )
-    return LLMDoneEvent(type="done", stop_reason=stop_reason, content=content)
+        return {}
+    return parsed if isinstance(parsed, dict) else {}

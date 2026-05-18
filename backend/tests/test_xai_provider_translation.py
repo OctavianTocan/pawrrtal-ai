@@ -1,10 +1,12 @@
-"""Unit tests for xAI provider request/response translation helpers.
+"""Unit tests for xAI provider's xai-sdk message/stream translation helpers.
 
-These exercise the small pure helpers that turn ``AgentMessage`` lists
-and openai-SDK streaming chunks into the OpenAI wire shape (and back).
-They do NOT hit the agent loop — that path is covered by
+Exercises the small pure helpers that turn ``AgentMessage`` lists into
+``chat_pb2`` protos and translate xai-sdk ``Chunk`` / ``Response``
+typed objects back into loop-shaped ``LLMEvent`` / ``StreamEvent``.
+
+These tests DO NOT hit the agent loop — that path is covered by
 ``test_xai_stream_fn.py`` via ``ScriptedStreamFn``.  Splitting the
-concerns keeps each test focused: the helpers only do shape
+concerns keeps each file focused: the helpers only do shape
 translation, so they should be testable without booting the loop.
 """
 
@@ -17,11 +19,11 @@ from typing import Any
 from uuid import uuid4
 
 import pytest
+from xai_sdk.proto import chat_pb2
 
 from app.core.agent_loop.types import (
     AgentTool,
     AssistantMessage,
-    LLMDoneEvent,
     TextContent,
     ToolCallContent,
     ToolResultContent,
@@ -30,96 +32,202 @@ from app.core.agent_loop.types import (
 )
 from app.core.providers._xai_messages import (
     build_xai_messages,
-    build_xai_tool_declarations,
+    build_xai_tools,
 )
-from app.core.providers._xai_stream import parse_tool_arguments
+from app.core.providers._xai_stream import (
+    UsageAccumulator,
+    deltas_from_chunk,
+    done_event_from_response,
+    tool_call_events_from_response,
+    usage_record_from_response,
+)
 from app.core.providers.xai_provider import (
-    XAI_BASE_URL,
     XaiLLM,
-    _build_xai_extra_body,
+    _live_search_off,
     _map_reasoning_effort,
     _resolve_xai_api_key,
     make_xai_stream_fn,
 )
 
+# ---------------------------------------------------------------------------
+# Fake xai-sdk surface
+# ---------------------------------------------------------------------------
 
-def _delta(
+
+def _fake_chunk(
     *,
     content: str | None = None,
+    reasoning_content: str | None = None,
     tool_calls: list[Any] | None = None,
-    finish: str | None = None,
 ) -> SimpleNamespace:
-    """Shape a ``ChatCompletionChunk``-like fake the provider can iterate."""
-    delta = SimpleNamespace(content=content, tool_calls=tool_calls)
-    choice = SimpleNamespace(delta=delta, finish_reason=finish, index=0)
-    return SimpleNamespace(choices=[choice])
+    """Shape a ``xai_sdk.chat.Chunk``-like object the provider can iterate."""
+    return SimpleNamespace(
+        content=content or "",
+        reasoning_content=reasoning_content or "",
+        tool_calls=tool_calls or [],
+    )
 
 
-def _tc_delta(
+def _fake_tool_call(
     *,
-    index: int,
-    tc_id: str | None = None,
-    name: str | None = None,
-    arguments: str | None = None,
+    name: str,
+    arguments: dict[str, Any] | None = None,
+    call_id: str = "tc-1",
 ) -> SimpleNamespace:
-    """Fake one ``ChoiceDeltaToolCall`` fragment."""
-    fn = SimpleNamespace(name=name, arguments=arguments)
-    return SimpleNamespace(index=index, id=tc_id, function=fn)
+    """One xai-sdk-style tool call: ``call.id``, ``call.function.name``, ``call.function.arguments``."""
+    return SimpleNamespace(
+        id=call_id,
+        function=SimpleNamespace(
+            name=name,
+            arguments=json.dumps(arguments or {}),
+        ),
+    )
+
+
+def _fake_response(
+    *,
+    content: str = "",
+    reasoning_content: str = "",
+    tool_calls: list[Any] | None = None,
+    finish_reason: str = "REASON_STOP",
+    prompt_tokens: int = 0,
+    completion_tokens: int = 0,
+    cost_usd: float | None = None,
+) -> SimpleNamespace:
+    """Shape a ``xai_sdk.chat.Response``-like accumulated object."""
+    usage = SimpleNamespace(
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=prompt_tokens + completion_tokens,
+    )
+    return SimpleNamespace(
+        content=content,
+        reasoning_content=reasoning_content,
+        tool_calls=tool_calls or [],
+        finish_reason=finish_reason,
+        usage=usage,
+        cost_usd=cost_usd,
+    )
+
+
+class _FakeChat:
+    """Stand-in for ``client.chat.create(...)`` returning an iterable Chat.
+
+    ``last_create_kwargs`` records the kwargs the provider passed so
+    tests can assert on request shape (model, tools, search_parameters,
+    reasoning_effort).  The constructor takes a script of
+    ``(response, chunk)`` tuples — yielded by ``stream()`` in order.
+    """
+
+    def __init__(
+        self,
+        steps: list[tuple[Any, Any]],
+        create_kwargs: dict[str, Any],
+    ) -> None:
+        self._steps = steps
+        self.last_create_kwargs = create_kwargs
+
+    async def stream(self) -> AsyncIterator[tuple[Any, Any]]:
+        for step in self._steps:
+            yield step
+
+
+class _FakeChatNamespace:
+    """Holds the captured kwargs across ``create()`` calls."""
+
+    def __init__(self, steps: list[tuple[Any, Any]]) -> None:
+        self._steps = steps
+        self.last_create_kwargs: dict[str, Any] | None = None
+
+    def create(self, **kwargs: Any) -> _FakeChat:
+        self.last_create_kwargs = kwargs
+        return _FakeChat(self._steps, kwargs)
+
+
+class _FakeAsyncClient:
+    """Async-context-manager stand-in for ``xai_sdk.AsyncClient``."""
+
+    def __init__(self, steps: list[tuple[Any, Any]]) -> None:
+        self.chat = _FakeChatNamespace(steps)
+
+    async def __aenter__(self) -> _FakeAsyncClient:
+        return self
+
+    async def __aexit__(self, *args: object) -> None:
+        return None
+
+    async def close(self) -> None:
+        return None
+
+
+def _patch_async_client(
+    monkeypatch: pytest.MonkeyPatch,
+    steps: list[tuple[Any, Any]],
+) -> _FakeAsyncClient:
+    """Patch ``AsyncClient`` in the provider module and return the fake."""
+    fake = _FakeAsyncClient(steps)
+    monkeypatch.setattr(
+        "app.core.providers.xai_provider.AsyncClient",
+        lambda **_kwargs: fake,
+    )
+    return fake
 
 
 # ---------------------------------------------------------------------------
-# Pure helpers
+# build_xai_tools
 # ---------------------------------------------------------------------------
 
 
-def test_build_tool_declarations_returns_none_when_empty() -> None:
-    """No tools → None (not []) so we skip the param entirely on the wire."""
-    assert build_xai_tool_declarations([]) is None
+def test_build_tools_returns_none_when_empty() -> None:
+    """No tools → None so the create() call omits the field entirely."""
+    assert build_xai_tools([]) is None
 
 
-def test_build_tool_declarations_wraps_each_tool_in_function_shape() -> None:
-    """Each AgentTool becomes one ``{"type":"function", "function": ...}`` entry."""
+def test_build_tools_wraps_each_agent_tool_in_function_proto() -> None:
+    """Each AgentTool becomes one ``chat_pb2.Tool`` with the function spec."""
 
     async def _execute(_call_id: str, **_kwargs: Any) -> str:
         return ""
 
-    tool = AgentTool(
+    pawrrtal_tool = AgentTool(
         name="search",
         description="Search the web",
         parameters={"type": "object", "properties": {"q": {"type": "string"}}},
         execute=_execute,
     )
 
-    declarations = build_xai_tool_declarations([tool])
-
+    declarations = build_xai_tools([pawrrtal_tool])
     assert declarations is not None
-    assert declarations == [
-        {
-            "type": "function",
-            "function": {
-                "name": "search",
-                "description": "Search the web",
-                "parameters": {
-                    "type": "object",
-                    "properties": {"q": {"type": "string"}},
-                },
-            },
-        }
-    ]
+    assert len(declarations) == 1
+    proto = declarations[0]
+    assert proto.function.name == "search"
+    assert proto.function.description == "Search the web"
+    parsed = json.loads(proto.function.parameters)
+    assert parsed == {
+        "type": "object",
+        "properties": {"q": {"type": "string"}},
+    }
 
 
-def test_build_xai_messages_prepends_system_prompt() -> None:
-    """The system prompt becomes the first ``role="system"`` entry."""
+# ---------------------------------------------------------------------------
+# build_xai_messages
+# ---------------------------------------------------------------------------
+
+
+def test_build_messages_prepends_developer_system_prompt() -> None:
+    """The system prompt becomes the first ``ROLE_DEVELOPER`` message."""
     msgs = build_xai_messages(
         [UserMessage(role="user", content="hello")],
         system_prompt="you are helpful",
     )
-    assert msgs[0] == {"role": "system", "content": "you are helpful"}
-    assert msgs[1] == {"role": "user", "content": "hello"}
+    assert msgs[0].role == chat_pb2.MessageRole.ROLE_DEVELOPER
+    assert msgs[0].content[0].text == "you are helpful"
+    assert msgs[1].role == chat_pb2.MessageRole.ROLE_USER
+    assert msgs[1].content[0].text == "hello"
 
 
-def test_build_xai_messages_translates_assistant_with_tool_calls() -> None:
-    """An assistant turn splits text + tool calls into the OpenAI shape."""
+def test_build_messages_translates_assistant_with_tool_calls() -> None:
+    """An assistant turn with tool calls renders the proto's ``tool_calls`` field."""
     assistant = AssistantMessage(
         role="assistant",
         content=[
@@ -134,21 +242,18 @@ def test_build_xai_messages_translates_assistant_with_tool_calls() -> None:
         stop_reason="tool_use",
     )
     msgs = build_xai_messages([assistant], system_prompt="sys")
-    # Index 0 is the system prompt; index 1 is the assistant turn.
-    entry = msgs[1]
-    assert entry["role"] == "assistant"
-    assert entry["content"] == "searching..."
-    assert entry["tool_calls"] == [
-        {
-            "id": "tc-1",
-            "type": "function",
-            "function": {"name": "search", "arguments": json.dumps({"q": "pawrrtal"})},
-        }
-    ]
+    proto = msgs[1]
+    assert proto.role == chat_pb2.MessageRole.ROLE_ASSISTANT
+    assert proto.content[0].text == "searching..."
+    assert len(proto.tool_calls) == 1
+    call = proto.tool_calls[0]
+    assert call.id == "tc-1"
+    assert call.function.name == "search"
+    assert json.loads(call.function.arguments) == {"q": "pawrrtal"}
 
 
-def test_build_xai_messages_assistant_without_text_uses_none_content() -> None:
-    """An assistant turn that's only tool_calls still wires content=None."""
+def test_build_messages_assistant_tool_calls_only_keeps_empty_content() -> None:
+    """An assistant turn that's only tool_calls drops the text content array."""
     assistant = AssistantMessage(
         role="assistant",
         content=[
@@ -157,13 +262,13 @@ def test_build_xai_messages_assistant_without_text_uses_none_content() -> None:
         stop_reason="tool_use",
     )
     msgs = build_xai_messages([assistant], system_prompt="sys")
-    entry = msgs[1]
-    assert entry["content"] is None
-    assert entry["tool_calls"][0]["function"]["name"] == "ping"
+    proto = msgs[1]
+    assert list(proto.content) == []
+    assert proto.tool_calls[0].function.name == "ping"
 
 
-def test_build_xai_messages_translates_tool_result() -> None:
-    """A toolResult message renders into OpenAI's ``role="tool"`` entry."""
+def test_build_messages_translates_tool_result_to_role_tool() -> None:
+    """A toolResult message renders the SDK's tool_result helper output."""
     msg = ToolResultMessage(
         role="toolResult",
         tool_call_id="tc-1",
@@ -175,22 +280,26 @@ def test_build_xai_messages_translates_tool_result() -> None:
         is_error=False,
     )
     msgs = build_xai_messages([msg], system_prompt="sys")
-    assert msgs[1] == {
-        "role": "tool",
-        "tool_call_id": "tc-1",
-        "content": "line 1\nline 2",
-    }
+    proto = msgs[1]
+    assert proto.role == chat_pb2.MessageRole.ROLE_TOOL
+    assert proto.tool_call_id == "tc-1"
+    assert proto.content[0].text == "line 1\nline 2"
 
 
-def test_parse_tool_arguments_handles_empty_and_invalid() -> None:
-    """Empty string → empty dict; bad JSON → empty dict with a warning."""
-    assert parse_tool_arguments("", "ping") == {}
-    assert parse_tool_arguments('{"x": 1}', "ping") == {"x": 1}
-    # Invalid JSON should fall back to empty, not raise.
-    assert parse_tool_arguments("{not json", "ping") == {}
+def test_build_messages_drops_empty_user_messages() -> None:
+    """Blank-only user messages are dropped — historical behaviour."""
+    msgs = build_xai_messages([UserMessage(role="user", content="   ")], system_prompt="sys")
+    # Only the system prompt survives.
+    assert len(msgs) == 1
+    assert msgs[0].role == chat_pb2.MessageRole.ROLE_DEVELOPER
 
 
-def test_resolve_xai_api_key_uses_settings_when_no_workspace(
+# ---------------------------------------------------------------------------
+# _resolve_xai_api_key
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_api_key_uses_settings_when_no_workspace(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """No workspace_id → use the gateway-global key from Settings."""
@@ -201,7 +310,7 @@ def test_resolve_xai_api_key_uses_settings_when_no_workspace(
     assert _resolve_xai_api_key(None) == "gateway-key"
 
 
-def test_resolve_xai_api_key_workspace_override(
+def test_resolve_api_key_workspace_override(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """workspace_id present → delegate to resolve_api_key (mocked)."""
@@ -214,353 +323,262 @@ def test_resolve_xai_api_key_workspace_override(
 
 
 # ---------------------------------------------------------------------------
-# StreamFn integration with a fake openai client
-# ---------------------------------------------------------------------------
-
-
-class _FakeStream:
-    """Async-iterable wrapper around a list of chunk fakes."""
-
-    def __init__(self, chunks: list[Any]) -> None:
-        self._chunks = chunks
-
-    def __aiter__(self) -> AsyncIterator[Any]:
-        return self._iterate()
-
-    async def _iterate(self) -> AsyncIterator[Any]:
-        for chunk in self._chunks:
-            yield chunk
-
-
-class _FakeCompletions:
-    """Captures the kwargs the provider passes to ``chat.completions.create``."""
-
-    def __init__(self, chunks: list[Any]) -> None:
-        self._chunks = chunks
-        self.last_kwargs: dict[str, Any] | None = None
-
-    async def create(self, **kwargs: Any) -> _FakeStream:
-        self.last_kwargs = kwargs
-        return _FakeStream(self._chunks)
-
-
-class _FakeClient:
-    """Replaces ``AsyncOpenAI`` so no network call happens during tests."""
-
-    def __init__(self, chunks: list[Any]) -> None:
-        self.chat = SimpleNamespace(completions=_FakeCompletions(chunks))
-
-
-@pytest.mark.anyio
-async def test_stream_fn_assembles_tool_call_from_streamed_fragments(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Streamed tool-call arg fragments are accumulated into one LLMToolCallEvent."""
-    chunks = [
-        _delta(content="thinking..."),
-        _delta(
-            tool_calls=[
-                _tc_delta(index=0, tc_id="call-1", name="search", arguments='{"q":'),
-            ]
-        ),
-        _delta(tool_calls=[_tc_delta(index=0, arguments=' "grok"')]),
-        _delta(tool_calls=[_tc_delta(index=0, arguments="}")]),
-        _delta(finish="tool_calls"),
-    ]
-    fake = _FakeClient(chunks)
-    monkeypatch.setattr("app.core.providers.xai_provider.AsyncOpenAI", lambda **_kwargs: fake)
-
-    stream_fn = make_xai_stream_fn("grok-4.3", None, system_prompt="sys")
-    events = [event async for event in stream_fn([], [])]
-
-    text_events = [e for e in events if e["type"] == "text_delta"]
-    tool_events = [e for e in events if e["type"] == "tool_call"]
-    done_events = [e for e in events if e["type"] == "done"]
-
-    assert [e["text"] for e in text_events] == ["thinking..."]
-    assert len(tool_events) == 1
-    assert tool_events[0]["name"] == "search"
-    assert tool_events[0]["arguments"] == {"q": "grok"}
-    assert tool_events[0]["tool_call_id"] == "call-1"
-
-    assert len(done_events) == 1
-    done = done_events[0]
-    assert done["stop_reason"] == "tool_use"
-    assert any(b["type"] == "toolCall" for b in done["content"])
-
-
-@pytest.mark.anyio
-async def test_stream_fn_plain_text_turn_emits_stop(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A pure-text turn ends with ``stop_reason='stop'`` and one text block."""
-    chunks = [_delta(content="hi"), _delta(content=" there"), _delta(finish="stop")]
-    fake = _FakeClient(chunks)
-    monkeypatch.setattr("app.core.providers.xai_provider.AsyncOpenAI", lambda **_kwargs: fake)
-
-    stream_fn = make_xai_stream_fn("grok-4.3", None, system_prompt="sys")
-    events = [event async for event in stream_fn([], [])]
-
-    assert events[-1]["type"] == "done"
-    assert events[-1]["stop_reason"] == "stop"
-    assert events[-1]["content"] == [TextContent(type="text", text="hi there")]
-
-
-@pytest.mark.anyio
-async def test_stream_fn_request_payload_includes_system_and_tools(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The request kwargs carry the system prompt and tool declarations."""
-    fake = _FakeClient([_delta(finish="stop")])
-    monkeypatch.setattr("app.core.providers.xai_provider.AsyncOpenAI", lambda **_kwargs: fake)
-
-    async def _execute(_call_id: str, **_kwargs: Any) -> str:
-        return ""
-
-    tool = AgentTool(
-        name="ping",
-        description="ping",
-        parameters={"type": "object", "properties": {}},
-        execute=_execute,
-    )
-
-    stream_fn = make_xai_stream_fn("grok-4.3", None, system_prompt="custom-sys")
-    async for _ in stream_fn([UserMessage(role="user", content="hello")], [tool]):
-        pass
-
-    kwargs = fake.chat.completions.last_kwargs
-    assert kwargs is not None
-    assert kwargs["model"] == "grok-4.3"
-    assert kwargs["stream"] is True
-    assert kwargs["messages"][0] == {"role": "system", "content": "custom-sys"}
-    assert kwargs["tools"] is not None
-    # Live Search must be disabled by default: pawrrtal uses exa_search
-    # as the canonical web tool and we don't want xAI double-billing or
-    # ghost-searching every turn.  See ``_LIVE_SEARCH_DISABLED``.
-    assert kwargs["extra_body"]["search_parameters"] == {"mode": "off"}
-    assert kwargs["tools"][0]["function"]["name"] == "ping"
-
-
-@pytest.mark.anyio
-async def test_stream_fn_surfaces_upstream_error_as_done_event(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """An exception raised by the SDK becomes a graceful error ``done`` event."""
-
-    class _ExplodingCompletions:
-        async def create(self, **_kwargs: Any) -> Any:
-            raise RuntimeError("upstream 503")
-
-    class _ExplodingClient:
-        chat = SimpleNamespace(completions=_ExplodingCompletions())
-
-    monkeypatch.setattr(
-        "app.core.providers.xai_provider.AsyncOpenAI",
-        lambda **_kwargs: _ExplodingClient(),
-    )
-
-    stream_fn = make_xai_stream_fn("grok-4.3", None, system_prompt="sys")
-    events = [event async for event in stream_fn([], [])]
-
-    text = next(e for e in events if e["type"] == "text_delta")
-    done = next(e for e in events if e["type"] == "done")
-    assert "upstream 503" in text["text"]
-    assert done["stop_reason"] == "error"
-
-
-def test_xai_base_url_points_at_xai_v1() -> None:
-    """Regression guard: ensure we never accidentally hit api.openai.com."""
-    assert XAI_BASE_URL == "https://api.x.ai/v1"
-
-
-def test_provider_class_construction_records_model_and_workspace() -> None:
-    """Smoke check the class shape (the chat router constructs the provider)."""
-    workspace = uuid4()
-    provider = XaiLLM("grok-4.3", workspace_id=workspace)
-    # No public getters — assert via private slots since this is an internal contract.
-    assert provider._model_id == "grok-4.3"
-    assert provider._workspace_id == workspace
-
-
-@pytest.mark.anyio
-async def test_done_assistant_blocks_include_unstreamed_text_and_tool_calls(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """LLMDoneEvent.content lists every text + tool-call block from the turn."""
-    chunks = [
-        _delta(content="ack"),
-        _delta(
-            tool_calls=[
-                _tc_delta(index=0, tc_id="call-A", name="echo", arguments='{"value":"hi"}'),
-            ]
-        ),
-        _delta(finish="tool_calls"),
-    ]
-    fake = _FakeClient(chunks)
-    monkeypatch.setattr("app.core.providers.xai_provider.AsyncOpenAI", lambda **_kwargs: fake)
-
-    stream_fn = make_xai_stream_fn("grok-4.3", None, system_prompt="sys")
-    events = [event async for event in stream_fn([], [])]
-
-    done = next(e for e in events if e["type"] == "done")
-    assert isinstance(done, dict)
-    # Narrow for the type checker so mypy understands the union shape.
-    done_event: LLMDoneEvent = done  # type: ignore[assignment]
-    text_blocks = [b for b in done_event["content"] if b["type"] == "text"]
-    tool_blocks = [b for b in done_event["content"] if b["type"] == "toolCall"]
-    assert [b["text"] for b in text_blocks] == ["ack"]
-    assert len(tool_blocks) == 1
-    assert tool_blocks[0]["name"] == "echo"
-    assert tool_blocks[0]["arguments"] == {"value": "hi"}
-
-
-# ---------------------------------------------------------------------------
-# xAI-specific extensions: reasoning_effort + reasoning_content + Live Search
+# _map_reasoning_effort + _live_search_off
 # ---------------------------------------------------------------------------
 
 
 def test_map_reasoning_effort_collapses_four_levels_to_two() -> None:
-    """Pawrrtal's four-level UI knob → grok-4.3's two-level enum.
-
-    grok-4.3 rejects anything other than ``"low"`` or ``"high"``
-    (https://docs.x.ai/docs/models/grok-4-3), so the mapper has to
-    collapse ``medium``/``extra-high`` rather than pass them through.
-    """
+    """Pawrrtal's four-level UI knob → grok-4.3's two-level proto enum."""
     assert _map_reasoning_effort(None) is None
-    assert _map_reasoning_effort("low") == "low"
-    assert _map_reasoning_effort("medium") == "low"
-    assert _map_reasoning_effort("high") == "high"
-    assert _map_reasoning_effort("extra-high") == "high"
+    assert _map_reasoning_effort("low") == chat_pb2.ReasoningEffort.EFFORT_LOW
+    assert _map_reasoning_effort("medium") == chat_pb2.ReasoningEffort.EFFORT_LOW
+    assert _map_reasoning_effort("high") == chat_pb2.ReasoningEffort.EFFORT_HIGH
+    assert _map_reasoning_effort("extra-high") == chat_pb2.ReasoningEffort.EFFORT_HIGH
 
 
-def test_build_xai_extra_body_always_disables_live_search() -> None:
-    """search_parameters.mode is always ``off`` regardless of effort."""
-    assert _build_xai_extra_body(None) == {"search_parameters": {"mode": "off"}}
-    assert _build_xai_extra_body("low") == {
-        "search_parameters": {"mode": "off"},
-        "reasoning_effort": "low",
-    }
-    assert _build_xai_extra_body("high") == {
-        "search_parameters": {"mode": "off"},
-        "reasoning_effort": "high",
-    }
+def test_live_search_off_returns_off_mode() -> None:
+    """The default Live Search guard sets ``mode="off"``."""
+    sp = _live_search_off()
+    # ``SearchParameters`` is the xai-sdk dataclass; the live wire mode
+    # is exposed via the ``mode`` attribute as a string literal.
+    assert sp.mode == "off"
 
 
-@pytest.mark.anyio
-async def test_stream_fn_forwards_mapped_reasoning_effort(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """``reasoning_effort='extra-high'`` lands as ``'high'`` in extra_body."""
-    fake = _FakeClient([_delta(finish="stop")])
-    monkeypatch.setattr("app.core.providers.xai_provider.AsyncOpenAI", lambda **_kwargs: fake)
+# ---------------------------------------------------------------------------
+# Stream helpers (Chunk → ChunkDeltas, Response → events)
+# ---------------------------------------------------------------------------
 
-    stream_fn = make_xai_stream_fn(
-        "grok-4.3", None, system_prompt="sys", reasoning_effort="extra-high"
+
+def test_deltas_from_chunk_text_only() -> None:
+    """A plain text chunk yields ``ChunkDeltas(text=..., thinking=None)``."""
+    deltas = deltas_from_chunk(_fake_chunk(content="hi"))
+    assert deltas.text == "hi"
+    assert deltas.thinking is None
+
+
+def test_deltas_from_chunk_reasoning_only() -> None:
+    """A reasoning-only chunk yields ``thinking`` without bleeding into ``text``."""
+    deltas = deltas_from_chunk(_fake_chunk(reasoning_content="Let me think..."))
+    assert deltas.text is None
+    assert deltas.thinking == "Let me think..."
+
+
+def test_deltas_from_chunk_empty_strings_normalise_to_none() -> None:
+    """Empty-string fields normalise to None so the caller can branch on truthiness."""
+    deltas = deltas_from_chunk(_fake_chunk(content="", reasoning_content=""))
+    assert deltas.text is None
+    assert deltas.thinking is None
+
+
+def test_tool_call_events_from_response_translates_each_call() -> None:
+    """Each accumulated tool call becomes one :class:`LLMToolCallEvent`."""
+    response = _fake_response(
+        tool_calls=[
+            _fake_tool_call(name="search", arguments={"q": "x"}, call_id="tc-A"),
+            _fake_tool_call(name="get_weather", arguments={"city": "Paris"}, call_id="tc-B"),
+        ],
     )
-    async for _ in stream_fn([], []):
-        pass
+    events = tool_call_events_from_response(response)
+    assert len(events) == 2
+    assert events[0]["name"] == "search"
+    assert events[0]["arguments"] == {"q": "x"}
+    assert events[0]["tool_call_id"] == "tc-A"
+    assert events[1]["name"] == "get_weather"
+    assert events[1]["arguments"] == {"city": "Paris"}
+    assert events[1]["tool_call_id"] == "tc-B"
 
-    kwargs = fake.chat.completions.last_kwargs
-    assert kwargs is not None
-    assert kwargs["extra_body"]["reasoning_effort"] == "high"
-    assert kwargs["extra_body"]["search_parameters"] == {"mode": "off"}
+
+def test_tool_call_events_handle_empty_arguments_as_dict() -> None:
+    """A tool call with empty-string arguments becomes ``{}``."""
+    call = SimpleNamespace(
+        id="tc-1",
+        function=SimpleNamespace(name="ping", arguments=""),
+    )
+    response = _fake_response(tool_calls=[call])
+    events = tool_call_events_from_response(response)
+    assert events[0]["arguments"] == {}
 
 
-@pytest.mark.anyio
-async def test_stream_fn_emits_thinking_deltas_from_reasoning_content(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """xAI's ``delta.reasoning_content`` surfaces as ``thinking_delta`` events.
+def test_done_event_marks_tool_use_when_tool_calls_present() -> None:
+    """``done.stop_reason="tool_use"`` when the response carries tool calls."""
+    response = _fake_response(
+        content="thinking...",
+        tool_calls=[_fake_tool_call(name="search", arguments={"q": "x"})],
+        finish_reason="REASON_TOOL_CALLS",
+    )
+    done = done_event_from_response(response)
+    assert done["stop_reason"] == "tool_use"
+    blocks = list(done["content"])
+    text_blocks = [b for b in blocks if b["type"] == "text"]
+    tool_blocks = [b for b in blocks if b["type"] == "toolCall"]
+    assert text_blocks[0]["text"] == "thinking..."
+    assert tool_blocks[0]["name"] == "search"
 
-    Mirrors the Gemini regression test for issue #98 — without this
-    wiring the frontend's thinking pane is empty for Grok even though
-    grok-4.3 streams its chain-of-thought back on every reasoning turn.
+
+def test_done_event_marks_stop_for_text_only_response() -> None:
+    """``done.stop_reason="stop"`` when there are no tool calls."""
+    response = _fake_response(content="final answer", finish_reason="REASON_STOP")
+    done = done_event_from_response(response)
+    assert done["stop_reason"] == "stop"
+    assert done["content"] == [TextContent(type="text", text="final answer")]
+
+
+def test_done_event_marks_tool_use_when_finish_reason_says_so() -> None:
+    """Even with no tool_calls list, ``REASON_TOOL_CALLS`` flips stop_reason.
+
+    Defensive — guards against an SDK chunk-vs-response race where the
+    response's ``tool_calls`` is empty momentarily but the finish reason
+    has already been written.
     """
-    # ``ChoiceDelta`` has ``extra='allow'``; the openai SDK preserves
-    # ``reasoning_content`` on unknown-field deltas via Pydantic.  We
-    # mimic that here so the test stays decoupled from the SDK's
-    # internal mutation API.
-    thinking_chunk = SimpleNamespace(
-        choices=[
-            SimpleNamespace(
-                delta=SimpleNamespace(
-                    content=None,
-                    tool_calls=None,
-                    reasoning_content="Let me think... 2 + 2 = 4.",
-                ),
-                finish_reason=None,
-                index=0,
-            )
-        ]
+    response = _fake_response(content="", finish_reason="REASON_TOOL_CALLS")
+    done = done_event_from_response(response)
+    assert done["stop_reason"] == "tool_use"
+
+
+def test_usage_record_reads_tokens_and_cost() -> None:
+    """``usage_record_from_response`` reads ``cost_usd`` and token counts."""
+    response = _fake_response(prompt_tokens=42, completion_tokens=17, cost_usd=0.0001234)
+    record = usage_record_from_response(response)
+    assert record is not None
+    assert record.input_tokens == 42
+    assert record.output_tokens == 17
+    assert record.cost_usd == pytest.approx(0.0001234)
+
+
+def test_usage_record_returns_none_when_nothing_reported() -> None:
+    """Empty usage + missing cost → None, so the ledger sees nothing."""
+    response = _fake_response(prompt_tokens=0, completion_tokens=0, cost_usd=None)
+    assert usage_record_from_response(response) is None
+
+
+def test_usage_accumulator_sums_across_iterations() -> None:
+    """The accumulator sums multiple :class:`UsageRecord` instances."""
+    from app.core.providers._xai_stream import UsageRecord
+
+    sink = UsageAccumulator()
+    sink.absorb(UsageRecord(input_tokens=10, output_tokens=5, cost_usd=0.001))
+    sink.absorb(UsageRecord(input_tokens=20, output_tokens=15, cost_usd=0.003))
+    sink.absorb(None)  # no-op for turns without usage
+    assert sink.saw_any is True
+    assert sink.input_tokens == 30
+    assert sink.output_tokens == 20
+    assert sink.cost_usd == pytest.approx(0.004)
+
+
+# ---------------------------------------------------------------------------
+# StreamFn integration against a fake xai-sdk client
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_stream_fn_yields_text_and_thinking_deltas(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Text chunks → ``LLMTextDeltaEvent``; reasoning chunks → ``LLMThinkingDeltaEvent``.
+
+    The frontend's "thinking" pane (already wired for Gemini) renders
+    these as a separate panel from the assistant transcript.
+    """
+    response_text_only = _fake_response(content="4", finish_reason="REASON_STOP")
+    response_after_reasoning = _fake_response(
+        content="4",
+        reasoning_content="Let me think... 2 + 2 = 4.",
+        finish_reason="REASON_STOP",
     )
-    answer_chunk = _delta(content="4", finish="stop")
-    fake = _FakeClient([thinking_chunk, answer_chunk])
-    monkeypatch.setattr("app.core.providers.xai_provider.AsyncOpenAI", lambda **_kwargs: fake)
+    steps: list[tuple[Any, Any]] = [
+        (response_after_reasoning, _fake_chunk(reasoning_content="Let me think... 2 + 2 = 4.")),
+        (response_text_only, _fake_chunk(content="4")),
+    ]
+    _patch_async_client(monkeypatch, steps)
 
     stream_fn = make_xai_stream_fn("grok-4.3", None, system_prompt="sys")
     events = [event async for event in stream_fn([], [])]
-
-    thinking_events = [e for e in events if e["type"] == "thinking_delta"]
-    text_events = [e for e in events if e["type"] == "text_delta"]
-    assert any("2 + 2 = 4" in e["text"] for e in thinking_events)
-    # Reasoning content must NOT bleed into the regular text stream — the
-    # frontend renders text_delta in the assistant transcript.
-    assert not any("Let me think" in e["text"] for e in text_events)
-    assert any(e["text"] == "4" for e in text_events)
-
-
-# ---------------------------------------------------------------------------
-# Cost tracking: usage capture + terminal StreamEvent
-# ---------------------------------------------------------------------------
+    thinking = [e for e in events if e["type"] == "thinking_delta"]
+    text = [e for e in events if e["type"] == "text_delta"]
+    assert any("2 + 2 = 4" in e["text"] for e in thinking)
+    assert any(e["text"] == "4" for e in text)
+    # Reasoning must not bleed into the regular text stream.
+    assert not any("Let me think" in e["text"] for e in text)
 
 
 @pytest.mark.anyio
-async def test_stream_fn_requests_include_usage(
+async def test_stream_fn_emits_tool_calls_after_stream(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``stream_options.include_usage=True`` is on every request.
+    """Tool calls surface as ``LLMToolCallEvent`` after the stream ends.
 
-    Without it xAI never emits the ``usage`` block and the cost ledger
-    sees zero for every Grok turn.
+    Reading from the accumulated :class:`Response` (not from streamed
+    chunks) sidesteps the question of how xAI partitions tool-call
+    chunks — the SDK accumulates either way.
     """
-    fake = _FakeClient([_delta(finish="stop")])
-    monkeypatch.setattr("app.core.providers.xai_provider.AsyncOpenAI", lambda **_kwargs: fake)
+    final_response = _fake_response(
+        content="searching",
+        tool_calls=[_fake_tool_call(name="search", arguments={"q": "pawrrtal"})],
+        finish_reason="REASON_TOOL_CALLS",
+    )
+    steps: list[tuple[Any, Any]] = [
+        (final_response, _fake_chunk(content="searching")),
+    ]
+    _patch_async_client(monkeypatch, steps)
 
     stream_fn = make_xai_stream_fn("grok-4.3", None, system_prompt="sys")
-    async for _ in stream_fn([], []):
-        pass
-
-    kwargs = fake.chat.completions.last_kwargs
-    assert kwargs is not None
-    assert kwargs["stream_options"] == {"include_usage": True}
+    events = [event async for event in stream_fn([], [])]
+    tool_events = [e for e in events if e["type"] == "tool_call"]
+    assert len(tool_events) == 1
+    assert tool_events[0]["name"] == "search"
+    assert tool_events[0]["arguments"] == {"q": "pawrrtal"}
+    # Tool call must arrive after every delta but before the done event.
+    delta_idx = next(i for i, e in enumerate(events) if e["type"] == "text_delta")
+    tool_idx = next(i for i, e in enumerate(events) if e["type"] == "tool_call")
+    done_idx = next(i for i, e in enumerate(events) if e["type"] == "done")
+    assert delta_idx < tool_idx < done_idx
 
 
 @pytest.mark.anyio
-async def test_stream_fn_accumulates_usage_from_final_chunk(
+async def test_stream_fn_request_carries_search_off_and_reasoning_effort(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The final chunk's ``usage`` block lands on the shared accumulator.
-
-    xAI emits one ``usage`` block per request on the chunk just before
-    ``[DONE]``; the StreamFn must read both the OpenAI-standard names
-    (``prompt_tokens``/``completion_tokens``) and the xAI extras
-    (``cost_in_usd_ticks``) and convert ticks → USD at the documented
-    ``1e-10`` rate.
-    """
-    from app.core.providers._xai_stream import UsageAccumulator
-
-    usage_chunk = SimpleNamespace(
-        choices=[],
-        usage=SimpleNamespace(
-            prompt_tokens=120,
-            completion_tokens=45,
-            total_tokens=165,
-            cost_in_usd_ticks=4_250_000_000,  # 0.000425 USD
-        ),
+    """The create() kwargs always disable Live Search and forward the mapped effort."""
+    fake = _patch_async_client(
+        monkeypatch, [(_fake_response(content="hi"), _fake_chunk(content="hi"))]
     )
-    chunks = [_delta(content="hi"), _delta(finish="stop"), usage_chunk]
-    fake = _FakeClient(chunks)
-    monkeypatch.setattr("app.core.providers.xai_provider.AsyncOpenAI", lambda **_kwargs: fake)
+
+    stream_fn = make_xai_stream_fn(
+        "grok-4.3", None, system_prompt="custom-sys", reasoning_effort="extra-high"
+    )
+    async for _ in stream_fn([UserMessage(role="user", content="hello")], []):
+        pass
+
+    kwargs = fake.chat.last_create_kwargs
+    assert kwargs is not None
+    assert kwargs["model"] == "grok-4.3"
+    # First message is the system prompt rendered as ROLE_DEVELOPER.
+    assert kwargs["messages"][0].role == chat_pb2.MessageRole.ROLE_DEVELOPER
+    assert kwargs["messages"][0].content[0].text == "custom-sys"
+    # extra-high → EFFORT_HIGH (the upper bucket of grok-4.3's two-level enum).
+    assert kwargs["reasoning_effort"] == chat_pb2.ReasoningEffort.EFFORT_HIGH
+    # Live Search forced off so xAI's built-in search doesn't fire.
+    assert kwargs["search_parameters"].mode == "off"
+
+
+@pytest.mark.anyio
+async def test_stream_fn_captures_usage_into_accumulator(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The terminal :class:`Response`'s usage lands on the shared accumulator.
+
+    Multiple iterations of the agent loop each call the StreamFn; the
+    accumulator must sum across them so a tool-using turn pays for
+    every internal LLM call.
+    """
+    final_response = _fake_response(
+        content="hi",
+        prompt_tokens=120,
+        completion_tokens=45,
+        cost_usd=0.0001234,
+        finish_reason="REASON_STOP",
+    )
+    _patch_async_client(monkeypatch, [(final_response, _fake_chunk(content="hi"))])
 
     sink = UsageAccumulator()
     stream_fn = make_xai_stream_fn("grok-4.3", None, system_prompt="sys", usage_sink=sink)
@@ -570,65 +588,67 @@ async def test_stream_fn_accumulates_usage_from_final_chunk(
     assert sink.saw_any
     assert sink.input_tokens == 120
     assert sink.output_tokens == 45
-    # 4_250_000_000 ticks * 1e-10 USD/tick = 0.425 USD.
-    assert sink.cost_usd == pytest.approx(0.425, abs=1e-9)
+    assert sink.cost_usd == pytest.approx(0.0001234)
 
 
 @pytest.mark.anyio
-async def test_stream_fn_accumulator_reads_xai_naming_fallback(
+async def test_stream_fn_surfaces_upstream_error_as_done_event(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``input_tokens``/``output_tokens`` (xAI naming) is read if OpenAI names missing.
+    """An exception during streaming becomes a graceful error ``done`` event."""
 
-    The Chat Completions endpoint uses the OpenAI names by default, but
-    xAI's own SDK proto uses ``input_tokens``/``output_tokens`` — guard
-    against an endpoint variant that emits the latter only.
-    """
-    from app.core.providers._xai_stream import UsageAccumulator
+    class _ExplodingChatNamespace:
+        def create(self, **_kwargs: Any) -> Any:
+            raise RuntimeError("upstream 503")
 
-    usage_chunk = SimpleNamespace(
-        choices=[],
-        usage=SimpleNamespace(input_tokens=10, output_tokens=20, cost_in_usd_ticks=0),
+    class _ExplodingClient:
+        def __init__(self) -> None:
+            self.chat = _ExplodingChatNamespace()
+
+        async def __aenter__(self) -> _ExplodingClient:
+            return self
+
+        async def __aexit__(self, *_args: object) -> None:
+            return None
+
+    monkeypatch.setattr(
+        "app.core.providers.xai_provider.AsyncClient",
+        lambda **_kwargs: _ExplodingClient(),
     )
-    fake = _FakeClient([_delta(finish="stop"), usage_chunk])
-    monkeypatch.setattr("app.core.providers.xai_provider.AsyncOpenAI", lambda **_kwargs: fake)
 
-    sink = UsageAccumulator()
-    stream_fn = make_xai_stream_fn("grok-4.3", None, system_prompt="sys", usage_sink=sink)
-    async for _ in stream_fn([], []):
-        pass
+    stream_fn = make_xai_stream_fn("grok-4.3", None, system_prompt="sys")
+    events = [event async for event in stream_fn([], [])]
+    text_events = [e for e in events if e["type"] == "text_delta"]
+    done_events = [e for e in events if e["type"] == "done"]
+    assert any("upstream 503" in e["text"] for e in text_events)
+    assert done_events[-1]["stop_reason"] == "error"
 
-    assert sink.input_tokens == 10
-    assert sink.output_tokens == 20
-    assert sink.cost_usd == 0.0
+
+# ---------------------------------------------------------------------------
+# End-to-end: XaiLLM.stream emits the terminal usage StreamEvent
+# ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_xai_provider_emits_terminal_usage_stream_event(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``XaiLLM.stream`` emits ``StreamEvent(type='usage', ...)`` after agent_loop.
+    """``XaiLLM.stream`` emits ``StreamEvent(type="usage", ...)`` after agent_loop.
 
     The chat aggregator folds this into the cost ledger via
     :func:`record_turn_cost_if_enabled`, same shape as Claude's
-    ``_build_usage_event``.  Real ``agent_loop`` runs end-to-end with a
-    fake :class:`AsyncOpenAI` that emits a text chunk plus a final
-    usage chunk — exercising the actual ``stream_options.include_usage``
-    code path, not a patched factory.
+    ``_build_usage_event``.  Real ``agent_loop`` runs end-to-end with
+    a fake :class:`AsyncClient` so the actual usage-capture code path
+    is exercised, not a patched factory.
     """
-    from app.core.providers.xai_provider import XaiLLM
-
-    usage_chunk = SimpleNamespace(
-        choices=[],
-        usage=SimpleNamespace(
-            prompt_tokens=42,
-            completion_tokens=17,
-            total_tokens=59,
-            cost_in_usd_ticks=1_234_000,  # 1.234e-4 USD
-        ),
+    final_response = _fake_response(
+        content="hi",
+        prompt_tokens=42,
+        completion_tokens=17,
+        cost_usd=0.000125,
+        finish_reason="REASON_STOP",
     )
-    fake = _FakeClient([_delta(content="hi"), _delta(finish="stop"), usage_chunk])
-    monkeypatch.setattr("app.core.providers.xai_provider.AsyncOpenAI", lambda **_kwargs: fake)
+    _patch_async_client(monkeypatch, [(final_response, _fake_chunk(content="hi"))])
 
     provider = XaiLLM("grok-4.3")
     events = [
@@ -640,34 +660,28 @@ async def test_xai_provider_emits_terminal_usage_stream_event(
             history=[],
         )
     ]
-
     usage_events = [e for e in events if e["type"] == "usage"]
     assert len(usage_events) == 1
     usage_event = usage_events[0]
     assert usage_event["input_tokens"] == 42
     assert usage_event["output_tokens"] == 17
-    assert usage_event["cost_usd"] == pytest.approx(1.234e-4, abs=1e-12)
-    # Must arrive after the text delta the model produced — the cost
-    # ledger row is finalised once the user-visible reply is on the wire.
-    assert events.index(usage_event) > events.index(next(e for e in events if e["type"] == "delta"))
+    assert usage_event["cost_usd"] == pytest.approx(0.000125)
+    # Usage event arrives after the visible reply — cost ledger row is
+    # finalised once the user-visible reply is on the wire.
+    delta_idx = events.index(next(e for e in events if e["type"] == "delta"))
+    usage_idx = events.index(usage_event)
+    assert usage_idx > delta_idx
 
 
 @pytest.mark.anyio
 async def test_xai_provider_skips_usage_event_when_no_chunk_reported(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """When no chunk carries usage (early failure, test stream), no usage event fires.
-
-    Stops spurious zero-cost rows in the ledger.
-    """
-    from app.core.providers.xai_provider import XaiLLM
+    """When no turn reported usage, no usage event fires — no spurious zeros."""
     from tests.agent_harness import ScriptedStreamFn, text_turn
 
-    # Real ScriptedStreamFn — no real chunks, so usage_sink never sees
-    # a ``usage`` field.
     provider = XaiLLM("grok-4.3")
     monkeypatch.setattr(provider, "_stream_fn", ScriptedStreamFn([text_turn("hi")]))
-
     events = [
         e
         async for e in provider.stream(
@@ -677,5 +691,4 @@ async def test_xai_provider_skips_usage_event_when_no_chunk_reported(
             history=[],
         )
     ]
-
     assert not any(e["type"] == "usage" for e in events)
