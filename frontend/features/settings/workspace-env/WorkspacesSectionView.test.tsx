@@ -8,7 +8,8 @@
  * and no I/O of its own.
  */
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { type WorkspaceEnvKeyMeta, WorkspacesSectionView } from './WorkspacesSectionView';
 
@@ -72,8 +73,9 @@ describe('WorkspacesSectionView', () => {
 		).toBe(true);
 	});
 
-	it('enables Save when isDirty is true and fires onSave on click', () => {
+	it('enables Save when isDirty is true and fires onSave on click', async () => {
 		const onSave = vi.fn();
+		const user = userEvent.setup();
 		render(
 			<WorkspacesSectionView
 				{...baseProps}
@@ -82,7 +84,7 @@ describe('WorkspacesSectionView', () => {
 			/>
 		);
 		const saveButton = screen.getByRole('button', { name: 'Save' });
-		fireEvent.click(saveButton);
+		await user.click(saveButton);
 		expect(onSave).toHaveBeenCalledTimes(1);
 	});
 
@@ -107,19 +109,22 @@ describe('WorkspacesSectionView', () => {
 		expect(alert.textContent).toContain('exceeds 512 characters');
 	});
 
-	it('fires onValueChange with the typed key + new value on input', () => {
+	it('fires onValueChange with the typed key + new value on input', async () => {
 		const onValueChange = vi.fn();
+		const user = userEvent.setup();
 		render(<WorkspacesSectionView {...baseProps} onValueChange={onValueChange} />);
 		const gemini = screen.getByLabelText('Gemini API Key');
-		fireEvent.change(gemini, { target: { value: 'new-gemini-value' } });
+		await user.click(gemini);
+		await user.paste('new-gemini-value');
 		expect(onValueChange).toHaveBeenCalledWith('GEMINI_API_KEY', 'new-gemini-value');
 	});
 
-	it('shows the eye toggle as a focusable button with an aria label', () => {
+	it('shows the eye toggle as a focusable button with an aria label', async () => {
 		const onToggleVisibility = vi.fn();
+		const user = userEvent.setup();
 		render(<WorkspacesSectionView {...baseProps} onToggleVisibility={onToggleVisibility} />);
 		const toggle = screen.getByRole('button', { name: /show gemini api key value/i });
-		fireEvent.click(toggle);
+		await user.click(toggle);
 		expect(onToggleVisibility).toHaveBeenCalledWith('GEMINI_API_KEY');
 	});
 

@@ -1,4 +1,5 @@
-import { fireEvent, render } from '@testing-library/react';
+import { render } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { CreateProjectModal } from './CreateProjectModal';
 
@@ -31,24 +32,26 @@ describe('CreateProjectModal', () => {
 		expect(button.disabled).toBe(true);
 	});
 
-	it('fires onSubmit with the trimmed name when the form is submitted', () => {
+	it('fires onSubmit with the trimmed name when the form is submitted', async () => {
 		const onSubmit = vi.fn();
+		const user = userEvent.setup();
 		const { getByLabelText, getByRole } = render(
 			<CreateProjectModal isPending={false} onDismiss={noop} onSubmit={onSubmit} open />
 		);
-		fireEvent.change(getByLabelText('Project name'), {
-			target: { value: '  Copenhagen Trip  ' },
-		});
-		fireEvent.click(getByRole('button', { name: 'Create project' }));
+		const input = getByLabelText('Project name');
+		await user.click(input);
+		await user.paste('  Copenhagen Trip  ');
+		await user.click(getByRole('button', { name: 'Create project' }));
 		expect(onSubmit).toHaveBeenCalledWith('Copenhagen Trip');
 	});
 
-	it('fires onDismiss when Cancel is clicked', () => {
+	it('fires onDismiss when Cancel is clicked', async () => {
 		const onDismiss = vi.fn();
+		const user = userEvent.setup();
 		const { getByRole } = render(
 			<CreateProjectModal isPending={false} onDismiss={onDismiss} onSubmit={noop} open />
 		);
-		fireEvent.click(getByRole('button', { name: 'Cancel' }));
+		await user.click(getByRole('button', { name: 'Cancel' }));
 		expect(onDismiss).toHaveBeenCalled();
 	});
 
