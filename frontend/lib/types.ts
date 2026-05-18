@@ -60,6 +60,41 @@ export type ChatTimelineEntry =
 	| { kind: 'tool'; toolCallId: string };
 
 /**
+ * Submitted value of an interactive widget. String for text fields, an
+ * array of selected option keys for multi-choice, and a number for sliders.
+ */
+export type ChatArtifactInteractionValue = string | readonly string[] | number;
+
+/**
+ * Forward-compat dispatch mode for {@link ChatArtifactInteractionPayload}.
+ *
+ * v1 only implements `new_turn` — the interaction is converted to a regular
+ * user message via the existing chat send flow. The enum exists so a future
+ * in-place mode (artifact mutates without consuming a turn) can be added
+ * without breaking the renderer's call sites.
+ */
+export type ChatArtifactInteractionMode = 'new_turn';
+
+/**
+ * Payload submitted when the user interacts with a widget inside an
+ * interactive artifact (button click, choice pick, text submit, slider
+ * value). Renderers consume this through `useArtifactInteraction()` and
+ * never construct the dispatch themselves.
+ */
+export interface ChatArtifactInteractionPayload {
+	/** Artifact id (matches {@link ChatArtifactPayload.id}). */
+	artifactId: string;
+	/** Stable widget id chosen by the AI when authoring the artifact. */
+	actionId: string;
+	/** Human-readable label shown to the user (button text, choice label, etc.). */
+	label: string;
+	/** Submitted value — string for text, string[] for multi-choice, number for slider. */
+	value: ChatArtifactInteractionValue;
+	/** Forward-compat hook: v1 only implements `new_turn`. */
+	mode: ChatArtifactInteractionMode;
+}
+
+/**
  * Structured `render_artifact` payload — emitted as a sibling of the
  * matching `tool_use` so the frontend can render an inline preview card
  * without round-tripping the spec back through the LLM. The catalog of

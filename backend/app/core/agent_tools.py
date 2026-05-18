@@ -153,7 +153,11 @@ def build_agent_tools(
     # client, so there's no key/quota to gate on.  The chat router
     # picks up artifact tool-calls and lifts the spec into a sibling
     # SSE event (see ``app.api.chat`` and ``app.core.tools.artifact``).
-    tools.append(make_artifact_tool())
+    # ``surface`` flips the tool description between the read-only and
+    # interactive catalogs — Telegram (text-only) sees the read-only one,
+    # web/electron sees the interactive widget catalog. Validation is
+    # surface-independent.
+    tools.append(make_artifact_tool(surface=surface))
 
     # Image generation — pure tool: generates PNG, saves to workspace,
     # returns path.  The agent decides whether to send it via send_message.

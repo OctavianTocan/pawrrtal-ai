@@ -74,7 +74,9 @@ export function ArtifactDialog({ artifact, onClose }: ArtifactDialogProps): Reac
 					</button>
 				</header>
 				<div className="artifact-dialog-body">
-					<ArtifactRenderer artifact={artifact} />
+					{/* Close on successful interaction submit so the user sees
+					    the chat respond instead of staring at the modal. */}
+					<ArtifactRenderer artifact={artifact} onInteractionSubmitted={onClose} />
 				</div>
 			</div>
 		</div>,
