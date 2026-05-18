@@ -57,6 +57,7 @@ from openai import AsyncOpenAI, AsyncStream
 from openai.types.chat import (
     ChatCompletionChunk,
     ChatCompletionMessageParam,
+    ChatCompletionStreamOptionsParam,
     ChatCompletionToolUnionParam,
 )
 
@@ -90,6 +91,7 @@ from ._xai_events import agent_event_to_stream_event, identity_convert
 from ._xai_messages import build_xai_messages, build_xai_tool_declarations
 from ._xai_stream import (
     ChunkAggregate,
+    UsageAccumulator,
     absorb_chunk,
     done_event_for,
     finalize_tool_calls,
@@ -186,11 +188,17 @@ async def _open_xai_stream(
     """
     typed_messages = cast("list[ChatCompletionMessageParam]", messages)
     extra_body = _build_xai_extra_body(reasoning_effort)
+    # ``include_usage=True`` makes xAI emit a terminal chunk carrying
+    # the request's ``usage`` block — that's where ``cost_in_usd_ticks``
+    # and the token counts live.  Without it, the cost ledger sees zero
+    # for every Grok turn.
+    stream_options: ChatCompletionStreamOptionsParam = {"include_usage": True}
     if tools is None:
         return await client.chat.completions.create(
             model=model_id,
             messages=typed_messages,
             stream=True,
+            stream_options=stream_options,
             extra_body=extra_body,
         )
     typed_tools = cast("list[ChatCompletionToolUnionParam]", tools)
@@ -199,6 +207,7 @@ async def _open_xai_stream(
         messages=typed_messages,
         tools=typed_tools,
         stream=True,
+        stream_options=stream_options,
         extra_body=extra_body,
     )
 
@@ -209,6 +218,7 @@ def make_xai_stream_fn(
     *,
     system_prompt: str,
     reasoning_effort: ReasoningEffort | None = None,
+    usage_sink: UsageAccumulator | None = None,
 ) -> StreamFn:
     """Build a :data:`StreamFn` backed by xAI's OpenAI-compatible API.
 
@@ -227,6 +237,13 @@ def make_xai_stream_fn(
             Mapped onto xAI's two-level enum (``low`` / ``high``) via
             :func:`_map_reasoning_effort` and forwarded through
             ``extra_body``.  ``None`` lets xAI pick the model default.
+        usage_sink: Optional mutable :class:`UsageAccumulator` the
+            StreamFn writes per-chunk usage into.  Shared across every
+            agent_loop iteration for a single ``XaiLLM.stream`` call so
+            multi-turn tool-using conversations sum their cost
+            correctly.  ``None`` skips usage capture entirely — useful
+            for unit tests and for utility callers that don't talk to
+            the cost ledger.
 
     Returns:
         An async generator factory that yields ``LLMEvent`` instances.
@@ -254,6 +271,8 @@ def make_xai_stream_fn(
             )
             async for chunk in stream:
                 deltas = absorb_chunk(chunk, aggregate)
+                if usage_sink is not None:
+                    usage_sink.absorb(chunk)
                 if deltas.thinking:
                     yield LLMThinkingDeltaEvent(type="thinking_delta", text=deltas.thinking)
                 if deltas.text:
@@ -394,11 +413,16 @@ class XaiLLM:
             permission_check=permission_check,
         )
 
+        # One accumulator per ``stream()`` call, shared across every
+        # StreamFn invocation the agent loop makes for this turn so a
+        # multi-iteration tool-using conversation sums the cost correctly.
+        usage_sink = UsageAccumulator()
         stream_fn = self._stream_fn or make_xai_stream_fn(
             self._model_id,
             self._workspace_id,
             system_prompt=context.system_prompt,
             reasoning_effort=reasoning_effort,
+            usage_sink=usage_sink,
         )
 
         try:
@@ -409,3 +433,17 @@ class XaiLLM:
 
         except Exception as exc:
             yield StreamEvent(type="error", content=f"xAI provider error: {exc}")
+            return
+
+        # Terminal usage event — the chat aggregator folds it into the
+        # cost ledger (see ``ChatTurnAggregator.apply`` and
+        # ``app.channels._turn_cost.record_turn_cost_if_enabled``).  Skip
+        # when no chunk reported usage (test scripts, error-only turns)
+        # so the ledger doesn't see spurious zero rows.
+        if usage_sink.saw_any:
+            yield StreamEvent(
+                type="usage",
+                input_tokens=usage_sink.input_tokens,
+                output_tokens=usage_sink.output_tokens,
+                cost_usd=usage_sink.cost_usd,
+            )

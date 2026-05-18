@@ -507,3 +507,175 @@ async def test_stream_fn_emits_thinking_deltas_from_reasoning_content(
     # frontend renders text_delta in the assistant transcript.
     assert not any("Let me think" in e["text"] for e in text_events)
     assert any(e["text"] == "4" for e in text_events)
+
+
+# ---------------------------------------------------------------------------
+# Cost tracking: usage capture + terminal StreamEvent
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_stream_fn_requests_include_usage(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``stream_options.include_usage=True`` is on every request.
+
+    Without it xAI never emits the ``usage`` block and the cost ledger
+    sees zero for every Grok turn.
+    """
+    fake = _FakeClient([_delta(finish="stop")])
+    monkeypatch.setattr("app.core.providers.xai_provider.AsyncOpenAI", lambda **_kwargs: fake)
+
+    stream_fn = make_xai_stream_fn("grok-4.3", None, system_prompt="sys")
+    async for _ in stream_fn([], []):
+        pass
+
+    kwargs = fake.chat.completions.last_kwargs
+    assert kwargs is not None
+    assert kwargs["stream_options"] == {"include_usage": True}
+
+
+@pytest.mark.anyio
+async def test_stream_fn_accumulates_usage_from_final_chunk(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The final chunk's ``usage`` block lands on the shared accumulator.
+
+    xAI emits one ``usage`` block per request on the chunk just before
+    ``[DONE]``; the StreamFn must read both the OpenAI-standard names
+    (``prompt_tokens``/``completion_tokens``) and the xAI extras
+    (``cost_in_usd_ticks``) and convert ticks → USD at the documented
+    ``1e-10`` rate.
+    """
+    from app.core.providers._xai_stream import UsageAccumulator
+
+    usage_chunk = SimpleNamespace(
+        choices=[],
+        usage=SimpleNamespace(
+            prompt_tokens=120,
+            completion_tokens=45,
+            total_tokens=165,
+            cost_in_usd_ticks=4_250_000_000,  # 0.000425 USD
+        ),
+    )
+    chunks = [_delta(content="hi"), _delta(finish="stop"), usage_chunk]
+    fake = _FakeClient(chunks)
+    monkeypatch.setattr("app.core.providers.xai_provider.AsyncOpenAI", lambda **_kwargs: fake)
+
+    sink = UsageAccumulator()
+    stream_fn = make_xai_stream_fn("grok-4.3", None, system_prompt="sys", usage_sink=sink)
+    async for _ in stream_fn([], []):
+        pass
+
+    assert sink.saw_any
+    assert sink.input_tokens == 120
+    assert sink.output_tokens == 45
+    # 4_250_000_000 ticks * 1e-10 USD/tick = 0.425 USD.
+    assert sink.cost_usd == pytest.approx(0.425, abs=1e-9)
+
+
+@pytest.mark.anyio
+async def test_stream_fn_accumulator_reads_xai_naming_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``input_tokens``/``output_tokens`` (xAI naming) is read if OpenAI names missing.
+
+    The Chat Completions endpoint uses the OpenAI names by default, but
+    xAI's own SDK proto uses ``input_tokens``/``output_tokens`` — guard
+    against an endpoint variant that emits the latter only.
+    """
+    from app.core.providers._xai_stream import UsageAccumulator
+
+    usage_chunk = SimpleNamespace(
+        choices=[],
+        usage=SimpleNamespace(input_tokens=10, output_tokens=20, cost_in_usd_ticks=0),
+    )
+    fake = _FakeClient([_delta(finish="stop"), usage_chunk])
+    monkeypatch.setattr("app.core.providers.xai_provider.AsyncOpenAI", lambda **_kwargs: fake)
+
+    sink = UsageAccumulator()
+    stream_fn = make_xai_stream_fn("grok-4.3", None, system_prompt="sys", usage_sink=sink)
+    async for _ in stream_fn([], []):
+        pass
+
+    assert sink.input_tokens == 10
+    assert sink.output_tokens == 20
+    assert sink.cost_usd == 0.0
+
+
+@pytest.mark.anyio
+async def test_xai_provider_emits_terminal_usage_stream_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``XaiLLM.stream`` emits ``StreamEvent(type='usage', ...)`` after agent_loop.
+
+    The chat aggregator folds this into the cost ledger via
+    :func:`record_turn_cost_if_enabled`, same shape as Claude's
+    ``_build_usage_event``.  Real ``agent_loop`` runs end-to-end with a
+    fake :class:`AsyncOpenAI` that emits a text chunk plus a final
+    usage chunk — exercising the actual ``stream_options.include_usage``
+    code path, not a patched factory.
+    """
+    from app.core.providers.xai_provider import XaiLLM
+
+    usage_chunk = SimpleNamespace(
+        choices=[],
+        usage=SimpleNamespace(
+            prompt_tokens=42,
+            completion_tokens=17,
+            total_tokens=59,
+            cost_in_usd_ticks=1_234_000,  # 1.234e-4 USD
+        ),
+    )
+    fake = _FakeClient([_delta(content="hi"), _delta(finish="stop"), usage_chunk])
+    monkeypatch.setattr("app.core.providers.xai_provider.AsyncOpenAI", lambda **_kwargs: fake)
+
+    provider = XaiLLM("grok-4.3")
+    events = [
+        e
+        async for e in provider.stream(
+            question="Hi",
+            conversation_id=uuid4(),
+            user_id=uuid4(),
+            history=[],
+        )
+    ]
+
+    usage_events = [e for e in events if e["type"] == "usage"]
+    assert len(usage_events) == 1
+    usage_event = usage_events[0]
+    assert usage_event["input_tokens"] == 42
+    assert usage_event["output_tokens"] == 17
+    assert usage_event["cost_usd"] == pytest.approx(1.234e-4, abs=1e-12)
+    # Must arrive after the text delta the model produced — the cost
+    # ledger row is finalised once the user-visible reply is on the wire.
+    assert events.index(usage_event) > events.index(next(e for e in events if e["type"] == "delta"))
+
+
+@pytest.mark.anyio
+async def test_xai_provider_skips_usage_event_when_no_chunk_reported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When no chunk carries usage (early failure, test stream), no usage event fires.
+
+    Stops spurious zero-cost rows in the ledger.
+    """
+    from app.core.providers.xai_provider import XaiLLM
+    from tests.agent_harness import ScriptedStreamFn, text_turn
+
+    # Real ScriptedStreamFn — no real chunks, so usage_sink never sees
+    # a ``usage`` field.
+    provider = XaiLLM("grok-4.3")
+    monkeypatch.setattr(provider, "_stream_fn", ScriptedStreamFn([text_turn("hi")]))
+
+    events = [
+        e
+        async for e in provider.stream(
+            question="Hi",
+            conversation_id=uuid4(),
+            user_id=uuid4(),
+            history=[],
+        )
+    ]
+
+    assert not any(e["type"] == "usage" for e in events)

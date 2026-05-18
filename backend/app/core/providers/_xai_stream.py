@@ -27,6 +27,15 @@ logger = logging.getLogger(__name__)
 # model produced one or more tool calls.  Mirrors OpenAI's vocabulary.
 FINISH_REASON_TOOL_CALLS = "tool_calls"
 
+# xAI bills in "ticks" where ``1 tick = 1e-10 USD``.  Sourced from the
+# official xai-sdk Python package's ``cost.py``:
+# https://github.com/xai-org/xai-sdk-python/blob/main/src/xai_sdk/cost.py
+# (citing
+# https://github.com/xai-org/xai-proto/blob/0c0f5353aa7ab2a4ffea310f9d9364ed5c424af2/proto/xai/api/v1/usage.proto#L45).
+# Field is opaque on the wire; keeping the constant here means future
+# divisor changes are a single-line edit.
+USD_PER_TICK = 1e-10
+
 
 @dataclass(frozen=True, slots=True)
 class ChunkDeltas:
@@ -185,6 +194,70 @@ def finalize_tool_calls(aggregate: ChunkAggregate) -> list[dict[str, Any]]:
             {"tool_call_id": tool_call_id, "name": buffer.name, "arguments": arguments}
         )
     return completed
+
+
+class UsageAccumulator:
+    """Per-request usage totals summed across every StreamFn invocation.
+
+    The agent loop calls the StreamFn once per assistant turn (LLM →
+    tool → LLM round-trip), so a single user prompt can drive several
+    chat-completions requests.  Each request returns its own ``usage``
+    block on the terminal streaming chunk (when
+    ``stream_options.include_usage=True``); we sum them so the chat
+    aggregator sees the total for the whole turn, matching how Claude
+    reports its per-turn cost.
+
+    Mutable on purpose: the StreamFn closure owns one and writes into
+    it from inside the stream; :class:`XaiLLM.stream` reads the totals
+    after :func:`agent_loop` returns and emits the terminal
+    ``StreamEvent(type="usage")``.
+    """
+
+    __slots__ = ("cost_usd", "input_tokens", "output_tokens", "saw_any")
+
+    def __init__(self) -> None:
+        self.input_tokens: int = 0
+        self.output_tokens: int = 0
+        self.cost_usd: float = 0.0
+        self.saw_any: bool = False
+
+    def absorb(self, chunk: Any) -> None:
+        """Fold one chunk's ``usage`` block into the running totals.
+
+        No-op when the chunk has no usage payload — only the final chunk
+        of a ``stream_options.include_usage=True`` stream carries it.
+        Reads ``prompt_tokens``/``completion_tokens`` (OpenAI naming)
+        AND ``input_tokens``/``output_tokens`` (xAI naming) defensively
+        because the two endpoints have historically disagreed on which
+        names land in the REST envelope.
+        """
+        usage = getattr(chunk, "usage", None)
+        if usage is None:
+            return
+        self.saw_any = True
+        prompt = _read_usage_int(usage, "prompt_tokens", "input_tokens")
+        completion = _read_usage_int(usage, "completion_tokens", "output_tokens")
+        self.input_tokens += prompt
+        self.output_tokens += completion
+        ticks = _read_usage_int(usage, "cost_in_usd_ticks")
+        if ticks > 0:
+            self.cost_usd += ticks * USD_PER_TICK
+
+
+def _read_usage_int(usage: Any, *names: str) -> int:
+    """Read the first non-zero integer field from ``usage``.
+
+    Tries each name in order using ``getattr`` (Pydantic models from
+    the openai SDK preserve unknown xAI fields via ``extra='allow'``,
+    so the xAI-specific names land on the model alongside the
+    OpenAI-standard ones).  Returns 0 when none of the names are
+    present or carry a usable integer.
+    """
+    for name in names:
+        value = getattr(usage, name, None)
+        if isinstance(value, int) and value > 0:
+            return value
+    return 0
 
 
 def done_event_for(
