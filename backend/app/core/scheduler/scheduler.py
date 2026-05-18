@@ -39,6 +39,28 @@ from app.models import ScheduledJob
 logger = logging.getLogger(__name__)
 
 
+def _row_to_dict(row: ScheduledJob) -> dict[str, object]:
+    """Convert a :class:`ScheduledJob` row into a plain dict.
+
+    Used by the agent-facing list/get methods so the ``core/tools``
+    layer (which calls them) never has to import ``app.models``.
+    Keeps the model boundary clean per the import-linter contract.
+    """
+    return {
+        "id": row.id,
+        "user_id": row.user_id,
+        "name": row.name,
+        "cron_expression": row.cron_expression,
+        "prompt": row.prompt,
+        "skill_name": row.skill_name,
+        "target_chat_ids": list(row.target_chat_ids or []),
+        "working_directory": row.working_directory,
+        "is_active": row.is_active,
+        "created_at": row.created_at,
+        "last_fired_at": getattr(row, "last_fired_at", None),
+    }
+
+
 class JobScheduler:
     """APScheduler wrapper with a Postgres-backed job catalogue."""
 
@@ -129,6 +151,44 @@ class JobScheduler:
             logger.debug("SCHEDULER_REMOVE_NOT_REGISTERED job_id=%s", job_id)
         logger.info("SCHEDULER_JOB_REMOVED job_id=%s", job_id)
         return True
+
+    async def list_jobs_for_user(
+        self,
+        *,
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        include_inactive: bool = False,
+    ) -> list[dict[str, object]]:
+        """Return scheduled jobs for ``user_id`` as plain dicts.
+
+        Used by the agent-facing ``cron_list`` tool (#313). Returning
+        dicts (not ORM rows) keeps the model boundary clean — the
+        ``core/tools`` layer does not import ``app.models``.
+        """
+        stmt = select(ScheduledJob).where(ScheduledJob.user_id == user_id)
+        if not include_inactive:
+            stmt = stmt.where(ScheduledJob.is_active.is_(True))
+        stmt = stmt.order_by(ScheduledJob.created_at.desc())
+        result = await session.execute(stmt)
+        rows = list(result.scalars().all())
+        return [_row_to_dict(row) for row in rows]
+
+    async def get_job_for_user(
+        self,
+        *,
+        session: AsyncSession,
+        user_id: uuid.UUID,
+        job_id: uuid.UUID,
+    ) -> dict[str, object] | None:
+        """Return one job iff it exists AND belongs to ``user_id``.
+
+        Used by the agent-facing ``cron_delete`` tool (#313) so the
+        tool can authorise without importing ``app.models``.
+        """
+        row = await session.get(ScheduledJob, job_id)
+        if row is None or row.user_id != user_id:
+            return None
+        return _row_to_dict(row)
 
     async def _hydrate_active_jobs(self) -> None:
         """Re-register every ``is_active=True`` row at startup."""

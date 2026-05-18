@@ -29,14 +29,11 @@ import logging
 import uuid
 from typing import Any
 
-from sqlalchemy import select
-
 from app.core.agent_loop.types import AgentTool
 from app.core.scheduler import get_active_scheduler
 from app.core.tools.display import make_tool_display
 from app.core.tools.errors import ToolError, ToolErrorCode
 from app.db import async_session_maker
-from app.models import ScheduledJob
 
 log = logging.getLogger(__name__)
 
@@ -47,12 +44,20 @@ _DISABLED_MSG = (
 )
 
 
-def _format_job_row(row: ScheduledJob) -> str:
-    """Return a one-line summary of a :class:`ScheduledJob`."""
-    state = "active" if row.is_active else "inactive"
+def _format_job_row(row: dict[str, object]) -> str:
+    """Return a one-line summary of a scheduler job dict.
+
+    The dict comes from :meth:`JobScheduler.list_jobs_for_user` — using
+    dicts here instead of the :class:`ScheduledJob` ORM type keeps the
+    ``core/tools`` layer free of model imports per the import-linter
+    contract.
+    """
+    state = "active" if row.get("is_active") else "inactive"
+    prompt = str(row.get("prompt") or "")
     return (
-        f"- {row.id} | {row.name} | cron={row.cron_expression!r} | "
-        f"{state} | prompt={row.prompt[:60]!r}"
+        f"- {row.get('id')} | {row.get('name')} | "
+        f"cron={row.get('cron_expression')!r} | {state} | "
+        f"prompt={prompt[:60]!r}"
     )
 
 
@@ -165,12 +170,11 @@ def make_cron_list_tool(*, user_id: uuid.UUID) -> AgentTool:
             return _DISABLED_MSG
         include_inactive = bool(kwargs.get("include_inactive"))
         async with async_session_maker() as session:
-            stmt = select(ScheduledJob).where(ScheduledJob.user_id == user_id)
-            if not include_inactive:
-                stmt = stmt.where(ScheduledJob.is_active.is_(True))
-            stmt = stmt.order_by(ScheduledJob.created_at.desc())
-            result = await session.execute(stmt)
-            rows = list(result.scalars().all())
+            rows = await scheduler.list_jobs_for_user(
+                session=session,
+                user_id=user_id,
+                include_inactive=include_inactive,
+            )
         if not rows:
             return "No active scheduled jobs." if not include_inactive else "No scheduled jobs."
         return "\n".join(_format_job_row(row) for row in rows)
@@ -225,8 +229,10 @@ def make_cron_delete_tool(*, user_id: uuid.UUID) -> AgentTool:
             return f"[invalid_job_id] {job_id_raw!r} is not a valid UUID."
         async with async_session_maker() as session:
             # Per-user scope: 404 if the row doesn't exist OR isn't theirs.
-            row = await session.get(ScheduledJob, job_id)
-            if row is None or row.user_id != user_id:
+            owned = await scheduler.get_job_for_user(
+                session=session, user_id=user_id, job_id=job_id
+            )
+            if owned is None:
                 return f"[not_found] No scheduled job {job_id_raw} owned by you."
             removed = await scheduler.remove_job(session=session, job_id=job_id)
         if removed:
