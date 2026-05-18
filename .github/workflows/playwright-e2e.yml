@@ -115,6 +115,12 @@ jobs:
           DATABASE_URL: 'sqlite+aiosqlite:///./e2e.db'
           ADMIN_EMAIL: e2e-admin@example.com
           ADMIN_PASSWORD: e2e-admin-password
+          # ``workspace_base_dir`` defaults to ``/data/workspaces`` which
+          # the CI runner cannot write to. Point at a temp directory so
+          # the dev-login workspace seed (#317 follow-up) can succeed
+          # and the FE's onboarding-status endpoint reports a ready
+          # workspace, letting the sidebar render.
+          WORKSPACE_BASE_DIR: /tmp/pawrrtal-e2e-workspaces
           COOKIE_SAMESITE: lax
           COOKIE_SECURE: 'false'
         run: |
