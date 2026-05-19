@@ -30,10 +30,13 @@ from typing import TYPE_CHECKING, NoReturn
 from acp import connect_to_agent
 
 from app.core.agent_loop.types import AgentTool, PermissionCheckFn
-
-from ._gemini_cli_acp import AcpFatalError, open_session, run_prompt_and_drain
-from ._gemini_cli_client import PawrrtalAcpClient
-from .base import ReasoningEffort, StreamEvent
+from app.core.providers.base import ReasoningEffort, StreamEvent
+from app.core.providers.gemini_cli.acp import (
+    AcpFatalError,
+    open_session,
+    run_prompt_and_drain,
+)
+from app.core.providers.gemini_cli.client import PawrrtalAcpClient
 
 if TYPE_CHECKING:
     # Typed connection handle from the ACP Python SDK. Imported under

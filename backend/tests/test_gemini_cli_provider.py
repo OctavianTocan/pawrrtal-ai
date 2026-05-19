@@ -45,8 +45,16 @@ from acp.schema import (
     UserMessageChunk,
 )
 
-from app.core.providers._gemini_cli_acp import _drain_queue
-from app.core.providers._gemini_cli_client import (
+from app.core.providers.base import StreamEvent
+from app.core.providers.catalog import MODEL_CATALOG
+from app.core.providers.factory import resolve_llm
+from app.core.providers.gemini_cli import (
+    GeminiCliLLM,
+    is_gemini_cli_available,
+    render_history_prefix,
+)
+from app.core.providers.gemini_cli.acp import _drain_queue
+from app.core.providers.gemini_cli.client import (
     PawrrtalAcpClient,
     _stream_event_for_update,
     _tool_progress_event,
@@ -55,15 +63,7 @@ from app.core.providers._gemini_cli_client import (
     text_from_content_block,
     text_from_tool_content_item,
 )
-from app.core.providers._gemini_cli_fs import ensure_workspace_path, slice_text
-from app.core.providers.base import StreamEvent
-from app.core.providers.catalog import MODEL_CATALOG
-from app.core.providers.factory import resolve_llm
-from app.core.providers.gemini_cli_provider import (
-    GeminiCliLLM,
-    is_gemini_cli_available,
-    render_history_prefix,
-)
+from app.core.providers.gemini_cli.fs import ensure_workspace_path, slice_text
 from app.core.providers.model_id import Host, Vendor
 
 # ---------------------------------------------------------------------------
@@ -134,7 +134,7 @@ def test_factory_host_table_is_exhaustive() -> None:
 
 def test_is_gemini_cli_available_when_binary_present(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "app.core.providers.gemini_cli_provider.shutil.which",
+        "app.core.providers.gemini_cli.provider.shutil.which",
         lambda _name: "/usr/local/bin/gemini",
     )
     assert is_gemini_cli_available() is True
@@ -142,7 +142,7 @@ def test_is_gemini_cli_available_when_binary_present(monkeypatch: pytest.MonkeyP
 
 def test_is_gemini_cli_available_when_binary_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "app.core.providers.gemini_cli_provider.shutil.which",
+        "app.core.providers.gemini_cli.provider.shutil.which",
         lambda _name: None,
     )
     assert is_gemini_cli_available() is False
@@ -412,12 +412,8 @@ def test_usage_event_without_cost_returns_none() -> None:
         AgentPlanUpdate(session_update="plan", entries=[]),
         AvailableCommandsUpdate(session_update="available_commands_update", available_commands=[]),
         CurrentModeUpdate(session_update="current_mode_update", current_mode_id="default"),
-        ConfigOptionUpdate(
-            session_update="current_config_option_update",
-            config_id="opt",
-            value=True,
-        ),
-        SessionInfoUpdate(session_update="session_info_update", session_id="s1"),
+        ConfigOptionUpdate(session_update="config_option_update", config_options=[]),
+        SessionInfoUpdate(session_update="session_info_update"),
         UserMessageChunk(
             session_update="user_message_chunk",
             content=TextContentBlock(type="text", text="echoed"),
@@ -724,7 +720,7 @@ async def test_stream_yields_error_event_when_binary_missing(
     tmp_path: Path,
 ) -> None:
     monkeypatch.setattr(
-        "app.core.providers.gemini_cli_provider.shutil.which",
+        "app.core.providers.gemini_cli.provider.shutil.which",
         lambda _name: None,
     )
     provider = GeminiCliLLM("gemini-2.5-pro", workspace_root=tmp_path)
@@ -747,7 +743,7 @@ async def test_stream_yields_error_event_when_spawn_returns_none(
     tmp_path: Path,
 ) -> None:
     monkeypatch.setattr(
-        "app.core.providers.gemini_cli_provider.shutil.which",
+        "app.core.providers.gemini_cli.provider.shutil.which",
         lambda _name: "/usr/local/bin/gemini",
     )
 
@@ -755,7 +751,7 @@ async def test_stream_yields_error_event_when_spawn_returns_none(
         return None
 
     monkeypatch.setattr(
-        "app.core.providers.gemini_cli_provider._spawn_subprocess",
+        "app.core.providers.gemini_cli.provider._spawn_subprocess",
         fake_spawn,
     )
     provider = GeminiCliLLM("gemini-2.5-pro", workspace_root=tmp_path)
@@ -779,7 +775,7 @@ async def test_stream_drops_images_tools_and_reasoning_for_protocol_parity(
     # list does not raise — the provider logs and ignores. The binary
     # is missing so the stream terminates with a single error event.
     monkeypatch.setattr(
-        "app.core.providers.gemini_cli_provider.shutil.which",
+        "app.core.providers.gemini_cli.provider.shutil.which",
         lambda _name: None,
     )
     provider = GeminiCliLLM("gemini-2.5-pro", workspace_root=tmp_path)

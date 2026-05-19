@@ -20,7 +20,7 @@ from app.core.config import settings
 
 from .base import AILLM
 from .claude_provider import ClaudeLLM, ClaudeLLMConfig
-from .gemini_cli_provider import GeminiCliLLM
+from .gemini_cli import GeminiCliLLM
 from .gemini_provider import GeminiLLM
 from .litellm_provider import LiteLLMLLM
 from .model_id import Host, ParsedModelId, parse_model_id

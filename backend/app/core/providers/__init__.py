@@ -4,7 +4,7 @@ from .base import AILLM, ReasoningEffort, StreamEvent
 from .catalog import default_model
 from .claude_provider import ClaudeLLM, ClaudeLLMConfig
 from .factory import resolve_llm
-from .gemini_cli_provider import GeminiCliLLM, is_gemini_cli_available
+from .gemini_cli import GeminiCliLLM, is_gemini_cli_available
 from .xai_provider import XaiLLM
 
 __all__ = [

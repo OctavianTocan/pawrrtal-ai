@@ -1,8 +1,7 @@
 """Filesystem callbacks for the Gemini CLI ACP client.
 
-Split out of :mod:`_gemini_cli_client` to keep that module under the
-500-line gate. Pure helpers — no ACP class, no event-queue coupling.
-Owns the workspace-path safety check and the OS-error-to-``RequestError``
+Pure helpers — no ACP class, no event-queue coupling. Owns the
+workspace-path safety check and the OS-error-to-``RequestError``
 translation used by ``fs/read_text_file`` / ``fs/write_text_file``.
 """
 

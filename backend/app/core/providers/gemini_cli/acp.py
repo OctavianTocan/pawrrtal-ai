@@ -1,10 +1,9 @@
 """ACP protocol drive for the Gemini CLI provider.
 
-Split out of :mod:`gemini_cli_provider` to keep that module under the
-500-line gate. Owns the JSON-RPC handshake (``initialize`` +
-``session/new``), the prompt-and-drain loop, and the cancellation
-cleanup. Subprocess lifecycle, history rendering, and the public
-:class:`GeminiCliLLM` class stay in the provider module.
+Owns the JSON-RPC handshake (``initialize`` + ``session/new``), the
+prompt-and-drain loop, and the cancellation cleanup. Subprocess
+lifecycle, history rendering, and the public :class:`GeminiCliLLM`
+class stay in :mod:`.provider`.
 
 Connection close lifecycle: :func:`run_prompt_and_drain` *does not*
 call ``conn.close()`` — the caller (``_drive_acp_turn``) owns a single
@@ -23,7 +22,7 @@ from typing import TYPE_CHECKING, Any
 from acp import PROTOCOL_VERSION, RequestError, text_block
 from acp.schema import ClientCapabilities, FileSystemCapabilities
 
-from .base import StreamEvent
+from app.core.providers.base import StreamEvent
 
 if TYPE_CHECKING:
     from acp.core import ClientSideConnection

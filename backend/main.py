@@ -36,7 +36,7 @@ from app.core.config import settings
 from app.core.event_bus import AgentHandler, EventBus, NotificationService
 from app.core.event_bus.global_bus import set_event_bus
 from app.core.middleware import BackendApiKeyMiddleware
-from app.core.providers.gemini_cli_provider import (
+from app.core.providers.gemini_cli import (
     GEMINI_BINARY_NAME,
     is_gemini_cli_available,
 )

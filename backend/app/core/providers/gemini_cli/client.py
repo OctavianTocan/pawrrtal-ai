@@ -8,8 +8,8 @@ The class is intentionally narrow: it only translates ACP
 ``session/update`` notifications into Pawrrtal :class:`StreamEvent`
 records pushed onto an :class:`asyncio.Queue`, plus a tiny bit of
 glue for filesystem + permission requests. The owning
-:class:`gemini_cli_provider.GeminiCliLLM` drains the queue and yields
-the events to the chat router.
+:class:`.provider.GeminiCliLLM` drains the queue and yields the events
+to the chat router.
 
 The asymmetry of "agent calls back into client" maps to Pawrrtal's
 existing seams:
@@ -73,14 +73,13 @@ from acp.schema import (
 )
 
 from app.core.agent_loop.types import PermissionCheckFn
-
-from ._gemini_cli_fs import (
+from app.core.providers.base import StreamEvent
+from app.core.providers.gemini_cli.fs import (
     ensure_workspace_path,
     read_text_or_raise,
     slice_text,
     write_text_or_raise,
 )
-from .base import StreamEvent
 
 logger = logging.getLogger(__name__)
 
@@ -302,8 +301,8 @@ class PawrrtalAcpClient:
 
     # Terminal methods all raise ``method_not_found``; the ACP
     # ``initialize`` handshake declares ``terminal=False`` so a
-    # well-behaved agent never calls them. Keeping them here as
-    # defence in depth in case the agent ignores the capability list.
+    # well-behaved agent never calls them. Defence in depth in case
+    # the agent ignores the capability list.
 
     async def create_terminal(
         self,
@@ -315,26 +314,31 @@ class PawrrtalAcpClient:
         output_byte_limit: int | None = None,
         **kwargs: Any,
     ) -> CreateTerminalResponse:
+        """Terminals are not exposed; see class-level note."""
         raise RequestError.method_not_found("terminal/create")
 
     async def terminal_output(
         self, session_id: str, terminal_id: str, **kwargs: Any
     ) -> TerminalOutputResponse:
+        """Terminals are not exposed; see class-level note."""
         raise RequestError.method_not_found("terminal/output")
 
     async def release_terminal(
         self, session_id: str, terminal_id: str, **kwargs: Any
     ) -> ReleaseTerminalResponse | None:
+        """Terminals are not exposed; see class-level note."""
         raise RequestError.method_not_found("terminal/release")
 
     async def wait_for_terminal_exit(
         self, session_id: str, terminal_id: str, **kwargs: Any
     ) -> WaitForTerminalExitResponse:
+        """Terminals are not exposed; see class-level note."""
         raise RequestError.method_not_found("terminal/wait_for_exit")
 
     async def kill_terminal(
         self, session_id: str, terminal_id: str, **kwargs: Any
     ) -> KillTerminalResponse | None:
+        """Terminals are not exposed; see class-level note."""
         raise RequestError.method_not_found("terminal/kill")
 
     async def ext_method(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
