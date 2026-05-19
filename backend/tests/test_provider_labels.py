@@ -8,7 +8,9 @@ from app.core.providers.labels import (
     HOST_LABELS,
     VENDOR_LABELS,
     host_label,
+    host_label_from_slug,
     vendor_label,
+    vendor_label_from_slug,
 )
 from app.core.providers.model_id import Host, Vendor
 
@@ -44,8 +46,6 @@ def test_vendor_label_returns_expected_strings() -> None:
 
 def test_host_label_from_slug_helper_round_trip() -> None:
     """``host_label`` accepts both the enum and the wire slug."""
-    from app.core.providers.labels import host_label_from_slug
-
     assert host_label_from_slug("agent-sdk") == "Anthropic Agent SDK"
     assert host_label_from_slug("opencode-go") == "OpenCode Go"
     with pytest.raises(KeyError):
@@ -54,8 +54,6 @@ def test_host_label_from_slug_helper_round_trip() -> None:
 
 def test_vendor_label_from_slug_helper_round_trip() -> None:
     """``vendor_label`` accepts both the enum and the wire slug."""
-    from app.core.providers.labels import vendor_label_from_slug
-
     assert vendor_label_from_slug("zai") == "Z.AI"
     with pytest.raises(KeyError):
         vendor_label_from_slug("not-a-vendor")
