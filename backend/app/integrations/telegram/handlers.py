@@ -51,6 +51,15 @@ from app.integrations.telegram._attachments import (  # noqa: F401
 )
 from app.integrations.telegram.dev_admin import resolve_or_autolink_telegram_user
 
+# Re-export ``TelegramSender`` from its shared module so historical
+# import paths (``from app.integrations.telegram.handlers import
+# TelegramSender``) keep working. ``TelegramSender`` itself lives in
+# ``sender.py`` so this module and ``dev_admin`` can both depend on
+# the dataclass without forming an import cycle through ``handlers``.
+from app.integrations.telegram.sender import (
+    TelegramSender as TelegramSender,  # noqa: PLC0414  re-export
+)
+
 # Loose match for the link-code shape (8 chars from the look-alike-free
 # alphabet defined in app.crud.channel). Used to distinguish "user pasted
 # a code" from "user is talking to an unbound bot" so we can redeem the
@@ -117,22 +126,6 @@ _VERBOSE_FAIL_MESSAGE = "Couldn't update verbose level — please try again."
 from app.integrations.telegram.status import (  # noqa: E402
     _VERBOSE_LABELS,
 )
-
-
-@dataclass(frozen=True)
-class TelegramSender:
-    """Stable subset of an aiogram ``Message.from_user`` we need.
-
-    Modeled as a plain dataclass so handler tests don't have to import aiogram
-    or build a fake bot.
-    """
-
-    user_id: int
-    chat_id: int
-    username: str | None
-    full_name: str | None
-    # Telegram Bot API 9.3+ topic thread ID.  None when topics not enabled.
-    thread_id: int | None = None
 
 
 @dataclass(frozen=True)

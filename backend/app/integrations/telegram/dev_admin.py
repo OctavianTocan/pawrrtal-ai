@@ -20,7 +20,6 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
@@ -30,14 +29,8 @@ from app.core.config import settings
 from app.crud.channel import get_user_id_for_external
 from app.crud.workspace import ensure_dev_admin_workspace
 from app.db import User
+from app.integrations.telegram.sender import TelegramSender
 from app.models import ChannelBinding
-
-# TelegramSender is referenced only in annotations (this module activates
-# `from __future__ import annotations`, so the names stay as strings at
-# runtime). Importing under ``TYPE_CHECKING`` breaks the runtime cycle
-# with ``handlers`` while keeping the type information accurate.
-if TYPE_CHECKING:
-    from app.integrations.telegram.handlers import TelegramSender
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +53,7 @@ async def resolve_or_autolink_telegram_user(
 
     Args:
         session: Async database session.
-        sender: The Telegram sender from ``handlers``. Annotated as a
-            forward reference to avoid a runtime import cycle.
+        sender: The Telegram sender dataclass shared across the package.
 
     Returns:
         The Pawrrtal user UUID, or ``None`` if no binding can be
