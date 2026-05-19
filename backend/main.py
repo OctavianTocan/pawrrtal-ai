@@ -36,6 +36,10 @@ from app.core.config import settings
 from app.core.event_bus import AgentHandler, EventBus, NotificationService
 from app.core.event_bus.global_bus import set_event_bus
 from app.core.middleware import BackendApiKeyMiddleware
+from app.core.providers.gemini_cli_provider import (
+    GEMINI_BINARY_NAME,
+    is_gemini_cli_available,
+)
 from app.core.rate_limit import ChatRateLimitMiddleware
 from app.core.request_logging import RequestLoggingMiddleware
 from app.core.scheduler import JobScheduler
@@ -64,20 +68,23 @@ def _log_gemini_cli_status() -> None:
     when the ``gemini`` binary is missing from PATH. The Gemini CLI
     provider (``host=Host.gemini_cli`` models) needs the binary to
     function; the rest of Pawrrtal does not, so we never block startup.
+
+    Delegates the actual probe to :func:`is_gemini_cli_available` so the
+    binary-name constant lives in exactly one place.
     """
-    import logging  # noqa: PLC0415 — local import keeps the top file imports tight
+    import logging  # noqa: PLC0415 — keep startup imports lazy
     import shutil  # noqa: PLC0415
 
     log = logging.getLogger(__name__)
-    path = shutil.which("gemini")
-    if path is None:
+    if not is_gemini_cli_available():
         log.warning(
-            "GEMINI_CLI_UNAVAILABLE binary=gemini path=$PATH "
+            "GEMINI_CLI_UNAVAILABLE binary=%s path=$PATH "
             "(install with `npm install -g @google/gemini-cli` to enable "
-            "gemini-cli:* models; other providers unaffected)"
+            "gemini-cli:* models; other providers unaffected)",
+            GEMINI_BINARY_NAME,
         )
         return
-    log.info("GEMINI_CLI_FOUND path=%s", path)
+    log.info("GEMINI_CLI_FOUND path=%s", shutil.which(GEMINI_BINARY_NAME))
 
 
 # --- Lifespan ----------------------------------------------------------------

@@ -41,6 +41,14 @@ Add a new entry when adding a new :class:`Host` — the catalog and
 this table must always agree.
 """
 
+# Module-import-time exhaustiveness check — converts the "every
+# ``Host`` member must have a provider class" invariant from an
+# implicit runtime ``KeyError`` in :func:`resolve_llm` into a clear
+# import-time ``ValueError`` next to the table itself.
+_missing_hosts = set(Host) - set(HOST_TO_PROVIDER)
+if _missing_hosts:
+    raise ValueError(f"HOST_TO_PROVIDER missing entries for: {_missing_hosts}")
+
 
 def resolve_llm(
     model_id: str | ParsedModelId | None,

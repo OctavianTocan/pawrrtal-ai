@@ -20,21 +20,27 @@ configured on disk; the provider passes no credentials.
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import logging
 import shutil
 import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, NoReturn
 
-from acp import PROTOCOL_VERSION, RequestError, connect_to_agent, text_block
-from acp.schema import ClientCapabilities, FileSystemCapabilities
+from acp import connect_to_agent
 
 from app.core.agent_loop.types import AgentTool, PermissionCheckFn
 
+from ._gemini_cli_acp import AcpFatalError, open_session, run_prompt_and_drain
 from ._gemini_cli_client import PawrrtalAcpClient
 from .base import ReasoningEffort, StreamEvent
+
+if TYPE_CHECKING:
+    # Typed connection handle from the ACP Python SDK. Imported under
+    # ``TYPE_CHECKING`` to keep the runtime untouched (the SDK warns on
+    # constructing ``ClientSideConnection`` directly; we receive one
+    # back from ``connect_to_agent``).
+    from acp.core import ClientSideConnection
 
 logger = logging.getLogger(__name__)
 
@@ -42,27 +48,21 @@ logger = logging.getLogger(__name__)
 # Subprocess lifecycle ------------------------------------------------------
 
 # Binary + flag exposed for the startup health-check and tests so the
-# magic strings stay in one place.  ``--acp`` is the stable flag from
-# Gemini CLI ``0.21+``; older builds use ``--experimental-acp`` and
-# need to lift this to a setting.
+# magic strings stay in one place.  ``--acp`` is the stable flag; if a
+# user reports the CLI rejecting it, the fallback is
+# ``--experimental-acp`` — promote this to a setting at that point.
 GEMINI_BINARY_NAME = "gemini"
 GEMINI_ACP_FLAG = "--acp"
 
-# Timeouts: handshakes finish in under a second when the CLI is live;
-# the caps below treat anything past them as a wedged subprocess.
-_INIT_TIMEOUT_SECONDS = 30.0
-_NEW_SESSION_TIMEOUT_SECONDS = 30.0
 # Wait between ``proc.terminate()`` and the harder ``proc.kill()`` so
 # the CLI can flush its transcript before we yank it.
 _SHUTDOWN_GRACE_SECONDS = 5.0
-# Cleanup-path caps — by this point we just want descriptors released
-# and ``session/cancel`` flushed to the kernel buffer.
+# Cleanup cap — by this point we just want descriptors released.
 _CONN_CLOSE_TIMEOUT_SECONDS = 2.0
-_CANCEL_TIMEOUT_SECONDS = 2.0
 
-# History rendering — mirrors ``ClaudeLLM._HISTORY_PREFIX_MAX_ROWS``
-# / ``_HISTORY_PREFIX_MAX_CHARS``.  The chat router caps ``history_window``
-# to 20 already; we re-cap so the LCM path can't balloon the prefix.
+# History prefix caps (mirrors Claude's bounded recap). The chat router
+# already caps ``history_window=20`` — the re-cap protects against LCM
+# paths that bypass that cap.
 _HISTORY_PREFIX_MAX_ROWS = 20
 _HISTORY_PREFIX_MAX_CHARS = 12_000
 
@@ -185,7 +185,12 @@ class GeminiCliLLM:
         system_prompt: str | None,
         permission_check: PermissionCheckFn | None,
     ) -> AsyncIterator[StreamEvent]:
-        """Run one ACP initialize → new_session → prompt cycle on ``proc``."""
+        """Run one ACP initialize → new_session → prompt cycle on ``proc``.
+
+        Owns the JSON-RPC connection's lifecycle: a single outer
+        ``try/finally`` guarantees ``conn.close()`` runs regardless of
+        which inner stage (handshake, session, prompt) failed.
+        """
         event_queue: asyncio.Queue[StreamEvent | None] = asyncio.Queue()
         client_impl = PawrrtalAcpClient(
             event_queue=event_queue,
@@ -202,13 +207,37 @@ class GeminiCliLLM:
         conn = connect_to_agent(client_impl, stdin, stdout)
 
         try:
-            session_id = await _open_session(conn, self._workspace_root)
-        except _AcpFatalError as err:
-            yield _error_event(err.message)
-            return
+            async for event in self._run_handshake_and_prompt(
+                conn,
+                history=history,
+                system_prompt=system_prompt,
+                question=question,
+                event_queue=event_queue,
+            ):
+                yield event
+        finally:
+            try:
+                await asyncio.wait_for(conn.close(), timeout=_CONN_CLOSE_TIMEOUT_SECONDS)
+            except (TimeoutError, ConnectionError, OSError) as exc:
+                logger.warning("GEMINI_CLI_CONN_CLOSE_FAILED reason=%s", exc)
 
+    async def _run_handshake_and_prompt(
+        self,
+        conn: ClientSideConnection,
+        *,
+        history: list[dict[str, str]] | None,
+        system_prompt: str | None,
+        question: str,
+        event_queue: asyncio.Queue[StreamEvent | None],
+    ) -> AsyncIterator[StreamEvent]:
+        """Run handshake + prompt drain. Caller owns ``conn.close()``."""
+        try:
+            session_id = await open_session(conn, self._workspace_root)
+        except AcpFatalError as err:
+            yield _error_event(str(err))
+            return
         prompt_text = render_history_prefix(history, system_prompt) + question
-        async for event in _run_prompt_and_drain(
+        async for event in run_prompt_and_drain(
             conn,
             session_id=session_id,
             prompt_text=prompt_text,
@@ -239,9 +268,11 @@ async def _spawn_subprocess(
         GEMINI_ACP_FLAG,
         "--model",
         model_id,
-        # The Gemini CLI may otherwise refuse to operate in a directory
-        # it hasn't been told to trust. The workspace is owned by the
-        # current user; trust is fine.
+        # ``--skip-trust`` bypasses the CLI's "trust this folder?"
+        # interactive prompt, which would otherwise block the JSON-RPC
+        # stream on stdin. Safe here because the workspace is per-user
+        # under the current process's UID; revisit when running the CLI
+        # under a shared service account.
         "--skip-trust",
     ]
     try:
@@ -265,156 +296,41 @@ async def _spawn_subprocess(
 
 
 async def _shutdown_subprocess(proc: asyncio.subprocess.Process) -> None:
-    """Best-effort shutdown — terminate, wait, escalate to kill."""
+    """Best-effort shutdown — terminate, wait, escalate to kill.
+
+    Tolerates a race where the subprocess exits between the
+    ``returncode`` check and the ``terminate()`` call (the kernel may
+    have reaped it already; ``ProcessLookupError`` short-circuits us).
+    """
     if proc.returncode is not None:
         return
-    proc.terminate()
+    try:
+        proc.terminate()
+    except ProcessLookupError:
+        return
     try:
         await asyncio.wait_for(proc.wait(), timeout=_SHUTDOWN_GRACE_SECONDS)
         return
     except TimeoutError:
         pass
-    proc.kill()
-    with contextlib.suppress(asyncio.TimeoutError, ProcessLookupError):
+    try:
+        proc.kill()
+    except ProcessLookupError:
+        return
+    try:
         await asyncio.wait_for(proc.wait(), timeout=_SHUTDOWN_GRACE_SECONDS)
+    except (TimeoutError, ProcessLookupError) as exc:
+        logger.warning("GEMINI_CLI_SHUTDOWN_TIMEOUT pid=%s reason=%s", proc.pid, exc)
 
 
-def _missing_stdio(name: str) -> Any:
+def _missing_stdio(name: str) -> NoReturn:
     """Raise on missing subprocess stdio pipes — narrows None at call sites.
 
     Used as ``stdin = proc.stdin or _missing_stdio("stdin")`` so the
     type-checker accepts the narrowing without the helper having to
-    fabricate an :class:`asyncio.StreamWriter` from thin air. Return
-    type is ``Any`` for the same reason: this function never returns.
+    fabricate an :class:`asyncio.StreamWriter` from thin air.
     """
     raise RuntimeError(f"Gemini CLI subprocess missing {name} pipe; cannot proceed.")
-
-
-# ---------------------------------------------------------------------------
-# ACP handshake + prompt drive.
-# ---------------------------------------------------------------------------
-
-
-class _AcpFatalError(Exception):
-    """Internal signal for "initialize or new_session failed".
-
-    Raised inside the ACP drive helpers, caught at the top of
-    :meth:`GeminiCliLLM._drive_acp_turn` so the public ``stream``
-    contract surfaces a single ``error`` event rather than an
-    unhandled exception.
-    """
-
-    def __init__(self, message: str) -> None:
-        """Carry the user-facing error message verbatim."""
-        super().__init__(message)
-        self.message = message
-
-
-async def _open_session(conn: Any, workspace_root: Path | None) -> str:
-    """Run ``initialize`` + ``session/new`` and return the session id."""
-    fs_capable = workspace_root is not None
-    capabilities = ClientCapabilities(
-        fs=FileSystemCapabilities(
-            read_text_file=fs_capable,
-            write_text_file=fs_capable,
-        ),
-        terminal=False,
-    )
-    try:
-        init_resp = await asyncio.wait_for(
-            conn.initialize(
-                protocol_version=PROTOCOL_VERSION,
-                client_capabilities=capabilities,
-            ),
-            timeout=_INIT_TIMEOUT_SECONDS,
-        )
-    except TimeoutError as exc:
-        raise _AcpFatalError("Gemini CLI did not respond to ACP initialize within 30s.") from exc
-    except RequestError as exc:
-        raise _AcpFatalError(f"Gemini CLI ACP initialize failed: {exc}") from exc
-
-    logger.info(
-        "GEMINI_CLI_INITIALIZED protocol_version=%s",
-        getattr(init_resp, "protocol_version", "?"),
-    )
-
-    cwd = str(workspace_root) if workspace_root is not None else str(Path.cwd())
-    try:
-        session = await asyncio.wait_for(
-            conn.new_session(cwd=cwd, mcp_servers=[]),
-            timeout=_NEW_SESSION_TIMEOUT_SECONDS,
-        )
-    except TimeoutError as exc:
-        raise _AcpFatalError("Gemini CLI did not respond to session/new within 30s.") from exc
-    except RequestError as exc:
-        raise _AcpFatalError(f"Gemini CLI session/new failed: {exc}") from exc
-
-    return session.session_id
-
-
-async def _run_prompt_and_drain(
-    conn: Any,
-    *,
-    session_id: str,
-    prompt_text: str,
-    event_queue: asyncio.Queue[StreamEvent | None],
-) -> AsyncIterator[StreamEvent]:
-    """Send the prompt and drain queued events until the turn ends."""
-    prompt_outcome: dict[str, Any] = {}
-
-    async def run_prompt() -> None:
-        try:
-            response = await conn.prompt(
-                session_id=session_id,
-                prompt=[text_block(prompt_text)],
-            )
-            prompt_outcome["response"] = response
-        except RequestError as exc:
-            prompt_outcome["error"] = f"Gemini CLI ACP prompt failed: {exc}"
-        except (TimeoutError, ConnectionError, OSError) as exc:
-            prompt_outcome["error"] = f"Gemini CLI ACP transport error: {exc}"
-        finally:
-            await event_queue.put(None)
-
-    prompt_task = asyncio.create_task(run_prompt())
-    try:
-        async for event in _drain_queue(event_queue):
-            yield event
-        await prompt_task
-        error_text = prompt_outcome.get("error")
-        if error_text is not None:
-            yield _error_event(error_text)
-        else:
-            response = prompt_outcome.get("response")
-            stop_reason = getattr(response, "stop_reason", None)
-            logger.info("GEMINI_CLI_TURN_DONE stop_reason=%s", stop_reason)
-    except asyncio.CancelledError:
-        # Caller aborted the SSE stream — politely tell the CLI to
-        # stop and re-raise so the surrounding ``finally`` blocks in
-        # :meth:`GeminiCliLLM.stream` clean up the subprocess.
-        with contextlib.suppress(Exception):
-            await asyncio.wait_for(
-                conn.cancel(session_id=session_id),
-                timeout=_CANCEL_TIMEOUT_SECONDS,
-            )
-        prompt_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await prompt_task
-        raise
-    finally:
-        with contextlib.suppress(Exception):
-            await asyncio.wait_for(conn.close(), timeout=_CONN_CLOSE_TIMEOUT_SECONDS)
-
-
-async def _drain_queue(
-    event_queue: asyncio.Queue[StreamEvent | None],
-) -> AsyncIterator[StreamEvent]:
-    """Yield queued events until the producer signals end-of-turn with ``None``."""
-    while True:
-        event = await event_queue.get()
-        if event is None:
-            return
-        yield event
 
 
 # ---------------------------------------------------------------------------
@@ -429,39 +345,50 @@ def render_history_prefix(
     """Render the system prompt and prior turns as a single text prefix.
 
     The CLI gets a fresh ACP session per turn, so the only way to carry
-    multi-turn context is to fold it into the user prompt. The prefix is
-    wrapped in clear BEGIN/END markers so the model doesn't confuse it
-    with the user's current message — same pattern :class:`ClaudeLLM`
-    uses for its provider-switch fallback.
+    multi-turn context is to fold it into the user prompt. Each section
+    is wrapped in clear BEGIN/END markers so the model doesn't confuse
+    it with the user's current message; truncation operates on the
+    *inner* content (keeping the tail — most-recent turns), then the
+    wrappers are applied, so the markers are never lost no matter how
+    long the input.
 
-    Returns an empty string when there's nothing to prefix, so the caller
-    can ``render_history_prefix(...) + question`` unconditionally.
+    Returns an empty string when there's nothing to prefix, so the
+    caller can ``render_history_prefix(...) + question`` unconditionally.
     """
-    parts: list[str] = []
+    sections: list[str] = []
     sp = (system_prompt or "").strip()
     if sp:
-        parts.append("--- BEGIN SYSTEM CONTEXT ---")
-        parts.append(sp)
-        parts.append("--- END SYSTEM CONTEXT ---")
-        parts.append("")
+        sections.append(_wrap_section("SYSTEM CONTEXT", _truncate_tail(sp)))
     rendered_history = _render_history_lines(history)
     if rendered_history:
-        parts.append("--- BEGIN PRIOR CONVERSATION ---")
-        parts.append(rendered_history)
-        parts.append("--- END PRIOR CONVERSATION ---")
-        parts.append("")
-    body = "\n".join(parts)
-    if len(body) > _HISTORY_PREFIX_MAX_CHARS:
-        body = "…" + body[-_HISTORY_PREFIX_MAX_CHARS:]
-    return body
+        sections.append(
+            _wrap_section("PRIOR CONVERSATION", _truncate_tail(rendered_history)),
+        )
+    return "\n".join(sections)
+
+
+def _wrap_section(label: str, body: str) -> str:
+    """Wrap ``body`` in ``--- BEGIN <label> --- / --- END <label> ---`` markers."""
+    return f"--- BEGIN {label} ---\n{body}\n--- END {label} ---\n"
+
+
+def _truncate_tail(text: str) -> str:
+    """Cap ``text`` at :data:`_HISTORY_PREFIX_MAX_CHARS`, keeping the tail.
+
+    Tail preservation is the right call for both system prompts and
+    history: the most recent rows / instructions are what the model
+    needs to see if anything is dropped.
+    """
+    if len(text) <= _HISTORY_PREFIX_MAX_CHARS:
+        return text
+    return "…" + text[-_HISTORY_PREFIX_MAX_CHARS:]
 
 
 def _render_history_lines(history: list[dict[str, str]] | None) -> str:
     """Render the trailing window of history rows as ``Speaker: text`` lines.
 
     Returns the empty string when history is missing or carries no
-    usable ``user``/``assistant`` rows. Extracted so
-    :func:`render_history_prefix` stays under the nesting budget.
+    usable ``user`` / ``assistant`` rows.
     """
     if not history:
         return ""

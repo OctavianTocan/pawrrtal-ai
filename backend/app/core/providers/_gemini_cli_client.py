@@ -36,7 +36,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from acp import RequestError
 from acp.schema import (
@@ -74,21 +74,26 @@ from acp.schema import (
 
 from app.core.agent_loop.types import PermissionCheckFn
 
+from ._gemini_cli_fs import (
+    ensure_workspace_path,
+    read_text_or_raise,
+    slice_text,
+    write_text_or_raise,
+)
 from .base import StreamEvent
 
 logger = logging.getLogger(__name__)
 
 
-PermissionOptionKind = str
-"""ACP permission option kinds — ``allow_once``, ``allow_always``,
-``reject_once``, ``reject_always``. We model as ``str`` rather than a
-literal alias to track upstream changes without redefining."""
+PermissionOptionKind = Literal["allow_once", "allow_always", "reject_once", "reject_always"]
+"""The four ACP permission option kinds. Modelling as a ``Literal``
+narrows :data:`ALLOW_KINDS` and surfaces typos in ``option.kind ==``
+comparisons as type-checker errors rather than runtime falsities."""
 
 ALLOW_KINDS: frozenset[PermissionOptionKind] = frozenset({"allow_once", "allow_always"})
 """Permission option kinds we treat as "approve" when auto-approving.
-Anything else (rejection, cancellation) we leave alone — picking the
-first matching allow option keeps the lifetime narrow (``allow_once``
-beats ``allow_always`` when both are offered)."""
+``allow_once`` is preferred over ``allow_always`` so an auto-approved
+decision does not silently widen future permission scope."""
 
 _DENY_OUTCOME = "cancelled"
 """ACP ``DeniedOutcome`` requires a string — ``cancelled`` is the
@@ -144,7 +149,10 @@ def text_from_tool_content_item(item: object) -> str:
         return f"diff: {item.path}"
     if isinstance(item, TerminalToolCallContent):
         return f"terminal: {item.terminal_id}"
-    # ``ContentToolCallContent`` wraps another content block.
+    # Fall through via duck-typing rather than a third isinstance arm so
+    # forward-compat ACP schema variants don't silently produce empty
+    # output — anything carrying a ``.content`` attribute gets best-effort
+    # text extraction.
     inner = getattr(item, "content", None)
     if inner is not None:
         return text_from_content_block(inner)
@@ -217,20 +225,49 @@ class PawrrtalAcpClient:
         tool_call: ToolCallUpdate,
         **kwargs: Any,
     ) -> RequestPermissionResponse:
-        """Approve or deny a tool-call permission request."""
+        """Approve or deny a tool-call permission request.
+
+        When a Pawrrtal :data:`PermissionCheckFn` is bound, its decision
+        wins; on denial we also push a ``StreamEvent(type="error")`` so
+        the user sees *why* the chat stopped producing output instead of
+        staring at a frozen partial response. When no closure is bound,
+        we auto-approve via :func:`pick_allow_option`; when the spec
+        offers no allow options we deny.
+        """
+        tool_name = tool_call.title or "<unknown>"
         if self._permission_check is not None:
-            tool_name = tool_call.title or "<unknown>"
             arguments = tool_call.raw_input if isinstance(tool_call.raw_input, dict) else {}
             decision = await self._permission_check(tool_name, arguments)
             if not decision["allow"]:
+                reason = decision["reason"] or "denied by Pawrrtal policy"
                 logger.info(
                     "GEMINI_CLI_PERMISSION_DENIED tool=%s reason=%s",
                     tool_name,
-                    decision["reason"],
+                    reason,
+                )
+                await self._event_queue.put(
+                    StreamEvent(
+                        type="error",
+                        content=f"Tool '{tool_name}' was denied: {reason}",
+                    ),
                 )
                 return RequestPermissionResponse(outcome=DeniedOutcome(outcome=_DENY_OUTCOME))
         option = pick_allow_option(options)
         if option is None:
+            logger.warning(
+                "GEMINI_CLI_NO_ALLOW_OPTION tool=%s offered=%s",
+                tool_name,
+                [opt.kind for opt in options],
+            )
+            await self._event_queue.put(
+                StreamEvent(
+                    type="error",
+                    content=(
+                        f"Tool '{tool_name}' could not run: "
+                        "no allow option was offered by the agent."
+                    ),
+                ),
+            )
             return RequestPermissionResponse(outcome=DeniedOutcome(outcome=_DENY_OUTCOME))
         return RequestPermissionResponse(
             outcome=AllowedOutcome(option_id=option.option_id, outcome=_ALLOW_OUTCOME),
@@ -245,10 +282,10 @@ class PawrrtalAcpClient:
         **kwargs: Any,
     ) -> ReadTextFileResponse:
         """Read a workspace-scoped file for the agent."""
-        resolved = _ensure_workspace_path(path, self._workspace_root)
-        text = resolved.read_text()
+        resolved = ensure_workspace_path(path, self._workspace_root)
+        text = read_text_or_raise(resolved, path)
         if line is not None or limit is not None:
-            text = _slice_text(text, line, limit)
+            text = slice_text(text, line, limit)
         return ReadTextFileResponse(content=text)
 
     async def write_text_file(
@@ -259,10 +296,14 @@ class PawrrtalAcpClient:
         **kwargs: Any,
     ) -> WriteTextFileResponse | None:
         """Write a workspace-scoped file on the agent's behalf."""
-        resolved = _ensure_workspace_path(path, self._workspace_root)
-        resolved.parent.mkdir(parents=True, exist_ok=True)
-        resolved.write_text(content)
+        resolved = ensure_workspace_path(path, self._workspace_root)
+        write_text_or_raise(resolved, content, path)
         return WriteTextFileResponse()
+
+    # Terminal methods all raise ``method_not_found``; the ACP
+    # ``initialize`` handshake declares ``terminal=False`` so a
+    # well-behaved agent never calls them. Keeping them here as
+    # defence in depth in case the agent ignores the capability list.
 
     async def create_terminal(
         self,
@@ -274,7 +315,6 @@ class PawrrtalAcpClient:
         output_byte_limit: int | None = None,
         **kwargs: Any,
     ) -> CreateTerminalResponse:
-        """Terminals are not exposed to the agent."""
         raise RequestError.method_not_found("terminal/create")
 
     async def terminal_output(
@@ -306,7 +346,8 @@ class PawrrtalAcpClient:
         logger.debug("GEMINI_CLI_EXT_NOTIFICATION_IGNORED method=%s", method)
 
     def on_connect(self, conn: object) -> None:
-        """Hook fired once the connection is established. No-op for us."""
+        """Hook fired once the JSON-RPC connection is established."""
+        logger.debug("GEMINI_CLI_ACP_CONNECTED")
 
 
 # ---------------------------------------------------------------------------
@@ -314,25 +355,44 @@ class PawrrtalAcpClient:
 # ---------------------------------------------------------------------------
 
 
+# Editor-UI hint update types we intentionally drop. They have no
+# chat-aggregator counterpart in Pawrrtal — add a branch in
+# :func:`_stream_event_for_update` when Pawrrtal grows a UI surface
+# for any of them.
+_DROPPED_UPDATE_TYPES: tuple[type, ...] = (
+    AgentPlanUpdate,
+    AvailableCommandsUpdate,
+    CurrentModeUpdate,
+    ConfigOptionUpdate,
+    SessionInfoUpdate,
+    UserMessageChunk,
+)
+
+
 def _stream_event_for_update(update: object) -> StreamEvent | None:
-    """Map one ACP session-update variant to a Pawrrtal StreamEvent."""
+    """Map one ACP session-update variant to a Pawrrtal StreamEvent.
+
+    Unknown variants are logged at DEBUG so a future ACP-SDK addition
+    becomes debuggable rather than silently lost.
+    """
     if isinstance(update, AgentMessageChunk):
-        text = text_from_content_block(update.content)
-        return StreamEvent(type="delta", content=text) if text else None
+        return _delta_or_none("delta", text_from_content_block(update.content))
     if isinstance(update, AgentThoughtChunk):
-        text = text_from_content_block(update.content)
-        return StreamEvent(type="thinking", content=text) if text else None
+        return _delta_or_none("thinking", text_from_content_block(update.content))
     if isinstance(update, ToolCallStart):
         return _tool_start_event(update)
     if isinstance(update, ToolCallProgress):
         return _tool_progress_event(update)
     if isinstance(update, UsageUpdate):
         return _usage_event(update)
-    # Plan, available-commands, mode-change, config-option, session-info,
-    # user-message-chunk: not surfaced as StreamEvents in v1. They are
-    # editor-UI hints (mode badges, slash-command palettes) that have no
-    # equivalent in Pawrrtal's chat surface yet.
+    if not isinstance(update, _DROPPED_UPDATE_TYPES):
+        logger.debug("GEMINI_CLI_UPDATE_DROPPED type=%s", type(update).__name__)
     return None
+
+
+def _delta_or_none(event_type: str, text: str) -> StreamEvent | None:
+    """Build a ``delta`` / ``thinking`` event, or ``None`` if empty."""
+    return StreamEvent(type=event_type, content=text) if text else None
 
 
 def _tool_start_event(update: ToolCallStart) -> StreamEvent:
@@ -373,61 +433,16 @@ def _tool_progress_event(update: ToolCallProgress) -> StreamEvent | None:
 def _usage_event(update: UsageUpdate) -> StreamEvent | None:
     """Translate a ``usage`` notification into ``StreamEvent(type=usage)``.
 
-    ACP's ``UsageUpdate`` reports the *current* context window state
-    (``size`` total, ``used`` consumed) rather than per-turn token deltas.
-    Until Pawrrtal's cost ledger learns to consume that shape directly,
-    surface only the values that match the existing ``StreamEvent``
-    contract (input / output / cost). When the SDK exposes the per-turn
-    breakdown via ``cost``, this becomes the place to translate it.
+    ACP's :class:`UsageUpdate` reports the *current* context window
+    state (``size`` total, ``used`` consumed) and an optional
+    :class:`Cost` (``amount`` + ``currency``). ``amount`` is cumulative
+    per session, not per turn — the chat aggregator therefore treats
+    successive usage events as monotonically-increasing totals.
     """
     cost_blob = getattr(update, "cost", None)
     if cost_blob is None:
         return None
-    cost_usd = getattr(cost_blob, "total_cost_usd", None)
-    if cost_usd is None:
+    cost_amount = getattr(cost_blob, "amount", None)
+    if cost_amount is None:
         return None
-    return StreamEvent(type="usage", cost_usd=float(cost_usd))
-
-
-def _ensure_workspace_path(path: str, workspace_root: Path | None) -> Path:
-    """Validate ``path`` is an absolute path under ``workspace_root``.
-
-    The Gemini CLI's filesystem methods only carry absolute paths per
-    the ACP spec, so the absolute check would normally pass; we keep
-    it explicit because a non-absolute path from a buggy agent could
-    otherwise be resolved against ``Path.cwd()`` and escape the
-    workspace via traversal.
-    """
-    candidate = Path(path)
-    if not candidate.is_absolute():
-        raise RequestError.invalid_params(
-            {"path": path, "reason": "path must be absolute"},
-        )
-    if workspace_root is None:
-        raise RequestError.invalid_params(
-            {"path": path, "reason": "filesystem access not enabled for this session"},
-        )
-    resolved = candidate.resolve()
-    workspace_resolved = workspace_root.resolve()
-    if not resolved.is_relative_to(workspace_resolved):
-        raise RequestError.invalid_params(
-            {"path": path, "reason": "path is outside the workspace"},
-        )
-    return resolved
-
-
-def _slice_text(content: str, line: int | None, limit: int | None) -> str:
-    """Return ``content`` sliced by 1-based ``line`` / ``limit`` lines.
-
-    Mirrors the ACP spec's read_text_file semantics: ``line`` is the
-    1-based starting line, ``limit`` caps the number of returned lines.
-    Out-of-range values are clamped (the spec leaves clamping to the
-    client; clamping is forgiving so the model self-corrects on the
-    next read instead of erroring).
-    """
-    lines = content.splitlines()
-    start = max((line or 1) - 1, 0)
-    end = len(lines)
-    if limit is not None:
-        end = min(start + limit, end)
-    return "\n".join(lines[start:end])
+    return StreamEvent(type="usage", cost_usd=float(cost_amount))
