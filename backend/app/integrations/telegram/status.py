@@ -223,16 +223,16 @@ async def handle_status_command(
     Returns:
         Reply string the bot should send immediately.
     """
-    nexus_user_id = await get_user_id_for_external(
+    pawrrtal_user_id = await get_user_id_for_external(
         provider=_PROVIDER,
         external_user_id=str(sender.user_id),
         session=session,
     )
-    if nexus_user_id is None:
+    if pawrrtal_user_id is None:
         return _STATUS_NOT_BOUND_MESSAGE
 
     conversation = await get_or_create_telegram_conversation_full(
-        user_id=nexus_user_id,
+        user_id=pawrrtal_user_id,
         session=session,
         thread_id=sender.thread_id,
     )

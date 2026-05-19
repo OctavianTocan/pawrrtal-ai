@@ -242,7 +242,7 @@ async def test_plain_message_from_dev_admin_routes_to_llm_pipeline(
     reply = await handle_plain_message(sender=sender, text="hello", session=db_session)
 
     assert isinstance(reply, TelegramTurnContext)
-    assert reply.nexus_user_id == seeded_admin_user.id
+    assert reply.pawrrtal_user_id == seeded_admin_user.id
 
 
 async def test_empty_start_from_dev_admin_returns_connected_message(

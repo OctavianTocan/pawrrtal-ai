@@ -164,14 +164,14 @@ async def _autolink_dev_admin(
             # is visible.
             raise
         logger.info(
-            "TELEGRAM_DEV_ADMIN_AUTOLINK_RACE external_user_id=%s nexus_user_id=%s",
+            "TELEGRAM_DEV_ADMIN_AUTOLINK_RACE external_user_id=%s pawrrtal_user_id=%s",
             external_user_id,
             winner,
         )
         return winner
 
     logger.info(
-        "TELEGRAM_DEV_ADMIN_AUTOLINK external_user_id=%s nexus_user_id=%s "
+        "TELEGRAM_DEV_ADMIN_AUTOLINK external_user_id=%s pawrrtal_user_id=%s "
         "chat_id=%s display_handle=%s",
         external_user_id,
         admin_user.id,
