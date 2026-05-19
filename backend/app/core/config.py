@@ -183,6 +183,14 @@ class Settings(BaseSettings):
     # so the receiving FastAPI route can drop forgeries.
     telegram_webhook_secret: str = ""
 
+    # When set, inbound Telegram messages from this numeric user_id are
+    # auto-linked to the seeded dev-admin user (``ADMIN_EMAIL``) without
+    # the manual ``/start <code>`` flow. Lets the developer skip the
+    # link dance after every fresh DB checkout (paired with the
+    # branch-scoped ``SQLITE_DB_FILENAME``). Unset → behaviour
+    # unchanged; the standard onboarding nudge still fires.
+    telegram_dev_admin_id: int | None = None
+
     # Per-user chat rate limit (requests per 60-second rolling window).
     # Zero disables the limit entirely — useful for local dev.  Production
     # deployments should pick a value that matches the operator's monthly

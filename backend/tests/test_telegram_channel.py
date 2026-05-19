@@ -476,7 +476,7 @@ class TestHandlePlainMessage:
         sender = TelegramSender(user_id=999, chat_id=999, username=None, full_name="Stranger")
         session = AsyncMock()
         with patch(
-            "app.integrations.telegram.handlers.get_user_id_for_external",
+            "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
             new=AsyncMock(return_value=None),
         ):
             result = await handle_plain_message(sender=sender, text="hello", session=session)
@@ -497,7 +497,7 @@ class TestHandlePlainMessage:
 
         with (
             patch(
-                "app.integrations.telegram.handlers.get_user_id_for_external",
+                "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
                 new=AsyncMock(return_value=nexus_uid),
             ),
             patch(
@@ -525,7 +525,7 @@ class TestHandlePlainMessage:
 
         with (
             patch(
-                "app.integrations.telegram.handlers.get_user_id_for_external",
+                "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
                 new=AsyncMock(return_value=nexus_uid),
             ),
             patch(
@@ -590,7 +590,7 @@ class TestHandleModelCommand:
         update_mock = AsyncMock(return_value=True)
         with (
             patch(
-                "app.integrations.telegram.handlers.get_user_id_for_external",
+                "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
                 new=AsyncMock(return_value=uuid.uuid4()),
             ),
             patch(
@@ -609,7 +609,7 @@ class TestHandleModelCommand:
         sender = TelegramSender(user_id=2, chat_id=2, username=None, full_name=None)
         session = AsyncMock()
         with patch(
-            "app.integrations.telegram.handlers.get_user_id_for_external",
+            "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
             new=AsyncMock(return_value=None),
         ):
             reply = await handle_model_command(
@@ -662,7 +662,7 @@ class TestHandleModelCommand:
         update_mock = AsyncMock(return_value=True)
         with (
             patch(
-                "app.integrations.telegram.handlers.get_user_id_for_external",
+                "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
                 new=AsyncMock(return_value=nexus_uid),
             ),
             patch(
@@ -700,7 +700,7 @@ class TestHandleModelCommand:
 
         with (
             patch(
-                "app.integrations.telegram.handlers.get_user_id_for_external",
+                "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
                 new=AsyncMock(return_value=nexus_uid),
             ),
             patch(
@@ -742,7 +742,7 @@ class TestHandleModelCommand:
         update_mock = AsyncMock(return_value=True)
         with (
             patch(
-                "app.integrations.telegram.handlers.get_user_id_for_external",
+                "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
                 new=AsyncMock(return_value=nexus_uid),
             ),
             patch(

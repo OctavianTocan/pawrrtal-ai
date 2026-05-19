@@ -37,7 +37,6 @@ from app.core.providers.catalog import default_model, find
 from app.core.providers.model_id import InvalidModelId, parse_model_id
 from app.crud.channel import (
     get_or_create_telegram_conversation_full,
-    get_user_id_for_external,
     redeem_link_code,
     update_conversation_model,
     update_conversation_verbose_level,
@@ -50,6 +49,7 @@ from app.crud.channel import (
 from app.integrations.telegram._attachments import (  # noqa: F401
     collect_attachments,
 )
+from app.integrations.telegram.dev_admin import resolve_or_autolink_telegram_user
 
 # Loose match for the link-code shape (8 chars from the look-alike-free
 # alphabet defined in app.crud.channel). Used to distinguish "user pasted
@@ -183,7 +183,11 @@ async def handle_start_command(
     """
     code = (payload or "").strip()
     if not code:
-        return _NOT_BOUND_MESSAGE
+        # Empty ``/start`` is the dev-admin's "hello" too. Try the
+        # auto-link path so the configured Telegram ID jumps straight
+        # to a connected state instead of seeing the nudge.
+        nexus_user_id = await resolve_or_autolink_telegram_user(session=session, sender=sender)
+        return _BIND_OK_MESSAGE if nexus_user_id is not None else _NOT_BOUND_MESSAGE
 
     binding = await redeem_link_code(
         code=code,
@@ -226,11 +230,7 @@ async def handle_plain_message(
     Returns:
         ``str`` for immediate replies, ``TelegramTurnContext`` for LLM routing.
     """
-    nexus_user_id = await get_user_id_for_external(
-        provider=PROVIDER,
-        external_user_id=str(sender.user_id),
-        session=session,
-    )
+    nexus_user_id = await resolve_or_autolink_telegram_user(session=session, sender=sender)
     if nexus_user_id is None:
         # The not-bound nudge tells the user to "send me the code" — so
         # if a plain message looks like one, try to redeem it here
@@ -301,11 +301,7 @@ async def handle_new_command(
     Returns:
         Reply string the bot should send immediately.
     """
-    nexus_user_id = await get_user_id_for_external(
-        provider=PROVIDER,
-        external_user_id=str(sender.user_id),
-        session=session,
-    )
+    nexus_user_id = await resolve_or_autolink_telegram_user(session=session, sender=sender)
     if nexus_user_id is None:
         return _NEW_NOT_BOUND_MESSAGE
 
@@ -388,11 +384,7 @@ async def handle_model_command(
     if entry is None:
         return _MODEL_UNKNOWN_MESSAGE.format(raw=raw)
 
-    nexus_user_id = await get_user_id_for_external(
-        provider=PROVIDER,
-        external_user_id=str(sender.user_id),
-        session=session,
-    )
+    nexus_user_id = await resolve_or_autolink_telegram_user(session=session, sender=sender)
     if nexus_user_id is None:
         return _MODEL_NOT_BOUND_MESSAGE
 
@@ -459,11 +451,7 @@ async def handle_verbose_command(
     if level not in _VERBOSE_LABELS:
         return _VERBOSE_USAGE_MESSAGE
 
-    nexus_user_id = await get_user_id_for_external(
-        provider=PROVIDER,
-        external_user_id=str(sender.user_id),
-        session=session,
-    )
+    nexus_user_id = await resolve_or_autolink_telegram_user(session=session, sender=sender)
     if nexus_user_id is None:
         return _VERBOSE_NOT_BOUND_MESSAGE
 
