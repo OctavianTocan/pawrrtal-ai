@@ -1,337 +1,47 @@
 """Single source of truth for which models pawrrtal supports.
 
 Catalog entries carry the canonical ``host:vendor/model`` identity
-plus display metadata. Adding a model is a one-file change here.
+plus display metadata. Adding a model is a one-file change in
+``_catalog_entries.py``; this module just composes the per-host
+tuples into the public :data:`MODEL_CATALOG` and exposes the lookup
+helpers.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-from dataclasses import asdict, dataclass
+from dataclasses import asdict
 
-from .model_id import (
-    Host,
-    InvalidModelId,  # noqa: F401  # re-exported in docstring contract; raised via parse_model_id
-    ParsedModelId,
-    UnknownModelId,
-    Vendor,
-    parse_model_id,
+from ._catalog_entries import (
+    ANTHROPIC_ENTRIES,
+    GOOGLE_ENTRIES,
+    XAI_ENTRIES,
+    ModelEntry,
 )
+from ._catalog_gemini_cli import GEMINI_CLI_ENTRIES
+from ._catalog_openai import OPENAI_ENTRIES
+from ._catalog_opencode_go import OPENCODE_GO_ENTRIES
+from .model_id import ParsedModelId, UnknownModelId, parse_model_id
 
-
-@dataclass(frozen=True, slots=True)
-class ModelEntry:
-    """One supported model.
-
-    The ``id`` property is the canonical wire form used by the API,
-    DB, logs, and frontend.
-
-    Cost-per-mtok rates (PR 04): ``cost_per_mtok_in_usd`` /
-    ``cost_per_mtok_out_usd`` drive Gemini's per-turn USD computation
-    in the chat aggregator.  Claude reports a precise
-    ``total_cost_usd`` on its ``ResultMessage`` so these fields are
-    informational for Claude entries and authoritative for everyone
-    else.  Values are USD per 1M tokens — ``0.0`` means "unknown,
-    skip cost accounting"; the cost ledger still records the token
-    counts so a later catalog backfill can recompute the dollar
-    column.
-    """
-
-    host: Host
-    vendor: Vendor
-    model: str
-    display_name: str
-    short_name: str
-    description: str
-    is_default: bool
-    cost_per_mtok_in_usd: float = 0.0
-    cost_per_mtok_out_usd: float = 0.0
-
-    @property
-    def id(self) -> str:
-        """Canonical wire string: ``host:vendor/model``."""
-        return f"{self.host.value}:{self.vendor.value}/{self.model}"
-
-
-# Cost rates published by Anthropic (input / output USD per 1M tokens
-# at the time of writing).  Sourced from
-# https://docs.anthropic.com/claude/docs/models-overview#model-pricing.
-# Update alongside every model release; the chat aggregator uses these
-# only as a fallback — Claude's own ``ResultMessage.total_cost_usd``
-# wins when available.
-_CLAUDE_OPUS_4_7_IN_USD = 15.00
-_CLAUDE_OPUS_4_7_OUT_USD = 75.00
-_CLAUDE_SONNET_4_6_IN_USD = 3.00
-_CLAUDE_SONNET_4_6_OUT_USD = 15.00
-_CLAUDE_HAIKU_4_5_IN_USD = 0.80
-_CLAUDE_HAIKU_4_5_OUT_USD = 4.00
-
-# Gemini cost rates from
-# https://ai.google.dev/gemini-api/docs/pricing.  Used directly by the
-# Gemini provider (no SDK-reported total) to fill in the cost ledger.
-_GEMINI_3_FLASH_IN_USD = 0.30
-_GEMINI_3_FLASH_OUT_USD = 2.50
-_GEMINI_3_FLASH_LITE_IN_USD = 0.10
-_GEMINI_3_FLASH_LITE_OUT_USD = 0.40
-
-# Gemini CLI cost rates (``host=Host.gemini_cli``) are intentionally
-# zero. The locally-installed ``gemini`` binary authenticates via the
-# user's Google account by default (free tier with daily quota), or via
-# an API key / Gemini Code Assist license they've configured outside
-# Pawrrtal. Either way, billing is the user's concern — we do not see
-# the per-token bill and shouldn't pretend to. Tokens still flow through
-# ``StreamEvent(type="usage")`` for telemetry; the cost column is 0.0
-# so the ledger stays honest.
-_GEMINI_CLI_IN_USD = 0.0
-_GEMINI_CLI_OUT_USD = 0.0
-
-# xAI Grok pricing per https://docs.x.ai/docs/models.  Used by the
-# native xAI provider's cost-ledger path (no SDK-reported total).
-_GROK_4_3_IN_USD = 1.25
-_GROK_4_3_OUT_USD = 2.50
-
-# OpenAI cost rates published at https://openai.com/api/pricing/.
-# Routed via LiteLLM so the cost ledger uses these directly (no
-# SDK-reported total).  Update on each price change.
-_OPENAI_GPT_4O_IN_USD = 2.50
-_OPENAI_GPT_4O_OUT_USD = 10.00
-_OPENAI_GPT_4O_MINI_IN_USD = 0.15
-_OPENAI_GPT_4O_MINI_OUT_USD = 0.60
-_OPENAI_O1_IN_USD = 15.00
-_OPENAI_O1_OUT_USD = 60.00
-_OPENAI_O1_MINI_IN_USD = 3.00
-_OPENAI_O1_MINI_OUT_USD = 12.00
-_OPENAI_O3_MINI_IN_USD = 1.10
-_OPENAI_O3_MINI_OUT_USD = 4.40
-
-# OpenCode Go gateway cost rates, mirrored from the upstream catalogue
-# at https://github.com/sst/models.dev/tree/dev/providers/opencode-go.
-# OpenCode Go is a hosted OpenAI-compatible gateway that fronts
-# open-weight coding models; the provider reports usage tokens on the
-# terminal stream chunk and the provider multiplies these rates to fill
-# the cost ledger.  Update alongside upstream catalogue changes.
-_OPENCODE_GO_GLM_5_1_IN_USD = 1.4
-_OPENCODE_GO_GLM_5_1_OUT_USD = 4.4
-_OPENCODE_GO_KIMI_K2_6_IN_USD = 0.95
-_OPENCODE_GO_KIMI_K2_6_OUT_USD = 4.0
+__all__ = [
+    "CATALOG_ETAG",
+    "MODEL_CATALOG",
+    "ModelEntry",
+    "default_model",
+    "find",
+    "is_known",
+    "require_known",
+]
 
 
 MODEL_CATALOG: tuple[ModelEntry, ...] = (
-    ModelEntry(
-        host=Host.agent_sdk,
-        vendor=Vendor.anthropic,
-        model="claude-opus-4-7",
-        display_name="Claude Opus 4.7",
-        short_name="Claude Opus 4.7",
-        description="Most capable for ambitious work",
-        is_default=False,
-        cost_per_mtok_in_usd=_CLAUDE_OPUS_4_7_IN_USD,
-        cost_per_mtok_out_usd=_CLAUDE_OPUS_4_7_OUT_USD,
-    ),
-    ModelEntry(
-        host=Host.agent_sdk,
-        vendor=Vendor.anthropic,
-        model="claude-sonnet-4-6",
-        display_name="Claude Sonnet 4.6",
-        short_name="Claude Sonnet 4.6",
-        description="Balanced for everyday tasks",
-        is_default=False,
-        cost_per_mtok_in_usd=_CLAUDE_SONNET_4_6_IN_USD,
-        cost_per_mtok_out_usd=_CLAUDE_SONNET_4_6_OUT_USD,
-    ),
-    ModelEntry(
-        host=Host.agent_sdk,
-        vendor=Vendor.anthropic,
-        model="claude-haiku-4-5",
-        display_name="Claude Haiku 4.5",
-        short_name="Claude Haiku 4.5",
-        description="Fastest for quick answers",
-        is_default=False,
-        cost_per_mtok_in_usd=_CLAUDE_HAIKU_4_5_IN_USD,
-        cost_per_mtok_out_usd=_CLAUDE_HAIKU_4_5_OUT_USD,
-    ),
-    ModelEntry(
-        host=Host.google_ai,
-        vendor=Vendor.google,
-        model="gemini-3-flash-preview",
-        display_name="Gemini 3 Flash Preview",
-        short_name="Gemini 3 Flash",
-        description="Google's frontier multimodal",
-        is_default=True,
-        cost_per_mtok_in_usd=_GEMINI_3_FLASH_IN_USD,
-        cost_per_mtok_out_usd=_GEMINI_3_FLASH_OUT_USD,
-    ),
-    ModelEntry(
-        host=Host.google_ai,
-        vendor=Vendor.google,
-        model="gemini-3.1-flash-lite-preview",
-        display_name="Gemini 3.1 Flash Lite Preview",
-        short_name="Gemini Flash Lite",
-        description="Light and fast Gemini",
-        is_default=False,
-        cost_per_mtok_in_usd=_GEMINI_3_FLASH_LITE_IN_USD,
-        cost_per_mtok_out_usd=_GEMINI_3_FLASH_LITE_OUT_USD,
-    ),
-    # Gemini CLI (https://geminicli.com) — local subprocess driven over
-    # the Agent Client Protocol (ACP, https://agentclientprotocol.com).
-    # Same protocol Zed/Neovim/JetBrains use to drive coding agents, so
-    # the bridge is a typed JSON-RPC client, not a stream-json parser.
-    # Models exposed match Gemini CLI's ``--model`` accept list.
-    ModelEntry(
-        host=Host.gemini_cli,
-        vendor=Vendor.google,
-        model="gemini-2.5-pro",
-        display_name="Gemini 2.5 Pro (CLI)",
-        short_name="Gemini 2.5 Pro CLI",
-        description="Local Gemini CLI agent",
-        is_default=False,
-        cost_per_mtok_in_usd=_GEMINI_CLI_IN_USD,
-        cost_per_mtok_out_usd=_GEMINI_CLI_OUT_USD,
-    ),
-    ModelEntry(
-        host=Host.gemini_cli,
-        vendor=Vendor.google,
-        model="gemini-2.5-flash",
-        display_name="Gemini 2.5 Flash (CLI)",
-        short_name="Gemini 2.5 Flash CLI",
-        description="Local Gemini CLI agent, faster",
-        is_default=False,
-        cost_per_mtok_in_usd=_GEMINI_CLI_IN_USD,
-        cost_per_mtok_out_usd=_GEMINI_CLI_OUT_USD,
-    ),
-    ModelEntry(
-        host=Host.gemini_cli,
-        vendor=Vendor.google,
-        model="gemini-2.5-flash-lite",
-        display_name="Gemini 2.5 Flash Lite (CLI)",
-        short_name="Gemini 2.5 Flash Lite CLI",
-        description="Local Gemini CLI agent, lightest",
-        is_default=False,
-        cost_per_mtok_in_usd=_GEMINI_CLI_IN_USD,
-        cost_per_mtok_out_usd=_GEMINI_CLI_OUT_USD,
-    ),
-    ModelEntry(
-        host=Host.gemini_cli,
-        vendor=Vendor.google,
-        model="gemini-3-pro-preview",
-        display_name="Gemini 3 Pro Preview (CLI)",
-        short_name="Gemini 3 Pro CLI",
-        description="Local Gemini CLI agent, Gemini 3",
-        is_default=False,
-        cost_per_mtok_in_usd=_GEMINI_CLI_IN_USD,
-        cost_per_mtok_out_usd=_GEMINI_CLI_OUT_USD,
-    ),
-    ModelEntry(
-        host=Host.gemini_cli,
-        vendor=Vendor.google,
-        model="gemini-3.1-pro-preview",
-        display_name="Gemini 3.1 Pro Preview (CLI)",
-        short_name="Gemini 3.1 Pro CLI",
-        description="Local Gemini CLI agent, Gemini 3.1",
-        is_default=False,
-        cost_per_mtok_in_usd=_GEMINI_CLI_IN_USD,
-        cost_per_mtok_out_usd=_GEMINI_CLI_OUT_USD,
-    ),
-    ModelEntry(
-        host=Host.xai,
-        vendor=Vendor.xai,
-        model="grok-4.3",
-        display_name="Grok 4.3",
-        short_name="Grok 4.3",
-        description="xAI's frontier 1M-context model",
-        is_default=False,
-        cost_per_mtok_in_usd=_GROK_4_3_IN_USD,
-        cost_per_mtok_out_usd=_GROK_4_3_OUT_USD,
-    ),
-    # OpenAI — routed through LiteLLM in-process SDK gateway.  Tool use
-    # is intentionally text-only for v1 (provider rejects non-empty
-    # ``tools=`` with a debug log); revisit once the OpenAI function-
-    # calling bridge lands.
-    #
-    # NOTE: xAI catalog entries via LiteLLM were intentionally dropped
-    # in favour of the native ``Host.xai`` provider (PRs #314/#324)
-    # which has full reasoning + Live Search support.  If Grok 3 needs
-    # to be available again, add it under ``Host.xai`` in this catalog.
-    ModelEntry(
-        host=Host.litellm,
-        vendor=Vendor.openai,
-        model="gpt-4o",
-        display_name="GPT-4o",
-        short_name="GPT-4o",
-        description="OpenAI's flagship multimodal",
-        is_default=False,
-        cost_per_mtok_in_usd=_OPENAI_GPT_4O_IN_USD,
-        cost_per_mtok_out_usd=_OPENAI_GPT_4O_OUT_USD,
-    ),
-    ModelEntry(
-        host=Host.litellm,
-        vendor=Vendor.openai,
-        model="gpt-4o-mini",
-        display_name="GPT-4o mini",
-        short_name="GPT-4o mini",
-        description="Cheap and fast OpenAI",
-        is_default=False,
-        cost_per_mtok_in_usd=_OPENAI_GPT_4O_MINI_IN_USD,
-        cost_per_mtok_out_usd=_OPENAI_GPT_4O_MINI_OUT_USD,
-    ),
-    ModelEntry(
-        host=Host.litellm,
-        vendor=Vendor.openai,
-        model="o1",
-        display_name="OpenAI o1",
-        short_name="o1",
-        description="Deep reasoning, slow",
-        is_default=False,
-        cost_per_mtok_in_usd=_OPENAI_O1_IN_USD,
-        cost_per_mtok_out_usd=_OPENAI_O1_OUT_USD,
-    ),
-    ModelEntry(
-        host=Host.litellm,
-        vendor=Vendor.openai,
-        model="o1-mini",
-        display_name="OpenAI o1 mini",
-        short_name="o1 mini",
-        description="Lightweight reasoning",
-        is_default=False,
-        cost_per_mtok_in_usd=_OPENAI_O1_MINI_IN_USD,
-        cost_per_mtok_out_usd=_OPENAI_O1_MINI_OUT_USD,
-    ),
-    ModelEntry(
-        host=Host.litellm,
-        vendor=Vendor.openai,
-        model="o3-mini",
-        display_name="OpenAI o3 mini",
-        short_name="o3 mini",
-        description="Newer reasoning, balanced",
-        is_default=False,
-        cost_per_mtok_in_usd=_OPENAI_O3_MINI_IN_USD,
-        cost_per_mtok_out_usd=_OPENAI_O3_MINI_OUT_USD,
-    ),
-    # OpenCode Go gateway — SST's hosted OpenAI-compatible endpoint
-    # serving open-weight coding models (GLM-5.1, Kimi K2.6).
-    ModelEntry(
-        host=Host.opencode_go,
-        vendor=Vendor.zai,
-        model="glm-5.1",
-        display_name="GLM-5.1",
-        short_name="GLM-5.1",
-        description="Open coding model via OpenCode Go",
-        is_default=False,
-        cost_per_mtok_in_usd=_OPENCODE_GO_GLM_5_1_IN_USD,
-        cost_per_mtok_out_usd=_OPENCODE_GO_GLM_5_1_OUT_USD,
-    ),
-    ModelEntry(
-        host=Host.opencode_go,
-        vendor=Vendor.moonshot,
-        model="kimi-k2.6",
-        display_name="Kimi K2.6",
-        short_name="Kimi K2.6",
-        description="Long-context coding model via OpenCode Go",
-        is_default=False,
-        cost_per_mtok_in_usd=_OPENCODE_GO_KIMI_K2_6_IN_USD,
-        cost_per_mtok_out_usd=_OPENCODE_GO_KIMI_K2_6_OUT_USD,
-    ),
+    *ANTHROPIC_ENTRIES,
+    *GOOGLE_ENTRIES,
+    *GEMINI_CLI_ENTRIES,
+    *XAI_ENTRIES,
+    *OPENAI_ENTRIES,
+    *OPENCODE_GO_ENTRIES,
 )
 
 

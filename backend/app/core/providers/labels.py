@@ -13,6 +13,7 @@ from app.core.providers.model_id import Host, Vendor
 
 HOST_LABELS: dict[Host, str] = {
     Host.agent_sdk: "Anthropic Agent SDK",
+    Host.gemini_cli: "Gemini CLI",
     Host.google_ai: "Gemini API",
     Host.litellm: "LiteLLM",
     Host.opencode_go: "OpenCode Go",
@@ -21,11 +22,15 @@ HOST_LABELS: dict[Host, str] = {
 """Map from :class:`Host` enum to user-facing display string."""
 
 VENDOR_LABELS: dict[Vendor, str] = {
+    Vendor.alibaba: "Alibaba",
     Vendor.anthropic: "Anthropic",
+    Vendor.deepseek: "DeepSeek",
     Vendor.google: "Google",
+    Vendor.minimax: "MiniMax",
     Vendor.moonshot: "Moonshot",
     Vendor.openai: "OpenAI",
     Vendor.xai: "xAI",
+    Vendor.xiaomi: "Xiaomi",
     Vendor.zai: "Z.AI",
 }
 """Map from :class:`Vendor` enum to user-facing display string."""

@@ -31,17 +31,41 @@ from app.core.agent_loop.types import (
     PermissionCheckFn,
     TextContent,
     ToolCallContent,
-    ToolResultMessage,
 )
 from app.core.agent_system_prompt import (
     DEFAULT_AGENT_SYSTEM_PROMPT as _FALLBACK_SYSTEM_PROMPT,
 )
 from app.core.config import settings
-from app.core.keys import resolve_api_key
+from app.core.governance.cost_tracker import compute_cost_usd
 
 from ._gemini_events import agent_event_to_stream_event, identity_convert
-from ._gemini_replay import function_call_content_for, replay_content_for
+from ._gemini_messages import (
+    build_gemini_contents,
+    build_gemini_tool_declarations,
+    resolve_gemini_api_key,
+    split_chunk_text,
+    tool_calls_from_chunk,
+)
+from ._gemini_replay import function_call_content_for
+from ._gemini_thinking import compose_thinking_config
+from ._gemini_usage import (
+    GeminiUsageAccumulator,
+    absorb_request_usage,
+    gemini_catalog_entry,
+)
 from .base import ReasoningEffort, StreamEvent
+
+__all__ = [
+    "GeminiLLM",
+    "GeminiUsageAccumulator",
+    "build_gemini_contents",
+    "build_gemini_tool_declarations",
+    "compose_thinking_config",
+    "make_gemini_stream_fn",
+    "resolve_gemini_api_key",
+    "split_chunk_text",
+    "tool_calls_from_chunk",
+]
 
 logger = logging.getLogger(__name__)
 
@@ -52,164 +76,12 @@ logger = logging.getLogger(__name__)
 # change when the user switched models.
 
 
-def _build_gemini_tool_declarations(
-    tools: list[AgentTool],
-) -> list[gtypes.Tool] | None:
-    """Convert AgentTools to Gemini FunctionDeclarations."""
-    if not tools:
-        return None
-    # This is how we declare the tools to the model.
-    declarations = [
-        gtypes.FunctionDeclaration(
-            name=t.name,
-            description=t.description,
-            parameters_json_schema=t.parameters,
-        )
-        for t in tools
-    ]
-    return [gtypes.Tool(function_declarations=declarations)]
+# Message- and chunk-level helpers live in ``_gemini_messages`` so
+# this module fits the 500-line file budget.
 
 
-def _assistant_parts(content: list[TextContent | ToolCallContent]) -> list[gtypes.Part]:
-    """Convert one assistant message's text/tool-call blocks to Gemini parts."""
-    parts: list[gtypes.Part] = []
-
-    for block in content:
-        if block["type"] == "text":
-            text = block["text"]
-            if text.strip():
-                parts.append(gtypes.Part.from_text(text=text))
-            continue
-
-        parts.append(
-            gtypes.Part.from_function_call(
-                name=block["name"],
-                args=block["arguments"],
-            )
-        )
-
-    return parts
-
-
-def _tool_result_content(msg: ToolResultMessage) -> gtypes.Content:
-    """Convert a loop tool result to Gemini's function-response content."""
-    text: str = "\n".join(block["text"] for block in msg["content"])
-    response_key: str = "error" if msg["is_error"] else "result"
-    return gtypes.UserContent(
-        parts=[
-            gtypes.Part.from_function_response(
-                name=msg["name"],
-                response={response_key: text},
-            )
-        ]
-    )
-
-
-def _build_gemini_contents(messages: list[AgentMessage]) -> list[gtypes.ContentUnion]:
-    """Convert AgentMessages to Gemini Contents, oldest-first.
-
-    Args:
-        messages: The list of AgentMessages to convert.
-
-    Returns:
-        The list of Gemini Contents.
-    """
-    # ``ContentUnion`` matches the SDK's overloaded ``contents=`` param —
-    # ``list[Content]`` alone is rejected by mypy even though it works at
-    # runtime. See ``app/core/gemini_utils.py`` for the same workaround.
-    contents: list[gtypes.ContentUnion] = []
-
-    for msg in messages:
-        if msg["role"] == "user":
-            text = msg["content"]
-            if text.strip():
-                contents.append(gtypes.UserContent(parts=[gtypes.Part.from_text(text=text)]))
-            continue
-        if msg["role"] == "assistant":
-            # When the assistant message carries the original Gemini
-            # ``ModelContent`` (saved on the producing turn), replay it
-            # verbatim.  This preserves ``thought_signature`` bytes that
-            # Vertex / Gemini-3 require for follow-up tool turns:
-            # https://ai.google.dev/gemini-api/docs/thought-signatures
-            replay = replay_content_for(msg)
-            if replay is not None:
-                contents.append(replay)
-                continue
-            parts = _assistant_parts(msg["content"])
-            if parts:
-                contents.append(gtypes.ModelContent(parts=parts))
-            continue
-        contents.append(_tool_result_content(msg))
-
-    return contents
-
-
-def _resolve_gemini_api_key(workspace_root: Path | None) -> str:
-    """Resolve the Gemini API key for this request."""
-    if workspace_root is not None:
-        return resolve_api_key(workspace_root, "GEMINI_API_KEY") or ""
-    return settings.google_api_key
-
-
-def _split_chunk_text(chunk: Any) -> tuple[str, str]:
-    """Return ``(thinking_text, response_text)`` for a streaming chunk.
-
-    Gemini's thinking-capable models emit ``Part`` objects with a
-    ``thought=True`` flag for chain-of-thought content; regular response
-    text uses ``thought=False`` (or ``None``).  The ``chunk.text``
-    convenience accessor concatenates *all* text parts regardless of the
-    flag, so consumers that need to render the two streams separately
-    must walk parts explicitly.
-
-    Non-thinking models simply never set ``thought=True``, so the
-    thinking string stays empty and the response string is identical to
-    ``chunk.text``.
-    """
-    thinking_parts: list[str] = []
-    response_parts: list[str] = []
-    for candidate in chunk.candidates or []:
-        if not candidate.content or not candidate.content.parts:
-            continue
-        for part in candidate.content.parts:
-            text = getattr(part, "text", None)
-            if not text:
-                continue
-            if getattr(part, "thought", False):
-                thinking_parts.append(text)
-            else:
-                response_parts.append(text)
-    return "".join(thinking_parts), "".join(response_parts)
-
-
-def _tool_calls_from_chunk(chunk: Any, start_index: int) -> list[dict[str, Any]]:
-    """Extract Gemini function-call parts from a streaming chunk.
-
-    Only the name + args are surfaced to the agent loop; the enclosing
-    ``ModelContent`` (with its ``thought_signature`` bytes) is captured
-    separately by :func:`function_call_content_for` and forwarded as opaque
-    ``provider_state`` on the terminal ``LLMDoneEvent``.
-    """
-    calls: list[dict[str, Any]] = []
-    for candidate in chunk.candidates or []:
-        if not candidate.content or not candidate.content.parts:
-            continue
-        for part in candidate.content.parts:
-            if not part.function_call:
-                continue
-            fc = part.function_call
-            fn_name = fc.name or ""
-            # uuid suffix keeps tool_call_ids unique across loop iterations
-            # (start_index resets each StreamFn call). Gemini matches calls
-            # to responses by ordinal position, so the suffix is invisible.
-            tool_call_id = f"call-{fn_name}-{start_index + len(calls)}-{uuid.uuid4().hex[:8]}"
-            calls.append(
-                {
-                    "tool_call_id": tool_call_id,
-                    "name": fn_name,
-                    "arguments": dict(fc.args) if fc.args else {},
-                }
-            )
-    return calls
+# ``compose_thinking_config`` / ``_GEMINI_THINKING_LEVEL`` live in
+# ``_gemini_thinking`` so this module fits the 500-line file budget.
 
 
 def make_gemini_stream_fn(
@@ -217,6 +89,8 @@ def make_gemini_stream_fn(
     workspace_root: Path | None = None,
     *,
     system_prompt: str,
+    reasoning_effort: ReasoningEffort | None = None,
+    usage_sink: GeminiUsageAccumulator | None = None,
 ) -> StreamFn:
     """Build a StreamFn backed by the google-genai SDK.
 
@@ -236,6 +110,20 @@ def make_gemini_stream_fn(
             sensible "factory default" because every production caller already
             has the request prompt in scope and unit tests should be explicit
             about what they bind.
+        reasoning_effort: Pawrrtal's per-turn reasoning knob, already
+            resolved against the model's catalog support tuple by the
+            chat-router backstop. ``None`` lets Gemini use its dynamic
+            default; otherwise we forward the mapped Gemini level via
+            ``thinking_level``.
+        usage_sink: Optional mutable :class:`GeminiUsageAccumulator` the
+            StreamFn writes per-request token counts into. Shared across
+            every agent_loop iteration for a single ``GeminiLLM.stream``
+            call so multi-turn tool-using conversations sum their
+            spend correctly. ``None`` skips usage capture — useful for
+            unit tests and utility callers that don't talk to the cost
+            ledger. Thinking tokens are billed as output by Gemini (per
+            https://ai.google.dev/gemini-api/docs/thinking), so we
+            include them in ``output_tokens`` rather than dropping them.
 
     Returns:
         An async generator factory that yields ``LLMEvent``s. The generator
@@ -246,13 +134,13 @@ def make_gemini_stream_fn(
         messages: list[AgentMessage],
         tools: list[AgentTool],
     ) -> AsyncIterator[LLMEvent]:
-        client = genai.Client(api_key=_resolve_gemini_api_key(workspace_root))
-        contents = _build_gemini_contents(messages)
+        client = genai.Client(api_key=resolve_gemini_api_key(workspace_root))
+        contents = build_gemini_contents(messages)
         # ``GenerateContentConfig.tools`` is typed as the wider union
         # ``list[Tool | Callable | mcp.Tool | ClientSession] | None``;
         # ``list`` is invariant, so we widen the local list at this seam
         # rather than make the helper return the wide type.
-        gemini_tools: list[Any] | None = _build_gemini_tool_declarations(tools)
+        gemini_tools: list[Any] | None = build_gemini_tool_declarations(tools)
         config = gtypes.GenerateContentConfig(
             system_instruction=system_prompt,
             # Pass None (not []) when there are no tools — some SDK versions raise on empty list.
@@ -262,10 +150,21 @@ def make_gemini_stream_fn(
             # provider-agnostic agent_loop remains the sole tool executor.
             # Docs: https://github.com/googleapis/python-genai/blob/main/README.md
             # Ask the model to emit reasoning chunks alongside the answer
-            # when it supports it (gemini-2.5-pro / -flash with thinking).
-            # Older / non-thinking models silently ignore the flag, so this
-            # is safe to send unconditionally.
-            thinking_config=gtypes.ThinkingConfig(include_thoughts=True),
+            # when it supports it (gemini-2.5-pro / -flash, gemini-3-*
+            # with thinking).  Older / non-thinking models silently
+            # ignore both ``include_thoughts`` and ``thinking_level``,
+            # so it's safe to set both unconditionally when the caller
+            # supplied a knob.  ``thinking_level`` is the Gemini 3
+            # parameter (``minimal | low | medium | high``); we map
+            # Pawrrtal's five-level ``ReasoningEffort`` onto it via
+            # :data:`_GEMINI_THINKING_LEVEL`.  Sending both
+            # ``thinking_level`` and the legacy ``thinking_budget`` in
+            # one request 400s — Pawrrtal never sets the latter so the
+            # surface here stays clean.
+            thinking_config=compose_thinking_config(
+                reasoning_effort=reasoning_effort,
+                model_id=model_id,
+            ),
             automatic_function_calling=gtypes.AutomaticFunctionCallingConfig(disable=True),
         )
 
@@ -277,6 +176,11 @@ def make_gemini_stream_fn(
         # ``LLMDoneEvent.provider_state["gemini"]["model_content"]`` so
         # the next turn's request can replay ``thought_signature`` bytes.
         function_call_content: gtypes.Content | None = None
+        # Latest ``usage_metadata`` snapshot from this request. Gemini
+        # emits cumulative counts on each chunk and a final snapshot on
+        # the terminal chunk; we just keep overwriting and absorb the
+        # last value into ``usage_sink`` at end-of-stream.
+        last_usage_metadata: Any | None = None
 
         try:
             # google-genai's async ``generate_content_stream`` returns
@@ -289,19 +193,25 @@ def make_gemini_stream_fn(
                 config=config,
             )
             async for chunk in stream:
+                # Track the latest ``usage_metadata`` — Gemini reports it
+                # cumulatively per chunk, so the final non-None value is
+                # the per-request total we want to bill.
+                chunk_usage = getattr(chunk, "usage_metadata", None)
+                if chunk_usage is not None:
+                    last_usage_metadata = chunk_usage
                 # Split parts into thoughts (``part.thought is True``) and
                 # regular text.  ``chunk.text`` is a convenience accessor
                 # that concatenates *all* text parts regardless of the
                 # thought flag, so we walk parts explicitly to keep the
                 # two streams separate downstream.
-                thinking_text, response_text = _split_chunk_text(chunk)
+                thinking_text, response_text = split_chunk_text(chunk)
                 if thinking_text:
                     yield LLMThinkingDeltaEvent(type="thinking_delta", text=thinking_text)
                 if response_text:
                     yield LLMTextDeltaEvent(type="text_delta", text=response_text)
                     full_text += response_text
 
-                chunk_tool_calls = _tool_calls_from_chunk(chunk, len(tool_calls))
+                chunk_tool_calls = tool_calls_from_chunk(chunk, len(tool_calls))
                 if chunk_tool_calls:
                     # Capture the original Gemini ``ModelContent`` so
                     # follow-up turns can replay ``thought_signature``
@@ -331,6 +241,8 @@ def make_gemini_stream_fn(
                 content=[TextContent(type="text", text=error_text)],
             )
             return
+
+        absorb_request_usage(usage_sink, last_usage_metadata)
 
         # Determine stop reason
         stop_reason = "tool_use" if tool_calls else "stop"
@@ -482,11 +394,15 @@ class GeminiLLM:
         # StreamFn per request so the captured ``system_prompt`` matches
         # what the chat router assembled this turn.  Tests monkeypatch
         # ``_stream_fn`` with a ``ScriptedStreamFn``; when set we honour
-        # the injection (the script doesn't care about the prompt).
+        # the injection (the script doesn't care about the prompt or
+        # usage accumulator).
+        usage = GeminiUsageAccumulator()
         stream_fn = self._stream_fn or make_gemini_stream_fn(
             self._model_id,
             self._workspace_root,
             system_prompt=context.system_prompt,
+            reasoning_effort=reasoning_effort,
+            usage_sink=usage,
         )
 
         try:
@@ -497,3 +413,27 @@ class GeminiLLM:
 
         except Exception as exc:
             yield StreamEvent(type="error", content=f"Gemini provider error: {exc}")
+            return
+
+        # Emit one terminal ``usage`` event so the chat aggregator can
+        # fold per-turn token totals into the cost ledger. Gemini's
+        # API doesn't ship a server-reported USD figure, so we
+        # compute it locally from the catalog's per-mtok rates via
+        # :func:`compute_cost_usd`. Thinking tokens are billed as
+        # output (per the Gemini Thinking docs) and were folded into
+        # ``output_tokens`` upstream in
+        # :meth:`GeminiUsageAccumulator.absorb_request`. ``saw_any``
+        # skips the emission on early failures so we don't poison
+        # the ledger with a zero-token row.
+        if usage.saw_any:
+            cost_usd = compute_cost_usd(
+                catalog_entry=gemini_catalog_entry(self._model_id),
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+            )
+            yield StreamEvent(
+                type="usage",
+                input_tokens=usage.input_tokens,
+                output_tokens=usage.output_tokens,
+                cost_usd=cost_usd,
+            )

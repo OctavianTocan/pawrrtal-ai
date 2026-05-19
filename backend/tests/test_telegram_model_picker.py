@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Sequence
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
@@ -11,6 +12,7 @@ import pytest
 from app.core.providers.catalog import MODEL_CATALOG, default_model
 from app.core.providers.model_id import Host
 from app.integrations.telegram.model_picker import (
+    ModelButton,
     ModelCallback,
     build_host_keyboard,
     build_models_keyboard,
@@ -27,7 +29,7 @@ from app.integrations.telegram.model_picker import (
 from app.integrations.telegram.sender import TelegramSender
 
 
-def _flatten(rows: list[list[object]]) -> list[object]:
+def _flatten(rows: Sequence[Sequence[ModelButton]]) -> list[ModelButton]:
     return [button for row in rows for button in row]
 
 
@@ -36,10 +38,10 @@ def test_host_keyboard_lists_all_hosts_with_friendly_labels() -> None:
     labels = [button.text for button in buttons]
 
     assert "Anthropic Agent SDK (3)" in labels
-    assert "Gemini API (2)" in labels
+    assert "Gemini API (5)" in labels
     assert "xAI (1)" in labels
-    assert "LiteLLM (5)" in labels
-    assert "OpenCode Go (2)" in labels
+    assert "LiteLLM (19)" in labels
+    assert "OpenCode Go (12)" in labels
     # Title-casing bug from before: must not contain the broken labels.
     assert "Openai (5)" not in labels
     assert "Xai (1)" not in labels
@@ -75,8 +77,12 @@ def test_vendor_keyboard_lists_vendors_for_a_host() -> None:
     rows = build_vendor_keyboard(host=Host.opencode_go.value)
     labels = [b.text for b in _flatten(rows)]
 
-    assert "Z.AI (1)" in labels
-    assert "Moonshot (1)" in labels
+    assert "Z.AI (2)" in labels
+    assert "Moonshot (2)" in labels
+    assert "Xiaomi (2)" in labels
+    assert "Alibaba (2)" in labels
+    assert "MiniMax (2)" in labels
+    assert "DeepSeek (2)" in labels
 
 
 def test_vendor_keyboard_back_button_returns_to_host_screen() -> None:
@@ -254,10 +260,15 @@ def test_pagination_last_page_omits_next_button(monkeypatch: pytest.MonkeyPatch)
     import app.integrations.telegram.model_picker as picker_module
 
     monkeypatch.setattr(picker_module, "_MODEL_PAGE_SIZE", 1)
+    # The catalog currently exposes 19 OpenAI models under LiteLLM
+    # (GPT-5.5, GPT-5.4 family, GPT-5.3 chat + codex, GPT-5.1 Codex
+    # Max, GPT-5 family, GPT-4.1 family, GPT-4o family, o-series).
+    # With page_size=1 that's 19 pages; page 19 is the last page so
+    # it must omit ``Next >``.
     rows = build_models_keyboard(
         host=Host.litellm.value,
         vendor="openai",
-        page=5,  # LiteLLM has 5 OpenAI models, so page 5 of 5 with size 1
+        page=19,
         current_model_id="",
     )
     labels = [b.text for b in _flatten(rows)]

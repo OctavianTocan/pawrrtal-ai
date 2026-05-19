@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from app.db import async_session_maker
-from app.integrations.telegram.handlers import handle_model_command
+from app.integrations.telegram.model_command import handle_model_command
 from app.integrations.telegram.model_picker import (
+    MODEL_CALLBACK_PREFIX,  # noqa: F401  # re-exported so bot.py imports both via one module
     ModelButton,
     ModelCallback,
     build_host_keyboard,
@@ -42,7 +43,7 @@ async def answer_model_command(*, message: Message, model_arg: str) -> None:
 
 
 async def answer_model_picker(*, message: Message) -> None:
-    """Open the host picker for ``/models`` or empty ``/model``."""
+    """Open the host picker for an argument-less ``/model``."""
     sender = _sender_from_message(message)
     async with async_session_maker() as session:
         state = await get_model_picker_state(sender=sender, session=session)

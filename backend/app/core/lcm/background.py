@@ -36,6 +36,8 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -77,6 +79,58 @@ class _LockSlot:
 _LCM_COMPACT_LOCKS: dict[uuid.UUID, _LockSlot] = {}
 
 
+def _claim_slot(conversation_id: uuid.UUID) -> _LockSlot:
+    """Get or create the slot and synchronously bump its refcount.
+
+    Centralised so both ``schedule_lcm_compaction`` (which claims the
+    slot before launching a background task) and ``acquire_lcm_lock``
+    (which claims it inside an async context manager) share the same
+    "create-if-missing + refcount++" invariant — preventing drift if
+    the refcount contract evolves.
+    """
+    slot = _LCM_COMPACT_LOCKS.get(conversation_id)
+    if slot is None:
+        slot = _LockSlot(lock=asyncio.Lock(), refcount=0)
+        _LCM_COMPACT_LOCKS[conversation_id] = slot
+    slot.refcount += 1
+    return slot
+
+
+def _release_slot(conversation_id: uuid.UUID) -> None:
+    """Decrement the slot's refcount and drop it from the registry at zero."""
+    slot = _LCM_COMPACT_LOCKS.get(conversation_id)
+    if slot is None:
+        return
+    slot.refcount -= 1
+    if slot.refcount <= 0:
+        _LCM_COMPACT_LOCKS.pop(conversation_id, None)
+
+
+@asynccontextmanager
+async def acquire_lcm_lock(conversation_id: uuid.UUID) -> AsyncIterator[None]:
+    """Hold the per-conversation lock for the duration of the ``with`` block.
+
+    Public seam so foreground callers (the Telegram ``/compact`` command,
+    one-off admin scripts) can run a compaction pass under the same
+    lock the background helper uses. Without sharing the lock, a
+    manual /compact firing concurrently with the auto-scheduled
+    background pass would race on the ``(conversation_id, ordinal)``
+    unique constraint.
+
+    Same refcount + cleanup contract as
+    :func:`schedule_lcm_compaction`: increment on entry, decrement in
+    the ``finally``, drop the registry entry when the count returns
+    to zero. The actual ``acquire`` happens inside the ``async with``
+    so concurrent callers queue cleanly behind any current holder.
+    """
+    slot = _claim_slot(conversation_id)
+    try:
+        async with slot.lock:
+            yield
+    finally:
+        _release_slot(conversation_id)
+
+
 def schedule_lcm_compaction(
     *,
     conversation_id: uuid.UUID,
@@ -97,11 +151,7 @@ def schedule_lcm_compaction(
     """
     if not settings.lcm_enabled:
         return
-    slot = _LCM_COMPACT_LOCKS.get(conversation_id)
-    if slot is None:
-        slot = _LockSlot(lock=asyncio.Lock(), refcount=0)
-        _LCM_COMPACT_LOCKS[conversation_id] = slot
-    slot.refcount += 1
+    _claim_slot(conversation_id)
     task = asyncio.create_task(
         _lcm_compact_bg(
             conversation_id=conversation_id,
@@ -149,6 +199,4 @@ async def _lcm_compact_bg(
             conversation_id,
         )
     finally:
-        slot.refcount -= 1
-        if slot.refcount <= 0:
-            _LCM_COMPACT_LOCKS.pop(conversation_id, None)
+        _release_slot(conversation_id)

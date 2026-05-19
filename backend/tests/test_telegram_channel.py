@@ -35,10 +35,10 @@ from app.integrations.telegram.bot_provider_resolution import (
 )
 from app.integrations.telegram.handlers import (
     TelegramTurnContext,
-    handle_model_command,
     handle_plain_message,
     handle_stop_command,
 )
+from app.integrations.telegram.model_command import handle_model_command
 from app.integrations.telegram.sender import TelegramSender
 from app.integrations.telegram.status import (
     _format_duration,
@@ -127,7 +127,17 @@ async def test_refresh_telegram_commands_sets_current_command_menu() -> None:
     bot.set_my_commands.assert_awaited_once()
     commands = bot.set_my_commands.await_args.args[0]
     names = [command.command for command in commands]
-    assert names == ["start", "new", "model", "models", "verbose", "stop", "status", "lcm"]
+    assert names == [
+        "start",
+        "new",
+        "model",
+        "thinking",
+        "verbose",
+        "stop",
+        "status",
+        "lcm",
+        "compact",
+    ]
     assert all(command.description for command in commands)
 
 
@@ -590,11 +600,11 @@ class TestHandleModelCommand:
         update_mock = AsyncMock(return_value=True)
         with (
             patch(
-                "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
+                "app.integrations.telegram.model_command.resolve_or_autolink_telegram_user",
                 new=AsyncMock(return_value=uuid.uuid4()),
             ),
             patch(
-                "app.integrations.telegram.handlers.update_conversation_model",
+                "app.integrations.telegram.model_command.update_conversation_model",
                 new=update_mock,
             ),
         ):
@@ -609,7 +619,7 @@ class TestHandleModelCommand:
         sender = TelegramSender(user_id=2, chat_id=2, username=None, full_name=None)
         session = AsyncMock()
         with patch(
-            "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
+            "app.integrations.telegram.model_command.resolve_or_autolink_telegram_user",
             new=AsyncMock(return_value=None),
         ):
             reply = await handle_model_command(
@@ -626,7 +636,7 @@ class TestHandleModelCommand:
         session = AsyncMock()
         update_mock = AsyncMock(return_value=True)
         with patch(
-            "app.integrations.telegram.handlers.update_conversation_model",
+            "app.integrations.telegram.model_command.update_conversation_model",
             new=update_mock,
         ):
             reply = await handle_model_command(
@@ -636,7 +646,7 @@ class TestHandleModelCommand:
             )
 
         assert "catalog" in reply.lower()
-        assert "/models" in reply
+        assert "/model" in reply  # /models was removed; /model with no args opens picker
         update_mock.assert_not_called()
 
     async def test_model_command_stores_canonical_form_for_well_formed_input(
@@ -662,15 +672,15 @@ class TestHandleModelCommand:
         update_mock = AsyncMock(return_value=True)
         with (
             patch(
-                "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
+                "app.integrations.telegram.model_command.resolve_or_autolink_telegram_user",
                 new=AsyncMock(return_value=pawrrtal_uid),
             ),
             patch(
-                "app.integrations.telegram.handlers.get_or_create_telegram_conversation_full",
+                "app.integrations.telegram.model_command.get_or_create_telegram_conversation_full",
                 new=AsyncMock(return_value=fake_conv),
             ),
             patch(
-                "app.integrations.telegram.handlers.update_conversation_model",
+                "app.integrations.telegram.model_command.update_conversation_model",
                 new=update_mock,
             ),
         ):
@@ -700,15 +710,15 @@ class TestHandleModelCommand:
 
         with (
             patch(
-                "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
+                "app.integrations.telegram.model_command.resolve_or_autolink_telegram_user",
                 new=AsyncMock(return_value=pawrrtal_uid),
             ),
             patch(
-                "app.integrations.telegram.handlers.get_or_create_telegram_conversation_full",
+                "app.integrations.telegram.model_command.get_or_create_telegram_conversation_full",
                 new=AsyncMock(return_value=fake_conv),
             ),
             patch(
-                "app.integrations.telegram.handlers.update_conversation_model",
+                "app.integrations.telegram.model_command.update_conversation_model",
                 new=AsyncMock(return_value=False),
             ),
         ):
@@ -742,15 +752,15 @@ class TestHandleModelCommand:
         update_mock = AsyncMock(return_value=True)
         with (
             patch(
-                "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
+                "app.integrations.telegram.model_command.resolve_or_autolink_telegram_user",
                 new=AsyncMock(return_value=pawrrtal_uid),
             ),
             patch(
-                "app.integrations.telegram.handlers.get_or_create_telegram_conversation_full",
+                "app.integrations.telegram.model_command.get_or_create_telegram_conversation_full",
                 new=AsyncMock(return_value=fake_conv),
             ),
             patch(
-                "app.integrations.telegram.handlers.update_conversation_model",
+                "app.integrations.telegram.model_command.update_conversation_model",
                 new=update_mock,
             ),
         ):
@@ -917,12 +927,14 @@ class TestRenderStatusMessage:
             conversation_id=uuid.uuid4(),
             model_id=default_model().id,
             verbose_level=1,
+            reasoning_effort=None,
             started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),
             message_count=14,
             user_message_count=7,
             assistant_message_count=7,
             total_input_tokens=18_420,
             total_output_tokens=6_108,
+            total_cost_usd=0.0,
         )
 
     def test_renders_known_model_without_warning(self) -> None:
@@ -957,12 +969,14 @@ class TestRenderStatusMessage:
             conversation_id=uuid.uuid4(),
             model_id=default_model().id,
             verbose_level=1,
+            reasoning_effort=None,
             started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),
             message_count=48,
             user_message_count=24,
             assistant_message_count=24,
             total_input_tokens=0,
             total_output_tokens=0,
+            total_cost_usd=0.0,
         )
         rendered = _render_status_message(
             bot_uptime_seconds=60,
@@ -987,12 +1001,14 @@ class TestRenderStatusMessage:
             conversation_id=uuid.uuid4(),
             model_id=default_model().id,
             verbose_level=1,
+            reasoning_effort=None,
             started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),
             message_count=0,
             user_message_count=0,
             assistant_message_count=0,
             total_input_tokens=0,
             total_output_tokens=0,
+            total_cost_usd=0.0,
         )
         rendered = _render_status_message(
             bot_uptime_seconds=60,
@@ -1011,12 +1027,14 @@ class TestRenderStatusMessage:
             conversation_id=uuid.uuid4(),
             model_id="agent-sdk:anthropic/claude-removed-from-catalog",
             verbose_level=None,
+            reasoning_effort=None,
             started_at=_dt(2026, 5, 17, 19, 0, tzinfo=UTC),
             message_count=2,
             user_message_count=1,
             assistant_message_count=1,
             total_input_tokens=100,
             total_output_tokens=50,
+            total_cost_usd=0.0,
         )
         rendered = _render_status_message(
             bot_uptime_seconds=60,
@@ -1043,12 +1061,14 @@ class TestRenderStatusMessage:
             conversation_id=uuid.uuid4(),
             model_id=default_model().id,
             verbose_level=1,
+            reasoning_effort=None,
             started_at=_dt(2026, 5, 17, 18, 0),  # tz-naive, matches DB
             message_count=1,
             user_message_count=1,
             assistant_message_count=0,
             total_input_tokens=10,
             total_output_tokens=5,
+            total_cost_usd=0.0,
         )
         rendered = _render_status_message(
             bot_uptime_seconds=60,
@@ -1107,12 +1127,14 @@ class TestHandleStatusCommand:
             conversation_id=conv_id,
             model_id=default_model().id,
             verbose_level=2,
+            reasoning_effort=None,
             started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),
             message_count=3,
             user_message_count=2,
             assistant_message_count=1,
             total_input_tokens=900,
             total_output_tokens=200,
+            total_cost_usd=0.0,
         )
 
         with (

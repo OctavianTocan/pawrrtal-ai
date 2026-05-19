@@ -29,7 +29,7 @@ _CALLBACK_LIST_PARTS = 5  # mdl:l:<host>:<vendor>:<page>
 _CALLBACK_SELECT_PARTS = 4  # mdl:s:<token>:<index>
 
 _PICKER_NOT_BOUND_MESSAGE = "Connect your account first before changing models."
-_PICKER_STALE_MESSAGE = "That model picker is out of date. Open /models again."
+_PICKER_STALE_MESSAGE = "That model picker is out of date. Send /model again."
 
 
 class TelegramSenderLike(Protocol):

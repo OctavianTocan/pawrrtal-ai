@@ -32,6 +32,7 @@ def system_prompt_for_turn(
     *,
     model_id: str | None,
     tools: list[AgentTool] | None,
+    reasoning_effort: str | None = None,
 ) -> str | None:
     """Return the workspace prompt with runtime metadata appended.
 
@@ -45,6 +46,11 @@ def system_prompt_for_turn(
             tool-inventory block entirely; the empty list still renders
             an explicit "no tools" notice so the model doesn't fall
             back to filesystem discovery.
+        reasoning_effort: The reasoning-effort level the provider is
+            being called with this turn, after the resolver backstop
+            has normalized it against the model's catalog support
+            tuple. ``None`` means "no knob set; provider default" —
+            the active-model block omits the line in that case.
 
     Returns:
         Composed system prompt, or ``None`` when the workspace prompt
@@ -55,13 +61,17 @@ def system_prompt_for_turn(
     base_prompt = workspace_system_prompt(workspace_root)
     return append_runtime_context(
         base_prompt,
-        identity=_provider_identity_for(model_id),
+        identity=_provider_identity_for(model_id, reasoning_effort=reasoning_effort),
         safety=safety_from_settings(settings),
         tools=tools,
     )
 
 
-def _provider_identity_for(model_id: str | None) -> ProviderIdentity | None:
+def _provider_identity_for(
+    model_id: str | None,
+    *,
+    reasoning_effort: str | None = None,
+) -> ProviderIdentity | None:
     """Look up trusted provider + model metadata for ``model_id``.
 
     Returns ``None`` when the channel didn't supply a model id (rare —
@@ -80,11 +90,16 @@ def _provider_identity_for(model_id: str | None) -> ProviderIdentity | None:
     except InvalidModelId:
         # Channel sent us something we can't decode — surface the raw
         # id rather than silently drop the section.
-        return ProviderIdentity(provider="unknown", model_id=model_id)
+        return ProviderIdentity(
+            provider="unknown",
+            model_id=model_id,
+            reasoning_effort=reasoning_effort,
+        )
     entry = find_catalog_entry(parsed)
     display_name = entry.display_name if entry is not None else None
     return ProviderIdentity(
         provider=parsed.host.value,
         model_id=model_id,
         display_name=display_name,
+        reasoning_effort=reasoning_effort,
     )

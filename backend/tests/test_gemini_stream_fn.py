@@ -388,3 +388,103 @@ async def test_gemini_provider_accumulates_tool_result_in_context(
 
     # Second call's message list includes the tool result.
     assert "toolResult" in second_call_roles
+
+
+# ---------------------------------------------------------------------------
+# Test 8 — usage capture + per-model thinking-level defaults
+# ---------------------------------------------------------------------------
+
+
+def _thinking_level(cfg: object) -> str:
+    """Return the ``thinking_level`` of a ``ThinkingConfig`` as a string.
+
+    The Gemini SDK coerces the string we pass into a ``ThinkingLevel``
+    enum (whose ``str()`` is ``"ThinkingLevel.MINIMAL"`` etc.). We
+    pull the ``.value`` when present and fall back to the bare string
+    suffix for forward compatibility.
+    """
+    level = getattr(cfg, "thinking_level", None)
+    if level is None:
+        return ""
+    value = getattr(level, "value", None)
+    if isinstance(value, str):
+        return value.lower()
+    return str(level).rsplit(".", 1)[-1].lower()
+
+
+def test_compose_thinking_config_defaults_per_model() -> None:
+    """Each Gemini family gets a safe-default thinking level that avoids
+    the empty-response trap.
+
+    Gemini 3 series models default to ``thinking_level=high`` upstream,
+    which on tool follow-up turns can consume the entire output budget
+    on internal reasoning. We pin per-model defaults so an unconfigured
+    chat turn stays interactive.
+    """
+    from app.core.providers.gemini_provider import compose_thinking_config
+
+    flash_lite = compose_thinking_config(reasoning_effort=None, model_id="gemini-3.1-flash-lite")
+    assert _thinking_level(flash_lite) == "minimal"
+
+    flash_35 = compose_thinking_config(reasoning_effort=None, model_id="gemini-3.5-flash")
+    assert _thinking_level(flash_35) == "low"
+
+    flash_3 = compose_thinking_config(reasoning_effort=None, model_id="gemini-3-flash-preview")
+    assert _thinking_level(flash_3) == "low"
+
+    pro = compose_thinking_config(reasoning_effort=None, model_id="gemini-3.1-pro-preview")
+    assert _thinking_level(pro) == "medium"
+
+
+def test_compose_thinking_config_honours_explicit_override() -> None:
+    """An explicit ``reasoning_effort`` from the /thinking picker
+    always wins over the per-model default."""
+    from app.core.providers.gemini_provider import compose_thinking_config
+
+    cfg = compose_thinking_config(reasoning_effort="high", model_id="gemini-3.1-flash-lite")
+    assert _thinking_level(cfg) == "high"
+
+
+def test_compose_thinking_config_maps_minimal_and_extra_high() -> None:
+    """Pawrrtal's five-level enum collapses onto Gemini's four-level
+    enum: ``minimal`` rides through unchanged, ``extra-high`` saturates
+    at ``high``."""
+    from app.core.providers.gemini_provider import compose_thinking_config
+
+    cfg_min = compose_thinking_config(reasoning_effort="minimal", model_id="gemini-3.5-flash")
+    assert _thinking_level(cfg_min) == "minimal"
+
+    cfg_xhigh = compose_thinking_config(reasoning_effort="extra-high", model_id="gemini-3.5-flash")
+    assert _thinking_level(cfg_xhigh) == "high"
+
+
+def test_gemini_usage_accumulator_sums_across_requests() -> None:
+    """Each StreamFn invocation is one Gemini request whose
+    ``usage_metadata`` is cumulative within that request; the
+    accumulator sums per-request totals across requests, with
+    thinking tokens billed as output (per the Gemini Thinking docs).
+    """
+    from app.core.providers.gemini_provider import GeminiUsageAccumulator
+
+    acc = GeminiUsageAccumulator()
+    acc.absorb_request(prompt_tokens=100, candidates_tokens=50, thoughts_tokens=20)
+    acc.absorb_request(prompt_tokens=80, candidates_tokens=40, thoughts_tokens=10)
+
+    # Sums across requests; thoughts fold into output.
+    assert acc.input_tokens == 180
+    assert acc.output_tokens == 50 + 20 + 40 + 10
+    assert acc.thoughts_tokens == 30
+    assert acc.saw_any is True
+
+
+def test_gemini_usage_accumulator_ignores_empty_records() -> None:
+    """Pure-failure paths (no tokens at all) leave ``saw_any`` false so
+    the provider skips emitting a zero-token usage event."""
+    from app.core.providers.gemini_provider import GeminiUsageAccumulator
+
+    acc = GeminiUsageAccumulator()
+    acc.absorb_request(prompt_tokens=0, candidates_tokens=0, thoughts_tokens=0)
+
+    assert acc.saw_any is False
+    assert acc.input_tokens == 0
+    assert acc.output_tokens == 0

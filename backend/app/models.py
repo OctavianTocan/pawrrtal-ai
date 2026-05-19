@@ -81,6 +81,12 @@ class Conversation(Base):
     # 2 = detailed (+ thinking + tool inputs). NULL inherits
     # settings.telegram_verbose_default (or 1 if unset).
     verbose_level: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Per-conversation reasoning depth. One of the ReasoningEffort literal
+    # values ("low" | "medium" | "high" | "extra-high") or NULL to let the
+    # provider pick its default. Mirrors verbose_level's plumbing: a chat
+    # request may still override per-turn, but absent that the persisted
+    # value is what the turn runner forwards to the provider.
+    reasoning_effort: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
 
 class Project(Base):

@@ -111,6 +111,32 @@ def test_identity_block_skips_display_when_equal_to_model_id() -> None:
     assert "Display name" not in block
 
 
+def test_identity_block_renders_reasoning_effort_when_set() -> None:
+    """Reasoning effort surfaces in the active-model block when present."""
+    identity = ProviderIdentity(
+        provider="anthropic",
+        model_id="claude-opus-4-7",
+        display_name="Claude Opus 4.7",
+        reasoning_effort="high",
+    )
+    block = compose_runtime_identity_block(identity)
+    assert block is not None
+    assert "Reasoning effort: high" in block
+
+
+def test_identity_block_omits_reasoning_when_none() -> None:
+    """Models running without a knob don't get a misleading 'default' line."""
+    identity = ProviderIdentity(
+        provider="anthropic",
+        model_id="claude-opus-4-7",
+        display_name="Claude Opus 4.7",
+        reasoning_effort=None,
+    )
+    block = compose_runtime_identity_block(identity)
+    assert block is not None
+    assert "Reasoning effort" not in block
+
+
 # ---------------------------------------------------------------------------
 # compose_resource_budget_block (#291)
 # ---------------------------------------------------------------------------
