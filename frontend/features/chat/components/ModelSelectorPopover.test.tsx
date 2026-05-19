@@ -19,8 +19,9 @@ import type { ChatModelOption } from '../hooks/use-chat-models';
 import { CHAT_REASONING_LEVELS, ModelSelectorPopover } from './ModelSelectorPopover';
 
 /**
- * Fixture catalog passed via the `models` prop. Mirrors the shape returned by
- * `GET /api/v1/models`, with two vendors so the grouping path is exercised.
+ * Fixture catalog passed via the `models` prop. Now exercises the
+ * three-level walk: most hosts have a single vendor (collapsed path)
+ * and OpenCode Go carries two vendors (uncollapsed path).
  */
 const FIXTURE_MODELS: ChatModelOption[] = [
 	{
@@ -61,6 +62,26 @@ const FIXTURE_MODELS: ChatModelOption[] = [
 		display_name: 'Gemini 3.1 Flash Lite Preview',
 		short_name: 'Gemini 3.1 Flash Lite',
 		description: "Google's fast preview model",
+		is_default: false,
+	},
+	{
+		id: 'opencode-go:zai/glm-5.1',
+		host: 'opencode-go',
+		vendor: 'zai',
+		model: 'glm-5.1',
+		display_name: 'GLM-5.1',
+		short_name: 'GLM-5.1',
+		description: 'Open coding model via OpenCode Go',
+		is_default: false,
+	},
+	{
+		id: 'opencode-go:moonshot/kimi-k2.6',
+		host: 'opencode-go',
+		vendor: 'moonshot',
+		model: 'kimi-k2.6',
+		display_name: 'Kimi K2.6',
+		short_name: 'Kimi K2.6',
+		description: 'Long-context coding model via OpenCode Go',
 		is_default: false,
 	},
 ];
@@ -137,24 +158,63 @@ describe('ModelSelectorPopover', () => {
 		expect(trigger).toBeTruthy();
 	});
 
-	it('selects a dotted Gemini model from the vendor submenu on pointer-down', () => {
+	it('renders host rows at the root level with friendly labels', () => {
+		render(<ModelSelectorPopover {...DEFAULT_PROPS} />);
+		fireEvent.click(screen.getByRole('button', { name: /select model/i }));
+
+		expect(screen.getByText('Anthropic Agent SDK')).toBeTruthy();
+		expect(screen.getByText('Gemini API')).toBeTruthy();
+		expect(screen.getByText('OpenCode Go')).toBeTruthy();
+	});
+
+	it('collapses single-vendor hosts straight to the model list', () => {
 		vi.useFakeTimers();
 		const onSelectModel = vi.fn();
 		render(<ModelSelectorPopover {...DEFAULT_PROPS} onSelectModel={onSelectModel} />);
 
 		fireEvent.click(screen.getByRole('button', { name: /select model/i }));
-		const googleRow = closestButton(screen.getByText('Google'));
-		fireEvent.pointerEnter(googleRow);
+		const geminiHost = closestButton(screen.getByText('Gemini API'));
+		fireEvent.pointerEnter(geminiHost);
 		act(() => {
 			vi.advanceTimersByTime(120);
 		});
 
+		// Gemini API has one vendor (Google), so the model list appears
+		// directly without an intermediate "Google" submenu trigger.
 		const dottedGeminiRow = closestButton(screen.getByText('Gemini 3.1 Flash Lite'));
 		fireEvent.pointerDown(dottedGeminiRow, { button: 0 });
 		fireEvent.click(dottedGeminiRow);
 
 		expect(onSelectModel).toHaveBeenCalledTimes(1);
 		expect(onSelectModel).toHaveBeenCalledWith(DOTTED_GEMINI_ID);
+	});
+
+	it('shows a vendor submenu for multi-vendor hosts (OpenCode Go)', () => {
+		vi.useFakeTimers();
+		const onSelectModel = vi.fn();
+		render(<ModelSelectorPopover {...DEFAULT_PROPS} onSelectModel={onSelectModel} />);
+
+		fireEvent.click(screen.getByRole('button', { name: /select model/i }));
+		const opencodeHost = closestButton(screen.getByText('OpenCode Go'));
+		fireEvent.pointerEnter(opencodeHost);
+		act(() => {
+			vi.advanceTimersByTime(120);
+		});
+
+		// Vendor screen: Z.AI and Moonshot both render here.
+		expect(screen.getByText('Z.AI')).toBeTruthy();
+		const zaiVendor = closestButton(screen.getByText('Z.AI'));
+		fireEvent.pointerEnter(zaiVendor);
+		act(() => {
+			vi.advanceTimersByTime(120);
+		});
+
+		const glmRow = closestButton(screen.getByText('GLM-5.1'));
+		fireEvent.pointerDown(glmRow, { button: 0 });
+		fireEvent.click(glmRow);
+
+		expect(onSelectModel).toHaveBeenCalledTimes(1);
+		expect(onSelectModel).toHaveBeenCalledWith('opencode-go:zai/glm-5.1');
 	});
 
 	it('selects a reasoning level from the thinking submenu on pointer-down', () => {
@@ -252,8 +312,8 @@ describe('ModelSelectorPopover', () => {
 		expect(screen.getAllByRole('button').length).toBeGreaterThan(0);
 	});
 
-	it('groups vendors from the catalog (smoke render with two vendors)', () => {
-		// Smoke test: two-vendor fixture renders without throwing.
+	it('groups hosts from the catalog (smoke render with three hosts)', () => {
+		// Smoke test: three-host fixture renders without throwing.
 		// Deeper grouping coverage requires a Radix portal interaction test.
 		render(<ModelSelectorPopover {...DEFAULT_PROPS} />);
 		expect(screen.getByRole('button', { name: /select model/i })).toBeTruthy();
