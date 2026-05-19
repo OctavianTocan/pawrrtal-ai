@@ -12,8 +12,6 @@ from app.core.providers.catalog import MODEL_CATALOG, default_model
 from app.integrations.telegram.handlers import TelegramSender
 from app.integrations.telegram.model_picker import (
     ModelCallback,
-    _list_callback,
-    _vendor_callback,
     build_models_keyboard,
     build_provider_keyboard,
     format_provider_picker_text,
@@ -123,14 +121,6 @@ async def test_get_model_picker_state_reads_conversation_override() -> None:
 
     assert state is not None
     assert state.current_model_id == override
-
-
-def test_vendor_callback_serializes_with_host_slug() -> None:
-    assert _vendor_callback("opencode-go") == "mdl:v:opencode-go"
-
-
-def test_list_callback_serializes_with_host_and_vendor() -> None:
-    assert _list_callback("opencode-go", "zai", 1) == "mdl:l:opencode-go:zai:1"
 
 
 def test_parse_vendor_callback_round_trips_host() -> None:
