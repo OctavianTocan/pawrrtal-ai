@@ -57,6 +57,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 from xai_sdk import AsyncClient
 from xai_sdk.proto import chat_pb2
@@ -100,15 +101,15 @@ from .base import ReasoningEffort, StreamEvent
 logger = logging.getLogger(__name__)
 
 
-def _resolve_xai_api_key(workspace_id: uuid.UUID | None) -> str:
+def _resolve_xai_api_key(workspace_root: Path | None) -> str:
     """Resolve the xAI API key for this request.
 
     Workspace overrides win over the gateway-global ``settings.xai_api_key``;
     :func:`resolve_api_key` already performs that fallback, so callers
     never need an ``or settings.xai_api_key`` suffix.
     """
-    if workspace_id is not None:
-        return resolve_api_key(workspace_id, "XAI_API_KEY") or ""
+    if workspace_root is not None:
+        return resolve_api_key(workspace_root, "XAI_API_KEY") or ""
     return settings.xai_api_key
 
 
@@ -135,7 +136,7 @@ def _map_reasoning_effort(
 
 def make_xai_stream_fn(
     model_id: str,
-    workspace_id: uuid.UUID | None = None,
+    workspace_root: Path | None = None,
     *,
     system_prompt: str,
     reasoning_effort: ReasoningEffort | None = None,
@@ -146,8 +147,9 @@ def make_xai_stream_fn(
     Args:
         model_id: xAI model identifier (e.g. ``"grok-4.3"``).  Passed
             straight through to ``client.chat.create(model=...)``.
-        workspace_id: Active workspace UUID, used to honour a
-            per-workspace ``XAI_API_KEY`` override.  ``None`` falls back
+        workspace_root: Absolute path from the ``workspaces.path`` DB
+            column, used to honour a per-workspace ``XAI_API_KEY``
+            override.  ``None`` falls back
             to the gateway-global ``settings.xai_api_key``.
         system_prompt: System prompt for this StreamFn.  Captured into
             the returned closure and prepended as a ``ROLE_DEVELOPER``
@@ -176,7 +178,7 @@ def make_xai_stream_fn(
         messages: list[AgentMessage],
         tools: list[AgentTool],
     ) -> AsyncIterator[LLMEvent]:
-        api_key = _resolve_xai_api_key(workspace_id)
+        api_key = _resolve_xai_api_key(workspace_root)
         request_messages = build_xai_messages(messages, system_prompt)
         xai_tools = build_xai_tools(tools)
         effort = _map_reasoning_effort(reasoning_effort)
@@ -265,7 +267,7 @@ class XaiLLM:
     ``.claude/rules/architecture/no-tools-in-providers.md``.
     """
 
-    def __init__(self, model_id: str, *, workspace_id: uuid.UUID | None = None) -> None:
+    def __init__(self, model_id: str, *, workspace_root: Path | None = None) -> None:
         """Construct an xAI provider bound to a specific model slug.
 
         Args:
@@ -273,14 +275,14 @@ class XaiLLM:
                 The factory unwraps the canonical
                 ``host:vendor/model`` form before constructing the
                 provider.
-            workspace_id: Active workspace UUID, optional.  When
-                supplied, a per-workspace ``XAI_API_KEY`` override is
-                honoured; otherwise the gateway-global key is used.
-                Optional to match :class:`ClaudeLLM` and
+            workspace_root: Absolute path from the ``workspaces.path`` DB
+                column.  When supplied, a per-workspace ``XAI_API_KEY``
+                override is honoured; otherwise the gateway-global key is
+                used.  Optional to match :class:`ClaudeLLM` and
                 :class:`GeminiLLM` for unauthenticated callers.
         """
         self._model_id = model_id
-        self._workspace_id = workspace_id
+        self._workspace_root = workspace_root
         # ``_stream_fn`` is ``None`` in production; ``stream()`` builds
         # a fresh StreamFn per request so the per-request system prompt
         # is captured into the closure.  Tests monkeypatch this
@@ -373,7 +375,7 @@ class XaiLLM:
         usage_sink = UsageAccumulator()
         stream_fn = self._stream_fn or make_xai_stream_fn(
             self._model_id,
-            self._workspace_id,
+            self._workspace_root,
             system_prompt=context.system_prompt,
             reasoning_effort=reasoning_effort,
             usage_sink=usage_sink,

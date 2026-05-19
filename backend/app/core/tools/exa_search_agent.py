@@ -16,7 +16,7 @@ Usage::
 
 from __future__ import annotations
 
-import uuid
+from pathlib import Path
 from typing import Any
 
 from app.core.agent_loop.types import AgentTool
@@ -76,12 +76,13 @@ _PARAMETERS: dict[str, Any] = {
 }
 
 
-def make_exa_search_tool(*, workspace_id: uuid.UUID | None = None) -> AgentTool:
+def make_exa_search_tool(*, workspace_root: Path | None = None) -> AgentTool:
     """Return an :class:`AgentTool` wrapping the Exa web-search core.
 
     Args:
-        workspace_id: Active workspace UUID, used to resolve per-workspace
-            API key overrides. When ``None`` the global settings key is used.
+        workspace_root: Absolute path from the ``workspaces.path`` DB column,
+            used to resolve per-workspace API key overrides. When ``None`` the
+            global settings key is used.
 
     Returns:
         A configured :class:`AgentTool` ready to be appended to
@@ -95,8 +96,8 @@ def make_exa_search_tool(*, workspace_id: uuid.UUID | None = None) -> AgentTool:
         num_results = int(raw_num_results) if isinstance(raw_num_results, int | float | str) else 5
         include_full_text = bool(kwargs.get("include_full_text") or False)
         api_key = None
-        if workspace_id:
-            api_key = resolve_api_key(workspace_id, "EXA_API_KEY")
+        if workspace_root:
+            api_key = resolve_api_key(workspace_root, "EXA_API_KEY")
         result = await exa_search(
             query,
             num_results=num_results,

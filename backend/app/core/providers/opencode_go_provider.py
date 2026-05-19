@@ -32,6 +32,7 @@ import logging
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 from openai import AsyncOpenAI
@@ -144,7 +145,7 @@ def _absorb_usage(chunk: Any, usage_acc: _UsageAccumulator) -> None:
     )
 
 
-def _resolve_opencode_api_key(workspace_id: uuid.UUID | None) -> str:
+def _resolve_opencode_api_key(workspace_root: Path | None) -> str:
     """Resolve the OpenCode API key for this request.
 
     Mirrors the ``_resolve_gemini_api_key`` /
@@ -153,8 +154,8 @@ def _resolve_opencode_api_key(workspace_id: uuid.UUID | None) -> str:
     through to the global when no workspace is in scope (background
     utility agents) or the workspace has not set an override.
     """
-    if workspace_id is not None:
-        return resolve_api_key(workspace_id, _OPENCODE_API_KEY_NAME) or ""
+    if workspace_root is not None:
+        return resolve_api_key(workspace_root, _OPENCODE_API_KEY_NAME) or ""
     return settings.opencode_api_key
 
 
@@ -226,7 +227,7 @@ def _done_event(full_text: str, tool_calls: list[dict[str, Any]]) -> LLMDoneEven
 
 def make_opencode_go_stream_fn(
     model_id: str,
-    workspace_id: uuid.UUID | None,
+    workspace_root: Path | None,
     *,
     config: OpencodeGoLLMConfig,
     system_prompt: str,
@@ -238,7 +239,8 @@ def make_opencode_go_stream_fn(
         model_id: The bare model slug accepted by the gateway, e.g.
             ``"glm-5.1"`` or ``"kimi-k2.6"`` (no ``vendor/`` prefix —
             the canonical wire id is parsed upstream).
-        workspace_id: Active workspace UUID; honoured for per-workspace
+        workspace_root: Absolute path from the ``workspaces.path`` DB
+            column; honoured for per-workspace
             API-key override.  ``None`` falls back to
             :attr:`Settings.opencode_api_key`.
         config: Per-model rates + gateway base URL.
@@ -259,7 +261,7 @@ def make_opencode_go_stream_fn(
         messages: list[AgentMessage],
         tools: list[AgentTool],
     ) -> AsyncIterator[LLMEvent]:
-        api_key = _resolve_opencode_api_key(workspace_id)
+        api_key = _resolve_opencode_api_key(workspace_root)
         client = AsyncOpenAI(base_url=config.base_url, api_key=api_key or "missing")
         openai_messages = build_openai_messages(system_prompt=system_prompt, messages=messages)
         openai_tools = build_openai_tools(tools)
@@ -320,7 +322,7 @@ class OpencodeGoLLM:
         model_id: str,
         *,
         config: OpencodeGoLLMConfig,
-        workspace_id: uuid.UUID | None = None,
+        workspace_root: Path | None = None,
     ) -> None:
         """Construct an OpenCode Go provider.
 
@@ -331,14 +333,15 @@ class OpencodeGoLLM:
             config: Per-model rates + gateway base URL. The factory
                 derives this from the matching
                 ``catalog.ModelEntry``.
-            workspace_id: Active workspace UUID, optional. When
-                supplied, ``stream()`` resolves a per-workspace
-                ``OPENCODE_API_KEY`` override; otherwise falls back to
-                the gateway-global ``settings.opencode_api_key``.
-                Mirrors the ``GeminiLLM`` / ``XaiLLM`` contract.
+            workspace_root: Absolute path from the ``workspaces.path`` DB
+                column.  When supplied, ``stream()`` resolves a
+                per-workspace ``OPENCODE_API_KEY`` override; otherwise
+                falls back to the gateway-global
+                ``settings.opencode_api_key``.  Mirrors the
+                ``GeminiLLM`` / ``XaiLLM`` contract.
         """
         self._model_id = model_id
-        self._workspace_id = workspace_id
+        self._workspace_root = workspace_root
         self._config = config
         # ``_stream_fn`` defaults to ``None`` so production callers
         # build a fresh StreamFn per request (with the request's
@@ -366,7 +369,7 @@ class OpencodeGoLLM:
             conversation_id: Used only for logging here.
             user_id: Authenticated user UUID, used for logging only.
                 Per-workspace API-key resolution happens at
-                construction time via ``self._workspace_id``.
+                construction time via ``self._workspace_root``.
             history: Prior messages oldest-first as ``{role, content}``
                 dicts.
             tools: Optional ``AgentTool`` list assembled by the chat
@@ -422,7 +425,7 @@ class OpencodeGoLLM:
 
         stream_fn = self._stream_fn or make_opencode_go_stream_fn(
             self._model_id,
-            self._workspace_id,
+            self._workspace_root,
             config=self._config,
             system_prompt=context.system_prompt,
             usage_acc=usage_acc,

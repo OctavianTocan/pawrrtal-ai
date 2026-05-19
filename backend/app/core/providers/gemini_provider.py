@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any
 
 from google import genai
@@ -143,10 +144,10 @@ def _build_gemini_contents(messages: list[AgentMessage]) -> list[gtypes.ContentU
     return contents
 
 
-def _resolve_gemini_api_key(workspace_id: uuid.UUID | None) -> str:
+def _resolve_gemini_api_key(workspace_root: Path | None) -> str:
     """Resolve the Gemini API key for this request."""
-    if workspace_id is not None:
-        return resolve_api_key(workspace_id, "GEMINI_API_KEY") or ""
+    if workspace_root is not None:
+        return resolve_api_key(workspace_root, "GEMINI_API_KEY") or ""
     return settings.google_api_key
 
 
@@ -213,7 +214,7 @@ def _tool_calls_from_chunk(chunk: Any, start_index: int) -> list[dict[str, Any]]
 
 def make_gemini_stream_fn(
     model_id: str,
-    workspace_id: uuid.UUID | None = None,
+    workspace_root: Path | None = None,
     *,
     system_prompt: str,
 ) -> StreamFn:
@@ -221,11 +222,11 @@ def make_gemini_stream_fn(
 
     Args:
         model_id: Gemini model identifier (e.g. ``"gemini-3.1-flash-lite-preview"``).
-        workspace_id: Active workspace UUID, used to resolve a per-workspace
-            ``GEMINI_API_KEY`` override. When ``None`` the gateway-global
-            ``settings.google_api_key`` is used directly, matching
-            ``ClaudeLLM``'s optional ``workspace_id`` contract for
-            unauthenticated background work (e.g. utility agents).
+        workspace_root: Absolute path from the ``workspaces.path`` DB column,
+            used to resolve a per-workspace ``GEMINI_API_KEY`` override. When
+            ``None`` the gateway-global ``settings.google_api_key`` is used
+            directly, matching ``ClaudeLLM``'s optional ``workspace_root``
+            contract for unauthenticated background work (e.g. utility agents).
         system_prompt: The system prompt for this StreamFn.  Captured into the
             returned closure and bound to ``GenerateContentConfig.system_instruction``
             on every call.  ``GeminiLLM.stream`` builds a fresh StreamFn per
@@ -245,7 +246,7 @@ def make_gemini_stream_fn(
         messages: list[AgentMessage],
         tools: list[AgentTool],
     ) -> AsyncIterator[LLMEvent]:
-        client = genai.Client(api_key=_resolve_gemini_api_key(workspace_id))
+        client = genai.Client(api_key=_resolve_gemini_api_key(workspace_root))
         contents = _build_gemini_contents(messages)
         # ``GenerateContentConfig.tools`` is typed as the wider union
         # ``list[Tool | Callable | mcp.Tool | ClientSession] | None``;
@@ -372,18 +373,19 @@ class GeminiLLM:
     chat.py).  Tools are injected per-request via the AgentContext.
     """
 
-    def __init__(self, model_id: str, *, workspace_id: uuid.UUID | None = None) -> None:
+    def __init__(self, model_id: str, *, workspace_root: Path | None = None) -> None:
         """Construct a Gemini provider.
 
         Args:
             model_id: Gemini model identifier.
-            workspace_id: Active workspace UUID, optional. When supplied,
-                a per-workspace ``GEMINI_API_KEY`` override is honoured;
-                otherwise the gateway-global key is used. Optional to match
-                ``ClaudeLLM``'s contract for unauthenticated callers.
+            workspace_root: Absolute path from the ``workspaces.path`` DB
+                column. When supplied, a per-workspace ``GEMINI_API_KEY``
+                override is honoured; otherwise the gateway-global key is
+                used. Optional to match ``ClaudeLLM``'s contract for
+                unauthenticated callers.
         """
         self._model_id = model_id
-        self._workspace_id = workspace_id
+        self._workspace_root = workspace_root
         # ``_stream_fn`` defaults to ``None`` because the production system
         # prompt isn't known until ``stream()`` is called — ``stream()``
         # builds a fresh StreamFn per request via ``make_gemini_stream_fn``
@@ -483,7 +485,7 @@ class GeminiLLM:
         # the injection (the script doesn't care about the prompt).
         stream_fn = self._stream_fn or make_gemini_stream_fn(
             self._model_id,
-            self._workspace_id,
+            self._workspace_root,
             system_prompt=context.system_prompt,
         )
 

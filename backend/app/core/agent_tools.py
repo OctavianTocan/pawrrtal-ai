@@ -141,13 +141,15 @@ def build_agent_tools(
     # `resolve_api_key` already handles workspace-then-settings fallback,
     # so a single call is sufficient. The unauthenticated fallback (no
     # `user_id` — e.g. background jobs) reads `settings.exa_api_key`
-    # directly.
+    # directly.  The `workspace_id` guard is an auth-context check, not a
+    # path check — it distinguishes authenticated chat turns (which have
+    # a workspace-bound .env) from background callers (which don't).
     if workspace_id is not None:
-        exa_key = resolve_api_key(workspace_id, "EXA_API_KEY")
+        exa_key = resolve_api_key(workspace_root, "EXA_API_KEY")
     else:
         exa_key = settings.exa_api_key or None
     if exa_key:
-        tools.append(make_exa_search_tool(workspace_id=workspace_id))
+        tools.append(make_exa_search_tool(workspace_root=workspace_root))
 
     # Artifact rendering.  Always present — the wire shape is purely
     # structural and the catalog of safe components is enforced on the
@@ -163,12 +165,14 @@ def build_agent_tools(
     # Image generation — pure tool: generates PNG, saves to workspace,
     # returns path.  The agent decides whether to send it via send_message.
     # Capability-gated on OPENAI_CODEX_OAUTH_TOKEN being resolvable.
+    # Same auth-gate pattern as the Exa block above: `workspace_id`
+    # distinguishes authenticated turns from background callers.
     if workspace_id is not None:
-        codex_token = resolve_api_key(workspace_id, "OPENAI_CODEX_OAUTH_TOKEN")
+        codex_token = resolve_api_key(workspace_root, "OPENAI_CODEX_OAUTH_TOKEN")
     else:
         codex_token = None
     if codex_token:
-        tools.append(make_image_gen_tool(workspace_root=workspace_root, workspace_id=workspace_id))
+        tools.append(make_image_gen_tool(workspace_root=workspace_root))
 
     # Document-to-Markdown conversion via markitdown.  Always present —
     # no external API key required; all conversion happens locally.

@@ -25,7 +25,7 @@ def resolve_workspace_token(ctx: ToolContext) -> str | None:
     name; if Notion ever expands the env-key surface the change lands
     in exactly one place.
     """
-    return resolve_api_key(ctx.workspace_id, NOTION_API_KEY_NAME)
+    return resolve_api_key(ctx.workspace_root, NOTION_API_KEY_NAME)
 
 
 def encode_error(message: str) -> str:

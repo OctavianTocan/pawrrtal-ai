@@ -62,7 +62,8 @@ class TestMigrateUserKeyedEnvFile:
 
         assert result is True
         # The new path is readable through the public resolver.
-        loaded = keys.load_workspace_env(workspace_id)
+        ws_root = isolate_workspace_base / str(workspace_id)
+        loaded = keys.load_workspace_env(ws_root)
         assert loaded == {"GEMINI_API_KEY": "from-legacy"}
 
     def test_legacy_file_renamed_after_migration(self, isolate_workspace_base: Path) -> None:
@@ -99,7 +100,8 @@ class TestMigrateUserKeyedEnvFile:
         workspace_id = uuid.uuid4()
 
         # Pre-existing workspace-keyed env (the "new" value to preserve).
-        keys.save_workspace_env(workspace_id, {"EXA_API_KEY": "workspace-value"})
+        ws_root = isolate_workspace_base / str(workspace_id)
+        keys.save_workspace_env(ws_root, {"EXA_API_KEY": "workspace-value"})
         # Legacy file with a conflicting value.
         legacy_path = _write_legacy_env(
             isolate_workspace_base, user_id, {"EXA_API_KEY": "legacy-value"}
@@ -111,6 +113,6 @@ class TestMigrateUserKeyedEnvFile:
 
         assert result is False
         # Workspace value is untouched.
-        assert keys.load_workspace_env(workspace_id) == {"EXA_API_KEY": "workspace-value"}
+        assert keys.load_workspace_env(ws_root) == {"EXA_API_KEY": "workspace-value"}
         # Legacy file was quarantined.
         assert not legacy_path.exists()

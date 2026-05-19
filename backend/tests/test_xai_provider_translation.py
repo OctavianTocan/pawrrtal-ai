@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
@@ -317,13 +318,13 @@ def test_resolve_api_key_uses_settings_when_no_workspace(
 def test_resolve_api_key_workspace_override(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """workspace_id present → delegate to resolve_api_key (mocked)."""
-    workspace_id = uuid4()
+    """workspace_root present → delegate to resolve_api_key (mocked)."""
+    workspace_root = Path("/tmp/some-workspace")
     monkeypatch.setattr(
         "app.core.providers.xai_provider.resolve_api_key",
-        lambda wid, key: "workspace-key" if (wid, key) == (workspace_id, "XAI_API_KEY") else None,
+        lambda wr, key: "workspace-key" if (wr, key) == (workspace_root, "XAI_API_KEY") else None,
     )
-    assert _resolve_xai_api_key(workspace_id) == "workspace-key"
+    assert _resolve_xai_api_key(workspace_root) == "workspace-key"
 
 
 # ---------------------------------------------------------------------------

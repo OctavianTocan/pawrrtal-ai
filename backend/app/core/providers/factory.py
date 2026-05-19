@@ -14,7 +14,6 @@ programming error.
 
 from __future__ import annotations
 
-import uuid
 from pathlib import Path
 
 from app.core.config import settings
@@ -44,7 +43,6 @@ this table must always agree.
 def resolve_llm(
     model_id: str | ParsedModelId | None,
     *,
-    workspace_id: uuid.UUID | None = None,
     workspace_root: Path | None = None,
 ) -> AILLM:
     """Return the correct :class:`AILLM` for ``model_id``.
@@ -53,18 +51,14 @@ def resolve_llm(
         model_id: Canonical wire string (``host:vendor/model``) or a
             pre-parsed identifier. ``None`` defaults to the catalog's
             default model.
-        workspace_id: Active workspace UUID, used to resolve
-            per-workspace API-key overrides.  ``None`` falls back
-            to the global gateway key.
-        workspace_root: The caller's per-user workspace directory. When
-            supplied, the Claude SDK subprocess runs with this as its
-            ``cwd`` so its transcript files land under the workspace
-            (not the backend process directory). ``None`` leaves
-            ``cwd`` unset for back-compat with non-chat callers
-            (LCM jobs, event-bus handlers) that don't have a
-            workspace in scope — those paths still rely on
-            ``setting_sources=[]`` in the provider to keep filesystem
-            sources off.
+        workspace_root: Absolute path from the ``workspaces.path`` DB
+            column. Used to resolve per-workspace API-key overrides via
+            the encrypted ``{workspace_root}/.env`` file. Also serves
+            as ``cwd`` for the Claude SDK subprocess so its transcript
+            files land under the workspace. ``None`` leaves both
+            behaviours unset for back-compat with non-chat callers
+            (LCM jobs, event-bus handlers) that don't have a workspace
+            in scope.
 
     Returns:
         A provider instance ready to ``stream()``.
@@ -95,22 +89,19 @@ def resolve_llm(
             oauth_token=settings.claude_code_oauth_token or None,
             cwd=str(workspace_root) if workspace_root is not None else None,
         )
-        return ClaudeLLM(parsed.model, config=config, workspace_id=workspace_id)
+        return ClaudeLLM(parsed.model, config=config, workspace_root=workspace_root)
     if provider_cls is GeminiLLM:
-        return GeminiLLM(parsed.model, workspace_id=workspace_id)
+        return GeminiLLM(parsed.model, workspace_root=workspace_root)
     if provider_cls is XaiLLM:
-        return XaiLLM(parsed.model, workspace_id=workspace_id)
+        return XaiLLM(parsed.model, workspace_root=workspace_root)
     if provider_cls is LiteLLMLLM:
-        # LiteLLM is multi-vendor — the parsed vendor selects which
-        # API-key workspace name to resolve and which LiteLLM provider
-        # prefix to prepend at request time.
-        return LiteLLMLLM(parsed.model, parsed.vendor, workspace_id=workspace_id)
+        return LiteLLMLLM(parsed.model, parsed.vendor, workspace_root=workspace_root)
     if provider_cls is OpencodeGoLLM:
-        return _build_opencode_go(parsed, workspace_id)
+        return _build_opencode_go(parsed, workspace_root)
     raise KeyError(f"no provider class registered for host {parsed.host!r}")
 
 
-def _build_opencode_go(parsed: ParsedModelId, workspace_id: uuid.UUID | None) -> OpencodeGoLLM:
+def _build_opencode_go(parsed: ParsedModelId, workspace_root: Path | None) -> OpencodeGoLLM:
     """Construct an ``OpencodeGoLLM`` with rates pulled from the catalog.
 
     The provider stays catalog-agnostic by accepting per-model rates +
@@ -134,4 +125,4 @@ def _build_opencode_go(parsed: ParsedModelId, workspace_id: uuid.UUID | None) ->
         cost_per_mtok_out_usd=entry.cost_per_mtok_out_usd,
         base_url=settings.opencode_go_base_url,
     )
-    return OpencodeGoLLM(parsed.model, config=config, workspace_id=workspace_id)
+    return OpencodeGoLLM(parsed.model, config=config, workspace_root=workspace_root)

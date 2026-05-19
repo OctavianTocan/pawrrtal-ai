@@ -271,7 +271,7 @@ def get_chat_router() -> APIRouter:
         # ``workspace_root`` is also forwarded so the Claude SDK subprocess
         # writes its transcripts under the user's workspace rather than
         # the uvicorn process directory.
-        provider = resolve_llm(model_id, workspace_id=workspace_id, workspace_root=root)
+        provider = resolve_llm(model_id, workspace_root=root)
         # Per-turn tool composition lives in `app.core.agent_tools` —
         # the chat router only decides *that* the agent gets tools,
         # not *which* (that's the builder's job, and where future

@@ -1,11 +1,12 @@
 """Per-workspace environment variable resolution.
 
 A workspace `.env` file is encrypted at rest under
-``{settings.workspace_base_dir}/{workspace_id}/.env``.  Users supply their own
-provider keys (e.g. their own ``GEMINI_API_KEY``) without ever editing the
-server-wide global ``.env``.  Keying is per-workspace, not per-user — a user
-with multiple workspaces configures each independently.  The settings global
-remains the gateway-level fallback for any key the workspace doesn't override.
+``{workspace_root}/.env`` where ``workspace_root`` comes from the
+``workspaces.path`` DB column.  Users supply their own provider keys (e.g.
+their own ``GEMINI_API_KEY``) without ever editing the server-wide global
+``.env``.  Keying is per-workspace, not per-user — a user with multiple
+workspaces configures each independently.  The settings global remains the
+gateway-level fallback for any key the workspace doesn't override.
 
 Resolution order for any overridable key:
 
@@ -93,20 +94,18 @@ _SETTINGS_ATTR_MAP: dict[str, str] = {
 VALUE_FORBIDDEN_CHARS = re.compile(r"[\r\n]")
 
 
-def _workspace_env_path(workspace_id: uuid.UUID) -> Path:
+def _workspace_env_path(workspace_root: Path) -> Path:
     """Return the absolute path to a workspace's encrypted ``.env`` file.
 
-    Computed on every call so that test code can monkeypatch
-    ``settings.workspace_base_dir`` without restarting the import graph.
+    The ``.env`` file lives at the root of the workspace directory tree
+    (a sibling of ``AGENTS.md`` / ``SOUL.md``), keeping per-workspace state
+    self-contained so a single rsync of the workspace directory moves the
+    agent state and its credentials together.
 
-    The path matches the canonical workspace directory shape produced by
-    :func:`app.core.workspace.seed_workspace` — i.e. the env file is a
-    sibling of ``AGENTS.md`` / ``SOUL.md`` and lives inside the workspace
-    root.  This keeps the per-workspace state self-contained so a single
-    rsync of the workspace directory moves the agent state and its
-    credentials together.
+    Args:
+        workspace_root: Absolute path from the ``workspaces.path`` DB column.
     """
-    return Path(settings.workspace_base_dir) / str(workspace_id) / ".env"
+    return workspace_root / ".env"
 
 
 @lru_cache(maxsize=1)
@@ -177,7 +176,7 @@ def _quarantine_corrupt_file(path: Path) -> None:
         )
 
 
-def load_workspace_env(workspace_id: uuid.UUID) -> dict[str, str]:
+def load_workspace_env(workspace_root: Path) -> dict[str, str]:
     """Decrypt and parse the workspace's ``.env`` file.
 
     Returns an empty dict when:
@@ -186,7 +185,7 @@ def load_workspace_env(workspace_id: uuid.UUID) -> dict[str, str]:
         in this case the bad file is quarantined to a sibling path and a
         WARNING is logged.
     """
-    path = _workspace_env_path(workspace_id)
+    path = _workspace_env_path(workspace_root)
     if not path.exists():
         return {}
     try:
@@ -197,7 +196,7 @@ def load_workspace_env(workspace_id: uuid.UUID) -> dict[str, str]:
     return _parse_env_lines(plaintext)
 
 
-def save_workspace_env(workspace_id: uuid.UUID, env: dict[str, str]) -> None:
+def save_workspace_env(workspace_root: Path, env: dict[str, str]) -> None:
     """Encrypt and persist the workspace's ``.env`` file.
 
     Permissions: the workspace directory is created with mode 0o700 and
@@ -208,7 +207,7 @@ def save_workspace_env(workspace_id: uuid.UUID, env: dict[str, str]) -> None:
     string for a key is the documented way for a user to "clear" the
     override and fall back to the gateway default.
     """
-    path = _workspace_env_path(workspace_id)
+    path = _workspace_env_path(workspace_root)
     path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
     plaintext = _serialize_env_lines(env)
     ciphertext = _fernet().encrypt(plaintext.encode())
@@ -216,12 +215,12 @@ def save_workspace_env(workspace_id: uuid.UUID, env: dict[str, str]) -> None:
     path.chmod(0o600)
 
 
-def resolve_api_key(workspace_id: uuid.UUID, workspace_key: str) -> str | None:
+def resolve_api_key(workspace_root: Path, workspace_key: str) -> str | None:
     """Resolve an env key for the given workspace with workspace → settings fallback.
 
     Args:
-        workspace_id: The active workspace UUID. Used to locate the
-            encrypted ``.env`` file.
+        workspace_root: Absolute path from the ``workspaces.path`` DB column.
+            Used to locate the encrypted ``.env`` file.
         workspace_key: One of :data:`OVERRIDABLE_KEYS`, e.g.
             ``"GEMINI_API_KEY"``.
 
@@ -237,7 +236,7 @@ def resolve_api_key(workspace_id: uuid.UUID, workspace_key: str) -> str | None:
     settings fallback via :data:`_SETTINGS_ATTR_MAP`. A second fallback
     at the call site is dead code that drifts when the map is extended.
     """
-    workspace = load_workspace_env(workspace_id)
+    workspace = load_workspace_env(workspace_root)
     override = workspace.get(workspace_key)
     if override:
         return override

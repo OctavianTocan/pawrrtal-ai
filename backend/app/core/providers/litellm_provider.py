@@ -21,6 +21,7 @@ from __future__ import annotations
 import logging
 import uuid
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import litellm
@@ -78,13 +79,13 @@ def _litellm_model_string(vendor: Vendor, model: str) -> str:
     return f"{vendor.value}/{model}"
 
 
-def _resolve_litellm_api_key(vendor: Vendor, workspace_id: uuid.UUID | None) -> str | None:
+def _resolve_litellm_api_key(vendor: Vendor, workspace_root: Path | None) -> str | None:
     """Resolve the API key for ``vendor`` honouring workspace overrides."""
     key_name = _VENDOR_API_KEY_NAME.get(vendor)
     if key_name is None:
         return None
-    if workspace_id is not None:
-        return resolve_api_key(workspace_id, key_name) or None
+    if workspace_root is not None:
+        return resolve_api_key(workspace_root, key_name) or None
     settings_attr = {
         Vendor.openai: "openai_api_key",
         Vendor.xai: "xai_api_key",
@@ -145,7 +146,7 @@ def _delta_text(chunk: Any) -> str:
 def make_litellm_stream_fn(
     vendor: Vendor,
     model: str,
-    workspace_id: uuid.UUID | None = None,
+    workspace_root: Path | None = None,
     *,
     system_prompt: str,
 ) -> StreamFn:
@@ -156,7 +157,9 @@ def make_litellm_stream_fn(
             workspace name and to format LiteLLM's ``provider/model``
             string).
         model: Bare model name (no provider prefix), e.g. ``"gpt-4o"``.
-        workspace_id: Active workspace UUID for per-workspace key
+        workspace_root: Absolute path from the ``workspaces.path`` DB
+            column for per-workspace key overrides.  Optional, matching
+            the other providers.
             overrides.  ``None`` falls back to gateway-global settings.
         system_prompt: The system prompt captured into the returned
             closure.  Mirrors :func:`make_gemini_stream_fn`'s contract
@@ -182,7 +185,7 @@ def make_litellm_stream_fn(
                 len(tools),
             )
 
-        api_key = _resolve_litellm_api_key(vendor, workspace_id)
+        api_key = _resolve_litellm_api_key(vendor, workspace_root)
         if not api_key:
             error_text = (
                 f"LiteLLM error: missing {_VENDOR_API_KEY_NAME[vendor]} — "
@@ -248,7 +251,7 @@ class LiteLLMLLM:
         model: str,
         vendor: Vendor,
         *,
-        workspace_id: uuid.UUID | None = None,
+        workspace_root: Path | None = None,
     ) -> None:
         """Construct a LiteLLM provider.
 
@@ -256,12 +259,13 @@ class LiteLLMLLM:
             model: Bare model name (no provider prefix), e.g. ``"gpt-4o"``.
             vendor: The model's vendor enum — picks the API-key
                 workspace name and the LiteLLM provider prefix.
-            workspace_id: Active workspace UUID for per-workspace key
-                overrides.  Optional, matching the other providers.
+            workspace_root: Absolute path from the ``workspaces.path`` DB
+                column for per-workspace key overrides.  Optional, matching
+                the other providers.
         """
         self._model = model
         self._vendor = vendor
-        self._workspace_id = workspace_id
+        self._workspace_root = workspace_root
         # Tests monkeypatch this attribute to inject a
         # ``ScriptedStreamFn``; production sets it per-request inside
         # ``stream()`` so the captured system prompt matches the
@@ -340,7 +344,7 @@ class LiteLLMLLM:
         stream_fn = self._stream_fn or make_litellm_stream_fn(
             self._vendor,
             self._model,
-            self._workspace_id,
+            self._workspace_root,
             system_prompt=context.system_prompt,
         )
 

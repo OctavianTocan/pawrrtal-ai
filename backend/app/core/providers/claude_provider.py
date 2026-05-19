@@ -43,6 +43,7 @@ import logging
 import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from claude_agent_sdk import (
@@ -188,7 +189,7 @@ class ClaudeLLM:
         model_id: str,
         *,
         config: ClaudeLLMConfig | None = None,
-        workspace_id: uuid.UUID | None = None,
+        workspace_root: Path | None = None,
     ) -> None:
         """Construct a Claude provider bound to a specific model slug.
 
@@ -201,13 +202,14 @@ class ClaudeLLM:
             config: Optional Claude-specific config (OAuth token,
                 ``max_turns``, extra env). Defaults are read by the
                 factory from ``settings``.
-            workspace_id: Active workspace UUID. When set, ``stream()``
-                resolves per-workspace API-key overrides through
+            workspace_root: Absolute path from the ``workspaces.path`` DB
+                column. When set, ``stream()`` resolves per-workspace
+                API-key overrides through
                 :func:`app.core.keys.resolve_api_key`.
         """
         self._model_id = model_id
         self._config = config or ClaudeLLMConfig()
-        self._workspace_id = workspace_id
+        self._workspace_root = workspace_root
         # PR 05: rolling buffer for the last few CLI stderr lines so a
         # ``ProcessError`` can surface useful diagnostic context.
         self._stderr_buffer: list[str] = []
@@ -538,8 +540,8 @@ class ClaudeLLM:
     def _build_env(self) -> dict[str, str]:
         """Compose the env dict forwarded to the CLI subprocess."""
         env: dict[str, str] = dict(self._config.extra_env)
-        if self._workspace_id:
-            token = resolve_api_key(self._workspace_id, "CLAUDE_CODE_OAUTH_TOKEN")
+        if self._workspace_root:
+            token = resolve_api_key(self._workspace_root, "CLAUDE_CODE_OAUTH_TOKEN")
             if token:
                 env["CLAUDE_CODE_OAUTH_TOKEN"] = token
         elif self._config.oauth_token:

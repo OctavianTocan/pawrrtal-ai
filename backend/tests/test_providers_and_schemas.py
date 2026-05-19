@@ -8,6 +8,7 @@ This module covers:
 - :func:`resolve_api_key` precedence (workspace override > settings fallback)
 """
 
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
@@ -127,57 +128,57 @@ def test_user_create_strips_invite_code_from_create_update_dict() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_llm_accepts_workspace_id_for_gemini() -> None:
-    """resolve_llm with a workspace_id returns a GeminiLLM instance.
+def test_resolve_llm_accepts_workspace_root_for_gemini() -> None:
+    """resolve_llm with a workspace_root returns a GeminiLLM instance.
 
-    This verifies the new workspace_id kwarg is forwarded without blowing up.
+    This verifies the workspace_root kwarg is forwarded without blowing up.
     The actual key resolution happens inside GeminiLLM.stream() which is
     tested separately.
     """
-    provider = resolve_llm("google/gemini-3-flash-preview", workspace_id=uuid4())
+    provider = resolve_llm("google/gemini-3-flash-preview", workspace_root=Path(f"/tmp/{uuid4()}"))
     assert isinstance(provider, GeminiLLM)
 
 
-def test_resolve_llm_accepts_workspace_id_for_claude() -> None:
-    """resolve_llm with a workspace_id returns a ClaudeLLM instance."""
-    provider = resolve_llm("anthropic/claude-sonnet-4-6", workspace_id=uuid4())
+def test_resolve_llm_accepts_workspace_root_for_claude() -> None:
+    """resolve_llm with a workspace_root returns a ClaudeLLM instance."""
+    provider = resolve_llm("anthropic/claude-sonnet-4-6", workspace_root=Path(f"/tmp/{uuid4()}"))
     assert isinstance(provider, ClaudeLLM)
 
 
-def test_resolve_llm_workspace_id_none_is_default() -> None:
-    """Passing workspace_id=None (the default) must behave identically to omitting it.
+def test_resolve_llm_workspace_root_none_is_default() -> None:
+    """Passing workspace_root=None (the default) must behave identically to omitting it.
 
-    Both paths must route by model-id prefix; workspace_id only affects key
+    Both paths must route by model-id prefix; workspace_root only affects key
     resolution inside the provider, not which provider class is returned.
     """
     without = resolve_llm("google/gemini-3-flash-preview")
-    with_none = resolve_llm("google/gemini-3-flash-preview", workspace_id=None)
+    with_none = resolve_llm("google/gemini-3-flash-preview", workspace_root=None)
 
     assert type(without) is type(with_none)
 
 
-def test_resolve_llm_gemini_accepts_workspace_id_without_error() -> None:
-    """resolve_llm(workspace_id=uid) for Gemini must not raise AttributeError or TypeError.
+def test_resolve_llm_gemini_accepts_workspace_root_without_error() -> None:
+    """resolve_llm(workspace_root=path) for Gemini must not raise AttributeError or TypeError.
 
-    The workspace_id kwarg is forwarded to make_gemini_stream_fn internally;
+    The workspace_root kwarg is forwarded to make_gemini_stream_fn internally;
     this test ensures the forwarding wiring isn't accidentally dropped.
     """
-    uid = uuid4()
+    ws_root = Path(f"/tmp/{uuid4()}")
     # Must not raise.
-    provider = resolve_llm("google/gemini-3-flash-preview", workspace_id=uid)
+    provider = resolve_llm("google/gemini-3-flash-preview", workspace_root=ws_root)
     assert isinstance(provider, GeminiLLM)
 
 
-def test_resolve_llm_claude_provider_stores_workspace_id() -> None:
-    """The ClaudeLLM instance returned by resolve_llm carries the workspace_id.
+def test_resolve_llm_claude_provider_stores_workspace_root() -> None:
+    """The ClaudeLLM instance returned by resolve_llm carries the workspace_root.
 
-    ClaudeLLM stores workspace_id internally as ``_workspace_id`` and uses it
-    during stream() to resolve per-workspace CLAUDE_CODE_OAUTH_TOKEN.
+    ClaudeLLM stores workspace_root internally as ``_workspace_root`` and uses
+    it during stream() to resolve per-workspace CLAUDE_CODE_OAUTH_TOKEN.
     """
-    uid = uuid4()
-    provider = resolve_llm("anthropic/claude-sonnet-4-6", workspace_id=uid)
+    ws_root = Path(f"/tmp/{uuid4()}")
+    provider = resolve_llm("anthropic/claude-sonnet-4-6", workspace_root=ws_root)
     assert isinstance(provider, ClaudeLLM)
-    assert provider._workspace_id == uid
+    assert provider._workspace_root == ws_root
 
 
 def test_resolve_llm_claude_propagates_workspace_root_to_cwd(tmp_path) -> None:
@@ -191,7 +192,6 @@ def test_resolve_llm_claude_propagates_workspace_root_to_cwd(tmp_path) -> None:
     """
     provider = resolve_llm(
         "anthropic/claude-sonnet-4-6",
-        workspace_id=uuid4(),
         workspace_root=tmp_path,
     )
     assert isinstance(provider, ClaudeLLM)
@@ -205,7 +205,7 @@ def test_resolve_llm_claude_workspace_root_none_leaves_cwd_unset() -> None:
     keep filesystem sources off — ``cwd`` is just the transcript
     location for them.
     """
-    provider = resolve_llm("anthropic/claude-sonnet-4-6", workspace_id=uuid4())
+    provider = resolve_llm("anthropic/claude-sonnet-4-6")
     assert isinstance(provider, ClaudeLLM)
     assert provider._config.cwd is None
 
@@ -229,9 +229,10 @@ def test_resolve_api_key_workspace_override_beats_settings(
     monkeypatch.setattr(settings, "google_api_key", "gateway-key")
 
     uid = uuid4()
-    keys.save_workspace_env(uid, {"GEMINI_API_KEY": "my-personal-gemini-key"})
+    ws_root = tmp_path / str(uid)
+    keys.save_workspace_env(ws_root, {"GEMINI_API_KEY": "my-personal-gemini-key"})
 
-    result = keys.resolve_api_key(uid, "GEMINI_API_KEY")
+    result = keys.resolve_api_key(ws_root, "GEMINI_API_KEY")
     assert result == "my-personal-gemini-key", f"Expected workspace override to win; got {result!r}"
 
 
@@ -247,7 +248,8 @@ def test_resolve_api_key_falls_back_to_settings_when_no_override(
     monkeypatch.setattr(settings, "exa_api_key", "gateway-exa")
 
     uid = uuid4()  # User with no saved env.
-    result = keys.resolve_api_key(uid, "EXA_API_KEY")
+    ws_root = tmp_path / str(uid)
+    result = keys.resolve_api_key(ws_root, "EXA_API_KEY")
     assert result == "gateway-exa"
 
 
@@ -264,14 +266,15 @@ def test_resolve_api_key_cleared_override_reverts_to_settings(
     monkeypatch.setattr(settings, "exa_api_key", "gateway-exa")
 
     uid = uuid4()
+    ws_root = tmp_path / str(uid)
     # Set an override first.
-    keys.save_workspace_env(uid, {"EXA_API_KEY": "my-exa"})
-    assert keys.resolve_api_key(uid, "EXA_API_KEY") == "my-exa"
+    keys.save_workspace_env(ws_root, {"EXA_API_KEY": "my-exa"})
+    assert keys.resolve_api_key(ws_root, "EXA_API_KEY") == "my-exa"
 
     # Clear it by saving empty string.
-    keys.save_workspace_env(uid, {"EXA_API_KEY": ""})
+    keys.save_workspace_env(ws_root, {"EXA_API_KEY": ""})
     # Now falls back to settings.
-    assert keys.resolve_api_key(uid, "EXA_API_KEY") == "gateway-exa"
+    assert keys.resolve_api_key(ws_root, "EXA_API_KEY") == "gateway-exa"
 
 
 def test_resolve_api_key_two_users_are_isolated(
@@ -288,8 +291,11 @@ def test_resolve_api_key_two_users_are_isolated(
     uid_a = uuid4()
     uid_b = uuid4()
 
-    keys.save_workspace_env(uid_a, {"EXA_API_KEY": "user-a-exa"})
+    ws_root_a = tmp_path / str(uid_a)
+    ws_root_b = tmp_path / str(uid_b)
+
+    keys.save_workspace_env(ws_root_a, {"EXA_API_KEY": "user-a-exa"})
     # User B has no override.
 
-    assert keys.resolve_api_key(uid_a, "EXA_API_KEY") == "user-a-exa"
-    assert keys.resolve_api_key(uid_b, "EXA_API_KEY") == "gateway-exa"
+    assert keys.resolve_api_key(ws_root_a, "EXA_API_KEY") == "user-a-exa"
+    assert keys.resolve_api_key(ws_root_b, "EXA_API_KEY") == "gateway-exa"

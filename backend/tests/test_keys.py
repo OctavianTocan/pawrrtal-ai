@@ -37,9 +37,9 @@ def tmp_workspace_base(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
 
 def test_save_and_load_round_trips(tmp_workspace_base: Path) -> None:
     """Saving then loading returns the same key/value pairs."""
-    workspace_id = uuid4()
-    keys.save_workspace_env(workspace_id, {"GEMINI_API_KEY": "real-gemini-key"})
-    loaded = keys.load_workspace_env(workspace_id)
+    workspace_root = tmp_workspace_base / str(uuid4())
+    keys.save_workspace_env(workspace_root, {"GEMINI_API_KEY": "real-gemini-key"})
+    loaded = keys.load_workspace_env(workspace_root)
     assert loaded == {"GEMINI_API_KEY": "real-gemini-key"}
 
 
@@ -51,19 +51,19 @@ def test_save_strips_empty_values(tmp_workspace_base: Path) -> None:
     string as "no override". Strip during save keeps the on-disk file
     consistent with what the resolver actually honours.
     """
-    workspace_id = uuid4()
+    workspace_root = tmp_workspace_base / str(uuid4())
     keys.save_workspace_env(
-        workspace_id,
+        workspace_root,
         {"GEMINI_API_KEY": "kept", "EXA_API_KEY": ""},
     )
-    loaded = keys.load_workspace_env(workspace_id)
+    loaded = keys.load_workspace_env(workspace_root)
     assert loaded == {"GEMINI_API_KEY": "kept"}
     assert "EXA_API_KEY" not in loaded
 
 
 def test_load_returns_empty_when_no_file(tmp_workspace_base: Path) -> None:
     """A user who never saved a workspace .env loads as ``{}``."""
-    assert keys.load_workspace_env(uuid4()) == {}
+    assert keys.load_workspace_env(tmp_workspace_base / str(uuid4())) == {}
 
 
 def test_resolve_api_key_prefers_workspace_override(
@@ -72,9 +72,9 @@ def test_resolve_api_key_prefers_workspace_override(
 ) -> None:
     """When both workspace override and settings are set, override wins."""
     monkeypatch.setattr(settings, "exa_api_key", "from-settings")
-    workspace_id = uuid4()
-    keys.save_workspace_env(workspace_id, {"EXA_API_KEY": "from-workspace"})
-    assert keys.resolve_api_key(workspace_id, "EXA_API_KEY") == "from-workspace"
+    workspace_root = tmp_workspace_base / str(uuid4())
+    keys.save_workspace_env(workspace_root, {"EXA_API_KEY": "from-workspace"})
+    assert keys.resolve_api_key(workspace_root, "EXA_API_KEY") == "from-workspace"
 
 
 def test_resolve_api_key_falls_back_to_settings(
@@ -88,8 +88,8 @@ def test_resolve_api_key_falls_back_to_settings(
     Bean A across stt.py / agent_tools.py / agents.py).
     """
     monkeypatch.setattr(settings, "exa_api_key", "from-settings")
-    workspace_id = uuid4()
-    assert keys.resolve_api_key(workspace_id, "EXA_API_KEY") == "from-settings"
+    workspace_root = tmp_workspace_base / str(uuid4())
+    assert keys.resolve_api_key(workspace_root, "EXA_API_KEY") == "from-settings"
 
 
 def test_resolve_api_key_returns_none_for_unset(
@@ -98,7 +98,7 @@ def test_resolve_api_key_returns_none_for_unset(
 ) -> None:
     """No override and empty settings → returns None (not empty string)."""
     monkeypatch.setattr(settings, "exa_api_key", "")
-    assert keys.resolve_api_key(uuid4(), "EXA_API_KEY") is None
+    assert keys.resolve_api_key(tmp_workspace_base / str(uuid4()), "EXA_API_KEY") is None
 
 
 def test_resolve_api_key_unknown_key_returns_none(tmp_workspace_base: Path) -> None:
@@ -108,7 +108,7 @@ def test_resolve_api_key_unknown_key_returns_none(tmp_workspace_base: Path) -> N
     `resolve_api_key`, but defensive callers should still get a clean
     None rather than a `getattr` crash.
     """
-    assert keys.resolve_api_key(uuid4(), "NOT_A_REAL_KEY") is None
+    assert keys.resolve_api_key(tmp_workspace_base / str(uuid4()), "NOT_A_REAL_KEY") is None
 
 
 def test_load_quarantines_corrupt_file(tmp_workspace_base: Path) -> None:
@@ -117,12 +117,12 @@ def test_load_quarantines_corrupt_file(tmp_workspace_base: Path) -> None:
     Without this, a key rotation or partial write would 500 every
     request for that user permanently.
     """
-    workspace_id = uuid4()
-    path = keys._workspace_env_path(workspace_id)
+    workspace_root = tmp_workspace_base / str(uuid4())
+    path = keys._workspace_env_path(workspace_root)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(b"not encrypted at all")
 
-    loaded = keys.load_workspace_env(workspace_id)
+    loaded = keys.load_workspace_env(workspace_root)
 
     assert loaded == {}
     assert not path.exists(), "corrupt file should have been renamed aside"
@@ -149,8 +149,26 @@ def test_workspace_path_uses_settings_workspace_base_dir(
     dir, causing data loss on Docker (volume mounts `/data/workspaces`)
     and PermissionError on macOS dev (no `/workspace` directory).
     """
-    workspace_id = uuid4()
-    keys.save_workspace_env(workspace_id, {"GEMINI_API_KEY": "val"})
-    expected = tmp_workspace_base / str(workspace_id) / ".env"
+    workspace_root = tmp_workspace_base / str(uuid4())
+    keys.save_workspace_env(workspace_root, {"GEMINI_API_KEY": "val"})
+    expected = workspace_root / ".env"
     assert expected.exists()
-    assert expected.parent.parent == tmp_workspace_base
+    assert expected.parent == workspace_root
+
+
+def test_custom_workspace_root_uses_path_not_uuid(
+    tmp_workspace_base: Path,
+) -> None:
+    """Regression test for issue #339.
+
+    Workspaces with a custom ``path`` (e.g. ``{base}/dev-admin``) must
+    have their ``.env`` land at ``{custom_path}/.env``, not at
+    ``{base}/{uuid}/.env``.  This was the root-cause bug: the key
+    functions took ``workspace_id: UUID`` and always derived the path
+    from it, ignoring the DB ``path`` column.
+    """
+    custom_root = tmp_workspace_base / "dev-admin"
+    keys.save_workspace_env(custom_root, {"NOTION_API_KEY": "ntn_test"})
+    assert (custom_root / ".env").exists()
+    assert keys.load_workspace_env(custom_root) == {"NOTION_API_KEY": "ntn_test"}
+    assert keys.resolve_api_key(custom_root, "NOTION_API_KEY") == "ntn_test"

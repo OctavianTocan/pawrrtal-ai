@@ -7,6 +7,7 @@ resulting blob to ``POST /api/v1/stt``, and we forward it to
 """
 
 import logging
+from pathlib import Path
 
 import httpx
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
@@ -91,7 +92,9 @@ def get_stt_router() -> APIRouter:  # noqa: C901 — single cohesive STT route +
         # falls back to `settings.xai_api_key`, so the caller doesn't need a
         # manual `or settings.x` suffix.
         workspace = await get_default_workspace(user.id, session)
-        api_key = resolve_api_key(workspace.id, "XAI_API_KEY") if workspace is not None else None
+        api_key = (
+            resolve_api_key(Path(workspace.path), "XAI_API_KEY") if workspace is not None else None
+        )
         if not api_key:
             raise HTTPException(
                 status_code=503,

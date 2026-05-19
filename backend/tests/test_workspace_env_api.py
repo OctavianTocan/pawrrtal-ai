@@ -163,8 +163,9 @@ async def test_put_preserves_unmentioned_keys(
     seeded_default_workspace: Workspace,
 ) -> None:
     """PUT is PATCH-like: keys not in the payload are left untouched."""
+    ws_root = Path(seeded_default_workspace.path)
     keys.save_workspace_env(
-        seeded_default_workspace.id,
+        ws_root,
         {"GEMINI_API_KEY": "keep-me", "EXA_API_KEY": "also-keep-me"},
     )
     response = await client.put(
@@ -190,13 +191,14 @@ async def test_put_empty_string_clears_key(
     identically (both fall through to settings); persisting `""` would
     be confusing on inspection, so we drop it.
     """
-    keys.save_workspace_env(seeded_default_workspace.id, {"GEMINI_API_KEY": "had-a-value"})
+    ws_root = Path(seeded_default_workspace.path)
+    keys.save_workspace_env(ws_root, {"GEMINI_API_KEY": "had-a-value"})
     response = await client.put(
         f"/api/v1/workspaces/{seeded_default_workspace.id}/env",
         json={"vars": {"GEMINI_API_KEY": ""}},
     )
     assert response.status_code == 200
-    on_disk = keys.load_workspace_env(seeded_default_workspace.id)
+    on_disk = keys.load_workspace_env(Path(seeded_default_workspace.path))
     assert "GEMINI_API_KEY" not in on_disk
 
 
@@ -207,8 +209,9 @@ async def test_delete_removes_one_key(
     seeded_default_workspace: Workspace,
 ) -> None:
     """DELETE drops a single key without touching the others."""
+    ws_root = Path(seeded_default_workspace.path)
     keys.save_workspace_env(
-        seeded_default_workspace.id,
+        ws_root,
         {"GEMINI_API_KEY": "g", "EXA_API_KEY": "e"},
     )
     response = await client.delete(
@@ -216,7 +219,7 @@ async def test_delete_removes_one_key(
     )
     assert response.status_code == 204
 
-    remaining = keys.load_workspace_env(seeded_default_workspace.id)
+    remaining = keys.load_workspace_env(Path(seeded_default_workspace.path))
     assert "GEMINI_API_KEY" not in remaining
     assert remaining.get("EXA_API_KEY") == "e"
 
