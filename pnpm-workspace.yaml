@@ -1,0 +1,6 @@
+packages:
+  - frontend
+  - electrobun
+  - frontend/lib/react-dropdown
+  - frontend/lib/react-overlay
+  - frontend/lib/react-chat-composer
