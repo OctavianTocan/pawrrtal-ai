@@ -20,9 +20,10 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import UTC, datetime
-from typing import Protocol
+from typing import TYPE_CHECKING
 
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -31,45 +32,22 @@ from app.crud.workspace import ensure_dev_admin_workspace
 from app.db import User
 from app.models import ChannelBinding
 
+# TelegramSender is referenced only in annotations (this module activates
+# `from __future__ import annotations`, so the names stay as strings at
+# runtime). Importing under ``TYPE_CHECKING`` breaks the runtime cycle
+# with ``handlers`` while keeping the type information accurate.
+if TYPE_CHECKING:
+    from app.integrations.telegram.handlers import TelegramSender
+
 logger = logging.getLogger(__name__)
 
 TELEGRAM_PROVIDER = "telegram"
 
 
-class TelegramSenderLike(Protocol):
-    """Structural type for a Telegram sender — matches ``handlers.TelegramSender``.
-
-    Declared here so this module never imports from ``handlers`` (which
-    imports back, creating a cycle). Properties (not bare class
-    annotations) so a ``frozen=True`` dataclass — whose fields pyright
-    treats as read-only — satisfies the contract.
-    """
-
-    @property
-    def user_id(self) -> int:
-        """Telegram numeric user id."""
-        ...
-
-    @property
-    def chat_id(self) -> int:
-        """Telegram chat id where bot replies should be pushed."""
-        ...
-
-    @property
-    def username(self) -> str | None:
-        """``@handle`` (no leading ``@``) when the user has one set."""
-        ...
-
-    @property
-    def full_name(self) -> str | None:
-        """Human-readable display name captured by aiogram."""
-        ...
-
-
 async def resolve_or_autolink_telegram_user(
     *,
     session: AsyncSession,
-    sender: TelegramSenderLike,
+    sender: TelegramSender,
 ) -> uuid.UUID | None:
     """Resolve a Telegram sender to its Pawrrtal user UUID.
 
@@ -82,8 +60,8 @@ async def resolve_or_autolink_telegram_user(
 
     Args:
         session: Async database session.
-        sender: Object exposing the Telegram sender fields
-            (``user_id``, ``chat_id``, ``username``, ``full_name``).
+        sender: The Telegram sender from ``handlers``. Annotated as a
+            forward reference to avoid a runtime import cycle.
 
     Returns:
         The Pawrrtal user UUID, or ``None`` if no binding can be
@@ -104,7 +82,7 @@ async def resolve_or_autolink_telegram_user(
 async def _autolink_dev_admin(
     *,
     session: AsyncSession,
-    sender: TelegramSenderLike,
+    sender: TelegramSender,
 ) -> uuid.UUID | None:
     """Forge a ``ChannelBinding`` for the dev-admin on Telegram ID match.
 
@@ -116,8 +94,20 @@ async def _autolink_dev_admin(
     onboarding nudge.
     """
     dev_admin_id = settings.telegram_dev_admin_id
+    if dev_admin_id is None:
+        return None
+
     external_user_id = str(sender.user_id)
-    if dev_admin_id is None or str(dev_admin_id) != external_user_id:
+    if str(dev_admin_id) != external_user_id:
+        # DEBUG (not WARNING) so every non-admin sender doesn't spam
+        # logs. Helps diagnose a fat-fingered TELEGRAM_DEV_ADMIN_ID
+        # without paging on normal traffic.
+        logger.debug(
+            "TELEGRAM_DEV_ADMIN_AUTOLINK_SKIPPED reason=sender_id_mismatch "
+            "configured=%s external_user_id=%s",
+            dev_admin_id,
+            external_user_id,
+        )
         return None
 
     admin_email = settings.admin_email
@@ -143,23 +133,57 @@ async def _autolink_dev_admin(
         )
         return None
 
+    chat_id = str(sender.chat_id)
+    display_handle = sender.username or sender.full_name
     binding = ChannelBinding(
         user_id=admin_user.id,
         provider=TELEGRAM_PROVIDER,
         external_user_id=external_user_id,
-        external_chat_id=str(sender.chat_id),
-        display_handle=sender.username or sender.full_name,
+        external_chat_id=chat_id,
+        display_handle=display_handle,
         # Naive UTC matches the column type used throughout the codebase.
         created_at=datetime.now(UTC).replace(tzinfo=None),
     )
-    session.add(binding)
-    # Idempotent — re-fetches the existing row when one is already present.
-    await ensure_dev_admin_workspace(admin_user.id, session)
-    await session.commit()
+    try:
+        session.add(binding)
+        # Idempotent — re-fetches the existing row when one is already present.
+        await ensure_dev_admin_workspace(admin_user.id, session)
+        await session.commit()
+    except IntegrityError:
+        # Concurrent first-contact race: another task observed an empty
+        # binding lookup, raced through ``_autolink_dev_admin`` and
+        # committed first, so this insert trips the
+        # ``(provider, external_user_id)`` unique constraint — either
+        # at autoflush (when ``ensure_dev_admin_workspace`` opens its
+        # savepoint) or at the final commit. Roll back and surface the
+        # winner instead of throwing — the autolink contract is "the
+        # dev-admin's Telegram ID maps to *a* user", so either winner
+        # satisfies the caller.
+        await session.rollback()
+        winner = await get_user_id_for_external(
+            provider=TELEGRAM_PROVIDER,
+            external_user_id=external_user_id,
+            session=session,
+        )
+        if winner is None:
+            # The IntegrityError fired without a competing row showing
+            # up — something else is wrong (e.g. a different constraint
+            # on the workspace insert).  Let it propagate so the failure
+            # is visible.
+            raise
+        logger.info(
+            "TELEGRAM_DEV_ADMIN_AUTOLINK_RACE external_user_id=%s nexus_user_id=%s",
+            external_user_id,
+            winner,
+        )
+        return winner
 
     logger.info(
-        "TELEGRAM_DEV_ADMIN_AUTOLINK external_user_id=%s nexus_user_id=%s",
+        "TELEGRAM_DEV_ADMIN_AUTOLINK external_user_id=%s nexus_user_id=%s "
+        "chat_id=%s display_handle=%s",
         external_user_id,
         admin_user.id,
+        chat_id,
+        display_handle,
     )
     return admin_user.id

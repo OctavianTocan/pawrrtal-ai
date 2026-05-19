@@ -10,6 +10,8 @@ message routes to the LLM) instead of the onboarding nudge.
 
 from __future__ import annotations
 
+import uuid
+from datetime import UTC, datetime
 from pathlib import Path
 from uuid import uuid4
 
@@ -275,3 +277,80 @@ async def test_empty_start_from_unknown_user_still_nudges(
 
     assert isinstance(reply, str)
     assert "don't recognize" in reply.lower()
+
+
+async def test_autolink_recovers_from_concurrent_insert_race(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+    admin_workspace_root: Path,
+    seeded_admin_user: User,
+) -> None:
+    """A commit-time ``IntegrityError`` from a concurrent winner is recovered:
+    rollback, re-query, and return the winning user_id instead of crashing.
+
+    Simulates the race window by patching ``get_user_id_for_external`` so
+    the initial lookup misses (as it would for a true first-message race)
+    while a competing binding already exists in the DB. The auto-link's
+    own commit then trips the unique constraint and falls through to the
+    recovery path's re-query, which surfaces the winner.
+    """
+    from app.crud import channel as channel_module
+
+    monkeypatch.setattr(settings, "telegram_dev_admin_id", DEV_ADMIN_TELEGRAM_ID)
+
+    # The "winner" of the race: another user that already owns the
+    # Telegram ID's binding in the DB.
+    winning_user_id = uuid4()
+    winning_user = User(
+        id=winning_user_id,
+        email="winner@example.com",
+        hashed_password="not-used",
+        is_active=True,
+        is_superuser=False,
+        is_verified=True,
+    )
+    db_session.add(winning_user)
+    db_session.add(
+        ChannelBinding(
+            user_id=winning_user_id,
+            provider=TELEGRAM_PROVIDER,
+            external_user_id=str(DEV_ADMIN_TELEGRAM_ID),
+            external_chat_id=str(DEV_ADMIN_TELEGRAM_ID),
+            display_handle="other_task",
+            created_at=datetime.now(UTC).replace(tzinfo=None),
+        )
+    )
+    await db_session.commit()
+
+    # Force a "lookup miss" on the entry path while leaving the
+    # recovery-path lookup (which fires after rollback) untouched.
+    original_lookup = channel_module.get_user_id_for_external
+    miss_once = {"used": False}
+
+    async def lookup_misses_then_recovers(
+        *,
+        provider: str,
+        external_user_id: str,
+        session: AsyncSession,
+    ) -> uuid.UUID | None:
+        if not miss_once["used"]:
+            miss_once["used"] = True
+            return None
+        return await original_lookup(
+            provider=provider,
+            external_user_id=external_user_id,
+            session=session,
+        )
+
+    monkeypatch.setattr(
+        "app.integrations.telegram.dev_admin.get_user_id_for_external",
+        lookup_misses_then_recovers,
+    )
+
+    sender = _make_sender(DEV_ADMIN_TELEGRAM_ID)
+    resolved = await resolve_or_autolink_telegram_user(session=db_session, sender=sender)
+
+    assert resolved == winning_user_id
+    bindings = (await db_session.execute(select(ChannelBinding))).scalars().all()
+    assert len(bindings) == 1
+    assert bindings[0].user_id == winning_user_id

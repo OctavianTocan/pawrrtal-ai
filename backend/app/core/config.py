@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
 
-from pydantic import field_validator, model_validator
+from pydantic import PositiveInt, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -189,7 +189,11 @@ class Settings(BaseSettings):
     # link dance after every fresh DB checkout (paired with the
     # branch-scoped ``SQLITE_DB_FILENAME``). Unset → behaviour
     # unchanged; the standard onboarding nudge still fires.
-    telegram_dev_admin_id: int | None = None
+    # ``PositiveInt`` (rather than plain ``int``) makes the
+    # "unset vs invalid" distinction unambiguous: Telegram user_ids
+    # are always > 0, so 0/negative inputs are rejected at config
+    # load time instead of silently never matching.
+    telegram_dev_admin_id: PositiveInt | None = None
 
     # Per-user chat rate limit (requests per 60-second rolling window).
     # Zero disables the limit entirely — useful for local dev.  Production
