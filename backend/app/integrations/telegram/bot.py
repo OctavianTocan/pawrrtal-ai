@@ -43,7 +43,6 @@ from app.integrations.telegram.bot_provider_resolution import (
     resolve_provider_with_auto_clear,
 )
 from app.integrations.telegram.handlers import (
-    TelegramSender,
     TelegramTurnContext,
     collect_attachments,
     handle_new_command,
@@ -58,6 +57,7 @@ from app.integrations.telegram.model_picker_runtime import (
     answer_model_picker,
     handle_model_picker_callback,
 )
+from app.integrations.telegram.sender import TelegramSender
 from app.integrations.telegram.status import handle_lcm_command, handle_status_command
 
 if TYPE_CHECKING:
@@ -207,7 +207,7 @@ async def _run_llm_turn(
     )
 
     async with async_session_maker() as ws_session:
-        workspace = await get_default_workspace(context.nexus_user_id, ws_session)
+        workspace = await get_default_workspace(context.pawrrtal_user_id, ws_session)
 
     tg_sender = make_telegram_sender(
         message.bot,
@@ -218,7 +218,7 @@ async def _run_llm_turn(
     agent_tools = (
         build_agent_tools(
             workspace_root=Path(workspace.path),
-            user_id=context.nexus_user_id,
+            user_id=context.pawrrtal_user_id,
             workspace_id=workspace.id,
             send_fn=tg_sender,
             surface="telegram",
@@ -235,7 +235,7 @@ async def _run_llm_turn(
         await message.answer(warning, reply_parameters=_reply_parameters(message.message_id))
 
     channel_message: ChannelMessage = {
-        "user_id": context.nexus_user_id,
+        "user_id": context.pawrrtal_user_id,
         "conversation_id": context.conversation_id,
         "text": user_text,
         "surface": SURFACE_TELEGRAM,
@@ -250,7 +250,7 @@ async def _run_llm_turn(
     }
     turn_input = ChatTurnInput(
         conversation_id=context.conversation_id,
-        user_id=context.nexus_user_id,
+        user_id=context.pawrrtal_user_id,
         question=user_text,
         provider=provider,
         channel=resolve_channel(SURFACE_TELEGRAM),

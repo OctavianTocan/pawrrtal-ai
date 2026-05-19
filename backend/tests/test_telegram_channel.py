@@ -34,12 +34,12 @@ from app.integrations.telegram.bot_provider_resolution import (
     resolve_provider_with_auto_clear as _resolve_provider_with_auto_clear,
 )
 from app.integrations.telegram.handlers import (
-    TelegramSender,
     TelegramTurnContext,
     handle_model_command,
     handle_plain_message,
     handle_stop_command,
 )
+from app.integrations.telegram.sender import TelegramSender
 from app.integrations.telegram.status import (
     _format_duration,
     _format_token_count,
@@ -476,7 +476,7 @@ class TestHandlePlainMessage:
         sender = TelegramSender(user_id=999, chat_id=999, username=None, full_name="Stranger")
         session = AsyncMock()
         with patch(
-            "app.integrations.telegram.handlers.get_user_id_for_external",
+            "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
             new=AsyncMock(return_value=None),
         ):
             result = await handle_plain_message(sender=sender, text="hello", session=session)
@@ -485,7 +485,7 @@ class TestHandlePlainMessage:
 
     async def test_bound_user_returns_turn_context(self) -> None:
         """A known user must get a TelegramTurnContext with correct fields."""
-        nexus_uid = uuid.uuid4()
+        pawrrtal_uid = uuid.uuid4()
         conv_id = uuid.uuid4()
         sender = TelegramSender(user_id=42, chat_id=42, username="tavi", full_name="Tavi")
         session = AsyncMock()
@@ -497,8 +497,8 @@ class TestHandlePlainMessage:
 
         with (
             patch(
-                "app.integrations.telegram.handlers.get_user_id_for_external",
-                new=AsyncMock(return_value=nexus_uid),
+                "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
+                new=AsyncMock(return_value=pawrrtal_uid),
             ),
             patch(
                 "app.integrations.telegram.handlers.get_or_create_telegram_conversation_full",
@@ -508,13 +508,13 @@ class TestHandlePlainMessage:
             result = await handle_plain_message(sender=sender, text="what is RAG?", session=session)
 
         assert isinstance(result, TelegramTurnContext)
-        assert result.nexus_user_id == nexus_uid
+        assert result.pawrrtal_user_id == pawrrtal_uid
         assert result.conversation_id == conv_id
         assert isinstance(result.model_id, str)
 
     async def test_bound_user_uses_conversation_model_override(self) -> None:
         """When conversation.model_id is set it must propagate into the context."""
-        nexus_uid = uuid.uuid4()
+        pawrrtal_uid = uuid.uuid4()
         conv_id = uuid.uuid4()
         sender = TelegramSender(user_id=42, chat_id=42, username="tavi", full_name="Tavi")
         session = AsyncMock()
@@ -525,8 +525,8 @@ class TestHandlePlainMessage:
 
         with (
             patch(
-                "app.integrations.telegram.handlers.get_user_id_for_external",
-                new=AsyncMock(return_value=nexus_uid),
+                "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
+                new=AsyncMock(return_value=pawrrtal_uid),
             ),
             patch(
                 "app.integrations.telegram.handlers.get_or_create_telegram_conversation_full",
@@ -590,7 +590,7 @@ class TestHandleModelCommand:
         update_mock = AsyncMock(return_value=True)
         with (
             patch(
-                "app.integrations.telegram.handlers.get_user_id_for_external",
+                "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
                 new=AsyncMock(return_value=uuid.uuid4()),
             ),
             patch(
@@ -609,7 +609,7 @@ class TestHandleModelCommand:
         sender = TelegramSender(user_id=2, chat_id=2, username=None, full_name=None)
         session = AsyncMock()
         with patch(
-            "app.integrations.telegram.handlers.get_user_id_for_external",
+            "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
             new=AsyncMock(return_value=None),
         ):
             reply = await handle_model_command(
@@ -650,7 +650,7 @@ class TestHandleModelCommand:
         path in the backend that bypasses the Pydantic boundary, so the
         canonical form is enforced explicitly here.
         """
-        nexus_uid = uuid.uuid4()
+        pawrrtal_uid = uuid.uuid4()
         conv_id = uuid.uuid4()
         sender = TelegramSender(user_id=3, chat_id=3, username="t", full_name="T")
         session = AsyncMock()
@@ -662,8 +662,8 @@ class TestHandleModelCommand:
         update_mock = AsyncMock(return_value=True)
         with (
             patch(
-                "app.integrations.telegram.handlers.get_user_id_for_external",
-                new=AsyncMock(return_value=nexus_uid),
+                "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
+                new=AsyncMock(return_value=pawrrtal_uid),
             ),
             patch(
                 "app.integrations.telegram.handlers.get_or_create_telegram_conversation_full",
@@ -689,7 +689,7 @@ class TestHandleModelCommand:
 
     async def test_update_failure_returns_error_message(self) -> None:
         """When the DB update fails the user gets an error string, not an exception."""
-        nexus_uid = uuid.uuid4()
+        pawrrtal_uid = uuid.uuid4()
         conv_id = uuid.uuid4()
         sender = TelegramSender(user_id=4, chat_id=4, username="t", full_name="T")
         session = AsyncMock()
@@ -700,8 +700,8 @@ class TestHandleModelCommand:
 
         with (
             patch(
-                "app.integrations.telegram.handlers.get_user_id_for_external",
-                new=AsyncMock(return_value=nexus_uid),
+                "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
+                new=AsyncMock(return_value=pawrrtal_uid),
             ),
             patch(
                 "app.integrations.telegram.handlers.get_or_create_telegram_conversation_full",
@@ -729,7 +729,7 @@ class TestHandleModelCommand:
         next to pick a known model.  It must persist the new canonical
         form unchanged — proving the auto-clear didn't break the write path.
         """
-        nexus_uid = uuid.uuid4()
+        pawrrtal_uid = uuid.uuid4()
         conv_id = uuid.uuid4()
         sender = TelegramSender(user_id=5, chat_id=5, username="t", full_name="T")
         session = AsyncMock()
@@ -742,8 +742,8 @@ class TestHandleModelCommand:
         update_mock = AsyncMock(return_value=True)
         with (
             patch(
-                "app.integrations.telegram.handlers.get_user_id_for_external",
-                new=AsyncMock(return_value=nexus_uid),
+                "app.integrations.telegram.handlers.resolve_or_autolink_telegram_user",
+                new=AsyncMock(return_value=pawrrtal_uid),
             ),
             patch(
                 "app.integrations.telegram.handlers.get_or_create_telegram_conversation_full",
@@ -788,7 +788,7 @@ class TestResolveProviderWithAutoClear:
     @staticmethod
     def _make_context(model_id: str) -> TelegramTurnContext:
         return TelegramTurnContext(
-            nexus_user_id=uuid.uuid4(),
+            pawrrtal_user_id=uuid.uuid4(),
             conversation_id=uuid.uuid4(),
             model_id=model_id,
             thread_id=None,
@@ -1092,7 +1092,7 @@ class TestHandleStatusCommand:
         assert "connect" in reply.lower()
 
     async def test_bound_user_renders_status_with_run_state(self) -> None:
-        nexus_uid = uuid.uuid4()
+        pawrrtal_uid = uuid.uuid4()
         conv_id = uuid.uuid4()
         sender = TelegramSender(user_id=9, chat_id=9, username="t", full_name="T")
         session = AsyncMock()
@@ -1118,7 +1118,7 @@ class TestHandleStatusCommand:
         with (
             patch(
                 "app.integrations.telegram.status.get_user_id_for_external",
-                new=AsyncMock(return_value=nexus_uid),
+                new=AsyncMock(return_value=pawrrtal_uid),
             ),
             patch(
                 "app.integrations.telegram.status.get_or_create_telegram_conversation_full",

@@ -163,7 +163,7 @@ def get_chat_router() -> APIRouter:
         request: ChatRequest,
         user: User = Depends(get_allowed_user),
         session: AsyncSession = Depends(get_async_session),
-        x_nexus_surface: str | None = Header(default=None),
+        x_pawrrtal_surface: str | None = Header(default=None),
     ) -> StreamingResponse:
         """Stream an AI response as Server-Sent Events.
 
@@ -188,7 +188,7 @@ def get_chat_router() -> APIRouter:
         """
         # Entry log — pairs with REQ_IN/REQ_OUT from the request middleware via rid.
         # Question length, not contents, to avoid leaking PII into the log file.
-        surface = surface_from_header(x_nexus_surface)
+        surface = surface_from_header(x_pawrrtal_surface)
         channel = resolve_channel(surface)
 
         rid = get_request_id()

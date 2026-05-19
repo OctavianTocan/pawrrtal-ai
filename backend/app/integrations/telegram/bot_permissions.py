@@ -41,7 +41,7 @@ def build_telegram_permission_check(
         return None
     workspace_ctx = load_workspace_context(workspace_root)
     permission_context = PermissionContext(
-        user_id=str(context.nexus_user_id),
+        user_id=str(context.pawrrtal_user_id),
         workspace_root=workspace_root,
         conversation_id=str(context.conversation_id),
         surface=SURFACE_TELEGRAM,

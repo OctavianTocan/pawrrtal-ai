@@ -37,7 +37,6 @@ from app.core.providers.catalog import default_model, find
 from app.core.providers.model_id import InvalidModelId, parse_model_id
 from app.crud.channel import (
     get_or_create_telegram_conversation_full,
-    get_user_id_for_external,
     redeem_link_code,
     update_conversation_model,
     update_conversation_verbose_level,
@@ -50,6 +49,8 @@ from app.crud.channel import (
 from app.integrations.telegram._attachments import (  # noqa: F401
     collect_attachments,
 )
+from app.integrations.telegram.dev_admin import resolve_or_autolink_telegram_user
+from app.integrations.telegram.sender import TelegramSender
 
 # Loose match for the link-code shape (8 chars from the look-alike-free
 # alphabet defined in app.crud.channel). Used to distinguish "user pasted
@@ -120,22 +121,6 @@ from app.integrations.telegram.status import (  # noqa: E402
 
 
 @dataclass(frozen=True)
-class TelegramSender:
-    """Stable subset of an aiogram ``Message.from_user`` we need.
-
-    Modeled as a plain dataclass so handler tests don't have to import aiogram
-    or build a fake bot.
-    """
-
-    user_id: int
-    chat_id: int
-    username: str | None
-    full_name: str | None
-    # Telegram Bot API 9.3+ topic thread ID.  None when topics not enabled.
-    thread_id: int | None = None
-
-
-@dataclass(frozen=True)
 class TelegramTurnContext:
     """Resolved context for routing a Telegram message to the LLM pipeline.
 
@@ -144,7 +129,7 @@ class TelegramTurnContext:
     channel delivery loop.
     """
 
-    nexus_user_id: uuid.UUID
+    pawrrtal_user_id: uuid.UUID
     """Pawrrtal user UUID resolved from the channel binding."""
 
     conversation_id: uuid.UUID
@@ -183,7 +168,11 @@ async def handle_start_command(
     """
     code = (payload or "").strip()
     if not code:
-        return _NOT_BOUND_MESSAGE
+        # Empty ``/start`` is the dev-admin's "hello" too. Try the
+        # auto-link path so the configured Telegram ID jumps straight
+        # to a connected state instead of seeing the nudge.
+        pawrrtal_user_id = await resolve_or_autolink_telegram_user(session=session, sender=sender)
+        return _BIND_OK_MESSAGE if pawrrtal_user_id is not None else _NOT_BOUND_MESSAGE
 
     binding = await redeem_link_code(
         code=code,
@@ -197,7 +186,7 @@ async def handle_start_command(
         return _BIND_BAD_CODE_MESSAGE
 
     logger.info(
-        "TELEGRAM_BIND_OK external_user_id=%s nexus_user_id=%s",
+        "TELEGRAM_BIND_OK external_user_id=%s pawrrtal_user_id=%s",
         sender.user_id,
         binding.user_id,
     )
@@ -226,12 +215,8 @@ async def handle_plain_message(
     Returns:
         ``str`` for immediate replies, ``TelegramTurnContext`` for LLM routing.
     """
-    nexus_user_id = await get_user_id_for_external(
-        provider=PROVIDER,
-        external_user_id=str(sender.user_id),
-        session=session,
-    )
-    if nexus_user_id is None:
+    pawrrtal_user_id = await resolve_or_autolink_telegram_user(session=session, sender=sender)
+    if pawrrtal_user_id is None:
         # The not-bound nudge tells the user to "send me the code" — so
         # if a plain message looks like one, try to redeem it here
         # instead of forcing them through the /start deep link. We only
@@ -249,7 +234,7 @@ async def handle_plain_message(
             )
             if binding is not None:
                 logger.info(
-                    "TELEGRAM_BIND_OK_VIA_PLAIN external_user_id=%s nexus_user_id=%s",
+                    "TELEGRAM_BIND_OK_VIA_PLAIN external_user_id=%s pawrrtal_user_id=%s",
                     sender.user_id,
                     binding.user_id,
                 )
@@ -258,7 +243,7 @@ async def handle_plain_message(
         return _NOT_BOUND_MESSAGE
 
     conversation = await get_or_create_telegram_conversation_full(
-        user_id=nexus_user_id,
+        user_id=pawrrtal_user_id,
         session=session,
         thread_id=sender.thread_id,
     )
@@ -267,7 +252,7 @@ async def handle_plain_message(
 
     logger.info(
         "TELEGRAM_TURN user_id=%s conversation_id=%s model=%s thread_id=%s text_len=%d",
-        nexus_user_id,
+        pawrrtal_user_id,
         conversation.id,
         model_id,
         sender.thread_id,
@@ -275,7 +260,7 @@ async def handle_plain_message(
     )
 
     return TelegramTurnContext(
-        nexus_user_id=nexus_user_id,
+        pawrrtal_user_id=pawrrtal_user_id,
         conversation_id=conversation.id,
         model_id=model_id,
         thread_id=sender.thread_id,
@@ -301,19 +286,15 @@ async def handle_new_command(
     Returns:
         Reply string the bot should send immediately.
     """
-    nexus_user_id = await get_user_id_for_external(
-        provider=PROVIDER,
-        external_user_id=str(sender.user_id),
-        session=session,
-    )
-    if nexus_user_id is None:
+    pawrrtal_user_id = await resolve_or_autolink_telegram_user(session=session, sender=sender)
+    if pawrrtal_user_id is None:
         return _NEW_NOT_BOUND_MESSAGE
 
     from app.models import Conversation  # noqa: PLC0415
 
     conversation = Conversation(
         id=uuid.uuid4(),
-        user_id=nexus_user_id,
+        user_id=pawrrtal_user_id,
         title="Telegram",
         origin_channel="telegram",
         telegram_thread_id=sender.thread_id,
@@ -325,7 +306,7 @@ async def handle_new_command(
 
     logger.info(
         "TELEGRAM_NEW_CONVERSATION user_id=%s conversation_id=%s thread_id=%s",
-        nexus_user_id,
+        pawrrtal_user_id,
         conversation.id,
         sender.thread_id,
     )
@@ -388,16 +369,12 @@ async def handle_model_command(
     if entry is None:
         return _MODEL_UNKNOWN_MESSAGE.format(raw=raw)
 
-    nexus_user_id = await get_user_id_for_external(
-        provider=PROVIDER,
-        external_user_id=str(sender.user_id),
-        session=session,
-    )
-    if nexus_user_id is None:
+    pawrrtal_user_id = await resolve_or_autolink_telegram_user(session=session, sender=sender)
+    if pawrrtal_user_id is None:
         return _MODEL_NOT_BOUND_MESSAGE
 
     conversation = await get_or_create_telegram_conversation_full(
-        user_id=nexus_user_id,
+        user_id=pawrrtal_user_id,
         session=session,
         thread_id=sender.thread_id,
     )
@@ -421,7 +398,7 @@ async def handle_model_command(
 
     logger.info(
         "TELEGRAM_MODEL_SET user_id=%s conversation_id=%s model_id=%s",
-        nexus_user_id,
+        pawrrtal_user_id,
         conversation.id,
         canonical_id,
     )
@@ -459,16 +436,12 @@ async def handle_verbose_command(
     if level not in _VERBOSE_LABELS:
         return _VERBOSE_USAGE_MESSAGE
 
-    nexus_user_id = await get_user_id_for_external(
-        provider=PROVIDER,
-        external_user_id=str(sender.user_id),
-        session=session,
-    )
-    if nexus_user_id is None:
+    pawrrtal_user_id = await resolve_or_autolink_telegram_user(session=session, sender=sender)
+    if pawrrtal_user_id is None:
         return _VERBOSE_NOT_BOUND_MESSAGE
 
     conversation = await get_or_create_telegram_conversation_full(
-        user_id=nexus_user_id,
+        user_id=pawrrtal_user_id,
         session=session,
         thread_id=sender.thread_id,
     )
@@ -487,7 +460,7 @@ async def handle_verbose_command(
 
     logger.info(
         "TELEGRAM_VERBOSE_SET user_id=%s conversation_id=%s level=%d",
-        nexus_user_id,
+        pawrrtal_user_id,
         conversation.id,
         level,
     )
