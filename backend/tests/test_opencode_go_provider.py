@@ -42,15 +42,18 @@ from tests.agent_harness import (
     tool_call_turn,
 )
 
-# Cost rates used throughout — match the catalogue entry for glm-5.1
-# from backend/app/core/providers/catalog.py so a regression there
-# trips a test failure here as well.
+# OpenCode Go runs on subscription pricing (per
+# https://opencode.ai/docs/go/), so the catalogue exposes 0.0 for all
+# per-token rates ("unknown — skip cost accounting"). These constants
+# are kept locally for the cost-arithmetic helpers below so we can still
+# verify the pure compute_cost_usd math without depending on catalogue
+# values.
 _GLM_IN_USD = 1.4
 _GLM_OUT_USD = 4.4
 
 
 def _make_provider() -> OpencodeGoLLM:
-    """Construct an ``OpencodeGoLLM`` with the GLM-5.1 cost profile."""
+    """Construct an ``OpencodeGoLLM`` with an arbitrary cost profile."""
     return OpencodeGoLLM(
         "glm-5.1",
         config=OpencodeGoLLMConfig(
@@ -281,8 +284,10 @@ def test_catalogue_contains_opencode_go_entries(
 
     entry = find(parsed)
     assert entry is not None
-    assert entry.cost_per_mtok_in_usd > 0
-    assert entry.cost_per_mtok_out_usd > 0
+    # OpenCode Go uses subscription pricing — every catalogue entry
+    # reports 0.0 ("skip cost accounting") for per-token rates.
+    assert entry.cost_per_mtok_in_usd == 0.0
+    assert entry.cost_per_mtok_out_usd == 0.0
 
 
 def test_resolve_llm_returns_opencodego_with_catalog_costs(
@@ -292,8 +297,8 @@ def test_resolve_llm_returns_opencodego_with_catalog_costs(
     # Ensure the gateway URL comes from settings (default value).
     provider = resolve_llm("opencode-go:zai/glm-5.1")
     assert isinstance(provider, OpencodeGoLLM)
-    assert provider._config.cost_per_mtok_in_usd == _GLM_IN_USD
-    assert provider._config.cost_per_mtok_out_usd == _GLM_OUT_USD
+    assert provider._config.cost_per_mtok_in_usd == 0.0
+    assert provider._config.cost_per_mtok_out_usd == 0.0
     assert provider._config.base_url == "https://opencode.ai/zen/go/v1"
 
 

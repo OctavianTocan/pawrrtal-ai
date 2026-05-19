@@ -29,11 +29,12 @@ from app.crud.channel import (
 )
 from app.crud.conversation import ConversationStatus, get_conversation_status
 
-# Re-export so callers in ``bot.py`` import both status helpers from one
-# module path — keeping ``bot.py``'s fan-out under sentrux's
+# Re-export so callers in ``bot.py`` import all LCM-flavoured handlers
+# from one module path — keeping ``bot.py``'s fan-out under sentrux's
 # ``no_god_files`` budget (issue #303 added the second helper). The
-# underlying implementation lives in :mod:`lcm_status` to keep each
-# file focused on one command.
+# underlying implementations live in their own per-command files to
+# keep each module focused on one command.
+from app.integrations.telegram.compact_command import handle_compact_command  # noqa: F401
 from app.integrations.telegram.lcm_status import handle_lcm_command  # noqa: F401
 
 
@@ -77,17 +78,23 @@ _STATUS_MESSAGE = (
     "📊 Pawrrtal gateway\n\n"
     "⏱  Bot up: {uptime} (this worker)\n"
     "🤖 Model: {model_display} (<code>{model_id}</code>){model_warning}\n"
-    "🔊 Verbose: {verbose_level} ({verbose_label})\n\n"
+    "🔊 Verbose: {verbose_level} ({verbose_label})\n"
+    "🧠 Thinking: {reasoning_label}\n\n"
     "💬 This conversation\n"
     "   • Started: {started_ago} ago\n"
     "   • Messages: {messages} ({user_messages} yours, {assistant_messages} assistant)\n"
     "   • Tokens: {tokens}\n"
+    "   • Cost: {cost}\n"
     "   • Status: {run_status}"
 )
 _STATUS_THREAD_LINE = "\n🧵 Topic thread: <code>{thread_id}</code>"
 _STATUS_MODEL_WARNING_SUFFIX = " ⚠️ catalog lookup failed"
 _STATUS_RUN_RUNNING = "running"
 _STATUS_RUN_IDLE = "idle"
+_REASONING_LABEL_DEFAULT = "default (provider-picked)"
+_REASONING_LABEL_UNSUPPORTED = "n/a (model doesn't support)"
+_COST_DECIMAL_PLACES = 4
+_COST_UNAVAILABLE = "n/a (provider did not report cost)"
 
 _SECONDS_PER_MINUTE = 60
 _SECONDS_PER_HOUR = 3_600
@@ -144,6 +151,50 @@ def _resolve_verbose(level: int | None) -> tuple[int, str]:
     return effective, _VERBOSE_LABELS.get(effective, "unknown")
 
 
+def _resolve_reasoning_label(
+    reasoning_effort: str | None,
+    *,
+    model_id: str | None,
+) -> str:
+    """Render the ``🧠 Thinking`` line for the status reply.
+
+    Returns the persisted effort verbatim when one is set, otherwise:
+
+    * ``"n/a (model doesn't support)"`` when the catalog entry exposes
+      no reasoning levels — surfaces honestly that a /thinking choice
+      would do nothing on this model.
+    * ``"default (provider-picked)"`` when the model does support
+      reasoning levels but no per-conversation override is stored.
+    """
+    if reasoning_effort:
+        return reasoning_effort
+    canonical = model_id or default_model().id
+    try:
+        parsed = parse_model_id(canonical)
+        entry = find(parsed)
+    except InvalidModelId:
+        entry = None
+    if entry is None or not entry.supports_reasoning:
+        return _REASONING_LABEL_UNSUPPORTED
+    return _REASONING_LABEL_DEFAULT
+
+
+def _format_cost_usd(cost_usd: float, *, has_messages: bool, has_usage: bool) -> str:
+    """Render the ``💵 Cost`` line.
+
+    Mirrors the tokens-line honesty pattern: when a conversation has
+    messages but the provider didn't report usage tokens at all
+    (``has_usage=False``), surface that explicitly rather than print
+    a misleading ``$0.0000``. A genuine ``$0.00`` turn (the user
+    /stop'd before the first token, or the model produced no output)
+    still renders as ``$0.0000`` because tokens were reported even
+    though the cost was zero.
+    """
+    if has_messages and not has_usage:
+        return _COST_UNAVAILABLE
+    return f"${cost_usd:.{_COST_DECIMAL_PLACES}f}"
+
+
 def _now_utc() -> datetime:
     """Indirection seam for tests that want to freeze 'now'."""
     return datetime.now(UTC)
@@ -182,6 +233,11 @@ def _render_status_message(
             f"{_format_token_count(status.total_output_tokens)} out"
         )
 
+    reasoning_label = _resolve_reasoning_label(status.reasoning_effort, model_id=status.model_id)
+    cost_line = _format_cost_usd(
+        status.total_cost_usd, has_messages=has_messages, has_usage=has_usage
+    )
+
     body = _STATUS_MESSAGE.format(
         uptime=_format_duration(bot_uptime_seconds),
         model_display=model_display,
@@ -189,11 +245,13 @@ def _render_status_message(
         model_warning=model_warning,
         verbose_level=verbose_level,
         verbose_label=verbose_label,
+        reasoning_label=reasoning_label,
         started_ago=_format_duration(started_ago_seconds),
         messages=status.message_count,
         user_messages=status.user_message_count,
         assistant_messages=status.assistant_message_count,
         tokens=tokens_line,
+        cost=cost_line,
         run_status=_STATUS_RUN_RUNNING if run_active else _STATUS_RUN_IDLE,
     )
     if thread_id is not None:

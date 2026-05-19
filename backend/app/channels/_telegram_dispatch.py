@@ -20,7 +20,6 @@ Draft streaming helpers (Workstream 1) live in
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import html as html_lib
 import logging
 import time
@@ -34,9 +33,9 @@ from ._telegram_draft import (
     DraftStreamState,
     handle_text_delta_draft,
 )
+from ._telegram_finalize import finalize_turn_delivery
 from .telegram_delivery import (
     format_tool_use,
-    safe_delete,
     safe_edit,
     safe_edit_html,
     safe_send_html,
@@ -450,74 +449,6 @@ async def handle_text_delta(
     return text_buffer, text_message_id, chars_since_edit, last_edit_at
 
 
-async def finalize_turn_delivery(
-    *,
-    bot: Bot,
-    chat_id: int | str,
-    placeholder_message_id: int,
-    first_block_kind: str | None,
-    previous_block_kind: str | None,
-    tool_trace: str,
-    thinking_text: str,
-    text_message_id: int | None,
-    text_buffer: str,
-    final_text: str,
-    reply_to_message_id: int | None,
-    message_thread_id: int | None,
-    draft_state: DraftStreamState | None = None,
-) -> None:
-    """Resolve the ⏳ placeholder and send the closing reply (#288, #293, #306).
-
-    When ``draft_state`` is set, the keepalive task is cancelled and the
-    final text is persisted via ``sendMessage`` (drafts auto-expire and
-    never appear in the user's message history).
-
-    When ``text_message_id`` is set, we flush its final buffer in place
-    and skip the closing ``final_text`` send so the user doesn't see the
-    answer twice.
-    """
-    if draft_state is not None and draft_state.keepalive_task is not None:
-        draft_state.keepalive_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError, Exception):
-            await draft_state.keepalive_task
-
-    if first_block_kind == "tools":
-        await safe_edit_html(bot, chat_id, placeholder_message_id, tool_trace)
-    elif first_block_kind in ("thinking", "text") or final_text:
-        await safe_delete(bot, chat_id, placeholder_message_id)
-    else:
-        await safe_edit(bot, chat_id, placeholder_message_id, _EMPTY_RESPONSE_FALLBACK)
-        logger.warning(
-            "TELEGRAM_EMPTY_STREAM chat_id=%s message_id=%s",
-            chat_id,
-            placeholder_message_id,
-        )
-
-    if text_message_id is not None and text_buffer:
-        await safe_edit(bot, chat_id, text_message_id, text_buffer)
-        return
-
-    if final_text:
-        await safe_send_text(
-            bot,
-            chat_id,
-            final_text,
-            reply_to_message_id=reply_to_message_id,
-            message_thread_id=message_thread_id,
-        )
-        return
-
-    if previous_block_kind == "tools" and not thinking_text:
-        await safe_send_text(
-            bot,
-            chat_id,
-            _EMPTY_RESPONSE_FALLBACK,
-            reply_to_message_id=reply_to_message_id,
-            message_thread_id=message_thread_id,
-        )
-        logger.warning(
-            "TELEGRAM_TOOL_ONLY_TURN chat_id=%s message_id=%s tool_trace_len=%d",
-            chat_id,
-            placeholder_message_id,
-            len(tool_trace),
-        )
+# ``finalize_turn_delivery`` lives in ``_telegram_finalize`` so this
+# module fits the 500-line file budget. Re-exported via ``__all__``
+# above for callers that import from this module.

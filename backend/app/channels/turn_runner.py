@@ -150,6 +150,7 @@ async def run_turn(
         turn_input.workspace_root,
         model_id=model_id,
         tools=turn_input.tools,
+        reasoning_effort=turn_input.reasoning_effort,
     )
 
     with turn_span(

@@ -116,20 +116,20 @@ def _resolve_xai_api_key(workspace_root: Path | None) -> str:
 def _map_reasoning_effort(
     effort: ReasoningEffort | None,
 ) -> chat_pb2.ReasoningEffort | None:
-    """Map Pawrrtal's four-level UI knob onto xAI's proto enum.
+    """Map Pawrrtal's five-level UI knob onto xAI's proto enum.
 
     Grok 4.3 accepts ``EFFORT_LOW`` or ``EFFORT_HIGH``
     (https://docs.x.ai/docs/models/grok-4-3) and 400s on anything
     else, including ``EFFORT_MEDIUM`` and ``EFFORT_NONE``.  The
-    Pawrrtal UI surfaces ``low | medium | high | extra-high`` — we
-    collapse the lower two to ``EFFORT_LOW`` and the upper two to
-    ``EFFORT_HIGH`` so the user gets a meaningful difference without
-    overshooting xAI's schema.  ``None`` means "let xAI pick the
-    model default" and the field is omitted from the request.
+    Pawrrtal UI surfaces ``minimal | low | medium | high | extra-high``
+    — we collapse the lower three to ``EFFORT_LOW`` and the upper two
+    to ``EFFORT_HIGH`` so the user gets a meaningful difference
+    without overshooting xAI's schema.  ``None`` means "let xAI pick
+    the model default" and the field is omitted from the request.
     """
     if effort is None:
         return None
-    if effort in ("low", "medium"):
+    if effort in ("minimal", "low", "medium"):
         return chat_pb2.ReasoningEffort.EFFORT_LOW
     return chat_pb2.ReasoningEffort.EFFORT_HIGH
 

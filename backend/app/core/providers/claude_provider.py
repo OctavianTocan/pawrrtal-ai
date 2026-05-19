@@ -130,6 +130,21 @@ _STDERR_TAIL_LINES = 20
 # for minutes.
 _RETRY_SLEEP_CEILING_SECONDS = 30.0
 
+# Pawrrtal's five-level ``ReasoningEffort`` literal collapses onto
+# Claude's three documented adaptive-thinking levels (low/medium/high
+# per https://docs.claude.com/en/docs/build-with-claude/extended-thinking).
+# ``minimal`` rounds up to ``low`` (Claude has no faster tier) and
+# ``extra-high`` saturates at ``high``. The chat-router resolver
+# normally adapts these before we get here because no Claude catalog
+# row lists either level — this is the belt-and-braces.
+_CLAUDE_EFFORT_MAP: dict[str, str] = {
+    "minimal": "low",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "extra-high": "high",
+}
+
 # System prompt scoped to a chat product. We deliberately do NOT use
 # Claude Code's default preset, which steers the model toward software
 # engineering tasks and tools that don't exist in this surface.
@@ -469,7 +484,19 @@ class ClaudeLLM:
             "setting_sources": setting_sources,
         }
         if reasoning_effort is not None:
-            kwargs["effort"] = "max" if reasoning_effort == "extra-high" else reasoning_effort
+            # The Claude API's adaptive thinking ``effort`` enum is
+            # documented as ``low | medium | high`` only (see
+            # https://docs.claude.com/en/docs/build-with-claude/extended-thinking).
+            # Pawrrtal's ``minimal`` collapses to ``low`` (Claude has
+            # no faster tier) and ``extra-high`` saturates at ``high``
+            # — so a user who picked the lightest or heaviest level on
+            # a model that supports the full five-step ladder still
+            # gets the closest level Claude exposes after switching.
+            # The catalog's ``supports_reasoning`` tuple should not
+            # list ``minimal`` or ``extra-high`` for any Claude model
+            # — the chat-router resolver adapts before this line runs
+            # — so this mapping is belt-and-braces.
+            kwargs["effort"] = _CLAUDE_EFFORT_MAP.get(reasoning_effort, reasoning_effort)
         # Per-request cost cap (PR 04). The Claude SDK enforces this
         # natively — when the agent burns past ``max_budget_usd`` mid-turn,
         # the SDK terminates with a ``ResultMessage(is_error=True,

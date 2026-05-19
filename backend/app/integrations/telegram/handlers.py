@@ -33,12 +33,10 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.providers.catalog import default_model, find
-from app.core.providers.model_id import InvalidModelId, parse_model_id
+from app.core.providers.catalog import default_model
 from app.crud.channel import (
     get_or_create_telegram_conversation_full,
     redeem_link_code,
-    update_conversation_model,
     update_conversation_verbose_level,
 )
 
@@ -81,22 +79,6 @@ _BIND_BAD_CODE_MESSAGE = (
 # every `await` point in the run.
 _STOP_STOPPED_MESSAGE = "⏹ Stopped."
 _STOP_NOTHING_MESSAGE = "Nothing is running right now."
-_MODEL_MISSING_MESSAGE = (
-    "Usage: /model &lt;vendor&gt;/&lt;model&gt;\n\n"
-    "The structural form is <code>[host:]vendor/model</code>; the host "
-    "prefix is optional and filled in automatically."
-)
-_MODEL_INVALID_MESSAGE = (
-    "Couldn't parse <code>{raw}</code> as a model ID ({reason}).\n\n"
-    "Expected structural form: <code>[host:]vendor/model</code>."
-)
-_MODEL_UNKNOWN_MESSAGE = (
-    "I don't have <code>{raw}</code> in the model catalog.\n\n"
-    "Use /models to pick one of the configured models."
-)
-_MODEL_NOT_BOUND_MESSAGE = "You need to connect your account first before switching models."
-_MODEL_OK_MESSAGE = "Model switched to <code>{model_id}</code> ✅"
-_MODEL_FAIL_MESSAGE = "Couldn't update model — please try again."
 _NEW_NOT_BOUND_MESSAGE = "Connect your account first before starting a new conversation."
 _NEW_OK_MESSAGE = "✨ New conversation started. What's on your mind?"
 
@@ -334,75 +316,6 @@ def handle_stop_command(*, was_running: bool) -> str:
         Reply string the bot should send immediately.
     """
     return _STOP_STOPPED_MESSAGE if was_running else _STOP_NOTHING_MESSAGE
-
-
-async def handle_model_command(
-    *,
-    sender: TelegramSender,
-    model_arg: str,
-    session: AsyncSession,
-) -> str:
-    """Process a ``/model <id>`` command and persist the model override.
-
-    Resolves the sender's binding, finds (or creates) their Telegram
-    conversation, and updates ``Conversation.model_id`` so subsequent turns
-    use the requested model.
-
-    Args:
-        sender: Normalized sender identity.
-        model_arg: The whitespace-stripped text after ``/model``.  An empty
-            string triggers a usage hint.
-        session: Async database session.
-
-    Returns:
-        Reply string the bot should send immediately.
-    """
-    raw = model_arg.strip()
-    if not raw:
-        return _MODEL_MISSING_MESSAGE
-
-    try:
-        parsed = parse_model_id(raw)
-    except InvalidModelId as exc:
-        return _MODEL_INVALID_MESSAGE.format(raw=raw, reason=str(exc))
-    entry = find(parsed)
-    if entry is None:
-        return _MODEL_UNKNOWN_MESSAGE.format(raw=raw)
-
-    pawrrtal_user_id = await resolve_or_autolink_telegram_user(session=session, sender=sender)
-    if pawrrtal_user_id is None:
-        return _MODEL_NOT_BOUND_MESSAGE
-
-    conversation = await get_or_create_telegram_conversation_full(
-        user_id=pawrrtal_user_id,
-        session=session,
-        thread_id=sender.thread_id,
-    )
-
-    # Store the canonical, fully-qualified form ("host:vendor/model"), not
-    # the raw user input — keeps stored model_ids consistent regardless of
-    # whether the user typed the host prefix.
-    canonical_id = entry.id
-    updated = await update_conversation_model(
-        conversation_id=conversation.id,
-        model_id=canonical_id,
-        session=session,
-    )
-    if not updated:
-        logger.warning(
-            "TELEGRAM_MODEL_UPDATE_FAILED conversation_id=%s model_id=%s",
-            conversation.id,
-            canonical_id,
-        )
-        return _MODEL_FAIL_MESSAGE
-
-    logger.info(
-        "TELEGRAM_MODEL_SET user_id=%s conversation_id=%s model_id=%s",
-        pawrrtal_user_id,
-        conversation.id,
-        canonical_id,
-    )
-    return _MODEL_OK_MESSAGE.format(model_id=canonical_id)
 
 
 async def handle_verbose_command(
