@@ -223,7 +223,10 @@ def parse_model_callback_data(data: str | None) -> ModelCallback | None:
 
 
 def resolve_model_selection(callback: ModelCallback) -> ModelEntry | None:
-    """Resolve a parsed selection callback to a catalog entry."""
+    """Resolve a parsed selection callback to a catalog entry.
+
+    Returns ``None`` for stale catalog tokens or out-of-range indexes.
+    """
     if callback.action != "select" or callback.catalog_token != _CATALOG_TOKEN:
         return None
     if callback.index is None or callback.index < 0:
@@ -367,6 +370,7 @@ __all__ = [
     "ModelButton",
     "ModelCallback",
     "ModelPickerState",
+    "TelegramSenderLike",
     "build_host_keyboard",
     "build_models_keyboard",
     "build_vendor_keyboard",
