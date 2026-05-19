@@ -30,8 +30,8 @@ proto / SDK fields, not ``extra_body``):
   (``low | medium | high | extra-high``) is collapsed to xAI's
   two-level enum via :func:`_map_reasoning_effort`.  Grok 4.3 400s on
   anything else (https://docs.x.ai/docs/models/grok-4-3).
-* ``search_parameters`` — xAI deprecated Live Search (May 2026);
-  the field is no longer sent.  Pawrrtal's canonical web tool is
+* ``search_parameters`` — xAI's Live Search was removed in May 2026;
+  we no longer send this field.  Pawrrtal's canonical web tool is
   ``exa_search`` (gated by ``EXA_API_KEY``).  If xAI ships a
   replacement search surface, the knob will flow through here.
 * ``response.cost_usd`` — the SDK does the

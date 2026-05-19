@@ -278,7 +278,7 @@ async def get_or_create_telegram_conversation_full(
         thread_id: Telegram topic thread ID (Bot API 9.3+).  When set,
             the query scopes to conversations with a matching
             ``telegram_thread_id``; otherwise it falls back to the
-            legacy ``title.like("Telegram%")`` lookup for plain DMs.
+            pre-topic ``title.like("Telegram%")`` lookup for plain DMs.
 
     Returns:
         The resolved or newly created ``Conversation`` ORM row.
@@ -366,7 +366,7 @@ async def _get_or_create_telegram_conv_row(
     Routing branches:
     - ``thread_id`` set → query by ``(user_id, telegram_thread_id)``; each
       Telegram topic gets its own independent conversation.
-    - ``thread_id`` None → legacy DM mode; find the most recently updated
+    - ``thread_id`` None → pre-topic DM mode; find the most recently updated
       conversation whose title starts with "Telegram" and has no thread ID.
     """
     from app.models import Conversation  # noqa: PLC0415

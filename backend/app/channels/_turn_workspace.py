@@ -15,7 +15,7 @@ def workspace_system_prompt(workspace_root: Path | None) -> str | None:
 
     PR 06 — uses :func:`load_workspace_context` so SOUL.md / AGENTS.md /
     CLAUDE.md and ``.claude/skills/`` are merged into one provider-
-    neutral system prompt. Falls back to the legacy
+    neutral system prompt. Falls back to the alternative
     :func:`assemble_workspace_prompt` builder when WorkspaceContext is
     disabled or returns nothing so existing deployments don't lose
     their AGENTS.md content.

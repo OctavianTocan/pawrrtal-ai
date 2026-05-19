@@ -65,7 +65,7 @@ def _provider_identity_for(model_id: str | None) -> ProviderIdentity | None:
     """Look up trusted provider + model metadata for ``model_id``.
 
     Returns ``None`` when the channel didn't supply a model id (rare —
-    typically only legacy tests). When the id is well-formed we always
+    typically only unit tests). When the id is well-formed we always
     return a :class:`ProviderIdentity` so the system-prompt block can
     answer "which model are you?" with trusted runtime metadata. The
     catalog lookup is best-effort: an unknown but well-formed id (e.g.

@@ -105,7 +105,6 @@ jobs:
           # tests don't go near the database.
           AUTH_SECRET: ci-not-a-secret
           GOOGLE_API_KEY: ci-not-a-key
-          FERNET_KEY: 'zG9KQK6sH0xLm4LJ4n8C9aD2vF3gN5pT7rE1yU8xKqM='
           # Required by Settings.workspace_encryption_key (no default).
           WORKSPACE_ENCRYPTION_KEY: 'zG9KQK6sH0xLm4LJ4n8C9aD2vF3gN5pT7rE1yU8xKqM='
           CORS_ORIGINS: '["http://localhost:3001"]'

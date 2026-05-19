@@ -4,11 +4,12 @@ import { ChevronRightIcon } from 'lucide-react';
 import { memo, type ReactNode, useMemo } from 'react';
 import { Streamdown } from 'streamdown';
 import { Shimmer } from '@/components/ai-elements/shimmer';
+import type { ChatTimelineEntry } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { getCompletedToolLabel, getToolIcon, getToolLabel } from '../thinking-constants';
 import { parseThinkingSections } from '../thinking-parser';
 import type { ToolResultChips } from '../tool-result-parsers';
-import type { ChatTimelineEntry, ChatToolCall } from '../types';
+import type { ChatToolCall } from '../types';
 import { ToolResultChipsRow } from './ToolResultChipsRow';
 
 /**

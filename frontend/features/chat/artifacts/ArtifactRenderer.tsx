@@ -16,7 +16,7 @@
 import type { Components, Spec } from '@json-render/react';
 import { defineRegistry, JSONUIProvider, Renderer } from '@json-render/react';
 import type { ReactNode } from 'react';
-import type { ChatArtifactPayload } from '../types';
+import type { ChatArtifactPayload } from '@/lib/types';
 import { artifactCatalog } from './catalog';
 import { artifactComponents } from './components';
 import { ArtifactInteractionScope } from './interaction-context';

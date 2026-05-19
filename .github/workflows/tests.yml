@@ -60,7 +60,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '22'
 
       - name: Build local libs (frontend/lib/* submodules)
         run: bash scripts/build-local-libs.sh
@@ -176,13 +176,7 @@ jobs:
         env:
           AUTH_SECRET: pytest-not-a-secret
           GOOGLE_API_KEY: pytest-not-a-key
-          # Fernet expects a 32-byte url-safe base64 key.  Generated once
-          # via `python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"`
-          # and pinned here so test runs are deterministic.
-          FERNET_KEY: 'zG9KQK6sH0xLm4LJ4n8C9aD2vF3gN5pT7rE1yU8xKqM='
           # Required by Settings.workspace_encryption_key (no default).
-          # Same Fernet-format key as FERNET_KEY above — both are
-          # encryption keys, just at different layers.
           WORKSPACE_ENCRYPTION_KEY: 'zG9KQK6sH0xLm4LJ4n8C9aD2vF3gN5pT7rE1yU8xKqM='
           CORS_ORIGINS: '["http://localhost:3001"]'
           DATABASE_URL: 'sqlite+aiosqlite:///:memory:'

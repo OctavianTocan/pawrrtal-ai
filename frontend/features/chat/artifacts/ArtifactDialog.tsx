@@ -19,7 +19,7 @@
 import { XIcon } from 'lucide-react';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import type { ChatArtifactPayload } from '../types';
+import type { ChatArtifactPayload } from '@/lib/types';
 import { ArtifactRenderer } from './ArtifactRenderer';
 
 interface ArtifactDialogProps {

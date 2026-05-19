@@ -81,16 +81,16 @@ class ChatTurnInput:
     workspace_root: Path | None = None
     tools: list[AgentTool] | None = None
     reasoning_effort: ReasoningEffort | None = None
-    # PR 03b — cross-provider can_use_tool gate. None preserves the
-    # historical behaviour (no permission check); when supplied, the
-    # provider plumbs it into AgentLoopConfig (Gemini) or
+    # PR 03b — cross-provider can_use_tool gate.  ``None`` (the
+    # default) means no permission check; when supplied, the provider
+    # plumbs it into AgentLoopConfig (Gemini) or
     # ClaudeAgentOptions.can_use_tool (Claude) so the same policy
     # applies regardless of model.
     permission_check: PermissionCheckFn | None = None
     # PR 09 — multimodal image inputs forwarded to the provider.  Each
     # entry is ``{"data": <base64>, "media_type": "image/<mime>"}`` —
     # the same wire shape ``ChatRequest.images`` carries on the API
-    # boundary.  ``None`` (the default) is the legacy text-only path.
+    # boundary.  ``None`` (the default) indicates a text-only turn.
     images: list[dict[str, str]] | None = None
     history_window: int = 20
     log_tag: str = "TURN"
@@ -102,7 +102,8 @@ class ChatTurnInput:
 class _EventCounter:
     """Mutable counter shared with the nested provider-stream wrapper.
 
-    ``value`` is the total event count (kept for backwards-compatible logs).
+    ``value`` is the total event count, used in error logs and turn
+    finalisation.
     ``by_type`` is the per-event-type breakdown so the postmortem log line
     can answer "what kinds of 51 events did this turn produce?" — invaluable
     when debugging stuck Telegram placeholders or runaway tool loops.
