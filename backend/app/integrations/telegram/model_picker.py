@@ -348,20 +348,27 @@ def _pagination_rows(
 ) -> list[list[ModelButton]]:
     if page_count <= 1:
         return []
-    row = [
-        ModelButton(
-            text="< Prev",
-            callback_data=_list_callback(host=host, vendor=vendor, page=page - 1),
-        ),
+    row: list[ModelButton] = []
+    if page > 1:
+        row.append(
+            ModelButton(
+                text="< Prev",
+                callback_data=_list_callback(host=host, vendor=vendor, page=page - 1),
+            )
+        )
+    row.append(
         ModelButton(
             text=f"{page}/{page_count}",
             callback_data=_list_callback(host=host, vendor=vendor, page=page),
-        ),
-        ModelButton(
-            text="Next >",
-            callback_data=_list_callback(host=host, vendor=vendor, page=page + 1),
-        ),
-    ]
+        )
+    )
+    if page < page_count:
+        row.append(
+            ModelButton(
+                text="Next >",
+                callback_data=_list_callback(host=host, vendor=vendor, page=page + 1),
+            )
+        )
     return [row]
 
 

@@ -231,3 +231,35 @@ def test_parse_legacy_list_callback_without_host_returns_none() -> None:
     re-open so we don't keep backwards-compat parsing for them.
     """
     assert parse_model_callback_data("mdl:l:anthropic:1") is None
+
+
+def test_pagination_first_page_omits_prev_button(monkeypatch: pytest.MonkeyPatch) -> None:
+    """First page must not emit a < Prev button — taking it produces a stale alert."""
+    import app.integrations.telegram.model_picker as picker_module
+
+    monkeypatch.setattr(picker_module, "_MODEL_PAGE_SIZE", 1)
+    rows = build_models_keyboard(
+        host=Host.litellm.value,
+        vendor="openai",
+        page=1,
+        current_model_id="",
+    )
+    labels = [b.text for b in _flatten(rows)]
+    assert "< Prev" not in labels
+    assert "Next >" in labels
+
+
+def test_pagination_last_page_omits_next_button(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Last page must not emit a Next > button."""
+    import app.integrations.telegram.model_picker as picker_module
+
+    monkeypatch.setattr(picker_module, "_MODEL_PAGE_SIZE", 1)
+    rows = build_models_keyboard(
+        host=Host.litellm.value,
+        vendor="openai",
+        page=5,  # LiteLLM has 5 OpenAI models, so page 5 of 5 with size 1
+        current_model_id="",
+    )
+    labels = [b.text for b in _flatten(rows)]
+    assert "< Prev" in labels
+    assert "Next >" not in labels
