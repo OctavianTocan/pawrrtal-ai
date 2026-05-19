@@ -18,6 +18,7 @@ import type { ChatModelOption } from '../hooks/use-chat-models';
 import { hostLabel } from './model-picker-labels';
 import {
 	groupModelsByHost,
+	type ModelRowSlotProps,
 	MultiVendorHostMenuRow,
 	SingleVendorHostMenuRow,
 } from './model-selector-host-rows';
@@ -48,6 +49,21 @@ type RootRow = { kind: 'host'; host: string } | { kind: 'thinking' };
 /** Stable React key for each root row. */
 function rootRowKey(row: RootRow): string {
 	return row.kind === 'host' ? `host:${row.host}` : 'thinking';
+}
+
+/** Type-ahead display string for each root row — uses the host label or a fixed literal. */
+function rootRowDisplay(row: RootRow): string {
+	return row.kind === 'host' ? hostLabel(row.host) : 'Thinking';
+}
+
+/**
+ * Render a model row; passed as a slot to host-row components.
+ *
+ * Pure function — depends only on its arguments, not on component state.
+ * Lifted to module scope so React does not re-create it on every render.
+ */
+function renderModelRow({ model, isSelected, onSelect }: ModelRowSlotProps): React.JSX.Element {
+	return <ModelRow key={model.id} model={model} isSelected={isSelected} onSelect={onSelect} />;
 }
 
 /**
@@ -216,26 +232,6 @@ export function ModelSelectorPopover({
 		...groupedHosts.map((group) => ({ kind: 'host', host: group.host }) satisfies RootRow),
 		{ kind: 'thinking' },
 	];
-
-	// Type-ahead display string for each root row — uses the live host list.
-	function rootRowDisplay(row: RootRow): string {
-		return row.kind === 'host' ? hostLabel(row.host) : 'Thinking';
-	}
-
-	/** Render a model row; passed as a slot to host-row components. */
-	function renderModelRow({
-		model,
-		isSelected,
-		onSelect,
-	}: {
-		model: ChatModelOption;
-		isSelected: boolean;
-		onSelect: (modelId: string) => void;
-	}): React.JSX.Element {
-		return (
-			<ModelRow key={model.id} model={model} isSelected={isSelected} onSelect={onSelect} />
-		);
-	}
 
 	/** Select and render the correct host submenu variant based on vendor count. */
 	function renderHostRow(hostSlug: string): React.JSX.Element | null {

@@ -125,13 +125,19 @@ interface MultiVendorHostMenuRowProps extends HostMenuRowProps {
 }
 
 /** Props for a single model row rendered inside a host submenu. */
-interface ModelRowSlotProps {
+export interface ModelRowSlotProps {
 	/** The model to render. */
 	model: ChatModelOption;
 	/** True when this model is the currently selected one. */
 	isSelected: boolean;
 	/** Callback fired when the user selects this model. */
 	onSelect: (modelId: string) => void;
+}
+
+/** Mixin that adds the `renderModelRow` slot to a host-row props interface. */
+interface WithRenderModelRow {
+	/** Render a single model row. Called once per model entry. */
+	renderModelRow: (props: ModelRowSlotProps) => React.JSX.Element;
 }
 
 /**
@@ -142,16 +148,12 @@ interface ModelRowSlotProps {
  * This indirection keeps `model-selector-host-rows.tsx` a pure layout
  * module with no hook calls, which simplifies testing.
  */
-export interface HostMenuRowRenderProps extends HostMenuRowProps {
-	/** Render a single model row. Called once per model entry. */
-	renderModelRow: (props: ModelRowSlotProps) => React.JSX.Element;
-}
+export interface HostMenuRowRenderProps extends HostMenuRowProps, WithRenderModelRow {}
 
 /** Multi-vendor variant render props. */
-export interface MultiVendorHostMenuRowRenderProps extends MultiVendorHostMenuRowProps {
-	/** Render a single model row. Called once per model entry. */
-	renderModelRow: (props: ModelRowSlotProps) => React.JSX.Element;
-}
+export interface MultiVendorHostMenuRowRenderProps
+	extends MultiVendorHostMenuRowProps,
+		WithRenderModelRow {}
 
 /**
  * Flyout submenu for a single host that has only one vendor.
