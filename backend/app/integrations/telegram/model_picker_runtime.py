@@ -9,22 +9,19 @@ from app.integrations.telegram.handlers import TelegramSender, handle_model_comm
 from app.integrations.telegram.model_picker import (
     ModelButton,
     ModelCallback,
+    build_host_keyboard,
     build_models_keyboard,
+    build_vendor_keyboard,
+    format_host_picker_text,
     format_models_picker_text,
+    format_vendor_picker_text,
     get_model_picker_state,
+    has_host,
+    has_vendor_in_host,
     parse_model_callback_data,
     picker_not_bound_message,
     picker_stale_message,
     resolve_model_selection,
-)
-from app.integrations.telegram.model_picker import (
-    build_host_keyboard as build_provider_keyboard,  # TODO: removed in Task 5
-)
-from app.integrations.telegram.model_picker import (
-    format_host_picker_text as format_provider_picker_text,  # TODO: removed in Task 5
-)
-from app.integrations.telegram.model_picker import (
-    has_host as has_provider,  # TODO: removed in Task 5
 )
 
 if TYPE_CHECKING:
@@ -44,7 +41,7 @@ async def answer_model_command(*, message: Message, model_arg: str) -> None:
 
 
 async def answer_model_picker(*, message: Message) -> None:
-    """Open the provider picker for ``/models`` or empty ``/model``."""
+    """Open the host picker for ``/models`` or empty ``/model``."""
     sender = _sender_from_message(message)
     async with async_session_maker() as session:
         state = await get_model_picker_state(sender=sender, session=session)
@@ -57,8 +54,8 @@ async def answer_model_picker(*, message: Message) -> None:
         return
 
     await message.answer(
-        format_provider_picker_text(state.current_model_id),
-        reply_markup=_inline_keyboard(build_provider_keyboard()),
+        format_host_picker_text(state.current_model_id),
+        reply_markup=_inline_keyboard(build_host_keyboard()),
         reply_parameters=_reply_parameters(message.message_id),
     )
 
@@ -81,13 +78,16 @@ async def handle_model_picker_callback(*, callback: CallbackQuery) -> None:
         await callback.answer(picker_not_bound_message(), show_alert=True)
         return
 
-    if parsed.action == "list" and parsed.provider is not None:
+    if parsed.action == "vendors" and parsed.host is not None:
+        await _edit_vendor_list(callback=callback, parsed=parsed)
+        return
+    if parsed.action == "list" and parsed.host is not None and parsed.provider is not None:
         await _edit_model_list(
             callback=callback, parsed=parsed, current_model_id=state.current_model_id
         )
         return
 
-    await _edit_provider_list(callback=callback, current_model_id=state.current_model_id)
+    await _edit_host_list(callback=callback, current_model_id=state.current_model_id)
 
 
 def _opens_picker(model_arg: str) -> bool:
@@ -111,13 +111,32 @@ async def _handle_model_select(*, callback: CallbackQuery, parsed: ModelCallback
     await callback.answer(f"Model set: {entry.short_name}")
 
 
+async def _edit_vendor_list(*, callback: CallbackQuery, parsed: ModelCallback) -> None:
+    if parsed.host is None or not has_host(parsed.host):
+        await callback.answer(picker_stale_message(), show_alert=True)
+        return
+    message = _callback_message(callback)
+    if message is None:
+        await callback.answer(picker_stale_message(), show_alert=True)
+        return
+    await message.edit_text(
+        format_vendor_picker_text(host=parsed.host),
+        reply_markup=_inline_keyboard(build_vendor_keyboard(host=parsed.host)),
+    )
+    await callback.answer()
+
+
 async def _edit_model_list(
     *,
     callback: CallbackQuery,
     parsed: ModelCallback,
     current_model_id: str,
 ) -> None:
-    if parsed.provider is None or not has_provider(parsed.provider):
+    if (
+        parsed.host is None
+        or parsed.provider is None
+        or not has_vendor_in_host(host=parsed.host, vendor=parsed.provider)
+    ):
         await callback.answer(picker_stale_message(), show_alert=True)
         return
 
@@ -127,10 +146,11 @@ async def _edit_model_list(
         return
 
     await message.edit_text(
-        format_models_picker_text(provider=parsed.provider, page=parsed.page),
+        format_models_picker_text(host=parsed.host, vendor=parsed.provider, page=parsed.page),
         reply_markup=_inline_keyboard(
             build_models_keyboard(
-                provider=parsed.provider,
+                host=parsed.host,
+                vendor=parsed.provider,
                 page=parsed.page,
                 current_model_id=current_model_id,
             )
@@ -139,14 +159,14 @@ async def _edit_model_list(
     await callback.answer()
 
 
-async def _edit_provider_list(*, callback: CallbackQuery, current_model_id: str) -> None:
+async def _edit_host_list(*, callback: CallbackQuery, current_model_id: str) -> None:
     message = _callback_message(callback)
     if message is None:
         await callback.answer(picker_stale_message(), show_alert=True)
         return
     await message.edit_text(
-        format_provider_picker_text(current_model_id),
-        reply_markup=_inline_keyboard(build_provider_keyboard()),
+        format_host_picker_text(current_model_id),
+        reply_markup=_inline_keyboard(build_host_keyboard()),
     )
     await callback.answer()
 
