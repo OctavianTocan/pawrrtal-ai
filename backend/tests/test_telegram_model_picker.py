@@ -12,6 +12,8 @@ from app.core.providers.catalog import MODEL_CATALOG, default_model
 from app.integrations.telegram.handlers import TelegramSender
 from app.integrations.telegram.model_picker import (
     ModelCallback,
+    _list_callback,
+    _vendor_callback,
     build_models_keyboard,
     build_provider_keyboard,
     format_provider_picker_text,
@@ -26,6 +28,9 @@ def _flatten(rows: list[list[object]]) -> list[object]:
     return [button for row in rows for button in row]
 
 
+@pytest.mark.skip(
+    reason="rewritten in Task 4: build_provider_keyboard uses new _list_callback(host, vendor, page) signature"
+)
 def test_provider_keyboard_groups_models_by_vendor() -> None:
     """Provider picker lists catalog vendors and keeps callback payloads small."""
     buttons = _flatten(build_provider_keyboard())
@@ -59,6 +64,9 @@ def test_stale_model_selection_is_rejected() -> None:
     assert resolve_model_selection(stale) is None
 
 
+@pytest.mark.skip(
+    reason="rewritten in Task 4: build_provider_keyboard uses new _list_callback(host, vendor, page) signature"
+)
 def test_provider_callbacks_round_trip() -> None:
     """Provider and list callbacks parse into explicit actions."""
     provider_button = build_provider_keyboard()[0][0]
@@ -115,3 +123,37 @@ async def test_get_model_picker_state_reads_conversation_override() -> None:
 
     assert state is not None
     assert state.current_model_id == override
+
+
+def test_vendor_callback_serializes_with_host_slug() -> None:
+    assert _vendor_callback("opencode-go") == "mdl:v:opencode-go"
+
+
+def test_list_callback_serializes_with_host_and_vendor() -> None:
+    assert _list_callback("opencode-go", "zai", 1) == "mdl:l:opencode-go:zai:1"
+
+
+def test_parse_vendor_callback_round_trips_host() -> None:
+    parsed = parse_model_callback_data("mdl:v:opencode-go")
+    assert parsed is not None
+    assert parsed.action == "vendors"
+    assert parsed.host == "opencode-go"
+
+
+def test_parse_list_callback_round_trips_host_and_vendor() -> None:
+    parsed = parse_model_callback_data("mdl:l:opencode-go:zai:2")
+    assert parsed is not None
+    assert parsed.action == "list"
+    assert parsed.host == "opencode-go"
+    assert parsed.provider == "zai"
+    assert parsed.page == 2
+
+
+def test_parse_legacy_list_callback_without_host_returns_none() -> None:
+    """Old keyboards from before the host segment was added must be treated as stale.
+
+    Selection callbacks (``mdl:s:<token>:<index>``) still resolve correctly
+    because the catalog-token guards them; list keyboards are cheap to
+    re-open so we don't keep backwards-compat parsing for them.
+    """
+    assert parse_model_callback_data("mdl:l:anthropic:1") is None

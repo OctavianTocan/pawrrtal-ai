@@ -22,7 +22,9 @@ MODEL_CALLBACK_PREFIX = "mdl:"
 _CATALOG_TOKEN = CATALOG_ETAG[:8]
 _MODEL_PAGE_SIZE = 8
 _PROVIDER_BUTTONS_PER_ROW = 2
-_CALLBACK_PART_COUNT = 4
+_CALLBACK_VENDOR_PARTS = 3  # mdl:v:<host>
+_CALLBACK_LIST_PARTS = 5  # mdl:l:<host>:<vendor>:<page>
+_CALLBACK_SELECT_PARTS = 4  # mdl:s:<token>:<index>
 
 _PICKER_NOT_BOUND_MESSAGE = "Connect your account first before changing models."
 _PICKER_STALE_MESSAGE = "That model picker is out of date. Open /models again."
@@ -55,6 +57,7 @@ class ModelCallback:
     """Parsed Telegram callback payload for the model picker."""
 
     action: str
+    host: str | None = None
     provider: str | None = None
     page: int = 1
     index: int | None = None
@@ -164,9 +167,11 @@ def parse_model_callback_data(data: str | None) -> ModelCallback | None:
         return None
 
     parts = data.split(":")
-    if len(parts) == _CALLBACK_PART_COUNT and parts[1] == "l":
+    if len(parts) == _CALLBACK_VENDOR_PARTS and parts[1] == "v":
+        return ModelCallback(action="vendors", host=parts[2])
+    if len(parts) == _CALLBACK_LIST_PARTS and parts[1] == "l":
         return _parse_list_callback(parts)
-    if len(parts) == _CALLBACK_PART_COUNT and parts[1] == "s":
+    if len(parts) == _CALLBACK_SELECT_PARTS and parts[1] == "s":
         return _parse_select_callback(parts)
     return None
 
@@ -226,8 +231,12 @@ def _providers_callback() -> str:
     return "mdl:p"
 
 
-def _list_callback(provider: str, page: int) -> str:
-    return f"mdl:l:{provider}:{page}"
+def _vendor_callback(host: str) -> str:
+    return f"mdl:v:{host}"
+
+
+def _list_callback(host: str, vendor: str, page: int) -> str:
+    return f"mdl:l:{host}:{vendor}:{page}"
 
 
 def _select_callback(index: int) -> str:
@@ -236,12 +245,12 @@ def _select_callback(index: int) -> str:
 
 def _parse_list_callback(parts: list[str]) -> ModelCallback | None:
     try:
-        page = int(parts[3])
+        page = int(parts[4])
     except ValueError:
         return None
     if page < 1:
         return None
-    return ModelCallback(action="list", provider=parts[2], page=page)
+    return ModelCallback(action="list", host=parts[2], provider=parts[3], page=page)
 
 
 def _parse_select_callback(parts: list[str]) -> ModelCallback | None:
