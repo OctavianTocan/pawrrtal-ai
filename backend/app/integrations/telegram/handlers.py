@@ -50,15 +50,7 @@ from app.integrations.telegram._attachments import (  # noqa: F401
     collect_attachments,
 )
 from app.integrations.telegram.dev_admin import resolve_or_autolink_telegram_user
-
-# Re-export ``TelegramSender`` from its shared module so historical
-# import paths (``from app.integrations.telegram.handlers import
-# TelegramSender``) keep working. ``TelegramSender`` itself lives in
-# ``sender.py`` so this module and ``dev_admin`` can both depend on
-# the dataclass without forming an import cycle through ``handlers``.
-from app.integrations.telegram.sender import (
-    TelegramSender as TelegramSender,  # noqa: PLC0414  re-export
-)
+from app.integrations.telegram.sender import TelegramSender
 
 # Loose match for the link-code shape (8 chars from the look-alike-free
 # alphabet defined in app.crud.channel). Used to distinguish "user pasted

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from app.db import async_session_maker
-from app.integrations.telegram.handlers import TelegramSender, handle_model_command
+from app.integrations.telegram.handlers import handle_model_command
 from app.integrations.telegram.model_picker import (
     ModelButton,
     ModelCallback,
@@ -23,6 +23,7 @@ from app.integrations.telegram.model_picker import (
     picker_stale_message,
     resolve_model_selection,
 )
+from app.integrations.telegram.sender import TelegramSender
 
 if TYPE_CHECKING:
     from aiogram.types import CallbackQuery, Message

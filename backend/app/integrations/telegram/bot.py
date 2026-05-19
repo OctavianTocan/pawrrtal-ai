@@ -43,7 +43,6 @@ from app.integrations.telegram.bot_provider_resolution import (
     resolve_provider_with_auto_clear,
 )
 from app.integrations.telegram.handlers import (
-    TelegramSender,
     TelegramTurnContext,
     collect_attachments,
     handle_new_command,
@@ -58,6 +57,7 @@ from app.integrations.telegram.model_picker_runtime import (
     answer_model_picker,
     handle_model_picker_callback,
 )
+from app.integrations.telegram.sender import TelegramSender
 from app.integrations.telegram.status import handle_lcm_command, handle_status_command
 
 if TYPE_CHECKING:

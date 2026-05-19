@@ -10,7 +10,6 @@ import pytest
 
 from app.core.providers.catalog import MODEL_CATALOG, default_model
 from app.core.providers.model_id import Host
-from app.integrations.telegram.handlers import TelegramSender
 from app.integrations.telegram.model_picker import (
     ModelCallback,
     build_host_keyboard,
@@ -25,6 +24,7 @@ from app.integrations.telegram.model_picker import (
     parse_model_callback_data,
     resolve_model_selection,
 )
+from app.integrations.telegram.sender import TelegramSender
 
 
 def _flatten(rows: list[list[object]]) -> list[object]:

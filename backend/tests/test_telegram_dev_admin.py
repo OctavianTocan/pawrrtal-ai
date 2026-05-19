@@ -28,11 +28,11 @@ from app.integrations.telegram.dev_admin import (
 )
 from app.integrations.telegram.handlers import (
     PROVIDER,
-    TelegramSender,
     TelegramTurnContext,
     handle_plain_message,
     handle_start_command,
 )
+from app.integrations.telegram.sender import TelegramSender
 from app.models import ChannelBinding, Workspace
 
 pytestmark = pytest.mark.anyio

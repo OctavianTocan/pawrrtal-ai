@@ -34,12 +34,12 @@ from app.integrations.telegram.bot_provider_resolution import (
     resolve_provider_with_auto_clear as _resolve_provider_with_auto_clear,
 )
 from app.integrations.telegram.handlers import (
-    TelegramSender,
     TelegramTurnContext,
     handle_model_command,
     handle_plain_message,
     handle_stop_command,
 )
+from app.integrations.telegram.sender import TelegramSender
 from app.integrations.telegram.status import (
     _format_duration,
     _format_token_count,

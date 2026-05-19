@@ -24,10 +24,10 @@ from app.crud.channel import (
 from app.db import User
 from app.integrations.telegram.handlers import (
     PROVIDER,
-    TelegramSender,
     handle_plain_message,
     handle_start_command,
 )
+from app.integrations.telegram.sender import TelegramSender
 
 pytestmark = pytest.mark.anyio
 
