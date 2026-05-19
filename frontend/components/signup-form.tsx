@@ -6,6 +6,7 @@
 
 'use client';
 
+import { Loader2Icon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useId, useState } from 'react';
@@ -161,7 +162,13 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
 						<FieldGroup>
 							<Field>
 								<Button type="submit" disabled={isSubmitting}>
-									Create Account
+									{isSubmitting && (
+										<Loader2Icon
+											className="mr-2 size-4 animate-spin"
+											aria-hidden="true"
+										/>
+									)}
+									{isSubmitting ? 'Creating Account...' : 'Create Account'}
 								</Button>
 								{/* <Button variant="outline" type="button">
                                     Sign up with Google
