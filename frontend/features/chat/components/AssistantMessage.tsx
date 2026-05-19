@@ -83,7 +83,7 @@ function ReasoningPanel({
 	const [isOpen, setIsOpen] = useState<boolean>(true);
 
 	return (
-		<Collapsible className="not-prose mb-3 max-w-prose" onOpenChange={setIsOpen} open={isOpen}>
+		<Collapsible className="not-prose max-w-prose" onOpenChange={setIsOpen} open={isOpen}>
 			<ThinkingHeader
 				durationSeconds={durationSeconds}
 				hasExpandableContent
@@ -93,10 +93,9 @@ function ReasoningPanel({
 			/>
 			<CollapsibleContent
 				className={cn(
-					'mt-2',
-					'data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2',
-					'data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2',
-					'data-[state=closed]:animate-out data-[state=open]:animate-in'
+					'mt-2 overflow-hidden',
+					'data-[state=closed]:animate-collapsible-close',
+					'data-[state=open]:animate-collapsible-open'
 				)}
 			>
 				<ChainOfThought

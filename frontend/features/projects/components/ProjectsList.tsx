@@ -6,7 +6,6 @@ import type * as React from 'react';
 import { useId, useReducer, useState } from 'react';
 import { AppDialog } from '@/components/ui/app-dialog';
 import { AppDialogFooter } from '@/components/ui/app-dialog-footer';
-import { AppEmptyState } from '@/components/ui/app-empty-state';
 import { AppFormRow } from '@/components/ui/app-form-row';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -128,8 +127,14 @@ export function ProjectsList({
 						<FolderPlus className="size-3.5" />
 					</button>
 				}
-				variant="collapsible"
-				onToggle={() => setIsCollapsed((prev) => !prev)}
+				variant={!isLoading && list.length === 0 ? 'static' : 'collapsible'}
+				onToggle={() => {
+					if (!isLoading && list.length === 0) {
+						openCreateModal();
+						return;
+					}
+					setIsCollapsed((prev) => !prev);
+				}}
 			/>
 
 			{isCollapsed ? null : (
@@ -138,15 +143,6 @@ export function ProjectsList({
 						<span className="px-2 py-1 text-sm text-muted-foreground/70">
 							Loading projects&hellip;
 						</span>
-					) : null}
-					{!isLoading && list.length === 0 ? (
-						<AppEmptyState
-							action={{ onClick: openCreateModal }}
-							icon={<FolderPlus className="size-4" />}
-							layout="inlineCta"
-							title="Create your first project"
-							tone="sidebar"
-						/>
 					) : null}
 					{list.map((project) => (
 						<ProjectRow

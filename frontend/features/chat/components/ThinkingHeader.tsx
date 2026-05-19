@@ -82,7 +82,7 @@ export function ThinkingHeader({
 			: formatThinkingDuration(durationSeconds);
 
 	const textClass = cn(
-		'font-medium text-base',
+		'font-medium text-sm',
 		isStreaming ? 'thinking-gradient-text' : 'text-muted-foreground'
 	);
 
@@ -100,7 +100,7 @@ export function ThinkingHeader({
 			aria-expanded={isOpen}
 			aria-label={isOpen ? 'Collapse thinking' : 'Expand thinking'}
 			className={cn(
-				'inline-flex items-center gap-1 transition-opacity',
+				'cursor-pointer inline-flex items-center gap-1 transition-opacity',
 				'hover:opacity-80 focus-visible:opacity-80'
 			)}
 			onClick={onToggle}
@@ -111,8 +111,8 @@ export function ThinkingHeader({
 			<ChevronRightIcon
 				aria-hidden="true"
 				className={cn(
-					'size-3.5 shrink-0 text-muted-foreground transition-transform duration-150 ease-out',
-					isOpen ? 'rotate-90' : 'rotate-0'
+					'size-3.5 shrink-0 text-muted-foreground transition-transform',
+					isOpen ? 'rotate-90 duration-200 ease-out' : 'rotate-0 duration-150 ease-in'
 				)}
 			/>
 		</button>

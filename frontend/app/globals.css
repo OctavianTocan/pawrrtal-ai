@@ -728,6 +728,11 @@ html[data-font="inter"] {
 	   waits before removing the element, so the exit plays in full. */
 	--animate-dropdown-open: dropdown-open 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
 	--animate-dropdown-close: dropdown-close 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
+	/* Collapsible open/close — asymmetric easing: ease-out for enter, ease-in for exit.
+	   `both` fill-mode so the `from` state applies before the animation fires
+	   (no flash on mount) and the `to` state persists after it ends. */
+	--animate-collapsible-open: collapsible-open 200ms cubic-bezier(0.25, 1, 0.5, 1) both;
+	--animate-collapsible-close: collapsible-close 150ms cubic-bezier(0.7, 0, 0.84, 0) both;
 }
 
 /* Keyframes consolidated near the end of this file under the
@@ -1186,6 +1191,24 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 	animation: none !important;
 }
 
+/* Radix Collapsible height animation via grid-template-rows.
+   This is the modern "zero-height-trick" — animating grid-template-rows from
+   0fr (collapsed, empty row) to 1fr (expanded, auto row) gives smooth height
+   animation without animating height or max-height directly. Coordinated with
+   our content fade + translateY to feel like one unified motion.
+   Durations: 150ms close (matches content slide-up), 200ms open (matches
+   content slide-down). Easing: ease-in for exit, ease-out for enter. */
+[data-radix-collapsible-content-wrapper] {
+	display: grid;
+	grid-template-rows: 0fr;
+	transition: grid-template-rows 150ms cubic-bezier(0.7, 0, 0.84, 0);
+}
+
+[data-radix-collapsible-content-wrapper][data-state="open"] {
+	grid-template-rows: 1fr;
+	transition: grid-template-rows 200ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
 [data-radix-scroll-area-viewport] > div {
 	min-width: 0 !important;
 	display: block !important;
@@ -1385,6 +1408,18 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 		color: var(--thinking-gradient-from);
 		-webkit-text-fill-color: var(--thinking-gradient-from);
 	}
+
+	/* Collapsible: disable motion animations, keep instant state changes */
+	.animate-collapsible-open,
+	.animate-collapsible-close {
+		animation: none !important;
+		opacity: 1 !important;
+		transform: none !important;
+	}
+
+	[data-radix-collapsible-content-wrapper] {
+		transition: none !important;
+	}
 }
 
 /* shimmer-loading keyframes moved to the consolidated Animations section. */
@@ -1407,6 +1442,19 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 
 .animate-shake {
 	animation: shake 0.4s ease-in-out;
+}
+
+/* Collapsible open/close — explicit classes so `tw-animate-css` cannot inject
+   a default scale transform onto `.animate-*`. transform: none resets any
+   inherited scale from Radix or the animation framework. */
+.animate-collapsible-open {
+	animation: var(--animate-collapsible-open);
+	transform: none;
+}
+
+.animate-collapsible-close {
+	animation: var(--animate-collapsible-close);
+	transform: none;
 }
 
 /* editPopoverFadeIn keyframes moved to the consolidated Animations section. */
@@ -1768,6 +1816,30 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 	to {
 		opacity: 1;
 		transform: translateY(0);
+	}
+}
+
+/* --- Collapsible open / close ---------------------------------------------- */
+
+@keyframes collapsible-open {
+	from {
+		opacity: 0;
+		transform: translateY(-4px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes collapsible-close {
+	from {
+		opacity: 1;
+		transform: translateY(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateY(-4px);
 	}
 }
 

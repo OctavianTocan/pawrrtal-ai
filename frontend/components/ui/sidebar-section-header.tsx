@@ -10,7 +10,7 @@
  * @fileoverview Sidebar section header primitive for Pawrrtal.
  */
 
-import { ChevronRight } from 'lucide-react';
+import { Folder, FolderOpen } from 'lucide-react';
 import type * as React from 'react';
 import type { ButtonHTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
@@ -41,6 +41,7 @@ interface StaticSidebarSectionHeaderProps {
 	variant: 'static';
 	label: string;
 	className?: string;
+	onToggle?: () => void;
 }
 
 /**
@@ -51,14 +52,17 @@ interface StaticSidebarSectionHeaderProps {
 export function SidebarSectionHeader(props: SidebarSectionHeaderProps): React.JSX.Element {
 	if (props.variant === 'static') {
 		return (
-			<p
-				className={cn(
-					'px-2 text-[11px] font-semibold tracking-[0.04em] text-muted-foreground/80 uppercase',
-					props.className
-				)}
+			<button
+				className="group/header relative flex w-full cursor-pointer items-center gap-1.5 px-4 py-2 text-left"
+				onClick={props.onToggle}
+				type="button"
 			>
-				{props.label}
-			</p>
+				<div className="pointer-events-none absolute inset-y-0.5 left-2 right-2 rounded-control transition-colors group-hover/header:bg-foreground/2" />
+				<Folder aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground/60" />
+				<span className="relative text-sm font-medium text-muted-foreground">
+					{props.label}
+				</span>
+			</button>
 		);
 	}
 
@@ -81,12 +85,11 @@ export function SidebarSectionHeader(props: SidebarSectionHeaderProps): React.JS
 				{...toggleButtonProps}
 			>
 				<div className="pointer-events-none absolute inset-y-0.5 left-2 right-2 rounded-control transition-colors group-hover/header:bg-foreground/2" />
-				<ChevronRight
-					className={cn(
-						'relative size-3.5 text-muted-foreground/60 transition-transform',
-						!isCollapsed && 'rotate-90'
-					)}
-				/>
+				{isCollapsed ? (
+					<Folder aria-hidden="true" className="size-3.5 text-muted-foreground/60" />
+				) : (
+					<FolderOpen aria-hidden="true" className="size-3.5 text-muted-foreground/60" />
+				)}
 				<span className="relative text-sm font-medium text-muted-foreground">
 					{label}
 					{isCollapsed && collapsedMetaCount !== undefined ? (

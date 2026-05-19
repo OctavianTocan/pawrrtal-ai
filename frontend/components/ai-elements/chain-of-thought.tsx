@@ -117,7 +117,7 @@ export const ChainOfThoughtStep = memo(
 		return (
 			<div
 				className={cn(
-					'flex gap-2 text-sm',
+					'flex gap-2 text-muted-foreground',
 					statusStyles[status],
 					'fade-in-0 slide-in-from-top-2 animate-in',
 					className
@@ -128,11 +128,9 @@ export const ChainOfThoughtStep = memo(
 					<Icon className="size-4" />
 					<div className="-mx-px absolute top-7 bottom-0 left-1/2 w-px bg-border" />
 				</div>
-				<div className="flex-1 space-y-2 overflow-hidden">
+				<div className="flex flex-col gap-1 text-xs">
 					<div>{label}</div>
-					{description && (
-						<div className="text-muted-foreground text-xs">{description}</div>
-					)}
+					{description && <div className="text-muted-foreground/70">{description}</div>}
 					{children}
 				</div>
 			</div>
@@ -172,7 +170,7 @@ export const ChainOfThoughtContent = memo(
 			<Collapsible open={isOpen}>
 				<CollapsibleContent
 					className={cn(
-						'mt-2 space-y-3',
+						'mt-2 space-y-3 text-sm',
 						'data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-popover-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in',
 						className
 					)}

@@ -18,6 +18,7 @@
 			"!**/.crush",
 			"!**/.codex",
 			"!**/.beans",
+			"!**/.pawrrtal",
 			"!**/.zed",
 			"!**/.vscode",
 			"!**/.sentrux",

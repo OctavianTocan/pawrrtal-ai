@@ -370,25 +370,30 @@ function SidebarTrigger({
 	const SidebarActionIcon = willCloseSidebar ? PanelLeftCloseIcon : PanelLeftOpenIcon;
 
 	return (
-		<TopBarButton
-			data-sidebar="trigger"
-			data-slot="sidebar-trigger"
-			aria-label="Toggle Sidebar"
-			className={cn('[&_svg]:size-4', className)}
-			onClick={(event) => {
-				onClick?.(event);
-				toggleSidebar();
-			}}
-			{...props}
-		>
-			<HugeiconsIcon
-				icon={SidebarActionIcon}
-				size={16}
-				strokeWidth={1.7}
-				aria-hidden="true"
-			/>
-			<span className="sr-only">Toggle Sidebar</span>
-		</TopBarButton>
+		<Tooltip>
+			<TooltipTrigger asChild>
+				<TopBarButton
+					data-sidebar="trigger"
+					data-slot="sidebar-trigger"
+					aria-label="Toggle Sidebar"
+					className={cn('[&_svg]:size-4', className)}
+					onClick={(event) => {
+						onClick?.(event);
+						toggleSidebar();
+					}}
+					{...props}
+				>
+					<HugeiconsIcon
+						icon={SidebarActionIcon}
+						size={16}
+						strokeWidth={1.7}
+						aria-hidden="true"
+					/>
+					<span className="sr-only">Toggle Sidebar</span>
+				</TopBarButton>
+			</TooltipTrigger>
+			<TooltipContent side="right">Toggle Sidebar</TooltipContent>
+		</Tooltip>
 	);
 }
 

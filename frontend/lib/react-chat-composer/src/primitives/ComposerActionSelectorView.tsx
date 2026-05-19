@@ -55,6 +55,8 @@ export interface ComposerActionSelectorViewProps {
 	onMenuOpenChange: (open: boolean) => void;
 	/** Fired by Radix when the tooltip opens or closes. */
 	onTooltipOpenChange: (open: boolean) => void;
+	/** Optional Tailwind class for the label span inside the trigger button. */
+	triggerLabelClassName?: string;
 }
 
 interface ComposerActionSelectorRowProps {
@@ -117,6 +119,7 @@ export function ComposerActionSelectorView({
 	tooltipOpen,
 	onMenuOpenChange,
 	onTooltipOpenChange,
+	triggerLabelClassName,
 }: ComposerActionSelectorViewProps): React.JSX.Element {
 	const activeItem = items.find((item) => item.id === selectedId) ?? items[0];
 	const triggerLabel = activeItem?.label ?? '';
@@ -134,7 +137,9 @@ export function ComposerActionSelectorView({
 			variant="ghost"
 		>
 			{activeItem?.icon ?? null}
-			{triggerLabel}
+			<span className={cn('truncate sm:contents', triggerLabelClassName)}>
+				{triggerLabel}
+			</span>
 			<ChevronDownIcon aria-hidden="true" className="size-3" />
 		</Button>
 	);

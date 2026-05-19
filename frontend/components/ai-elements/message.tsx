@@ -39,9 +39,9 @@ export const MessageContent = ({ children, className, ...props }: MessageContent
 		className={cn(
 			// Base sizing flows from the design system (`--font-size-base` = 16px,
 			// surfaced as `text-base`). `leading-relaxed` matches the body rhythm.
-			// `gap-4` (16px) keeps inter-block rhythm (thinking header → reasoning →
-			// response) on the same beat as inter-paragraph gaps inside the response.
-			'is-user:dark flex w-fit max-w-full min-w-0 flex-col gap-4 overflow-hidden text-base leading-relaxed',
+			// `gap-[13px]` (13px) keeps inter-block rhythm (thinking header → reasoning →
+			// response) at a tighter beat than the previous 16px. Adjacent paragraph
+			'is-user:dark flex w-fit max-w-full min-w-0 flex-col gap-[13px] overflow-hidden text-base leading-relaxed',
 			// User bubble: asymmetric "tail" radii driven by the design-token
 			// pair `--radius-bubble` / `--radius-bubble-tail`. The global
 			// `--radius` is 0 so the standard `rounded-*` scale is no-op here —
@@ -285,7 +285,7 @@ export const MessageResponse = memo(
 		<Streamdown
 			className={cn(
 				// Base flow.
-				'size-full text-base leading-relaxed',
+				'size-full text-sm leading-relaxed',
 				// Reset edge margins so the bubble hugs content.
 				'[&>*:first-child]:mt-0 [&>*:last-child]:mb-0',
 				// Vertical rhythm — `my-4` = 16px under the project's
@@ -294,7 +294,7 @@ export const MessageResponse = memo(
 				// 16px gap between them, matching the inter-block rhythm in
 				// `MessageContent`. Tailwind spacing scale only, all wired to
 				// project tokens in globals.css.
-				'[&_p]:my-4 [&_p]:leading-normal',
+				'[&_p]:my-4 [&_p]:text-sm [&_p]:leading-normal',
 				'[&_ul]:my-4 [&_ol]:my-4 [&_li]:my-0.5 [&_li]:leading-normal',
 				// Pull nested paragraphs (e.g. inside list items) flush so each
 				// bullet sits as one tight unit instead of acquiring my-4 again.
