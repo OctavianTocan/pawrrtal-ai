@@ -136,7 +136,6 @@ export function ResponsiveModal({
 				onDismiss={onDismiss}
 				header={header}
 				footer={footer}
-				title={sheetTitle}
 				testId={testId}
 				dismissButton={sheetDismiss}
 			>
