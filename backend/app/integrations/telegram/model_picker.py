@@ -1,8 +1,8 @@
 """Catalog-backed Telegram model picker helpers.
 
-The aiogram dispatcher owns message delivery, but the model picker itself is
-pure data: button labels, callback payloads, and the current conversation
-model.  Keeping that logic here makes the Telegram UX testable without a bot.
+The picker is a three-level walk: provider (host) → vendor → models.
+Hosts that serve a single vendor collapse to two levels (host → models),
+because forcing a single-button vendor screen is just an extra tap.
 """
 
 from __future__ import annotations
@@ -15,13 +15,15 @@ from typing import Protocol
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.providers.catalog import CATALOG_ETAG, MODEL_CATALOG, ModelEntry, default_model
+from app.core.providers.labels import host_label_from_slug, vendor_label_from_slug
 from app.crud.channel import get_or_create_telegram_conversation_full, get_user_id_for_external
 
 PROVIDER = "telegram"
 MODEL_CALLBACK_PREFIX = "mdl:"
 _CATALOG_TOKEN = CATALOG_ETAG[:8]
 _MODEL_PAGE_SIZE = 8
-_PROVIDER_BUTTONS_PER_ROW = 2
+_HOST_BUTTONS_PER_ROW = 2
+_VENDOR_BUTTONS_PER_ROW = 2
 _CALLBACK_VENDOR_PARTS = 3  # mdl:v:<host>
 _CALLBACK_LIST_PARTS = 5  # mdl:l:<host>:<vendor>:<page>
 _CALLBACK_SELECT_PARTS = 4  # mdl:s:<token>:<index>
@@ -58,7 +60,7 @@ class ModelCallback:
 
     action: str
     host: str | None = None
-    provider: str | None = None
+    provider: str | None = None  # vendor slug; name kept for runtime compatibility
     page: int = 1
     index: int | None = None
     catalog_token: str | None = None
@@ -71,8 +73,7 @@ async def get_model_picker_state(
 ) -> ModelPickerState | None:
     """Resolve the current model for a Telegram sender.
 
-    Returns:
-        ``None`` when the Telegram sender is not bound to a Pawrrtal user.
+    Returns ``None`` when the Telegram sender is not bound to a user.
     """
     nexus_user_id = await get_user_id_for_external(
         provider=PROVIDER,
@@ -90,18 +91,19 @@ async def get_model_picker_state(
     return ModelPickerState(current_model_id=conversation.model_id or default_model().id)
 
 
-def build_provider_keyboard() -> list[list[ModelButton]]:
-    """Build a two-column provider picker from the catalog."""
+def build_host_keyboard() -> list[list[ModelButton]]:
+    """Build a two-column host picker from the catalog."""
     rows: list[list[ModelButton]] = []
     current_row: list[ModelButton] = []
-    for provider, entries in _grouped_catalog().items():
+    for host, vendors in _host_to_vendors().items():
+        total = sum(len(entries) for entries in vendors.values())
         current_row.append(
             ModelButton(
-                text=f"{_provider_label(provider)} ({len(entries)})",
-                callback_data=_list_callback(provider, 1),
+                text=f"{host_label_from_slug(host)} ({total})",
+                callback_data=_host_button_callback(host=host, vendors=vendors),
             )
         )
-        if len(current_row) == _PROVIDER_BUTTONS_PER_ROW:
+        if len(current_row) == _HOST_BUTTONS_PER_ROW:
             rows.append(current_row)
             current_row = []
     if current_row:
@@ -109,19 +111,52 @@ def build_provider_keyboard() -> list[list[ModelButton]]:
     return rows
 
 
+def build_vendor_keyboard(*, host: str) -> list[list[ModelButton]]:
+    """Build the vendor keyboard for a host that has multiple vendors.
+
+    For single-vendor hosts the caller should jump straight to
+    :func:`build_models_keyboard`; this function still works in that
+    case but produces a one-button screen.
+    """
+    vendors = _host_to_vendors().get(host, {})
+    rows: list[list[ModelButton]] = []
+    current_row: list[ModelButton] = []
+    for vendor, entries in vendors.items():
+        current_row.append(
+            ModelButton(
+                text=f"{vendor_label_from_slug(vendor)} ({len(entries)})",
+                callback_data=_list_callback(host=host, vendor=vendor, page=1),
+            )
+        )
+        if len(current_row) == _VENDOR_BUTTONS_PER_ROW:
+            rows.append(current_row)
+            current_row = []
+    if current_row:
+        rows.append(current_row)
+    rows.append([ModelButton(text="Back to providers", callback_data=_providers_callback())])
+    return rows
+
+
 def build_models_keyboard(
     *,
-    provider: str,
+    host: str,
+    vendor: str,
     page: int,
     current_model_id: str,
 ) -> list[list[ModelButton]]:
-    """Build a paginated model keyboard for one provider."""
-    entries = _grouped_catalog().get(provider, [])
+    """Build a paginated model keyboard for one host+vendor pair.
+
+    The trailing "Back to ..." row collapses to "Back to providers" when
+    the host has a single vendor, since the vendor screen was skipped on
+    the way in.
+    """
+    vendors = _host_to_vendors().get(host, {})
+    entries = vendors.get(vendor, [])
     page_count = _page_count(entries)
     page = _clamped_page(page, page_count)
     page_entries = _page_entries(entries, page)
 
-    rows = [
+    rows: list[list[ModelButton]] = [
         [
             ModelButton(
                 text=_model_label(entry, current_model_id),
@@ -130,33 +165,44 @@ def build_models_keyboard(
         ]
         for entry in page_entries
     ]
-    rows.extend(_pagination_rows(provider=provider, page=page, page_count=page_count))
-    rows.append([ModelButton(text="Back to providers", callback_data=_providers_callback())])
+    rows.extend(_pagination_rows(host=host, vendor=vendor, page=page, page_count=page_count))
+    if len(vendors) > 1:
+        rows.append([ModelButton(text="Back to vendors", callback_data=_vendor_callback(host))])
+    else:
+        rows.append([ModelButton(text="Back to providers", callback_data=_providers_callback())])
     return rows
 
 
-def has_provider(provider: str) -> bool:
-    """Return whether the catalog has at least one model for ``provider``."""
-    return provider in _grouped_catalog()
+def has_host(host: str) -> bool:
+    """Return whether the catalog has at least one model for ``host``."""
+    return host in _host_to_vendors()
 
 
-def format_provider_picker_text(current_model_id: str) -> str:
-    """Render the provider picker message in Telegram HTML."""
+def has_vendor_in_host(*, host: str, vendor: str) -> bool:
+    """Return whether ``vendor`` has at least one model under ``host``."""
+    return vendor in _host_to_vendors().get(host, {})
+
+
+def format_host_picker_text(current_model_id: str) -> str:
+    """Render the host picker message in Telegram HTML."""
     current = _display_name_for_model(current_model_id)
-    return f"Choose a model for this Telegram conversation.\n\nCurrent: <b>{escape(current)}</b>"
+    return f"Choose a provider for this Telegram conversation.\n\nCurrent: <b>{escape(current)}</b>"
 
 
-def format_models_picker_text(
-    *,
-    provider: str,
-    page: int,
-) -> str:
+def format_vendor_picker_text(*, host: str) -> str:
+    """Render the vendor screen header in Telegram HTML."""
+    return f"Select a vendor for <b>{escape(host_label_from_slug(host))}</b>."
+
+
+def format_models_picker_text(*, host: str, vendor: str, page: int) -> str:
     """Render the model page header in Telegram HTML."""
-    entries = _grouped_catalog().get(provider, [])
+    entries = _host_to_vendors().get(host, {}).get(vendor, [])
     page_count = _page_count(entries)
     page = _clamped_page(page, page_count)
-    label = _provider_label(provider)
-    return f"Select a {escape(label)} model.\nPage {page}/{page_count}"
+    return (
+        f"Select a {escape(vendor_label_from_slug(vendor))} model "
+        f"on <b>{escape(host_label_from_slug(host))}</b>.\nPage {page}/{page_count}"
+    )
 
 
 def parse_model_callback_data(data: str | None) -> ModelCallback | None:
@@ -177,10 +223,7 @@ def parse_model_callback_data(data: str | None) -> ModelCallback | None:
 
 
 def resolve_model_selection(callback: ModelCallback) -> ModelEntry | None:
-    """Resolve a parsed selection callback to a catalog entry.
-
-    Returns ``None`` for stale catalog tokens or invalid indexes.
-    """
+    """Resolve a parsed selection callback to a catalog entry."""
     if callback.action != "select" or callback.catalog_token != _CATALOG_TOKEN:
         return None
     if callback.index is None or callback.index < 0:
@@ -200,15 +243,25 @@ def picker_stale_message() -> str:
     return _PICKER_STALE_MESSAGE
 
 
-def _grouped_catalog() -> dict[str, list[ModelEntry]]:
-    providers: dict[str, list[ModelEntry]] = {}
+def _host_to_vendors() -> dict[str, dict[str, list[ModelEntry]]]:
+    """Group the catalog as ``{host_slug: {vendor_slug: [entries]}}``.
+
+    Both layers preserve a stable, alphabetised order so the keyboards
+    are deterministic.
+    """
+    grouped: dict[str, dict[str, list[ModelEntry]]] = {}
     for entry in MODEL_CATALOG:
-        providers.setdefault(entry.vendor.value, []).append(entry)
-    return dict(sorted(providers.items()))
+        host_bucket = grouped.setdefault(entry.host.value, {})
+        host_bucket.setdefault(entry.vendor.value, []).append(entry)
+    return {host: dict(sorted(vendors.items())) for host, vendors in sorted(grouped.items())}
 
 
-def _provider_label(provider: str) -> str:
-    return provider.replace("-", " ").title()
+def _host_button_callback(*, host: str, vendors: dict[str, list[ModelEntry]]) -> str:
+    """Callback for a host button — collapses single-vendor hosts to the model list."""
+    if len(vendors) == 1:
+        only_vendor = next(iter(vendors))
+        return _list_callback(host=host, vendor=only_vendor, page=1)
+    return _vendor_callback(host)
 
 
 def _model_label(entry: ModelEntry, current_model_id: str) -> str:
@@ -235,7 +288,7 @@ def _vendor_callback(host: str) -> str:
     return f"mdl:v:{host}"
 
 
-def _list_callback(host: str, vendor: str, page: int) -> str:
+def _list_callback(*, host: str, vendor: str, page: int) -> str:
     return f"mdl:l:{host}:{vendor}:{page}"
 
 
@@ -250,7 +303,12 @@ def _parse_list_callback(parts: list[str]) -> ModelCallback | None:
         return None
     if page < 1:
         return None
-    return ModelCallback(action="list", host=parts[2], provider=parts[3], page=page)
+    return ModelCallback(
+        action="list",
+        host=parts[2],
+        provider=parts[3],
+        page=page,
+    )
 
 
 def _parse_select_callback(parts: list[str]) -> ModelCallback | None:
@@ -280,16 +338,46 @@ def _page_entries(entries: list[ModelEntry], page: int) -> list[ModelEntry]:
 
 def _pagination_rows(
     *,
-    provider: str,
+    host: str,
+    vendor: str,
     page: int,
     page_count: int,
 ) -> list[list[ModelButton]]:
     if page_count <= 1:
         return []
-
     row = [
-        ModelButton(text="< Prev", callback_data=_list_callback(provider, page - 1)),
-        ModelButton(text=f"{page}/{page_count}", callback_data=_list_callback(provider, page)),
-        ModelButton(text="Next >", callback_data=_list_callback(provider, page + 1)),
+        ModelButton(
+            text="< Prev",
+            callback_data=_list_callback(host=host, vendor=vendor, page=page - 1),
+        ),
+        ModelButton(
+            text=f"{page}/{page_count}",
+            callback_data=_list_callback(host=host, vendor=vendor, page=page),
+        ),
+        ModelButton(
+            text="Next >",
+            callback_data=_list_callback(host=host, vendor=vendor, page=page + 1),
+        ),
     ]
     return [row]
+
+
+__all__ = [
+    "MODEL_CALLBACK_PREFIX",
+    "ModelButton",
+    "ModelCallback",
+    "ModelPickerState",
+    "build_host_keyboard",
+    "build_models_keyboard",
+    "build_vendor_keyboard",
+    "format_host_picker_text",
+    "format_models_picker_text",
+    "format_vendor_picker_text",
+    "get_model_picker_state",
+    "has_host",
+    "has_vendor_in_host",
+    "parse_model_callback_data",
+    "picker_not_bound_message",
+    "picker_stale_message",
+    "resolve_model_selection",
+]

@@ -10,15 +10,21 @@ from app.integrations.telegram.model_picker import (
     ModelButton,
     ModelCallback,
     build_models_keyboard,
-    build_provider_keyboard,
     format_models_picker_text,
-    format_provider_picker_text,
     get_model_picker_state,
-    has_provider,
     parse_model_callback_data,
     picker_not_bound_message,
     picker_stale_message,
     resolve_model_selection,
+)
+from app.integrations.telegram.model_picker import (
+    build_host_keyboard as build_provider_keyboard,  # TODO: removed in Task 5
+)
+from app.integrations.telegram.model_picker import (
+    format_host_picker_text as format_provider_picker_text,  # TODO: removed in Task 5
+)
+from app.integrations.telegram.model_picker import (
+    has_host as has_provider,  # TODO: removed in Task 5
 )
 
 if TYPE_CHECKING:
