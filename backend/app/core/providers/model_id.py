@@ -42,6 +42,7 @@ class Host(StrEnum):
     """
 
     agent_sdk = "agent-sdk"
+    gemini_cli = "gemini-cli"
     google_ai = "google-ai"
     litellm = "litellm"
     opencode_go = "opencode-go"

@@ -75,6 +75,17 @@ _GEMINI_3_FLASH_OUT_USD = 2.50
 _GEMINI_3_FLASH_LITE_IN_USD = 0.10
 _GEMINI_3_FLASH_LITE_OUT_USD = 0.40
 
+# Gemini CLI cost rates (``host=Host.gemini_cli``) are intentionally
+# zero. The locally-installed ``gemini`` binary authenticates via the
+# user's Google account by default (free tier with daily quota), or via
+# an API key / Gemini Code Assist license they've configured outside
+# Pawrrtal. Either way, billing is the user's concern — we do not see
+# the per-token bill and shouldn't pretend to. Tokens still flow through
+# ``StreamEvent(type="usage")`` for telemetry; the cost column is 0.0
+# so the ledger stays honest.
+_GEMINI_CLI_IN_USD = 0.0
+_GEMINI_CLI_OUT_USD = 0.0
+
 # xAI Grok pricing per https://docs.x.ai/docs/models.  Used by the
 # native xAI provider's cost-ledger path (no SDK-reported total).
 _GROK_4_3_IN_USD = 1.25
@@ -161,6 +172,66 @@ MODEL_CATALOG: tuple[ModelEntry, ...] = (
         is_default=False,
         cost_per_mtok_in_usd=_GEMINI_3_FLASH_LITE_IN_USD,
         cost_per_mtok_out_usd=_GEMINI_3_FLASH_LITE_OUT_USD,
+    ),
+    # Gemini CLI (https://geminicli.com) — local subprocess driven over
+    # the Agent Client Protocol (ACP, https://agentclientprotocol.com).
+    # Same protocol Zed/Neovim/JetBrains use to drive coding agents, so
+    # the bridge is a typed JSON-RPC client, not a stream-json parser.
+    # Models exposed match Gemini CLI's ``--model`` accept list.
+    ModelEntry(
+        host=Host.gemini_cli,
+        vendor=Vendor.google,
+        model="gemini-2.5-pro",
+        display_name="Gemini 2.5 Pro (CLI)",
+        short_name="Gemini 2.5 Pro CLI",
+        description="Local Gemini CLI agent",
+        is_default=False,
+        cost_per_mtok_in_usd=_GEMINI_CLI_IN_USD,
+        cost_per_mtok_out_usd=_GEMINI_CLI_OUT_USD,
+    ),
+    ModelEntry(
+        host=Host.gemini_cli,
+        vendor=Vendor.google,
+        model="gemini-2.5-flash",
+        display_name="Gemini 2.5 Flash (CLI)",
+        short_name="Gemini 2.5 Flash CLI",
+        description="Local Gemini CLI agent, faster",
+        is_default=False,
+        cost_per_mtok_in_usd=_GEMINI_CLI_IN_USD,
+        cost_per_mtok_out_usd=_GEMINI_CLI_OUT_USD,
+    ),
+    ModelEntry(
+        host=Host.gemini_cli,
+        vendor=Vendor.google,
+        model="gemini-2.5-flash-lite",
+        display_name="Gemini 2.5 Flash Lite (CLI)",
+        short_name="Gemini 2.5 Flash Lite CLI",
+        description="Local Gemini CLI agent, lightest",
+        is_default=False,
+        cost_per_mtok_in_usd=_GEMINI_CLI_IN_USD,
+        cost_per_mtok_out_usd=_GEMINI_CLI_OUT_USD,
+    ),
+    ModelEntry(
+        host=Host.gemini_cli,
+        vendor=Vendor.google,
+        model="gemini-3-pro-preview",
+        display_name="Gemini 3 Pro Preview (CLI)",
+        short_name="Gemini 3 Pro CLI",
+        description="Local Gemini CLI agent, Gemini 3",
+        is_default=False,
+        cost_per_mtok_in_usd=_GEMINI_CLI_IN_USD,
+        cost_per_mtok_out_usd=_GEMINI_CLI_OUT_USD,
+    ),
+    ModelEntry(
+        host=Host.gemini_cli,
+        vendor=Vendor.google,
+        model="gemini-3.1-pro-preview",
+        display_name="Gemini 3.1 Pro Preview (CLI)",
+        short_name="Gemini 3.1 Pro CLI",
+        description="Local Gemini CLI agent, Gemini 3.1",
+        is_default=False,
+        cost_per_mtok_in_usd=_GEMINI_CLI_IN_USD,
+        cost_per_mtok_out_usd=_GEMINI_CLI_OUT_USD,
     ),
     ModelEntry(
         host=Host.xai,

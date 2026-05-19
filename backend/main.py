@@ -56,6 +56,30 @@ from app.users import auth_backend, fastapi_users
 # Configure logging at the very start of the application. This ensures that all loggers in the app will use this configuration.
 configure_logging()
 
+
+def _log_gemini_cli_status() -> None:
+    """Emit a one-line log line describing Gemini CLI availability.
+
+    Called once during :func:`lifespan` so operators see a clear signal
+    when the ``gemini`` binary is missing from PATH. The Gemini CLI
+    provider (``host=Host.gemini_cli`` models) needs the binary to
+    function; the rest of Pawrrtal does not, so we never block startup.
+    """
+    import logging  # noqa: PLC0415 — local import keeps the top file imports tight
+    import shutil  # noqa: PLC0415
+
+    log = logging.getLogger(__name__)
+    path = shutil.which("gemini")
+    if path is None:
+        log.warning(
+            "GEMINI_CLI_UNAVAILABLE binary=gemini path=$PATH "
+            "(install with `npm install -g @google/gemini-cli` to enable "
+            "gemini-cli:* models; other providers unaffected)"
+        )
+        return
+    log.info("GEMINI_CLI_FOUND path=%s", path)
+
+
 # --- Lifespan ----------------------------------------------------------------
 
 
@@ -66,6 +90,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
     # is unset, so dev environments are unaffected.  Must run before any
     # outbound httpx call so the autoinstrumenter wraps the global client.
     setup_tracing(app)
+    # Surface Gemini CLI availability once at startup so an operator
+    # sees a single clear log line instead of an opaque per-request
+    # "subprocess spawn failed" error. We never refuse to boot — the
+    # rest of the providers stay usable when the CLI is absent.
+    _log_gemini_cli_status()
     await create_db_and_tables()
     # This creates the admin user on every startup, but the UserManager will check if it already exists and skip creation if so, so it's idempotent and safe to run every time.
     await seed_admin_user()
