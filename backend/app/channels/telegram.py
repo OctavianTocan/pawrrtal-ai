@@ -257,24 +257,32 @@ class TelegramChannel:
             if etype == "delta":
                 chunk: str = event.get("content", "")
                 answer_text += chunk
-                # Content-preview: edit the placeholder to show the emerging
-                # answer while no tool/thinking block has claimed it yet.
-                # Skipped in draft mode — the animated draft shows the stream.
+                # Content-preview: when the placeholder hasn't yet been
+                # consumed by a tool or thinking block, edit it to show
+                # the assistant's emerging answer (truncated, italic).
+                # Debounced by the same chars/time budget as text edits
+                # so we don't hammer Telegram's rate limit.
+                # Skipped in draft mode — the animated draft already
+                # shows the streaming answer.
                 if first_block_kind is None and chunk and draft_state is None:
-                    (
-                        progress_state,
-                        text_chars_since_edit,
-                        text_last_edit_at,
-                    ) = await _update_progress_preview(
-                        bot=bot,
-                        chat_id=chat_id,
-                        message_id=message_id,
-                        answer_text=answer_text,
-                        chunk=chunk,
-                        progress_state=progress_state,
-                        chars_since_edit=text_chars_since_edit,
-                        last_edit_at=text_last_edit_at,
-                    )
+                    preview_now = asyncio.get_event_loop().time()
+                    if progress_state == ProgressState.INITIAL:
+                        progress_state = ProgressState.WORKING
+                        await safe_edit_html(bot, chat_id, message_id, render_working(answer_text))
+                        text_last_edit_at = preview_now
+                        text_chars_since_edit = 0
+                    else:
+                        text_chars_since_edit += len(chunk)
+                        elapsed = preview_now - text_last_edit_at
+                        if (
+                            text_chars_since_edit >= _EDIT_DEBOUNCE_CHARS
+                            or elapsed >= _MAX_EDIT_INTERVAL_S
+                        ):
+                            await safe_edit_html(
+                                bot, chat_id, message_id, render_working(answer_text)
+                            )
+                            text_last_edit_at = preview_now
+                            text_chars_since_edit = 0
                 (
                     text_buffer,
                     text_message_id,
@@ -352,54 +360,6 @@ class TelegramChannel:
         # signature), so callers can ``async for`` over it even though we
         # only ever side-effect through ``edit_message_text``.
         yield
-
-
-# ---------------------------------------------------------------------------
-# Private helpers
-# ---------------------------------------------------------------------------
-
-
-async def _update_progress_preview(
-    *,
-    bot: Bot,
-    chat_id: int | str,
-    message_id: int,
-    answer_text: str,
-    chunk: str,
-    progress_state: ProgressState,
-    chars_since_edit: int,
-    last_edit_at: float,
-) -> tuple[ProgressState, int, float]:
-    """Edit the placeholder to show an emerging answer preview (debounced).
-
-    Called only when no tool or thinking block has claimed the placeholder and
-    draft streaming is disabled.  Returns the updated ``(progress_state,
-    chars_since_edit, last_edit_at)`` triple.
-
-    Args:
-        bot: Live aiogram ``Bot`` instance.
-        chat_id: Target Telegram chat or channel ID.
-        message_id: Placeholder message ID to overwrite.
-        answer_text: Full accumulated answer text so far.
-        chunk: New text delta that just arrived.
-        progress_state: Current ``ProgressState`` of the placeholder.
-        chars_since_edit: Characters accumulated since the last edit.
-        last_edit_at: Event-loop timestamp of the last edit.
-
-    Returns:
-        Updated ``(progress_state, chars_since_edit, last_edit_at)`` triple.
-    """
-    now = asyncio.get_event_loop().time()
-    if progress_state == ProgressState.INITIAL:
-        await safe_edit_html(bot, chat_id, message_id, render_working(answer_text))
-        return ProgressState.WORKING, 0, now
-
-    chars_since_edit += len(chunk)
-    elapsed = now - last_edit_at
-    if chars_since_edit >= _EDIT_DEBOUNCE_CHARS or elapsed >= _MAX_EDIT_INTERVAL_S:
-        await safe_edit_html(bot, chat_id, message_id, render_working(answer_text))
-        return progress_state, 0, now
-    return progress_state, chars_since_edit, last_edit_at
 
 
 # ---------------------------------------------------------------------------

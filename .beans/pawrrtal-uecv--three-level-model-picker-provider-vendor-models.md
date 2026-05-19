@@ -5,7 +5,7 @@ status: in-progress
 type: feature
 priority: normal
 created_at: 2026-05-19T07:03:14Z
-updated_at: 2026-05-19T07:03:20Z
+updated_at: 2026-05-19T07:34:46Z
 parent: pawrrtal-7k7w
 ---
 
@@ -13,10 +13,10 @@ Switch web composer model selector and Telegram /model picker from 2-level (vend
 
 ## Task Tracker
 
-- [ ] Task 1: Backend label module
-- [ ] Task 2: Frontend label module
-- [ ] Task 3: Telegram callback model
-- [ ] Task 4: Telegram keyboard builders
+- [x] Task 1: Backend label module
+- [x] Task 2: Frontend label module
+- [x] Task 3: Telegram callback model
+- [x] Task 4: Telegram keyboard builders
 - [ ] Task 5: Telegram runtime wiring
 - [ ] Task 6: Frontend three-level submenu
 - [ ] Task 7: End-to-end smoke
