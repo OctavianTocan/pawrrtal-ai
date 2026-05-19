@@ -20,6 +20,7 @@ from app.core.config import settings
 
 from .base import AILLM
 from .claude_provider import ClaudeLLM, ClaudeLLMConfig
+from .gemini_cli import GeminiCliLLM
 from .gemini_provider import GeminiLLM
 from .litellm_provider import LiteLLMLLM
 from .model_id import Host, ParsedModelId, parse_model_id
@@ -28,6 +29,7 @@ from .xai_provider import XaiLLM
 
 HOST_TO_PROVIDER: dict[Host, type[AILLM]] = {
     Host.agent_sdk: ClaudeLLM,
+    Host.gemini_cli: GeminiCliLLM,
     Host.google_ai: GeminiLLM,
     Host.litellm: LiteLLMLLM,
     Host.opencode_go: OpencodeGoLLM,
@@ -38,6 +40,14 @@ HOST_TO_PROVIDER: dict[Host, type[AILLM]] = {
 Add a new entry when adding a new :class:`Host` — the catalog and
 this table must always agree.
 """
+
+# Module-import-time exhaustiveness check — converts the "every
+# ``Host`` member must have a provider class" invariant from an
+# implicit runtime ``KeyError`` in :func:`resolve_llm` into a clear
+# import-time ``ValueError`` next to the table itself.
+_missing_hosts = set(Host) - set(HOST_TO_PROVIDER)
+if _missing_hosts:
+    raise ValueError(f"HOST_TO_PROVIDER missing entries for: {_missing_hosts}")
 
 
 def resolve_llm(
@@ -92,6 +102,8 @@ def resolve_llm(
         return ClaudeLLM(parsed.model, config=config, workspace_root=workspace_root)
     if provider_cls is GeminiLLM:
         return GeminiLLM(parsed.model, workspace_root=workspace_root)
+    if provider_cls is GeminiCliLLM:
+        return GeminiCliLLM(parsed.model, workspace_root=workspace_root)
     if provider_cls is XaiLLM:
         return XaiLLM(parsed.model, workspace_root=workspace_root)
     if provider_cls is LiteLLMLLM:
