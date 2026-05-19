@@ -7,22 +7,24 @@
  * of throwing so the picker keeps rendering.
  */
 
-const HOST_LABELS: Readonly<Record<string, string>> = {
+/** Map from host wire-slug to user-facing display string. Mirrors backend `app.core.providers.labels.HOST_LABELS`. */
+const HOST_LABELS = {
 	'agent-sdk': 'Anthropic Agent SDK',
 	'google-ai': 'Gemini API',
 	litellm: 'LiteLLM',
 	'opencode-go': 'OpenCode Go',
 	xai: 'xAI',
-};
+} as const satisfies Record<string, string>;
 
-const VENDOR_LABELS: Readonly<Record<string, string>> = {
+/** Map from vendor wire-slug to user-facing display string. Mirrors backend `app.core.providers.labels.VENDOR_LABELS`. */
+const VENDOR_LABELS = {
 	anthropic: 'Anthropic',
 	google: 'Google',
 	moonshot: 'Moonshot',
 	openai: 'OpenAI',
 	xai: 'xAI',
 	zai: 'Z.AI',
-};
+} as const satisfies Record<string, string>;
 
 /**
  * Return the display label for a host wire-slug.
@@ -31,7 +33,7 @@ const VENDOR_LABELS: Readonly<Record<string, string>> = {
  * @returns The display label, or the slug itself when unknown.
  */
 export function hostLabel(slug: string): string {
-	return HOST_LABELS[slug] ?? slug;
+	return (HOST_LABELS as Record<string, string>)[slug] ?? slug;
 }
 
 /**
@@ -41,5 +43,5 @@ export function hostLabel(slug: string): string {
  * @returns The display label, or the slug itself when unknown.
  */
 export function vendorLabel(slug: string): string {
-	return VENDOR_LABELS[slug] ?? slug;
+	return (VENDOR_LABELS as Record<string, string>)[slug] ?? slug;
 }
