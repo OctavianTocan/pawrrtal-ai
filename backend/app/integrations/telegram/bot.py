@@ -229,7 +229,6 @@ async def _run_llm_turn(
 
     provider, warning = await resolve_provider_with_auto_clear(
         context,
-        workspace_id=workspace.id if workspace is not None else None,
         workspace_root=Path(workspace.path) if workspace is not None else None,
     )
     if warning is not None:
