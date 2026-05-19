@@ -1,11 +1,14 @@
 """Tests for the dev-admin Telegram auto-link helper.
 
-Covers the four branches of ``resolve_or_autolink_telegram_user``:
-unset env var, mismatched sender, missing admin user, and the happy
-path where the binding is forged and the workspace ensured. The
-integration test pipes a sender through ``handle_plain_message`` to
-confirm the dev-admin gets a ``TelegramTurnContext`` (i.e. their
-message routes to the LLM) instead of the onboarding nudge.
+Covers ``resolve_or_autolink_telegram_user`` end-to-end:
+
+- the four skip branches (env var unset, sender ID mismatch, admin
+  email unset, admin user missing),
+- the happy path (binding forged + workspace ensured),
+- idempotency on repeat calls,
+- the "existing binding wins" precedence rule,
+- the ``IntegrityError`` race recovery,
+- integration through ``handle_plain_message`` and ``handle_start_command``.
 """
 
 from __future__ import annotations

@@ -5,8 +5,9 @@ message arrives from that numeric user_id without an existing
 ``ChannelBinding`` row, this module forges the binding pointing at the
 dev-admin user (whose credentials are ``ADMIN_EMAIL`` /
 ``ADMIN_PASSWORD``) and ensures the dev-admin workspace exists. Skips
-silently when the env var is unset (default), the admin credentials
-aren't configured, or the sender's Telegram ID doesn't match.
+(logging at DEBUG for sender-ID mismatch and WARNING for misconfig)
+when the env var is unset (default), the admin credentials aren't
+configured, or the sender's Telegram ID doesn't match.
 
 Pairs with the branch-scoped SQLite filename (PR #363): switching git
 branches now spins up a fresh DB and an empty bindings table, which
@@ -113,7 +114,7 @@ async def _autolink_dev_admin(
     # Reach the column via ``__table__.c`` so mypy sees a real
     # ``ColumnElement[bool]`` (the fastapi-users base class declares
     # ``email: str`` which shadows the SQLAlchemy descriptor). Same
-    # workaround documented in :func:`app.api.oauth._login_or_create_user`.
+    # workaround used by ``app.api.oauth``'s OAuth login helper.
     stmt = select(User).where(User.__table__.c.email == admin_email)
     admin_user = (await session.execute(stmt)).scalar_one_or_none()
     if admin_user is None:

@@ -2,10 +2,7 @@
 
 Lives in its own module so the Telegram package — handlers, dev-admin
 auto-link, model picker, status formatters — can all share one source
-of truth without forming an import cycle through ``handlers``. The
-package's previous workaround was a per-consumer ``TelegramSenderLike``
-``Protocol`` (in ``dev_admin``, ``model_picker``, ``status``,
-``lcm_status``); those can fold back to the real type as a follow-up.
+of truth without forming an import cycle through ``handlers``.
 """
 
 from __future__ import annotations
