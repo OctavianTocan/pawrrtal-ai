@@ -18,7 +18,7 @@ Tables defined here:
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 
 from sqlalchemy import (
     JSON,
@@ -33,7 +33,19 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import Text
 
 from .db_base import Base
-from .models import _utcnow
+
+
+def _utcnow() -> datetime:
+    """Timezone-aware UTC now.
+
+    Mirrors :func:`app.models._utcnow`. Defined locally instead of imported
+    from ``app.models`` because ``app.models`` re-exports the LCM classes
+    from this module — importing the helper across that boundary creates
+    a partial-init circular reference whenever a caller does
+    ``from app.lcm_models import LCMSummary`` directly. Matches the
+    ``mcp_models.py`` pattern.
+    """
+    return datetime.now(UTC)
 
 
 class LCMSummary(Base):
