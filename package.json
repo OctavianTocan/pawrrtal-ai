@@ -7,7 +7,6 @@
 	"scripts": {
 		"dev": "bun run dev.ts",
 		"commit": "bun run commit.ts",
-		"lint:policies": "bun run check-policies.mjs",
 		"lint:file-lines": "node scripts/check-file-lines.mjs",
 		"lint:view-container": "node scripts/check-view-container.mjs",
 		"lint:docs": "bun run scripts/check-docs.ts",

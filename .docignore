@@ -17,5 +17,23 @@
 frontend/components/ai-elements/**
 frontend/components/ui/**
 
+# ── Vendored sibling packages ────────────────────────────────────────────────
+# Each of these is a git-submoduled copy of an external @octavian-tocan
+# package. Their docstring conventions belong to the upstream package, not
+# the host app — our TSDoc gate would force changes that wouldn't survive
+# the next submodule sync. Tests + stories under these paths are also
+# already excluded from the frontend vitest runner.
+frontend/lib/react-dropdown/**
+frontend/lib/react-overlay/**
+frontend/lib/react-chat-composer/**
+
+# ── Stub modules ─────────────────────────────────────────────────────────────
+# `__mocks__/` files exist solely to satisfy import resolution under vitest.
+frontend/__mocks__/**
+
 # ── Auto-generated and declaration files ─────────────────────────────────────
 **/*.d.ts
+# Fumadocs-mdx code-generated collection wrappers (re-built on `bun run
+# generate:docs`). Their re-exports are upstream contracts, not ours to
+# document.
+frontend/.source/**

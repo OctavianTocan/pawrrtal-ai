@@ -146,7 +146,6 @@ const EXEMPT_FILES = new Set([
 	'frontend/features/knowledge/components/DocumentViewer.tsx',
 	'frontend/features/tasks/TasksContainer.tsx',
 	'frontend/features/nav-chats/context/sidebar-focus.tsx',
-	'frontend/components/app-layout.tsx',
 	'frontend/features/settings/sections/AppearanceRows.tsx',
 	'frontend/features/nav-chats/NavChats.tsx',
 	'frontend/features/onboarding/v2/step-server.tsx',

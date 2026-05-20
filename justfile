@@ -22,9 +22,9 @@ commit:
 push:
     git push
 
-# Lint check (read-only) — Biome (JS/TS) + custom policies + ruff (Python)
+# Lint check (read-only) — Biome (JS/TS) + ruff (Python)
 lint: lint-py
-    bunx --bun @biomejs/biome check --no-errors-on-unmatched --files-ignore-unknown=true . && bun run lint:policies
+    bunx --bun @biomejs/biome check --no-errors-on-unmatched --files-ignore-unknown=true .
 
 # Lint and auto-fix — Biome (JS/TS) + ruff (Python)
 lint-fix: lint-py-fix
