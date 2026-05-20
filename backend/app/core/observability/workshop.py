@@ -97,12 +97,53 @@ __all__ = [
     "ToolSpanRecorder",
     "TurnSpanRecorder",
     "llm_span",
+    "reset_tracer_for_tests",
+    "set_tracer_for_tests",
     "tool_span",
     "turn_span",
     "workshop_event_hook",
 ]
 
 _tracer = trace.get_tracer(TRACER_NAME, TRACER_VERSION)
+
+# Test-injectable tracer override (#352 L6). When non-``None``, every
+# span recorder reads spans through this tracer instead of the
+# global ``_tracer``. ``InMemorySpanExporter``-based tests inject
+# their own provider's tracer here, so the test never has to swap
+# the global ``trace.set_tracer_provider`` (which is one-shot per
+# process and produces order-dependent flakes in pytest fixtures).
+_tracer_override: trace.Tracer | None = None
+
+
+def _active_tracer() -> trace.Tracer:
+    """Return the test-injected tracer when set, otherwise the module tracer.
+
+    Every span context manager in this module reads through this
+    helper so the override is a single seam — there's no chance a
+    new code path forgets to consult it.
+    """
+    return _tracer_override if _tracer_override is not None else _tracer
+
+
+def set_tracer_for_tests(tracer: trace.Tracer) -> None:
+    """Install a test tracer so OTel assertions stay local to the test.
+
+    Pair with :func:`reset_tracer_for_tests` in a ``finally`` /
+    ``addfinalizer`` so the override doesn't leak across tests.
+
+    Args:
+        tracer: A tracer (typically built from a per-test
+            ``TracerProvider`` + ``InMemorySpanExporter``) that
+            captures spans into an exporter the test can read back.
+    """
+    global _tracer_override  # noqa: PLW0603 — test seam by design
+    _tracer_override = tracer
+
+
+def reset_tracer_for_tests() -> None:
+    """Clear the test tracer so subsequent spans use the module default."""
+    global _tracer_override  # noqa: PLW0603 — test seam by design
+    _tracer_override = None
 
 # Per-conversation memory of the previous turn's span context so
 # successive turns in the same conversation are linked.  OTel span
@@ -154,7 +195,7 @@ def turn_span(
     prev_ctx = _previous_turn.get(conv_key)
     links = [trace.Link(prev_ctx)] if prev_ctx is not None else None
 
-    with _tracer.start_as_current_span("pawrrtal.turn", links=links) as span:
+    with _active_tracer().start_as_current_span("pawrrtal.turn", links=links) as span:
         span.set_attribute(ATTR_CONVERSATION_ID, conv_key)
         span.set_attribute(ATTR_USER_ID, str(user_id))
         span.set_attribute(ATTR_SURFACE, surface)
@@ -206,7 +247,7 @@ def llm_span(
         An ``LLMSpanRecorder`` whose ``record_*`` methods accumulate
         streamed tokens and stamp final attributes on ``flush()``.
     """
-    with _tracer.start_as_current_span("pawrrtal.llm.chat") as span:
+    with _active_tracer().start_as_current_span("pawrrtal.llm.chat") as span:
         span.set_attribute(ATTR_TRACELOOP_KIND, KIND_LLM)
         span.set_attribute(ATTR_GENAI_OPERATION, "chat")
         span.set_attribute(ATTR_GENAI_REQUEST_MODEL, model_id)
@@ -259,7 +300,7 @@ def tool_span(
         A ``ToolSpanRecorder`` — call ``record_result`` (or
         ``record_error``) before the context exits to stamp the output.
     """
-    with _tracer.start_as_current_span(f"{name}.tool") as span:
+    with _active_tracer().start_as_current_span(f"{name}.tool") as span:
         span.set_attribute(ATTR_TRACELOOP_KIND, KIND_TOOL)
         span.set_attribute(ATTR_TRACELOOP_NAME, name)
         span.set_attribute(ATTR_TRACELOOP_INPUT, json_dumps(arguments))
