@@ -217,10 +217,14 @@ def _event_from_block(
 
 
 def _tool_result_event(block: ToolResultBlock) -> StreamEvent:
+    # ``ToolResultBlock.is_error`` is ``bool | None`` per the SDK; coerce to
+    # bool with ``False`` as the default so the StreamEvent shape stays
+    # consumable by the Telegram dispatcher without a None check.
     return StreamEvent(
         type="tool_result",
         tool_use_id=block.tool_use_id,
         content=_tool_result_to_text(block.content),
+        is_error=bool(block.is_error),
     )
 
 
