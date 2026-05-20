@@ -182,7 +182,7 @@ class TestHandleToolUseStateTracking:
         bot = _make_bot()
         event: StreamEvent = {
             "type": "tool_use",
-            "id": "call_abc",
+            "tool_use_id": "call_abc",
             "name": "read_file",
             "input": {"path": "README.md"},
         }
@@ -209,7 +209,7 @@ class TestHandleToolUseStateTracking:
         for i in range(3):
             event: StreamEvent = {
                 "type": "tool_use",
-                "id": f"call_{i}",
+                "tool_use_id": f"call_{i}",
                 "name": f"tool_{i}",
                 "input": {},
             }
@@ -232,7 +232,7 @@ class TestHandleToolUseStateTracking:
         bot = _make_bot()
         event: StreamEvent = {
             "type": "tool_use",
-            "id": "call_x",
+            "tool_use_id": "call_x",
             "name": "read_file",
             "input": {"path": "a.txt"},
         }

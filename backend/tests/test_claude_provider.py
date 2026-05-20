@@ -302,7 +302,14 @@ class TestEventsFromMessage:
             model="claude",
         )
         events = list(_events_from_message(message))
-        assert events == [{"type": "tool_result", "tool_use_id": "tu_1", "content": "output"}]
+        assert events == [
+            {
+                "type": "tool_result",
+                "tool_use_id": "tu_1",
+                "content": "output",
+                "is_error": False,
+            }
+        ]
 
     def test_assistant_mixed_blocks_preserve_order(self) -> None:
         """Multiple blocks in one message should yield events in order."""
@@ -336,7 +343,14 @@ class TestEventsFromMessage:
             content=[ToolResultBlock(tool_use_id="tu_1", content="ok")],
         )
         events = list(_events_from_message(message))
-        assert events == [{"type": "tool_result", "tool_use_id": "tu_1", "content": "ok"}]
+        assert events == [
+            {
+                "type": "tool_result",
+                "tool_use_id": "tu_1",
+                "content": "ok",
+                "is_error": False,
+            }
+        ]
 
     def test_user_message_with_string_content_emits_nothing(self) -> None:
         """Plain string user messages are echoes — no events should be emitted."""
