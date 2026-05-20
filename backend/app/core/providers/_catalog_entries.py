@@ -231,6 +231,11 @@ XAI_ENTRIES: tuple[ModelEntry, ...] = (
         is_default=False,
         cost_per_mtok_in_usd=_GROK_4_3_IN_USD,
         cost_per_mtok_out_usd=_GROK_4_3_OUT_USD,
-        supports_reasoning=("low", "high"),
+        # xAI added an explicit no-thinking mode on grok-4.3 (#373).
+        # ``minimal`` maps to ``EFFORT_NONE`` inside the provider so
+        # the user can pick "no reasoning" without clearing the
+        # override entirely; ``low`` / ``high`` continue to map onto
+        # xAI's two-level enum.
+        supports_reasoning=("minimal", "low", "high"),
     ),
 )

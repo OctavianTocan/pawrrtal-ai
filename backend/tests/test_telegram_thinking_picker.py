@@ -99,9 +99,15 @@ def test_claude_haiku_no_adaptive_thinking() -> None:
     assert _entry(Host.agent_sdk, "claude-haiku-4-5").supports_reasoning == ()
 
 
-def test_grok_collapses_to_two_levels() -> None:
-    """xai_provider._map_reasoning_effort folds four levels into two."""
-    assert _entry(Host.xai, "grok-4.3").supports_reasoning == ("low", "high")
+def test_grok_exposes_minimal_low_high_after_no_thinking_addition() -> None:
+    """xAI added ``EFFORT_NONE`` to grok-4.3; the picker now surfaces 3 rungs (#373).
+
+    ``minimal`` maps to ``EFFORT_NONE`` (no thinking), ``low`` and
+    ``medium`` collapse to ``EFFORT_LOW``, ``high`` and ``extra-high``
+    collapse to ``EFFORT_HIGH``. The picker shows the three distinct
+    rungs the user can meaningfully select.
+    """
+    assert _entry(Host.xai, "grok-4.3").supports_reasoning == ("minimal", "low", "high")
 
 
 def test_gemini_3_flash_models_expose_all_four_levels() -> None:
