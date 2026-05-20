@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from app.core.config import settings
 from app.core.providers.catalog import MODEL_CATALOG, default_model
 from app.core.providers.model_id import Host
 from app.integrations.telegram.model_picker import (
@@ -25,10 +26,28 @@ from app.integrations.telegram.model_picker import (
     get_model_picker_state,
     has_host,
     has_vendor_in_host,
+    is_host_authenticated,
     parse_model_callback_data,
     resolve_model_selection,
 )
 from app.integrations.telegram.sender import TelegramSender
+
+
+@pytest.fixture(autouse=True)
+def _all_providers_authenticated(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Set every gateway API key so the picker shows every host (#370).
+
+    The picker filters out hosts whose credentials are missing
+    (:func:`is_host_authenticated`). Most tests in this file exercise
+    the full keyboard, so we default every key to a placeholder; the
+    filter behaviour itself has dedicated tests below that opt out by
+    overriding individual settings on top of this fixture.
+    """
+    monkeypatch.setattr(settings, "google_api_key", "test-google-key")
+    monkeypatch.setattr(settings, "claude_code_oauth_token", "test-claude-token")
+    monkeypatch.setattr(settings, "xai_api_key", "test-xai-key")
+    monkeypatch.setattr(settings, "openai_api_key", "test-openai-key")
+    monkeypatch.setattr(settings, "opencode_api_key", "test-opencode-key")
 
 
 def _flatten(rows: Sequence[Sequence[ModelButton]]) -> list[ModelButton]:
@@ -155,6 +174,43 @@ def test_stale_model_selection_is_rejected() -> None:
 def test_has_host_and_has_vendor_in_host_guards() -> None:
     assert has_host(Host.agent_sdk.value) is True
     assert has_host("totally-fake") is False
+
+
+def test_is_host_authenticated_reports_gateway_key_presence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``is_host_authenticated`` reflects the gateway-global setting (#370)."""
+    monkeypatch.setattr(settings, "opencode_api_key", "")
+    assert is_host_authenticated(Host.opencode_go.value) is False
+
+    monkeypatch.setattr(settings, "opencode_api_key", "real-key")
+    assert is_host_authenticated(Host.opencode_go.value) is True
+
+
+def test_is_host_authenticated_returns_true_for_hosts_without_gateway_key() -> None:
+    """``gemini-cli`` runs a local subprocess, so it never needs a gateway key."""
+    assert is_host_authenticated(Host.gemini_cli.value) is True
+
+
+def test_host_keyboard_hides_unauthenticated_providers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When an API key is missing the host is hidden from the picker (#370).
+
+    Reproduces the symptom the issue described: OpenCode Go was shown
+    even when no ``OPENCODE_API_KEY`` was configured, so users picked a
+    model that immediately failed.
+    """
+    monkeypatch.setattr(settings, "opencode_api_key", "")
+    monkeypatch.setattr(settings, "xai_api_key", "")
+
+    labels = [button.text for button in _flatten(build_host_keyboard())]
+
+    assert not any("OpenCode Go" in label for label in labels)
+    assert not any(label.startswith("xAI") for label in labels)
+    # Hosts that DO have keys configured stay visible.
+    assert any("Gemini API" in label for label in labels)
+    assert any("Anthropic Agent SDK" in label for label in labels)
     assert has_vendor_in_host(host=Host.opencode_go.value, vendor="zai") is True
     assert has_vendor_in_host(host=Host.opencode_go.value, vendor="anthropic") is False
 

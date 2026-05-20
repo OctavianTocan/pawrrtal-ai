@@ -14,6 +14,7 @@ from typing import Literal, Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.providers.catalog import CATALOG_ETAG, MODEL_CATALOG, ModelEntry
 from app.core.providers.labels import host_label_from_slug, vendor_label_from_slug
 from app.crud.channel import get_or_create_telegram_conversation_full, get_user_id_for_external
@@ -40,6 +41,39 @@ _DEFAULT_BUTTON_TEXT = "⭐ Set as my default"
 _DEFAULT_ALREADY_SET_TEXT = "⭐ Already your default"
 # Inert callback used by the post-default badge so a second tap is a no-op.
 NOOP_CALLBACK = "mdl:noop"
+
+# Host → settings field that must be non-empty for the host to appear in
+# the picker (#370). Hosts that don't require a gateway API key
+# (``gemini-cli`` uses a local subprocess) are absent from this map and
+# always shown.
+_HOST_AUTH_SETTING: dict[str, str] = {
+    "agent-sdk": "claude_code_oauth_token",
+    "google-ai": "google_api_key",
+    "litellm": "openai_api_key",
+    "opencode-go": "opencode_api_key",
+    "xai": "xai_api_key",
+}
+
+
+def is_host_authenticated(host_slug: str) -> bool:
+    """Return whether the gateway-global config has the credentials for ``host_slug``.
+
+    Used by the picker to hide hosts whose credentials aren't configured
+    so the user doesn't pick a model that will immediately fail. Per-
+    workspace overrides aren't consulted here — the picker runs in the
+    chat surface (not the workspace), and a host that only some
+    workspaces have keys for is still better hidden than shown with a
+    failing default. When a workspace lands real per-user picker
+    filtering, that work threads workspace_root through this seam.
+
+    Hosts absent from :data:`_HOST_AUTH_SETTING` (e.g. ``gemini-cli``,
+    which runs a local subprocess rather than calling out to a managed
+    gateway) are always considered authenticated.
+    """
+    setting_name = _HOST_AUTH_SETTING.get(host_slug)
+    if setting_name is None:
+        return True
+    return bool(getattr(settings, setting_name, "") or "")
 
 
 class TelegramSenderLike(Protocol):
@@ -327,12 +361,17 @@ def picker_stale_message() -> str:
 def _host_to_vendors() -> dict[str, dict[str, list[ModelEntry]]]:
     """Group the catalog as ``{host_slug: {vendor_slug: [entries]}}``.
 
-    Both layers preserve a stable, alphabetised order so the keyboards
-    are deterministic.
+    Hosts whose gateway-global API key is absent are filtered out so
+    the picker only shows providers the user can actually invoke
+    (#370). Both layers preserve a stable, alphabetised order so the
+    keyboards are deterministic.
     """
     grouped: dict[str, dict[str, list[ModelEntry]]] = {}
     for entry in MODEL_CATALOG:
-        host_bucket = grouped.setdefault(entry.host.value, {})
+        host_slug = entry.host.value
+        if not is_host_authenticated(host_slug):
+            continue
+        host_bucket = grouped.setdefault(host_slug, {})
         host_bucket.setdefault(entry.vendor.value, []).append(entry)
     return {host: dict(sorted(vendors.items())) for host, vendors in sorted(grouped.items())}
 
@@ -492,6 +531,7 @@ __all__ = [
     "get_model_picker_state",
     "has_host",
     "has_vendor_in_host",
+    "is_host_authenticated",
     "parse_model_callback_data",
     "picker_not_bound_message",
     "picker_stale_message",
