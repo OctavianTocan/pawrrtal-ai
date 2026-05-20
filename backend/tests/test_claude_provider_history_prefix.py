@@ -8,7 +8,7 @@ the prior turns.
 
 from __future__ import annotations
 
-from app.core.providers.claude_provider import _render_history_prefix
+from app.core.providers.claude import _render_history_prefix
 
 
 def test_returns_none_for_empty_history() -> None:

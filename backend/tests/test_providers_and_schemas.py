@@ -16,7 +16,7 @@ from pydantic import ValidationError
 
 from app.core import keys
 from app.core.config import settings
-from app.core.providers.claude_provider import ClaudeLLM
+from app.core.providers.claude import ClaudeLLM
 from app.core.providers.factory import resolve_llm
 from app.core.providers.gemini_provider import GeminiLLM
 from app.core.providers.litellm_provider import LiteLLMLLM

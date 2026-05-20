@@ -1,7 +1,7 @@
 """Tests for the Claude-side cross-provider tool bridge.
 
-Covers :mod:`app.core.providers._claude_tool_bridge` and its wiring
-into :class:`app.core.providers.claude_provider.ClaudeLLM`.
+Covers :mod:`app.core.providers.claude.tool_bridge` and its wiring
+into :class:`app.core.providers.claude.ClaudeLLM`.
 
 The bridge translates the provider-neutral
 :class:`app.core.agent_loop.types.AgentTool` shape into Claude's
@@ -13,8 +13,8 @@ verify:
   * An empty AgentTool list produces no MCP server (vs an empty one).
   * Wrapping an AgentTool preserves its ``execute`` semantics and
     surfaces the result as the SDK's text-content shape.
-  * ``ClaudeLLM._build_options`` mounts the server + appends the
-    whitelist when handed AgentTools.
+  * The provider's per-request ``build_options`` helper mounts the
+    server + appends the whitelist when handed AgentTools.
 """
 
 from __future__ import annotations
@@ -25,14 +25,14 @@ from uuid import uuid4
 import pytest
 
 from app.core.agent_loop.types import AgentTool
-from app.core.providers import _claude_tool_bridge as bridge
-from app.core.providers._claude_tool_bridge import (
+from app.core.providers.claude import ClaudeLLM, ClaudeLLMConfig
+from app.core.providers.claude import tool_bridge as bridge
+from app.core.providers.claude.tool_bridge import (
     MCP_SERVER_NAME,
     allowed_tool_ids,
     build_mcp_server,
     claude_tool_id,
 )
-from app.core.providers.claude_provider import ClaudeLLM, ClaudeLLMConfig
 
 
 def _make_agent_tool(name: str = "echo") -> AgentTool:
@@ -114,13 +114,13 @@ async def test_wrapped_tool_marks_is_error_when_execute_raises() -> None:
 
 
 def test_provider_options_mount_server_and_whitelist_for_agent_tools() -> None:
-    """``ClaudeLLM._build_options`` must propagate AgentTools to the SDK."""
+    """The provider's per-request options must propagate AgentTools to the SDK."""
     provider = ClaudeLLM(
         "claude-haiku-4-5",
         config=ClaudeLLMConfig(oauth_token=None),
     )
 
-    options = provider._build_options(uuid4(), agent_tools=[_make_agent_tool("read_file")])
+    options = _options_for(provider, agent_tools=[_make_agent_tool("read_file")])
 
     assert isinstance(options.mcp_servers, dict)
     assert MCP_SERVER_NAME in options.mcp_servers
@@ -135,10 +135,36 @@ def test_provider_options_omit_server_when_no_agent_tools_supplied() -> None:
         config=ClaudeLLMConfig(oauth_token=None),
     )
 
-    options = provider._build_options(uuid4(), agent_tools=None)
+    options = _options_for(provider, agent_tools=None)
 
     # No agent tools → no server, no whitelist additions.
     assert options.mcp_servers == {} or options.mcp_servers is None
     # Whatever the config-level local tools whitelist was should pass
     # through unchanged — the bridge never silently strips it.
     assert options.tools == list(provider._config.tools or [])
+
+
+def _options_for(
+    provider: ClaudeLLM,
+    *,
+    agent_tools: list[AgentTool] | None,
+) -> Any:
+    """Drive ``build_options`` through the provider's bound state.
+
+    Replaces the previous direct ``provider._build_options`` call after
+    that method was extracted into
+    :func:`app.core.providers.claude.options.build_options` so the
+    provider file fits under the 500-line budget.
+    """
+    from app.core.providers.claude.options import build_options
+    from app.core.providers.claude.provider import _resolve_sdk_model
+
+    return build_options(
+        config=provider._config,
+        workspace_root=provider._workspace_root,
+        conversation_id=uuid4(),
+        sdk_model=_resolve_sdk_model(provider._model_id),
+        stderr_callback=provider._capture_stderr_line,
+        session_probe=lambda *_a, **_k: False,
+        agent_tools=agent_tools,
+    )

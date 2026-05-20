@@ -81,14 +81,16 @@ const EXEMPT_PATH_FRAGMENTS = [
 	// CCT-integration stack (PRs feat/cct-03 onward) extended each of these
 	// modules. They were already near the budget on `development`
 	// (claude_provider.py was 499 lines pre-CCT), and the per-PR additions
-	// are too small individually to justify in-PR splits. Tracked as a
-	// follow-up to extract:
+	// are too small individually to justify in-PR splits. The
+	// `providers/claude_provider.py` entry was retired when the provider
+	// was promoted to a `providers/claude/` package (provider / events /
+	// tool_bridge / options / prompt / history / retry / tools), each
+	// well under the budget. The remaining entries still need the same
+	// treatment:
 	//   - agent_loop/loop.py → agent_loop/permission_gate.py (PR 03 addition)
-	//   - providers/claude_provider.py → split sandbox/retry/multimodal helpers (PR 05)
 	//   - integrations/telegram/bot.py → split typing-indicator + permission helpers (PR 03 + PR 07)
 	// TODO(pawrrtal-cct follow-up): split these and remove the exemption.
 	'backend/app/core/agent_loop/loop.py',
-	'backend/app/core/providers/claude_provider.py',
 	'backend/app/integrations/telegram/bot.py',
 	// LCM retrieval lab (PR #258) — two files still over budget. ``evals.py``
 	// is the largest (873 lines: harness + scenarios + answerer + retrievers

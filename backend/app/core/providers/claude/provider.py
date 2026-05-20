@@ -34,6 +34,20 @@ Notable design decisions:
   ``ClaudeAgentOptions.env``. Pydantic-settings reads ``.env`` files but
   does not push the values back into ``os.environ``, so the bundled CLI
   subprocess would otherwise miss the token.
+
+Helpers that used to live in this file have been split into sibling
+modules so this file stays under the project's 500-line budget:
+
+- :mod:`.events` — Claude SDK ``Message`` → ``StreamEvent`` projection.
+- :mod:`.tool_bridge` — cross-provider ``AgentTool`` → in-process MCP server.
+- :mod:`.tools` — per-request whitelist + display-map composition.
+- :mod:`.prompt` — multimodal ``aiter_user_prompt`` envelope assembly.
+- :mod:`.history` — bounded prior-turn recap for cross-provider switches.
+- :mod:`.retry` — transient-error classification + backoff.
+
+All public names (including the underscore-prefixed test helpers) are
+re-exported from :mod:`app.core.providers.claude` (the package
+``__init__.py``) so existing import sites keep working.
 """
 
 from __future__ import annotations
@@ -58,24 +72,22 @@ from claude_agent_sdk import (
     query,
 )
 
-from app.core.agent_loop.display import tool_display_map
+from app.core.agent_loop.display import ToolDisplay
 from app.core.agent_loop.types import AgentTool, PermissionCheckFn
 from app.core.agent_system_prompt import (
     DEFAULT_AGENT_SYSTEM_PROMPT as _DEFAULT_SYSTEM_PROMPT,
 )
 from app.core.config import settings as _settings
-from app.core.keys import resolve_api_key
-
-from ._claude_tool_bridge import (
-    MCP_SERVER_NAME as AGENT_TOOL_MCP_SERVER_NAME,
+from app.core.providers.base import ReasoningEffort, StreamEvent
+from app.core.providers.claude.events import _error_event, _events_from_message
+from app.core.providers.claude.history import _render_history_prefix
+from app.core.providers.claude.options import build_options
+from app.core.providers.claude.prompt import _aiter_user_prompt
+from app.core.providers.claude.retry import (
+    _is_retryable_cli_connection,
+    _retry_backoff_seconds,
 )
-from ._claude_tool_bridge import (
-    allowed_tool_ids,
-    build_mcp_server,
-    claude_tool_id,
-    make_can_use_tool,
-)
-from .base import ReasoningEffort, StreamEvent
+from app.core.providers.claude.tools import _claude_display_map
 
 logger = logging.getLogger(__name__)
 
@@ -102,18 +114,11 @@ _MODEL_MAP: dict[str, str] = {
 # surface — the model can't read files, run bash, or fetch URLs.
 _DEFAULT_TOOLS: list[str] = []
 
-# Single-turn chat: each user message produces exactly one assistant
-# response; the SDK closes the subprocess after that turn.
+# Single-turn chat default; widened to ``_TOOL_ENABLED_MAX_TURNS`` by
+# :func:`app.core.providers.claude.options.build_options` when tool use
+# is enabled. Mirrored in :mod:`.options` so this module doesn't need
+# to import from there for a single int.
 _DEFAULT_MAX_TURNS = 1
-
-# When tool use is enabled (e.g. ``exa_search``), the agent needs at
-# least one extra turn to read the tool result and respond. We budget a
-# few more so the model can plan → call tool → read result → maybe
-# refine with a follow-up call → respond. ``error_max_turns`` surfaces
-# as a ``ResultMessage(is_error=True)`` and is the symptom users see when
-# this number is too low (the chat shows an error panel after a
-# successful "Searched the web" indicator).
-_TOOL_ENABLED_MAX_TURNS = 6
 
 # With ``tools=[]`` no tool ever runs, so the choice here is mostly
 # cosmetic. We pick "default" rather than "bypassPermissions" so that
@@ -124,26 +129,6 @@ _DEFAULT_PERMISSION_MODE: PermissionMode = "default"
 # on a ``ProcessError``.  Bounded so a chatty subprocess can't grow
 # the buffer without bound.
 _STDERR_TAIL_LINES = 20
-
-# Cap on the per-retry sleep — even with the configured exponential
-# backoff we don't want a single transient blip to wedge the request
-# for minutes.
-_RETRY_SLEEP_CEILING_SECONDS = 30.0
-
-# Pawrrtal's five-level ``ReasoningEffort`` literal collapses onto
-# Claude's three documented adaptive-thinking levels (low/medium/high
-# per https://docs.claude.com/en/docs/build-with-claude/extended-thinking).
-# ``minimal`` rounds up to ``low`` (Claude has no faster tier) and
-# ``extra-high`` saturates at ``high``. The chat-router resolver
-# normally adapts these before we get here because no Claude catalog
-# row lists either level — this is the belt-and-braces.
-_CLAUDE_EFFORT_MAP: dict[str, str] = {
-    "minimal": "low",
-    "low": "low",
-    "medium": "medium",
-    "high": "high",
-    "extra-high": "high",
-}
 
 # System prompt scoped to a chat product. We deliberately do NOT use
 # Claude Code's default preset, which steers the model toward software
@@ -262,7 +247,7 @@ class ClaudeLLM:
                 the prior turns. Closes #308.
             tools: Optional list of cross-provider :class:`AgentTool`
                 instances. Bridged into a single in-process MCP server
-                by ``_claude_tool_bridge`` so the SDK can call them.
+                by :mod:`.tool_bridge` so the SDK can call them.
             system_prompt: Optional system prompt to override the
                 provider-default chat-scoped prompt. Falls back to
                 :data:`DEFAULT_AGENT_SYSTEM_PROMPT` when ``None``.
@@ -271,7 +256,7 @@ class ClaudeLLM:
             permission_check: Optional cross-provider ``can_use_tool``
                 gate (PR 03b).  Bound into the Claude SDK's
                 ``can_use_tool`` callback via
-                :func:`_claude_tool_bridge.make_can_use_tool` so the
+                :func:`.tool_bridge.make_can_use_tool` so the
                 same policy applies as the Gemini path.  ``None``
                 preserves the historical namespace-only auto-approval.
             images: Optional list of multimodal image inputs (PR 05).
@@ -305,8 +290,13 @@ class ClaudeLLM:
 
         while True:
             attempt += 1
-            options = self._build_options(
-                conversation_id,
+            options = build_options(
+                config=self._config,
+                workspace_root=self._workspace_root,
+                conversation_id=conversation_id,
+                sdk_model=_resolve_sdk_model(self._model_id),
+                stderr_callback=self._capture_stderr_line,
+                session_probe=_session_exists,
                 system_prompt=system_prompt,
                 agent_tools=tools,
                 reasoning_effort=reasoning_effort,
@@ -391,167 +381,6 @@ class ClaudeLLM:
 
     # -- internal --------------------------------------------------------
 
-    def _build_options(
-        self,
-        conversation_id: uuid.UUID,
-        *,
-        system_prompt: str | None = None,
-        agent_tools: list[AgentTool] | None = None,
-        reasoning_effort: ReasoningEffort | None = None,
-        permission_check: PermissionCheckFn | None = None,
-        force_fresh_session: bool = False,
-    ) -> ClaudeAgentOptions:
-        """Build per-request options, picking ``session_id`` vs ``resume``.
-
-        Args:
-            conversation_id: App-level conversation UUID; reused as the
-                Claude SDK session id.
-            system_prompt: Optional per-call override.  When provided,
-                takes precedence over ``self._config.system_prompt`` so
-                the chat router can inject app-assembled context (e.g.
-                workspace AGENTS.md per PR #113).
-            agent_tools: Cross-provider :class:`AgentTool` list assembled
-                by the chat router.  Translated into a single in-process
-                MCP server via
-                :mod:`app.core.providers._claude_tool_bridge` and mounted
-                under ``ClaudeAgentOptions.mcp_servers``; the matching
-                ``mcp__pawrrtal__<name>`` IDs are appended to the
-                allowed-tools whitelist so the SDK actually permits
-            permission_check: Optional cross-provider permission gate.
-                When supplied, bound into ``ClaudeAgentOptions.can_use_tool``
-                via :func:`_claude_tool_bridge.make_can_use_tool` so the
-                SDK enforces the same policy as the Gemini path.
-            force_fresh_session: When True, skips the resume probe and
-                seeds a brand-new SDK session.  Used by the resume-failure
-                fallback path in :meth:`stream` so a single conversation
-                can recover from a missing transcript without 500ing.
-                execution.
-            reasoning_effort: Optional per-turn reasoning-depth knob.
-        """
-        session_id = str(conversation_id)
-
-        # Local tool whitelist for the Claude SDK's built-in CLI tools
-        # (read/write filesystem, etc.).  Distinct from ``agent_tools``
-        # — those are app-defined tools we bridge into an MCP server.
-        local_tools = list(self._config.tools) if self._config.tools is not None else None
-        mcp_servers: dict[str, Any] = {}
-
-        # Bridge the cross-provider AgentTool list into a single MCP
-        # server.  All app-defined tools (workspace files, web search,
-        # …) flow through here — the provider doesn't know which ones
-        # are in the list and shouldn't.
-        local_tools = _merge_agent_tools_into_whitelist(
-            local_tools, list(agent_tools or []), mcp_servers
-        )
-
-        # If tool use is enabled but the caller didn't override
-        # ``max_turns``, automatically widen the turn budget so the agent
-        # can read its own tool result. Without this the very first
-        # tool invocation hits the SDK's ``error_max_turns`` and surfaces
-        # in chat as a "Claude SDK result reported an error" panel
-        # immediately after the "Searched the web" indicator.
-        effective_max_turns = self._config.max_turns
-        tool_use_enabled = bool(local_tools) or bool(mcp_servers)
-        if tool_use_enabled and effective_max_turns <= _DEFAULT_MAX_TURNS:
-            effective_max_turns = _TOOL_ENABLED_MAX_TURNS
-
-        # System prompt resolution: per-call value (from the chat router /
-        # AGENTS.md loader) wins over ``self._config.system_prompt``.
-        effective_system_prompt = system_prompt or self._config.system_prompt
-
-        # Full SDK isolation: ``setting_sources=[]`` disables every
-        # filesystem-driven source the bundled CLI would otherwise
-        # read from cwd — ``CLAUDE.md``, ``.claude/settings.json``
-        # (hooks!), and the project's ``.mcp.json`` MCP-server
-        # registration. Without this, an unset ``cwd`` falls back to
-        # the uvicorn process directory, and the SDK ingests the
-        # *host repo's* files instead of the user workspace.
-        #
-        # We do not lose the workspace ``CLAUDE.md`` by doing this:
-        # ``channels.turn_runner._workspace_system_prompt`` already
-        # injects it via ``system_prompt=`` from the user's actual
-        # workspace root, which is the only directory we should be
-        # reading. The previous ``["project"]`` branch was reading
-        # the wrong project (the backend repo) — not "defence in
-        # depth", just a leak.
-        setting_sources: list[str] = []
-        kwargs: dict[str, Any] = {
-            "model": _resolve_sdk_model(self._model_id),
-            "tools": local_tools,
-            "max_turns": effective_max_turns,
-            "permission_mode": self._config.permission_mode,
-            "system_prompt": effective_system_prompt,
-            "setting_sources": setting_sources,
-        }
-        if reasoning_effort is not None:
-            # The Claude API's adaptive thinking ``effort`` enum is
-            # documented as ``low | medium | high`` only (see
-            # https://docs.claude.com/en/docs/build-with-claude/extended-thinking).
-            # Pawrrtal's ``minimal`` collapses to ``low`` (Claude has
-            # no faster tier) and ``extra-high`` saturates at ``high``
-            # — so a user who picked the lightest or heaviest level on
-            # a model that supports the full five-step ladder still
-            # gets the closest level Claude exposes after switching.
-            # The catalog's ``supports_reasoning`` tuple should not
-            # list ``minimal`` or ``extra-high`` for any Claude model
-            # — the chat-router resolver adapts before this line runs
-            # — so this mapping is belt-and-braces.
-            kwargs["effort"] = _CLAUDE_EFFORT_MAP.get(reasoning_effort, reasoning_effort)
-        # Per-request cost cap (PR 04). The Claude SDK enforces this
-        # natively — when the agent burns past ``max_budget_usd`` mid-turn,
-        # the SDK terminates with a ``ResultMessage(is_error=True,
-        # subtype="error_max_budget")``. Zero / negative disables (the
-        # SDK treats it as unlimited), so a deployment that doesn't want
-        # the cap can leave ``cost_max_per_request_usd=0``.
-        if _settings.cost_tracker_enabled and _settings.cost_max_per_request_usd > 0:
-            kwargs["max_budget_usd"] = _settings.cost_max_per_request_usd
-        # Claude SDK sandbox (PR 05). Off by default; flip
-        # ``CLAUDE_SANDBOX_ENABLED=true`` to wrap the bundled CLI in
-        # the SDK's macOS Seatbelt sandbox. ``excludedCommands`` is
-        # parsed from the comma-separated env var via
-        # ``settings.claude_sandbox_excluded_commands_list``.
-        if _settings.claude_sandbox_enabled:
-            kwargs["sandbox"] = {
-                "enabled": True,
-                "autoAllowBashIfSandboxed": _settings.claude_sandbox_auto_allow_bash,
-                "excludedCommands": _settings.claude_sandbox_excluded_commands_list,
-            }
-        # Stderr tail capture (PR 05). The SDK lets us subscribe to
-        # CLI stderr via a callback; we keep the last
-        # ``_STDERR_TAIL_LINES`` lines in a ring buffer so a
-        # ``ProcessError`` can surface a useful diagnostic instead
-        # of just the exit code.
-        kwargs["stderr"] = self._capture_stderr_line
-        if mcp_servers:
-            kwargs["mcp_servers"] = mcp_servers
-            # ``can_use_tool`` is the SDK's per-call permission hook.
-            # When the chat router supplies a cross-provider
-            # ``permission_check`` (PR 03b), we delegate to it so
-            # Claude and Gemini enforce the same policy.  Without
-            # one, the bridge falls back to namespace-only approval
-            # (the historical behaviour from PR #131).  Either way
-            # the whitelist on ``tools=`` is necessary but not
-            # sufficient — without ``can_use_tool`` the SDK blocks
-            # every custom MCP tool call.
-            kwargs["can_use_tool"] = make_can_use_tool(permission_check)
-        if self._config.cwd is not None:
-            kwargs["cwd"] = self._config.cwd
-
-        env = self._build_env()
-        if env:
-            kwargs["env"] = env
-
-        # First turn: seed a brand-new SDK session that uses the same UUID
-        # as our conversation. Subsequent turns: resume it.  ``force_fresh_session``
-        # (PR 05) skips the resume probe so the resume-failure fallback path
-        # in :meth:`stream` can re-issue the same conversation as a fresh session.
-        if not force_fresh_session and _session_exists(session_id, self._config.cwd):
-            kwargs["resume"] = session_id
-        else:
-            kwargs["session_id"] = session_id
-
-        return ClaudeAgentOptions(**kwargs)
-
     def _capture_stderr_line(self, line: str) -> None:
         """Push one CLI stderr line onto the rolling diagnostic buffer.
 
@@ -564,64 +393,17 @@ class ClaudeLLM:
         if len(buffer) > _STDERR_TAIL_LINES:
             del buffer[0 : len(buffer) - _STDERR_TAIL_LINES]
 
-    def _build_env(self) -> dict[str, str]:
-        """Compose the env dict forwarded to the CLI subprocess."""
-        env: dict[str, str] = dict(self._config.extra_env)
-        if self._workspace_root:
-            token = resolve_api_key(self._workspace_root, "CLAUDE_CODE_OAUTH_TOKEN")
-            if token:
-                env["CLAUDE_CODE_OAUTH_TOKEN"] = token
-        elif self._config.oauth_token:
-            env["CLAUDE_CODE_OAUTH_TOKEN"] = self._config.oauth_token
-        return env
-
 
 # ---------------------------------------------------------------------------
-# Module-level helpers (also unit-tested directly).
+# Module-level helpers (provider-internal — also unit-tested directly).
 # ---------------------------------------------------------------------------
-
-
-def _merge_agent_tools_into_whitelist(
-    local_tools: list[str] | None,
-    agent_tool_list: list[AgentTool],
-    mcp_servers: dict[str, Any],
-) -> list[str] | None:
-    """Mount *agent_tool_list* as an MCP server and append its IDs to *local_tools*.
-
-    Mutates *mcp_servers* in place (adding the bridge server when there
-    is at least one tool) and returns the updated *local_tools* whitelist.
-    Extracted from :meth:`ClaudeLLM._build_options` so the body stays under
-    the project nesting budget.
-    """
-    if not agent_tool_list:
-        return local_tools
-    server = build_mcp_server(agent_tool_list)
-    if server is not None:
-        mcp_servers[AGENT_TOOL_MCP_SERVER_NAME] = server
-    allowed = allowed_tool_ids(agent_tool_list)
-    if local_tools is None:
-        return list(allowed)
-    deduped = list(local_tools)
-    for tid in allowed:
-        if tid not in deduped:
-            deduped.append(tid)
-    return deduped
-
-
-def _claude_display_map(agent_tools: list[AgentTool]) -> dict[str, Any]:
-    """Return display metadata keyed by bare and Claude MCP-prefixed names."""
-    bare = tool_display_map(agent_tools)
-    mapped: dict[str, Any] = dict(bare)
-    for name, display in bare.items():
-        mapped[claude_tool_id(name)] = display
-    return mapped
 
 
 async def _stream_events_for_attempt(
     *,
     prompt: AsyncIterator[dict[str, Any]],
     options: ClaudeAgentOptions,
-    display_by_name: dict[str, Any] | None = None,
+    display_by_name: dict[str, ToolDisplay] | None = None,
 ) -> AsyncIterator[StreamEvent]:
     """Stream ``StreamEvent``s from one ``query()`` call.
 
@@ -633,117 +415,6 @@ async def _stream_events_for_attempt(
     async for message in query(prompt=prompt, options=options):
         for event in _events_from_message(message, display_by_name or {}):
             yield event
-
-
-async def _aiter_user_prompt(
-    question: str,
-    images: list[dict[str, str]] | None = None,
-) -> AsyncIterator[dict[str, Any]]:
-    """Wrap a single user message as the streaming-mode input the SDK expects.
-
-    The Claude SDK accepts either a plain string *or* an
-    ``AsyncIterable[dict]`` for the ``prompt`` arg, but enforces the
-    streaming-mode shape whenever a permission hook (``can_use_tool``)
-    is registered — which we now always do via the bridge.  Yielding
-    one envelope keeps every call site uniform regardless of whether
-    tools were mounted on this turn.
-
-    PR 05: when ``images`` is supplied, the user message becomes a
-    multimodal content list (images first, then the text question)
-    matching Claude's `messages.content` shape:
-
-        [{"type": "image", "source": {"type": "base64", "media_type": ..., "data": ...}},
-         {"type": "text", "text": question}]
-    """
-    if not images:
-        yield {
-            "type": "user",
-            "message": {"role": "user", "content": question},
-        }
-        return
-    blocks: list[dict[str, Any]] = [
-        {
-            "type": "image",
-            "source": {
-                "type": "base64",
-                "media_type": image.get("media_type", "image/png"),
-                "data": image["data"],
-            },
-        }
-        for image in images
-        if "data" in image
-    ]
-    blocks.append({"type": "text", "text": question})
-    yield {
-        "type": "user",
-        "message": {"role": "user", "content": blocks},
-    }
-
-
-# How many of the most recent rows from ``history`` we surface to the
-# model on a cold provider switch. The chat router caps ``history_window``
-# to 20 already, but the LCM path can balloon this list — bound it again
-# here so a giant history can't poison the first Claude turn.
-_HISTORY_PREFIX_MAX_ROWS = 20
-
-# Hard cap on the rendered prefix length. Long histories get truncated
-# at the head (oldest first) so the most recent turns are always preserved.
-_HISTORY_PREFIX_MAX_CHARS = 12_000
-
-
-def _render_history_prefix(history: list[dict[str, str]] | None) -> str | None:
-    """Render prior turns as a bounded recap the model can read.
-
-    Returns ``None`` when ``history`` is empty or carries no usable
-    ``user``/``assistant`` rows. The output is wrapped in clear
-    BEGIN/END markers so the model never confuses it with the user's
-    actual current message.
-
-    Closes #308.
-    """
-    if not history:
-        return None
-    rows = [
-        row
-        for row in history[-_HISTORY_PREFIX_MAX_ROWS:]
-        if row.get("role") in {"user", "assistant"} and (row.get("content") or "").strip()
-    ]
-    if not rows:
-        return None
-    lines = ["(Conversation context — earlier turns from this same conversation:)"]
-    for row in rows:
-        speaker = "User" if row["role"] == "user" else "Assistant"
-        content = (row.get("content") or "").strip()
-        lines.append(f"{speaker}: {content}")
-    body = "\n".join(lines)
-    if len(body) > _HISTORY_PREFIX_MAX_CHARS:
-        body = "…" + body[-_HISTORY_PREFIX_MAX_CHARS:]
-    return f"--- BEGIN PRIOR CONTEXT ---\n{body}\n--- END PRIOR CONTEXT ---"
-
-
-def _is_retryable_cli_connection(error: BaseException) -> bool:
-    """Decide whether a ``CLIConnectionError`` should trigger a retry.
-
-    MCP-related connection errors are NOT retryable — they almost
-    always indicate a configuration problem (a bridge server crashed,
-    a tool wasn't mounted, …) and retrying just delays the visible
-    failure.  Plain network / subprocess hiccups are retryable.
-    """
-    msg = str(error).lower()
-    return "mcp" not in msg
-
-
-def _retry_backoff_seconds(attempt: int) -> float:
-    """Exponential backoff capped at :data:`_RETRY_SLEEP_CEILING_SECONDS`.
-
-    ``attempt`` is 1-indexed (first failure is attempt 1, second is 2…)
-    so a base of 1.0 with factor 2.0 produces 1, 2, 4, 8, … seconds.
-    """
-    base = float(_settings.claude_retry_base_delay_seconds)
-    factor = float(_settings.claude_retry_backoff_factor)
-    ceiling = float(_settings.claude_retry_max_delay_seconds)
-    raw = base * (factor ** max(0, attempt - 1))
-    return min(raw, ceiling, _RETRY_SLEEP_CEILING_SECONDS)
 
 
 def _resolve_sdk_model(model_id: str) -> str:
@@ -773,29 +444,3 @@ def _session_exists(session_id: str, directory: str | None) -> bool:
             error,
         )
         return False
-
-
-# Event-translation helpers live in ``_claude_events`` so this file
-# stays under the 500-line gate.  Re-exported here because the existing
-# tests + provider code import them from this module — keeping the
-# import surface stable means the split is internal-only. Late import is
-# intentional: it must follow the class definitions above so the module
-# graph round-trips without a circular reference; ruff's E402 doesn't
-# express this constraint, so it's silenced explicitly.
-from ._claude_events import (  # noqa: E402  (deliberate post-class re-export)
-    _error_event,
-    _events_from_assistant,
-    _events_from_message,
-    _tool_result_event,
-    _tool_result_to_text,
-)
-
-__all__ = [
-    "ClaudeLLM",
-    "ClaudeLLMConfig",
-    "_error_event",
-    "_events_from_assistant",
-    "_events_from_message",
-    "_tool_result_event",
-    "_tool_result_to_text",
-]

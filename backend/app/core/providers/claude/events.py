@@ -1,7 +1,7 @@
 """Translate Claude Agent SDK ``Message`` instances into ``StreamEvent`` dicts.
 
 Pure projection: SDK message types in, ``StreamEvent`` dicts out.  Lives
-in its own module so :mod:`app.core.providers.claude_provider` stays
+in its own module so :mod:`app.core.providers.claude.provider` stays
 under the project's 500-line file budget — the events surface is large
 enough on its own (``AssistantMessage``, ``UserMessage``,
 ``ResultMessage``, ``RateLimitEvent``, ``SystemMessage``) that splitting
@@ -11,8 +11,8 @@ Dispatch is **table-based** rather than a chain of ``isinstance`` arms,
 so each translator stays under the project's 3-level nesting budget
 without paying for the indirection ``functools.singledispatch`` would
 add.  All public names (the underscore-prefixed helpers below) are
-re-exported from ``claude_provider`` so existing import sites and tests
-keep working.
+re-exported from the :mod:`app.core.providers.claude` package surface
+(``__init__.py``) so existing import sites and tests keep working.
 """
 
 from __future__ import annotations
@@ -34,8 +34,7 @@ from claude_agent_sdk import (
 )
 
 from app.core.agent_loop.display import ToolDisplay, render_display_from_map
-
-from .base import StreamEvent
+from app.core.providers.base import StreamEvent
 
 logger = logging.getLogger(__name__)
 

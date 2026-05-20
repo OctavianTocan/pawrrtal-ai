@@ -19,7 +19,7 @@ from pathlib import Path
 from app.core.config import settings as settings  # noqa: PLC0414
 
 from .base import AILLM
-from .claude_provider import ClaudeLLM, ClaudeLLMConfig
+from .claude import ClaudeLLM, ClaudeLLMConfig
 from .gemini_cli import GeminiCliLLM
 from .gemini_provider import GeminiLLM
 from .litellm_provider import LiteLLMLLM

@@ -21,7 +21,7 @@ import pytest
 
 from app.core.agent_loop.types import AgentTool
 from app.core.providers.base import StreamEvent
-from app.core.providers.claude_provider import ClaudeLLM, ClaudeLLMConfig
+from app.core.providers.claude import ClaudeLLM, ClaudeLLMConfig
 
 # Mark every test in this module as anyio so we can ``await``
 # inside.  AnyIO-style async tests align with the rest of the suite.

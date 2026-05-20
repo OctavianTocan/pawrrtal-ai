@@ -43,12 +43,12 @@ from app.core.providers import (
     ClaudeLLMConfig,
     StreamEvent,
 )
-from app.core.providers import claude_provider as cp_module
-from app.core.providers.claude_provider import (
+from app.core.providers.claude import (
     _events_from_message,
     _resolve_sdk_model,
     _tool_result_to_text,
 )
+from app.core.providers.claude import provider as cp_module
 
 # Note: ClaudeLLM runs its own agent loop via the Claude Code SDK subprocess
 # (max_turns controls iteration depth).  It does NOT use the Python agent_loop

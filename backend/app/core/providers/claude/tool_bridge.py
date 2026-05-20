@@ -15,12 +15,12 @@ caller-supplied tools, per the official docstring).  We wrap each
 them into a single server named :data:`MCP_SERVER_NAME`, which the
 provider mounts via ``ClaudeAgentOptions.mcp_servers``.
 
-The bridge is intentionally a ``providers/_*`` private module rather
-than an ``app.core.tools.*`` import: the no-tools-in-providers gate
-(``scripts/check-no-tools-in-providers.py``) blocks providers from
-reaching into specific tool factories, but provider-internal plumbing
-that translates the *abstract* ``AgentTool`` is exactly what we want
-to live next to the provider.
+The bridge is intentionally a package-internal module inside
+``providers/claude/`` rather than an ``app.core.tools.*`` import: the
+no-tools-in-providers gate (``scripts/check-no-tools-in-providers.py``)
+blocks providers from reaching into specific tool factories, but
+provider-internal plumbing that translates the *abstract* ``AgentTool``
+is exactly what we want to live next to the provider.
 
 PR 03b: ``make_can_use_tool`` extends the bridge so the SDK-side
 ``can_use_tool`` callback can also delegate to the cross-provider

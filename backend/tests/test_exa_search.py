@@ -10,7 +10,7 @@ The Claude-specific Exa adapter was removed when tool composition
 moved into the chat router.  Exa now flows through the same
 :class:`app.core.agent_loop.types.AgentTool` path as every other
 app-defined tool, bridged by
-:mod:`app.core.providers._claude_tool_bridge` for the Claude provider
+:mod:`app.core.providers.claude.tool_bridge` for the Claude provider
 — see ``test_claude_tool_bridge.py``.
 
 The HTTP boundary is mocked with ``httpx.MockTransport`` so no test
