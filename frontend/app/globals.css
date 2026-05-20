@@ -219,8 +219,10 @@
 	--foreground: oklch(0.21 0.005 285);
 	--foreground-dimmed: color-mix(in srgb, var(--foreground) 80%, var(--background));
 	--foreground-rgb: 31, 31, 31;
-	--user-message-bubble: oklch(from var(--foreground) l c h / 0.05);
-	--user-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.03);
+	--user-message-bubble: oklch(from var(--foreground) l c h / 1);
+	--user-message-bubble-dimmed: oklch(from var(--foreground) l c h / 1);
+	--assistant-message-bubble: oklch(from var(--foreground) l c h / 0.12);
+	--assistant-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.12);
 	/* Soft purple ~#9e94d5 — brand accent + active states. */
 	--accent: oklch(0.704 0.102 285);
 	--accent-rgb: 158, 148, 213;
@@ -375,11 +377,12 @@
 	--tracking-normal: 0em;
 
 	/* Chat bubble radii — separate token because the global `--radius` is 0
-	 * (flat aesthetic) but message bubbles need a fully-pill silhouette. The
-	 * "tail" radius is kept around in case a future variant wants asymmetric
-	 * corners; today it equals the main radius so the bubble reads as a pill. */
+	 * (flat aesthetic) but message bubbles need a rounded silhouette. The
+	 * "tail" corner is kept sharper (2px) to create the Telegram-style
+	 * pointed bubble effect; the triangle pseudo-element reinforces the tail.
+	 * Asymmetric: user bubble tail points right (toward avatar on the right). */
 	--radius-bubble: 1.25rem; /* 20px */
-	--radius-bubble-tail: 1.25rem; /* 20px — match for symmetric pill */
+	--radius-bubble-tail: 0.125rem; /* 2px — sharp tail corner */
 
 	/* Thinking-gradient endpoints — sourced from project semantic colors so
 	 * theme switches propagate to the streaming-state shimmer text. */
@@ -432,8 +435,10 @@
 	--foreground: oklch(1 0 0);
 	--foreground-dimmed: color-mix(in srgb, var(--foreground) 80%, var(--background));
 	--foreground-rgb: 255, 255, 255;
-	--user-message-bubble: oklch(from var(--foreground) l c h / 0.06);
-	--user-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.035);
+	--user-message-bubble: oklch(0.95 0 0);
+	--user-message-bubble-dimmed: oklch(0.95 0 0);
+	--assistant-message-bubble: oklch(0.95 0 0);
+	--assistant-message-bubble-dimmed: oklch(0.95 0 0);
 	/* Soft purple ~#9e94d5 — consistent brand accent in dark mode */
 	--accent: oklch(0.704 0.102 285);
 	--accent-rgb: 158, 148, 213;

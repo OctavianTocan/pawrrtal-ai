@@ -24,8 +24,8 @@ export type MessageProps = HTMLAttributes<HTMLDivElement> & {
 export const Message = ({ className, from, ...props }: MessageProps) => (
 	<div
 		className={cn(
-			'group flex w-full max-w-[95%] flex-col gap-2',
-			from === 'user' ? 'is-user ml-auto justify-end' : 'is-assistant',
+			'group flex w-full flex-col gap-2',
+			from === 'user' ? 'is-user ml-auto max-w-[80%] justify-end' : 'is-assistant max-w-full',
 			className
 		)}
 		{...props}
@@ -46,9 +46,13 @@ export const MessageContent = ({ children, className, ...props }: MessageContent
 			// pair `--radius-bubble` / `--radius-bubble-tail`. The global
 			// `--radius` is 0 so the standard `rounded-*` scale is no-op here —
 			// this is the project's bubble token by design.
-			'group-[.is-user]:ml-auto group-[.is-user]:rounded-[var(--radius-bubble)] group-[.is-user]:rounded-br-[var(--radius-bubble-tail)]',
-			'group-[.is-user]:bg-user-message-bubble group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground',
-			'group-[.is-assistant]:text-foreground',
+			// `rounded-br` keeps the bottom-right (outer) corner sharp; a ::before
+			// pseudo-element extends a triangular tail pointing right toward the avatar.
+			'group-[.is-user]:ml-auto group-[.is-user]:rounded-[var(--radius-bubble)] group-[.is-user]:rounded-br-[var(--radius-bubble-tail)] group-[.is-user]:relative',
+			'group-[.is-user]:bg-user-message-bubble group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-background',
+			'group-[.is-user]:before:absolute group-[.is-user]:before:bottom-[2px] group-[.is-user]:before:right-[calc(100%-18px)]',
+			'group-[.is-user]:before:size-0 group-[.is-user]:before:border-t-[7px] group-[.is-user]:before:border-l-[9px]',
+			'group-[.is-user]:before:border-t-transparent group-[.is-user]:before:border-l-user-message-bubble',
 			className
 		)}
 		{...props}

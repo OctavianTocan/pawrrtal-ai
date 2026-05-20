@@ -102,7 +102,7 @@ rounded:
   md: 8px
   lg: 14px
   bubble: 20px
-  bubble-tail: 4px
+  bubble-tail: 2px
   full: 9999px
 spacing:
   unit: 4px
@@ -554,7 +554,7 @@ Chat message bubbles use an **asymmetric "tail" radius** so the bubble
 visually attaches to its author edge:
 
 - `--radius-bubble: 1.25rem` (20px) - three rounded corners.
-- `--radius-bubble-tail: 0.25rem` (4px) - the corner adjacent to the author.
+- `--radius-bubble-tail: 0.125rem` (2px) - the corner adjacent to the author.
 
 User messages tail toward the right; assistant messages tail toward the left.
 This is the only place in the system that breaks the flat default.
