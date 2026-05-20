@@ -27,10 +27,10 @@ function ToolStep({ call, chips }: { call: ChatToolCall; chips: ToolResultChips 
 	const emojiIcon = call.display?.icon;
 
 	return (
-		<div className="group flex flex-col">
+		<div className="flex flex-col">
 			<div
 				className={cn(
-					'flex items-center gap-2 rounded-md px-1.5 py-1 text-sm',
+					'group/tool-step flex cursor-pointer select-none items-center gap-2 rounded-md px-1.5 py-1 text-sm',
 					'text-muted-foreground transition-colors hover:bg-muted/50'
 				)}
 			>
@@ -55,7 +55,7 @@ function ToolStep({ call, chips }: { call: ChatToolCall; chips: ToolResultChips 
 					aria-hidden="true"
 					className={cn(
 						'size-3.5 shrink-0 text-muted-foreground/60',
-						'opacity-0 transition-opacity group-hover:opacity-100'
+						'opacity-0 transition-opacity group-hover/tool-step:opacity-100'
 					)}
 				/>
 			</div>
