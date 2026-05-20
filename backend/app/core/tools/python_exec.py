@@ -346,10 +346,10 @@ def _exec_sync(code: str, fs: WorkspaceFS, cap_bytes: int) -> str:
         globals_ns: dict[str, Any] = {"__name__": "__virtual_python__", "fs": fs}
         try:
             compiled = compile(code, "<python tool>", "exec")
-            # ``# noqa: S102`` silences ruff/flake8-bandit; ``# nosec B102``
-            # silences the pre-commit bandit hook.  Both flag ``exec()`` —
-            # which is the documented entire purpose of this tool (see the
-            # module docstring + the ``virtual_python_enabled`` settings gate).
+            # The ruff (noqa: S102) and bandit (nosec B102) suppressions on
+            # the next line acknowledge that exec() is the documented
+            # entire purpose of this tool — see the module docstring and the
+            # ``virtual_python_enabled`` settings gate.
             exec(compiled, globals_ns)  # noqa: S102  # nosec B102
         except SystemExit as exit_exc:
             buf.write(f"\n[SystemExit: {exit_exc.code}]\n")
