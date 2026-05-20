@@ -7,6 +7,7 @@ this module's :func:`resolve_xai_credentials` to pick between an
 OAuth access token and the legacy long-lived ``XAI_API_KEY``.
 """
 
+from app.integrations.xai.credentials import resolve_xai_credentials
 from app.integrations.xai.oauth import (
     DeviceCodeGrant,
     DeviceCodeRequest,
@@ -23,4 +24,5 @@ __all__ = [
     "poll_for_token",
     "refresh_token",
     "request_device_code",
+    "resolve_xai_credentials",
 ]
