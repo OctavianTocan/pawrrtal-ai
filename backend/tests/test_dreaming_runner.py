@@ -30,6 +30,7 @@ from app.core.dreaming import (
     run_dreaming_job,
     schedule_daily_rollup_dream,
     schedule_session_end_dream,
+    schedule_session_end_dream_if_idle,
 )
 from app.crud.memory import insert_memory
 from app.db import User
@@ -336,3 +337,82 @@ async def test_daily_rollup_scope_creates_a_pending_job_row(
     assert row.scope == "daily_rollup"
     assert row.conversation_id is None
     assert row.user_id == test_user.id
+
+
+@pytest.mark.anyio
+async def test_throttled_trigger_skips_when_recent_pass_exists(
+    db_session: AsyncSession, test_user: User
+) -> None:
+    """The throttle suppresses a second trigger within the throttle window.
+
+    First call returns a job id (passes through to ``schedule_session_end_dream``).
+    Second call within ``throttle_minutes`` returns ``None`` and DOES NOT
+    add a new row.
+    """
+    factory = _session_factory_for(db_session)
+    conversation = await _seed_conversation(
+        db_session,
+        user_id=test_user.id,
+        messages=[("user", "hi")],
+    )
+    first = await schedule_session_end_dream_if_idle(
+        db_session,
+        user_id=test_user.id,
+        conversation_id=conversation.id,
+        session_factory=factory,
+    )
+    assert first is not None
+    second = await schedule_session_end_dream_if_idle(
+        db_session,
+        user_id=test_user.id,
+        conversation_id=conversation.id,
+        session_factory=factory,
+        throttle_minutes=60,
+    )
+    assert second is None
+
+    # Only one row exists for this conversation in the throttle window.
+    rows = list(
+        (
+            await db_session.execute(
+                select(DreamingJob).where(DreamingJob.conversation_id == conversation.id)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    assert len(rows) == 1
+
+
+@pytest.mark.anyio
+async def test_throttled_trigger_fires_when_window_elapsed(
+    db_session: AsyncSession, test_user: User
+) -> None:
+    """When the throttle is zero, the trigger always fires.
+
+    Simulates "idle window elapsed" so the second call gets a fresh
+    job row instead of being filtered out.
+    """
+    factory = _session_factory_for(db_session)
+    conversation = await _seed_conversation(
+        db_session,
+        user_id=test_user.id,
+        messages=[("user", "hi")],
+    )
+    first = await schedule_session_end_dream_if_idle(
+        db_session,
+        user_id=test_user.id,
+        conversation_id=conversation.id,
+        session_factory=factory,
+        throttle_minutes=0,
+    )
+    second = await schedule_session_end_dream_if_idle(
+        db_session,
+        user_id=test_user.id,
+        conversation_id=conversation.id,
+        session_factory=factory,
+        throttle_minutes=0,
+    )
+    assert first is not None
+    assert second is not None
+    assert first != second

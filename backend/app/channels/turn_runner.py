@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.channels._turn_cost import record_turn_cost_if_enabled
+from app.channels._turn_dreaming import trigger_dreaming as _trigger_dreaming
 from app.channels._turn_runtime_context import system_prompt_for_turn
 from app.channels._turn_workspace import workspace_system_prompt
 from app.core.chat_aggregator import ChatTurnAggregator, should_emit_event
@@ -484,12 +485,13 @@ async def _finalize_turn(
             source=turn_input.log_tag.lower(),
         )
     )
-    # Fire-and-forget LCM leaf compaction.  Runs after the assistant row is
-    # finalized so the just-completed turn is eligible for compaction.
-    # The helper handles the ``settings.lcm_enabled`` gate, task-strong-ref
-    # bookkeeping, and exception suppression in one place.
+    # Fire-and-forget background passes after the assistant row is
+    # finalized. Each helper owns its own settings gate + task ref
+    # bookkeeping + error suppression.
     schedule_lcm_compaction(
         conversation_id=turn_input.conversation_id,
         user_id=turn_input.user_id,
         model_id=model_id or "",
     )
+    if settings.dreaming_enabled:
+        await _trigger_dreaming(turn_input, _turn_session)

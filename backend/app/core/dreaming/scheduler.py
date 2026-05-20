@@ -28,8 +28,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from datetime import UTC, datetime, timedelta
 from typing import Literal
 
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dreaming.runner import DreamFn, SessionFactory, run_dreaming_job
@@ -43,6 +45,14 @@ DreamingScope = Literal["session_end", "daily_rollup"]
 # finalise them mid-loop. See app.core.lcm.background for the same
 # pattern + rationale.
 _DREAMING_TASKS: set[asyncio.Task[None]] = set()
+
+# How long to wait after a completed dreaming pass for the same
+# conversation before allowing another. Approximates the
+# "idle window" behaviour from the ADR without an actual delayed
+# scheduler: turns within this window count as the same session
+# and don't re-trigger reflection. 30 minutes is the same default
+# the ADR uses for the conceptual idle threshold.
+_SESSION_END_THROTTLE_MINUTES = 30
 
 
 async def schedule_session_end_dream(
@@ -69,6 +79,72 @@ async def schedule_session_end_dream(
         dream_fn=dream_fn,
         session_factory=session_factory,
     )
+
+
+async def schedule_session_end_dream_if_idle(
+    session: AsyncSession,
+    *,
+    user_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    workspace_id: uuid.UUID | None = None,
+    dream_fn: DreamFn | None = None,
+    session_factory: SessionFactory | None = None,
+    throttle_minutes: int = _SESSION_END_THROTTLE_MINUTES,
+) -> uuid.UUID | None:
+    """Schedule a session_end pass only if the conversation isn't recently reflected.
+
+    Approximates the "idle window" trigger from the ADR without an
+    actual delayed-task scheduler: the turn-runner fires this after
+    every turn, and the throttle keeps consecutive turns inside the
+    same session from spawning many redundant passes.
+
+    Returns the new job's id when a pass was scheduled, or ``None``
+    when the throttle filtered the call.
+    """
+    if await _has_recent_dreaming_pass(
+        session,
+        conversation_id=conversation_id,
+        throttle_minutes=throttle_minutes,
+    ):
+        logger.debug(
+            "DREAMING_TRIGGER_THROTTLED conversation_id=%s throttle_minutes=%s",
+            conversation_id,
+            throttle_minutes,
+        )
+        return None
+    return await schedule_session_end_dream(
+        session,
+        user_id=user_id,
+        conversation_id=conversation_id,
+        workspace_id=workspace_id,
+        dream_fn=dream_fn,
+        session_factory=session_factory,
+    )
+
+
+async def _has_recent_dreaming_pass(
+    session: AsyncSession,
+    *,
+    conversation_id: uuid.UUID,
+    throttle_minutes: int,
+) -> bool:
+    """Return whether a recent dreaming job exists for ``conversation_id``.
+
+    Both ``completed`` and any non-terminal status count — if a job
+    is already running for this conversation we don't want a second
+    racer in the same window.
+    """
+    cutoff = datetime.now(UTC) - timedelta(minutes=throttle_minutes)
+    stmt = (
+        select(DreamingJob.id)
+        .where(DreamingJob.conversation_id == conversation_id)
+        .where(DreamingJob.scope == "session_end")
+        .where(DreamingJob.created_at >= cutoff)
+        .order_by(desc(DreamingJob.created_at))
+        .limit(1)
+    )
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none() is not None
 
 
 async def schedule_daily_rollup_dream(
@@ -140,4 +216,5 @@ __all__ = [
     "DreamingScope",
     "schedule_daily_rollup_dream",
     "schedule_session_end_dream",
+    "schedule_session_end_dream_if_idle",
 ]

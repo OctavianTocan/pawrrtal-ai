@@ -360,6 +360,10 @@ class Settings(BaseSettings):
     lcm_summary_model: str = ""
 
     # ── Dreaming (between-sessions reflection) ──────────────────────
+    # Master switch for the dreaming reflection pass (#341). Off by
+    # default so the rollout is gradual — the runner + scheduler are
+    # in place but no background LLM call fires until this is True.
+    dreaming_enabled: bool = False
     # Litellm model id used by the dreaming pass. Defaults to Gemini
     # Flash because the prompt is single-turn JSON-only — no need to
     # spend a premium model on it. See the ADR at

@@ -27,6 +27,7 @@ from app.core.dreaming.scheduler import (
     DreamingScope,
     schedule_daily_rollup_dream,
     schedule_session_end_dream,
+    schedule_session_end_dream_if_idle,
 )
 from app.core.dreaming.schema import (
     ConsolidatedMemory,
@@ -48,4 +49,5 @@ __all__ = [
     "run_dreaming_job",
     "schedule_daily_rollup_dream",
     "schedule_session_end_dream",
+    "schedule_session_end_dream_if_idle",
 ]
