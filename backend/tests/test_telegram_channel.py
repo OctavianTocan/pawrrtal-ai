@@ -137,6 +137,7 @@ async def test_refresh_telegram_commands_sets_current_command_menu() -> None:
         "status",
         "lcm",
         "compact",
+        "login",
     ]
     assert all(command.description for command in commands)
 

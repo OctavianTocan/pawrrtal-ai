@@ -86,6 +86,10 @@ from app.integrations.telegram.status import (
     handle_status_command,
 )
 
+# ``/login`` lives in its own module so the OAuth driver + reply
+# copy don't push bot.py past the structural ceiling.
+from app.integrations.telegram.login_command import handle_login_command
+
 # ``THINKING_CALLBACK_PREFIX`` is re-exported via
 # :mod:`thinking_picker_runtime` for the same fan-out reason.
 from app.integrations.telegram.thinking_picker_runtime import (
@@ -110,6 +114,7 @@ _TELEGRAM_COMMANDS: tuple[tuple[str, str], ...] = (
     ("status", "Show gateway + conversation status"),
     ("lcm", "Show LCM (long-context memory) status for this conversation"),
     ("compact", "Force an LCM leaf-compaction pass now"),
+    ("login", "Authorise a provider (currently: /login xai)"),
 )
 
 # Captured at module import so /status can report this worker's uptime
@@ -490,6 +495,38 @@ def _register_telegram_command_handlers(dispatcher: Dispatcher) -> None:
         await message.answer(reply)
 
     _register_telegram_lcm_command_handlers(dispatcher)
+    _register_telegram_login_command_handler(dispatcher)
+
+
+def _register_telegram_login_command_handler(dispatcher: Dispatcher) -> None:
+    """Register the ``/login`` slash-command handler.
+
+    Split out of :func:`_register_telegram_command_handlers` so that
+    function stays under the PLR0915 cap and so the auth surface
+    lives next to the rest of the OAuth driver
+    (:mod:`login_command`).
+    """
+    from aiogram.filters import Command  # noqa: PLC0415
+
+    @dispatcher.message(Command("login"))
+    async def _on_login(message: Message) -> None:
+        text = message.text or ""
+        parts = text.strip().split(maxsplit=1)
+        login_args = parts[1].strip() if len(parts) > 1 else ""
+        sender = _sender_from_message(message)
+        if message.bot is None:
+            await message.answer(
+                "Login requires a live bot connection — please try again in a moment."
+            )
+            return
+        async with async_session_maker() as session:
+            reply = await handle_login_command(
+                sender=sender,
+                bot=message.bot,
+                args=login_args,
+                session=session,
+            )
+        await message.answer(reply, parse_mode="HTML")
 
 
 def _register_telegram_lcm_command_handlers(dispatcher: Dispatcher) -> None:
