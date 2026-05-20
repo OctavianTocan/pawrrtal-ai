@@ -144,28 +144,29 @@
 @property --accent {
 	syntax: "<color>";
 	inherits: true;
-	/* Mistral orange ~#fa520f — saturated brand CTA. */
-	initial-value: oklch(0.66 0.21 38);
+	/* Soft purple ~#9E94D5 — primary brand accent. */
+	initial-value: oklch(0.704 0.102 285);
 }
 
 @property --info {
 	syntax: "<color>";
 	inherits: true;
-	/* Mistral sunshine ~#ff8105 — warm sunlight for "Ask" / warnings. */
-	initial-value: oklch(0.74 0.18 55);
+	/* Soft blue ~#87C3FF — info, warnings, Ask mode. */
+	initial-value: oklch(0.783 0.119 255);
 }
 
 @property --success {
 	syntax: "<color>";
 	inherits: true;
-	initial-value: oklch(0.55 0.17 145);
+	/* Forest green ~#1F8A65 — success, connected states. */
+	initial-value: oklch(0.5 0.12 165);
 }
 
 @property --destructive {
 	syntax: "<color>";
 	inherits: true;
-	/* Mistral deep red ~#cc3a05 — errors / destructive actions. */
-	initial-value: oklch(0.55 0.22 32);
+	/* Rose red ~#cf2d56 — errors, destructive actions. */
+	initial-value: oklch(0.55 0.2 355);
 }
 
 /* =============================================================================
@@ -188,12 +189,12 @@
 
 /* Light Mode */
 :root {
-	/* === 6 BASE COLORS — Mistral defaults === */
-	/* Warm cream surface (~#fff8e0). High luminance, warm chroma, sunset hue. */
-	--background: oklch(0.985 0.026 92);
+	/* === 6 BASE COLORS — Pawrrtal defaults === */
+	/* Warm off-white surface (~#f7f7f4). High luminance, neutral warm. */
+	--background: oklch(0.973 0.014 90);
 	/* Light-mode chat panel — pinned at OKLCH lightness 0.99 (near-white)
 	   while preserving the canvas hue and dropping chroma to 25% so warm
-	   backgrounds (Mistral cream, Cursor warm-grey) resolve to a near-white
+	   backgrounds (Pawrrtal warm-white, Cursor warm-grey) resolve to a near-white
 	   surface that still carries a hint of the preset's tint, and pure-color
 	   backgrounds (a bright blue preset, etc.) don't bleed their saturation
 	   into the chat panel as a tinted wash. Result: chat panel feels white
@@ -214,23 +215,24 @@
 			transparent 40%
 		),
 		linear-gradient(180deg, var(--background), var(--foreground-3));
-	/* Deep ink ~#1f1f1f — Mistral primary text. */
+	/* Deep ink ~#1f1f1f — primary text. */
 	--foreground: oklch(0.21 0.005 285);
 	--foreground-dimmed: color-mix(in srgb, var(--foreground) 80%, var(--background));
 	--foreground-rgb: 31, 31, 31;
 	--user-message-bubble: oklch(from var(--foreground) l c h / 0.05);
 	--user-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.03);
-	/* Mistral orange ~#fa520f — saturated brand CTA + active states. */
-	--accent: oklch(0.66 0.21 38);
-	--accent-rgb: 250, 82, 15;
-	/* Mistral sunshine ~#ff8105 — warm sunlight for "Ask" / warnings. */
-	--info: oklch(0.74 0.18 55);
-	--info-rgb: 255, 129, 5;
-	--success: oklch(0.55 0.17 145);
-	--success-rgb: 34, 120, 60;
-	/* Mistral deep red ~#cc3a05 — errors / destructive actions. */
-	--destructive: oklch(0.55 0.22 32);
-	--destructive-rgb: 204, 58, 5;
+	/* Soft purple ~#9e94d5 — brand accent + active states. */
+	--accent: oklch(0.704 0.102 285);
+	--accent-rgb: 158, 148, 213;
+	/* Soft blue ~#87c3ff — info, Ask mode, warnings. */
+	--info: oklch(0.783 0.119 255);
+	--info-rgb: 135, 195, 255;
+	/* Forest green ~#1f8a65 — success, connected states. */
+	--success: oklch(0.5 0.12 165);
+	--success-rgb: 31, 138, 101;
+	/* Rose red ~#cf2d56 — errors, destructive actions. */
+	--destructive: oklch(0.55 0.2 355);
+	--destructive-rgb: 207, 45, 86;
 
 	/* === SHADOW OPACITY (light mode = subtle, dark mode = stronger) === */
 	--shadow-border-opacity: 0.08;
@@ -403,11 +405,11 @@
 	--z-splash: 600;
 }
 
-/* Dark Mode — Codex/GitHub-adjacent neutrals + blue accent (#0D1117 canvas, #388BFD links) */
+/* Dark Mode — near-black canvas (#141414) + soft purple accent (#9E94D5) */
 .dark {
 	/* === 6 BASE COLORS === */
-	/* Page/workspace ~#0D1117 */
-	--background: oklch(0.205 0.012 264);
+	/* Page/workspace ~#141414 */
+	--background: oklch(0.145 0.005 285);
 	/* Dark-mode chat panel — lift lightness off `--background` while keeping
 	   chroma and hue, so the panel re-tints whenever the preset's dark
 	   palette changes (instead of the old hardcoded blue). The +0.04
@@ -426,21 +428,24 @@
 			transparent 40%
 		),
 		linear-gradient(180deg, var(--background), var(--foreground-5));
-	/* Primary text ~#E6EDF3 */
-	--foreground: oklch(0.939 0.012 252);
+	/* Primary text ~#ffffff */
+	--foreground: oklch(1 0 0);
 	--foreground-dimmed: color-mix(in srgb, var(--foreground) 80%, var(--background));
-	--foreground-rgb: 230, 237, 243;
+	--foreground-rgb: 255, 255, 255;
 	--user-message-bubble: oklch(from var(--foreground) l c h / 0.06);
 	--user-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.035);
-	/* Interactive accent ~#388BFD */
-	--accent: oklch(0.628 0.154 264);
-	--accent-rgb: 56, 139, 253;
-	--info: oklch(0.7 0.16 70);
-	--info-rgb: 200, 140, 60;
-	--success: oklch(0.6 0.17 145);
-	--success-rgb: 50, 140, 80;
-	--destructive: oklch(0.7 0.19 22);
-	--destructive-rgb: 200, 80, 70;
+	/* Soft purple ~#9e94d5 — consistent brand accent in dark mode */
+	--accent: oklch(0.704 0.102 285);
+	--accent-rgb: 158, 148, 213;
+	/* Soft blue ~#87c3ff — info, Ask mode, warnings. */
+	--info: oklch(0.783 0.119 255);
+	--info-rgb: 135, 195, 255;
+	/* Mid forest green ~#34785c — success, connected states. */
+	--success: oklch(0.5 0.09 165);
+	--success-rgb: 52, 120, 92;
+	/* Rose red ~#cf2d56 — errors, destructive actions. */
+	--destructive: oklch(0.55 0.2 355);
+	--destructive-rgb: 207, 45, 86;
 
 	/* === SHADOW OPACITY (stronger in dark mode for visibility) === */
 	--shadow-border-opacity: 0.15;
