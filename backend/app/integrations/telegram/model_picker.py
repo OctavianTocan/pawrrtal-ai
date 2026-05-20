@@ -38,6 +38,8 @@ _PICKER_NOT_BOUND_MESSAGE = "Connect your account first before changing models."
 _PICKER_STALE_MESSAGE = "That model picker is out of date. Send /model again."
 _DEFAULT_BUTTON_TEXT = "⭐ Set as my default"
 _DEFAULT_ALREADY_SET_TEXT = "⭐ Already your default"
+# Inert callback used by the post-default badge so a second tap is a no-op.
+NOOP_CALLBACK = "mdl:noop"
 
 
 class TelegramSenderLike(Protocol):
@@ -64,27 +66,17 @@ class ModelButton:
 
 @dataclass(frozen=True)
 class ModelPickerState:
-    """Current catalog state for one Telegram conversation.
-
-    ``current_model_id`` is the conversation's resolved model.
-    ``user_default_model_id`` is the persisted per-user default (or
-    ``None``), used to decide whether to surface "set as default".
-    """
+    """Current catalog state for one Telegram conversation."""
 
     current_model_id: str
+    # Persisted per-user default (or ``None``) — drives whether the
+    # picker offers "set as default" affordances after a selection.
     user_default_model_id: str | None = None
 
 
 @dataclass(frozen=True)
 class ModelCallback:
-    """Parsed Telegram callback payload for the model picker.
-
-    ``action`` is one of: ``"providers"`` (root screen),
-    ``"vendors"`` (host's vendor list), ``"list"`` (paginated model
-    list), ``"select"`` (pick for this conversation), or
-    ``"set_default"`` (pin as user default; same payload shape as
-    ``"select"``).
-    """
+    """Parsed Telegram callback payload for the model picker."""
 
     action: ModelCallbackAction
     host: str | None = None
@@ -272,7 +264,8 @@ def parse_model_callback_data(data: str | None) -> ModelCallback | None:
 
 
 def _parse_prefixed_callback(parts: list[str]) -> ModelCallback | None:
-    """Dispatch a ``mdl:<tag>:...`` payload to the right parser."""
+    # Minimum length is `mdl:<tag>` (two parts); below that there's no
+    # tag byte to read and we'd index past the end.
     if len(parts) < _CALLBACK_MIN_PARTS:
         return None
     tag = parts[1]
@@ -318,7 +311,7 @@ def build_set_default_keyboard(*, model_id: str) -> list[list[ModelButton]] | No
 
 def build_default_already_set_keyboard() -> list[list[ModelButton]]:
     """Build the inert "⭐ Already your default" confirmation row."""
-    return [[ModelButton(text=_DEFAULT_ALREADY_SET_TEXT, callback_data="mdl:noop")]]
+    return [[ModelButton(text=_DEFAULT_ALREADY_SET_TEXT, callback_data=NOOP_CALLBACK)]]
 
 
 def picker_not_bound_message() -> str:
@@ -483,6 +476,7 @@ def _pagination_rows(
 
 __all__ = [
     "MODEL_CALLBACK_PREFIX",
+    "NOOP_CALLBACK",
     "ModelButton",
     "ModelCallback",
     "ModelPickerState",

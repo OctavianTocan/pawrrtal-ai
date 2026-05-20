@@ -22,7 +22,6 @@ depends_on = None
 
 
 def upgrade() -> None:
-    """Add the nullable ``default_model_id`` column."""
     op.add_column(
         "user_preferences",
         sa.Column("default_model_id", sa.String(length=128), nullable=True),
@@ -30,5 +29,4 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """Drop the ``default_model_id`` column."""
     op.drop_column("user_preferences", "default_model_id")

@@ -13,6 +13,7 @@ duck-typed objects with ``data``, ``from_user``, ``message``,
 
 from __future__ import annotations
 
+import logging
 import uuid
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -21,6 +22,7 @@ import pytest
 
 from app.core.providers.catalog import MODEL_CATALOG
 from app.integrations.telegram.model_picker import (
+    NOOP_CALLBACK,
     ModelPickerState,
     build_set_default_keyboard,
 )
@@ -55,7 +57,7 @@ class TestMdlNoopShortCircuit:
 
     async def test_mdl_noop_answers_without_alert(self) -> None:
         """A second tap on the inert badge must answer silently."""
-        callback = _make_callback(data="mdl:noop")
+        callback = _make_callback(data=NOOP_CALLBACK)
         await handle_model_picker_callback(callback=callback)
         callback.answer.assert_awaited_once_with()
         # No edits should happen — the badge stays put.
@@ -82,7 +84,7 @@ class TestHandleSetDefault:
         # The replacement keyboard's first button must be the inert badge.
         kwargs = callback.message.edit_reply_markup.await_args.kwargs
         inline_keyboard = kwargs["reply_markup"].inline_keyboard
-        assert inline_keyboard[0][0].callback_data == "mdl:noop"
+        assert inline_keyboard[0][0].callback_data == NOOP_CALLBACK
         callback.answer.assert_awaited_once()
         answer_text = callback.answer.await_args.args[0]
         assert entry.short_name in answer_text
@@ -149,6 +151,51 @@ class TestHandleModelSelectButtonBranching:
         callback.message.edit_text.assert_awaited_once()
         kwargs = callback.message.edit_text.await_args.kwargs
         assert "reply_markup" not in kwargs or kwargs.get("reply_markup") is None
+
+    async def test_stale_catalog_omits_button_and_logs(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """When the catalog rotates between select + render, log + omit button.
+
+        The picker's select callback was emitted against a catalog
+        snapshot that no longer holds the picked entry by the time
+        the runtime tries to render its "Set as default" follow-up.
+        The conversation switch already succeeded — we just can't
+        offer the next-step affordance for a stale ID, so we log it
+        and edit the message without a keyboard.
+        """
+        entry = MODEL_CATALOG[0]
+        select_callback_data = f"mdl:s:{_catalog_token()}:0"
+        callback = _make_callback(data=select_callback_data)
+        state = ModelPickerState(
+            current_model_id=entry.id,
+            user_default_model_id=MODEL_CATALOG[1].id,
+        )
+        with (
+            patch(
+                "app.integrations.telegram.model_picker_runtime.handle_model_command",
+                new=AsyncMock(return_value="Model switched ✅"),
+            ),
+            patch(
+                "app.integrations.telegram.model_picker_runtime.get_model_picker_state",
+                new=AsyncMock(return_value=state),
+            ),
+            patch(
+                "app.integrations.telegram.model_picker_runtime.build_set_default_keyboard",
+                return_value=None,
+            ),
+            caplog.at_level(logging.WARNING),
+        ):
+            await _handle_model_select(callback=callback, parsed=_select_callback_for_entry(0))
+        # Edit happens without a keyboard.
+        callback.message.edit_text.assert_awaited_once()
+        kwargs = callback.message.edit_text.await_args.kwargs
+        assert kwargs.get("reply_markup") is None
+        # And the operator gets a breadcrumb.
+        assert any(
+            "MODEL_PICKER_STALE_DEFAULT_KEYBOARD" in record.message
+            for record in caplog.records
+        )
 
     async def test_button_present_when_selection_is_new_default(self) -> None:
         """If the picked model differs from the user default, surface the button."""

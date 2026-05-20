@@ -21,11 +21,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import UserPreferences
 
-# Seed value used when the row is created on demand for a user who's
-# only setting their default model. Column is NOT NULL in the
-# existing schema; matches the implicit frontend appearance default.
-_DEFAULT_FONT_SIZE = 14
-
 
 async def get_user_default_model_id(
     session: AsyncSession,
@@ -55,11 +50,7 @@ async def set_user_default_model_id(
     """
     row = await session.get(UserPreferences, user_id)
     if row is None:
-        row = UserPreferences(
-            user_id=user_id,
-            font_size=_DEFAULT_FONT_SIZE,
-            default_model_id=model_id,
-        )
+        row = UserPreferences(user_id=user_id, default_model_id=model_id)
         session.add(row)
     else:
         row.default_model_id = model_id

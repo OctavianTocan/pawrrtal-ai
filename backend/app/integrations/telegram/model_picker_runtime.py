@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, cast
+import logging
+from typing import TYPE_CHECKING
 
 from app.db import async_session_maker
 from app.integrations.telegram.model_command import (
@@ -15,6 +16,7 @@ from app.integrations.telegram.model_picker import (
     MODEL_CALLBACK_PREFIX as MODEL_CALLBACK_PREFIX,  # noqa: PLC0414
 )
 from app.integrations.telegram.model_picker import (
+    NOOP_CALLBACK,
     ModelButton,
     ModelCallback,
     build_default_already_set_keyboard,
@@ -42,6 +44,8 @@ if TYPE_CHECKING:
         Message,
         ReplyParameters,
     )
+
+logger = logging.getLogger(__name__)
 
 
 async def answer_model_command(*, message: Message, model_arg: str) -> None:
@@ -82,7 +86,7 @@ async def answer_model_picker(*, message: Message) -> None:
 async def handle_model_picker_callback(*, callback: CallbackQuery) -> None:
     """Handle inline keyboard callbacks produced by the model picker."""
     # Inert confirmation button — no-op so a second tap doesn't error.
-    if callback.data == "mdl:noop":
+    if callback.data == NOOP_CALLBACK:
         await callback.answer()
         return
 
@@ -99,7 +103,6 @@ async def handle_model_picker_callback(*, callback: CallbackQuery) -> None:
 
 
 async def _handle_mutating_callback(*, callback: CallbackQuery, parsed: ModelCallback) -> None:
-    """Dispatch to the right per-action mutation handler."""
     if parsed.action == "select":
         await _handle_model_select(callback=callback, parsed=parsed)
         return
@@ -163,10 +166,18 @@ async def _handle_model_select(*, callback: CallbackQuery, parsed: ModelCallback
         await message.edit_text(reply)
     else:
         default_keyboard = build_set_default_keyboard(model_id=entry.id)
-        await message.edit_text(
-            reply,
-            reply_markup=_inline_keyboard(default_keyboard) if default_keyboard else None,
-        )
+        if default_keyboard is None:
+            # Catalog rotated under us between the select callback and the
+            # success edit. The conversation switch already landed; we just
+            # can't offer the "Set as default" affordance for a model that's
+            # no longer in the catalog. Log so operators see the churn.
+            logger.warning(
+                "MODEL_PICKER_STALE_DEFAULT_KEYBOARD model_id=%s",
+                entry.id,
+            )
+            await message.edit_text(reply)
+        else:
+            await message.edit_text(reply, reply_markup=_inline_keyboard(default_keyboard))
     await callback.answer(f"Model set: {entry.short_name}")
 
 
@@ -308,7 +319,7 @@ def _callback_message(callback: CallbackQuery) -> Message | None:
         return None
     # ``callback.message`` is typed ``Message | InaccessibleMessage``; the
     # hasattr() guard above narrows to the accessible Message at runtime.
-    return cast("Message", message)
+    return message  # type: ignore[return-value]
 
 
 def _reply_parameters(message_id: int) -> ReplyParameters:

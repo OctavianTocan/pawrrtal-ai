@@ -335,8 +335,10 @@ def test_build_set_default_keyboard_returns_none_for_unknown_model() -> None:
 
 
 def test_build_default_already_set_keyboard_emits_inert_button() -> None:
+    from app.integrations.telegram.model_picker import NOOP_CALLBACK
+
     rows = build_default_already_set_keyboard()
-    assert rows == [[ModelButton(text="⭐ Already your default", callback_data="mdl:noop")]]
+    assert rows == [[ModelButton(text="⭐ Already your default", callback_data=NOOP_CALLBACK)]]
 
 
 def test_parse_set_default_round_trips_to_catalog_entry() -> None:
