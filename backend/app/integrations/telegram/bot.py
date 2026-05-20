@@ -34,8 +34,10 @@ from app.channels.base import ChannelMessage
 from app.channels.telegram import SURFACE_TELEGRAM, make_telegram_sender
 from app.channels.telegram_progress import render_initial
 from app.channels.turn_runner import ChatTurnInput, run_turn
+from app.core.agent_hooks import build_pre_turn_hooks
 from app.core.agent_tools import build_agent_tools
 from app.core.config import settings
+from app.core.plugins.types import PreTurnHook
 from app.crud.workspace import get_default_workspace
 from app.db import async_session_maker
 from app.integrations.telegram.bot_permissions import build_telegram_permission_check
@@ -226,6 +228,7 @@ async def _run_llm_turn(
         if workspace is not None
         else []
     )
+    pre_turn_hooks: list[PreTurnHook] = build_pre_turn_hooks()
 
     provider, warning = await resolve_provider_with_auto_clear(
         context,
@@ -270,6 +273,7 @@ async def _run_llm_turn(
             if context.verbose_level is not None
             else settings.telegram_verbose_default
         ),
+        pre_turn_hooks=pre_turn_hooks,
     )
 
     async def _do_stream() -> None:

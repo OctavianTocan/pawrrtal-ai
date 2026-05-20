@@ -24,6 +24,7 @@ from app.api._chat_permissions import (
 from app.channels import resolve_channel, surface_from_header
 from app.channels.base import ChannelMessage
 from app.channels.turn_runner import ChatTurnInput, EventHook, run_turn
+from app.core.agent_hooks import build_pre_turn_hooks
 from app.core.agent_tools import build_agent_tools
 from app.core.providers import StreamEvent, default_model, resolve_llm
 from app.core.request_logging import get_request_id
@@ -369,6 +370,7 @@ def get_chat_router() -> APIRouter:
                 "model_id": model_id,
                 "surface": surface,
             },
+            pre_turn_hooks=build_pre_turn_hooks(),
         )
         hooks: list[EventHook] = [_artifact_hook, _drain_send_queue]
 

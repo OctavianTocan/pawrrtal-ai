@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import uuid
@@ -31,6 +32,7 @@ from app.core.observability import (
     turn_span,
     workshop_event_hook,
 )
+from app.core.plugins.types import PreTurnHook, PreTurnHookContext
 from app.crud.chat_message import (
     append_assistant_placeholder,
     append_user_message,
@@ -69,7 +71,27 @@ _TTFT_LOG_MISSING = "-"
 
 @dataclass(frozen=True)
 class ChatTurnInput:
-    """Resolved inputs for one persisted user/assistant turn."""
+    """Resolved inputs for one persisted user/assistant turn.
+
+    Attributes:
+        conversation_id: The conversation UUID.
+        user_id: The user UUID.
+        question: The user message.
+        provider: The LLM provider.
+        channel: The channel.
+        channel_message: The channel message.
+        db_session: The database session.
+        workspace_root: The workspace root path.
+        tools: The workspace-scoped agent tools.
+        reasoning_effort: The reasoning effort.
+        permission_check: The permission check function.
+        images: The multimodal image inputs.
+        history_window: The history window.
+        log_tag: The log tag.
+        log_extras: The log extras.
+        verbose_level: The verbose level.
+        pre_turn_hooks: The pre-turn hooks.
+    """
 
     conversation_id: uuid.UUID
     user_id: uuid.UUID
@@ -81,21 +103,14 @@ class ChatTurnInput:
     workspace_root: Path | None = None
     tools: list[AgentTool] | None = None
     reasoning_effort: ReasoningEffort | None = None
-    # PR 03b — cross-provider can_use_tool gate. None preserves the
-    # historical behaviour (no permission check); when supplied, the
-    # provider plumbs it into AgentLoopConfig (Gemini) or
-    # ClaudeAgentOptions.can_use_tool (Claude) so the same policy
-    # applies regardless of model.
     permission_check: PermissionCheckFn | None = None
-    # PR 09 — multimodal image inputs forwarded to the provider.  Each
-    # entry is ``{"data": <base64>, "media_type": "image/<mime>"}`` —
-    # the same wire shape ``ChatRequest.images`` carries on the API
-    # boundary.  ``None`` (the default) is the legacy text-only path.
     images: list[dict[str, str]] | None = None
     history_window: int = 20
     log_tag: str = "TURN"
     log_extras: dict[str, Any] = field(default_factory=dict)
     verbose_level: int | None = None
+    # These are the pre-turn hooks that will be run before the turn is started. They come from the plugin registry (for now).
+    pre_turn_hooks: list[PreTurnHook] | None = None
 
 
 @dataclass
@@ -137,6 +152,55 @@ async def run_turn(
     """
     started_at = time.perf_counter()
     history, assistant_message_id = await _load_history_and_persist(turn_input)
+
+    # --- Pre-turn hooks ---
+    pre_turn_added_context = ""
+    for hook in turn_input.pre_turn_hooks or []:
+        # For easier debugging.
+        hook_name = hook.__name__
+        logger.info(
+            "PRE_TURN_HOOK %s conversation_id=%s user_id=%s question=%s",
+            hook_name,
+            turn_input.conversation_id,
+            turn_input.user_id,
+            turn_input.question,
+        )
+        # TODO: Each hook should have its own timeout.
+        async with asyncio.timeout(settings.pre_turn_hook_timeout_seconds or 10):
+            try:
+                # Currently awaiting all hooks, to ensure they're synchronous.
+                result: str | None = await hook(
+                    PreTurnHookContext(
+                        conversation_id=turn_input.conversation_id,
+                        user_id=turn_input.user_id,
+                        question=turn_input.question,
+                    )
+                )
+                # We use this for hooks that return a string of context to add to the system prompt. (Like Active Recall.)
+                if result is not None:
+                    pre_turn_added_context += f"\n\n{result}"
+                    logger.info(
+                        "PRE_TURN_HOOK_SUCCESS %s conversation_id=%s user_id=%s hook_name=%s question=%s result=%s",
+                        hook_name,
+                        turn_input.conversation_id,
+                        turn_input.user_id,
+                        hook_name,
+                        turn_input.question,
+                        result,
+                    )
+            except Exception:
+                logger.exception(
+                    "PRE_TURN_HOOK_ERR %s conversation_id=%s user_id=%s hook_name=%s question=%s",
+                    hook_name,
+                    turn_input.conversation_id,
+                    turn_input.user_id,
+                    hook_name,
+                    turn_input.question,
+                )
+                continue
+    # --- End pre-turn hooks ---
+
+    # --- Main turn ---
     aggregator = ChatTurnAggregator()
     counter = _EventCounter()
     model_id = _channel_model_id(turn_input.channel_message)
@@ -149,6 +213,7 @@ async def run_turn(
         turn_input.workspace_root,
         model_id=model_id,
         tools=turn_input.tools,
+        extra_context=pre_turn_added_context,
     )
 
     with turn_span(

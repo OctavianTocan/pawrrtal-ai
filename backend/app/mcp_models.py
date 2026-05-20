@@ -27,6 +27,7 @@ def _utcnow() -> datetime:
     return datetime.now()
 
 
+# TODO: I'm not too sure that this should be a DB model; It feels more like something that should be stored in a text file in the user's workspace.
 class McpServer(Base):
     """One user-configured external MCP server.
 

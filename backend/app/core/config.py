@@ -347,6 +347,10 @@ class Settings(BaseSettings):
     # cheap models, wasteful for premium ones.
     lcm_summary_model: str = ""
 
+    # ── Pre-turn hooks ──────────────────────────────────────────────────
+    # The timeout in seconds for each pre-turn hook.
+    pre_turn_hook_timeout_seconds: int = 10
+
     @property
     def claude_sandbox_excluded_commands_list(self) -> list[str]:
         """Parsed view of ``claude_sandbox_excluded_commands``."""
