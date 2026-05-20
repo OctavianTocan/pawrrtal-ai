@@ -18,9 +18,10 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
+from typing import cast
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import Table, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -161,8 +162,11 @@ def test_cascade_metadata_is_declared() -> None:
     }
     for (table, column_name), expected in expected_cascades.items():
         matching_fks = [fk for fk in table.foreign_keys if fk.parent.name == column_name]
-        assert matching_fks, f"missing FK on {table.name}.{column_name}"
+        # __table__ types as FromClause but is always a Table at runtime;
+        # cast for the .name attribute (FromClause lacks it).
+        table_name = cast(Table, table).name
+        assert matching_fks, f"missing FK on {table_name}.{column_name}"
         assert matching_fks[0].ondelete == expected, (
-            f"{table.name}.{column_name} expected ondelete={expected!r} "
+            f"{table_name}.{column_name} expected ondelete={expected!r} "
             f"got {matching_fks[0].ondelete!r}"
         )

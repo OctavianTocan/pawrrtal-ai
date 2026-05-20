@@ -11,6 +11,8 @@ Coverage:
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from typing import Any
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -162,7 +164,9 @@ class TestGeminiToolPassthrough:
         in_tools = [make_exa_search_tool()]
         captured_tools: list[AgentTool] | None = None
 
-        async def recording_stream_fn(messages: list[AgentMessage], tools: list[AgentTool]):
+        async def recording_stream_fn(
+            messages: list[AgentMessage], tools: list[AgentTool]
+        ) -> AsyncIterator[Any]:
             nonlocal captured_tools
             captured_tools = list(tools)
             # Yield a clean stop so agent_loop exits immediately.
@@ -202,7 +206,9 @@ class TestGeminiToolPassthrough:
 
         captured_tools: list[AgentTool] | None = None
 
-        async def recording_stream_fn(messages: list[AgentMessage], tools: list[AgentTool]):
+        async def recording_stream_fn(
+            messages: list[AgentMessage], tools: list[AgentTool]
+        ) -> AsyncIterator[Any]:
             nonlocal captured_tools
             captured_tools = list(tools)
             from app.core.agent_loop.types import LLMDoneEvent, TextContent

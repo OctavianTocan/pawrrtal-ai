@@ -234,7 +234,7 @@ async def safe_send_draft(
         }
         if message_thread_id is not None:
             kwargs["message_thread_id"] = message_thread_id
-        result = await bot(SendMessageDraft(**kwargs))
+        result = await bot(SendMessageDraft(**kwargs))  # type: ignore[arg-type]
         return bool(result)
     except ImportError:
         # aiogram < 3.27.0 — SendMessageDraft not available; silently skip.

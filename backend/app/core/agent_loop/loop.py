@@ -570,6 +570,7 @@ async def _stream_with_retry(
             )
             if exhausted is not None:
                 _copy_stream_outcome(exhausted, outcome)
+                assert outcome.terminated_event is not None
                 yield outcome.terminated_event
                 return
 

@@ -131,7 +131,7 @@ def resolve_reasoning_effort(
     if stored_effort in entry.supports_reasoning:
         # ``stored_effort`` is a plain ``str`` from the DB column; the
         # membership check confirms it's one of the literal values.
-        effort: ReasoningEffort = stored_effort  # type: ignore[assignment]
+        effort: ReasoningEffort = stored_effort
         return ReasoningResolution(
             effective=effort, next_stored=effort, action="use", model_entry=entry
         )

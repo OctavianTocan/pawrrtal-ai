@@ -9,6 +9,7 @@ schema and the thin async wrapper the agent loop calls.
 from __future__ import annotations
 
 import uuid
+from typing import Any
 
 from app.core.agent_loop.types import AgentTool
 from app.core.tools.lcm_search import (
@@ -32,7 +33,7 @@ _TOOL_DESCRIPTION = (
     " ordered by score descending."
 )
 
-_PARAMETERS: dict = {
+_PARAMETERS: dict[str, Any] = {
     "type": "object",
     "properties": {
         "query": {
@@ -82,7 +83,7 @@ def make_lcm_search_tool(*, conversation_id: uuid.UUID) -> AgentTool:
         query = str(kwargs.get("query") or "")
         limit_raw = kwargs.get("limit")
         try:
-            limit_val: int | None = int(limit_raw) if limit_raw is not None else None
+            limit_val: int | None = int(limit_raw) if limit_raw is not None else None  # type: ignore[call-overload]
         except (TypeError, ValueError):
             limit_val = None
         include_messages = bool(kwargs.get("include_messages", True))

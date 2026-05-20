@@ -15,7 +15,8 @@ from collections.abc import AsyncIterator, Callable, Coroutine
 from dataclasses import dataclass, field
 from typing import Any, Literal, NotRequired, TypedDict
 
-from .display import ToolDisplay, ToolDisplayPayload
+from .display import ToolDisplay as ToolDisplay  # noqa: PLC0414
+from .display import ToolDisplayPayload as ToolDisplayPayload  # noqa: PLC0414
 
 # ---------------------------------------------------------------------------
 # Content blocks (inside messages)

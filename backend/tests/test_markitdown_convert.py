@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from app.core.agent_loop.types import AgentTool
 from app.core.agent_tools import build_agent_tools
 from app.core.tools.errors import ToolErrorCode
 from app.core.tools.markitdown_convert import make_markitdown_tool
@@ -31,7 +32,7 @@ def workspace(tmp_path: Path) -> Path:
     return tmp_path
 
 
-def _tool(root: Path) -> object:
+def _tool(root: Path) -> AgentTool:
     return make_markitdown_tool(workspace_root=root)
 
 
@@ -51,14 +52,14 @@ def _fake_converter(text: str) -> MagicMock:
 @pytest.mark.anyio
 async def test_missing_path_returns_invalid_path(workspace: Path) -> None:
     tool = _tool(workspace)
-    out = await tool.execute("call-1")  # type: ignore[union-attr]
+    out = await tool.execute("call-1")
     assert out.startswith(f"[{ToolErrorCode.INVALID_PATH.value}]")
 
 
 @pytest.mark.anyio
 async def test_empty_path_returns_invalid_path(workspace: Path) -> None:
     tool = _tool(workspace)
-    out = await tool.execute("call-2", path="")  # type: ignore[union-attr]
+    out = await tool.execute("call-2", path="")
     assert out.startswith(f"[{ToolErrorCode.INVALID_PATH.value}]")
 
 
@@ -70,7 +71,7 @@ async def test_empty_path_returns_invalid_path(workspace: Path) -> None:
 @pytest.mark.anyio
 async def test_traversal_attempt_returns_out_of_root(workspace: Path) -> None:
     tool = _tool(workspace)
-    out = await tool.execute("call-3", path="../../etc/passwd")  # type: ignore[union-attr]
+    out = await tool.execute("call-3", path="../../etc/passwd")
     assert out.startswith(f"[{ToolErrorCode.OUT_OF_ROOT.value}]")
 
 
@@ -82,14 +83,14 @@ async def test_traversal_attempt_returns_out_of_root(workspace: Path) -> None:
 @pytest.mark.anyio
 async def test_missing_file_returns_not_found(workspace: Path) -> None:
     tool = _tool(workspace)
-    out = await tool.execute("call-4", path="missing.pdf")  # type: ignore[union-attr]
+    out = await tool.execute("call-4", path="missing.pdf")
     assert out.startswith(f"[{ToolErrorCode.NOT_FOUND.value}]")
 
 
 @pytest.mark.anyio
 async def test_directory_target_returns_wrong_kind(workspace: Path) -> None:
     tool = _tool(workspace)
-    out = await tool.execute("call-5", path="subdir")  # type: ignore[union-attr]
+    out = await tool.execute("call-5", path="subdir")
     assert out.startswith(f"[{ToolErrorCode.WRONG_KIND.value}]")
 
 
@@ -103,7 +104,7 @@ async def test_successful_conversion_returns_markdown(workspace: Path) -> None:
     fake_cls = _fake_converter("# Hello\n")
     with patch("app.core.tools.markitdown_convert.MarkItDown", fake_cls):
         tool = _tool(workspace)
-        out = await tool.execute("call-6", path="report.html")  # type: ignore[union-attr]
+        out = await tool.execute("call-6", path="report.html")
     assert out == "# Hello\n"
 
 
@@ -112,7 +113,7 @@ async def test_empty_text_content_returns_placeholder(workspace: Path) -> None:
     fake_cls = _fake_converter("")
     with patch("app.core.tools.markitdown_convert.MarkItDown", fake_cls):
         tool = _tool(workspace)
-        out = await tool.execute("call-7", path="report.html")  # type: ignore[union-attr]
+        out = await tool.execute("call-7", path="report.html")
     assert out == "(empty document)"
 
 
@@ -128,7 +129,7 @@ async def test_converter_exception_returns_io_error(workspace: Path) -> None:
     fake_cls = MagicMock(return_value=instance)
     with patch("app.core.tools.markitdown_convert.MarkItDown", fake_cls):
         tool = _tool(workspace)
-        out = await tool.execute("call-8", path="report.html")  # type: ignore[union-attr]
+        out = await tool.execute("call-8", path="report.html")
     assert out.startswith(f"[{ToolErrorCode.IO_ERROR.value}]")
     assert "unsupported format" in out
 

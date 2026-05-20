@@ -12,9 +12,11 @@ import sys
 from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import AsyncMock
 
 import pytest
+from aiogram.types import Message
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
@@ -24,9 +26,14 @@ from app.integrations.telegram._attachments import collect_attachments  # noqa: 
 pytestmark = pytest.mark.anyio
 
 
-def _make_message(**overrides: object) -> SimpleNamespace:
-    """Build a minimal stub of an aiogram Message with attachment slots."""
-    defaults = {
+def _make_message(**overrides: Any) -> Message:
+    """Build a minimal stub of an aiogram Message with attachment slots.
+
+    Returns a ``Message``-typed ``SimpleNamespace`` so the test assertions
+    typecheck — the production callers only read the attachment-related
+    attributes that ``defaults`` covers.
+    """
+    defaults: dict[str, Any] = {
         "text": None,
         "caption": None,
         "photo": None,
@@ -38,7 +45,7 @@ def _make_message(**overrides: object) -> SimpleNamespace:
         "sticker": None,
     }
     defaults.update(overrides)
-    return SimpleNamespace(**defaults)
+    return cast(Message, SimpleNamespace(**defaults))
 
 
 def _make_bot_with_photo(raw_bytes: bytes) -> AsyncMock:
@@ -94,7 +101,9 @@ async def test_voice_message_without_file_id_emits_metadata_annotation() -> None
     )
 
 
-async def test_voice_message_transcribes_when_backend_configured(monkeypatch) -> None:
+async def test_voice_message_transcribes_when_backend_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     raw = b"OggS\x00fake-voice"
     message = _make_message(
         voice=SimpleNamespace(duration=4, file_id="voice-id", file_size=len(raw)),
@@ -115,7 +124,9 @@ async def test_voice_message_transcribes_when_backend_configured(monkeypatch) ->
     assert "Transcription: hello world" in annotation
 
 
-async def test_voice_message_transcription_failure_falls_back(monkeypatch) -> None:
+async def test_voice_message_transcription_failure_falls_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     from app.integrations.voice import TranscriptionError
 
     raw = b"OggS\x00fake-voice"
@@ -148,7 +159,7 @@ async def test_document_message_without_file_id_falls_back_to_metadata() -> None
     assert "application/pdf" in annotation
 
 
-async def test_document_message_extracts_markdown(monkeypatch) -> None:
+async def test_document_message_extracts_markdown(monkeypatch: pytest.MonkeyPatch) -> None:
     raw = b"hello, world\n"
     document = SimpleNamespace(
         file_id="doc-id",

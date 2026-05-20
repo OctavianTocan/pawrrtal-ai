@@ -14,9 +14,10 @@ and don't perturb the core tools' order.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from pathlib import Path
 from unittest.mock import patch
+from uuid import UUID
 
 import pytest
 
@@ -61,7 +62,7 @@ def _make_tool(name: str) -> AgentTool:
     )
 
 
-def _factory(name: str):
+def _factory(name: str) -> Callable[[ToolContext], AgentTool]:
     def _build(_ctx: ToolContext) -> AgentTool:
         return _make_tool(name)
 
@@ -169,7 +170,7 @@ class TestActivationGating:
         # We patch BOTH binding sites because Python's `from X import Y`
         # captures a local reference; the activation predicate looks up
         # the registry copy while core gating reads the keys-module copy.
-        def _resolve(_user_id, key_name: str) -> str | None:
+        def _resolve(_user_id: UUID, key_name: str) -> str | None:
             return "secret-value" if key_name == "NEEDY_API_KEY" else None
 
         with (

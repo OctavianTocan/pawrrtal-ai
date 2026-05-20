@@ -17,7 +17,7 @@ import uuid
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any
+from typing import Any, cast
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -39,7 +39,7 @@ from app.crud.workspace import (
     list_workspaces,
 )
 from app.db import User
-from app.models import UserPersonalization
+from app.models import UserPersonalization, Workspace
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -619,9 +619,11 @@ class TestWorkspaceService:
             ),
         ):
             mock_settings.workspace_base_dir = str(tmp_path)
-            recovered_ws = await ensure_default_workspace(user_id, fake_session)
+            recovered_ws = await ensure_default_workspace(
+                user_id, cast("AsyncSession", fake_session)
+            )
 
-        assert recovered_ws is winner
+        assert recovered_ws is cast("Workspace", winner)
         assert not orphan.exists()
 
 

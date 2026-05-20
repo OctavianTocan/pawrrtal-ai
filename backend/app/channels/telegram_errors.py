@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import html
 import logging
+from collections.abc import Callable
 from enum import StrEnum
 from typing import TYPE_CHECKING
 
@@ -228,7 +229,7 @@ def render_provider_error_card(detail: str = "") -> str:
 # Dispatch table
 # ---------------------------------------------------------------------------
 
-_CARD_RENDERERS: dict[ErrorKind, object] = {
+_CARD_RENDERERS: dict[ErrorKind, Callable[[str], str]] = {
     ErrorKind.TIMEOUT: render_timeout_card,
     ErrorKind.PROVIDER_OVERLOADED: render_provider_overloaded_card,
     ErrorKind.AUTH_ERROR: render_auth_error_card,
@@ -252,7 +253,7 @@ def render_error_card(kind: ErrorKind, detail: str = "") -> str:
         Telegram HTML string ready to pass to ``safe_send_html``.
     """
     renderer = _CARD_RENDERERS.get(kind, render_provider_error_card)
-    return renderer(detail)  # type: ignore[operator]
+    return renderer(detail)
 
 
 # ---------------------------------------------------------------------------

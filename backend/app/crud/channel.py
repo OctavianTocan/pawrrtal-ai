@@ -31,6 +31,7 @@ from app.core.config import settings
 from app.models import ChannelBinding, ChannelLinkCode
 
 if TYPE_CHECKING:
+    from app.core.providers.reasoning import ReasoningResolution
     from app.models import Conversation
 
 # Code alphabet excludes look-alikes (0/O, 1/I/L) so support tickets
@@ -396,7 +397,7 @@ async def normalize_conversation_reasoning_effort(
     conversation_id: uuid.UUID,
     session: AsyncSession,
     model_id_override: str | None = None,
-):
+) -> tuple[ReasoningResolution | None, str | None]:
     """Resolve + persist the conversation's reasoning effort against the model.
 
     Shared seam for the chat / Telegram backstop. Reads the row's
@@ -413,7 +414,6 @@ async def normalize_conversation_reasoning_effort(
     doesn't exist (treated as a no-op for caller simplicity).
     """
     from app.core.providers.reasoning import (  # noqa: PLC0415
-        ReasoningResolution,
         resolve_reasoning_effort,
     )
     from app.models import Conversation  # noqa: PLC0415

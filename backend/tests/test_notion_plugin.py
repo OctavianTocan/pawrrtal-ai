@@ -22,7 +22,7 @@ from __future__ import annotations
 import json
 import os
 import stat
-from collections.abc import Generator
+from collections.abc import Generator, Sequence
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -32,6 +32,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.plugins import ToolContext, all_plugins
+from app.db import User
 from app.integrations.notion import notion_plugin
 from app.integrations.notion.audit import STATUS_ERROR, STATUS_OK
 from app.integrations.notion.ntn_client import NtnError, call_ntn
@@ -50,7 +51,7 @@ NTN_BINARY_ENV_VAR = "NTN_BINARY"
 
 
 @pytest.fixture
-def ctx(seeded_default_workspace: Workspace, test_user) -> ToolContext:
+def ctx(seeded_default_workspace: Workspace, test_user: User) -> ToolContext:
     """Build a :class:`ToolContext` bound to the seeded workspace."""
     return ToolContext(
         workspace_id=seeded_default_workspace.id,
@@ -190,7 +191,7 @@ class TestToolFactories:
         # Mock the subprocess seam so we don't need a real ntn binary.
         captured_args: list[list[str]] = []
 
-        async def fake_call(args, *, token, **_):  # type: ignore[no-untyped-def]
+        async def fake_call(args: Sequence[str], *, token: str, **_: Any) -> dict[str, Any]:
             captured_args.append(list(args))
             return {"results": [{"id": "page-1", "object": "page"}]}
 
@@ -269,7 +270,7 @@ class TestToolFactories:
         )
         captured: list[list[str]] = []
 
-        async def fake_call_text(args, *, token, **_):  # type: ignore[no-untyped-def]
+        async def fake_call_text(args: Sequence[str], *, token: str, **_: Any) -> str:
             captured.append(list(args))
             return "Created page https://www.notion.so/abc"
 
@@ -325,7 +326,7 @@ class TestToolFactories:
         )
         captured: list[list[str]] = []
 
-        async def fake_call(args, *, token, **_):  # type: ignore[no-untyped-def]
+        async def fake_call(args: Sequence[str], *, token: str, **_: Any) -> dict[str, Any]:
             captured.append(list(args))
             return {"id": "p", "archived": True}
 

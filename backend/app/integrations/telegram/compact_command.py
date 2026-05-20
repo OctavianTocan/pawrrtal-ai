@@ -43,9 +43,20 @@ from app.db import async_session_maker
 class _TelegramSenderLike(Protocol):
     """Structural type for the subset of ``TelegramSender`` /compact needs."""
 
-    user_id: int
-    chat_id: int
-    thread_id: int | None
+    @property
+    def user_id(self) -> int:
+        """Telegram numeric user id."""
+        ...
+
+    @property
+    def chat_id(self) -> int:
+        """Telegram chat id (DM or group)."""
+        ...
+
+    @property
+    def thread_id(self) -> int | None:
+        """Telegram topic thread id, or ``None`` outside a topic."""
+        ...
 
 
 logger = logging.getLogger(__name__)

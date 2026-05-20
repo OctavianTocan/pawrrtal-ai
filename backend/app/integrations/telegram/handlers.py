@@ -44,11 +44,11 @@ from app.crud.channel import (
 # ``collect_attachments`` from the same module — keeps ``bot.py`` under
 # sentrux's ``no_god_files`` fan-out budget without forcing a registry
 # refactor in this PR (the long-term home is #281).
-from app.integrations.telegram._attachments import (  # noqa: F401
-    collect_attachments,
+from app.integrations.telegram._attachments import (
+    collect_attachments as collect_attachments,  # noqa: PLC0414
 )
 from app.integrations.telegram.dev_admin import resolve_or_autolink_telegram_user
-from app.integrations.telegram.sender import TelegramSender
+from app.integrations.telegram.sender import TelegramSender as TelegramSender  # noqa: PLC0414
 
 # Loose match for the link-code shape (8 chars from the look-alike-free
 # alphabet defined in app.crud.channel). Used to distinguish "user pasted

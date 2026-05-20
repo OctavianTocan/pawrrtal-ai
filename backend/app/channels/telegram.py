@@ -45,11 +45,8 @@ from .telegram_delivery import (
     safe_edit_html,
 )
 from .telegram_html import md_to_telegram_html
-from .telegram_progress import (
-    ProgressState,
-    render_initial,
-    render_working,
-)
+from .telegram_progress import ProgressState, render_working
+from .telegram_progress import render_initial as render_initial  # noqa: PLC0414
 
 if TYPE_CHECKING:
     from aiogram import Bot

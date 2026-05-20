@@ -20,12 +20,12 @@ class TestChatImageInput:
         ["image/png", "image/jpeg", "image/gif", "image/webp"],
     )
     def test_accepts_supported_mime_types(self, media_type: str) -> None:
-        img = ChatImageInput(data="abc", media_type=media_type)  # type: ignore[arg-type]
+        img = ChatImageInput(data="abc", media_type=media_type)
         assert img.media_type == media_type
 
     def test_rejects_unsupported_mime_type(self) -> None:
         with pytest.raises(ValidationError):
-            ChatImageInput(data="abc", media_type="image/svg+xml")  # type: ignore[arg-type]
+            ChatImageInput(data="abc", media_type="image/svg+xml")
 
 
 class TestChatRequest:

@@ -119,8 +119,9 @@ def test_user_create_strips_invite_code_from_create_update_dict() -> None:
         invite_code="secret",
     )
 
-    assert "invite_code" not in user.create_update_dict()
-    assert "invite_code" not in user.create_update_dict_superuser()
+    # fastapi-users helpers are untyped; cast their return for the membership check.
+    assert "invite_code" not in user.create_update_dict()  # type: ignore[no-untyped-call]
+    assert "invite_code" not in user.create_update_dict_superuser()  # type: ignore[no-untyped-call]
 
 
 # ---------------------------------------------------------------------------
@@ -181,7 +182,7 @@ def test_resolve_llm_claude_provider_stores_workspace_root() -> None:
     assert provider._workspace_root == ws_root
 
 
-def test_resolve_llm_claude_propagates_workspace_root_to_cwd(tmp_path) -> None:
+def test_resolve_llm_claude_propagates_workspace_root_to_cwd(tmp_path: Path) -> None:
     """``workspace_root`` must flow through to ``ClaudeLLMConfig.cwd``.
 
     Without this, the Claude SDK subprocess runs in the backend's own
@@ -217,7 +218,7 @@ def test_resolve_llm_claude_workspace_root_none_leaves_cwd_unset() -> None:
 
 def test_resolve_api_key_workspace_override_beats_settings(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     """resolve_api_key returns the per-user workspace override over settings.
 
@@ -238,7 +239,7 @@ def test_resolve_api_key_workspace_override_beats_settings(
 
 def test_resolve_api_key_falls_back_to_settings_when_no_override(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     """resolve_api_key falls back to settings when the user has no override.
 
@@ -255,7 +256,7 @@ def test_resolve_api_key_falls_back_to_settings_when_no_override(
 
 def test_resolve_api_key_cleared_override_reverts_to_settings(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     """Saving an empty-string value clears the override; settings is used again.
 
@@ -279,7 +280,7 @@ def test_resolve_api_key_cleared_override_reverts_to_settings(
 
 def test_resolve_api_key_two_users_are_isolated(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path,
+    tmp_path: Path,
 ) -> None:
     """Each user's workspace env is independent from others.
 

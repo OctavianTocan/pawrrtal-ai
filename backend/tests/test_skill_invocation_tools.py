@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -24,7 +25,7 @@ def _make_skill(workspace: Path, name: str, body: str = "# Demo\n\nUse this skil
     return skill_md
 
 
-def _write_manifest(workspace: Path, entries: list[dict]) -> None:
+def _write_manifest(workspace: Path, entries: list[dict[str, Any]]) -> None:
     (workspace / "skills").mkdir(exist_ok=True)
     (workspace / "skills" / "_manifest.jsonl").write_text(
         "\n".join(json.dumps(e) for e in entries),

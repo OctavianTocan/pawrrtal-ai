@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from app.core.agent_loop.types import AgentTool
 from app.core.tools.errors import ToolErrorCode
 from app.core.tools.python_exec import make_virtual_python_tool
 from tests.agent_harness import (
@@ -35,7 +36,9 @@ _TEST_TIMEOUT_SECONDS = 5.0
 _TEST_OUTPUT_CAP_BYTES = 4_000
 
 
-def _make_tool(workspace: Path, *, timeout: float | None = None, cap: int | None = None):
+def _make_tool(
+    workspace: Path, *, timeout: float | None = None, cap: int | None = None
+) -> AgentTool:
     return make_virtual_python_tool(
         workspace_root=workspace,
         timeout_seconds=timeout if timeout is not None else _TEST_TIMEOUT_SECONDS,

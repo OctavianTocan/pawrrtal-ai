@@ -29,25 +29,33 @@ from app.core.agent_loop.types import AgentTool
 # ``agent_tools.py`` can import them off ``now`` and stay under
 # sentrux's ``no_god_files`` fan-out ceiling. The aggregation is
 # purely organisational; the implementations live in ``tasks_md.py``.
-from app.core.tools.cron_tools import (  # noqa: F401
-    make_cron_create_tool,
-    make_cron_delete_tool,
-    make_cron_list_tool,
+from app.core.tools.cron_tools import (
+    make_cron_create_tool as make_cron_create_tool,  # noqa: PLC0414
 )
+from app.core.tools.cron_tools import (
+    make_cron_delete_tool as make_cron_delete_tool,  # noqa: PLC0414
+)
+from app.core.tools.cron_tools import make_cron_list_tool as make_cron_list_tool  # noqa: PLC0414
 from app.core.tools.display import make_tool_display
-from app.core.tools.external_mcp import (  # noqa: F401 — re-export keeps agent_tools fan-out under budget
-    build_external_mcp_tools,
+
+# Re-exports below keep agent_tools fan-out under sentrux's no_god_files budget.
+from app.core.tools.external_mcp import (
+    build_external_mcp_tools as build_external_mcp_tools,  # noqa: PLC0414
 )
-from app.core.tools.skill_invocation import (  # noqa: F401 — re-export keeps agent_tools fan-out under budget
-    make_invoke_skill_tool,
-    make_list_skills_tool,
-    make_read_skill_tool,
+from app.core.tools.skill_invocation import (
+    make_invoke_skill_tool as make_invoke_skill_tool,  # noqa: PLC0414
 )
-from app.core.tools.tasks_md import (  # noqa: F401
-    make_add_task_tool,
-    make_complete_task_tool,
-    make_list_tasks_tool,
+from app.core.tools.skill_invocation import (
+    make_list_skills_tool as make_list_skills_tool,  # noqa: PLC0414
 )
+from app.core.tools.skill_invocation import (
+    make_read_skill_tool as make_read_skill_tool,  # noqa: PLC0414
+)
+from app.core.tools.tasks_md import make_add_task_tool as make_add_task_tool  # noqa: PLC0414
+from app.core.tools.tasks_md import (
+    make_complete_task_tool as make_complete_task_tool,  # noqa: PLC0414
+)
+from app.core.tools.tasks_md import make_list_tasks_tool as make_list_tasks_tool  # noqa: PLC0414
 
 log = logging.getLogger(__name__)
 

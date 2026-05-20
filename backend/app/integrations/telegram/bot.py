@@ -97,7 +97,7 @@ from app.integrations.telegram.thinking_picker_runtime import (
 
 if TYPE_CHECKING:
     from aiogram import Bot, Dispatcher
-    from aiogram.types import CallbackQuery, Message, Update
+    from aiogram.types import CallbackQuery, Message, ReplyParameters, Update
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +193,7 @@ async def _maintain_typing_indicator(
         return
 
 
-def _reply_parameters(message_id: int) -> object:
+def _reply_parameters(message_id: int) -> ReplyParameters:
     """Build aiogram reply parameters without importing aiogram at module load."""
     from aiogram.types import ReplyParameters  # noqa: PLC0415
 

@@ -849,6 +849,7 @@ class TestResolveProviderWithAutoClear:
 
         # Stored model_id was cleared to NULL.
         update_mock.assert_awaited_once()
+        assert update_mock.await_args is not None
         assert update_mock.await_args.kwargs["model_id"] is None
         assert update_mock.await_args.kwargs["conversation_id"] == context.conversation_id
 

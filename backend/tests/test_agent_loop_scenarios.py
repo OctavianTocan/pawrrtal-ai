@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
+from typing import Any
 
 import pytest
 
@@ -411,7 +412,7 @@ async def test_message_context_grows_across_turns() -> None:
     )
     from tests.agent_harness import identity_convert
 
-    seen_messages: list[list] = []
+    seen_messages: list[list[Any]] = []
     turn_counter: list[int] = [0]
 
     async def recording_fn(messages, tools):

@@ -32,10 +32,20 @@ class StreamEvent(TypedDict, total=False):
 
     type: str  # "delta" | "thinking" | "tool_use" | "tool_result" | "error" | "artifact" | "message" | "usage"
     content: str  # for delta and thinking
+    # ``id`` is the provider-native call identifier on ``tool_use`` events.
+    # ``tool_use_id`` mirrors it back on the matching ``tool_result``.
+    # Some providers populate only one or the other, so the Telegram
+    # dispatcher reads both and prefers ``id`` for tool_use, ``tool_use_id``
+    # for tool_result.
+    id: str
     name: str  # for tool_use
     input: dict[str, Any]  # for tool_use
     display: ToolDisplayPayload  # for tool_use
     tool_use_id: str  # for tool_result
+    # ``True`` when a ``tool_result`` carries an error payload — set by the
+    # provider tool bridge (e.g. ``_claude_tool_bridge``) so downstream
+    # renderers can mark the turn as failed without re-parsing the content.
+    is_error: bool
     artifact: dict[str, Any]  # for artifact (id, title, spec)
     # ``message`` events emitted by the chat router's ``send_fn`` for
     # mid-turn pushes (text + optional file attachment back to the user).

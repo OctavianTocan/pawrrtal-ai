@@ -363,6 +363,10 @@ async def compact_leaf_if_needed(
 
     # ------------------------------------------------------------------ 5
     summary_model = _settings.lcm_summary_model or model_id
+    # resolve_llm currently does not accept user_id; per-user API key
+    # resolution flows through workspace_root, which the chat router
+    # passes in. Drop the kwarg at the call site to silence mypy.
+    _ = user_id
     provider = resolve_llm(summary_model)
     turns_text = _format_turns(selected_messages)
     summary_text, summary_kind = await _summarize(provider, turns_text, user_id)
