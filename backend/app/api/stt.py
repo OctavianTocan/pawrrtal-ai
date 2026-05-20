@@ -14,9 +14,9 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.keys import resolve_api_key
 from app.crud.workspace import get_default_workspace
 from app.db import User, get_async_session
+from app.integrations.xai import resolve_xai_credentials
 from app.users import get_allowed_user
 
 logger = logging.getLogger(__name__)
@@ -86,15 +86,16 @@ def get_stt_router() -> APIRouter:  # noqa: C901 — single cohesive STT route +
                 raise HTTPException(status_code=502, detail=str(exc)) from exc
             return JSONResponse(content={"text": text})
 
-        # STT runs against the user's default workspace's configured key —
-        # there's no concept of "STT for workspace X" in the UI yet, so the
-        # default is the only sensible choice.  `resolve_api_key` already
-        # falls back to `settings.xai_api_key`, so the caller doesn't need a
-        # manual `or settings.x` suffix.
+        # STT runs against the user's default workspace's configured
+        # credentials — there's no concept of "STT for workspace X" in
+        # the UI yet, so the default is the only sensible choice. The
+        # helper honours the OAuth access token (#372) when one is
+        # stored on the workspace, falls back to the workspace
+        # ``XAI_API_KEY``, then to the gateway-global
+        # ``settings.xai_api_key`` — no manual fallback needed here.
         workspace = await get_default_workspace(user.id, session)
-        api_key = (
-            resolve_api_key(Path(workspace.path), "XAI_API_KEY") if workspace is not None else None
-        )
+        workspace_root = Path(workspace.path) if workspace is not None else None
+        api_key = await resolve_xai_credentials(workspace_root)
         if not api_key:
             raise HTTPException(
                 status_code=503,
