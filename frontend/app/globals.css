@@ -216,11 +216,11 @@
 		),
 		linear-gradient(180deg, var(--background), var(--foreground-3));
 	/* Deep ink ~#1f1f1f — primary text. */
-	--foreground: oklch(0.21 0.005 285);
-	--foreground-dimmed: color-mix(in srgb, var(--foreground) 80%, var(--background));
+	--foreground: oklch(0.14 0 0);
+	--foreground-dimmed: oklch(0.89 0 0);
 	--foreground-rgb: 31, 31, 31;
-	--user-message-bubble: oklch(from var(--foreground) l c h / 1);
-	--user-message-bubble-dimmed: oklch(from var(--foreground) l c h / 1);
+	--user-message-bubble: oklch(0.89 0 0);
+	--user-message-bubble-dimmed: oklch(0.89 0 0);
 	--assistant-message-bubble: oklch(from var(--foreground) l c h / 0.12);
 	--assistant-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.12);
 	/* Soft purple ~#9e94d5 — brand accent + active states. */
@@ -433,10 +433,10 @@
 		linear-gradient(180deg, var(--background), var(--foreground-5));
 	/* Primary text ~#ffffff */
 	--foreground: oklch(1 0 0);
-	--foreground-dimmed: color-mix(in srgb, var(--foreground) 80%, var(--background));
+	--foreground-dimmed: oklch(0.89 0 0);
 	--foreground-rgb: 255, 255, 255;
-	--user-message-bubble: oklch(0.95 0 0);
-	--user-message-bubble-dimmed: oklch(0.95 0 0);
+	--user-message-bubble: oklch(0.89 0 0);
+	--user-message-bubble-dimmed: oklch(0.89 0 0);
 	--assistant-message-bubble: oklch(0.95 0 0);
 	--assistant-message-bubble-dimmed: oklch(0.95 0 0);
 	/* Soft purple ~#9e94d5 — consistent brand accent in dark mode */
