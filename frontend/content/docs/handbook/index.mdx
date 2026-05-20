@@ -29,7 +29,8 @@ layers:
 
 The plugin system layers on top: a `Plugin` provides one or more
 `AgentTool`s and is opted into per workspace. Notion is the
-reference plugin (18 tools, all shelling out to `ntn`).
+reference plugin: a single `ntn` tool that proxies arbitrary args
+to the official Notion CLI.
 
 LCM (Lossless Context Management) is the conversation-compaction
 DAG that lets long sessions survive without losing causal links.

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- **Notion plugin collapsed to a single `ntn` tool.** The 18 hand-rolled wrappers (`notion_search`, `notion_read`, `notion_create`, `notion_doctor`, `notion_logs_read`, …) are replaced by one `ntn` tool that proxies arbitrary args to the official Notion CLI. The agent can drive the entire Notion surface through `ntn api …`, `ntn pages get/create/update`, `ntn --help`, etc. — no parallel parameter schema per Notion endpoint to drift or maintain. Token isolation, ephemeral `HOME`, and `notion_operation_logs` auditing all stay in place; rows produced after this change carry `tool_name="ntn"` and `operation="cli"`. The `NotionOperationLog` table and migration `013` are untouched so historical rows from the per-tool era keep their `tool_name` values.
+
 ### Fixed
 - **Telegram voice notes are now transcribed under the default xAI deployment.** Previously the Telegram bot only attempted transcription when `VOICE_PROVIDER` was set to `mistral`, `openai`, or `local`; the default `xai` value made `resolve_transcriber()` return `None` and the bot fell back to the "Transcription is not available on this surface yet" stub annotation, so the agent never saw the spoken content. A new `XaiSttTranscriber` wraps xAI's HTTP STT endpoint (`https://api.x.ai/v1/stt`) and is now returned by `resolve_transcriber()` whenever `voice_provider == "xai"` and `settings.xai_api_key` is set. The web `POST /api/v1/stt` route was refactored to use the same transcriber class with workspace-first `XAI_API_KEY` resolution — same observable behaviour for web users, less duplicated code. Image and document attachment paths were diagnosed at the same time: images already forward correctly through `ChatTurnInput.images` for Claude (other providers still log-and-drop, tracked as a follow-up); documents already extract via markitdown when the optional dep is installed.
 

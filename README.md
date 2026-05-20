@@ -127,9 +127,9 @@ Workspace file tools are scoped to the workspace root and reject absolute paths/
 - **Activation**: The default activation predicate enables a plugin when every declared required env key is present in the active workspace.
 - **Tool composition**: Plugin tools are appended after core tools inside `build_agent_tools`.
 - **Notion plugin**: The first plugin consumer. It activates on `NOTION_API_KEY`.
-- **Notion tool surface**: `notion_search`, `notion_read`, `notion_append`, `notion_create`, `notion_read_markdown`, `notion_update_markdown`, `notion_update_page`, `notion_comment_create`, `notion_comment_list`, `notion_query`, `notion_delete`, `notion_move`, `notion_publish`, `notion_file_tree`, `notion_sync`, `notion_help`, `notion_doctor`, and `notion_logs_read`.
+- **Notion tool surface**: A single `ntn` tool that runs the official Notion CLI with arbitrary args. The agent drives `ntn pages get`, `ntn pages create`, `ntn api …`, etc. directly instead of going through hand-rolled wrappers.
 - **Execution model**: Notion calls run through the official `ntn` CLI with the token injected per call and temp-home isolation.
-- **Auditability**: Notion operations are logged in `notion_operation_logs`.
+- **Auditability**: Every `ntn` invocation is logged in `notion_operation_logs`.
 
 ### Voice and STT
 

@@ -1,34 +1,28 @@
 """Thin async wrapper around the official Notion CLI (``ntn``).
 
-Every Notion tool in this plugin shells out to ``ntn`` through
-:func:`call_ntn`.  The wrapper is deliberately narrow: it injects the
-workspace-scoped ``NOTION_API_TOKEN`` and an isolated ``HOME`` for
-each call, so two requests from different workspaces never share state
-on disk.  ``HOME`` isolation is defence-in-depth — ``ntn login``
-should never run server-side, but if it does, the artifacts land in a
-throw-away tempdir.
+The Notion plugin shells out to ``ntn`` through :func:`call_ntn`.  The
+wrapper is deliberately narrow: it injects the workspace-scoped
+``NOTION_API_TOKEN`` and an isolated ``HOME`` for each call, so two
+requests from different workspaces never share state on disk.
+``HOME`` isolation is defence-in-depth — ``ntn login`` should never
+run server-side, but if it does, the artifacts land in a throw-away
+tempdir.
 
-The binary itself is installed into the backend image (``chore(docker):
-install ntn`` commit).  In local development, the install instructions
-in ``docs/handbook/integrations/notion.md`` get the dev environment
-set up.
-
-JSON parsing is opt-in: most ``ntn api`` calls return JSON, but ``ntn
-pages get`` returns Markdown.  :func:`call_ntn_json` and
-:func:`call_ntn_text` make the caller's intent explicit at the call
-site so we don't silently corrupt one with the other's parser.
+The binary itself is installed into the backend image (see the
+``ntn``-related comments in ``backend/Dockerfile``).  In local
+development, the install instructions in
+``docs/handbook/integrations/notion.md`` get the dev environment set
+up.
 """
 
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 import tempfile
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +43,7 @@ class NtnError(RuntimeError):
 
     Carries the original return code and stderr so callers (typically
     :func:`app.integrations.notion.audit.with_audit`) can record the
-    failure mode for ``notion_logs_read`` to surface later.
+    failure mode against ``notion_operation_logs`` for later analysis.
     """
 
     def __init__(self, returncode: int, stderr: str) -> None:
@@ -157,29 +151,3 @@ async def call_ntn(
         if proc.returncode != 0:
             raise NtnError(proc.returncode or -1, stderr.decode(errors="replace"))
         return NtnResult(stdout=stdout, stderr=stderr)
-
-
-async def call_ntn_json(args: Sequence[str], *, token: str, stdin: bytes | None = None) -> Any:
-    """Run an ``ntn`` command that emits JSON; return the parsed body."""
-    result = await call_ntn(args, token=token, stdin=stdin)
-    if not result.stdout:
-        return None
-    return json.loads(result.stdout)
-
-
-async def call_ntn_text(args: Sequence[str], *, token: str, stdin: bytes | None = None) -> str:
-    """Run an ``ntn`` command that emits Markdown / plain text."""
-    result = await call_ntn(args, token=token, stdin=stdin)
-    return result.stdout.decode(errors="replace")
-
-
-def format_query_params(params: Mapping[str, str]) -> list[str]:
-    """Translate a ``{key: value}`` map into ``key==value`` arg tokens.
-
-    ``ntn api`` uses ``==`` for query-string params and ``=`` for body
-    fields (per its built-in help text).  Callers should pass body
-    fields directly as ``"foo=bar"`` strings; this helper exists for
-    the query-string case so we don't sprinkle ``==`` literals across
-    eighteen tool factories.
-    """
-    return [f"{key}=={value}" for key, value in params.items() if value != ""]

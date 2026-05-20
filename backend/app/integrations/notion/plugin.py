@@ -14,7 +14,7 @@ from app.core.plugins import (
     Plugin,
     register_plugin,
 )
-from app.integrations.notion.tools import factories
+from app.integrations.notion.tool import make_ntn_tool
 
 NOTION_INTEGRATION_URL = "https://www.notion.so/profile/integrations"
 
@@ -33,7 +33,7 @@ notion_plugin = Plugin(
             required=True,
         ),
     ),
-    tool_factories=factories,
+    tool_factories=(make_ntn_tool,),
 )
 
 register_plugin(notion_plugin)

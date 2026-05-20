@@ -1,15 +1,15 @@
 """Audit-log wrapper for Notion tool calls.
 
-Every ``notion_*`` tool runs its underlying work through
+The single ``ntn`` tool runs its underlying work through
 :func:`with_audit`, which times the call, captures the request/response
 shape, and writes one row to :class:`app.models.NotionOperationLog`.
-Failures are logged with the error string instead of the response, so
-the ``notion_logs_read`` tool can answer "what's been failing lately?"
-without forcing every tool to remember the same boilerplate.
+Failures are logged with the error string instead of the response so
+operators can answer "what's been failing lately?" against the table
+directly, without forcing the tool to remember the same boilerplate.
 
 The wrapper is intentionally tiny: it adds *only* audit logging.  Token
 isolation, subprocess management, and JSON parsing belong in
-``ntn_client``; tool-specific shaping belongs in the per-tool factory.
+``ntn_client``; tool-specific shaping belongs in :mod:`tool`.
 """
 
 from __future__ import annotations
@@ -54,22 +54,18 @@ async def with_audit(
 
     Args:
         workspace_id: The active workspace; rows cascade with its delete.
-        tool_name: Name of the calling tool (e.g. ``"notion_search"``).
-        operation: Coarse bucket — ``"search"``, ``"read"``, ``"write"``,
-            etc.  Looser than ``tool_name`` so log-reader queries can
-            slice across closely related tools.
+        tool_name: Name of the calling tool (today only ``"ntn"`` — the
+            column kept its old shape for historical row compatibility).
+        operation: Coarse bucket — ``"cli"`` for the proxy tool, plus
+            whatever legacy values are already in the table from the
+            pre-consolidation schema.
         request: Arbitrary JSON-safe dict capturing the call's input.
-            Pass ``None`` when the call has no meaningful input (e.g.
-            ``notion_doctor``).
+            Pass ``None`` when the call has no meaningful input.
         func: Async function that performs the actual work and returns
             the value :func:`with_audit` should forward to the caller.
-        page_id: Optional indexed column; set when the tool targets a
-            specific Notion page so ``notion_logs_read`` can filter on it.
-        database_id: Optional indexed column; set when the tool targets a
-            specific Notion database.
-        page_id / database_id: Optional indexed columns; set when the
-            tool targets a specific Notion entity so ``notion_logs_read``
-            can filter on them.
+        page_id: Optional indexed column; left for backfill compatibility
+            with rows written by the previous per-tool wrappers.
+        database_id: Optional indexed column; same backfill semantics.
 
     Returns:
         Whatever ``func()`` returned, unchanged.

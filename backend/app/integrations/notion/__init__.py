@@ -1,15 +1,15 @@
 """Notion integration for Pawrrtal.
 
 Importing this package registers the Notion :class:`Plugin` against
-:mod:`app.core.plugins.registry`, exposing the eighteen ``notion_*``
-tools to any agent whose workspace has a ``NOTION_API_KEY`` configured.
+:mod:`app.core.plugins.registry`, exposing a single ``ntn`` tool to
+any agent whose workspace has a ``NOTION_API_KEY`` configured.
 
 Execution is delegated to the official Notion CLI (``ntn``):
 :mod:`app.integrations.notion.ntn_client` shells out per call with the
 workspace's token injected via ``NOTION_API_TOKEN`` and an isolated
 ``HOME`` so any state ``ntn`` writes can't leak between workspaces.
 Each invocation is logged to :class:`app.models.NotionOperationLog`
-so ``notion_logs_read`` can surface history without scraping uvicorn
+so operators can audit what the agent ran without scraping uvicorn
 output.
 
 Design rationale lives in

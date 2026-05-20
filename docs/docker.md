@@ -204,7 +204,7 @@ Plugins declare their own env keys in `<plugin>/plugin.py`. They are
 
 | Plugin | Key | Notes |
 |--------|-----|-------|
-| Notion | `NOTION_API_KEY` | 18 tools via the `ntn` subprocess. Get from https://www.notion.so/profile/integrations |
+| Notion | `NOTION_API_KEY` | Single `ntn` tool that proxies arbitrary args to the Notion CLI subprocess. Get the key from https://www.notion.so/profile/integrations |
 
 POST to `/api/v1/workspaces/{workspace_id}/env` to set these without
 the UI.
