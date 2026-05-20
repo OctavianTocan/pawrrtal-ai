@@ -272,12 +272,21 @@ async def _guarded_stream(
             permission_check=turn_input.permission_check,
             images=turn_input.images,
         ):
+            # Hooks fire BEFORE the verbose filter so observability sees
+            # every provider event — including thinking-deltas at
+            # ``verbose_level < 2``, which the filter would otherwise
+            # drop before the Workshop span recorder ever sees them
+            # (#347). The hook contract for ``workshop_event_hook``
+            # returns ``[]`` (side-effects only); extras from any
+            # future hook stay behind the filter so /verbose still
+            # gates what the channel renders.
+            extras = list(_expand_hook_events(event, hooks))
             if not _should_deliver_event(event, turn_input.verbose_level):
                 continue
             counter.record(event)
             aggregator.apply(event)
             yield event
-            for extra in _expand_hook_events(event, hooks):
+            for extra in extras:
                 counter.record(extra)
                 aggregator.apply(extra)
                 yield extra
