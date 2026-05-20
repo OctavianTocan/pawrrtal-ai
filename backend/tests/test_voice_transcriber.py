@@ -127,6 +127,46 @@ class TestXaiSttTranscriber:
             await transcriber.transcribe(b"voice")
         assert "429" in str(excinfo.value)
         assert "rate limited" in str(excinfo.value)
+        # The status code is preserved on the exception so the route
+        # can forward it to the browser instead of collapsing every
+        # provider failure into a generic 502.
+        assert excinfo.value.upstream_status == 429
+
+    async def test_forwards_filename_and_content_type_to_multipart(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        captured: dict[str, Any] = {}
+        _install_stub_post(
+            monkeypatch,
+            _StubResponse(200, payload={"text": "ok"}),
+            captured=captured,
+        )
+        transcriber = XaiSttTranscriber(api_key="sk-test")
+        await transcriber.transcribe(
+            b"voice",
+            filename="meeting.webm",
+            content_type="audio/webm",
+        )
+        # ``files["file"]`` is a (filename, body, content_type) tuple.
+        file_part = captured["files"]["file"]
+        assert file_part[0] == "meeting.webm"
+        assert file_part[2] == "audio/webm"
+
+    async def test_defaults_filename_to_ogg_when_unspecified(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Telegram callers omit filename — preserve the OGG default."""
+        captured: dict[str, Any] = {}
+        _install_stub_post(
+            monkeypatch,
+            _StubResponse(200, payload={"text": "ok"}),
+            captured=captured,
+        )
+        transcriber = XaiSttTranscriber(api_key="sk-test")
+        await transcriber.transcribe(b"voice")
+        file_part = captured["files"]["file"]
+        assert file_part[0] == "voice.ogg"
+        assert file_part[2] == "audio/ogg"
 
     async def test_raises_on_empty_text(self, monkeypatch: pytest.MonkeyPatch) -> None:
         _install_stub_post(monkeypatch, _StubResponse(200, payload={"text": "   "}))

@@ -70,6 +70,18 @@ def get_stt_router() -> APIRouter:
             resolve_transcriber,
         )
 
+        # Verify the backend is configured BEFORE pulling the audio
+        # bytes — a misconfigured deployment shouldn't burn a 25 MB
+        # upload just to surface a 503.
+        transcriber = await _build_transcriber(
+            user=user,
+            session=session,
+            language=language,
+            request_format=format,
+            resolve_global=resolve_transcriber,
+            xai_factory=XaiSttTranscriber,
+        )
+
         audio_bytes = await file.read(MAX_AUDIO_BYTES + 1)
         if len(audio_bytes) > MAX_AUDIO_BYTES:
             raise HTTPException(
@@ -79,19 +91,21 @@ def get_stt_router() -> APIRouter:
         if not audio_bytes:
             raise HTTPException(status_code=422, detail="Audio file is empty.")
 
-        transcriber = await _build_transcriber(
-            user=user,
-            session=session,
-            language=language,
-            request_format=format,
-            resolve_global=resolve_transcriber,
-            xai_factory=XaiSttTranscriber,
-        )
         try:
-            text = await transcriber.transcribe(audio_bytes)
+            text = await transcriber.transcribe(
+                audio_bytes,
+                filename=file.filename,
+                content_type=file.content_type,
+            )
         except TranscriptionError as exc:
             logger.warning("STT_BACKEND_FAIL provider=%s", settings.voice_provider, exc_info=exc)
-            raise HTTPException(status_code=502, detail=str(exc)) from exc
+            # Forward upstream HTTP failures verbatim (401 / 403 / 429
+            # / 4xx malformed-input) so the browser can render the
+            # actual reason. Only fall through to 502 when the
+            # provider failure has no HTTP-level status (e.g. timeout,
+            # missing SDK, empty body).
+            status = exc.upstream_status if exc.upstream_status else 502
+            raise HTTPException(status_code=status, detail=str(exc)) from exc
         return JSONResponse(content={"text": text})
 
     return router

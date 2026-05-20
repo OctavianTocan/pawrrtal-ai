@@ -51,13 +51,39 @@ _HTTP_ERROR_STATUS_FLOOR = 400
 
 
 class TranscriptionError(RuntimeError):
-    """Raised by any backend when transcription fails."""
+    """Raised by any backend when transcription fails.
+
+    ``upstream_status`` carries the HTTP status code from the upstream
+    STT provider when the failure was an HTTP error (e.g. 401 / 429).
+    The web ``/api/v1/stt`` route forwards that status to the browser
+    so the user sees ``Unauthorised`` / ``Rate limited`` instead of a
+    generic 502 ``Bad gateway``.
+    """
+
+    def __init__(self, message: str, *, upstream_status: int | None = None) -> None:
+        super().__init__(message)
+        self.upstream_status = upstream_status
 
 
 class Transcriber(Protocol):
-    """Async transcription backend interface."""
+    """Async transcription backend interface.
 
-    async def transcribe(self, audio_bytes: bytes) -> str:
+    ``filename`` and ``content_type`` describe the audio payload so
+    multipart-based backends (xAI) can label the upload correctly.
+    Backends that ignore filename / content-type (Mistral SDK, OpenAI
+    SDK, local whisper.cpp) accept the kwargs for protocol parity and
+    drop them.  Both default to ``None`` so the Telegram path can call
+    ``transcribe(audio_bytes)`` with no extra metadata and get
+    sensible defaults.
+    """
+
+    async def transcribe(
+        self,
+        audio_bytes: bytes,
+        *,
+        filename: str | None = None,
+        content_type: str | None = None,
+    ) -> str:
         """Return the plain-text transcription of ``audio_bytes``."""
         ...
 
@@ -70,13 +96,19 @@ class MistralVoxtralTranscriber:
         self._model = model
         self._client: Any = None
 
-    async def transcribe(self, audio_bytes: bytes) -> str:
+    async def transcribe(
+        self,
+        audio_bytes: bytes,
+        *,
+        filename: str | None = None,
+        content_type: str | None = None,
+    ) -> str:
         """Return the plain-text transcription of ``audio_bytes``."""
         client = self._get_client()
         try:
             response = await client.audio.transcriptions.complete_async(
                 model=self._model,
-                file={"content": audio_bytes, "file_name": "voice.ogg"},
+                file={"content": audio_bytes, "file_name": filename or "voice.ogg"},
             )
         except Exception as exc:
             logger.warning("MISTRAL_TRANSCRIBE_FAIL error_type=%s", type(exc).__name__)
@@ -111,13 +143,19 @@ class OpenAIWhisperTranscriber:
         self._model = model
         self._client: Any = None
 
-    async def transcribe(self, audio_bytes: bytes) -> str:
+    async def transcribe(
+        self,
+        audio_bytes: bytes,
+        *,
+        filename: str | None = None,
+        content_type: str | None = None,
+    ) -> str:
         """Return the plain-text transcription of ``audio_bytes``."""
         client = self._get_client()
         try:
             response = await client.audio.transcriptions.create(
                 model=self._model,
-                file=("voice.ogg", audio_bytes),
+                file=(filename or "voice.ogg", audio_bytes),
             )
         except Exception as exc:
             logger.warning("OPENAI_TRANSCRIBE_FAIL error_type=%s", type(exc).__name__)
@@ -152,7 +190,13 @@ class LocalWhisperCppTranscriber:
         self._model_path = model_path
         self._resolved_binary: str | None = None
 
-    async def transcribe(self, audio_bytes: bytes) -> str:
+    async def transcribe(
+        self,
+        audio_bytes: bytes,
+        *,
+        filename: str | None = None,
+        content_type: str | None = None,
+    ) -> str:
         """Return the plain-text transcription of ``audio_bytes``."""
         binary = self._resolve_binary()
         model = self._model_path
@@ -271,8 +315,20 @@ class XaiSttTranscriber:
         self._format = format
         self._timeout_seconds = timeout_seconds
 
-    async def transcribe(self, audio_bytes: bytes) -> str:
-        """Return the plain-text transcription of ``audio_bytes``."""
+    async def transcribe(
+        self,
+        audio_bytes: bytes,
+        *,
+        filename: str | None = None,
+        content_type: str | None = None,
+    ) -> str:
+        """Return the plain-text transcription of ``audio_bytes``.
+
+        ``filename`` + ``content_type`` describe the audio payload.
+        Defaults to Telegram's OGG/Opus shape; the web route passes
+        the actual upload filename + content-type so browser-recorded
+        WebM / MP4 isn't mislabelled to xAI.
+        """
         # xAI's docs: the `file` field MUST be the last entry in the
         # multipart body.  httpx preserves insertion order from the
         # `data` + `files` tuples below.
@@ -281,7 +337,13 @@ class XaiSttTranscriber:
             data["language"] = self._language
         if self._format:
             data["format"] = "true"
-        files = {"file": ("voice.ogg", audio_bytes, "audio/ogg")}
+        files = {
+            "file": (
+                filename or "voice.ogg",
+                audio_bytes,
+                content_type or "audio/ogg",
+            ),
+        }
         try:
             async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
                 response = await client.post(
@@ -297,11 +359,13 @@ class XaiSttTranscriber:
             raise TranscriptionError("xAI STT request failed.") from exc
 
         if response.status_code >= _HTTP_ERROR_STATUS_FLOOR:
-            # Surface xAI's error body so deployers see the actual
-            # cause (rate limited, unsupported format, etc.).
+            # Surface xAI's error body + status so the web route can
+            # forward the original status to the browser instead of
+            # collapsing every non-2xx to a generic 502.
             logger.warning("XAI_STT_HTTP_%s body=%s", response.status_code, response.text[:200])
             raise TranscriptionError(
-                f"xAI STT returned HTTP {response.status_code}: {response.text[:200]}"
+                f"xAI STT returned HTTP {response.status_code}: {response.text[:200]}",
+                upstream_status=response.status_code,
             )
 
         try:
