@@ -133,3 +133,30 @@ class AgentResponseEvent(Event):
     text: str = ""
     originating_event_id: str | None = None
     source: str = "agent"
+
+
+@dataclass
+class DreamingCompletedEvent(Event):
+    """A background dreaming pass landed on a terminal status (#341).
+
+    Emitted from :func:`app.core.dreaming.runner.run_dreaming_job`
+    when it stamps a row as ``completed`` (or ``failed``). Telegram
+    subscribers surface the "🌙 Pawrrtal dreamed" notice;
+    observability subscribers can record per-user reflection
+    metrics.
+
+    The integer counts mirror the columns the runner just wrote to
+    ``dreaming_jobs`` so subscribers don't need a follow-up DB
+    round-trip.
+    """
+
+    job_id: uuid.UUID | None = None
+    user_id: uuid.UUID | None = None
+    conversation_id: uuid.UUID | None = None
+    scope: str = ""
+    status: str = ""
+    memories_written: int = 0
+    patterns_written: int = 0
+    followups_written: int = 0
+    session_summary: str | None = None
+    source: str = "dreaming"

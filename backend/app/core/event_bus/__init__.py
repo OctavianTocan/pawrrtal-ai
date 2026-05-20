@@ -29,6 +29,7 @@ from app.core.event_bus.global_bus import publish_if_available
 from app.core.event_bus.handlers import AgentHandler, NotificationService
 from app.core.event_bus.types import (
     AgentResponseEvent,
+    DreamingCompletedEvent,
     ScheduledEvent,
     TurnCompletedEvent,
     TurnStartedEvent,
@@ -38,6 +39,7 @@ from app.core.event_bus.types import (
 __all__ = [
     "AgentHandler",
     "AgentResponseEvent",
+    "DreamingCompletedEvent",
     "Event",
     "EventBus",
     "EventHandler",

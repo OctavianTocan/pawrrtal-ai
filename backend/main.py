@@ -46,6 +46,7 @@ from app.core.scheduler import JobScheduler
 from app.core.telemetry import setup_tracing, shutdown_tracing
 from app.db import create_db_and_tables
 from app.integrations.telegram import telegram_lifespan
+from app.integrations.telegram.dreaming_notify import DreamingNotificationService
 from app.integrations.webhooks import get_webhooks_router
 from app.logger_setup import (
     configure_logging,  # Set up logging configuration (this should be done before any loggers are used)
@@ -146,6 +147,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             telegram_bot=telegram_service.bot if telegram_service is not None else None
         )
         notification_service.register(event_bus)
+        # Dreaming completion notice (#341): posts "🌙 Pawrrtal dreamed"
+        # in the user's Telegram DM whenever a background reflection
+        # pass finishes with at least one new memory. No-op when the
+        # bot is down or dreaming is disabled.
+        dreaming_notify = DreamingNotificationService(
+            telegram_bot=telegram_service.bot if telegram_service is not None else None
+        )
+        dreaming_notify.register(event_bus)
         try:
             yield
         finally:

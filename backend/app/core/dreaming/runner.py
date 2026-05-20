@@ -275,7 +275,7 @@ async def _mark_completed(
     input_chars: int,
     raw_chars: int,
 ) -> None:
-    """Stamp the job row with the run's results."""
+    """Stamp the job row with the run's results and publish the completion event."""
     job.status = "completed"
     job.completed_at = datetime.now(UTC)
     job.memories_written = memories_written
@@ -287,6 +287,7 @@ async def _mark_completed(
     job.input_token_count = input_chars // _CHARS_PER_TOKEN
     job.output_token_count = raw_chars // _CHARS_PER_TOKEN
     await session.commit()
+    await _publish_completion(job)
 
 
 async def _mark_failed(session: AsyncSession, job: DreamingJob, *, error: str) -> None:
@@ -295,6 +296,36 @@ async def _mark_failed(session: AsyncSession, job: DreamingJob, *, error: str) -
     job.completed_at = datetime.now(UTC)
     job.error_text = error[:1000]
     await session.commit()
+    await _publish_completion(job)
+
+
+async def _publish_completion(job: DreamingJob) -> None:
+    """Publish a :class:`DreamingCompletedEvent` for downstream subscribers.
+
+    Lazy imports keep the event-bus dependency outside the
+    runner's hot path — important because the runner runs in
+    background tasks where a top-level import would force every
+    deployment to pay the bus's startup cost regardless of whether
+    dreaming is enabled.
+    """
+    from app.core.event_bus import (  # noqa: PLC0415
+        DreamingCompletedEvent,
+        publish_if_available,
+    )
+
+    await publish_if_available(
+        DreamingCompletedEvent(
+            job_id=job.id,
+            user_id=job.user_id,
+            conversation_id=job.conversation_id,
+            scope=job.scope,
+            status=job.status,
+            memories_written=job.memories_written,
+            patterns_written=job.patterns_written,
+            followups_written=job.followups_written,
+            session_summary=job.session_summary,
+        )
+    )
 
 
 async def _default_dream_fn(prompt: str) -> str:
