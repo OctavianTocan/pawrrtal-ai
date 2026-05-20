@@ -45,6 +45,7 @@ from app.core.tools.lcm_agents import (
     make_lcm_list_summaries_tool,
     make_lcm_search_tool,
 )
+from app.core.tools.hindsight import make_hindsight_query_tool
 from app.core.tools.markitdown_convert import make_markitdown_tool
 from app.core.tools.memory_query import make_memory_query_tool
 from app.core.tools.now import (
@@ -277,6 +278,14 @@ def build_agent_tools(
     # new tool until they opt in.
     if settings.memories_enabled and user_id is not None:
         tools.append(make_memory_query_tool(user_id=user_id))
+
+    # Hindsight (#359) — semantic recall across all of the user's
+    # past conversations. Pairs with the LCM family (per-conversation)
+    # and ``memory_query`` (typed proactive memories). Gated on
+    # ``hindsight_enabled`` so deployments without the candidate-row
+    # caps tuned can keep it dark.
+    if settings.hindsight_enabled and user_id is not None:
+        tools.append(make_hindsight_query_tool(user_id=user_id))
 
     # Plugin-contributed tools.  Additive only — core tools above are
     # unaffected.  Extracted into a helper so the main composition body

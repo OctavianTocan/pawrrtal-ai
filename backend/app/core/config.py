@@ -325,6 +325,11 @@ class Settings(BaseSettings):
     # per-user rather than big-bang. See
     # ``frontend/content/docs/handbook/decisions/2026-05-20-proactive-memory-updates.mdx``.
     memories_enabled: bool = False
+    # Master switch for the ``hindsight_query`` tool (#359) —
+    # semantic recall across all of the user's past conversations.
+    # Default off so deployments can tune the candidate-row cap
+    # before exposing it.
+    hindsight_enabled: bool = False
 
     # ── Voice transcription (PR 14) ──────────────────────────────────────
     # Selects which STT backend the voice handler routes to. The
