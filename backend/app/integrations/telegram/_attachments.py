@@ -325,7 +325,13 @@ async def _transcribe_audio(audio_bytes: bytes) -> str | None:
         resolve_transcriber,
     )
 
-    transcriber = resolve_transcriber()
+    # ``include_xai=True`` flips the default behaviour for the xAI
+    # backend (the gateway's most common setting). The web composer
+    # has its own workspace-aware ``api/stt.py`` route; Telegram
+    # voice notes don't reach that route, so without this flag a
+    # default ``voice_provider=xai`` deployment silently dropped every
+    # voice note with the "ask the user to retype" annotation (#374).
+    transcriber = resolve_transcriber(include_xai=True)
     if transcriber is None:
         return None
     try:

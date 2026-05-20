@@ -43,6 +43,68 @@ class Transcriber(Protocol):
         ...
 
 
+# xAI's documented STT endpoint. Mirrors the constant in
+# ``app.api.stt`` — kept independent here so the transcriber path
+# doesn't import from the FastAPI router module.
+_XAI_STT_URL = "https://api.x.ai/v1/stt"
+
+# Cap on the xAI STT request. Tuned for the typical 30-60s voice note;
+# longer recordings can still get through but won't hang the bot for
+# minutes if xAI is slow.
+_XAI_STT_TIMEOUT_SECONDS = 60.0
+
+
+class XaiSttTranscriber:
+    """Transcription via xAI's hosted STT endpoint.
+
+    The ``api/stt.py`` proxy that powers the web composer used to be
+    the only consumer of this endpoint; Telegram voice notes silently
+    fell through ``resolve_transcriber()`` (which returned ``None``
+    for ``voice_provider == "xai"``) and surfaced as "Transcription
+    is not available on this surface yet — ask the user to retype
+    the relevant bits." (#374). The transcriber below exposes the
+    same HTTP call as a :class:`Transcriber` so Telegram can use the
+    operator's existing ``XAI_API_KEY`` without additional config.
+    """
+
+    def __init__(self, api_key: str, *, url: str = _XAI_STT_URL) -> None:
+        self._api_key = api_key
+        self._url = url
+
+    async def transcribe(self, audio_bytes: bytes) -> str:
+        """Return the plain-text transcription of ``audio_bytes``."""
+        # ``httpx`` is a hard dependency of the gateway, so no lazy
+        # import gate is required — every deployment already has it.
+        import httpx  # noqa: PLC0415
+
+        try:
+            async with httpx.AsyncClient(timeout=_XAI_STT_TIMEOUT_SECONDS) as client:
+                response = await client.post(
+                    self._url,
+                    headers={"Authorization": f"Bearer {self._api_key}"},
+                    data={"format": "true"},
+                    files={"file": ("voice.ogg", audio_bytes, "audio/ogg")},
+                )
+        except httpx.TimeoutException as exc:
+            logger.warning("XAI_TRANSCRIBE_TIMEOUT after=%ss", _XAI_STT_TIMEOUT_SECONDS)
+            raise TranscriptionError("xAI transcription timed out.") from exc
+        except httpx.RequestError as exc:
+            logger.warning("XAI_TRANSCRIBE_REQUEST_FAIL error=%s", exc)
+            raise TranscriptionError("xAI transcription provider unreachable.") from exc
+
+        if response.status_code >= 400:
+            logger.warning(
+                "XAI_TRANSCRIBE_HTTP_ERROR status=%s body=%s",
+                response.status_code,
+                response.text[:200],
+            )
+            raise TranscriptionError(f"xAI transcription returned {response.status_code}.")
+        text = (response.json().get("text") or "").strip()
+        if not text:
+            raise TranscriptionError("xAI returned an empty transcription.")
+        return text
+
+
 class MistralVoxtralTranscriber:
     """Voxtral transcription via the Mistral SDK (lazy import)."""
 
@@ -229,12 +291,27 @@ class LocalWhisperCppTranscriber:
         return stdout.decode()
 
 
-def resolve_transcriber() -> Transcriber | None:
-    """Build the configured backend.  Returns ``None`` for ``xai`` (legacy path).
+def resolve_transcriber(*, include_xai: bool = False) -> Transcriber | None:
+    """Build the configured backend.
 
-    The xAI proxy lives in ``api/stt.py`` and is the historical path.
-    The other three backends are returned as :class:`Transcriber`
-    instances the route can call uniformly.
+    Args:
+        include_xai: When ``True`` (Telegram and other surfaces without
+            their own xAI route), the xAI path returns a
+            :class:`XaiSttTranscriber` so voice notes get transcribed
+            via the gateway's ``XAI_API_KEY`` (#374). When ``False``
+            (the default — kept for the ``api/stt.py`` web composer
+            route), the xAI path returns ``None`` so the route's own
+            workspace-aware ``XAI_API_KEY`` resolution continues to
+            run. Other backends ignore the flag.
+
+    The xAI proxy ``api/stt.py`` historically handled the web composer
+    directly without going through this function — Telegram, which
+    *does* call this function for voice notes, then got ``None`` back
+    on the default ``voice_provider == "xai"`` deployment and fell
+    through to the "transcription not available — please retype"
+    annotation. ``include_xai=True`` is the seam Telegram uses to
+    pick up the gateway-global key without touching the web composer
+    contract.
     """
     provider = settings.voice_provider
     if provider == "mistral":
@@ -250,4 +327,8 @@ def resolve_transcriber() -> Transcriber | None:
             binary_path=settings.voice_whisper_cpp_binary or None,
             model_path=settings.voice_whisper_cpp_model,
         )
+    if provider == "xai" and include_xai:
+        if not settings.xai_api_key:
+            return None
+        return XaiSttTranscriber(api_key=settings.xai_api_key)
     return None
