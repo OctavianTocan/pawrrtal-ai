@@ -89,7 +89,8 @@ ignore_imports =
     ; lcm_embeddings).  Grandfathered alongside the older LCM entries
     ; until the entire LCM stack is flattened in one pass.
     app.core.lcm.embeddings -> app.models
-    app.core.lcm.evals -> app.models
+    app.core.lcm.evals.seeding -> app.models
+    app.core.lcm.evals.retrievers -> app.models
     app.core.lcm.observe -> app.models
     app.core.tools.lcm_search -> app.models
 

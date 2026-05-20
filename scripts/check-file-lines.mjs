@@ -90,14 +90,11 @@ const EXEMPT_PATH_FRAGMENTS = [
 	'backend/app/core/agent_loop/loop.py',
 	'backend/app/core/providers/claude_provider.py',
 	'backend/app/integrations/telegram/bot.py',
-	// LCM retrieval lab (PR #258) — two files still over budget. ``evals.py``
-	// is the largest (873 lines: harness + scenarios + answerer + retrievers
-	// all in one) and the natural split is into an ``evals/`` package
-	// (runner / seeding / answerer / retrievers). ``embeddings.py`` is
-	// storage + semantic + RRF; split semantic vs RRF blender.
-	// TODO(pawrrtal-lcm-split follow-up): land the two splits and
-	// remove this exemption.
-	'backend/app/core/lcm/evals.py',
+	// LCM retrieval lab (PR #258) — ``embeddings.py`` is storage +
+	// semantic + RRF; planned split lives on `claude/lcm-embeddings-package`
+	// (PR #386) and will land separately.
+	// TODO(pawrrtal-lcm-embeddings-split): land PR #386 and remove this
+	// exemption.
 	'backend/app/core/lcm/embeddings.py',
 ];
 
