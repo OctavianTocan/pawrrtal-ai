@@ -5,7 +5,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from app.db import async_session_maker
-from app.integrations.telegram.model_command import handle_model_command
+from app.integrations.telegram.model_command import (
+    handle_model_command,
+    set_user_default_model_from_callback,
+)
 
 # Re-exported so bot.py imports both via one module.
 from app.integrations.telegram.model_picker import (
@@ -14,8 +17,10 @@ from app.integrations.telegram.model_picker import (
 from app.integrations.telegram.model_picker import (
     ModelButton,
     ModelCallback,
+    build_default_already_set_keyboard,
     build_host_keyboard,
     build_models_keyboard,
+    build_set_default_keyboard,
     build_vendor_keyboard,
     format_host_picker_text,
     format_models_picker_text,
@@ -65,7 +70,10 @@ async def answer_model_picker(*, message: Message) -> None:
         return
 
     await message.answer(
-        format_host_picker_text(state.current_model_id),
+        format_host_picker_text(
+            state.current_model_id,
+            user_default_model_id=state.user_default_model_id,
+        ),
         reply_markup=_inline_keyboard(build_host_keyboard()),
         reply_parameters=_reply_parameters(message.message_id),
     )
@@ -73,15 +81,33 @@ async def answer_model_picker(*, message: Message) -> None:
 
 async def handle_model_picker_callback(*, callback: CallbackQuery) -> None:
     """Handle inline keyboard callbacks produced by the model picker."""
+    # Inert confirmation button — no-op so a second tap doesn't error.
+    if callback.data == "mdl:noop":
+        await callback.answer()
+        return
+
     parsed = parse_model_callback_data(callback.data)
     if parsed is None:
         await callback.answer(picker_stale_message(), show_alert=True)
         return
 
+    if parsed.action in ("select", "set_default"):
+        await _handle_mutating_callback(callback=callback, parsed=parsed)
+        return
+
+    await _handle_navigation_callback(callback=callback, parsed=parsed)
+
+
+async def _handle_mutating_callback(*, callback: CallbackQuery, parsed: ModelCallback) -> None:
+    """Dispatch to the right per-action mutation handler."""
     if parsed.action == "select":
         await _handle_model_select(callback=callback, parsed=parsed)
         return
+    await _handle_set_default(callback=callback, parsed=parsed)
 
+
+async def _handle_navigation_callback(*, callback: CallbackQuery, parsed: ModelCallback) -> None:
+    """Handle the back-button / drill-in screens (no DB mutation)."""
     sender = _sender_from_callback(callback)
     async with async_session_maker() as session:
         state = await get_model_picker_state(sender=sender, session=session)
@@ -98,7 +124,11 @@ async def handle_model_picker_callback(*, callback: CallbackQuery) -> None:
         )
         return
 
-    await _edit_host_list(callback=callback, current_model_id=state.current_model_id)
+    await _edit_host_list(
+        callback=callback,
+        current_model_id=state.current_model_id,
+        user_default_model_id=state.user_default_model_id,
+    )
 
 
 def _opens_picker(model_arg: str) -> bool:
@@ -106,6 +136,13 @@ def _opens_picker(model_arg: str) -> bool:
 
 
 async def _handle_model_select(*, callback: CallbackQuery, parsed: ModelCallback) -> None:
+    """Persist a per-conversation model switch and offer "set as default".
+
+    The selection success message keeps a single inline button —
+    "⭐ Set as my default" — so the user can promote the just-picked
+    model to their personal default with a follow-up tap, without
+    typing the keyword.
+    """
     entry = resolve_model_selection(parsed)
     if entry is None:
         await callback.answer(picker_stale_message(), show_alert=True)
@@ -114,12 +151,49 @@ async def _handle_model_select(*, callback: CallbackQuery, parsed: ModelCallback
     sender = _sender_from_callback(callback)
     async with async_session_maker() as session:
         reply = await handle_model_command(sender=sender, model_arg=entry.id, session=session)
+        state = await get_model_picker_state(sender=sender, session=session)
+
     message = _callback_message(callback)
     if message is None:
         await callback.answer(picker_stale_message(), show_alert=True)
         return
-    await message.edit_text(reply)
+
+    already_default = state is not None and state.user_default_model_id == entry.id
+    if already_default:
+        await message.edit_text(reply)
+    else:
+        default_keyboard = build_set_default_keyboard(model_id=entry.id)
+        await message.edit_text(
+            reply,
+            reply_markup=_inline_keyboard(default_keyboard) if default_keyboard else None,
+        )
     await callback.answer(f"Model set: {entry.short_name}")
+
+
+async def _handle_set_default(*, callback: CallbackQuery, parsed: ModelCallback) -> None:
+    """Persist the user's default model from the post-selection button."""
+    entry = resolve_model_selection(parsed)
+    if entry is None:
+        await callback.answer(picker_stale_message(), show_alert=True)
+        return
+
+    sender = _sender_from_callback(callback)
+    async with async_session_maker() as session:
+        success = await set_user_default_model_from_callback(
+            sender=sender,
+            session=session,
+            canonical_model_id=entry.id,
+        )
+    if not success:
+        await callback.answer(picker_not_bound_message(), show_alert=True)
+        return
+
+    message = _callback_message(callback)
+    if message is not None:
+        await message.edit_reply_markup(
+            reply_markup=_inline_keyboard(build_default_already_set_keyboard())
+        )
+    await callback.answer(f"⭐ Default set: {entry.short_name}")
 
 
 async def _edit_vendor_list(*, callback: CallbackQuery, parsed: ModelCallback) -> None:
@@ -170,13 +244,18 @@ async def _edit_model_list(
     await callback.answer()
 
 
-async def _edit_host_list(*, callback: CallbackQuery, current_model_id: str) -> None:
+async def _edit_host_list(
+    *,
+    callback: CallbackQuery,
+    current_model_id: str,
+    user_default_model_id: str | None = None,
+) -> None:
     message = _callback_message(callback)
     if message is None:
         await callback.answer(picker_stale_message(), show_alert=True)
         return
     await message.edit_text(
-        format_host_picker_text(current_model_id),
+        format_host_picker_text(current_model_id, user_default_model_id=user_default_model_id),
         reply_markup=_inline_keyboard(build_host_keyboard()),
     )
     await callback.answer()

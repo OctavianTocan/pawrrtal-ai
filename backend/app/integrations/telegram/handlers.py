@@ -39,6 +39,7 @@ from app.crud.channel import (
     redeem_link_code,
     update_conversation_verbose_level,
 )
+from app.crud.user_preferences import get_user_default_model_id
 
 # Re-export so ``bot.py`` imports both ``handle_plain_message`` and
 # ``collect_attachments`` from the same module — keeps ``bot.py`` under
@@ -230,7 +231,13 @@ async def handle_plain_message(
         thread_id=sender.thread_id,
     )
 
-    model_id = conversation.model_id or default_model().id
+    # Conversation override wins; otherwise the user's pinned default;
+    # otherwise the system-wide catalog default.
+    user_default = await get_user_default_model_id(
+        session=session,
+        user_id=pawrrtal_user_id,
+    )
+    model_id = conversation.model_id or user_default or default_model().id
 
     logger.info(
         "TELEGRAM_TURN user_id=%s conversation_id=%s model=%s thread_id=%s text_len=%d",

@@ -14,8 +14,10 @@ from app.core.providers.model_id import Host
 from app.integrations.telegram.model_picker import (
     ModelButton,
     ModelCallback,
+    build_default_already_set_keyboard,
     build_host_keyboard,
     build_models_keyboard,
+    build_set_default_keyboard,
     build_vendor_keyboard,
     format_host_picker_text,
     format_models_picker_text,
@@ -206,11 +208,44 @@ async def test_get_model_picker_state_reads_conversation_override() -> None:
             "app.integrations.telegram.model_picker.get_or_create_telegram_conversation_full",
             new=AsyncMock(return_value=conversation),
         ),
+        patch(
+            "app.integrations.telegram.model_picker.get_user_default_model_id",
+            new=AsyncMock(return_value=None),
+        ),
     ):
         state = await get_model_picker_state(sender=sender, session=AsyncMock())
 
     assert state is not None
     assert state.current_model_id == override
+    assert state.user_default_model_id is None
+
+
+@pytest.mark.anyio
+async def test_get_model_picker_state_falls_back_to_user_default() -> None:
+    """When conversation has no override, the user's pinned default surfaces."""
+    sender = TelegramSender(user_id=3, chat_id=3, username=None, full_name=None)
+    user_default = MODEL_CATALOG[2].id
+    conversation = SimpleNamespace(model_id=None)
+
+    with (
+        patch(
+            "app.integrations.telegram.model_picker.get_user_id_for_external",
+            new=AsyncMock(return_value=uuid.uuid4()),
+        ),
+        patch(
+            "app.integrations.telegram.model_picker.get_or_create_telegram_conversation_full",
+            new=AsyncMock(return_value=conversation),
+        ),
+        patch(
+            "app.integrations.telegram.model_picker.get_user_default_model_id",
+            new=AsyncMock(return_value=user_default),
+        ),
+    ):
+        state = await get_model_picker_state(sender=sender, session=AsyncMock())
+
+    assert state is not None
+    assert state.current_model_id == user_default
+    assert state.user_default_model_id == user_default
 
 
 def test_parse_vendor_callback_round_trips_host() -> None:
@@ -253,6 +288,62 @@ def test_pagination_first_page_omits_prev_button(monkeypatch: pytest.MonkeyPatch
     labels = [b.text for b in _flatten(rows)]
     assert "< Prev" not in labels
     assert "Next >" in labels
+
+
+def test_host_picker_text_omits_default_line_when_user_default_matches_current() -> None:
+    """If current == default we suppress the second line to avoid noise."""
+    same = default_model().id
+    text = format_host_picker_text(same, user_default_model_id=same)
+    assert "Default:" not in text
+
+
+def test_host_picker_text_shows_default_line_when_distinct() -> None:
+    """A pinned default different from current must surface as its own line."""
+    current = MODEL_CATALOG[0].id
+    pinned = MODEL_CATALOG[1].id
+    text = format_host_picker_text(current, user_default_model_id=pinned)
+    assert "Default:" in text
+    assert MODEL_CATALOG[1].display_name in text
+
+
+def test_build_set_default_keyboard_emits_one_row_with_star() -> None:
+    """The success message gets one ⭐ row carrying the catalog-token payload."""
+    entry = MODEL_CATALOG[0]
+    rows = build_set_default_keyboard(model_id=entry.id)
+    assert rows is not None
+    assert len(rows) == 1
+    assert len(rows[0]) == 1
+    button = rows[0][0]
+    assert "⭐" in button.text
+    assert button.callback_data.startswith("mdl:d:")
+    # Round-trips through the parser as a set_default action.
+    parsed = parse_model_callback_data(button.callback_data)
+    assert parsed is not None
+    assert parsed.action == "set_default"
+
+
+def test_build_set_default_keyboard_returns_none_for_unknown_model() -> None:
+    assert build_set_default_keyboard(model_id="not-in-catalog") is None
+
+
+def test_build_default_already_set_keyboard_emits_inert_button() -> None:
+    rows = build_default_already_set_keyboard()
+    assert rows == [[ModelButton(text="⭐ Already your default", callback_data="mdl:noop")]]
+
+
+def test_parse_set_default_round_trips_to_catalog_entry() -> None:
+    """A set_default callback resolves to the same entry as a select callback."""
+    entry = MODEL_CATALOG[0]
+    rows = build_set_default_keyboard(model_id=entry.id)
+    assert rows is not None
+    parsed = parse_model_callback_data(rows[0][0].callback_data)
+    assert parsed is not None
+    assert resolve_model_selection(parsed) == entry
+
+
+def test_parse_set_default_rejects_stale_catalog_token() -> None:
+    stale = ModelCallback(action="set_default", index=0, catalog_token="deadbeef")
+    assert resolve_model_selection(stale) is None
 
 
 def test_pagination_last_page_omits_next_button(monkeypatch: pytest.MonkeyPatch) -> None:
