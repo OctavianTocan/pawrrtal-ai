@@ -93,9 +93,10 @@ function ReasoningPanel({
 			/>
 			<CollapsibleContent
 				className={cn(
-					'mt-2 overflow-hidden',
-					'data-[state=closed]:animate-collapsible-close',
-					'data-[state=open]:animate-collapsible-open'
+					'overflow-hidden pt-2',
+					'data-[state=closed]:animate-reasoning-panel-close',
+					'data-[state=open]:animate-reasoning-panel-open',
+					'motion-reduce:data-[state=closed]:animate-none motion-reduce:data-[state=open]:animate-none'
 				)}
 			>
 				<ChainOfThought

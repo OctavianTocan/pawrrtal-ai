@@ -752,6 +752,8 @@ html[data-font="inter"] {
 	   (no flash on mount) and the `to` state persists after it ends. */
 	--animate-collapsible-open: collapsible-open 200ms cubic-bezier(0.25, 1, 0.5, 1) both;
 	--animate-collapsible-close: collapsible-close 150ms cubic-bezier(0.7, 0, 0.84, 0) both;
+	--animate-reasoning-panel-open: reasoning-panel-open 320ms cubic-bezier(0.22, 1, 0.36, 1) both;
+	--animate-reasoning-panel-close: reasoning-panel-close 240ms cubic-bezier(0.55, 0, 0.1, 1) both;
 }
 
 /* Keyframes consolidated near the end of this file under the
@@ -1859,6 +1861,28 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 	to {
 		opacity: 0;
 		transform: translateY(-4px);
+	}
+}
+
+@keyframes reasoning-panel-open {
+	from {
+		height: 0;
+		opacity: 0;
+	}
+	to {
+		height: var(--radix-collapsible-content-height);
+		opacity: 1;
+	}
+}
+
+@keyframes reasoning-panel-close {
+	from {
+		height: var(--radix-collapsible-content-height);
+		opacity: 1;
+	}
+	to {
+		height: 0;
+		opacity: 0;
 	}
 }
 
