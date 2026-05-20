@@ -13,8 +13,9 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from app.api._chat_external_mcp import (  # noqa: F401 — re-export keeps chat.py fan-out under sentrux budget
-    load_external_mcp_configs,
+from app.api._chat_external_mcp import (
+    # Re-export keeps chat.py fan-out under sentrux budget.
+    load_external_mcp_configs as load_external_mcp_configs,  # noqa: PLC0414
 )
 from app.core.agent_loop.types import PermissionCheckFn, PermissionCheckResult
 from app.core.governance.permissions import (

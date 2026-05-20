@@ -66,7 +66,7 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 _THIS_FILE = Path(__file__)
 
@@ -84,7 +84,7 @@ if TYPE_CHECKING:
     from opentelemetry.trace import Tracer
 
 
-def _drop_grpc_connect_spans(exporter):
+def _drop_grpc_connect_spans(exporter: Any) -> Any:
     """Wrap *exporter* to silently discard gRPC C-core "connect" spans.
 
     grpcio ≥ 1.62 ships a native OpenTelemetry census plugin in the
@@ -111,18 +111,20 @@ def _drop_grpc_connect_spans(exporter):
             kept = [s for s in spans if s.name not in self._DROP_NAMES]
             if not kept:
                 return SpanExportResult.SUCCESS
-            return exporter.export(kept)
+            result: SpanExportResult = exporter.export(kept)
+            return result
 
         def shutdown(self) -> None:
             exporter.shutdown()
 
         def force_flush(self, timeout_millis: float = 0) -> bool:
-            return exporter.force_flush(timeout_millis)
+            result: bool = exporter.force_flush(timeout_millis)
+            return result
 
     return _FilteredExporter()
 
 
-def _make_json_exporter():
+def _make_json_exporter() -> Any:
     """Build an OTLP/HTTP **JSON** span exporter.
 
     The standard ``OTLPSpanExporter`` from
@@ -138,8 +140,8 @@ def _make_json_exporter():
     """
     from collections.abc import Sequence
 
-    from google.protobuf.json_format import MessageToJson
-    from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
+    from google.protobuf.json_format import MessageToJson  # type: ignore[import-untyped]
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import (  # type: ignore[attr-defined]
         OTLPSpanExporter,
         encode_spans,
     )

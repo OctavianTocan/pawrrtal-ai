@@ -115,7 +115,7 @@ class OpenAIWhisperTranscriber:
             # ``openai`` lives behind the optional ``[voice]`` extra,
             # so its stubs are not installed in the default environment.
             # The ModuleNotFoundError below is the load-bearing guard.
-            from openai import AsyncOpenAI  # type: ignore[import-not-found]  # noqa: PLC0415
+            from openai import AsyncOpenAI  # noqa: PLC0415
         except ModuleNotFoundError as exc:
             raise TranscriptionError(
                 "Optional dependency 'openai' is missing.  "

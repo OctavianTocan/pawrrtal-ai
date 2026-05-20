@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from app.db import async_session_maker
 from app.integrations.telegram.model_command import handle_model_command
+
+# Re-exported so bot.py imports both via one module.
 from app.integrations.telegram.model_picker import (
-    MODEL_CALLBACK_PREFIX,  # noqa: F401  # re-exported so bot.py imports both via one module
+    MODEL_CALLBACK_PREFIX as MODEL_CALLBACK_PREFIX,  # noqa: PLC0414
+)
+from app.integrations.telegram.model_picker import (
     ModelButton,
     ModelCallback,
     build_host_keyboard,
@@ -27,7 +31,12 @@ from app.integrations.telegram.model_picker import (
 from app.integrations.telegram.sender import TelegramSender
 
 if TYPE_CHECKING:
-    from aiogram.types import CallbackQuery, Message
+    from aiogram.types import (
+        CallbackQuery,
+        InlineKeyboardMarkup,
+        Message,
+        ReplyParameters,
+    )
 
 
 async def answer_model_command(*, message: Message, model_arg: str) -> None:
@@ -173,7 +182,7 @@ async def _edit_host_list(*, callback: CallbackQuery, current_model_id: str) -> 
     await callback.answer()
 
 
-def _inline_keyboard(rows: list[list[ModelButton]]) -> object:
+def _inline_keyboard(rows: list[list[ModelButton]]) -> InlineKeyboardMarkup:
     from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup  # noqa: PLC0415
 
     return InlineKeyboardMarkup(
@@ -218,10 +227,12 @@ def _callback_message(callback: CallbackQuery) -> Message | None:
     message = callback.message
     if message is None or not hasattr(message, "edit_text"):
         return None
-    return message
+    # ``callback.message`` is typed ``Message | InaccessibleMessage``; the
+    # hasattr() guard above narrows to the accessible Message at runtime.
+    return cast("Message", message)
 
 
-def _reply_parameters(message_id: int) -> object:
+def _reply_parameters(message_id: int) -> ReplyParameters:
     from aiogram.types import ReplyParameters  # noqa: PLC0415
 
     return ReplyParameters(message_id=message_id)

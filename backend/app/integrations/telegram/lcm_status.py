@@ -35,9 +35,20 @@ class _TelegramSenderLike(Protocol):
     other (sentrux's ``max_cycles=0`` forbids it).
     """
 
-    user_id: int
-    chat_id: int
-    thread_id: int | None
+    @property
+    def user_id(self) -> int:
+        """Telegram numeric user id."""
+        ...
+
+    @property
+    def chat_id(self) -> int:
+        """Telegram chat id (DM or group)."""
+        ...
+
+    @property
+    def thread_id(self) -> int | None:
+        """Telegram topic thread id, or ``None`` outside a topic."""
+        ...
 
 
 logger = logging.getLogger(__name__)

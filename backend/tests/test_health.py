@@ -21,6 +21,7 @@ from collections.abc import AsyncGenerator
 from pathlib import Path
 
 import pytest
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -54,7 +55,7 @@ def unauthenticated_app():
 
 
 @pytest.fixture
-async def raw_client(unauthenticated_app) -> AsyncGenerator[AsyncClient]:
+async def raw_client(unauthenticated_app: FastAPI) -> AsyncGenerator[AsyncClient]:
     """Async HTTP client talking to an unauthenticated app instance."""
     transport = ASGITransport(app=unauthenticated_app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as c:

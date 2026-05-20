@@ -8,6 +8,8 @@ Only the LLM is replaced with a deterministic script.
 
 from __future__ import annotations
 
+from typing import Any
+
 import pytest
 
 from app.core.agent_loop.types import AgentTool, PermissionCheckResult
@@ -21,13 +23,13 @@ from tests.agent_harness import (
 pytestmark = pytest.mark.anyio
 
 
-async def _allow_all(tool_name: str, arguments: dict) -> PermissionCheckResult:
+async def _allow_all(tool_name: str, arguments: dict[str, Any]) -> PermissionCheckResult:
     """Permission gate that allows every call."""
     _ = tool_name, arguments
     return PermissionCheckResult(allow=True, reason=None, violation_type=None)
 
 
-async def _deny_all(tool_name: str, arguments: dict) -> PermissionCheckResult:
+async def _deny_all(tool_name: str, arguments: dict[str, Any]) -> PermissionCheckResult:
     """Permission gate that denies every call."""
     _ = tool_name, arguments
     return PermissionCheckResult(
@@ -37,7 +39,7 @@ async def _deny_all(tool_name: str, arguments: dict) -> PermissionCheckResult:
     )
 
 
-async def _crash(_tool_name: str, _arguments: dict) -> PermissionCheckResult:
+async def _crash(_tool_name: str, _arguments: dict[str, Any]) -> PermissionCheckResult:
     """Permission gate that raises — verifies fail-closed semantics."""
     raise RuntimeError("policy crashed")
 
@@ -88,7 +90,7 @@ class TestPermissionGateLoop:
 
     async def test_deny_short_circuits_tool_execute(self) -> None:
         """A denial surfaces as an error tool_result and the tool's body never runs."""
-        executed: list[dict] = []
+        executed: list[dict[str, Any]] = []
 
         async def _spy_execute(_tool_call_id: str, **kwargs: object) -> str:
             executed.append(dict(kwargs))
@@ -126,7 +128,7 @@ class TestPermissionGateLoop:
 
     async def test_crash_in_gate_fails_closed(self) -> None:
         """A crashing gate denies the call (fail-closed) instead of allowing it."""
-        executed: list[dict] = []
+        executed: list[dict[str, Any]] = []
 
         async def _spy_execute(_tool_call_id: str, **kwargs: object) -> str:
             executed.append(dict(kwargs))
@@ -161,9 +163,9 @@ class TestPermissionGateLoop:
 
     async def test_audit_sink_called_on_denial(self) -> None:
         """A denial fires the optional audit sink with (name, args, decision)."""
-        sink_calls: list[tuple[str, dict, PermissionCheckResult]] = []
+        sink_calls: list[tuple[str, dict[str, Any], PermissionCheckResult]] = []
 
-        async def sink(name: str, args: dict, decision: PermissionCheckResult) -> None:
+        async def sink(name: str, args: dict[str, Any], decision: PermissionCheckResult) -> None:
             sink_calls.append((name, args, decision))
 
         script = ScriptedStreamFn(
@@ -194,7 +196,9 @@ class TestPermissionGateLoop:
     async def test_audit_sink_failure_is_swallowed(self) -> None:
         """An exception from the audit sink must never break the turn."""
 
-        async def crashing_sink(_name: str, _args: dict, _decision: PermissionCheckResult) -> None:
+        async def crashing_sink(
+            _name: str, _args: dict[str, Any], _decision: PermissionCheckResult
+        ) -> None:
             raise RuntimeError("sink boom")
 
         script = ScriptedStreamFn(

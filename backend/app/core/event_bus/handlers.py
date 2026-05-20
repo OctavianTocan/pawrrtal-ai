@@ -383,9 +383,11 @@ async def _run_agent_turn(*, prompt: str, user_id: uuid.UUID) -> str:
 
         permission_check_fn = permission_check_for_handler
 
+    # resolve_llm does not accept user_id; workspace_root carries the
+    # per-user key resolution upstream. Kept for call-site symmetry.
+    _ = user_id
     provider = resolve_llm(
         default_model().id,
-        user_id=user_id,
         workspace_root=workspace_root,
     )
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import uuid
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -135,11 +136,15 @@ class TestCompose:
         assert decision.allow is True
 
     async def test_compose_short_circuits_on_first_denial(self, context: PermissionContext) -> None:
-        async def deny_always(_a: str, _b: dict, _c: PermissionContext) -> PermissionDecision:
+        async def deny_always(
+            _a: str, _b: dict[str, Any], _c: PermissionContext
+        ) -> PermissionDecision:
             return PermissionDecision.deny(reason="nope", violation_type="test")
 
         # If short-circuit works, the second check (which would crash) never runs.
-        async def crash_always(_a: str, _b: dict, _c: PermissionContext) -> PermissionDecision:
+        async def crash_always(
+            _a: str, _b: dict[str, Any], _c: PermissionContext
+        ) -> PermissionDecision:
             raise RuntimeError("should not be called")
 
         check = compose_permission_checks(deny_always, crash_always)

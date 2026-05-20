@@ -57,12 +57,9 @@ check-py:
     cd backend && uv run ruff check .
     cd backend && uv run ruff format --check .
 
-# Static type-check with mypy (advisory — surfaces tech debt without failing the gate)
+# Static type-check with mypy. Gating — keep the gate green.
 typecheck:
-    # The leading `-` tells just to ignore a non-zero exit so the recipe
-    # reports findings without failing the build until the legacy backlog
-    # is drained. Address findings incrementally.
-    -cd backend && uv run mypy
+    cd backend && uv run mypy
 
 # Security scan with bandit (Python). Findings here are real and should fail.
 security-py:

@@ -35,8 +35,15 @@ _PICKER_STALE_MESSAGE = "That model picker is out of date. Send /model again."
 class TelegramSenderLike(Protocol):
     """Subset of ``TelegramSender`` used by picker state resolution."""
 
-    user_id: int
-    thread_id: int | None
+    @property
+    def user_id(self) -> int:
+        """Telegram numeric user id."""
+        ...
+
+    @property
+    def thread_id(self) -> int | None:
+        """Telegram topic thread id, or ``None`` outside a topic."""
+        ...
 
 
 @dataclass(frozen=True)

@@ -15,8 +15,8 @@ from sqlalchemy.ext.asyncio.session import AsyncSession
 # ``crud.conversation`` — which it's already importing — instead of
 # pulling in ``crud.channel`` as a separate module. Keeps chat.py
 # under sentrux's ``no_god_files`` fan-out budget.
-from app.crud.channel import (  # noqa: F401 — re-export, must follow other crud imports
-    normalize_conversation_reasoning_effort,
+from app.crud.channel import (
+    normalize_conversation_reasoning_effort as normalize_conversation_reasoning_effort,  # noqa: PLC0414
 )
 from app.governance_models import CostLedger
 from app.models import ChatMessage, Conversation
@@ -282,7 +282,9 @@ async def get_conversation_status(
         .where(ChatMessage.conversation_id == conversation_id)
         .group_by(ChatMessage.role)
     )
-    role_counts = dict((await session.execute(role_counts_stmt)).all())
+    role_counts: dict[str, int] = dict(
+        (await session.execute(role_counts_stmt)).all()  # type: ignore[arg-type]
+    )
     user_count = int(role_counts.get("user", 0))
     assistant_count = int(role_counts.get("assistant", 0))
 

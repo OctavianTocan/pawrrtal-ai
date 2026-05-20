@@ -485,7 +485,7 @@ async def test_request_permission_auto_approves_allow_once_when_no_closure() -> 
     options = [PermissionOption(option_id="1", name="Once", kind="allow_once")]
     tool_call = ToolCallUpdate(tool_call_id="tc", title="Bash", raw_input={"cmd": "ls"})
     resp = await client.request_permission(options=options, session_id="s1", tool_call=tool_call)
-    assert resp.outcome.option_id == "1"  # type: ignore[attr-defined]
+    assert resp.outcome.option_id == "1"
     assert queue.empty()  # no error event when auto-approving
 
 
@@ -498,8 +498,9 @@ async def test_request_permission_pushes_error_event_on_denial() -> None:
     options = [PermissionOption(option_id="1", name="Once", kind="allow_once")]
     tool_call = ToolCallUpdate(tool_call_id="tc", title="Bash", raw_input={"cmd": "rm -rf"})
     resp = await client.request_permission(options=options, session_id="s1", tool_call=tool_call)
-    assert resp.outcome.outcome == "cancelled"  # type: ignore[attr-defined]
+    assert resp.outcome.outcome == "cancelled"
     event = queue.get_nowait()
+    assert event is not None
     assert event["type"] == "error"
     assert "Bash" in event["content"]
     assert "blocked by policy" in event["content"]
@@ -511,8 +512,9 @@ async def test_request_permission_pushes_error_event_when_no_allow_offered() -> 
     options = [PermissionOption(option_id="0", name="No", kind="reject_once")]
     tool_call = ToolCallUpdate(tool_call_id="tc", title="Bash", raw_input={})
     resp = await client.request_permission(options=options, session_id="s1", tool_call=tool_call)
-    assert resp.outcome.outcome == "cancelled"  # type: ignore[attr-defined]
+    assert resp.outcome.outcome == "cancelled"
     event = queue.get_nowait()
+    assert event is not None
     assert event["type"] == "error"
 
 

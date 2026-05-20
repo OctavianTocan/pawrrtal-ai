@@ -11,6 +11,8 @@ Covers:
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 
 from app.channels.telegram_errors import (
@@ -27,6 +29,7 @@ from app.channels.telegram_errors import (
     render_timeout_card,
     render_unknown_model_card,
 )
+from app.core.providers.base import StreamEvent
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -204,81 +207,93 @@ class TestRenderErrorCard:
 
 class TestClassifyErrorEvent:
     def test_timeout_code(self) -> None:
-        assert classify_error({"type": "error", "error_code": "timeout"}) == ErrorKind.TIMEOUT
+        assert (
+            classify_error(cast(StreamEvent, {"type": "error", "error_code": "timeout"}))
+            == ErrorKind.TIMEOUT
+        )
 
     def test_request_timeout_code(self) -> None:
         assert (
-            classify_error({"type": "error", "error_code": "request_timeout"}) == ErrorKind.TIMEOUT
+            classify_error(cast(StreamEvent, {"type": "error", "error_code": "request_timeout"}))
+            == ErrorKind.TIMEOUT
         )
 
     def test_overloaded_code(self) -> None:
         assert (
-            classify_error({"type": "error", "error_code": "overloaded"})
+            classify_error(cast(StreamEvent, {"type": "error", "error_code": "overloaded"}))
             == ErrorKind.PROVIDER_OVERLOADED
         )
 
     def test_auth_error_code(self) -> None:
-        assert classify_error({"type": "error", "error_code": "auth_error"}) == ErrorKind.AUTH_ERROR
+        assert (
+            classify_error(cast(StreamEvent, {"type": "error", "error_code": "auth_error"}))
+            == ErrorKind.AUTH_ERROR
+        )
 
     def test_invalid_api_key_code(self) -> None:
         assert (
-            classify_error({"type": "error", "error_code": "invalid_api_key"})
+            classify_error(cast(StreamEvent, {"type": "error", "error_code": "invalid_api_key"}))
             == ErrorKind.AUTH_ERROR
         )
 
     def test_rate_limit_code(self) -> None:
-        assert classify_error({"type": "error", "error_code": "rate_limit"}) == ErrorKind.RATE_LIMIT
+        assert (
+            classify_error(cast(StreamEvent, {"type": "error", "error_code": "rate_limit"}))
+            == ErrorKind.RATE_LIMIT
+        )
 
     def test_too_many_requests_code(self) -> None:
         assert (
-            classify_error({"type": "error", "error_code": "too_many_requests"})
+            classify_error(cast(StreamEvent, {"type": "error", "error_code": "too_many_requests"}))
             == ErrorKind.RATE_LIMIT
         )
 
     def test_empty_stream_code(self) -> None:
         assert (
-            classify_error({"type": "error", "error_code": "empty_stream"})
+            classify_error(cast(StreamEvent, {"type": "error", "error_code": "empty_stream"}))
             == ErrorKind.EMPTY_STREAM
         )
 
     def test_agent_terminated_via_type(self) -> None:
         assert (
-            classify_error({"type": "agent_terminated", "content": "max iter"})
+            classify_error(cast(StreamEvent, {"type": "agent_terminated", "content": "max iter"}))
             == ErrorKind.AGENT_TERMINATED
         )
 
     def test_agent_terminated_via_error_code(self) -> None:
         assert (
-            classify_error({"type": "error", "error_code": "agent_terminated"})
+            classify_error(cast(StreamEvent, {"type": "error", "error_code": "agent_terminated"}))
             == ErrorKind.AGENT_TERMINATED
         )
 
     def test_connection_error_code(self) -> None:
         assert (
-            classify_error({"type": "error", "error_code": "connection_error"})
+            classify_error(cast(StreamEvent, {"type": "error", "error_code": "connection_error"}))
             == ErrorKind.CONNECTION
         )
 
     def test_unknown_model_code(self) -> None:
         assert (
-            classify_error({"type": "error", "error_code": "unknown_model"})
+            classify_error(cast(StreamEvent, {"type": "error", "error_code": "unknown_model"}))
             == ErrorKind.UNKNOWN_MODEL
         )
 
     def test_model_not_found_code(self) -> None:
         assert (
-            classify_error({"type": "error", "error_code": "model_not_found"})
+            classify_error(cast(StreamEvent, {"type": "error", "error_code": "model_not_found"}))
             == ErrorKind.UNKNOWN_MODEL
         )
 
     def test_unknown_code_falls_back_to_provider_error(self) -> None:
         assert (
-            classify_error({"type": "error", "error_code": "totally_unknown_xyz"})
+            classify_error(
+                cast(StreamEvent, {"type": "error", "error_code": "totally_unknown_xyz"})
+            )
             == ErrorKind.PROVIDER_ERROR
         )
 
     def test_no_error_code_falls_back_to_provider_error(self) -> None:
-        assert classify_error({"type": "error"}) == ErrorKind.PROVIDER_ERROR
+        assert classify_error(cast(StreamEvent, {"type": "error"})) == ErrorKind.PROVIDER_ERROR
 
 
 # ---------------------------------------------------------------------------

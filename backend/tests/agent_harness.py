@@ -41,7 +41,8 @@ Usage
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
+from typing import Any
 
 from app.core.agent_loop import (
     AgentContext,
@@ -121,7 +122,7 @@ def thinking_then_text_turn(thinking: str, text: str) -> list[LLMEvent]:
 
 def tool_call_turn(
     name: str,
-    args: dict,
+    args: dict[str, Any],
     turn_id: str = "tc-0",
 ) -> list[LLMEvent]:
     """LLM requests one tool call and stops with ``stop_reason='tool_use'``.
@@ -166,7 +167,7 @@ def error_turn() -> Exception:
 
 
 def parallel_tool_calls_turn(
-    calls: list[tuple[str, dict, str]],
+    calls: list[tuple[str, dict[str, Any], str]],
 ) -> list[LLMEvent]:
     """LLM requests multiple tool calls in a single turn (parallel tool use).
 
@@ -274,7 +275,7 @@ class ScriptedStreamFn:
         assert script.call_count == 2
     """
 
-    turns: list[list[LLMEvent] | Exception]
+    turns: Sequence[Sequence[LLMEvent] | Exception]
     call_count: int = dataclasses.field(default=0, init=False)
     messages_seen: list[list[AgentMessage]] = dataclasses.field(default_factory=list, init=False)
 

@@ -21,7 +21,7 @@ RED phase: all tests fail until loop.py and types.py are implemented.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 import pytest
@@ -81,7 +81,9 @@ def identity_converter(messages: list[AgentMessage]) -> list[AgentMessage]:
     return [m for m in messages if m["role"] in {"user", "assistant", "toolResult"}]
 
 
-def make_mock_stream(*responses: AssistantMessage):
+def make_mock_stream(
+    *responses: AssistantMessage,
+) -> Callable[[list[AgentMessage], list[AgentTool]], AsyncIterator[LLMEvent]]:
     """Build a StreamFn that yields pre-scripted AssistantMessages in order."""
     call_count = 0
 

@@ -20,7 +20,9 @@ from __future__ import annotations
 
 import json
 import uuid
-from collections.abc import Iterator
+from collections.abc import AsyncIterator, Iterator
+from typing import Any, cast
+from uuid import UUID
 
 import pytest
 from opentelemetry import trace
@@ -28,6 +30,7 @@ from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
+from app.core.agent_loop.types import AgentMessage
 from app.core.observability import workshop as workshop_module
 from app.core.observability._recorders import TurnSpanRecorder
 from app.core.observability.workshop import (
@@ -179,7 +182,7 @@ def test_llm_span_renders_assistant_tool_call_history(
         },
     ]
 
-    with llm_span(model_id="m", messages=messages, system_prompt=None):
+    with llm_span(model_id="m", messages=cast("list[AgentMessage]", messages), system_prompt=None):
         pass
 
     span = _span_by_name(span_exporter, "pawrrtal.llm.chat")
@@ -435,7 +438,7 @@ async def test_finalize_turn_errors_do_not_taint_llm_span(
     # Minimal fake provider — yields one delta + one usage event so the
     # aggregator + LLM recorder both have something to flush.
     class _FakeProvider:
-        async def stream(self, *_args: object, **_kwargs: object):
+        async def stream(self, *_args: object, **_kwargs: object) -> AsyncIterator[Any]:
             yield {"type": "delta", "content": "hi"}
             yield {
                 "type": "usage",
@@ -480,11 +483,11 @@ async def test_finalize_turn_errors_do_not_taint_llm_span(
     )
 
     turn_input = ChatTurnInput(
-        conversation_id=channel_message["conversation_id"],
-        user_id=channel_message["user_id"],
+        conversation_id=cast("UUID", channel_message["conversation_id"]),
+        user_id=cast("UUID", channel_message["user_id"]),
         question="hello",
-        provider=_FakeProvider(),  # type: ignore[arg-type]
-        channel=_FakeChannel(),  # type: ignore[arg-type]
+        provider=_FakeProvider(),
+        channel=_FakeChannel(),
         channel_message=channel_message,  # type: ignore[arg-type]
     )
 
@@ -513,7 +516,7 @@ async def test_run_turn_passes_history_into_llm_span(
     from app.channels.turn_runner import ChatTurnInput, run_turn
 
     class _FakeProvider:
-        async def stream(self, *_args: object, **_kwargs: object):
+        async def stream(self, *_args: object, **_kwargs: object) -> AsyncIterator[Any]:
             yield {"type": "delta", "content": "ack"}
 
     class _FakeChannel:
@@ -547,11 +550,11 @@ async def test_run_turn_passes_history_into_llm_span(
     monkeypatch.setattr("app.channels.turn_runner._finalize_turn", _noop_finalize)
 
     turn_input = ChatTurnInput(
-        conversation_id=channel_message["conversation_id"],
-        user_id=channel_message["user_id"],
+        conversation_id=cast("UUID", channel_message["conversation_id"]),
+        user_id=cast("UUID", channel_message["user_id"]),
         question="and 3+3?",
-        provider=_FakeProvider(),  # type: ignore[arg-type]
-        channel=_FakeChannel(),  # type: ignore[arg-type]
+        provider=_FakeProvider(),
+        channel=_FakeChannel(),
         channel_message=channel_message,  # type: ignore[arg-type]
     )
 
@@ -718,7 +721,7 @@ async def test_run_turn_stamps_latency_attributes_on_turn_span(
     from app.channels.turn_runner import ChatTurnInput, run_turn
 
     class _FakeProvider:
-        async def stream(self, *_args: object, **_kwargs: object):
+        async def stream(self, *_args: object, **_kwargs: object) -> AsyncIterator[Any]:
             yield {"type": "delta", "content": "hello"}
             yield {
                 "type": "usage",
@@ -756,11 +759,11 @@ async def test_run_turn_stamps_latency_attributes_on_turn_span(
     monkeypatch.setattr("app.channels.turn_runner._finalize_turn", _noop_finalize)
 
     turn_input = ChatTurnInput(
-        conversation_id=channel_message["conversation_id"],
-        user_id=channel_message["user_id"],
+        conversation_id=cast("UUID", channel_message["conversation_id"]),
+        user_id=cast("UUID", channel_message["user_id"]),
         question="hi",
-        provider=_FakeProvider(),  # type: ignore[arg-type]
-        channel=_FakeChannel(),  # type: ignore[arg-type]
+        provider=_FakeProvider(),
+        channel=_FakeChannel(),
         channel_message=channel_message,  # type: ignore[arg-type]
     )
 

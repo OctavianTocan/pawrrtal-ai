@@ -270,10 +270,13 @@ def make_opencode_go_stream_fn(
         full_text = ""
 
         try:
-            stream = await client.chat.completions.create(
+            # The openai SDK overloads expect a Literal model name from its
+            # static catalog; we pass a runtime model_id string the gateway
+            # owns, so the call-overload check rejects it here.
+            stream = await client.chat.completions.create(  # type: ignore[call-overload]
                 model=model_id,
-                messages=openai_messages,  # type: ignore[arg-type]
-                tools=openai_tools,  # type: ignore[arg-type]
+                messages=openai_messages,
+                tools=openai_tools,
                 stream=True,
                 stream_options={"include_usage": True},
             )

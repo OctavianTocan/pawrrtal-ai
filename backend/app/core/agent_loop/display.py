@@ -39,12 +39,13 @@ class ToolDisplay:
 
     def render(self, arguments: dict[str, Any]) -> ToolDisplayPayload:
         """Return a serializable display payload for *arguments*."""
-        payload = dict(self.formatter(arguments))
-        payload.setdefault("icon", self.icon)
-        payload.setdefault("label", self.label)
-        payload.setdefault("present", self.label)
-        payload.setdefault("compact", self.label)
-        return ToolDisplayPayload(**payload)
+        formatter_payload: dict[str, str] = dict(self.formatter(arguments))  # type: ignore[arg-type]
+        formatter_payload.setdefault("icon", self.icon)
+        formatter_payload.setdefault("label", self.label)
+        formatter_payload.setdefault("present", self.label)
+        formatter_payload.setdefault("compact", self.label)
+        payload: ToolDisplayPayload = ToolDisplayPayload(**formatter_payload)  # type: ignore[typeddict-item]
+        return payload
 
 
 def tool_display_map(tools: list[AgentTool]) -> dict[str, ToolDisplay]:

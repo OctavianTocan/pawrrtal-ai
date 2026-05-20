@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
+from typing import Any
 
 import pytest
 
@@ -98,7 +99,7 @@ class TestRegisteredSurfaces:
 # ---------------------------------------------------------------------------
 
 
-async def _make_stream(events: list) -> AsyncIterator:
+async def _make_stream(events: list[Any]) -> AsyncIterator[Any]:
     """Helper — yield a list of events as an async iterator."""
     for event in events:
         yield event

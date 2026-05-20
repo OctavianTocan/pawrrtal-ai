@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.core.config import settings
+from app.core.config import settings as settings  # noqa: PLC0414
 
 from .base import AILLM
 from .claude_provider import ClaudeLLM, ClaudeLLMConfig
