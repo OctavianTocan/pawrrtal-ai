@@ -359,6 +359,13 @@ class Settings(BaseSettings):
     # cheap models, wasteful for premium ones.
     lcm_summary_model: str = ""
 
+    # ── Dreaming (between-sessions reflection) ──────────────────────
+    # Litellm model id used by the dreaming pass. Defaults to Gemini
+    # Flash because the prompt is single-turn JSON-only — no need to
+    # spend a premium model on it. See the ADR at
+    # ``frontend/content/docs/handbook/decisions/2026-05-20-dreaming-background-reflection.mdx``.
+    dreaming_model_id: str = "gemini/gemini-flash-latest"
+
     @property
     def claude_sandbox_excluded_commands_list(self) -> list[str]:
         """Parsed view of ``claude_sandbox_excluded_commands``."""

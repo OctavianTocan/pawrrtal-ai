@@ -14,14 +14,20 @@ Public surface:
   output the model returns.
 - :func:`parse_dreaming_output` — robust parser that accepts the
   model's raw JSON / Markdown-fenced JSON / partial outputs.
-
-The actual job runner + scheduler integration lives in
-:mod:`app.core.dreaming.runner` (added in a stacked follow-up); this
-module owns the pure types + prompt so they're unit-testable without
-the LCM background scheduler in scope.
+- :func:`run_dreaming_job` — drive one job from pending →
+  completed/failed (used by the scheduler + cron entry points).
+- :func:`schedule_session_end_dream` /
+  :func:`schedule_daily_rollup_dream` — create a job and fire its
+  background runner.
 """
 
 from app.core.dreaming.prompt import DREAMING_PROMPT
+from app.core.dreaming.runner import DreamFn, run_dreaming_job
+from app.core.dreaming.scheduler import (
+    DreamingScope,
+    schedule_daily_rollup_dream,
+    schedule_session_end_dream,
+)
 from app.core.dreaming.schema import (
     ConsolidatedMemory,
     DreamingOutput,
@@ -31,10 +37,15 @@ from app.core.dreaming.schema import (
 )
 
 __all__ = [
-    "ConsolidatedMemory",
     "DREAMING_PROMPT",
+    "ConsolidatedMemory",
+    "DreamFn",
     "DreamingOutput",
     "DreamingPattern",
+    "DreamingScope",
     "Followup",
     "parse_dreaming_output",
+    "run_dreaming_job",
+    "schedule_daily_rollup_dream",
+    "schedule_session_end_dream",
 ]
