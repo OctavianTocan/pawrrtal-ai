@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-from google import genai
+from google import genai as genai  # noqa: PLC0414
 from google.genai import types as gtypes
 
 from app.core.agent_loop import (
@@ -82,6 +83,106 @@ logger = logging.getLogger(__name__)
 
 # ``compose_thinking_config`` / ``_GEMINI_THINKING_LEVEL`` live in
 # ``_gemini_thinking`` so this module fits the 500-line file budget.
+
+
+@dataclass
+class _GeminiStreamState:
+    """Mutable per-request scratch space for the Gemini StreamFn.
+
+    Lives at module scope so the chunk-level helper can mutate it in
+    place without inheriting the streaming for-loop's nesting depth.
+    """
+
+    full_text: str = ""
+    tool_calls: list[dict[str, Any]] = field(default_factory=list)
+    # Native ``ModelContent`` from whichever chunk produced the
+    # function_call parts (Gemini delivers function calls in a single
+    # chunk). Forwarded as ``LLMDoneEvent.provider_state["gemini"]
+    # ["model_content"]`` so the next turn's request can replay
+    # ``thought_signature`` bytes.
+    function_call_content: gtypes.Content | None = None
+    # Latest ``usage_metadata`` snapshot from this request. Gemini
+    # emits cumulative counts on each chunk and a final snapshot on
+    # the terminal chunk; we just keep overwriting and absorb the
+    # last value into ``usage_sink`` at end-of-stream.
+    last_usage_metadata: Any | None = None
+
+
+def _events_from_chunk(chunk: Any, state: _GeminiStreamState) -> Iterator[LLMEvent]:
+    """Yield events for one Gemini chunk and mutate ``state`` in place.
+
+    Returns a generator so the caller can ``for event in _events_from_chunk(...)``
+    one level shallower than inlining the body would force. Kept as a
+    sync generator to stay flat — the outer ``async for chunk`` already
+    awaits the SDK iterator.
+    """
+    # Track the latest ``usage_metadata`` — Gemini reports it
+    # cumulatively per chunk, so the final non-None value is the
+    # per-request total we want to bill.
+    chunk_usage = getattr(chunk, "usage_metadata", None)
+    if chunk_usage is not None:
+        state.last_usage_metadata = chunk_usage
+    # Split parts into thoughts (``part.thought is True``) and regular
+    # text. ``chunk.text`` is a convenience accessor that concatenates
+    # all text parts regardless of the thought flag, so we walk parts
+    # explicitly to keep the two streams separate downstream.
+    thinking_text, response_text = split_chunk_text(chunk)
+    if thinking_text:
+        yield LLMThinkingDeltaEvent(type="thinking_delta", text=thinking_text)
+    if response_text:
+        yield LLMTextDeltaEvent(type="text_delta", text=response_text)
+        state.full_text += response_text
+
+    chunk_tool_calls = tool_calls_from_chunk(chunk, len(state.tool_calls))
+    if not chunk_tool_calls:
+        return
+    # Capture the original Gemini ``ModelContent`` so follow-up turns
+    # can replay ``thought_signature`` bytes verbatim. Only the first
+    # function-call chunk is preserved — Gemini emits function calls
+    # in a single chunk so this is sufficient.
+    if state.function_call_content is None:
+        state.function_call_content = function_call_content_for(chunk)
+    for tool_call in chunk_tool_calls:
+        yield LLMToolCallEvent(
+            type="tool_call",
+            tool_call_id=tool_call["tool_call_id"],
+            name=tool_call["name"],
+            arguments=tool_call["arguments"],
+        )
+        state.tool_calls.append(tool_call)
+
+
+def _build_done_event(state: _GeminiStreamState) -> LLMDoneEvent:
+    """Build the terminal ``LLMDoneEvent`` from accumulated stream state.
+
+    When the turn made any tool calls, forward the original Gemini
+    ``ModelContent`` as opaque ``provider_state`` so the next iteration's
+    request body replays the exact function_call parts (preserving
+    ``thought_signature`` bytes that Gemini-3 / Vertex require).
+    Pure-text turns omit the field — there is nothing for the next turn
+    to replay.
+    """
+    stop_reason = "tool_use" if state.tool_calls else "stop"
+    content: list[TextContent | ToolCallContent] = []
+    if state.full_text:
+        content.append(TextContent(type="text", text=state.full_text))
+    content.extend(
+        ToolCallContent(
+            type="toolCall",
+            tool_call_id=tc["tool_call_id"],
+            name=tc["name"],
+            arguments=tc["arguments"],
+        )
+        for tc in state.tool_calls
+    )
+    done_event: LLMDoneEvent = LLMDoneEvent(
+        type="done",
+        stop_reason=stop_reason,
+        content=content,
+    )
+    if state.function_call_content is not None:
+        done_event["provider_state"] = {"gemini": {"model_content": state.function_call_content}}
+    return done_event
 
 
 def make_gemini_stream_fn(
@@ -168,67 +269,24 @@ def make_gemini_stream_fn(
             automatic_function_calling=gtypes.AutomaticFunctionCallingConfig(disable=True),
         )
 
-        full_text = ""
-        tool_calls: list[dict[str, Any]] = []
-        # Holds the native ``ModelContent`` from whichever chunk produced
-        # the function_call parts (Gemini delivers function calls in a
-        # single chunk).  When set, the loop forwards it as
-        # ``LLMDoneEvent.provider_state["gemini"]["model_content"]`` so
-        # the next turn's request can replay ``thought_signature`` bytes.
-        function_call_content: gtypes.Content | None = None
-        # Latest ``usage_metadata`` snapshot from this request. Gemini
-        # emits cumulative counts on each chunk and a final snapshot on
-        # the terminal chunk; we just keep overwriting and absorb the
-        # last value into ``usage_sink`` at end-of-stream.
-        last_usage_metadata: Any | None = None
-
+        state = _GeminiStreamState()
         try:
             # google-genai's async ``generate_content_stream`` returns
             # an awaitable that resolves to an ``AsyncIterator`` (per the
             # SDK's own docstring example). The earlier code relied on
             # the implicit-coroutine-as-iter pattern; mypy 1.x rejects it.
+            # The cast to ``ContentUnion`` widens our narrower
+            # ``list[Content]`` to the SDK's published union — ``list`` is
+            # invariant so the implicit conversion doesn't typecheck, but
+            # every element is already a ``Content`` subclass.
             stream = await client.aio.models.generate_content_stream(
                 model=model_id,
-                contents=contents,
+                contents=cast(gtypes.ContentListUnion, contents),
                 config=config,
             )
             async for chunk in stream:
-                # Track the latest ``usage_metadata`` — Gemini reports it
-                # cumulatively per chunk, so the final non-None value is
-                # the per-request total we want to bill.
-                chunk_usage = getattr(chunk, "usage_metadata", None)
-                if chunk_usage is not None:
-                    last_usage_metadata = chunk_usage
-                # Split parts into thoughts (``part.thought is True``) and
-                # regular text.  ``chunk.text`` is a convenience accessor
-                # that concatenates *all* text parts regardless of the
-                # thought flag, so we walk parts explicitly to keep the
-                # two streams separate downstream.
-                thinking_text, response_text = split_chunk_text(chunk)
-                if thinking_text:
-                    yield LLMThinkingDeltaEvent(type="thinking_delta", text=thinking_text)
-                if response_text:
-                    yield LLMTextDeltaEvent(type="text_delta", text=response_text)
-                    full_text += response_text
-
-                chunk_tool_calls = tool_calls_from_chunk(chunk, len(tool_calls))
-                if chunk_tool_calls:
-                    # Capture the original Gemini ``ModelContent`` so
-                    # follow-up turns can replay ``thought_signature``
-                    # bytes verbatim.  Only the first function-call chunk
-                    # is preserved — Gemini emits function calls in a
-                    # single chunk so this is sufficient.
-                    if function_call_content is None:
-                        function_call_content = function_call_content_for(chunk)
-                    for tool_call in chunk_tool_calls:
-                        yield LLMToolCallEvent(
-                            type="tool_call",
-                            tool_call_id=tool_call["tool_call_id"],
-                            name=tool_call["name"],
-                            arguments=tool_call["arguments"],
-                        )
-                        tool_calls.append(tool_call)
-
+                for event in _events_from_chunk(chunk, state):
+                    yield event
         except Exception as exc:
             # Log so the error is visible in app.log — previously swallowed silently.
             logger.error("Gemini streaming error model=%s: %s", model_id, exc, exc_info=True)
@@ -242,38 +300,8 @@ def make_gemini_stream_fn(
             )
             return
 
-        absorb_request_usage(usage_sink, last_usage_metadata)
-
-        # Determine stop reason
-        stop_reason = "tool_use" if tool_calls else "stop"
-
-        content: list[TextContent | ToolCallContent] = []
-        if full_text:
-            content.append(TextContent(type="text", text=full_text))
-        content.extend(
-            ToolCallContent(
-                type="toolCall",
-                tool_call_id=tc["tool_call_id"],
-                name=tc["name"],
-                arguments=tc["arguments"],
-            )
-            for tc in tool_calls
-        )
-
-        # When the turn made any tool calls, forward the original Gemini
-        # ``ModelContent`` as opaque ``provider_state`` so the next
-        # iteration's request body replays the exact function_call parts
-        # (preserving ``thought_signature`` bytes that Gemini-3 / Vertex
-        # require).  Pure-text turns omit the field — there is nothing
-        # for the next turn to replay.
-        done_event: LLMDoneEvent = LLMDoneEvent(
-            type="done",
-            stop_reason=stop_reason,
-            content=content,
-        )
-        if function_call_content is not None:
-            done_event["provider_state"] = {"gemini": {"model_content": function_call_content}}
-        yield done_event
+        absorb_request_usage(usage_sink, state.last_usage_metadata)
+        yield _build_done_event(state)
 
     return stream_fn
 
