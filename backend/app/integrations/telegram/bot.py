@@ -98,6 +98,15 @@ from app.integrations.telegram.thinking_picker_runtime import (
     handle_thinking_picker_callback,
 )
 
+# ``VERBOSE_CALLBACK_PREFIX`` mirrors the other pickers — re-exported
+# from the runtime so bot.py picks up the callback prefix and the
+# entry-point handlers from one module.
+from app.integrations.telegram.verbose_picker_runtime import (
+    VERBOSE_CALLBACK_PREFIX,
+    answer_verbose_command,
+    handle_verbose_picker_callback,
+)
+
 if TYPE_CHECKING:
     from aiogram import Bot, Dispatcher
     from aiogram.types import CallbackQuery, Message, ReplyParameters, Update
@@ -618,6 +627,12 @@ def _register_telegram_command_handlers(dispatcher: Dispatcher) -> None:
         text = message.text or ""
         parts = text.strip().split(maxsplit=1)
         level_arg = parts[1].strip() if len(parts) > 1 else ""
+        # No argument → open the inline-keyboard picker. The power-user
+        # ``/verbose 0|1|2`` shortcut still resolves through the
+        # original handler so scripts and aliases keep working (#343).
+        if level_arg == "":
+            await answer_verbose_command(message=message)
+            return
         sender = _sender_from_message(message)
         async with async_session_maker() as session:
             reply = await handle_verbose_command(
@@ -668,6 +683,12 @@ def _register_telegram_callback_handlers(dispatcher: Dispatcher) -> None:
     )
     async def _on_thinking_picker(callback: CallbackQuery) -> None:
         await handle_thinking_picker_callback(callback=callback)
+
+    @dispatcher.callback_query(
+        lambda query: (query.data or "").startswith(VERBOSE_CALLBACK_PREFIX)
+    )
+    async def _on_verbose_picker(callback: CallbackQuery) -> None:
+        await handle_verbose_picker_callback(callback=callback)
 
 
 def _register_telegram_message_handler(dispatcher: Dispatcher) -> None:
