@@ -85,8 +85,6 @@ from app.core.agent_system_prompt import (
     DEFAULT_AGENT_SYSTEM_PROMPT as _FALLBACK_SYSTEM_PROMPT,
 )
 from app.core.config import settings
-from app.core.keys import resolve_api_key
-
 from ._xai_events import agent_event_to_stream_event, identity_convert
 from ._xai_messages import build_xai_messages, build_xai_tools
 from ._xai_stream import (
@@ -101,16 +99,27 @@ from .base import ReasoningEffort, StreamEvent
 logger = logging.getLogger(__name__)
 
 
-def _resolve_xai_api_key(workspace_root: Path | None) -> str:
-    """Resolve the xAI API key for this request.
+async def _resolve_xai_api_key(workspace_root: Path | None) -> str:
+    """Resolve the xAI bearer token for this request (#372).
 
-    Workspace overrides win over the gateway-global ``settings.xai_api_key``;
-    :func:`resolve_api_key` already performs that fallback, so callers
-    never need an ``or settings.xai_api_key`` suffix.
+    Funnels through :func:`app.integrations.xai.resolve_xai_credentials`
+    so the OAuth access token (refreshed transparently when near
+    expiry) is preferred over the legacy long-lived ``XAI_API_KEY``.
+    Resolution order matches the helper's contract:
+
+    1. Workspace OAuth access token (refreshed if needed).
+    2. Workspace legacy ``XAI_API_KEY``.
+    3. Gateway-global ``settings.xai_api_key``.
+
+    Returns the empty string when nothing is configured — the
+    request will 401 and the caller surfaces the failure as a
+    StreamEvent error (matches the existing contract).
     """
-    if workspace_root is not None:
-        return resolve_api_key(workspace_root, "XAI_API_KEY") or ""
-    return settings.xai_api_key
+    # Lazy import keeps the provider's hot path free of the OAuth
+    # client at module-load when xAI isn't authenticated.
+    from app.integrations.xai import resolve_xai_credentials  # noqa: PLC0415
+
+    return await resolve_xai_credentials(workspace_root) or ""
 
 
 def _map_reasoning_effort(
@@ -178,7 +187,7 @@ def make_xai_stream_fn(
         messages: list[AgentMessage],
         tools: list[AgentTool],
     ) -> AsyncIterator[LLMEvent]:
-        api_key = _resolve_xai_api_key(workspace_root)
+        api_key = await _resolve_xai_api_key(workspace_root)
         request_messages = build_xai_messages(messages, system_prompt)
         xai_tools = build_xai_tools(tools)
         effort = _map_reasoning_effort(reasoning_effort)
