@@ -319,6 +319,12 @@ class Settings(BaseSettings):
     # for animated streaming. Falls back to ``editMessageText`` when
     # aiogram doesn't expose the binding.
     telegram_use_draft_streaming: bool = False
+    # Master switch for proactive memory writes (#340) + the
+    # ``memory_query`` tool. Default off so deployments roll out
+    # the new chat-surface acknowledgment line ("📝 Saved feedback")
+    # per-user rather than big-bang. See
+    # ``frontend/content/docs/handbook/decisions/2026-05-20-proactive-memory-updates.mdx``.
+    memories_enabled: bool = False
 
     # ── Voice transcription (PR 14) ──────────────────────────────────────
     # Selects which STT backend the voice handler routes to. The

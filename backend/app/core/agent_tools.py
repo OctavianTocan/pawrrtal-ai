@@ -46,6 +46,7 @@ from app.core.tools.lcm_agents import (
     make_lcm_search_tool,
 )
 from app.core.tools.markitdown_convert import make_markitdown_tool
+from app.core.tools.memory_query import make_memory_query_tool
 from app.core.tools.now import (
     build_external_mcp_tools,
     make_add_task_tool,
@@ -266,6 +267,16 @@ def build_agent_tools(
                     model_id=expand_model_id,
                 )
             )
+
+    # Proactive memory (#340) — give the agent on-demand access to
+    # the long tail of user preferences / project decisions /
+    # feedback the post-turn classifier wrote. Gated on a configured
+    # user_id (the closure embeds the authorisation gate) and the
+    # ``memories_enabled`` master switch from the ADR plan; the
+    # default-off rollout means existing deployments don't see the
+    # new tool until they opt in.
+    if settings.memories_enabled and user_id is not None:
+        tools.append(make_memory_query_tool(user_id=user_id))
 
     # Plugin-contributed tools.  Additive only — core tools above are
     # unaffected.  Extracted into a helper so the main composition body
