@@ -51,6 +51,10 @@ from app.integrations.telegram.bot_provider_resolution import (
 # imports it from :mod:`sender`) so bot.py imports both
 # ``handle_plain_message`` and ``TelegramSender`` from the same module
 # — keeps bot.py under sentrux's ``no_god_files`` fan-out budget.
+from app.integrations.telegram.message_queue import (
+    ChatMessageQueueDispatcher,
+    QueuedTurn,
+)
 from app.integrations.telegram.handlers import (
     TelegramSender,
     TelegramTurnContext,
@@ -124,7 +128,14 @@ def get_bot_uptime_seconds() -> float:
 
 
 def is_chat_run_active(chat_id: int) -> bool:
-    """Return whether an agent run is in flight for ``chat_id`` on this worker."""
+    """Return whether an agent run is in flight for ``chat_id`` on this worker.
+
+    When the FIFO dispatcher is enabled (``settings.telegram_chat_queue_enabled``),
+    delegates to :meth:`ChatMessageQueueDispatcher.is_running`; otherwise
+    reads the legacy ``_running_tasks`` dict.
+    """
+    if settings.telegram_chat_queue_enabled:
+        return _get_chat_queue_dispatcher().is_running(chat_id)
     task = _running_tasks.get(chat_id)
     return task is not None and not task.done()
 
@@ -138,7 +149,96 @@ def is_chat_run_active(chat_id: int) -> bool:
 # cannot cancel a task running on worker B.  This is correct for the current
 # single-worker deployment; promote to a shared store (e.g. Redis pub/sub)
 # before running multiple uvicorn workers.
+#
+# When ``settings.telegram_chat_queue_enabled`` is True the dispatcher
+# from :mod:`message_queue` owns this state instead (#357).
 _running_tasks: dict[int, asyncio.Task[None]] = {}
+
+
+# Singleton :class:`ChatMessageQueueDispatcher` for the per-chat FIFO
+# turn queue (#357). Built lazily on first access so processes that
+# never enable the dispatcher (the default) pay zero overhead.
+_CHAT_QUEUE_DISPATCHER: ChatMessageQueueDispatcher | None = None
+
+
+def _get_chat_queue_dispatcher() -> ChatMessageQueueDispatcher:
+    """Return the process-wide chat-queue dispatcher, building on first use."""
+    global _CHAT_QUEUE_DISPATCHER  # noqa: PLW0603 — singleton accessor pattern
+    if _CHAT_QUEUE_DISPATCHER is None:
+        _CHAT_QUEUE_DISPATCHER = ChatMessageQueueDispatcher(consumer=_chat_queue_consumer)
+    return _CHAT_QUEUE_DISPATCHER
+
+
+async def _chat_queue_consumer(turn: QueuedTurn) -> None:
+    """Default consumer — runs the turn payload that ``_run_llm_turn`` enqueued.
+
+    The payload is the bound coroutine factory ``_run_llm_turn`` would
+    have invoked synchronously; the consumer awaits it under the
+    dispatcher's per-chat serialised worker so messages arriving
+    mid-turn queue up instead of clobbering the in-flight reply.
+    """
+    coro_factory = turn.payload
+    if not callable(coro_factory):
+        logger.warning(
+            "TELEGRAM_CHAT_QUEUE_BAD_PAYLOAD chat_id=%s type=%s",
+            turn.chat_id,
+            type(coro_factory).__name__,
+        )
+        return
+    await coro_factory()
+
+
+async def _execute_turn_body(
+    *,
+    message: Message,
+    turn_input: ChatTurnInput,
+    user_text: str,
+    context: TelegramTurnContext,
+) -> None:
+    """Run the typing + stream + auto-title block under the FIFO dispatcher.
+
+    Extracted from :func:`_run_llm_turn` so the dispatcher's consumer
+    has a clean callable to await. The legacy non-FIFO path still
+    inlines this logic (with the extra ``_running_tasks`` bookkeeping
+    the dispatcher does on its own).
+    """
+    chat_id = message.chat.id
+    typing_task = asyncio.create_task(
+        _maintain_typing_indicator(message.bot, chat_id, context.thread_id),
+        name=f"telegram-typing-{chat_id}",
+    )
+    try:
+        async for _ in run_turn(turn_input):
+            pass
+    except asyncio.CancelledError:
+        logger.info("TELEGRAM_STREAM_CANCELLED chat_id=%s", chat_id)
+        raise
+    finally:
+        typing_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await typing_task
+
+    try:
+        await _maybe_set_auto_title(
+            bot=message.bot,
+            conversation_id=context.conversation_id,
+            user_text=user_text,
+            chat_id=chat_id,
+            thread_id=context.thread_id,
+        )
+    except Exception:
+        logger.warning("TELEGRAM_AUTO_TITLE_FAILED", exc_info=True)
+
+
+async def shutdown_chat_queue_dispatcher() -> None:
+    """Cancel every per-chat worker on bot shutdown.
+
+    Called from the bot's lifespan teardown so a clean ``SIGTERM``
+    doesn't leak dispatcher task references. No-op when the
+    dispatcher was never constructed.
+    """
+    if _CHAT_QUEUE_DISPATCHER is not None:
+        await _CHAT_QUEUE_DISPATCHER.shutdown()
 
 
 async def _send_one_typing_action(
@@ -332,8 +432,36 @@ async def _run_llm_turn(
         async for _ in run_turn(turn_input):
             pass
 
-    # Cancel any previous stream for this chat before starting the new one.
     chat_id = message.chat.id
+
+    if settings.telegram_chat_queue_enabled:
+        # FIFO mode (#357): enqueue the rest of the turn body and
+        # return. The dispatcher's per-chat worker drains the queue
+        # serially so a second message arriving here gets appended
+        # to the same worker's queue instead of clobbering the
+        # in-flight turn. The typing indicator + run_turn + auto-
+        # title block below is bound into a coroutine factory and
+        # handed to the dispatcher as the payload.
+        async def _enqueued_body() -> None:
+            await _execute_turn_body(
+                message=message,
+                turn_input=turn_input,
+                user_text=user_text,
+                context=context,
+            )
+
+        await _get_chat_queue_dispatcher().enqueue(
+            QueuedTurn(
+                chat_id=chat_id,
+                payload=_enqueued_body,
+                enqueued_at_monotonic=asyncio.get_event_loop().time(),
+            )
+        )
+        return
+
+    # Legacy "cancel previous task" path. Kept until the FIFO mode
+    # has baked in a production deployment, then this branch can be
+    # deleted and the helper inlined.
     old_task = _running_tasks.pop(chat_id, None)
     if old_task is not None and not old_task.done():
         old_task.cancel()
@@ -441,10 +569,13 @@ def _register_telegram_command_handlers(dispatcher: Dispatcher) -> None:
     @dispatcher.message(Command("stop"))
     async def _on_stop(message: Message) -> None:
         chat_id = message.chat.id
-        task = _running_tasks.pop(chat_id, None)
-        was_running = task is not None and not task.done()
-        if was_running:
-            task.cancel()  # type: ignore[union-attr]
+        if settings.telegram_chat_queue_enabled:
+            was_running = await _get_chat_queue_dispatcher().stop_chat(chat_id)
+        else:
+            task = _running_tasks.pop(chat_id, None)
+            was_running = task is not None and not task.done()
+            if was_running:
+                task.cancel()  # type: ignore[union-attr]
         # handle_stop_command is a plain sync function — no await.
         reply = handle_stop_command(was_running=was_running)
         await message.answer(reply)

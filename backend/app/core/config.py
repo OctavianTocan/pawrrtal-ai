@@ -325,6 +325,13 @@ class Settings(BaseSettings):
     # for animated streaming. Falls back to ``editMessageText`` when
     # aiogram doesn't expose the binding.
     telegram_use_draft_streaming: bool = False
+    # When True, the Telegram bot uses a per-chat FIFO turn queue
+    # (``ChatMessageQueueDispatcher``) instead of the legacy
+    # "cancel previous task" behaviour. Mid-turn user messages
+    # queue up and run serially rather than clobbering the
+    # in-flight reply (#357). Default off until the dispatcher has
+    # baked in a deployment.
+    telegram_chat_queue_enabled: bool = False
 
     # ── Voice transcription (PR 14) ──────────────────────────────────────
     # Selects which STT backend the voice handler routes to. The
