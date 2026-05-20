@@ -103,19 +103,19 @@
    of a flat-white island. The `var()` forwards track preset + theme switches.
 ============================================================================= */
 :root {
-	--color-chat-bg-elevated: var(--background-elevated);
-	--color-chat-bg-elevated-shade: var(--background-elevated-shade);
-	--color-chat-foreground: var(--foreground);
-	--color-chat-muted: var(--muted-foreground);
-	--color-chat-border: var(--border);
-	--color-chat-accent: var(--accent);
-	--color-chat-accent-foreground: var(--primary-foreground);
-	--color-chat-info: var(--info);
-	--color-chat-warning: var(--info);
-	--color-chat-destructive: var(--destructive);
-	--color-chat-success: var(--success);
-	--radius-chat-lg: var(--radius-surface-lg);
-	--shadow-chat-minimal: var(--shadow-minimal);
+	--color-chat-bg-elevated: var(--background-elevated) !important;
+	--color-chat-bg-elevated-shade: var(--background-elevated-shade) !important;
+	--color-chat-foreground: var(--foreground) !important;
+	--color-chat-muted: var(--muted-foreground) !important;
+	--color-chat-border: var(--border) !important;
+	--color-chat-accent: var(--accent) !important;
+	--color-chat-accent-foreground: var(--primary-foreground) !important;
+	--color-chat-info: var(--info) !important;
+	--color-chat-warning: var(--info) !important;
+	--color-chat-destructive: var(--destructive) !important;
+	--color-chat-success: var(--success) !important;
+	--radius-chat-lg: var(--radius-surface-lg) !important;
+	--shadow-chat-minimal: var(--shadow-minimal) !important;
 }
 
 @custom-variant dark (&:is(.dark *));
