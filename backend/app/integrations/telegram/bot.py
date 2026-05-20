@@ -94,6 +94,15 @@ from app.integrations.telegram.thinking_picker_runtime import (
     handle_thinking_picker_callback,
 )
 
+# Regenerate-keyboard runtime (#368) — re-exports the callback prefix
+# so bot.py imports both the registration prefix + handler from one
+# module, keeping the fan-out under the sentrux ``no_god_files``
+# budget. Same trick as the model / thinking / verbose pickers.
+from app.integrations.telegram.regenerate_runtime import (
+    REGEN_CALLBACK_PREFIX,
+    handle_regenerate_callback,
+)
+
 if TYPE_CHECKING:
     from aiogram import Bot, Dispatcher
     from aiogram.types import CallbackQuery, Message, Update
@@ -532,6 +541,12 @@ def _register_telegram_callback_handlers(dispatcher: Dispatcher) -> None:
     )
     async def _on_thinking_picker(callback: CallbackQuery) -> None:
         await handle_thinking_picker_callback(callback=callback)
+
+    @dispatcher.callback_query(
+        lambda query: (query.data or "").startswith(REGEN_CALLBACK_PREFIX)
+    )
+    async def _on_regenerate(callback: CallbackQuery) -> None:
+        await handle_regenerate_callback(callback=callback)
 
 
 def _register_telegram_message_handler(dispatcher: Dispatcher) -> None:
