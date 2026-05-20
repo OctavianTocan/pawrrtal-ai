@@ -10,14 +10,17 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from html import escape
-from typing import Protocol
+from typing import Literal, Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.providers.catalog import CATALOG_ETAG, MODEL_CATALOG, ModelEntry, default_model
+from app.core.providers.catalog import CATALOG_ETAG, MODEL_CATALOG, ModelEntry
 from app.core.providers.labels import host_label_from_slug, vendor_label_from_slug
 from app.crud.channel import get_or_create_telegram_conversation_full, get_user_id_for_external
 from app.crud.user_preferences import get_user_default_model_id
+from app.integrations.telegram.model_defaults import resolve_effective_model_id
+
+ModelCallbackAction = Literal["providers", "vendors", "list", "select", "set_default"]
 
 PROVIDER = "telegram"
 MODEL_CALLBACK_PREFIX = "mdl:"
@@ -83,7 +86,7 @@ class ModelCallback:
     ``"select"``).
     """
 
-    action: str
+    action: ModelCallbackAction
     host: str | None = None
     provider: str | None = None  # vendor slug; name kept for runtime compatibility
     page: int = 1
@@ -113,12 +116,17 @@ async def get_model_picker_state(
         session=session,
         thread_id=sender.thread_id,
     )
+    current_model_id = await resolve_effective_model_id(
+        session=session,
+        user_id=pawrrtal_user_id,
+        conversation_model_id=conversation.model_id,
+    )
     user_default = await get_user_default_model_id(
         session=session,
         user_id=pawrrtal_user_id,
     )
     return ModelPickerState(
-        current_model_id=conversation.model_id or user_default or default_model().id,
+        current_model_id=current_model_id,
         user_default_model_id=user_default,
     )
 
@@ -280,28 +288,21 @@ def _parse_prefixed_callback(parts: list[str]) -> ModelCallback | None:
 
 
 def resolve_model_selection(callback: ModelCallback) -> ModelEntry | None:
-    """Resolve a ``select`` or ``set_default`` callback to a catalog entry.
+    """Resolve a ``select`` / ``set_default`` callback to a catalog entry.
 
     Returns ``None`` for stale catalog tokens or out-of-range indexes.
-    Both actions share the same ``(catalog_token, index)`` payload.
     """
     if callback.action not in ("select", "set_default"):
         return None
     if callback.catalog_token != _CATALOG_TOKEN:
         return None
-    if callback.index is None or callback.index < 0:
-        return None
-    if callback.index >= len(MODEL_CATALOG):
+    if callback.index is None or callback.index < 0 or callback.index >= len(MODEL_CATALOG):
         return None
     return MODEL_CATALOG[callback.index]
 
 
 def build_set_default_keyboard(*, model_id: str) -> list[list[ModelButton]] | None:
-    """Build the "⭐ Set as my default" row for the success message.
-
-    Returns ``None`` when ``model_id`` is not in the catalog (e.g. a
-    stale catalog-bump that's no longer resolvable).
-    """
+    """Build the "⭐ Set as my default" row, or ``None`` for stale catalog."""
     entry = _entry_by_id(model_id)
     if entry is None:
         return None
@@ -316,7 +317,7 @@ def build_set_default_keyboard(*, model_id: str) -> list[list[ModelButton]] | No
 
 
 def build_default_already_set_keyboard() -> list[list[ModelButton]]:
-    """Build an inert "⭐ Already your default" confirmation row."""
+    """Build the inert "⭐ Already your default" confirmation row."""
     return [[ModelButton(text=_DEFAULT_ALREADY_SET_TEXT, callback_data="mdl:noop")]]
 
 

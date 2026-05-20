@@ -1,13 +1,16 @@
 """CRUD helpers for :class:`UserPreferences`.
 
 The row is created on demand the first time a preference is written.
-Reads tolerate a missing row by returning ``None``, since most users
-will not have customised anything (the row only exists once they
-flip a preference).
+Reads tolerate a missing row by returning ``None`` so reads stay
+cheap for the common "user hasn't customised anything" case.
 
-This module owns the read/write surface for ``default_model_id``,
-the per-user default model used as a fallback when a conversation
-doesn't carry its own explicit ``Conversation.model_id`` override.
+Owns the read/write surface for ``default_model_id`` — the per-user
+default model used as a fallback when a conversation doesn't carry
+its own explicit ``Conversation.model_id`` override.
+
+Signature convention: ``session`` first positional, then the owning
+identity (``user_id``), then the domain argument — see
+``.claude/rules/clean-code/python-parameter-order.md``.
 """
 
 from __future__ import annotations
@@ -18,15 +21,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import UserPreferences
 
-# Default ``font_size`` used when the row is created on demand for a
-# user who's only setting their default model. The column is non-null
-# in the existing schema; this seed value matches the implicit
-# frontend default used by the appearance settings.
+# Seed value used when the row is created on demand for a user who's
+# only setting their default model. Column is NOT NULL in the
+# existing schema; matches the implicit frontend appearance default.
 _DEFAULT_FONT_SIZE = 14
 
 
 async def get_user_default_model_id(
-    *,
     session: AsyncSession,
     user_id: uuid.UUID,
 ) -> str | None:
@@ -43,16 +44,14 @@ async def get_user_default_model_id(
 
 
 async def set_user_default_model_id(
-    *,
     session: AsyncSession,
     user_id: uuid.UUID,
     model_id: str | None,
 ) -> None:
     """Persist the user's default model ID, creating the row if absent.
 
-    Pass ``model_id=None`` to clear the override so the next resolution
-    falls back to ``catalog.default_model()``. Idempotent: writing the
-    same value twice is a no-op behaviourally.
+    Pass ``model_id=None`` to clear the override so the next
+    resolution falls back to ``catalog.default_model()``.
     """
     row = await session.get(UserPreferences, user_id)
     if row is None:

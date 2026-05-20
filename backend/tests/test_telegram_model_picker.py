@@ -212,6 +212,10 @@ async def test_get_model_picker_state_reads_conversation_override() -> None:
             "app.integrations.telegram.model_picker.get_user_default_model_id",
             new=AsyncMock(return_value=None),
         ),
+        patch(
+            "app.integrations.telegram.model_picker.resolve_effective_model_id",
+            new=AsyncMock(return_value=override),
+        ),
     ):
         state = await get_model_picker_state(sender=sender, session=AsyncMock())
 
@@ -238,6 +242,10 @@ async def test_get_model_picker_state_falls_back_to_user_default() -> None:
         ),
         patch(
             "app.integrations.telegram.model_picker.get_user_default_model_id",
+            new=AsyncMock(return_value=user_default),
+        ),
+        patch(
+            "app.integrations.telegram.model_picker.resolve_effective_model_id",
             new=AsyncMock(return_value=user_default),
         ),
     ):

@@ -31,13 +31,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.lcm import compact_leaf_if_needed
 from app.core.lcm.background import acquire_lcm_lock
-from app.core.providers.catalog import default_model
 from app.core.providers.model_id import InvalidModelId
 from app.crud.channel import (
     get_or_create_telegram_conversation_full,
     get_user_id_for_external,
 )
 from app.db import async_session_maker
+from app.integrations.telegram.model_defaults import resolve_effective_model_id
 
 
 class _TelegramSenderLike(Protocol):
@@ -116,10 +116,14 @@ async def handle_compact_command(
 
     # Default the summary model to whatever the conversation is using
     # (matches the fallback in ``compact_leaf_if_needed`` when
-    # ``lcm_summary_model`` is unset). Picking the catalog default for
-    # never-modelled conversations keeps the call shape valid even on a
-    # fresh row that has not picked a model yet.
-    summary_model_id = conversation.model_id or default_model().id
+    # ``lcm_summary_model`` is unset). Honours the user's pinned default
+    # before falling back to the catalog default — see
+    # :func:`resolve_effective_model_id`.
+    summary_model_id = await resolve_effective_model_id(
+        session=session,
+        user_id=pawrrtal_user_id,
+        conversation_model_id=conversation.model_id,
+    )
 
     # Take the per-conversation lock to serialize against any
     # background pass that turn_runner.py just scheduled — both paths

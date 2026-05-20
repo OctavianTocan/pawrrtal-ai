@@ -33,13 +33,11 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.providers.catalog import default_model
 from app.crud.channel import (
     get_or_create_telegram_conversation_full,
     redeem_link_code,
     update_conversation_verbose_level,
 )
-from app.crud.user_preferences import get_user_default_model_id
 
 # Re-export so ``bot.py`` imports both ``handle_plain_message`` and
 # ``collect_attachments`` from the same module — keeps ``bot.py`` under
@@ -49,6 +47,7 @@ from app.integrations.telegram._attachments import (
     collect_attachments as collect_attachments,  # noqa: PLC0414
 )
 from app.integrations.telegram.dev_admin import resolve_or_autolink_telegram_user
+from app.integrations.telegram.model_defaults import resolve_effective_model_id
 from app.integrations.telegram.sender import TelegramSender as TelegramSender  # noqa: PLC0414
 
 # Loose match for the link-code shape (8 chars from the look-alike-free
@@ -230,14 +229,11 @@ async def handle_plain_message(
         session=session,
         thread_id=sender.thread_id,
     )
-
-    # Conversation override wins; otherwise the user's pinned default;
-    # otherwise the system-wide catalog default.
-    user_default = await get_user_default_model_id(
+    model_id = await resolve_effective_model_id(
         session=session,
         user_id=pawrrtal_user_id,
+        conversation_model_id=conversation.model_id,
     )
-    model_id = conversation.model_id or user_default or default_model().id
 
     logger.info(
         "TELEGRAM_TURN user_id=%s conversation_id=%s model=%s thread_id=%s text_len=%d",

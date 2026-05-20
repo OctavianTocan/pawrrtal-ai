@@ -1,20 +1,17 @@
-"""``/model`` command handler — pulled out of ``handlers.py``.
+"""``/model`` command handler for the Telegram channel.
 
-Moved here so ``handlers.py`` stays under the project's 500-line file
-budget after the reasoning-effort backstop landed.
-
-The command supports three shapes:
+Supports three shapes:
 
 - ``/model <vendor>/<model>`` — switch this conversation only.
 - ``/model <vendor>/<model> default`` (or ``/model default <id>``)
-  — switch this conversation **and** set the user's default model,
+  — switch this conversation **and** set the user's default model
   so future conversations inherit it.
 - ``/model default`` — promote the conversation's *current* model
   to the user's default, without switching to anything else.
 
-Imported by :mod:`app.integrations.telegram.model_picker_runtime`
-(the aiogram glue) and indirectly reached from ``bot.py`` through
-``answer_model_command``.
+The aiogram glue lives in
+:mod:`app.integrations.telegram.model_picker_runtime`; this module
+stays framework-free and unit-testable.
 """
 
 from __future__ import annotations
@@ -70,6 +67,12 @@ _MODEL_DEFAULT_NO_CURRENT_MESSAGE = (
     "No current model to promote. Switch with <code>/model &lt;id&gt;</code> first, "
     "or pass an ID alongside <code>default</code>."
 )
+_MODEL_DEFAULT_STALE_MESSAGE = (
+    "This conversation's current model (<code>{model_id}</code>) is no longer "
+    "in the catalog. Pick a fresh one with <code>/model</code> first, then "
+    "promote it with <code>/model default</code> — or pass an ID directly: "
+    "<code>/model &lt;id&gt; default</code>."
+)
 _MODEL_FAIL_MESSAGE = "Couldn't update model — please try again."
 
 
@@ -88,15 +91,20 @@ class _ParsedArgs:
 
 
 def _parse_model_args(raw: str) -> _ParsedArgs:
-    """Split the trailing ``default`` keyword from the model token.
+    """Split the optional ``default`` keyword from the model token.
 
-    Accepts the two common shapes:
+    Accepted shapes:
 
     - ``<id> default``  → ``model_id=<id>, make_default=True``
     - ``default <id>``  → ``model_id=<id>, make_default=True``
     - ``default``       → ``model_id="", make_default=True``
     - ``<id>``          → ``model_id=<id>, make_default=False``
     - empty             → ``model_id="", make_default=False``
+
+    Keyword match is case-insensitive. Only strips one occurrence of
+    ``default`` per call — ``default default`` keeps the second as a
+    parse error candidate, surfacing as ``_MODEL_UNKNOWN_MESSAGE``
+    downstream.
     """
     tokens = raw.split()
     if not tokens:
@@ -179,6 +187,8 @@ async def _switch_and_maybe_default(
         thread_id=sender.thread_id,
     )
 
+    # Store the canonical "host:vendor/model" form regardless of how
+    # the user typed it, so persisted model_ids stay consistent.
     canonical_id = entry.id
     updated = await update_conversation_model(
         conversation_id=conversation.id,
@@ -227,10 +237,15 @@ async def _promote_current_to_default(
 ) -> str:
     """Handle the bare ``/model default`` shape.
 
-    Reads the conversation's current ``model_id`` and writes it to
-    ``UserPreferences.default_model_id``. Refuses when the
-    conversation hasn't been pinned to anything explicit yet — there
-    would be nothing meaningful to promote.
+    Reads the conversation's current ``model_id``, re-validates it
+    against the catalog, and writes the canonical form to
+    ``UserPreferences.default_model_id``. Refuses when:
+
+    - the conversation hasn't been pinned to anything explicit yet,
+      because there'd be nothing meaningful to promote; or
+    - the stored ``model_id`` is no longer in the catalog (e.g. after
+      a catalog rotation removed it), because promoting a stale ID
+      would silently poison every future conversation.
     """
     conversation = await get_or_create_telegram_conversation_full(
         user_id=pawrrtal_user_id,
@@ -241,17 +256,36 @@ async def _promote_current_to_default(
     if not current_id:
         return _MODEL_DEFAULT_NO_CURRENT_MESSAGE
 
+    canonical_id = _canonical_catalog_id(current_id)
+    if canonical_id is None:
+        logger.warning(
+            "TELEGRAM_DEFAULT_PROMOTE_STALE user_id=%s stale_model_id=%s",
+            pawrrtal_user_id,
+            current_id,
+        )
+        return _MODEL_DEFAULT_STALE_MESSAGE.format(model_id=current_id)
+
     await set_user_default_model_id(
         session=session,
         user_id=pawrrtal_user_id,
-        model_id=current_id,
+        model_id=canonical_id,
     )
     logger.info(
         "TELEGRAM_DEFAULT_MODEL_SET user_id=%s model_id=%s",
         pawrrtal_user_id,
-        current_id,
+        canonical_id,
     )
-    return _MODEL_DEFAULT_ONLY_MESSAGE.format(model_id=current_id)
+    return _MODEL_DEFAULT_ONLY_MESSAGE.format(model_id=canonical_id)
+
+
+def _canonical_catalog_id(model_id: str) -> str | None:
+    """Return the canonical catalog ID for ``model_id`` or ``None`` if stale."""
+    try:
+        parsed = parse_model_id(model_id)
+    except InvalidModelId:
+        return None
+    entry = find(parsed)
+    return None if entry is None else entry.id
 
 
 async def set_user_default_model_from_callback(
