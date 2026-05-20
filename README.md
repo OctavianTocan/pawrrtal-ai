@@ -134,11 +134,11 @@ Workspace file tools are scoped to the workspace root and reject absolute paths/
 ### Voice and STT
 
 - **Web STT endpoint**: `POST /api/v1/stt` accepts an uploaded audio file and returns transcript JSON.
-- **xAI legacy path**: `VOICE_PROVIDER=xai` uses the xAI STT HTTP endpoint and resolves `XAI_API_KEY` from the user's default workspace or gateway settings.
+- **xAI backend (default)**: `VOICE_PROVIDER=xai` uses the xAI STT HTTP endpoint via `XaiSttTranscriber`. The web `/api/v1/stt` route resolves `XAI_API_KEY` from the user's default workspace first then the gateway global; the Telegram bot reads the global setting.
 - **Mistral backend**: `VOICE_PROVIDER=mistral` uses Mistral Voxtral when `VOICE_MISTRAL_API_KEY` is set and the optional dependency is installed.
 - **OpenAI backend**: `VOICE_PROVIDER=openai` uses Whisper through the OpenAI SDK when `VOICE_OPENAI_API_KEY` is set and the optional dependency is installed.
 - **Local backend**: `VOICE_PROVIDER=local` shells out to ffmpeg and whisper.cpp.
-- **Telegram reuse**: Telegram voice/audio attachments use the same transcriber abstraction and fall back to metadata annotations when transcription is unavailable.
+- **Telegram reuse**: Telegram voice/audio attachments use the same transcriber abstraction (including the xAI backend) and fall back to metadata annotations only when no key is configured.
 
 ### Lossless Context Management
 

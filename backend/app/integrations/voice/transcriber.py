@@ -1,10 +1,12 @@
-"""Three voice-transcription backends behind a tiny Protocol.
+"""Four voice-transcription backends behind a tiny Protocol.
 
 Ported in shape from claude-code-telegram's ``voice_handler.py`` —
 the API-key-bearing backends use lazy imports so a deployment that
 sticks with xAI doesn't pay the install cost for ``mistralai`` /
 ``openai``; the local backend shells out to ``whisper.cpp`` via
-ffmpeg.
+ffmpeg; the xAI backend is a thin httpx wrapper around xAI's HTTP
+STT endpoint, so non-Telegram surfaces (the web ``/api/v1/stt`` route)
+and Telegram both go through the same code path now.
 
 Each backend raises :class:`TranscriptionError` on failure with a
 short human-readable reason; the route translates into HTTP 502
@@ -17,8 +19,11 @@ import asyncio
 import logging
 import shutil
 import tempfile
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Protocol
+
+import httpx
 
 from app.core.config import settings
 
@@ -29,6 +34,20 @@ logger = logging.getLogger(__name__)
 # can take a while to transcribe locally; 120s covers a 5-minute clip
 # on a modest box.
 _LOCAL_SUBPROCESS_TIMEOUT_S = 120
+
+# Wall-clock cap for any single xAI HTTP STT call.  A typical voice
+# note transcribes in 1-3 s; the long tail (multi-minute clips) still
+# finishes well under a minute.  Kept the same as the previous
+# inline-route default so we don't surprise existing operators.
+_XAI_STT_TIMEOUT_S = 60.0
+
+# xAI's documented STT endpoint.  Kept module-level so tests can
+# monkey-patch without poking at the class body.
+XAI_STT_URL = "https://api.x.ai/v1/stt"
+
+# Status floor at which xAI's response is treated as an error.  Mirrors
+# HTTP semantics — any 4xx / 5xx becomes a :class:`TranscriptionError`.
+_HTTP_ERROR_STATUS_FLOOR = 400
 
 
 class TranscriptionError(RuntimeError):
@@ -229,25 +248,121 @@ class LocalWhisperCppTranscriber:
         return stdout.decode()
 
 
-def resolve_transcriber() -> Transcriber | None:
-    """Build the configured backend.  Returns ``None`` for ``xai`` (legacy path).
+class XaiSttTranscriber:
+    """xAI HTTP STT endpoint, wrapped as a :class:`Transcriber`.
 
-    The xAI proxy lives in ``api/stt.py`` and is the historical path.
-    The other three backends are returned as :class:`Transcriber`
-    instances the route can call uniformly.
+    Used by both the web ``/api/v1/stt`` route (with the workspace-
+    resolved ``XAI_API_KEY``) and the Telegram bot (with the global
+    ``settings.xai_api_key``).  Previously the route did its own
+    inline ``httpx.AsyncClient.post(...)`` and the Telegram bot
+    silently skipped — the Telegram skip was the reported bug.
     """
-    provider = settings.voice_provider
-    if provider == "mistral":
-        if not settings.voice_mistral_api_key:
-            return None
-        return MistralVoxtralTranscriber(api_key=settings.voice_mistral_api_key)
-    if provider == "openai":
-        if not settings.voice_openai_api_key:
-            return None
-        return OpenAIWhisperTranscriber(api_key=settings.voice_openai_api_key)
-    if provider == "local":
-        return LocalWhisperCppTranscriber(
-            binary_path=settings.voice_whisper_cpp_binary or None,
-            model_path=settings.voice_whisper_cpp_model,
-        )
-    return None
+
+    def __init__(
+        self,
+        api_key: str,
+        *,
+        language: str | None = None,
+        format: bool = True,  # noqa: A002 — matches xAI's docs + the route's form field
+        timeout_seconds: float = _XAI_STT_TIMEOUT_S,
+    ) -> None:
+        self._api_key = api_key
+        self._language = language
+        self._format = format
+        self._timeout_seconds = timeout_seconds
+
+    async def transcribe(self, audio_bytes: bytes) -> str:
+        """Return the plain-text transcription of ``audio_bytes``."""
+        # xAI's docs: the `file` field MUST be the last entry in the
+        # multipart body.  httpx preserves insertion order from the
+        # `data` + `files` tuples below.
+        data: dict[str, str] = {}
+        if self._language:
+            data["language"] = self._language
+        if self._format:
+            data["format"] = "true"
+        files = {"file": ("voice.ogg", audio_bytes, "audio/ogg")}
+        try:
+            async with httpx.AsyncClient(timeout=self._timeout_seconds) as client:
+                response = await client.post(
+                    XAI_STT_URL,
+                    headers={"Authorization": f"Bearer {self._api_key}"},
+                    data=data,
+                    files=files,
+                )
+        except httpx.TimeoutException as exc:
+            raise TranscriptionError(f"xAI STT timed out after {self._timeout_seconds}s.") from exc
+        except httpx.RequestError as exc:
+            logger.warning("XAI_STT_REQUEST_FAIL error=%s", exc)
+            raise TranscriptionError("xAI STT request failed.") from exc
+
+        if response.status_code >= _HTTP_ERROR_STATUS_FLOOR:
+            # Surface xAI's error body so deployers see the actual
+            # cause (rate limited, unsupported format, etc.).
+            logger.warning("XAI_STT_HTTP_%s body=%s", response.status_code, response.text[:200])
+            raise TranscriptionError(
+                f"xAI STT returned HTTP {response.status_code}: {response.text[:200]}"
+            )
+
+        try:
+            payload = response.json()
+        except ValueError as exc:
+            raise TranscriptionError("xAI STT returned a non-JSON body.") from exc
+        text = (payload.get("text") if isinstance(payload, dict) else None) or ""
+        text = text.strip()
+        if not text:
+            raise TranscriptionError("xAI returned an empty transcription.")
+        return text
+
+
+def resolve_transcriber() -> Transcriber | None:
+    """Build the configured backend, or ``None`` when nothing is wired up.
+
+    Returns a :class:`Transcriber` for every provider supported by
+    ``settings.voice_provider``.  Callers — the web ``/api/v1/stt``
+    route and the Telegram bot — invoke the result uniformly.  The
+    xAI branch uses the global ``settings.xai_api_key``; surfaces that
+    have a workspace context (the web route) and want workspace-first
+    precedence should construct :class:`XaiSttTranscriber` directly
+    with the workspace-resolved key instead of relying on this helper.
+    """
+    builder = _PROVIDER_BUILDERS.get(settings.voice_provider)
+    if builder is None:
+        return None
+    return builder()
+
+
+def _build_xai() -> Transcriber | None:
+    if not settings.xai_api_key:
+        return None
+    return XaiSttTranscriber(api_key=settings.xai_api_key)
+
+
+def _build_mistral() -> Transcriber | None:
+    if not settings.voice_mistral_api_key:
+        return None
+    return MistralVoxtralTranscriber(api_key=settings.voice_mistral_api_key)
+
+
+def _build_openai() -> Transcriber | None:
+    if not settings.voice_openai_api_key:
+        return None
+    return OpenAIWhisperTranscriber(api_key=settings.voice_openai_api_key)
+
+
+def _build_local() -> Transcriber | None:
+    return LocalWhisperCppTranscriber(
+        binary_path=settings.voice_whisper_cpp_binary or None,
+        model_path=settings.voice_whisper_cpp_model,
+    )
+
+
+# Provider-name → builder function.  The dict form keeps the branch
+# count under ruff's PLR0911 ceiling (max 6 returns per function) and
+# makes a new backend a one-line addition.
+_PROVIDER_BUILDERS: dict[str, Callable[[], Transcriber | None]] = {
+    "xai": _build_xai,
+    "mistral": _build_mistral,
+    "openai": _build_openai,
+    "local": _build_local,
+}
