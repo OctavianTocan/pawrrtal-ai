@@ -219,8 +219,8 @@
 	--foreground: oklch(0.14 0 0);
 	--foreground-dimmed: oklch(0.89 0 0);
 	--foreground-rgb: 31, 31, 31;
-	--user-message-bubble: oklch(0.89 0 0);
-	--user-message-bubble-dimmed: oklch(0.89 0 0);
+	--user-message-bubble: oklch(0.89 0.015 245);
+	--user-message-bubble-dimmed: oklch(0.89 0.015 245);
 	--assistant-message-bubble: oklch(from var(--foreground) l c h / 0.12);
 	--assistant-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.12);
 	/* Soft purple ~#9e94d5 — brand accent + active states. */

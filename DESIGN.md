@@ -19,7 +19,7 @@ colors:
   destructive: "#CF2D56"
   border: "#E8E0C9"
   muted-foreground: "#8A8888"
-  user-message-bubble: "#E3E3E3"
+  user-message-bubble: "#E9EEF6"
   info-text: "#1A4F7A"
   success-text: "#0F4A2A"
   destructive-text: "#6B1A2A"
