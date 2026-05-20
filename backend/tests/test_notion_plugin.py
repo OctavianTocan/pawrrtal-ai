@@ -163,6 +163,28 @@ class TestNtnTool:
         assert "non-empty list" in body["error"]
 
     @pytest.mark.anyio
+    async def test_rejects_non_string_args_item(
+        self, ctx: ToolContext, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A dict in the args array would otherwise be Python-repr'd into
+        an invalid CLI token. Reject explicitly so the agent gets a
+        clear validation error instead of an opaque ``ntn`` failure.
+        """
+        monkeypatch.setattr(
+            "app.integrations.notion.tool.resolve_api_key",
+            lambda *_, **__: "tok",
+        )
+        tool = make_ntn_tool(ctx)
+        raw = await tool.execute(
+            "call-1",
+            args=["api", "v1/pages/abc", "-X", "PATCH", "-d", {"archived": True}],
+        )
+        body = json.loads(raw)
+        assert "error" in body
+        assert "args[5]" in body["error"]
+        assert "string" in body["error"]
+
+    @pytest.mark.anyio
     async def test_coerces_single_string_into_one_arg(
         self,
         ctx: ToolContext,

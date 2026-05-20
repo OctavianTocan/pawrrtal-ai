@@ -45,16 +45,21 @@ NTN_TOOL_DESCRIPTION = (
     "shell, no need to prefix `ntn` yourself). The workspace's "
     "`NOTION_API_KEY` is injected for you.\n"
     "\n"
-    "Common subcommands:\n"
-    "  • `ntn api <path>` — call the Notion HTTP API. Add `-X PATCH` / "
-    "`-X DELETE` / `-X POST` for non-GET methods, `-d '<json>'` for a body, "
-    "and `key==value` for query-string params.\n"
-    "  • `ntn pages get <page_id>` — return the page rendered as Markdown.\n"
-    "  • `ntn pages create --parent page:<parent_id> --title <t> "
-    "--content <md>` — create a new page from Markdown.\n"
-    "  • `ntn pages update <page_id> --content <md>` — replace a page's "
-    "body with new Markdown.\n"
-    "  • `ntn --help` / `ntn <command> --help` — discover everything else.\n"
+    "Common subcommands (each arg is a separate `args` element; do not "
+    "wrap values in shell quotes — there is no shell):\n"
+    '  • `args = ["api", "<path>"]` — call the Notion HTTP API. Add '
+    '`"-X", "PATCH"` / `"-X", "DELETE"` / `"-X", "POST"` for '
+    'non-GET methods, `"-d", "<raw json>"` for a body, and '
+    '`"key==value"` for query-string params.\n'
+    '  • `args = ["pages", "get", "<page_id>"]` — return the page '
+    "rendered as Markdown.\n"
+    '  • `args = ["pages", "create", "--parent", "page:<parent_id>",'
+    ' "--title", "<t>", "--content", "<md>"]` — create a new page '
+    "from Markdown.\n"
+    '  • `args = ["pages", "update", "<page_id>", "--content", '
+    '"<md>"]` — replace a page\'s body with new Markdown.\n'
+    '  • `args = ["--help"]` / `args = ["<command>", "--help"]` — '
+    "discover everything else.\n"
     "\n"
     'Return value is JSON: `{"stdout": str, "stderr": str}` on '
     'success, `{"error": str, "returncode": int}` on non-zero exit, '
@@ -146,10 +151,13 @@ def make_ntn_tool(ctx: ToolContext) -> AgentTool:
 def _coerce_args(raw: object) -> list[str]:
     """Validate ``args`` and return a list of strings.
 
-    Models occasionally send a single string for an array-typed field,
-    or include non-string items (numbers, ints). Coerce to strings and
-    reject empties — the agent should always pass something for the
-    binary to do.
+    Models occasionally collapse a single-element array into a bare
+    string for array-typed fields — that one shape is forgiven by
+    wrapping in a single-item list.  Anything else (numbers, dicts,
+    nested arrays) is rejected explicitly so the agent gets a clear
+    validation error instead of an opaque CLI failure from
+    ``str(dict)`` producing Python repr output that the ``ntn``
+    binary can't parse.
     """
     if isinstance(raw, str):
         items: list[Any] = [raw]
@@ -161,7 +169,14 @@ def _coerce_args(raw: object) -> list[str]:
     if not items:
         raise ValueError("`args` must be a non-empty list of strings.")
 
-    return [str(item) for item in items]
+    for index, item in enumerate(items):
+        if not isinstance(item, str):
+            raise TypeError(
+                f"`args[{index}]` must be a string (got {type(item).__name__}). "
+                "If you need to pass a JSON body, serialise it to a string "
+                "first and place it after the corresponding `-d` flag."
+            )
+    return list(items)
 
 
 def _coerce_stdin(raw: object) -> bytes | None:
