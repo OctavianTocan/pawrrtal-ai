@@ -70,7 +70,7 @@ async def sync_workspace_heartbeats(
     other surfaces (the user's own POST /api/v1/scheduled-jobs jobs)
     are untouched.
     """
-    path = Path(workspace.path) / "HEARTBEAT.md"
+    path = Path(workspace.path) / ".agent" / "HEARTBEAT.md"
     config = load_heartbeat_md(path)
 
     conversation = await get_or_create_heartbeat_conversation(user_id, session)

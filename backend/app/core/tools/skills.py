@@ -1,7 +1,8 @@
 """Skill manifest reader for the workspace API layer.
 
-Reads ``skills/_manifest.jsonl`` for machine-readable skill metadata and
-falls back to directory discovery when the manifest is absent or corrupt.
+Reads ``.agent/skills/_manifest.jsonl`` for machine-readable skill
+metadata and falls back to directory discovery when the manifest is
+absent or corrupt.
 
 No database access, no network calls — pure filesystem reads.
 """
@@ -16,8 +17,8 @@ from typing import Any
 
 log = logging.getLogger(__name__)
 
-_SKILLS_DIR = "skills"
-_MANIFEST_FILE = "skills/_manifest.jsonl"
+_SKILLS_DIR = ".agent/skills"
+_MANIFEST_FILE = ".agent/skills/_manifest.jsonl"
 _SKILL_MD_NAME = "SKILL.md"
 
 # Hard caps to prevent runaway directory scanning or line parsing.
@@ -40,9 +41,11 @@ def read_skill_manifest(workspace_root: Path) -> list[SkillEntry]:
     """Return all skills found in the workspace skills directory.
 
     Strategy:
-    1. Parse ``skills/_manifest.jsonl`` line-by-line into a name → dict lookup.
-       Corrupt lines are skipped with a warning; the function never raises.
-    2. Scan ``skills/`` for subdirectories whose names do not start with ``_``.
+    1. Parse ``.agent/skills/_manifest.jsonl`` line-by-line into a
+       name → dict lookup. Corrupt lines are skipped with a warning;
+       the function never raises.
+    2. Scan ``.agent/skills/`` for subdirectories whose names do not
+       start with ``_``.
     3. Merge each subdirectory with its manifest entry (if any) into a
        ``SkillEntry``, checking whether ``SKILL.md`` exists.
     4. Return up to ``_MAX_SKILLS`` entries sorted by name.
@@ -81,7 +84,7 @@ def read_skill_manifest(workspace_root: Path) -> list[SkillEntry]:
 
 
 def _load_manifest(workspace_root: Path) -> dict[str, dict[str, Any]]:
-    """Parse ``skills/_manifest.jsonl`` into a name → metadata dict.
+    """Parse ``.agent/skills/_manifest.jsonl`` into a name → metadata dict.
 
     Skips lines that exceed ``_MAX_MANIFEST_LINE_BYTES`` or fail JSON parsing.
     Returns an empty dict if the file is absent or unreadable.

@@ -267,8 +267,9 @@ def _register_skills_route(router: APIRouter) -> None:
     ) -> list[SkillRead]:
         """Return the skill list for a workspace.
 
-        Reads ``skills/_manifest.jsonl`` and falls back to directory discovery.
-        Returns an empty list (not 404) when the workspace has no skills yet.
+        Reads ``.agent/skills/_manifest.jsonl`` and falls back to
+        directory discovery. Returns an empty list (not 404) when the
+        workspace has no skills yet.
         """
         ws = await _get_owned_workspace(workspace_id, user, session)
         root = Path(ws.path)

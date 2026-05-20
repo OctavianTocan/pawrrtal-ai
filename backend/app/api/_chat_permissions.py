@@ -42,8 +42,9 @@ def build_chat_permission_check(
     ``can_use_tool`` hook, Gemini via
     :class:`~app.core.agent_loop.types.AgentLoopConfig.permission_check`.
 
-    PR 06: workspace context drives ``enabled_tools`` so the gate
-    respects ``.claude/settings.json`` allowlists.
+    Workspace context drives ``enabled_tools`` so the gate respects
+    the workspace's ``.agent/protocols/permissions.md`` allow list
+    once a Markdown parser is wired in.
     """
     workspace_ctx = load_workspace_context(workspace_root)
     permission_context = PermissionContext(
