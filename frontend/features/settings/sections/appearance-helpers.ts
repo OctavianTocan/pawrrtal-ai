@@ -87,7 +87,7 @@ export const DEFAULT_LIGHT_COLORS: Record<ColorSlot, string> = {
 /** Dark-mode color defaults — mirrors the values in `globals.css`. */
 export const DEFAULT_DARK_COLORS: Record<ColorSlot, string> = {
 	background: 'oklch(0.145 0.005 285)',
-	foreground: 'oklch(1 0 0)',
+	foreground: 'oklch(0.9158314607 0 0)',
 	accent: 'oklch(0.704 0.102 285)',
 	info: 'oklch(0.783 0.119 255)',
 	success: 'oklch(0.50 0.09 165)',

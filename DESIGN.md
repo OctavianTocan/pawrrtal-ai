@@ -10,7 +10,7 @@ description: >
   frontend/app/globals.css).
 colors:
   primary: "#9E94D5"
-  on-primary: "#FFFFFF"
+  on-primary: "#1F1F1F"
   background: "#F7F7F4"
   foreground: "#1F1F1F"
   accent: "#9E94D5"
@@ -19,7 +19,11 @@ colors:
   destructive: "#CF2D56"
   border: "#E8E0C9"
   muted-foreground: "#8A8888"
-  user-message-bubble: "#E9EEF6"
+  user-message-bubble: "#E3E3E3"
+  user-message-foreground: "#1F1F1F"
+  assistant-message-text: "#1F1F1F"
+  sidepanel-text: "#1F1F1F"
+  sidepanel-muted-text: "#8A8A8A"
   info-text: "#1A4F7A"
   success-text: "#0F4A2A"
   destructive-text: "#6B1A2A"
@@ -124,12 +128,12 @@ components:
     padding: 12px
   bubble-user:
     backgroundColor: "{colors.user-message-bubble}"
-    textColor: "{colors.foreground}"
+    textColor: "{colors.user-message-foreground}"
     rounded: "{rounded.bubble}"
     padding: 12px
   bubble-assistant:
     backgroundColor: "{colors.background}"
-    textColor: "{colors.foreground}"
+    textColor: "{colors.assistant-message-text}"
     padding: 12px
   step-icon:
     backgroundColor: "{colors.foreground}"
@@ -206,12 +210,12 @@ components:
     padding: "Sticky footer gap - `flex-col-reverse` narrow / `sm:flex-row sm:justify-end` wide"
   sidebar-nav-row:
     backgroundColor: "Hover `{colors.foreground}` @ 4%; selected @ 7%"
-    textColor: "{colors.foreground}"
+    textColor: "{colors.sidepanel-text}"
     rounded: "{rounded.sm}"
     padding: "Comfortable `min-h-9`; compact `h-8` density split"
     typography: sidebar-row
   sidebar-section-header:
-    textColor: "{colors.foreground}"
+    textColor: "{colors.sidepanel-muted-text}"
     typography: sidebar-section-header
     padding: "Floating tray hover - absolute inset micro-padding + `rounded-[6px]` wash"
   app-pill:
@@ -298,7 +302,11 @@ or overlays where the layer underneath should bleed through.
 | Role        | Hex (approx) | Canonical                    |
 | ----------- | ------------ | ---------------------------- |
 | background  | `#F7F7F4`    | `oklch(0.973 0.014 90)`     |
-| foreground  | `#1F1F1F`    | `oklch(0.21 0.005 285)`     |
+| foreground  | `#1F1F1F`    | `oklch(0.2392923762 0 0)`   |
+| assistant-message-text | `#1F1F1F` | `oklch(0.2392923762 0 0)` |
+| user-message-bubble | `#E3E3E3` | `oklch(0.9158314607 0 0)` |
+| user-message-foreground | `#1F1F1F` | `oklch(0.2392923762 0 0)` |
+| sidepanel-text | `#1F1F1F` | `oklch(0.2392923762 0 0)` |
 | accent      | `#9E94D5`    | `oklch(0.704 0.102 285)`    |
 | info        | `#87C3FF`    | `oklch(0.783 0.119 255)`    |
 | success     | `#1F8A65`    | `oklch(0.50 0.12 165)`      |
@@ -320,7 +328,12 @@ the **explicit anchors** referenced in `globals.css`:
 | ------------------ | --------- | ----------------------------- |
 | background         | `#141414` | Page / workspace canvas       |
 | background-elevated| `#191919` | Sidebar, elevated surfaces    |
-| foreground         | `#FFFFFF` | Primary text                  |
+| foreground         | `#E3E3E3` | Primary interface text        |
+| assistant-message-text | `#E3E3E3` | Assistant message text    |
+| user-message-bubble | `#282A2C` | User message bubble fill |
+| user-message-foreground | `#E3E3E3` | User message text        |
+| sidepanel-text | `#E3E3E3` | Sidebar / sidepanel text |
+| sidepanel-muted-text | `#8A8A8A` | Sidebar section/meta text |
 | accent             | `#9E94D5` | Soft purple                   |
 | border             | `#303030` | Hairline dividers             |
 | muted-foreground   | `#AAAAAA` | Secondary / metadata copy     |
@@ -786,6 +799,12 @@ Feature wrappers (**`ConversationsEmptyState`**, **`TasksEmptyState`**, Knowledg
 - **Selected:** `bg-foreground/[0.07]`
 - **`density="comfortable"`** - `min-h-9` rows (conversations, projects).
 - **`density="compact"`** - `h-8` metadata-heavy rows (tasks sidebar).
+- **Text scope:** sidepanels apply `.sidepanel-text-scope`, which resolves
+  generic `text-foreground` descendants to `--sidebar-foreground`: `#1F1F1F`
+  (`oklch(0.2392923762 0 0)`) in light mode and `#E3E3E3`
+  (`oklch(0.9158314607 0 0)`) in dark mode. Inside the same scope,
+  `text-muted-foreground` resolves to `#8A8A8A`
+  (`oklch(0.6334289302 0 0)`) for section and metadata labels.
 
 **`entity-row.tsx`** keeps selection + context-menu behavior and delegates surface
 classes via **`sidebarNavRowSurfaceClassName`**. **`ProjectRow`** composes the same
@@ -847,11 +866,17 @@ may not appear in the compiled CSS.
   no border on focus (the shadow alone defines the edge). Dropdowns opened
   from the composer (e.g. model picker) inherit `chat-composer-dropdown-menu`
   styling - 14px radius (`rounded.lg`), `--foreground-5` background.
-- **`bubble-user`** - User message bubbles use `--user-message-bubble` (a
-  tinted-foreground alpha) with the asymmetric tail described in **Shapes**.
+- **`bubble-user`** - User message bubbles use `--user-message-bubble` with
+  `--user-message-foreground` and the asymmetric tail described in **Shapes**.
+  In light mode the bubble is `#E3E3E3` (`oklch(0.9158314607 0 0)`) with
+  `#1F1F1F` text (`oklch(0.2392923762 0 0)`). In dark mode the bubble is
+  `#282A2C` (`oklch(0.2837694632 0.0046572957 247.9916671312)`) with
+  `#E3E3E3` text (`oklch(0.9158314607 0 0)`).
 - **`bubble-assistant`** - Assistant messages have **no bubble** by default.
-  They sit on the page background with the foreground color, with prose
-  styling for long-form output.
+  They sit on the page background with `--assistant-message-text`, which
+  resolves to `#1F1F1F` (`oklch(0.2392923762 0 0)`) in light mode and
+  `#E3E3E3` (`oklch(0.9158314607 0 0)`) in dark mode, with prose styling for
+  long-form output.
 - **`step-icon`** - Onboarding step iconography. 64px square, 16px radius,
   inverse fill (foreground on background-inverse). Inner glyph is 32px.
 - **`select-button`** - Project-internal compact picker (see

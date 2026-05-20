@@ -210,7 +210,7 @@ function ResizableSidebarContent({ children }: { children: React.ReactNode }): R
 				 */}
 				<SidebarFocusShell
 					className={cn(
-						'group bg-sidebar text-sidebar-foreground absolute inset-y-0 left-0 flex flex-col overflow-hidden pt-10',
+						'group sidepanel-text-scope bg-sidebar text-sidebar-foreground absolute inset-y-0 left-0 flex flex-col overflow-hidden pt-10',
 						transformTransition,
 						isExpanded ? 'translate-x-0' : '-translate-x-full'
 					)}

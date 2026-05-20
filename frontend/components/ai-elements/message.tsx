@@ -49,7 +49,7 @@ export const MessageContent = ({ children, className, ...props }: MessageContent
 			// `rounded-br` keeps the bottom-right (outer) corner sharp; a ::before
 			// pseudo-element extends a triangular tail pointing right toward the avatar.
 			'group-[.is-user]:ml-auto group-[.is-user]:rounded-[var(--radius-bubble)] group-[.is-user]:rounded-br-[var(--radius-bubble-tail)] group-[.is-user]:relative',
-			'group-[.is-user]:bg-user-message-bubble group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-background',
+			'group-[.is-assistant]:text-assistant-message-text group-[.is-user]:bg-user-message-bubble group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-user-message-foreground',
 			'group-[.is-user]:before:absolute group-[.is-user]:before:bottom-[2px] group-[.is-user]:before:right-[calc(100%-18px)]',
 			'group-[.is-user]:before:size-0 group-[.is-user]:before:border-t-[7px] group-[.is-user]:before:border-l-[9px]',
 			'group-[.is-user]:before:border-t-transparent group-[.is-user]:before:border-l-user-message-bubble',
@@ -289,7 +289,7 @@ export const MessageResponse = memo(
 		<Streamdown
 			className={cn(
 				// Base flow.
-				'size-full text-sm leading-relaxed',
+				'chat-message-response size-full text-inherit text-sm leading-relaxed [&_*]:text-inherit',
 				// Reset edge margins so the bubble hugs content.
 				'[&>*:first-child]:mt-0 [&>*:last-child]:mb-0',
 				// Vertical rhythm — `my-4` = 16px under the project's
@@ -313,6 +313,7 @@ export const MessageResponse = memo(
 				'[&_h2]:mt-4 [&_h2]:mb-1.5 [&_h2]:text-base [&_h2]:font-semibold',
 				'[&_h3]:mt-3 [&_h3]:mb-1.5 [&_h3]:text-base [&_h3]:font-semibold',
 				'[&_strong]:font-semibold',
+				'[&_button]:cursor-pointer',
 				// Inline code: muted surface + mono font from the design-system stack.
 				// Held one notch below body (text-sm = 14px) so monospace doesn't
 				// bloom against proportional body type.

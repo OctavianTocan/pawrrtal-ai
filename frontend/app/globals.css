@@ -138,7 +138,7 @@
 	syntax: "<color>";
 	inherits: true;
 	/* Deep ink ~#1f1f1f — primary text. */
-	initial-value: oklch(0.21 0.005 285);
+	initial-value: oklch(0.2392923762 0 0);
 }
 
 @property --accent {
@@ -216,11 +216,13 @@
 		),
 		linear-gradient(180deg, var(--background), var(--foreground-3));
 	/* Deep ink ~#1f1f1f — primary text. */
-	--foreground: oklch(0.14 0 0);
-	--foreground-dimmed: oklch(0.89 0 0);
+	--foreground: oklch(0.2392923762 0 0);
+	--foreground-dimmed: oklch(0.9158314607 0 0);
 	--foreground-rgb: 31, 31, 31;
-	--user-message-bubble: oklch(0.89 0.015 245);
-	--user-message-bubble-dimmed: oklch(0.89 0.015 245);
+	--user-message-bubble: oklch(0.9158314607 0 0);
+	--user-message-bubble-dimmed: oklch(0.9158314607 0 0);
+	--user-message-foreground: oklch(0.2392923762 0 0);
+	--assistant-message-text: oklch(0.2392923762 0 0);
 	--assistant-message-bubble: oklch(from var(--foreground) l c h / 0.12);
 	--assistant-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.12);
 	/* Soft purple ~#9e94d5 — brand accent + active states. */
@@ -300,10 +302,8 @@
 
 	/* === SHADCN COMPATIBILITY (derived from 6 base colors) === */
 	--primary: var(--accent);
-	/* Pure white on saturated orange — clears WCAG AA (4.5:1) where the
-	 * cream background does not (~3.15:1). Mistral's `on-primary` is the
-	 * same #ffffff for the same reason. */
-	--primary-foreground: oklch(1 0 0);
+	/* Deep ink on soft purple clears WCAG AA while avoiding true black. */
+	--primary-foreground: oklch(0.2392923762 0 0);
 	--secondary: oklch(from var(--foreground) l c h / 0.05);
 	--secondary-foreground: var(--foreground);
 	--muted: oklch(from var(--foreground) l c h / 0.05);
@@ -326,11 +326,11 @@
 	   foreground is light it reads as slightly lighter. Both sidebar and
 	   chat panel automatically follow whatever `--background` resolves to. */
 	--sidebar: var(--background);
-	--sidebar-foreground: var(--foreground);
+	--sidebar-foreground: oklch(0.2392923762 0 0);
 	--sidebar-primary: var(--accent);
 	--sidebar-primary-foreground: var(--background);
 	--sidebar-accent: var(--foreground-5);
-	--sidebar-accent-foreground: var(--foreground);
+	--sidebar-accent-foreground: oklch(0.2392923762 0 0);
 	--sidebar-border: var(--border);
 	--sidebar-ring: var(--ring);
 	--sidebar-hover: oklch(from var(--foreground) l c h / 0.02);
@@ -431,12 +431,14 @@
 			transparent 40%
 		),
 		linear-gradient(180deg, var(--background), var(--foreground-5));
-	/* Primary text ~#ffffff */
-	--foreground: oklch(1 0 0);
-	--foreground-dimmed: oklch(0.89 0 0);
-	--foreground-rgb: 255, 255, 255;
-	--user-message-bubble: oklch(0.89 0 0);
-	--user-message-bubble-dimmed: oklch(0.89 0 0);
+	/* Primary text ~#e3e3e3 */
+	--foreground: oklch(0.9158314607 0 0);
+	--foreground-dimmed: oklch(0.9158314607 0 0);
+	--foreground-rgb: 227, 227, 227;
+	--user-message-bubble: oklch(0.2837694632 0.0046572957 247.9916671312);
+	--user-message-bubble-dimmed: oklch(0.2837694632 0.0046572957 247.9916671312);
+	--user-message-foreground: oklch(0.9158314607 0 0);
+	--assistant-message-text: oklch(0.9158314607 0 0);
 	--assistant-message-bubble: oklch(0.95 0 0);
 	--assistant-message-bubble-dimmed: oklch(0.95 0 0);
 	/* Soft purple ~#9e94d5 — consistent brand accent in dark mode */
@@ -532,11 +534,11 @@
 	 * the panel reads as a slightly lighter tint of background; when
 	 * foreground is dark, slightly darker. */
 	--sidebar: var(--background);
-	--sidebar-foreground: var(--foreground);
+	--sidebar-foreground: oklch(0.9158314607 0 0);
 	--sidebar-primary: var(--accent);
 	--sidebar-primary-foreground: var(--primary-foreground);
 	--sidebar-accent: var(--foreground-5);
-	--sidebar-accent-foreground: var(--foreground);
+	--sidebar-accent-foreground: oklch(0.9158314607 0 0);
 	--sidebar-border: var(--border);
 	--sidebar-ring: var(--ring);
 	--sidebar-hover: oklch(from var(--foreground) l c h / 0.02);
@@ -564,6 +566,11 @@ html[data-theme-mismatch]::before {
 	background: var(--foreground-10);
 	z-index: -1;
 	pointer-events: none;
+}
+
+.sidepanel-text-scope {
+	--foreground: var(--sidebar-foreground);
+	--muted-foreground: oklch(0.6334289302 0 0);
 }
 
 /* =============================================================================
@@ -653,6 +660,8 @@ html[data-font="inter"] {
 	--color-sidebar-ring: var(--sidebar-ring);
 	--color-sidebar-hover: var(--sidebar-hover);
 	--color-user-message-bubble: var(--user-message-bubble);
+	--color-user-message-foreground: var(--user-message-foreground);
+	--color-assistant-message-text: var(--assistant-message-text);
 
 	/* === LEGACY COMPATIBILITY (shadcn/ui) === */
 	--color-primary: var(--primary);
@@ -1864,4 +1873,9 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 .pawrrtal-docs :is(h1, h2, h3, h4) {
 	font-family: var(--font-display-stack);
 	letter-spacing: -0.01em;
+}
+
+.chat-message-response,
+.chat-message-response * {
+	color: inherit !important;
 }
