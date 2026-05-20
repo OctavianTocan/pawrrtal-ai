@@ -88,7 +88,8 @@ ignore_imports =
     ; retrieval — and must read the same ORM tables (now plus
     ; lcm_embeddings).  Grandfathered alongside the older LCM entries
     ; until the entire LCM stack is flattened in one pass.
-    app.core.lcm.embeddings -> app.models
+    app.core.lcm.embeddings.storage -> app.models
+    app.core.lcm.embeddings.semantic -> app.models
     app.core.lcm.evals -> app.models
     app.core.lcm.observe -> app.models
     app.core.tools.lcm_search -> app.models
