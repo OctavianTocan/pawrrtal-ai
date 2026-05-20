@@ -41,6 +41,30 @@ PAW_CORE_SYSTEM_PROMPT = (
 )
 
 
+# Verification and timekeeping guidance is appended after the surface
+# description so it applies to every provider that falls back to the
+# default prompt. The workspace-assembled prompt (SOUL.md + AGENTS.md)
+# composes around the same guidance via ``compose_agent_system_prompt``.
+_AGENT_VERIFICATION_GUIDANCE = (
+    "Verify before declaring a capability missing. If a tool or "
+    "environment feature appears unavailable, attempt a minimal probe "
+    "(e.g. invoke the tool with a no-op argument, list the available "
+    "tools, run a short script in the Python sandbox) before telling "
+    "the user the capability isn't there. Persisting one step further "
+    "than your first assumption catches most false negatives."
+)
+_AGENT_TIMEKEEPING_GUIDANCE = (
+    "Treat any timestamp injected into the system prompt or first "
+    "message as the **Turn Start Time** — the moment this turn began. "
+    "It is not the **Current Time**. For anything that depends on the "
+    "live clock (scheduling, computing 'how long ago', deciding if a "
+    "deadline has passed), call the ``now()`` tool when it is available "
+    "and treat its output as the authoritative present moment. Do not "
+    "repeat the Turn Start Time as if it were the current time across "
+    "multi-step tool runs."
+)
+
+
 DEFAULT_AGENT_SYSTEM_PROMPT = (
     f"{PAW_CORE_SYSTEM_PROMPT}\n\n---\n\n"
     "You are an AI assistant inside a chat application.  You are "
@@ -50,12 +74,24 @@ DEFAULT_AGENT_SYSTEM_PROMPT = (
     "App-defined tools (web search, workspace file access, ...) are "
     "made available on a per-turn basis when configured by the chat "
     "router.  Use whichever tools are present, and always cite any "
-    "URLs returned by web-search-style tools."
+    "URLs returned by web-search-style tools.\n\n"
+    f"{_AGENT_VERIFICATION_GUIDANCE}\n\n"
+    f"{_AGENT_TIMEKEEPING_GUIDANCE}"
 )
 
 
 def compose_agent_system_prompt(workspace_prompt: str | None) -> str:
-    """Prepend the Paw identity to workspace-specific prompt material."""
+    """Prepend the Paw identity to workspace-specific prompt material.
+
+    The verification + timekeeping guidance lives below the workspace
+    block so a custom AGENTS.md cannot accidentally drop it. Both apply
+    across every surface (web, Telegram, automation) and every model.
+    """
     if workspace_prompt is None:
         return DEFAULT_AGENT_SYSTEM_PROMPT
-    return f"{PAW_CORE_SYSTEM_PROMPT}\n\n---\n\n{workspace_prompt}"
+    return (
+        f"{PAW_CORE_SYSTEM_PROMPT}\n\n---\n\n"
+        f"{workspace_prompt}\n\n"
+        f"{_AGENT_VERIFICATION_GUIDANCE}\n\n"
+        f"{_AGENT_TIMEKEEPING_GUIDANCE}"
+    )

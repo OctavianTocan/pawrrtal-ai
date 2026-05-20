@@ -170,6 +170,13 @@ def make_gemini_stream_fn(
 
         full_text = ""
         tool_calls: list[dict[str, Any]] = []
+        # Monotonic counter for Gemini's per-Part thinking blocks (#353).
+        # Each ``Part(thought=True)`` is its own block on the wire, and
+        # downstream renderers need that boundary information to insert
+        # paragraph breaks between blocks without guessing from
+        # whitespace heuristics. Starts at 0 and increments once per
+        # emitted thinking part.
+        thinking_block_index = 0
         # Holds the native ``ModelContent`` from whichever chunk produced
         # the function_call parts (Gemini delivers function calls in a
         # single chunk).  When set, the loop forwards it as
@@ -203,10 +210,17 @@ def make_gemini_stream_fn(
                 # regular text.  ``chunk.text`` is a convenience accessor
                 # that concatenates *all* text parts regardless of the
                 # thought flag, so we walk parts explicitly to keep the
-                # two streams separate downstream.
-                thinking_text, response_text = split_chunk_text(chunk)
-                if thinking_text:
-                    yield LLMThinkingDeltaEvent(type="thinking_delta", text=thinking_text)
+                # two streams separate downstream. ``split_chunk_text``
+                # returns thinking parts as a list so we can stamp each
+                # block with its own ``block_index`` (#353).
+                thinking_parts, response_text = split_chunk_text(chunk)
+                for thinking_text in thinking_parts:
+                    yield LLMThinkingDeltaEvent(
+                        type="thinking_delta",
+                        text=thinking_text,
+                        block_index=thinking_block_index,
+                    )
+                    thinking_block_index += 1
                 if response_text:
                     yield LLMTextDeltaEvent(type="text_delta", text=response_text)
                     full_text += response_text

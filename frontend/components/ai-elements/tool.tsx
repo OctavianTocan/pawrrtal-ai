@@ -36,12 +36,15 @@ export type ToolHeaderProps = {
 };
 
 const getStatusBadge = (status: ToolUIPart['state']) => {
+	// Past tense once the tool finishes: 'Ran' replaces 'Completed' so the
+	// post-completion label reads as a finished action ("Ran read_file"),
+	// matching the Telegram ✅ success line. See issue #360.
 	const labels: Record<ToolUIPart['state'], string> = {
 		'input-streaming': 'Pending',
 		'input-available': 'Running',
 		'approval-requested': 'Awaiting Approval',
 		'approval-responded': 'Responded',
-		'output-available': 'Completed',
+		'output-available': 'Ran',
 		'output-error': 'Error',
 		'output-denied': 'Denied',
 	};

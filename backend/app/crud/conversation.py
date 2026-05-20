@@ -224,6 +224,8 @@ async def update_conversation_model(
     user_id: uuid.UUID,
     conversation_id: uuid.UUID,
     session: AsyncSession,
+    *,
+    commit: bool = True,
 ) -> Conversation | None:
     """Persist a model_id change on an existing conversation.
 
@@ -232,9 +234,19 @@ async def update_conversation_model(
         user_id: Owner to match against (ownership check).
         conversation_id: The conversation to update.
         session: Async database session.
+        commit: When ``True`` (the default) the helper commits inside
+            and returns a refreshed row, matching every other caller in
+            this module. The chat router passes ``commit=False`` so the
+            subsequent ``normalize_conversation_reasoning_effort`` call
+            runs in the same transaction — without it the row is briefly
+            inconsistent (new model_id, stale reasoning_effort) and the
+            picker can submit an effort the resolver will then override
+            on the next turn (#366).
 
     Returns:
         The updated ``Conversation``, or ``None`` if not found / not owned.
+        With ``commit=False`` the row is staged but not yet flushed;
+        callers must commit before reading values they care about.
     """
     stmt = (
         select(Conversation)
@@ -250,6 +262,8 @@ async def update_conversation_model(
     conversation.model_id = model_id
     conversation.updated_at = datetime.now()
     session.add(conversation)
+    if not commit:
+        return conversation
     await session.commit()
     await session.refresh(conversation)
     return conversation

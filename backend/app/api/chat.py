@@ -234,13 +234,20 @@ def get_chat_router() -> APIRouter:
         # is the canonical wire form of the catalog default.
         model_id = request.model_id or conversation.model_id or default_model().id
 
-        # Persist model change if it differs from what is stored
+        # Persist model change if it differs from what is stored.
+        # ``commit=False`` defers the flush so the reasoning-effort
+        # normalize below lands in the same transaction (#366). Without
+        # it the row is briefly inconsistent — new ``model_id`` paired
+        # with a stale ``reasoning_effort`` between the two commits —
+        # and a /thinking tap that races the window can persist a
+        # level the resolver will override on the very next turn.
         if model_id != conversation.model_id:
             await update_conversation_model(
                 model_id=model_id,
                 user_id=user.id,
                 conversation_id=request.conversation_id,
                 session=session,
+                commit=False,
             )
 
         # Backstop: re-validate the stored reasoning_effort against
@@ -250,8 +257,9 @@ def get_chat_router() -> APIRouter:
         # /thinking picker, /model command, the web composer, etc.).
         # ``model_id_override`` makes the resolver see the *new* model
         # for the case where the user is switching models in this same
-        # request, even though `conversation.model_id` was updated
-        # above (we don't re-fetch the row before the resolver call).
+        # request — the model_id update above is staged but not yet
+        # committed, so this call's commit flushes both row changes
+        # atomically (#366).
         (
             reasoning_resolution,
             _previous_reasoning_effort,

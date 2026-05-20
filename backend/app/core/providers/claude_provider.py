@@ -629,9 +629,19 @@ async def _stream_events_for_attempt(
     retry/fallback loop stays under the nesting-depth budget (the
     ``while → try → async for → for`` chain in stream() reached
     depth 4, one over the cap). The two loops live here instead.
+
+    Stamps each ``thinking`` event with a monotonically increasing
+    ``block_index`` so downstream renderers know where Claude's
+    per-block emissions begin and end (#353). Claude already emits one
+    ``ThinkingBlock`` per logical block, so an increment-per-event
+    counter is the right grain.
     """
+    thinking_block_index = 0
     async for message in query(prompt=prompt, options=options):
         for event in _events_from_message(message, display_by_name or {}):
+            if event.get("type") == "thinking":
+                event["block_index"] = thinking_block_index
+                thinking_block_index += 1
             yield event
 
 

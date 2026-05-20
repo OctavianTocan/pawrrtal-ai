@@ -112,10 +112,21 @@ class LLMThinkingDeltaEvent(TypedDict):
     ``ThinkingConfig(include_thoughts=True)``, OpenAI o-series, etc.).
     The frontend renders these in a separate "thinking" pane so they
     don't appear in the final assistant transcript.
+
+    ``block_index`` disambiguates "next token in the same thinking
+    block" from "start of a new thinking block" — necessary because
+    xAI streams per-token (one block) while Gemini and Claude stream
+    per-block (each emission is a new block). Renderers insert a
+    paragraph break between events whose ``block_index`` differs and
+    concatenate verbatim within the same block. ``NotRequired`` so
+    older provider stream functions still validate; consumers MUST
+    treat its absence as "same block as previous" (effectively a
+    constant block index). See #353.
     """
 
     type: Literal["thinking_delta"]
     text: str
+    block_index: NotRequired[int]
 
 
 class LLMToolCallEvent(TypedDict):
@@ -196,10 +207,16 @@ class ThinkingDeltaEvent(TypedDict):
     as a ``ThinkingDeltaEvent`` so downstream wrappers (the chat router,
     SSE channel) can translate it into a ``StreamEvent`` of type
     ``"thinking"`` without growing a separate code path per provider.
+
+    ``block_index`` mirrors the LLM-event field: same value = same
+    thinking block, different value = paragraph boundary. Threaded
+    through the loop so the channel renderer and the chat aggregator
+    can coalesce by block identity. See #353.
     """
 
     type: Literal["thinking_delta"]
     text: str
+    block_index: NotRequired[int]
 
 
 class ToolCallStartEvent(TypedDict):

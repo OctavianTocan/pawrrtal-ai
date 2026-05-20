@@ -154,6 +154,12 @@ class TelegramChannel:
         text_last_edit_at = asyncio.get_event_loop().time()
         chars_since_edit = 0
         last_edit_at = asyncio.get_event_loop().time()
+        # ``previous_thinking_block_index`` tracks the ``block_index``
+        # of the most recent thinking event so ``handle_thinking`` can
+        # insert a paragraph break only when a new block starts (#353).
+        # ``None`` before the first thinking event so the very first
+        # chunk does not get a leading separator.
+        previous_thinking_block_index: int | None = None
         # Block-transition tracking (#288). ``previous_block_kind`` is the
         # kind of the most-recent block-emitting event (``"tools"`` /
         # ``"thinking"``). When the incoming event's kind differs from the
@@ -242,13 +248,24 @@ class TelegramChannel:
                     thinking_text=thinking_text,
                     thinking_message_id=thinking_message_id,
                 )
+                # Reset the block-index baseline whenever the prepare step
+                # opens a fresh thinking message (tools→thinking transition).
+                # Otherwise the carry-over index could trigger a leading
+                # paragraph break inside the new italic message.
+                if thinking_message_id is None:
+                    previous_thinking_block_index = None
                 previous_block_kind = "thinking"
-                thinking_text, thinking_message_id = await handle_thinking(
+                (
+                    thinking_text,
+                    thinking_message_id,
+                    previous_thinking_block_index,
+                ) = await handle_thinking(
                     event=event,
                     bot=bot,
                     chat_id=chat_id,
                     thinking_text=thinking_text,
                     thinking_message_id=thinking_message_id,
+                    previous_thinking_block_index=previous_thinking_block_index,
                     reply_to_message_id=reply_to_message_id,
                     message_thread_id=message_thread_id,
                 )

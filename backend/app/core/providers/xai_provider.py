@@ -239,7 +239,16 @@ async def _stream_one_request(
     async for response, chunk in chat.stream():
         deltas = deltas_from_chunk(chunk)
         if deltas.thinking:
-            yield LLMThinkingDeltaEvent(type="thinking_delta", text=deltas.thinking)
+            # xAI streams reasoning per-token within one continuous
+            # block, so every thinking delta from one ``chat.stream()``
+            # call belongs to the same logical block — emit a constant
+            # ``block_index=0`` so downstream renderers don't insert
+            # spurious paragraph breaks between tokens (#353).
+            yield LLMThinkingDeltaEvent(
+                type="thinking_delta",
+                text=deltas.thinking,
+                block_index=0,
+            )
         if deltas.text:
             yield LLMTextDeltaEvent(type="text_delta", text=deltas.text)
         final_response = response
