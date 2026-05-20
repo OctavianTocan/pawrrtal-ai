@@ -79,17 +79,16 @@ const EXEMPT_PATH_FRAGMENTS = [
 	'frontend/lib/react-overlay/',
 	'frontend/lib/react-chat-composer/',
 	// CCT-integration stack (PRs feat/cct-03 onward) extended each of these
-	// modules. They were already near the budget on `development`
-	// (claude_provider.py was 499 lines pre-CCT), and the per-PR additions
-	// are too small individually to justify in-PR splits. Tracked as a
-	// follow-up to extract:
-	//   - agent_loop/loop.py → agent_loop/permission_gate.py (PR 03 addition)
-	//   - providers/claude_provider.py → split sandbox/retry/multimodal helpers (PR 05)
-	//   - integrations/telegram/bot.py → split typing-indicator + permission helpers (PR 03 + PR 07)
-	// TODO(pawrrtal-cct follow-up): split these and remove the exemption.
+	// modules. The other two of the original three were retired:
+	//   - integrations/telegram/bot.py → promoted to ``bot/`` sub-package
+	//     (state / service / dispatcher / turn_runner / typing_indicator /
+	//     auto_title) in this PR.
+	//   - providers/claude_provider.py → promoted to ``claude/`` package
+	//     (split lives on sibling PR #403).
+	// ``agent_loop/loop.py`` is still 827 lines; its split lives on
+	// sibling PR #394. Remove this entry once that lands.
 	'backend/app/core/agent_loop/loop.py',
 	'backend/app/core/providers/claude_provider.py',
-	'backend/app/integrations/telegram/bot.py',
 	// LCM retrieval lab (PR #258) — two files still over budget. ``evals.py``
 	// is the largest (873 lines: harness + scenarios + answerer + retrievers
 	// all in one) and the natural split is into an ``evals/`` package
