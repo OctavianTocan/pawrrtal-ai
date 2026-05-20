@@ -17,13 +17,13 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from app.models import ChatMessage, Conversation
+from app.core.exporters.types import ConversationLike, MessageLike
 
 
 def render_json(
     *,
-    conversation: Conversation,
-    messages: Sequence[ChatMessage],
+    conversation: ConversationLike,
+    messages: Sequence[MessageLike],
 ) -> str:
     """Return a pretty-printed JSON export of the conversation."""
     payload: dict[str, Any] = {
@@ -33,7 +33,7 @@ def render_json(
     return json.dumps(payload, indent=2, sort_keys=True, default=str)
 
 
-def _serialize_conversation(conversation: Conversation) -> dict[str, Any]:
+def _serialize_conversation(conversation: ConversationLike) -> dict[str, Any]:
     return {
         "id": str(conversation.id),
         "user_id": str(conversation.user_id),
@@ -48,7 +48,7 @@ def _serialize_conversation(conversation: Conversation) -> dict[str, Any]:
     }
 
 
-def _serialize_message(message: ChatMessage) -> dict[str, Any]:
+def _serialize_message(message: MessageLike) -> dict[str, Any]:
     return {
         "id": str(message.id),
         "ordinal": message.ordinal,

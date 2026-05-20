@@ -13,7 +13,7 @@ from datetime import datetime
 from html import escape
 from typing import Any
 
-from app.models import ChatMessage, Conversation
+from app.core.exporters.types import ConversationLike, MessageLike
 
 _STYLE = """
 body { font-family: 'Inter', system-ui, sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; color: #222; }
@@ -31,8 +31,8 @@ pre { background: #f6f8fa; padding: 0.75rem; border-radius: 6px; overflow-x: aut
 
 def render_html(
     *,
-    conversation: Conversation,
-    messages: Sequence[ChatMessage],
+    conversation: ConversationLike,
+    messages: Sequence[MessageLike],
 ) -> str:
     """Return a self-contained HTML document for the conversation."""
     title = escape(conversation.title or "Conversation")
@@ -59,7 +59,7 @@ def render_html(
     return "\n".join(parts)
 
 
-def _render_message(message: ChatMessage) -> str:
+def _render_message(message: MessageLike) -> str:
     """Render one message as an HTML block."""
     role = escape(message.role)
     label = "You" if message.role == "user" else "Assistant"

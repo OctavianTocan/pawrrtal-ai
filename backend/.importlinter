@@ -58,9 +58,11 @@ layers =
 ; the api/crud layer) in a follow-up. Pattern mirrors `EXEMPT_FUNCTIONS` in
 ; `scripts/check-nesting.py`.
 ignore_imports =
-    app.core.exporters.markdown_export -> app.models
-    app.core.exporters.html_export -> app.models
-    app.core.exporters.json_export -> app.models
+    ; Exporters (markdown / html / json) previously imported the
+    ; ``Conversation`` + ``ChatMessage`` ORM rows directly. They now
+    ; take ``ConversationLike`` + ``MessageLike`` Protocols from
+    ; ``app.core.exporters.types`` and stay layer-pure. (Cluster A
+    ; flatten — exporters → models — has landed.)
     app.core.governance.audit -> app.models
     app.core.governance.cost_tracker -> app.models
     app.core.scheduler.scheduler -> app.models
