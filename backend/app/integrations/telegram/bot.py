@@ -90,6 +90,16 @@ from app.integrations.telegram.status import (
     handle_status_command,
 )
 
+# Interactive /status picker (#361). ``STATUS_CALLBACK_PREFIX`` is
+# re-exported via :mod:`status_picker_runtime` so bot.py imports the
+# picker entry-point + callback prefix + handler from one module —
+# same fan-out-budget trick as the model / thinking / verbose pickers.
+from app.integrations.telegram.status_picker_runtime import (
+    STATUS_CALLBACK_PREFIX,
+    answer_status_picker,
+    handle_status_picker_callback,
+)
+
 # ``THINKING_CALLBACK_PREFIX`` is re-exported via
 # :mod:`thinking_picker_runtime` for the same fan-out reason.
 from app.integrations.telegram.thinking_picker_runtime import (
@@ -603,6 +613,15 @@ def _register_telegram_command_handlers(dispatcher: Dispatcher) -> None:
 
     @dispatcher.message(Command("status"))
     async def _on_status(message: Message) -> None:
+        # ``/status`` (no arg) → interactive picker (#361).
+        # ``/status all`` → legacy monolithic dump (power-user shortcut).
+        text = message.text or ""
+        parts = text.strip().split(maxsplit=1)
+        arg = parts[1].strip().lower() if len(parts) > 1 else ""
+        if arg in {"", "panel", "menu"}:
+            await answer_status_picker(message=message)
+            return
+
         sender = _sender_from_message(message)
         async with async_session_maker() as session:
             reply = await handle_status_command(
@@ -668,6 +687,12 @@ def _register_telegram_callback_handlers(dispatcher: Dispatcher) -> None:
     )
     async def _on_thinking_picker(callback: CallbackQuery) -> None:
         await handle_thinking_picker_callback(callback=callback)
+
+    @dispatcher.callback_query(
+        lambda query: (query.data or "").startswith(STATUS_CALLBACK_PREFIX)
+    )
+    async def _on_status_picker(callback: CallbackQuery) -> None:
+        await handle_status_picker_callback(callback=callback)
 
 
 def _register_telegram_message_handler(dispatcher: Dispatcher) -> None:
