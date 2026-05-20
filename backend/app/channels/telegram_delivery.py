@@ -148,6 +148,7 @@ async def safe_send_text(
     *,
     reply_to_message_id: int | None,
     message_thread_id: int | None,
+    reply_markup: Any | None = None,
 ) -> int | None:
     """Send Markdown-ish text after converting it to Telegram HTML."""
     return await safe_send_html(
@@ -156,6 +157,7 @@ async def safe_send_text(
         md_to_telegram_html(text),
         reply_to_message_id=reply_to_message_id,
         message_thread_id=message_thread_id,
+        reply_markup=reply_markup,
     )
 
 
@@ -166,19 +168,23 @@ async def safe_send_html(
     *,
     reply_to_message_id: int | None,
     message_thread_id: int | None,
+    reply_markup: Any | None = None,
 ) -> int | None:
     """Call ``send_message`` with routing metadata, returning the message id."""
     if len(html) > MAX_MESSAGE_LEN:
         html = html[: MAX_MESSAGE_LEN - 1] + "..."
+    send_kwargs: dict[str, Any] = {
+        "chat_id": chat_id,
+        "text": html,
+        **routing_kwargs(
+            reply_to_message_id=reply_to_message_id,
+            message_thread_id=message_thread_id,
+        ),
+    }
+    if reply_markup is not None:
+        send_kwargs["reply_markup"] = reply_markup
     try:
-        sent = await bot.send_message(
-            chat_id=chat_id,
-            text=html,
-            **routing_kwargs(
-                reply_to_message_id=reply_to_message_id,
-                message_thread_id=message_thread_id,
-            ),
-        )
+        sent = await bot.send_message(**send_kwargs)
     except _aiogram_errors() as exc:
         logger.warning("TELEGRAM_SEND_FAILED chat_id=%s error=%s", chat_id, exc)
         return None

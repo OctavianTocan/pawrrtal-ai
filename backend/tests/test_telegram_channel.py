@@ -438,6 +438,47 @@ class TestTelegramChannelDeliver:
         kwargs = bot.send_message.await_args.kwargs
         assert kwargs["reply_parameters"].message_id == 44
 
+    async def test_regenerate_button_attached_to_final_reply_when_flag_on(self) -> None:
+        """When the regenerate flag is on, the closing send carries the rgn:<uuid> markup (#368)."""
+        from aiogram.types import InlineKeyboardMarkup
+
+        from app.integrations.telegram.regenerate_keyboard import REGEN_CALLBACK_PREFIX
+
+        bot = _make_bot()
+        conversation_id = uuid.uuid4()
+        msg = ChannelMessage(
+            user_id=uuid.uuid4(),
+            conversation_id=conversation_id,
+            text="hi",
+            surface="telegram",
+            model_id=None,
+            metadata={"bot": bot, "chat_id": 1, "message_id": 2},
+        )
+        channel = TelegramChannel()
+        with patch("app.channels.telegram.settings.telegram_regenerate_button_enabled", True):
+            async for _ in channel.deliver(_stream({"type": "delta", "content": "answer"}), msg):
+                pass
+
+        kwargs = bot.send_message.await_args.kwargs
+        markup = kwargs.get("reply_markup")
+        assert isinstance(markup, InlineKeyboardMarkup)
+        # The lone button row encodes the conversation_id behind the rgn prefix
+        # so the callback handler can replay the last user message.
+        button = markup.inline_keyboard[0][0]
+        assert button.callback_data == f"{REGEN_CALLBACK_PREFIX}{conversation_id}"
+
+    async def test_regenerate_button_omitted_when_flag_off(self) -> None:
+        """The default behaviour is unchanged — no inline keyboard is attached."""
+        bot = _make_bot()
+        msg = _make_channel_message(bot, chat_id=1, message_id=2)
+        channel = TelegramChannel()
+        with patch("app.channels.telegram.settings.telegram_regenerate_button_enabled", False):
+            async for _ in channel.deliver(_stream({"type": "delta", "content": "answer"}), msg):
+                pass
+
+        kwargs = bot.send_message.await_args.kwargs
+        assert "reply_markup" not in kwargs
+
     async def test_not_modified_error_swallowed(self) -> None:
         """TelegramBadRequest: message is not modified must not propagate."""
         from aiogram.exceptions import TelegramBadRequest

@@ -319,6 +319,11 @@ class Settings(BaseSettings):
     # for animated streaming. Falls back to ``editMessageText`` when
     # aiogram doesn't expose the binding.
     telegram_use_draft_streaming: bool = False
+    # When True, every assistant reply on Telegram carries a "🔄 Regenerate"
+    # inline-keyboard button (#368). Tapping the button replays the last
+    # user message through the turn pipeline. Off by default so the
+    # rollout is gradual.
+    telegram_regenerate_button_enabled: bool = False
 
     # ── Voice transcription (PR 14) ──────────────────────────────────────
     # Selects which STT backend the voice handler routes to. The

@@ -10,7 +10,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ._telegram_draft import DraftStreamState
 from .telegram_delivery import (
@@ -43,6 +43,7 @@ async def finalize_turn_delivery(
     reply_to_message_id: int | None,
     message_thread_id: int | None,
     draft_state: DraftStreamState | None = None,
+    reply_markup: Any | None = None,
 ) -> None:
     """Resolve the ⏳ placeholder and send the closing reply (#288, #293, #306).
 
@@ -53,6 +54,13 @@ async def finalize_turn_delivery(
     When ``text_message_id`` is set, we flush its final buffer in place
     and skip the closing ``final_text`` send so the user doesn't see the
     answer twice.
+
+    ``reply_markup`` (#368) attaches an inline keyboard to the closing
+    reply when one is supplied — the regenerate button is the only
+    current caller. The markup rides on whichever message the user
+    ultimately sees as the final answer; in the interleaved-text path
+    that's the existing ``text_message_id`` edit, otherwise it's the
+    closing ``safe_send_text``.
     """
     if draft_state is not None and draft_state.keepalive_task is not None:
         draft_state.keepalive_task.cancel()
@@ -72,7 +80,22 @@ async def finalize_turn_delivery(
         )
 
     if text_message_id is not None and text_buffer:
+        # Interleaved-text path: the answer already lives in an
+        # in-place edited message. We don't re-edit the text just to
+        # attach a markup — Telegram requires editMessageReplyMarkup
+        # for that, which would double the API spend. For now we just
+        # send a tiny zero-content trailing message that carries the
+        # button, so the user still has the affordance. The trailing
+        # message is empty when no markup is supplied.
         await safe_edit(bot, chat_id, text_message_id, text_buffer)
+        if reply_markup is not None:
+            await _send_regenerate_tail(
+                bot=bot,
+                chat_id=chat_id,
+                reply_to_message_id=reply_to_message_id,
+                message_thread_id=message_thread_id,
+                reply_markup=reply_markup,
+            )
         return
 
     if final_text:
@@ -82,6 +105,7 @@ async def finalize_turn_delivery(
             final_text,
             reply_to_message_id=reply_to_message_id,
             message_thread_id=message_thread_id,
+            reply_markup=reply_markup,
         )
         return
 
@@ -92,6 +116,7 @@ async def finalize_turn_delivery(
             _EMPTY_RESPONSE_FALLBACK,
             reply_to_message_id=reply_to_message_id,
             message_thread_id=message_thread_id,
+            reply_markup=reply_markup,
         )
         logger.warning(
             "TELEGRAM_TOOL_ONLY_TURN chat_id=%s message_id=%s tool_trace_len=%d",
@@ -99,3 +124,36 @@ async def finalize_turn_delivery(
             placeholder_message_id,
             len(tool_trace),
         )
+
+
+# Telegram requires `text` on send_message; a single whitespace
+# character is the smallest payload that lets us attach a button
+# below an already-rendered interleaved-text reply without re-editing
+# the answer message itself.
+_REGENERATE_TAIL_TEXT = "·"
+
+
+async def _send_regenerate_tail(
+    *,
+    bot: Bot,
+    chat_id: int | str,
+    reply_to_message_id: int | None,
+    message_thread_id: int | None,
+    reply_markup: Any,
+) -> None:
+    """Post a minimal trailing message that carries the regenerate button.
+
+    Used only on the interleaved-text path (#306) where the final
+    answer was rendered into an in-place-edited Telegram message.
+    Re-editing that message with a markup would require a separate
+    ``editMessageReplyMarkup`` call; sending one tiny extra message
+    keeps the helper symmetric with the closing-send path.
+    """
+    await safe_send_text(
+        bot,
+        chat_id,
+        _REGENERATE_TAIL_TEXT,
+        reply_to_message_id=reply_to_message_id,
+        message_thread_id=message_thread_id,
+        reply_markup=reply_markup,
+    )

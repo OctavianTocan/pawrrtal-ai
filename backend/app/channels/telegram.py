@@ -116,6 +116,18 @@ class TelegramChannel:
         message_id: int = meta["message_id"]
         reply_to_message_id = optional_int(meta.get("reply_to_message_id"))
         message_thread_id = optional_int(meta.get("message_thread_id"))
+        # #368: when the regenerate-button flag is on, every assistant
+        # reply carries a "🔄 Regenerate" inline-keyboard row. The
+        # markup is built once per turn from the conversation_id that
+        # rides on ``ChannelMessage`` itself (NOT metadata — that field
+        # is reserved for surface-specific routing). Off by default.
+        reply_markup: Any | None = None
+        if settings.telegram_regenerate_button_enabled:
+            from app.integrations.telegram.regenerate_keyboard import (  # noqa: PLC0415
+                regenerate_markup_for,
+            )
+
+            reply_markup = regenerate_markup_for(message["conversation_id"])
 
         tool_trace = ""
         # Per-tool state dict for Workstream 4 success/failure timing.
@@ -351,6 +363,7 @@ class TelegramChannel:
             reply_to_message_id=reply_to_message_id,
             message_thread_id=message_thread_id,
             draft_state=draft_state,
+            reply_markup=reply_markup,
         )
 
         # No bytes to yield — delivery is a side-effect only.
