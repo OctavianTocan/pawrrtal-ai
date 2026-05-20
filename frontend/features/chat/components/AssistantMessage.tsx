@@ -93,17 +93,19 @@ function ReasoningPanel({
 			/>
 			<CollapsibleContent
 				className={cn(
-					'overflow-hidden pt-2',
+					'overflow-hidden',
 					'data-[state=closed]:animate-reasoning-panel-close',
 					'data-[state=open]:animate-reasoning-panel-open',
 					'motion-reduce:data-[state=closed]:animate-none motion-reduce:data-[state=open]:animate-none'
 				)}
 			>
-				<ChainOfThought
-					chipsByToolId={chipsByToolId}
-					timeline={timeline}
-					toolCallsById={toolCallsById}
-				/>
+				<div className="pt-2">
+					<ChainOfThought
+						chipsByToolId={chipsByToolId}
+						timeline={timeline}
+						toolCallsById={toolCallsById}
+					/>
+				</div>
 			</CollapsibleContent>
 		</Collapsible>
 	);
