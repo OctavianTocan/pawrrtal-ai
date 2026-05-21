@@ -33,6 +33,8 @@ export interface AppEmptyStateProps {
 		onClick: () => void;
 		/** Button label for default layouts; omit when using `inlineCta`. */
 		label?: string;
+		/** Optional ARIA label for accessibility. */
+		ariaLabel?: string;
 	};
 	/**
 	 * `inlineCta` renders a single sidebar row button (e.g. “Create your first project”).
@@ -63,6 +65,7 @@ export function AppEmptyState({
 		}
 		return (
 			<button
+				aria-label={action.ariaLabel}
 				className={cn(
 					'flex cursor-pointer items-center gap-1.5 rounded-control px-2 py-1.5 text-left text-sm text-muted-foreground hover:bg-foreground/[0.05] hover:text-foreground',
 					className
@@ -112,6 +115,7 @@ export function AppEmptyState({
 					) : null}
 					{action?.label ? (
 						<button
+							aria-label={action.ariaLabel}
 							className="mt-2 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-foreground px-4 text-[13px] font-medium text-background transition-colors duration-150 ease-out hover:bg-foreground/90"
 							onClick={action.onClick}
 							type="button"
@@ -142,6 +146,7 @@ export function AppEmptyState({
 					) : null}
 					{action?.label ? (
 						<button
+							aria-label={action.ariaLabel}
 							className="mt-2 inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-full bg-foreground px-4 text-[13px] font-medium text-background transition-[background-color,transform] duration-150 ease-out hover:bg-foreground/90 active:scale-[0.98] motion-reduce:transition-none"
 							onClick={action.onClick}
 							type="button"
@@ -174,6 +179,7 @@ export function AppEmptyState({
 			) : null}
 			{action?.label ? (
 				<button
+					aria-label={action.ariaLabel}
 					className="mt-4 inline-flex h-7 items-center rounded-soft bg-background px-3 text-xs font-medium shadow-minimal transition-colors hover:bg-foreground/[0.03]"
 					onClick={action.onClick}
 					type="button"
