@@ -41,6 +41,65 @@ Add a new entry when adding a new :class:`Host` — the catalog and
 this table must always agree.
 """
 
+
+def host_authenticated(host: Host) -> bool:
+    """Return whether the deployment has credentials wired for ``host``.
+
+    Drives the "only show authenticated providers" filter on the
+    ``/api/v1/models`` endpoint (issue #370) so users don't see
+    catalog entries they can't actually pick. The check is
+    intentionally cheap and stable per-process — :data:`settings`
+    is read once at boot, so this function can be called freely
+    inside hot paths without touching disk.
+
+    Args:
+        host: The :class:`Host` enum value to gate.
+
+    Returns:
+        ``True`` when a credential / binary required to drive the
+        host is present, ``False`` otherwise.
+
+    Mapping:
+
+    * ``agent_sdk`` (Claude): non-empty ``claude_code_oauth_token``.
+    * ``gemini_cli``: the ``gemini`` binary is on ``PATH`` (probed
+      via :func:`is_gemini_cli_available`).
+    * ``google_ai`` (native Gemini): ``google_api_key`` non-empty.
+      ``Settings`` marks the field as required so the value is always
+      populated at runtime, but the gate stays uniform with the other
+      key-driven hosts rather than carrying a special case.
+    * ``litellm``: ``openai_api_key`` non-empty. LiteLLM in this
+      catalog only routes OpenAI models, so the OpenAI key is the
+      single credential we need.
+    * ``opencode_go``: ``opencode_api_key`` non-empty.
+    * ``xai``: ``xai_api_key`` non-empty.
+
+    Add a new branch when introducing a new :class:`Host`.
+    """
+    if host is Host.gemini_cli:
+        # Local import: ``gemini_cli`` imports the agent loop which
+        # would re-enter the factory module on a top-level import.
+        from .gemini_cli import is_gemini_cli_available  # noqa: PLC0415
+
+        return is_gemini_cli_available()
+    # Other hosts gate purely on a ``settings.*`` credential. The
+    # ``host → attribute`` mapping is a flat dict so adding a host
+    # costs one line of data rather than one branch of control flow,
+    # and it keeps the function under ruff's ``PLR0911`` return-count
+    # budget.
+    credential_attr_by_host: dict[Host, str] = {
+        Host.agent_sdk: "claude_code_oauth_token",
+        Host.google_ai: "google_api_key",
+        Host.litellm: "openai_api_key",
+        Host.opencode_go: "opencode_api_key",
+        Host.xai: "xai_api_key",
+    }
+    attr = credential_attr_by_host.get(host)
+    if attr is None:
+        return False
+    return bool(getattr(settings, attr))
+
+
 # Module-import-time exhaustiveness check — converts the "every
 # ``Host`` member must have a provider class" invariant from an
 # implicit runtime ``KeyError`` in :func:`resolve_llm` into a clear

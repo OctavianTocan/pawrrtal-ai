@@ -8,13 +8,33 @@ from fastapi.routing import APIRouter
 from pydantic import BaseModel
 
 from app.core.providers.catalog import CATALOG_ETAG, MODEL_CATALOG, ModelEntry
+from app.core.providers.factory import host_authenticated
+from app.core.providers.model_id import Host
 from app.db import User
 from app.users import get_allowed_user
+
+
+def _auth_fingerprint() -> str:
+    """Stable per-process fingerprint of which hosts are authenticated.
+
+    Folded into the ETag so a deployment that authenticates an extra
+    provider after boot (or unsets a key) produces a different ETag
+    and clients re-fetch instead of replaying a stale 304. Stable
+    ordering means the same auth state always produces the same
+    fingerprint string.
+    """
+    return "".join(
+        "1" if host_authenticated(h) else "0" for h in sorted(Host, key=lambda h: h.value)
+    )
+
 
 # RFC 7232 requires ``ETag`` values to be wrapped in double quotes.  The
 # ``CATALOG_ETAG`` constant is a bare 16-hex string; we quote it once here
 # so both the response header and the ``If-None-Match`` comparison agree.
-ETAG_HEADER = f'"{CATALOG_ETAG}"'
+# The auth fingerprint is appended so the ``304`` path doesn't replay a
+# stale list when the deployment's authenticated provider set changes
+# (issue #370).
+ETAG_HEADER = f'"{CATALOG_ETAG}-{_auth_fingerprint()}"'
 
 
 class ModelOption(BaseModel):
@@ -77,7 +97,11 @@ def get_models_router() -> APIRouter:
                 status_code=status.HTTP_304_NOT_MODIFIED,
                 headers={"ETag": ETAG_HEADER},
             )
-        body = ModelsResponse(models=[_to_option(e) for e in MODEL_CATALOG])
+        # Filter out catalog entries whose host doesn't have credentials
+        # (or, for ``gemini_cli``, doesn't have the binary on PATH). Users
+        # shouldn't see picker rows they can't actually click — issue #370.
+        authed_entries = [e for e in MODEL_CATALOG if host_authenticated(e.host)]
+        body = ModelsResponse(models=[_to_option(e) for e in authed_entries])
         return JSONResponse(
             content=body.model_dump(),
             headers={
