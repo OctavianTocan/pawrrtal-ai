@@ -24,7 +24,8 @@ from app.api._chat_permissions import (
 from app.channels import resolve_channel, surface_from_header
 from app.channels.base import ChannelMessage
 from app.channels.turn_runner import ChatTurnInput, EventHook, run_turn
-from app.core.agent_tools import build_agent_tools, build_pre_turn_hooks
+from app.core.agent_hooks import build_pre_turn_hooks
+from app.core.agent_tools import build_agent_tools
 from app.core.providers import StreamEvent, default_model, resolve_llm
 from app.core.request_logging import get_request_id
 from app.core.tools.artifact_agent import (

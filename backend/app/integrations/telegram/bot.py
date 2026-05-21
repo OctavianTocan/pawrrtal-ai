@@ -32,7 +32,8 @@ from typing import TYPE_CHECKING
 from app.channels import ChannelMessage, resolve_channel
 from app.channels.telegram import SURFACE_TELEGRAM, make_telegram_sender
 from app.channels.turn_runner import ChatTurnInput, run_turn
-from app.core.agent_tools import build_agent_tools, build_pre_turn_hooks
+from app.core.agent_hooks import build_pre_turn_hooks
+from app.core.agent_tools import build_agent_tools
 from app.core.config import settings
 from app.crud.workspace import get_default_workspace
 from app.db import async_session_maker
@@ -146,7 +147,7 @@ async def _maintain_typing_indicator(
     so a single failed ``sendChatAction`` never breaks the agent run.
     The whole task is cancelled by the caller's finally block.
     """
-    refresh = float(settings.telegram_typing_refresh_seconds)
+    refresh = settings.telegram_typing_refresh_seconds
     try:
         while True:
             await _send_one_typing_action(bot, chat_id, thread_id)

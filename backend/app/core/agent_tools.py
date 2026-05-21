@@ -34,7 +34,6 @@ from app.core.agent_loop.types import AgentTool
 from app.core.config import settings
 from app.core.keys import resolve_api_key
 from app.core.plugins import (
-    PreTurnHook,
     ToolContext,
     all_plugins,
     is_activated_by_env_keys,
@@ -322,12 +321,4 @@ def _build_plugin_tools(
         if not predicate(ctx):
             continue
         out.extend(factory(ctx) for factory in plugin.tool_factories)
-    return out
-
-
-def build_pre_turn_hooks() -> list[PreTurnHook]:
-    """Build the pre-turn hooks from the plugin registry."""
-    out: list[PreTurnHook] = []
-    for plugin in all_plugins():
-        out.extend(plugin.pre_turn_hooks)
     return out
