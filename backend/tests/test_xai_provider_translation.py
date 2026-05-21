@@ -332,9 +332,18 @@ def test_resolve_api_key_workspace_override(
 # ---------------------------------------------------------------------------
 
 
-def test_map_reasoning_effort_collapses_four_levels_to_two() -> None:
-    """Pawrrtal's four-level UI knob → grok-4.3's two-level proto enum."""
+def test_map_reasoning_effort_collapses_five_levels_to_three() -> None:
+    """Pawrrtal's five-level UI knob → grok-4.3's three-tier proto enum.
+
+    xAI's Grok 4.3 reasoning enum is ``EFFORT_NONE``, ``EFFORT_LOW``,
+    ``EFFORT_HIGH``. ``"minimal"`` opts into the no-thinking tier
+    (issue #373); ``"low"`` and ``"medium"`` collapse to
+    ``EFFORT_LOW``; ``"high"`` and ``"extra-high"`` collapse to
+    ``EFFORT_HIGH``; ``None`` omits the field so xAI's server-side
+    default fires.
+    """
     assert _map_reasoning_effort(None) is None
+    assert _map_reasoning_effort("minimal") == chat_pb2.ReasoningEffort.EFFORT_NONE
     assert _map_reasoning_effort("low") == chat_pb2.ReasoningEffort.EFFORT_LOW
     assert _map_reasoning_effort("medium") == chat_pb2.ReasoningEffort.EFFORT_LOW
     assert _map_reasoning_effort("high") == chat_pb2.ReasoningEffort.EFFORT_HIGH

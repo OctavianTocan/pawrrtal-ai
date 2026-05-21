@@ -99,9 +99,15 @@ def test_claude_haiku_no_adaptive_thinking() -> None:
     assert _entry(Host.agent_sdk, "claude-haiku-4-5").supports_reasoning == ()
 
 
-def test_grok_collapses_to_two_levels() -> None:
-    """xai_provider._map_reasoning_effort folds four levels into two."""
-    assert _entry(Host.xai, "grok-4.3").supports_reasoning == ("low", "high")
+def test_grok_exposes_minimal_low_high() -> None:
+    """xai_provider._map_reasoning_effort spans three Grok 4.3 tiers.
+
+    xAI added a no-thinking tier (``EFFORT_NONE``) to Grok 4.3 (issue
+    #373). ``"minimal"`` maps to it; ``"low"`` and ``"medium"`` collapse
+    to ``EFFORT_LOW``; ``"high"`` and ``"extra-high"`` collapse to
+    ``EFFORT_HIGH``. The picker surfaces the three distinct tiers.
+    """
+    assert _entry(Host.xai, "grok-4.3").supports_reasoning == ("minimal", "low", "high")
 
 
 def test_gemini_3_flash_models_expose_all_four_levels() -> None:
@@ -257,10 +263,30 @@ def test_gemini_picker_state_reports_supported() -> None:
     assert model_supports_reasoning(_gemini_state()) is True
 
 
-def test_grok_picker_shows_two_buttons() -> None:
+def test_grok_picker_shows_three_buttons() -> None:
+    """Grok 4.3's picker now surfaces ``minimal | low | high`` after
+    xAI shipped the no-thinking tier (issue #373).
+    """
     state = _grok_state()
     rows = build_thinking_keyboard(state)
-    assert [row[0].text for row in rows] == ["low", "high"]
+    assert [row[0].text for row in rows] == ["minimal", "low", "high"]
+
+
+def test_grok_picker_minimal_button_maps_to_no_thinking_for_xai() -> None:
+    """A ``minimal`` callback for Grok 4.3 resolves through
+    ``_map_reasoning_effort`` to ``EFFORT_NONE`` — the new
+    no-thinking tier (issue #373). Crossing the integration
+    boundary here keeps the picker UI and the provider mapping
+    locked in step.
+    """
+    from app.core.providers.xai_provider import _map_reasoning_effort
+
+    try:
+        from xai_sdk.proto.v6 import chat_pb2
+    except ImportError:  # pragma: no cover — xai-sdk pin variance
+        from xai_sdk.proto.v5 import chat_pb2
+
+    assert _map_reasoning_effort("minimal") == chat_pb2.ReasoningEffort.EFFORT_NONE
 
 
 def test_unsupported_text_mentions_the_model() -> None:

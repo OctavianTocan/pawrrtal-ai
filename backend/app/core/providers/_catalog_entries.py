@@ -231,6 +231,12 @@ XAI_ENTRIES: tuple[ModelEntry, ...] = (
         is_default=False,
         cost_per_mtok_in_usd=_GROK_4_3_IN_USD,
         cost_per_mtok_out_usd=_GROK_4_3_OUT_USD,
-        supports_reasoning=("low", "high"),
+        # xAI added a "no thinking" tier to Grok 4.3 (issue #373).
+        # ``"minimal"`` is Pawrrtal's canonical "lightest possible
+        # reasoning" sentinel, and for Grok it maps to the new
+        # ``EFFORT_NONE`` proto value (see ``_map_reasoning_effort``).
+        # ``"low"`` and ``"high"`` are Grok's two actual reasoning
+        # tiers; everything in between collapses to ``"low"``.
+        supports_reasoning=("minimal", "low", "high"),
     ),
 )

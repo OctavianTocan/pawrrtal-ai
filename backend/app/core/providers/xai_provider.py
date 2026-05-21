@@ -26,10 +26,12 @@ Design parity with :mod:`app.core.providers.gemini_provider`:
 xAI-specific surface this provider drives natively (via typed
 proto / SDK fields, not ``extra_body``):
 
-* ``reasoning_effort`` — Pawrrtal's four-level UI knob
-  (``low | medium | high | extra-high``) is collapsed to xAI's
-  two-level enum via :func:`_map_reasoning_effort`.  Grok 4.3 400s on
-  anything else (https://docs.x.ai/docs/models/grok-4-3).
+* ``reasoning_effort`` — Pawrrtal's five-level UI knob
+  (``minimal | low | medium | high | extra-high``) is collapsed to
+  xAI's three-tier enum via :func:`_map_reasoning_effort`.  Grok 4.3
+  accepts ``EFFORT_NONE``, ``EFFORT_LOW`` and ``EFFORT_HIGH`` and
+  400s on ``EFFORT_MEDIUM`` (https://docs.x.ai/docs/models/grok-4-3).
+  Picking ``"minimal"`` is the no-thinking path (issue #373).
 * ``search_parameters`` — xAI's Live Search was removed in May 2026;
   we no longer send this field.  Pawrrtal's canonical web tool is
   ``exa_search`` (gated by ``EXA_API_KEY``).  If xAI ships a
@@ -119,18 +121,28 @@ def _map_reasoning_effort(
 ) -> chat_pb2.ReasoningEffort | None:
     """Map Pawrrtal's five-level UI knob onto xAI's proto enum.
 
-    Grok 4.3 accepts ``EFFORT_LOW`` or ``EFFORT_HIGH``
-    (https://docs.x.ai/docs/models/grok-4-3) and 400s on anything
-    else, including ``EFFORT_MEDIUM`` and ``EFFORT_NONE``.  The
-    Pawrrtal UI surfaces ``minimal | low | medium | high | extra-high``
-    — we collapse the lower three to ``EFFORT_LOW`` and the upper two
-    to ``EFFORT_HIGH`` so the user gets a meaningful difference
-    without overshooting xAI's schema.  ``None`` means "let xAI pick
-    the model default" and the field is omitted from the request.
+    Grok 4.3 accepts ``EFFORT_NONE``, ``EFFORT_LOW``, and ``EFFORT_HIGH``
+    (https://docs.x.ai/docs/models/grok-4-3) — xAI shipped a "no
+    thinking" tier (``EFFORT_NONE``) after the original two-tier
+    mapping landed, and Pawrrtal needs to expose it (issue #373).
+    ``EFFORT_MEDIUM`` is still rejected, so the four-level catalog
+    knob collapses as follows:
+
+    * ``"minimal"`` → ``EFFORT_NONE`` (the new no-thinking tier).
+    * ``"low" | "medium"`` → ``EFFORT_LOW``.
+    * ``"high" | "extra-high"`` → ``EFFORT_HIGH``.
+
+    ``None`` means "no override stored on the conversation" and the
+    field is omitted from the request entirely — xAI then picks the
+    model's server-side default, which is typically a low/medium
+    reasoning level rather than "off". Pick ``"minimal"`` explicitly
+    to opt into no-thinking.
     """
     if effort is None:
         return None
-    if effort in ("minimal", "low", "medium"):
+    if effort == "minimal":
+        return chat_pb2.ReasoningEffort.EFFORT_NONE
+    if effort in ("low", "medium"):
         return chat_pb2.ReasoningEffort.EFFORT_LOW
     return chat_pb2.ReasoningEffort.EFFORT_HIGH
 
