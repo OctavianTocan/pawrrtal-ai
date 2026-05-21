@@ -36,13 +36,16 @@ export type ToolHeaderProps = {
 };
 
 const getStatusBadge = (status: ToolUIPart['state']) => {
+	// Labels pair the active state's verb with its past-tense completion
+	// (Running → Ran, Failed, Denied) so the transcript reads as a log
+	// of what happened, not a snapshot of what is. Issue #360.
 	const labels: Record<ToolUIPart['state'], string> = {
 		'input-streaming': 'Pending',
 		'input-available': 'Running',
 		'approval-requested': 'Awaiting Approval',
 		'approval-responded': 'Responded',
-		'output-available': 'Completed',
-		'output-error': 'Error',
+		'output-available': 'Ran',
+		'output-error': 'Failed',
 		'output-denied': 'Denied',
 	};
 
