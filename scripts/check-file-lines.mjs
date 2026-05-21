@@ -99,6 +99,15 @@ const EXEMPT_PATH_FRAGMENTS = [
 	// remove this exemption.
 	'backend/app/core/lcm/evals.py',
 	'backend/app/core/lcm/embeddings.py',
+	// Gemini CLI ACP client landed at 551 lines on ``development`` after
+	// the structured-stream-logging work in fe43674. The file mixes ACP
+	// handshake, prompt-drive, and stream translation; the natural split
+	// is into ``handshake.py`` / ``prompt.py`` / ``stream.py`` inside the
+	// existing ``gemini_cli/`` package. Tracked as a sibling follow-up so
+	// unrelated PRs (e.g. autocomplete) don't pay for the split.
+	// TODO(pawrrtal-gemini-cli-split follow-up): land the split and
+	// remove this exemption.
+	'backend/app/core/providers/gemini_cli/client.py',
 ];
 
 /** Recursively yield every source file under `dir` that we should check. */
