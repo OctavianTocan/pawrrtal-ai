@@ -75,6 +75,7 @@ from ._claude_tool_bridge import (
     claude_tool_id,
     make_can_use_tool,
 )
+from ._stream_logging import log_provider_stream_event
 from .base import ReasoningEffort, StreamEvent
 
 logger = logging.getLogger(__name__)
@@ -129,6 +130,21 @@ _STDERR_TAIL_LINES = 20
 # backoff we don't want a single transient blip to wedge the request
 # for minutes.
 _RETRY_SLEEP_CEILING_SECONDS = 30.0
+
+# Pawrrtal's five-level ``ReasoningEffort`` literal collapses onto
+# Claude's three documented adaptive-thinking levels (low/medium/high
+# per https://docs.claude.com/en/docs/build-with-claude/extended-thinking).
+# ``minimal`` rounds up to ``low`` (Claude has no faster tier) and
+# ``extra-high`` saturates at ``high``. The chat-router resolver
+# normally adapts these before we get here because no Claude catalog
+# row lists either level — this is the belt-and-braces.
+_CLAUDE_EFFORT_MAP: dict[str, str] = {
+    "minimal": "low",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "extra-high": "high",
+}
 
 # System prompt scoped to a chat product. We deliberately do NOT use
 # Claude Code's default preset, which steers the model toward software
@@ -305,11 +321,13 @@ class ClaudeLLM:
                     display_by_name=display_by_name,
                 ):
                     any_event_yielded = True
+                    self._log_stream_event(conversation_id, event)
                     yield event
                 return
             except CLINotFoundError as error:
                 logger.exception("Claude CLI binary not found")
-                yield _error_event(
+                yield self._logged_error_event(
+                    conversation_id,
                     "Claude Code CLI binary is not installed in this environment. "
                     "Install it with `npm i -g @anthropic-ai/claude-code` and ensure "
                     "the executable is on PATH, or set ClaudeAgentOptions.cli_path. "
@@ -345,7 +363,8 @@ class ClaudeLLM:
                     await asyncio.sleep(delay)
                     continue
                 logger.warning("Claude CLI subprocess connection lost: %s", error)
-                yield _error_event(
+                yield self._logged_error_event(
+                    conversation_id,
                     f"Lost connection to the Claude Code CLI subprocess. Underlying error: {error}",
                 )
                 return
@@ -359,7 +378,8 @@ class ClaudeLLM:
                     stderr,
                     stderr_tail,
                 )
-                yield _error_event(
+                yield self._logged_error_event(
+                    conversation_id,
                     "Claude Code CLI exited with an error. Verify CLAUDE_CODE_OAUTH_TOKEN "
                     "is configured and your account has access to the requested model. "
                     f"Exit code: {exit_code}. stderr: {stderr or stderr_tail!r}",
@@ -367,14 +387,33 @@ class ClaudeLLM:
                 return
             except CLIJSONDecodeError:
                 logger.exception("Claude CLI returned non-JSON message")
-                yield _error_event("Failed to parse a JSON message from the Claude Code CLI.")
+                yield self._logged_error_event(
+                    conversation_id,
+                    "Failed to parse a JSON message from the Claude Code CLI.",
+                )
                 return
             except ClaudeSDKError as error:
                 logger.exception("Claude SDK error during stream")
-                yield _error_event(f"Claude SDK error: {error}")
+                yield self._logged_error_event(conversation_id, f"Claude SDK error: {error}")
                 return
 
     # -- internal --------------------------------------------------------
+
+    def _log_stream_event(self, conversation_id: uuid.UUID, event: StreamEvent) -> None:
+        """Log one Claude stream event using the shared provider format."""
+        log_provider_stream_event(
+            logger,
+            provider="CLAUDE",
+            model=self._model_id,
+            conversation_id=conversation_id,
+            event=event,
+        )
+
+    def _logged_error_event(self, conversation_id: uuid.UUID, message: str) -> StreamEvent:
+        """Build and log a Claude error event."""
+        event = _error_event(message)
+        self._log_stream_event(conversation_id, event)
+        return event
 
     def _build_options(
         self,
@@ -469,7 +508,19 @@ class ClaudeLLM:
             "setting_sources": setting_sources,
         }
         if reasoning_effort is not None:
-            kwargs["effort"] = "max" if reasoning_effort == "extra-high" else reasoning_effort
+            # The Claude API's adaptive thinking ``effort`` enum is
+            # documented as ``low | medium | high`` only (see
+            # https://docs.claude.com/en/docs/build-with-claude/extended-thinking).
+            # Pawrrtal's ``minimal`` collapses to ``low`` (Claude has
+            # no faster tier) and ``extra-high`` saturates at ``high``
+            # — so a user who picked the lightest or heaviest level on
+            # a model that supports the full five-step ladder still
+            # gets the closest level Claude exposes after switching.
+            # The catalog's ``supports_reasoning`` tuple should not
+            # list ``minimal`` or ``extra-high`` for any Claude model
+            # — the chat-router resolver adapts before this line runs
+            # — so this mapping is belt-and-braces.
+            kwargs["effort"] = _CLAUDE_EFFORT_MAP.get(reasoning_effort, reasoning_effort)
         # Per-request cost cap (PR 04). The Claude SDK enforces this
         # natively — when the agent burns past ``max_budget_usd`` mid-turn,
         # the SDK terminates with a ``ResultMessage(is_error=True,

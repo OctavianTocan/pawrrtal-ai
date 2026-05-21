@@ -452,7 +452,14 @@ class TestProviderOptions:
         conversation_id: UUID,
         user_id: UUID,
     ) -> None:
-        """The UI reasoning selector should reach Claude Agent SDK options."""
+        """The UI reasoning selector should reach Claude Agent SDK options.
+
+        Pawrrtal's ``extra-high`` saturates at ``high`` for Claude
+        because the Claude API's adaptive thinking ``effort`` enum
+        only documents ``low | medium | high``. The chat-router
+        resolver normally maps this down before the provider runs
+        — this test is the belt-and-braces in the provider itself.
+        """
         captured = _patch_query(monkeypatch, _async_iter([]))
         provider = ClaudeLLM("claude-sonnet-4-6")
 
@@ -464,7 +471,7 @@ class TestProviderOptions:
             reasoning_effort="extra-high",
         )
 
-        assert captured[0].effort == "max"
+        assert captured[0].effort == "high"
 
     @pytest.mark.anyio
     async def test_first_turn_uses_session_id_not_resume(

@@ -4,11 +4,12 @@ import { ChevronRightIcon } from 'lucide-react';
 import { memo, type ReactNode, useMemo } from 'react';
 import { Streamdown } from 'streamdown';
 import { Shimmer } from '@/components/ai-elements/shimmer';
+import type { ChatTimelineEntry } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { getCompletedToolLabel, getToolIcon, getToolLabel } from '../thinking-constants';
+import { getToolIcon, getToolLabel } from '../thinking-constants';
 import { parseThinkingSections } from '../thinking-parser';
 import type { ToolResultChips } from '../tool-result-parsers';
-import type { ChatTimelineEntry, ChatToolCall } from '../types';
+import type { ChatToolCall } from '../types';
 import { ToolResultChipsRow } from './ToolResultChipsRow';
 
 /**
@@ -22,14 +23,14 @@ import { ToolResultChipsRow } from './ToolResultChipsRow';
 function ToolStep({ call, chips }: { call: ChatToolCall; chips: ToolResultChips }): ReactNode {
 	const Icon = getToolIcon(call.name);
 	const isComplete = call.status === 'completed';
-	const label = toolStepLabel(call, isComplete);
+	const label = toolStepLabel(call);
 	const emojiIcon = call.display?.icon;
 
 	return (
 		<div className="flex flex-col">
 			<div
 				className={cn(
-					'group flex items-center gap-2 rounded-md px-1.5 py-1 text-sm',
+					'group/tool-step flex cursor-pointer select-none items-center gap-2 rounded-md px-1.5 py-1 text-sm',
 					'text-muted-foreground transition-colors hover:bg-muted/50'
 				)}
 			>
@@ -54,7 +55,7 @@ function ToolStep({ call, chips }: { call: ChatToolCall; chips: ToolResultChips 
 					aria-hidden="true"
 					className={cn(
 						'size-3.5 shrink-0 text-muted-foreground/60',
-						'opacity-0 transition-opacity group-hover:opacity-100'
+						'opacity-0 transition-opacity group-hover/tool-step:opacity-100'
 					)}
 				/>
 			</div>
@@ -63,12 +64,12 @@ function ToolStep({ call, chips }: { call: ChatToolCall; chips: ToolResultChips 
 	);
 }
 
-function toolStepLabel(call: ChatToolCall, isComplete: boolean): string {
-	const displayText = isComplete ? call.display?.compact : call.display?.present;
+function toolStepLabel(call: ChatToolCall): string {
+	const displayText = call.display?.present;
 	if (displayText) {
 		return stripLeadingIcon(displayText, call.display?.icon);
 	}
-	return isComplete ? getCompletedToolLabel(call.name) : getToolLabel(call.name);
+	return getToolLabel(call.name);
 }
 
 function stripLeadingIcon(text: string, icon: string | undefined): string {
@@ -86,17 +87,12 @@ function stripLeadingIcon(text: string, icon: string | undefined): string {
  */
 function ThinkingStep({ title, content }: { title: string; content: string }): ReactNode {
 	return (
-		<div className="flex flex-col gap-1 px-1.5 py-1 text-base leading-snug text-muted-foreground">
+		<div className="flex flex-col gap-1 px-1.5 py-1 text-sm leading-snug text-muted-foreground">
 			{title ? <div className="font-medium text-foreground/85">{title}</div> : null}
 			{content ? (
-				// Streamdown renders each thinking line as its own <p>; default
-				// prose margins (~1em top + 1em bottom) made the chain of
-				// thought feel airy and disconnected. Collapse paragraph and
-				// list margins to a tight 0.25rem so consecutive lines read
-				// as one continuous reasoning block.
 				<Streamdown
 					className={cn(
-						'text-base text-muted-foreground',
+						'text-sm text-muted-foreground',
 						'[&>*:first-child]:mt-0 [&>*:last-child]:mb-0',
 						'[&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0',
 						'[&_p]:leading-snug'

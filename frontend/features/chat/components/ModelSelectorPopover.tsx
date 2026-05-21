@@ -15,7 +15,13 @@ import { usePointerDownCommit } from '@/hooks/use-pointer-down-commit';
 import { useTooltipDropdown } from '@/hooks/use-tooltip-dropdown';
 import { cn } from '@/lib/utils';
 import type { ChatModelOption } from '../hooks/use-chat-models';
-import { vendorLogo } from './VendorLogos';
+import { hostLabel } from './model-picker-labels';
+import {
+	groupModelsByHost,
+	type ModelRowSlotProps,
+	MultiVendorHostMenuRow,
+	SingleVendorHostMenuRow,
+} from './model-selector-host-rows';
 
 /** Reasoning levels displayed next to the selected model. */
 export const CHAT_REASONING_LEVELS = ['low', 'medium', 'high', 'extra-high'] as const;
@@ -37,21 +43,27 @@ const REASONING_OPTIONS: ReasoningOption[] = [
 	{ id: 'extra-high', label: 'Extra High' },
 ];
 
-/** Title-case label rendered for a vendor row. */
-function vendorLabel(vendor?: string): string {
-	if (typeof vendor !== 'string' || vendor.length === 0) {
-		return 'Unknown provider';
-	}
-	if (vendor === 'openai') return 'OpenAI';
-	return vendor.charAt(0).toUpperCase() + vendor.slice(1);
-}
-
 /** Discriminated union of root-menu rows. */
-type RootRow = { kind: 'vendor'; vendor: string } | { kind: 'thinking' };
+type RootRow = { kind: 'host'; host: string } | { kind: 'thinking' };
 
 /** Stable React key for each root row. */
 function rootRowKey(row: RootRow): string {
-	return row.kind === 'vendor' ? `vendor:${row.vendor}` : 'thinking';
+	return row.kind === 'host' ? `host:${row.host}` : 'thinking';
+}
+
+/** Type-ahead display string for each root row — uses the host label or a fixed literal. */
+function rootRowDisplay(row: RootRow): string {
+	return row.kind === 'host' ? hostLabel(row.host) : 'Thinking';
+}
+
+/**
+ * Render a model row; passed as a slot to host-row components.
+ *
+ * Pure function — depends only on its arguments, not on component state.
+ * Lifted to module scope so React does not re-create it on every render.
+ */
+function renderModelRow({ model, isSelected, onSelect }: ModelRowSlotProps): React.JSX.Element {
+	return <ModelRow key={model.id} model={model} isSelected={isSelected} onSelect={onSelect} />;
 }
 
 /**
@@ -103,43 +115,6 @@ function getTriggerLabel({
 	if (isError) return MODEL_ERROR_LABEL;
 	if (modelCount === 0) return NO_MODELS_LABEL;
 	return selectedModel?.short_name ?? SELECT_MODEL_LABEL;
-}
-
-/** Models grouped by vendor, preserving the catalog's declaration order. */
-function groupModelsByVendor(
-	models: readonly ChatModelOption[]
-): readonly { vendor: string; entries: readonly ChatModelOption[] }[] {
-	// Preserve insertion order — the catalog already groups by vendor.
-	const order: string[] = [];
-	const buckets = new Map<string, ChatModelOption[]>();
-	for (const model of models) {
-		if (typeof model.vendor !== 'string' || model.vendor.length === 0) {
-			continue;
-		}
-		const bucket = buckets.get(model.vendor);
-		if (bucket) {
-			bucket.push(model);
-		} else {
-			buckets.set(model.vendor, [model]);
-			order.push(model.vendor);
-		}
-	}
-	return order.map((vendor) => ({
-		vendor,
-		entries: buckets.get(vendor) ?? [],
-	}));
-}
-
-/** Render-only wrapper that resolves the vendor logo from the canonical map. */
-function VendorLogo({
-	vendor,
-	className,
-}: {
-	vendor: string;
-	className?: string;
-}): React.JSX.Element {
-	const Logo = vendorLogo(vendor);
-	return <Logo className={cn('size-3', className)} />;
 }
 
 /**
@@ -222,10 +197,11 @@ function ReasoningRow({
 
 /**
  * Renders the chat composer's model selector. Top-level rows group models by
- * vendor — each vendor opens a flyout submenu with its full model lineup.
- * The `Thinking` row at the bottom is a peer submenu with the four reasoning
- * levels and a descriptive secondary line, mirroring the layout used by the
- * Craft Agents reference design.
+ * host — single-vendor hosts skip the intermediate vendor screen and surface
+ * their model list directly, while multi-vendor hosts add a vendor flyout level
+ * between the host and model rows. The `Thinking` row at the bottom is a peer
+ * submenu with the four reasoning levels and a descriptive secondary line,
+ * mirroring the layout used by the Craft Agents reference design.
  *
  * Catalog data is supplied via the `models` prop — the source of truth is
  * the server-owned `GET /api/v1/models` endpoint surfaced through
@@ -249,19 +225,44 @@ export function ModelSelectorPopover({
 	const reasoningLabel = getReasoningLabel(selectedReasoning);
 	const { menuOpen, tooltipOpen, handleMenuOpenChange, handleTooltipOpenChange } =
 		useTooltipDropdown();
-	const groupedVendors = groupModelsByVendor(models);
+	const groupedHosts = groupModelsByHost(models);
 
 	// Discriminated union of every root-level row currently in the menu.
 	const rootRows: RootRow[] = [
-		...groupedVendors.map(
-			(group) => ({ kind: 'vendor', vendor: group.vendor }) satisfies RootRow
-		),
+		...groupedHosts.map((group) => ({ kind: 'host', host: group.host }) satisfies RootRow),
 		{ kind: 'thinking' },
 	];
 
-	// Type-ahead display string for each root row — uses the live vendor list.
-	function rootRowDisplay(row: RootRow): string {
-		return row.kind === 'vendor' ? vendorLabel(row.vendor) : 'Thinking';
+	/** Select and render the correct host submenu variant based on vendor count. */
+	function renderHostRow(hostSlug: string): React.JSX.Element | null {
+		const group = groupedHosts.find((entry) => entry.host === hostSlug);
+		if (!group || group.vendors.length === 0) return null;
+		const isActiveHost = selectedModel?.host === hostSlug;
+
+		if (group.vendors.length === 1) {
+			// Single-vendor host: skip the intermediate vendor screen.
+			return (
+				<SingleVendorHostMenuRow
+					group={group}
+					isActiveHost={isActiveHost}
+					selectedModelId={selectedModelId}
+					onSelectModel={onSelectModel}
+					renderModelRow={renderModelRow}
+				/>
+			);
+		}
+
+		// Multi-vendor host: host → vendor → model.
+		return (
+			<MultiVendorHostMenuRow
+				group={group}
+				isActiveHost={isActiveHost}
+				selectedModel={selectedModel}
+				selectedModelId={selectedModelId}
+				onSelectModel={onSelectModel}
+				renderModelRow={renderModelRow}
+			/>
+		);
 	}
 
 	const triggerLabel = getTriggerLabel({
@@ -288,7 +289,7 @@ export function ModelSelectorPopover({
 							getItemDisplay={rootRowDisplay}
 							getItemKey={rootRowKey}
 							// Render a separator above the Thinking row to break the
-							// vendor section from the reasoning section.
+							// host section from the reasoning section.
 							getItemSeparator={(row) => row.kind === 'thinking'}
 							items={rootRows}
 							onOpenChange={handleMenuOpenChange}
@@ -312,43 +313,8 @@ export function ModelSelectorPopover({
 								</Button>
 							}
 							renderItem={(row) => {
-								if (row.kind === 'vendor') {
-									const group = groupedVendors.find(
-										(entry) => entry.vendor === row.vendor
-									);
-									if (!group || group.entries.length === 0) return null;
-									const isActiveVendor = selectedModel?.vendor === row.vendor;
-									return (
-										<DropdownSubmenu>
-											{/* `DropdownSubmenuTrigger` bakes in its own flyout
-											    chevron — rendering an explicit ChevronRightIcon
-											    here used to produce two arrows side-by-side. We
-											    only emit the "active vendor" check now; the
-											    library's chevron handles the "expand"
-											    affordance for every row. */}
-											<DropdownSubmenuTrigger
-												className={cn(
-													'flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-foreground/[0.04]',
-													isActiveVendor && 'bg-foreground/[0.07]'
-												)}
-											>
-												<VendorLogo vendor={row.vendor} />
-												<span className="min-w-0 flex-1 truncate text-left">
-													{vendorLabel(row.vendor)}
-												</span>
-											</DropdownSubmenuTrigger>
-											<DropdownSubmenuContent className="chat-composer-dropdown-menu popover-styled p-1 min-w-64">
-												{group.entries.map((model) => (
-													<ModelRow
-														key={model.id}
-														model={model}
-														isSelected={selectedModelId === model.id}
-														onSelect={onSelectModel}
-													/>
-												))}
-											</DropdownSubmenuContent>
-										</DropdownSubmenu>
-									);
+								if (row.kind === 'host') {
+									return renderHostRow(row.host);
 								}
 								// 'thinking' row
 								return (

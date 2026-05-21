@@ -58,10 +58,6 @@ export interface ResponsiveModalProps {
 	 * `aria-label` text when a string title is not otherwise supplied.
 	 */
 	sheetTitle?: string;
-	/**
-	 * @deprecated Use **`footer`** — still supported as a fallback when **`footer`** is omitted.
-	 */
-	mobileFooter?: React.ReactNode;
 	/** Modal size preset (desktop only). Default `md`. */
 	size?: ModalSize;
 	/** Whether clicking the overlay backdrop dismisses. Default `true`. */
@@ -96,7 +92,6 @@ export function ResponsiveModal({
 	header,
 	footer,
 	sheetTitle,
-	mobileFooter,
 	size = 'md',
 	closeOnOverlayClick = true,
 	closeOnEscape = true,
@@ -107,8 +102,7 @@ export function ResponsiveModal({
 	testId,
 }: ResponsiveModalProps): React.JSX.Element {
 	const isMobile = useIsMobile();
-	const footerNode = footer ?? mobileFooter;
-	const usesChromeSlots = header !== undefined || footerNode !== undefined;
+	const usesChromeSlots = header !== undefined || footer !== undefined;
 	// Mounting flag so we don't try to portal during SSR — `document` is
 	// undefined on the server and the first render has to match.
 	const isMounted = useSyncExternalStore(
@@ -141,8 +135,7 @@ export function ResponsiveModal({
 				open={open}
 				onDismiss={onDismiss}
 				header={header}
-				footer={footerNode}
-				title={sheetTitle}
+				footer={footer}
 				testId={testId}
 				dismissButton={sheetDismiss}
 			>
@@ -168,7 +161,7 @@ export function ResponsiveModal({
 				<div className="flex flex-col gap-5 text-foreground">
 					{header}
 					<div className="min-h-0">{children}</div>
-					{footerNode}
+					{footer}
 				</div>
 			) : (
 				children

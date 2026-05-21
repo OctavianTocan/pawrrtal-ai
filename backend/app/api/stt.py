@@ -43,7 +43,7 @@ def get_stt_router() -> APIRouter:  # noqa: C901 — single cohesive STT route +
     router = APIRouter(prefix="/api/v1/stt", tags=["stt"])
 
     @router.post("")
-    async def transcribe_audio(  # noqa: C901 — xAI legacy path + alt-backend dispatch live in one route
+    async def transcribe_audio(  # noqa: C901 — xAI path + alt-backend dispatch live in one route
         file: UploadFile = File(...),
         language: str | None = Form(default=None),
         format: bool = Form(default=True),  # noqa: A002
@@ -62,7 +62,7 @@ def get_stt_router() -> APIRouter:  # noqa: C901 — single cohesive STT route +
         """
         # PR 14: when the operator selected a non-xAI backend, dispatch
         # to the configured ``Transcriber`` (Mistral / OpenAI / local
-        # whisper.cpp).  The xAI proxy below is the historical default
+        # whisper.cpp).  The xAI proxy below is the default
         # and stays the path when ``settings.voice_provider == "xai"``.
         from app.integrations.voice import (  # noqa: PLC0415 — local import keeps the route light when voice extras unused
             TranscriptionError,

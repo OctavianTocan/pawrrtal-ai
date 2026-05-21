@@ -26,6 +26,8 @@ export interface ComposerActionSelectorProps<TId extends string = string> {
 	onSelect: (id: TId) => void;
 	/** Optional tooltip rendered over the trigger. */
 	tooltip?: string;
+	/** Optional Tailwind class for the label span inside the trigger button. */
+	triggerLabelClassName?: string;
 }
 
 /**
@@ -39,6 +41,7 @@ export function ComposerActionSelector<TId extends string = string>({
 	selectedId,
 	onSelect,
 	tooltip,
+	triggerLabelClassName,
 }: ComposerActionSelectorProps<TId>): React.JSX.Element {
 	const { menuOpen, tooltipOpen, handleMenuOpenChange, handleTooltipOpenChange } =
 		useTooltipDropdown();
@@ -52,6 +55,7 @@ export function ComposerActionSelector<TId extends string = string>({
 			tooltipOpen={tooltipOpen}
 			onMenuOpenChange={handleMenuOpenChange}
 			onTooltipOpenChange={handleTooltipOpenChange}
+			triggerLabelClassName={triggerLabelClassName}
 		/>
 	);
 }

@@ -47,7 +47,7 @@ export function ChatPromptSuggestions({
 	);
 
 	return (
-		<div className={cn('w-full max-w-[48.75rem]', className)}>
+		<div className={cn('w-full max-w-[48.75rem] hidden lg:flex', className)}>
 			{visibleSuggestions.map((suggestion) => {
 				const Icon = suggestion.icon;
 

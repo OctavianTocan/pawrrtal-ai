@@ -103,19 +103,19 @@
    of a flat-white island. The `var()` forwards track preset + theme switches.
 ============================================================================= */
 :root {
-	--color-chat-bg-elevated: var(--background-elevated);
-	--color-chat-bg-elevated-shade: var(--background-elevated-shade);
-	--color-chat-foreground: var(--foreground);
-	--color-chat-muted: var(--muted-foreground);
-	--color-chat-border: var(--border);
-	--color-chat-accent: var(--accent);
-	--color-chat-accent-foreground: var(--primary-foreground);
-	--color-chat-info: var(--info);
-	--color-chat-warning: var(--info);
-	--color-chat-destructive: var(--destructive);
-	--color-chat-success: var(--success);
-	--radius-chat-lg: var(--radius-surface-lg);
-	--shadow-chat-minimal: var(--shadow-minimal);
+	--color-chat-bg-elevated: var(--background-elevated) !important;
+	--color-chat-bg-elevated-shade: var(--background-elevated-shade) !important;
+	--color-chat-foreground: var(--foreground) !important;
+	--color-chat-muted: var(--muted-foreground) !important;
+	--color-chat-border: var(--border) !important;
+	--color-chat-accent: var(--accent) !important;
+	--color-chat-accent-foreground: var(--primary-foreground) !important;
+	--color-chat-info: var(--info) !important;
+	--color-chat-warning: var(--info) !important;
+	--color-chat-destructive: var(--destructive) !important;
+	--color-chat-success: var(--success) !important;
+	--radius-chat-lg: var(--radius-surface-lg) !important;
+	--shadow-chat-minimal: var(--shadow-minimal) !important;
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -130,42 +130,43 @@
 @property --background {
 	syntax: "<color>";
 	inherits: true;
-	/* Mistral cream surface — `#fff8e0` territory. */
-	initial-value: oklch(0.985 0.026 92);
+	/* Warm off-white surface — `#f7f7f4` territory. */
+	initial-value: oklch(0.973 0.014 90);
 }
 
 @property --foreground {
 	syntax: "<color>";
 	inherits: true;
-	/* Deep ink ~#1f1f1f — Mistral primary text. */
-	initial-value: oklch(0.21 0.005 285);
+	/* Deep ink ~#1f1f1f — primary text. */
+	initial-value: oklch(0.2392923762 0 0);
 }
 
 @property --accent {
 	syntax: "<color>";
 	inherits: true;
-	/* Mistral orange ~#fa520f — saturated brand CTA. */
-	initial-value: oklch(0.66 0.21 38);
+	/* Soft purple ~#9E94D5 — primary brand accent. */
+	initial-value: oklch(0.704 0.102 285);
 }
 
 @property --info {
 	syntax: "<color>";
 	inherits: true;
-	/* Mistral sunshine ~#ff8105 — warm sunlight for "Ask" / warnings. */
-	initial-value: oklch(0.74 0.18 55);
+	/* Soft blue ~#87C3FF — info, warnings, Ask mode. */
+	initial-value: oklch(0.783 0.119 255);
 }
 
 @property --success {
 	syntax: "<color>";
 	inherits: true;
-	initial-value: oklch(0.55 0.17 145);
+	/* Forest green ~#1F8A65 — success, connected states. */
+	initial-value: oklch(0.5 0.12 165);
 }
 
 @property --destructive {
 	syntax: "<color>";
 	inherits: true;
-	/* Mistral deep red ~#cc3a05 — errors / destructive actions. */
-	initial-value: oklch(0.55 0.22 32);
+	/* Rose red ~#cf2d56 — errors, destructive actions. */
+	initial-value: oklch(0.55 0.2 355);
 }
 
 /* =============================================================================
@@ -188,12 +189,12 @@
 
 /* Light Mode */
 :root {
-	/* === 6 BASE COLORS — Mistral defaults === */
-	/* Warm cream surface (~#fff8e0). High luminance, warm chroma, sunset hue. */
-	--background: oklch(0.985 0.026 92);
+	/* === 6 BASE COLORS — Pawrrtal defaults === */
+	/* Warm off-white surface (~#f7f7f4). High luminance, neutral warm. */
+	--background: oklch(0.973 0.014 90);
 	/* Light-mode chat panel — pinned at OKLCH lightness 0.99 (near-white)
 	   while preserving the canvas hue and dropping chroma to 25% so warm
-	   backgrounds (Mistral cream, Cursor warm-grey) resolve to a near-white
+	   backgrounds (Pawrrtal warm-white, Cursor warm-grey) resolve to a near-white
 	   surface that still carries a hint of the preset's tint, and pure-color
 	   backgrounds (a bright blue preset, etc.) don't bleed their saturation
 	   into the chat panel as a tinted wash. Result: chat panel feels white
@@ -214,23 +215,28 @@
 			transparent 40%
 		),
 		linear-gradient(180deg, var(--background), var(--foreground-3));
-	/* Deep ink ~#1f1f1f — Mistral primary text. */
-	--foreground: oklch(0.21 0.005 285);
-	--foreground-dimmed: color-mix(in srgb, var(--foreground) 80%, var(--background));
+	/* Deep ink ~#1f1f1f — primary text. */
+	--foreground: oklch(0.2392923762 0 0);
+	--foreground-dimmed: oklch(0.9158314607 0 0);
 	--foreground-rgb: 31, 31, 31;
-	--user-message-bubble: oklch(from var(--foreground) l c h / 0.05);
-	--user-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.03);
-	/* Mistral orange ~#fa520f — saturated brand CTA + active states. */
-	--accent: oklch(0.66 0.21 38);
-	--accent-rgb: 250, 82, 15;
-	/* Mistral sunshine ~#ff8105 — warm sunlight for "Ask" / warnings. */
-	--info: oklch(0.74 0.18 55);
-	--info-rgb: 255, 129, 5;
-	--success: oklch(0.55 0.17 145);
-	--success-rgb: 34, 120, 60;
-	/* Mistral deep red ~#cc3a05 — errors / destructive actions. */
-	--destructive: oklch(0.55 0.22 32);
-	--destructive-rgb: 204, 58, 5;
+	--user-message-bubble: oklch(0.9158314607 0 0);
+	--user-message-bubble-dimmed: oklch(0.9158314607 0 0);
+	--user-message-foreground: oklch(0.2392923762 0 0);
+	--assistant-message-text: oklch(0.2392923762 0 0);
+	--assistant-message-bubble: oklch(from var(--foreground) l c h / 0.12);
+	--assistant-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.12);
+	/* Soft purple ~#9e94d5 — brand accent + active states. */
+	--accent: oklch(0.704 0.102 285);
+	--accent-rgb: 158, 148, 213;
+	/* Soft blue ~#87c3ff — info, Ask mode, warnings. */
+	--info: oklch(0.783 0.119 255);
+	--info-rgb: 135, 195, 255;
+	/* Forest green ~#1f8a65 — success, connected states. */
+	--success: oklch(0.5 0.12 165);
+	--success-rgb: 31, 138, 101;
+	/* Rose red ~#cf2d56 — errors, destructive actions. */
+	--destructive: oklch(0.55 0.2 355);
+	--destructive-rgb: 207, 45, 86;
 
 	/* === SHADOW OPACITY (light mode = subtle, dark mode = stronger) === */
 	--shadow-border-opacity: 0.08;
@@ -296,10 +302,8 @@
 
 	/* === SHADCN COMPATIBILITY (derived from 6 base colors) === */
 	--primary: var(--accent);
-	/* Pure white on saturated orange — clears WCAG AA (4.5:1) where the
-	 * cream background does not (~3.15:1). Mistral's `on-primary` is the
-	 * same #ffffff for the same reason. */
-	--primary-foreground: oklch(1 0 0);
+	/* Deep ink on soft purple clears WCAG AA while avoiding true black. */
+	--primary-foreground: oklch(0.2392923762 0 0);
 	--secondary: oklch(from var(--foreground) l c h / 0.05);
 	--secondary-foreground: var(--foreground);
 	--muted: oklch(from var(--foreground) l c h / 0.05);
@@ -322,11 +326,11 @@
 	   foreground is light it reads as slightly lighter. Both sidebar and
 	   chat panel automatically follow whatever `--background` resolves to. */
 	--sidebar: var(--background);
-	--sidebar-foreground: var(--foreground);
+	--sidebar-foreground: oklch(0.2392923762 0 0);
 	--sidebar-primary: var(--accent);
 	--sidebar-primary-foreground: var(--background);
 	--sidebar-accent: var(--foreground-5);
-	--sidebar-accent-foreground: var(--foreground);
+	--sidebar-accent-foreground: oklch(0.2392923762 0 0);
 	--sidebar-border: var(--border);
 	--sidebar-ring: var(--ring);
 	--sidebar-hover: oklch(from var(--foreground) l c h / 0.02);
@@ -373,11 +377,12 @@
 	--tracking-normal: 0em;
 
 	/* Chat bubble radii — separate token because the global `--radius` is 0
-	 * (flat aesthetic) but message bubbles need a fully-pill silhouette. The
-	 * "tail" radius is kept around in case a future variant wants asymmetric
-	 * corners; today it equals the main radius so the bubble reads as a pill. */
+	 * (flat aesthetic) but message bubbles need a rounded silhouette. The
+	 * "tail" corner is kept sharper (2px) to create the Telegram-style
+	 * pointed bubble effect; the triangle pseudo-element reinforces the tail.
+	 * Asymmetric: user bubble tail points right (toward avatar on the right). */
 	--radius-bubble: 1.25rem; /* 20px */
-	--radius-bubble-tail: 1.25rem; /* 20px — match for symmetric pill */
+	--radius-bubble-tail: 0.125rem; /* 2px — sharp tail corner */
 
 	/* Thinking-gradient endpoints — sourced from project semantic colors so
 	 * theme switches propagate to the streaming-state shimmer text. */
@@ -403,11 +408,11 @@
 	--z-splash: 600;
 }
 
-/* Dark Mode — Codex/GitHub-adjacent neutrals + blue accent (#0D1117 canvas, #388BFD links) */
+/* Dark Mode — near-black canvas (#141414) + soft purple accent (#9E94D5) */
 .dark {
 	/* === 6 BASE COLORS === */
-	/* Page/workspace ~#0D1117 */
-	--background: oklch(0.205 0.012 264);
+	/* Page/workspace ~#141414 */
+	--background: oklch(0.145 0.005 285);
 	/* Dark-mode chat panel — lift lightness off `--background` while keeping
 	   chroma and hue, so the panel re-tints whenever the preset's dark
 	   palette changes (instead of the old hardcoded blue). The +0.04
@@ -426,21 +431,28 @@
 			transparent 40%
 		),
 		linear-gradient(180deg, var(--background), var(--foreground-5));
-	/* Primary text ~#E6EDF3 */
-	--foreground: oklch(0.939 0.012 252);
-	--foreground-dimmed: color-mix(in srgb, var(--foreground) 80%, var(--background));
-	--foreground-rgb: 230, 237, 243;
-	--user-message-bubble: oklch(from var(--foreground) l c h / 0.06);
-	--user-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.035);
-	/* Interactive accent ~#388BFD */
-	--accent: oklch(0.628 0.154 264);
-	--accent-rgb: 56, 139, 253;
-	--info: oklch(0.7 0.16 70);
-	--info-rgb: 200, 140, 60;
-	--success: oklch(0.6 0.17 145);
-	--success-rgb: 50, 140, 80;
-	--destructive: oklch(0.7 0.19 22);
-	--destructive-rgb: 200, 80, 70;
+	/* Primary text ~#e3e3e3 */
+	--foreground: oklch(0.9158314607 0 0);
+	--foreground-dimmed: oklch(0.9158314607 0 0);
+	--foreground-rgb: 227, 227, 227;
+	--user-message-bubble: oklch(0.2837694632 0.0046572957 247.9916671312);
+	--user-message-bubble-dimmed: oklch(0.2837694632 0.0046572957 247.9916671312);
+	--user-message-foreground: oklch(0.9158314607 0 0);
+	--assistant-message-text: oklch(0.9158314607 0 0);
+	--assistant-message-bubble: oklch(0.95 0 0);
+	--assistant-message-bubble-dimmed: oklch(0.95 0 0);
+	/* Soft purple ~#9e94d5 — consistent brand accent in dark mode */
+	--accent: oklch(0.704 0.102 285);
+	--accent-rgb: 158, 148, 213;
+	/* Soft blue ~#87c3ff — info, Ask mode, warnings. */
+	--info: oklch(0.783 0.119 255);
+	--info-rgb: 135, 195, 255;
+	/* Mid forest green ~#34785c — success, connected states. */
+	--success: oklch(0.5 0.09 165);
+	--success-rgb: 52, 120, 92;
+	/* Rose red ~#cf2d56 — errors, destructive actions. */
+	--destructive: oklch(0.55 0.2 355);
+	--destructive-rgb: 207, 45, 86;
 
 	/* === SHADOW OPACITY (stronger in dark mode for visibility) === */
 	--shadow-border-opacity: 0.15;
@@ -522,11 +534,11 @@
 	 * the panel reads as a slightly lighter tint of background; when
 	 * foreground is dark, slightly darker. */
 	--sidebar: var(--background);
-	--sidebar-foreground: var(--foreground);
+	--sidebar-foreground: oklch(0.9158314607 0 0);
 	--sidebar-primary: var(--accent);
 	--sidebar-primary-foreground: var(--primary-foreground);
 	--sidebar-accent: var(--foreground-5);
-	--sidebar-accent-foreground: var(--foreground);
+	--sidebar-accent-foreground: oklch(0.9158314607 0 0);
 	--sidebar-border: var(--border);
 	--sidebar-ring: var(--ring);
 	--sidebar-hover: oklch(from var(--foreground) l c h / 0.02);
@@ -554,6 +566,11 @@ html[data-theme-mismatch]::before {
 	background: var(--foreground-10);
 	z-index: -1;
 	pointer-events: none;
+}
+
+.sidepanel-text-scope {
+	--foreground: var(--sidebar-foreground);
+	--muted-foreground: oklch(0.6334289302 0 0);
 }
 
 /* =============================================================================
@@ -592,7 +609,7 @@ html[data-scenic][data-theme-override]::before {
 }
 
 html[data-scenic] {
-	--background: oklch(0.205 0.012 264 / 0.55);
+	--background: oklch(0.145 0.005 285 / 0.55);
 }
 
 /* Inter Font - Opt-in via data-font="inter" attribute */
@@ -643,6 +660,8 @@ html[data-font="inter"] {
 	--color-sidebar-ring: var(--sidebar-ring);
 	--color-sidebar-hover: var(--sidebar-hover);
 	--color-user-message-bubble: var(--user-message-bubble);
+	--color-user-message-foreground: var(--user-message-foreground);
+	--color-assistant-message-text: var(--assistant-message-text);
 
 	/* === LEGACY COMPATIBILITY (shadcn/ui) === */
 	--color-primary: var(--primary);
@@ -728,6 +747,15 @@ html[data-font="inter"] {
 	   waits before removing the element, so the exit plays in full. */
 	--animate-dropdown-open: dropdown-open 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
 	--animate-dropdown-close: dropdown-close 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
+	/* Collapsible open/close — asymmetric easing: ease-out for enter, ease-in for exit.
+	   `both` fill-mode so the `from` state applies before the animation fires
+	   (no flash on mount) and the `to` state persists after it ends. */
+	--animate-collapsible-open: collapsible-open 200ms cubic-bezier(0.25, 1, 0.5, 1) both;
+	--animate-collapsible-close: collapsible-close 150ms cubic-bezier(0.7, 0, 0.84, 0) both;
+	--animate-reasoning-panel-open: reasoning-panel-open 300ms cubic-bezier(0.165, 0.84, 0.44, 1)
+		both;
+	--animate-reasoning-panel-close: reasoning-panel-close 300ms cubic-bezier(0.165, 0.84, 0.44, 1)
+		both;
 }
 
 /* Keyframes consolidated near the end of this file under the
@@ -1186,6 +1214,24 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 	animation: none !important;
 }
 
+/* Radix Collapsible height animation via grid-template-rows.
+   This is the modern "zero-height-trick" — animating grid-template-rows from
+   0fr (collapsed, empty row) to 1fr (expanded, auto row) gives smooth height
+   animation without animating height or max-height directly. Coordinated with
+   our content fade + translateY to feel like one unified motion.
+   Durations: 150ms close (matches content slide-up), 200ms open (matches
+   content slide-down). Easing: ease-in for exit, ease-out for enter. */
+[data-radix-collapsible-content-wrapper] {
+	display: grid;
+	grid-template-rows: 0fr;
+	transition: grid-template-rows 150ms cubic-bezier(0.7, 0, 0.84, 0);
+}
+
+[data-radix-collapsible-content-wrapper][data-state="open"] {
+	grid-template-rows: 1fr;
+	transition: grid-template-rows 200ms cubic-bezier(0.25, 1, 0.5, 1);
+}
+
 [data-radix-scroll-area-viewport] > div {
 	min-width: 0 !important;
 	display: block !important;
@@ -1385,6 +1431,18 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 		color: var(--thinking-gradient-from);
 		-webkit-text-fill-color: var(--thinking-gradient-from);
 	}
+
+	/* Collapsible: disable motion animations, keep instant state changes */
+	.animate-collapsible-open,
+	.animate-collapsible-close {
+		animation: none !important;
+		opacity: 1 !important;
+		transform: none !important;
+	}
+
+	[data-radix-collapsible-content-wrapper] {
+		transition: none !important;
+	}
 }
 
 /* shimmer-loading keyframes moved to the consolidated Animations section. */
@@ -1407,6 +1465,19 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 
 .animate-shake {
 	animation: shake 0.4s ease-in-out;
+}
+
+/* Collapsible open/close — explicit classes so `tw-animate-css` cannot inject
+   a default scale transform onto `.animate-*`. transform: none resets any
+   inherited scale from Radix or the animation framework. */
+.animate-collapsible-open {
+	animation: var(--animate-collapsible-open);
+	transform: none;
+}
+
+.animate-collapsible-close {
+	animation: var(--animate-collapsible-close);
+	transform: none;
 }
 
 /* editPopoverFadeIn keyframes moved to the consolidated Animations section. */
@@ -1771,6 +1842,52 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 	}
 }
 
+/* --- Collapsible open / close ---------------------------------------------- */
+
+@keyframes collapsible-open {
+	from {
+		opacity: 0;
+		transform: translateY(-4px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes collapsible-close {
+	from {
+		opacity: 1;
+		transform: translateY(0);
+	}
+	to {
+		opacity: 0;
+		transform: translateY(-4px);
+	}
+}
+
+@keyframes reasoning-panel-open {
+	from {
+		height: 0;
+		opacity: 0;
+	}
+	to {
+		height: var(--radix-collapsible-content-height);
+		opacity: 1;
+	}
+}
+
+@keyframes reasoning-panel-close {
+	from {
+		height: var(--radix-collapsible-content-height);
+		opacity: 1;
+	}
+	to {
+		height: 0;
+		opacity: 0;
+	}
+}
+
 /* `composer-placeholder-enter` keyframe ships with
    `@octavian-tocan/react-chat-composer` (imported at the top of this file). */
 
@@ -1782,4 +1899,9 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 .pawrrtal-docs :is(h1, h2, h3, h4) {
 	font-family: var(--font-display-stack);
 	letter-spacing: -0.01em;
+}
+
+.chat-message-response,
+.chat-message-response * {
+	color: inherit !important;
 }

@@ -11,6 +11,7 @@ dependencies = [
     "aiosqlite>=0.22.1",
     "anyio>=4.0.0",
     "apscheduler>=3.10.0",
+    "agent-client-protocol>=0.10.0",
     "claude-agent-sdk",
     "fastapi-users[sqlalchemy]>=15.0.3",
     "fastapi[standard]>=0.136.0",

@@ -9,8 +9,17 @@ from typing import TYPE_CHECKING, Any, Literal, Protocol, TypedDict
 if TYPE_CHECKING:
     from app.core.agent_loop.types import AgentTool, PermissionCheckFn, ToolDisplayPayload
 
-ReasoningEffort = Literal["low", "medium", "high", "extra-high"]
-"""Reasoning-depth values accepted from the chat UI."""
+ReasoningEffort = Literal["minimal", "low", "medium", "high", "extra-high"]
+"""Reasoning-depth values accepted from the chat UI.
+
+Ordered lightest → heaviest. ``minimal`` is the fastest tier — Gemini
+exposes it natively (Flash-Lite's default) and OpenAI accepts it on
+every reasoning model; providers that lack it (Claude's adaptive
+thinking, xAI's two-level enum) collapse it to ``low``. The
+:mod:`app.core.providers.reasoning` resolver treats this tuple as the
+canonical ladder for the nearest-supported fallback when the user
+switches models mid-conversation.
+"""
 
 
 class StreamEvent(TypedDict, total=False):

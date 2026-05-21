@@ -278,7 +278,7 @@ async def get_or_create_telegram_conversation_full(
         thread_id: Telegram topic thread ID (Bot API 9.3+).  When set,
             the query scopes to conversations with a matching
             ``telegram_thread_id``; otherwise it falls back to the
-            legacy ``title.like("Telegram%")`` lookup for plain DMs.
+            pre-topic ``title.like("Telegram%")`` lookup for plain DMs.
 
     Returns:
         The resolved or newly created ``Conversation`` ORM row.
@@ -355,6 +355,84 @@ async def update_conversation_verbose_level(
     return True
 
 
+async def update_conversation_reasoning_effort(
+    *,
+    conversation_id: uuid.UUID,
+    user_id: uuid.UUID,
+    reasoning_effort: str | None,
+    session: AsyncSession,
+) -> bool:
+    """Persist a per-conversation reasoning-effort override.
+
+    Used by the Telegram ``/thinking`` picker. ``None`` clears the
+    override so the next turn falls back to whatever the provider
+    picks (typically its medium / standard mode). The chat router
+    reads this column at request time when the per-turn override is
+    absent.
+
+    ``user_id`` is the ownership gate: the update silently no-ops
+    when the row exists but belongs to a different user. The
+    Telegram picker already resolves ``conversation_id`` from the
+    sender's binding so this is the belt-and-braces against a
+    future caller that hands in a ``conversation_id`` from an
+    untrusted source.
+
+    Returns:
+        ``True`` when the row was found, owned by ``user_id``, and
+        updated; ``False`` otherwise.
+    """
+    from app.models import Conversation  # noqa: PLC0415
+
+    row = await session.get(Conversation, conversation_id)
+    if row is None or row.user_id != user_id:
+        return False
+    row.reasoning_effort = reasoning_effort
+    await session.commit()
+    return True
+
+
+async def normalize_conversation_reasoning_effort(
+    *,
+    conversation_id: uuid.UUID,
+    session: AsyncSession,
+    model_id_override: str | None = None,
+):
+    """Resolve + persist the conversation's reasoning effort against the model.
+
+    Shared seam for the chat / Telegram backstop. Reads the row's
+    stored ``model_id`` + ``reasoning_effort``, runs them through
+    :func:`resolve_reasoning_effort`, and writes the normalized
+    value back when the resolver adapted or cleared it. Pass
+    ``model_id_override`` to resolve against a model the caller is
+    about to persist (e.g. mid-``/model``-switch).
+
+    Returns ``(resolution, previous_effort)`` so the caller can
+    render a "from → to" notice without a separate read:
+    ``previous_effort`` is whatever was on the row *before* the
+    normalize touched it. Returns ``(None, None)`` when the row
+    doesn't exist (treated as a no-op for caller simplicity).
+    """
+    from app.core.providers.reasoning import (  # noqa: PLC0415
+        ReasoningResolution,
+        resolve_reasoning_effort,
+    )
+    from app.models import Conversation  # noqa: PLC0415
+
+    row = await session.get(Conversation, conversation_id)
+    if row is None:
+        return None, None
+    previous_effort: str | None = row.reasoning_effort
+    effective_model_id = model_id_override if model_id_override is not None else row.model_id
+    resolution: ReasoningResolution = resolve_reasoning_effort(
+        model_id=effective_model_id,
+        stored_effort=previous_effort,
+    )
+    if resolution.action in ("adapted", "cleared"):
+        row.reasoning_effort = resolution.next_stored
+        await session.commit()
+    return resolution, previous_effort
+
+
 async def _get_or_create_telegram_conv_row(
     *,
     user_id: uuid.UUID,
@@ -366,7 +444,7 @@ async def _get_or_create_telegram_conv_row(
     Routing branches:
     - ``thread_id`` set → query by ``(user_id, telegram_thread_id)``; each
       Telegram topic gets its own independent conversation.
-    - ``thread_id`` None → legacy DM mode; find the most recently updated
+    - ``thread_id`` None → pre-topic DM mode; find the most recently updated
       conversation whose title starts with "Telegram" and has no thread ID.
     """
     from app.models import Conversation  # noqa: PLC0415

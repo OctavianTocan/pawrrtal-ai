@@ -24,10 +24,10 @@ from app.crud.channel import (
 from app.db import User
 from app.integrations.telegram.handlers import (
     PROVIDER,
-    TelegramSender,
     handle_plain_message,
     handle_start_command,
 )
+from app.integrations.telegram.sender import TelegramSender
 
 pytestmark = pytest.mark.anyio
 
@@ -156,7 +156,7 @@ async def test_plain_message_acks_bound_users(
     # Bound users no longer get a string ack — they get a routing context
     # the bot dispatcher hands to the LLM pipeline.
     assert not isinstance(reply, str)
-    assert reply.nexus_user_id == test_user.id
+    assert reply.pawrrtal_user_id == test_user.id
 
 
 async def test_unbind_removes_binding(

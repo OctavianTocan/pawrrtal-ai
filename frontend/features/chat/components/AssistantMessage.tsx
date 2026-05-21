@@ -7,10 +7,11 @@ import { Shimmer } from '@/components/ai-elements/shimmer';
 import { AgentSpinner } from '@/components/ui/agent-spinner';
 import { Button } from '@/components/ui/button';
 import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
+import type { ChatArtifactPayload, ChatTimelineEntry } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ArtifactCard } from '../artifacts/ArtifactCard';
 import { extractToolChips, type ToolResultChips } from '../tool-result-parsers';
-import type { ChatArtifactPayload, ChatTimelineEntry, ChatToolCall } from '../types';
+import type { ChatToolCall } from '../types';
 import { ChainOfThought } from './ChainOfThought';
 import { ReplyActionsRow } from './ReplyActionsRow';
 import { ThinkingHeader } from './ThinkingHeader';
@@ -82,7 +83,7 @@ function ReasoningPanel({
 	const [isOpen, setIsOpen] = useState<boolean>(true);
 
 	return (
-		<Collapsible className="not-prose mb-3 max-w-prose" onOpenChange={setIsOpen} open={isOpen}>
+		<Collapsible className="not-prose max-w-prose" onOpenChange={setIsOpen} open={isOpen}>
 			<ThinkingHeader
 				durationSeconds={durationSeconds}
 				hasExpandableContent
@@ -92,17 +93,19 @@ function ReasoningPanel({
 			/>
 			<CollapsibleContent
 				className={cn(
-					'mt-2',
-					'data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2',
-					'data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2',
-					'data-[state=closed]:animate-out data-[state=open]:animate-in'
+					'overflow-hidden',
+					'data-[state=closed]:animate-reasoning-panel-close',
+					'data-[state=open]:animate-reasoning-panel-open',
+					'motion-reduce:data-[state=closed]:animate-none motion-reduce:data-[state=open]:animate-none'
 				)}
 			>
-				<ChainOfThought
-					chipsByToolId={chipsByToolId}
-					timeline={timeline}
-					toolCallsById={toolCallsById}
-				/>
+				<div className="pt-2">
+					<ChainOfThought
+						chipsByToolId={chipsByToolId}
+						timeline={timeline}
+						toolCallsById={toolCallsById}
+					/>
+				</div>
 			</CollapsibleContent>
 		</Collapsible>
 	);

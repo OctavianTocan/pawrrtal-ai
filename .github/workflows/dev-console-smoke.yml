@@ -111,7 +111,6 @@ jobs:
         env:
           AUTH_SECRET: e2e-not-a-secret
           GOOGLE_API_KEY: e2e-not-a-key
-          FERNET_KEY: 'zG9KQK6sH0xLm4LJ4n8C9aD2vF3gN5pT7rE1yU8xKqM='
           WORKSPACE_ENCRYPTION_KEY: 'zG9KQK6sH0xLm4LJ4n8C9aD2vF3gN5pT7rE1yU8xKqM='
           CORS_ORIGINS: '["http://localhost:3001"]'
           DATABASE_URL: 'sqlite+aiosqlite:///./e2e.db'

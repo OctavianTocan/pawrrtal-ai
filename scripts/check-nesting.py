@@ -100,6 +100,17 @@ EXEMPT_FUNCTIONS: frozenset[str] = frozenset(
         "backend/app/core/providers/claude_provider.py::_events_from_assistant",
         "backend/app/core/providers/claude_provider.py::_events_from_message",
         "backend/app/core/providers/claude_provider.py::_tool_result_to_text",
+        # TODO(pawrrtal): flatten the Telegram channel's event loop.
+        # ``deliver`` walks the LLM stream with one branch per event
+        # kind (``tool_use``/``tool_result``/``thinking``/``delta``…)
+        # and an inner debounce/transition state machine, which
+        # pushes the nesting to 5. The pre-uecv form was kept on
+        # purpose after the flatten regressed Telegram's streaming
+        # UX; the real fix is splitting each branch into a small
+        # per-event-kind handler (see ``_telegram_dispatch`` for the
+        # existing helpers) and threading the shared state through
+        # them so the loop body stays at depth 1–2.
+        "backend/app/channels/telegram.py::deliver",
     }
 )
 

@@ -86,6 +86,7 @@ export function SafetyModeSelector(): React.JSX.Element {
 			onSelect={setSafetyMode}
 			selectedId={safetyMode}
 			tooltip="Safety mode"
+			triggerLabelClassName="hidden sm:contents"
 		/>
 	);
 }

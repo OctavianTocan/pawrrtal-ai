@@ -30,8 +30,8 @@ proto / SDK fields, not ``extra_body``):
   (``low | medium | high | extra-high``) is collapsed to xAI's
   two-level enum via :func:`_map_reasoning_effort`.  Grok 4.3 400s on
   anything else (https://docs.x.ai/docs/models/grok-4-3).
-* ``search_parameters`` — xAI deprecated Live Search (May 2026);
-  the field is no longer sent.  Pawrrtal's canonical web tool is
+* ``search_parameters`` — xAI's Live Search was removed in May 2026;
+  we no longer send this field.  Pawrrtal's canonical web tool is
   ``exa_search`` (gated by ``EXA_API_KEY``).  If xAI ships a
   replacement search surface, the knob will flow through here.
 * ``response.cost_usd`` — the SDK does the
@@ -87,6 +87,7 @@ from app.core.agent_system_prompt import (
 from app.core.config import settings
 from app.core.keys import resolve_api_key
 
+from ._stream_logging import log_provider_stream_event
 from ._xai_events import agent_event_to_stream_event, identity_convert
 from ._xai_messages import build_xai_messages, build_xai_tools
 from ._xai_stream import (
@@ -116,20 +117,20 @@ def _resolve_xai_api_key(workspace_root: Path | None) -> str:
 def _map_reasoning_effort(
     effort: ReasoningEffort | None,
 ) -> chat_pb2.ReasoningEffort | None:
-    """Map Pawrrtal's four-level UI knob onto xAI's proto enum.
+    """Map Pawrrtal's five-level UI knob onto xAI's proto enum.
 
     Grok 4.3 accepts ``EFFORT_LOW`` or ``EFFORT_HIGH``
     (https://docs.x.ai/docs/models/grok-4-3) and 400s on anything
     else, including ``EFFORT_MEDIUM`` and ``EFFORT_NONE``.  The
-    Pawrrtal UI surfaces ``low | medium | high | extra-high`` — we
-    collapse the lower two to ``EFFORT_LOW`` and the upper two to
-    ``EFFORT_HIGH`` so the user gets a meaningful difference without
-    overshooting xAI's schema.  ``None`` means "let xAI pick the
-    model default" and the field is omitted from the request.
+    Pawrrtal UI surfaces ``minimal | low | medium | high | extra-high``
+    — we collapse the lower three to ``EFFORT_LOW`` and the upper two
+    to ``EFFORT_HIGH`` so the user gets a meaningful difference
+    without overshooting xAI's schema.  ``None`` means "let xAI pick
+    the model default" and the field is omitted from the request.
     """
     if effort is None:
         return None
-    if effort in ("low", "medium"):
+    if effort in ("minimal", "low", "medium"):
         return chat_pb2.ReasoningEffort.EFFORT_LOW
     return chat_pb2.ReasoningEffort.EFFORT_HIGH
 
@@ -385,10 +386,25 @@ class XaiLLM:
             async for event in agent_loop([prompt], context, config, stream_fn):
                 stream_event = agent_event_to_stream_event(event)
                 if stream_event is not None:
+                    log_provider_stream_event(
+                        logger,
+                        provider="XAI",
+                        model=self._model_id,
+                        conversation_id=conversation_id,
+                        event=stream_event,
+                    )
                     yield stream_event
 
         except Exception as exc:
-            yield StreamEvent(type="error", content=f"xAI provider error: {exc}")
+            stream_event = StreamEvent(type="error", content=f"xAI provider error: {exc}")
+            log_provider_stream_event(
+                logger,
+                provider="XAI",
+                model=self._model_id,
+                conversation_id=conversation_id,
+                event=stream_event,
+            )
+            yield stream_event
             return
 
         # Terminal usage event — the chat aggregator folds it into the
@@ -397,9 +413,17 @@ class XaiLLM:
         # Skip when no chunk reported usage (test scripts, error-only
         # turns) so the ledger doesn't see spurious zero rows.
         if usage_sink.saw_any:
-            yield StreamEvent(
+            stream_event = StreamEvent(
                 type="usage",
                 input_tokens=usage_sink.input_tokens,
                 output_tokens=usage_sink.output_tokens,
                 cost_usd=usage_sink.cost_usd,
             )
+            log_provider_stream_event(
+                logger,
+                provider="XAI",
+                model=self._model_id,
+                conversation_id=conversation_id,
+                event=stream_event,
+            )
+            yield stream_event

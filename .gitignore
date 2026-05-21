@@ -5,7 +5,6 @@ node_modules/
 /.pnp
 .pnp.*
 .venv/
-.yarn/*
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/
@@ -17,10 +16,6 @@ node_modules/
 .env.production.local
 !.env.example
 !.env.docker
-!.yarn/patches
-!.yarn/plugins
-!.yarn/releases
-!.yarn/versions
 
 # Private
 /private

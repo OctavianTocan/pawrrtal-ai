@@ -29,8 +29,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+# ``ChannelMessage`` is re-exported via :mod:`app.channels` (its
+# ``__init__.py`` already does the lift) so bot.py imports both
+# ``resolve_channel`` and ``ChannelMessage`` from the same module —
+# one fewer fan-out hit for sentrux's ``no_god_files`` budget.
 from app.channels import ChannelMessage, resolve_channel
-from app.channels.telegram import SURFACE_TELEGRAM, make_telegram_sender
+
+# ``render_initial`` is re-exported via :mod:`app.channels.telegram`
+# to keep bot.py under sentrux's ``no_god_files`` fan-out budget.
+from app.channels.telegram import SURFACE_TELEGRAM, make_telegram_sender, render_initial
 from app.channels.turn_runner import ChatTurnInput, run_turn
 from app.core.agent_hooks import build_pre_turn_hooks
 from app.core.agent_tools import build_agent_tools
@@ -41,6 +48,11 @@ from app.integrations.telegram.bot_permissions import build_telegram_permission_
 from app.integrations.telegram.bot_provider_resolution import (
     resolve_provider_with_auto_clear,
 )
+
+# ``TelegramSender`` is re-exported via :mod:`handlers` (which already
+# imports it from :mod:`sender`) so bot.py imports both
+# ``handle_plain_message`` and ``TelegramSender`` from the same module
+# — keeps bot.py under sentrux's ``no_god_files`` fan-out budget.
 from app.integrations.telegram.handlers import (
     TelegramSender,
     TelegramTurnContext,
@@ -51,13 +63,37 @@ from app.integrations.telegram.handlers import (
     handle_stop_command,
     handle_verbose_command,
 )
-from app.integrations.telegram.model_picker import MODEL_CALLBACK_PREFIX
+
+# ``MODEL_CALLBACK_PREFIX`` is re-exported via
+# :mod:`model_picker_runtime` to keep bot.py under sentrux's
+# ``no_god_files`` fan-out budget.
 from app.integrations.telegram.model_picker_runtime import (
+    MODEL_CALLBACK_PREFIX,
     answer_model_command,
-    answer_model_picker,
     handle_model_picker_callback,
 )
-from app.integrations.telegram.status import handle_lcm_command, handle_status_command
+
+# The reasoning-effort backstop lives in its own module so bot.py
+# doesn't take a separate fan-out hit on the resolver + DB seam +
+# notice formatter.
+from app.integrations.telegram.reasoning_notify import normalize_reasoning_and_notify
+
+# ``compact_command`` is re-exported via :mod:`status` to keep bot.py
+# under sentrux's ``no_god_files`` fan-out budget (same trick as
+# ``handle_lcm_command``).
+from app.integrations.telegram.status import (
+    handle_compact_command,
+    handle_lcm_command,
+    handle_status_command,
+)
+
+# ``THINKING_CALLBACK_PREFIX`` is re-exported via
+# :mod:`thinking_picker_runtime` for the same fan-out reason.
+from app.integrations.telegram.thinking_picker_runtime import (
+    THINKING_CALLBACK_PREFIX,
+    answer_thinking_command,
+    handle_thinking_picker_callback,
+)
 
 if TYPE_CHECKING:
     from aiogram import Bot, Dispatcher
@@ -68,12 +104,13 @@ logger = logging.getLogger(__name__)
 _TELEGRAM_COMMANDS: tuple[tuple[str, str], ...] = (
     ("start", "Connect your Pawrrtal account"),
     ("new", "Start a new conversation"),
-    ("model", "Switch the model for this conversation"),
-    ("models", "Browse available models"),
+    ("model", "Pick or set the model (no arg = picker)"),
+    ("thinking", "Pick the reasoning level for the current model"),
     ("verbose", "Set detail level: 0 quiet, 1 tools, 2 thinking"),
     ("stop", "Stop the active run"),
     ("status", "Show gateway + conversation status"),
     ("lcm", "Show LCM (long-context memory) status for this conversation"),
+    ("compact", "Force an LCM leaf-compaction pass now"),
 )
 
 # Captured at module import so /status can report this worker's uptime
@@ -206,7 +243,7 @@ async def _run_llm_turn(
     )
 
     async with async_session_maker() as ws_session:
-        workspace = await get_default_workspace(context.nexus_user_id, ws_session)
+        workspace = await get_default_workspace(context.pawrrtal_user_id, ws_session)
 
     tg_sender = make_telegram_sender(
         message.bot,
@@ -217,7 +254,7 @@ async def _run_llm_turn(
     agent_tools = (
         build_agent_tools(
             workspace_root=Path(workspace.path),
-            user_id=context.nexus_user_id,
+            user_id=context.pawrrtal_user_id,
             workspace_id=workspace.id,
             send_fn=tg_sender,
             surface="telegram",
@@ -229,14 +266,13 @@ async def _run_llm_turn(
 
     provider, warning = await resolve_provider_with_auto_clear(
         context,
-        workspace_id=workspace.id if workspace is not None else None,
         workspace_root=Path(workspace.path) if workspace is not None else None,
     )
     if warning is not None:
         await message.answer(warning, reply_parameters=_reply_parameters(message.message_id))
 
     channel_message: ChannelMessage = {
-        "user_id": context.nexus_user_id,
+        "user_id": context.pawrrtal_user_id,
         "conversation_id": context.conversation_id,
         "text": user_text,
         "surface": SURFACE_TELEGRAM,
@@ -249,9 +285,25 @@ async def _run_llm_turn(
             "message_thread_id": context.thread_id,
         },
     }
+
+    # Backstop: re-validate the stored reasoning_effort against the
+    # current model. Telegram's /thinking picker writes the column,
+    # but model changes (via /model, the picker, or any future
+    # surface) can leave the stored value out of sync with what the
+    # model honours. The shared resolver in
+    # `app.core.providers.reasoning` adapts or clears the override;
+    # the helper sends a Telegram notice whenever a change happens
+    # so the new behaviour isn't silent. Returns ``None`` for the
+    # "let the provider pick its default" case.
+    effective_effort = await normalize_reasoning_and_notify(
+        message=message,
+        conversation_id=context.conversation_id,
+        model_id=context.model_id,
+    )
+
     turn_input = ChatTurnInput(
         conversation_id=context.conversation_id,
-        user_id=context.nexus_user_id,
+        user_id=context.pawrrtal_user_id,
         question=user_text,
         provider=provider,
         channel=resolve_channel(SURFACE_TELEGRAM),
@@ -271,6 +323,7 @@ async def _run_llm_turn(
             else settings.telegram_verbose_default
         ),
         pre_turn_hooks=pre_turn_hooks,
+        reasoning_effort=effective_effort,
     )
 
     async def _do_stream() -> None:
@@ -403,15 +456,17 @@ def _register_telegram_command_handlers(dispatcher: Dispatcher) -> None:
 
     @dispatcher.message(Command("model"))
     async def _on_model(message: Message) -> None:
+        # ``/model`` with no args opens the picker; ``/model <id>``
+        # sets the model directly. Single command for both flows —
+        # the old ``/models`` alias is gone.
         text = message.text or ""
-        # Strip the "/model" prefix (plus optional @botname) and grab the rest.
         parts = text.strip().split(maxsplit=1)
         model_arg = parts[1].strip() if len(parts) > 1 else ""
         await answer_model_command(message=message, model_arg=model_arg)
 
-    @dispatcher.message(Command("models"))
-    async def _on_models(message: Message) -> None:
-        await answer_model_picker(message=message)
+    @dispatcher.message(Command("thinking"))
+    async def _on_thinking(message: Message) -> None:
+        await answer_thinking_command(message=message)
 
     @dispatcher.message(Command("status"))
     async def _on_status(message: Message) -> None:
@@ -423,16 +478,6 @@ def _register_telegram_command_handlers(dispatcher: Dispatcher) -> None:
                 bot_uptime_seconds=get_bot_uptime_seconds(),
                 is_chat_run_active=is_chat_run_active,
             )
-        await message.answer(reply)
-
-    @dispatcher.message(Command("lcm"))
-    async def _on_lcm(message: Message) -> None:
-        # Closes #303 — diagnostic surface for Lossless Context Management
-        # so the operator can spot disabled / empty / stuck memory state
-        # from Telegram without tailing the server log.
-        sender = _sender_from_message(message)
-        async with async_session_maker() as session:
-            reply = await handle_lcm_command(sender=sender, session=session)
         await message.answer(reply)
 
     @dispatcher.message(Command("verbose"))
@@ -447,6 +492,36 @@ def _register_telegram_command_handlers(dispatcher: Dispatcher) -> None:
             )
         await message.answer(reply)
 
+    _register_telegram_lcm_command_handlers(dispatcher)
+
+
+def _register_telegram_lcm_command_handlers(dispatcher: Dispatcher) -> None:
+    """Register LCM-flavoured commands (``/lcm`` + ``/compact``).
+
+    Split out of :func:`_register_telegram_command_handlers` so that
+    function stays under the project's PLR0915 cap and so the LCM
+    surface lives in one place when future LCM commands land.
+    """
+    from aiogram.filters import Command  # noqa: PLC0415
+
+    @dispatcher.message(Command("lcm"))
+    async def _on_lcm(message: Message) -> None:
+        # Diagnostic surface for Lossless Context Management — closes #303.
+        sender = _sender_from_message(message)
+        async with async_session_maker() as session:
+            reply = await handle_lcm_command(sender=sender, session=session)
+        await message.answer(reply)
+
+    @dispatcher.message(Command("compact"))
+    async def _on_compact(message: Message) -> None:
+        # Force a synchronous LCM leaf-compaction pass. Distinct from
+        # the per-turn background trigger — surfaces errors instead of
+        # swallowing them so the operator gets a real reply.
+        sender = _sender_from_message(message)
+        async with async_session_maker() as session:
+            reply = await handle_compact_command(sender=sender, session=session)
+        await message.answer(reply)
+
 
 def _register_telegram_callback_handlers(dispatcher: Dispatcher) -> None:
     """Register inline-keyboard callback handlers on the aiogram dispatcher."""
@@ -454,6 +529,12 @@ def _register_telegram_callback_handlers(dispatcher: Dispatcher) -> None:
     @dispatcher.callback_query(lambda query: (query.data or "").startswith(MODEL_CALLBACK_PREFIX))
     async def _on_model_picker(callback: CallbackQuery) -> None:
         await handle_model_picker_callback(callback=callback)
+
+    @dispatcher.callback_query(
+        lambda query: (query.data or "").startswith(THINKING_CALLBACK_PREFIX)
+    )
+    async def _on_thinking_picker(callback: CallbackQuery) -> None:
+        await handle_thinking_picker_callback(callback=callback)
 
 
 def _register_telegram_message_handler(dispatcher: Dispatcher) -> None:

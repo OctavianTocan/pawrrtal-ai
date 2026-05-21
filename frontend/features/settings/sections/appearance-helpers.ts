@@ -76,22 +76,22 @@ export interface MockThemePreset {
 
 /** Light-mode color defaults — mirrors the values in `globals.css`. */
 export const DEFAULT_LIGHT_COLORS: Record<ColorSlot, string> = {
-	background: 'oklch(0.985 0.026 92)',
+	background: 'oklch(0.973 0.014 90)',
 	foreground: 'oklch(0.21 0.005 285)',
-	accent: 'oklch(0.66 0.21 38)',
-	info: 'oklch(0.74 0.18 55)',
-	success: 'oklch(0.55 0.17 145)',
-	destructive: 'oklch(0.55 0.22 32)',
+	accent: 'oklch(0.704 0.102 285)',
+	info: 'oklch(0.783 0.119 255)',
+	success: 'oklch(0.50 0.12 165)',
+	destructive: 'oklch(0.55 0.20 355)',
 };
 
 /** Dark-mode color defaults — mirrors the values in `globals.css`. */
 export const DEFAULT_DARK_COLORS: Record<ColorSlot, string> = {
-	background: 'oklch(0.205 0.012 264)',
-	foreground: 'oklch(0.939 0.012 252)',
-	accent: 'oklch(0.628 0.154 264)',
-	info: 'oklch(0.7 0.16 70)',
-	success: 'oklch(0.6 0.17 145)',
-	destructive: 'oklch(0.7 0.19 22)',
+	background: 'oklch(0.145 0.005 285)',
+	foreground: 'oklch(0.9158314607 0 0)',
+	accent: 'oklch(0.704 0.102 285)',
+	info: 'oklch(0.783 0.119 255)',
+	success: 'oklch(0.50 0.09 165)',
+	destructive: 'oklch(0.55 0.20 355)',
 };
 
 /** Default font stacks — mirrors `globals.css` font tokens. */
@@ -111,42 +111,21 @@ export const DEFAULT_OPTIONS: Required<MockAppearanceOptions> = {
 	ui_font_size: 16,
 };
 
-/** Mock preset list — same three the original system shipped, all data only. */
+/** Mock preset list — unified Pawrrtal default plus Cursor for warm-grey lovers. */
 export const THEME_PRESETS: ReadonlyArray<MockThemePreset> = [
 	{
 		id: 'pawrrtal',
 		name: 'Pawrrtal',
-		description: 'Project default — Mistral-inspired tokens with Newsreader display serif.',
+		description:
+			'Warm off-white canvas, soft purple accent, soft blue info, forest green success.',
 		light: DEFAULT_LIGHT_COLORS,
 		dark: DEFAULT_DARK_COLORS,
 		fonts: DEFAULT_FONTS,
 	},
 	{
-		id: 'mistral',
-		name: 'Mistral',
-		description: 'Sunlit cream surface, Mistral-orange accent, editorial serif display.',
-		light: {
-			background: 'oklch(0.985 0.026 92)',
-			foreground: 'oklch(0.21 0.005 285)',
-			accent: 'oklch(0.66 0.21 38)',
-			info: 'oklch(0.74 0.18 55)',
-			success: 'oklch(0.55 0.17 145)',
-			destructive: 'oklch(0.55 0.22 32)',
-		},
-		dark: {
-			background: 'oklch(0.205 0.012 264)',
-			foreground: 'oklch(0.939 0.012 252)',
-			accent: 'oklch(0.628 0.154 264)',
-			info: 'oklch(0.7 0.16 70)',
-			success: 'oklch(0.6 0.17 145)',
-			destructive: 'oklch(0.7 0.19 22)',
-		},
-		fonts: DEFAULT_FONTS,
-	},
-	{
 		id: 'cursor',
 		name: 'Cursor',
-		description: 'Cool warm-grey canvas, Cursor-orange CTAs, Geist sans typography.',
+		description: 'Cool warm-grey canvas, orange CTAs, Geist sans typography.',
 		light: {
 			background: '#f7f7f4',
 			foreground: '#26251e',

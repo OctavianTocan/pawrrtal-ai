@@ -37,7 +37,7 @@ const GROUP_EXPAND_EXIT_EASE = [0.7, 0, 0.84, 0] as const;
 // Scrolling lives on the parent wrapper in NavChatsView so projects and
 // conversations scroll as one group. This element keeps listbox semantics and
 // the spacing rhythm from the Projects section above.
-const CONVERSATION_LIST_CLASS = 'mt-3 pt-1 outline-none';
+const CONVERSATION_LIST_CLASS = 'mt-0 pt-1 outline-none';
 
 /**
  * Slice of the parent `NavChatsView` props that the inner content rendering

@@ -24,11 +24,15 @@ class Vendor(StrEnum):
     catalog.
     """
 
+    alibaba = "alibaba"
     anthropic = "anthropic"
+    deepseek = "deepseek"
     google = "google"
+    minimax = "minimax"
     moonshot = "moonshot"
     openai = "openai"
     xai = "xai"
+    xiaomi = "xiaomi"
     zai = "zai"
 
 
@@ -42,6 +46,7 @@ class Host(StrEnum):
     """
 
     agent_sdk = "agent-sdk"
+    gemini_cli = "gemini-cli"
     google_ai = "google-ai"
     litellm = "litellm"
     opencode_go = "opencode-go"
@@ -59,11 +64,16 @@ CANONICAL_HOST: dict[Vendor, Host] = {
     # is feature-incomplete; keep the native host as the canonical
     # so ``xai/<model>`` defaults to the full-featured path.
     Vendor.xai: Host.xai,
-    # z.ai (GLM) and Moonshot (Kimi) are served by the OpenCode Go
-    # gateway (https://opencode.ai/docs/zen) — SST's hosted
-    # OpenAI-compatible endpoint for open-weight coding models.
+    # Every open-weight coding model we ship — z.ai (GLM), Moonshot
+    # (Kimi), Xiaomi (MiMo), Alibaba (Qwen), MiniMax, DeepSeek — is
+    # served by the OpenCode Go gateway (https://opencode.ai/docs/go),
+    # SST's hosted OpenAI-compatible endpoint.
     Vendor.zai: Host.opencode_go,
     Vendor.moonshot: Host.opencode_go,
+    Vendor.xiaomi: Host.opencode_go,
+    Vendor.alibaba: Host.opencode_go,
+    Vendor.minimax: Host.opencode_go,
+    Vendor.deepseek: Host.opencode_go,
 }
 """Per-vendor canonical host used when the input omits ``host:``.
 

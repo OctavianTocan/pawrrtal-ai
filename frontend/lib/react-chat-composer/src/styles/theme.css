@@ -21,14 +21,14 @@
 	--color-chat-border: oklch(0.9 0.005 285);
 
 	/* Brand / actions */
-	--color-chat-accent: oklch(0.66 0.21 38);
+	--color-chat-accent: oklch(0.704 0.102 285);
 	--color-chat-accent-foreground: oklch(0.99 0 0);
 
 	/* Semantic */
-	--color-chat-info: oklch(0.74 0.18 55);
-	--color-chat-warning: oklch(0.74 0.18 75);
-	--color-chat-destructive: oklch(0.55 0.22 32);
-	--color-chat-success: oklch(0.55 0.17 145);
+	--color-chat-info: oklch(0.783 0.119 255);
+	--color-chat-warning: oklch(0.783 0.119 255);
+	--color-chat-destructive: oklch(0.55 0.2 355);
+	--color-chat-success: oklch(0.5 0.12 165);
 
 	/* Radii */
 	--radius-chat-lg: 14px;
@@ -50,7 +50,7 @@
 	--color-chat-foreground: oklch(0.95 0.005 285);
 	--color-chat-muted: oklch(0.65 0.005 285);
 	--color-chat-border: oklch(0.3 0.005 285);
-	--color-chat-accent: oklch(0.7 0.21 38);
+	--color-chat-accent: oklch(0.704 0.102 285);
 	--color-chat-accent-foreground: oklch(0.12 0 0);
 	--shadow-chat-minimal: 0 1px 0 oklch(0 0 0 / 0.4), 0 4px 12px oklch(0 0 0 / 0.5);
 }

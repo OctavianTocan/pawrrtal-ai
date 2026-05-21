@@ -10,7 +10,7 @@
 import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { ChatArtifactPayload } from '../types';
+import type { ChatArtifactPayload } from '@/lib/types';
 import { ArtifactCard } from './ArtifactCard';
 
 afterEach(cleanup);

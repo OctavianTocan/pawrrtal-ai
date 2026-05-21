@@ -49,6 +49,7 @@ from app.core.config import settings
 from app.core.keys import resolve_api_key
 
 from ._gemini_events import agent_event_to_stream_event, identity_convert
+from ._stream_logging import log_provider_stream_event
 from .base import ReasoningEffort, StreamEvent
 from .model_id import Vendor
 
@@ -143,12 +144,31 @@ def _delta_text(chunk: Any) -> str:
     return content or ""
 
 
+# Map Pawrrtal's five-level ``ReasoningEffort`` literal onto OpenAI's
+# six-level ``reasoning_effort`` enum (``none | minimal | low | medium |
+# high | xhigh``).  ``minimal`` is OpenAI's lightest tier (low-latency
+# chat / high throughput) and ``extra-high`` lifts to OpenAI's
+# ``xhigh`` so a user who picked the heaviest level on a Claude turn
+# keeps getting the heaviest available level after switching to a
+# GPT-5-class model. Sourced from
+# ``openai/types/shared/reasoning_effort.py`` in the official Python
+# SDK — see https://github.com/openai/openai-python.
+_LITELLM_REASONING_EFFORT: dict[str, str] = {
+    "minimal": "minimal",
+    "low": "low",
+    "medium": "medium",
+    "high": "high",
+    "extra-high": "xhigh",
+}
+
+
 def make_litellm_stream_fn(
     vendor: Vendor,
     model: str,
     workspace_root: Path | None = None,
     *,
     system_prompt: str,
+    reasoning_effort: ReasoningEffort | None = None,
 ) -> StreamFn:
     """Build a StreamFn backed by ``litellm.acompletion``.
 
@@ -165,6 +185,13 @@ def make_litellm_stream_fn(
             closure.  Mirrors :func:`make_gemini_stream_fn`'s contract
             so the chat router can assemble the workspace prompt and
             bind it per request.
+
+        reasoning_effort: Per-turn reasoning knob (already resolved
+            against the model's catalog support tuple). ``None`` lets
+            the model use its default; otherwise the mapped OpenAI
+            ``reasoning_effort`` value (per
+            :data:`_LITELLM_REASONING_EFFORT`) rides on the
+            ``litellm.acompletion`` kwargs.
 
     Returns:
         An async generator factory the agent loop can call.  When a
@@ -201,14 +228,27 @@ def make_litellm_stream_fn(
 
         litellm_messages = _build_litellm_messages(messages, system_prompt)
 
+        # Forward Pawrrtal's reasoning knob to OpenAI's
+        # ``reasoning_effort`` parameter via LiteLLM. Set only when the
+        # caller supplied a value AND the mapping exists — so non-
+        # reasoning models that LiteLLM routes (gpt-4o, gpt-4.1) keep
+        # their behaviour unchanged even if a stale stored value
+        # lingers (the chat-router resolver should have cleared it
+        # already, but this is a defensive belt-and-braces).
+        completion_kwargs: dict[str, object] = {
+            "model": model_string,
+            "messages": litellm_messages,
+            "api_key": api_key,
+            "stream": True,
+        }
+        if reasoning_effort is not None:
+            mapped = _LITELLM_REASONING_EFFORT.get(reasoning_effort)
+            if mapped is not None:
+                completion_kwargs["reasoning_effort"] = mapped
+
         full_text = ""
         try:
-            response = await litellm.acompletion(
-                model=model_string,
-                messages=litellm_messages,
-                api_key=api_key,
-                stream=True,
-            )
+            response = await litellm.acompletion(**completion_kwargs)
             async for chunk in response:
                 text = _delta_text(chunk)
                 if text:
@@ -298,9 +338,12 @@ class LiteLLMLLM:
             system_prompt: System prompt for this turn.  Falls back
                 to ``_FALLBACK_SYSTEM_PROMPT`` for bare unit-test
                 callers.
-            reasoning_effort: Accepted for protocol parity; ignored.
-                Wire to OpenAI's ``reasoning.effort`` / xAI's reasoning
-                knob when the v2 tool-flow lands.
+            reasoning_effort: Per-turn reasoning knob. Forwarded as
+                ``reasoning_effort`` on the ``litellm.acompletion`` call
+                via :data:`_LITELLM_REASONING_EFFORT` (Pawrrtal's four
+                levels mapped onto OpenAI's six-level enum, with
+                ``extra-high`` → ``xhigh``).  Non-reasoning models
+                ignore the kwarg.
             permission_check: Forwarded to the loop's
                 ``AgentLoopConfig``.  Inert in v1 because no tools fire.
             images: Multimodal inputs.  Accepted for protocol parity
@@ -346,12 +389,20 @@ class LiteLLMLLM:
             self._model,
             self._workspace_root,
             system_prompt=context.system_prompt,
+            reasoning_effort=reasoning_effort,
         )
 
         try:
             async for event in agent_loop([prompt], context, config, stream_fn):
                 stream_event = agent_event_to_stream_event(event)
                 if stream_event is not None:
+                    log_provider_stream_event(
+                        logger,
+                        provider="LITELLM",
+                        model=f"{self._vendor.value}/{self._model}",
+                        conversation_id=conversation_id,
+                        event=stream_event,
+                    )
                     yield stream_event
 
         except Exception as exc:
@@ -362,4 +413,12 @@ class LiteLLMLLM:
                 exc,
                 exc_info=True,
             )
-            yield StreamEvent(type="error", content=f"LiteLLM provider error: {exc}")
+            stream_event = StreamEvent(type="error", content=f"LiteLLM provider error: {exc}")
+            log_provider_stream_event(
+                logger,
+                provider="LITELLM",
+                model=f"{self._vendor.value}/{self._model}",
+                conversation_id=conversation_id,
+                event=stream_event,
+            )
+            yield stream_event

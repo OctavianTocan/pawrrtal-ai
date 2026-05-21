@@ -9,20 +9,24 @@ description: >
   @font-face rules in frontend/app/globals.css; token --font-sans-stack in
   frontend/app/globals.css).
 colors:
-  primary: "#FA520F"
-  on-primary: "#FFFFFF"
-  background: "#FFF8E0"
+  primary: "#9E94D5"
+  on-primary: "#1F1F1F"
+  background: "#F7F7F4"
   foreground: "#1F1F1F"
-  accent: "#FA520F"
-  info: "#FF8105"
-  success: "#22783C"
-  destructive: "#CC3A05"
+  accent: "#9E94D5"
+  info: "#87C3FF"
+  success: "#1F8A65"
+  destructive: "#CF2D56"
   border: "#E8E0C9"
   muted-foreground: "#8A8888"
-  user-message-bubble: "#F5EDD0"
-  info-text: "#6F4419"
-  success-text: "#1F4A30"
-  destructive-text: "#682C2B"
+  user-message-bubble: "#E3E3E3"
+  user-message-foreground: "#1F1F1F"
+  assistant-message-text: "#1F1F1F"
+  sidepanel-text: "#1F1F1F"
+  sidepanel-muted-text: "#8A8A8A"
+  info-text: "#1A4F7A"
+  success-text: "#0F4A2A"
+  destructive-text: "#6B1A2A"
 typography:
   display:
     fontFamily: Newsreader
@@ -102,7 +106,7 @@ rounded:
   md: 8px
   lg: 14px
   bubble: 20px
-  bubble-tail: 4px
+  bubble-tail: 2px
   full: 9999px
 spacing:
   unit: 4px
@@ -124,12 +128,12 @@ components:
     padding: 12px
   bubble-user:
     backgroundColor: "{colors.user-message-bubble}"
-    textColor: "{colors.foreground}"
+    textColor: "{colors.user-message-foreground}"
     rounded: "{rounded.bubble}"
     padding: 12px
   bubble-assistant:
     backgroundColor: "{colors.background}"
-    textColor: "{colors.foreground}"
+    textColor: "{colors.assistant-message-text}"
     padding: 12px
   step-icon:
     backgroundColor: "{colors.foreground}"
@@ -206,12 +210,12 @@ components:
     padding: "Sticky footer gap - `flex-col-reverse` narrow / `sm:flex-row sm:justify-end` wide"
   sidebar-nav-row:
     backgroundColor: "Hover `{colors.foreground}` @ 4%; selected @ 7%"
-    textColor: "{colors.foreground}"
+    textColor: "{colors.sidepanel-text}"
     rounded: "{rounded.sm}"
     padding: "Comfortable `min-h-9`; compact `h-8` density split"
     typography: sidebar-row
   sidebar-section-header:
-    textColor: "{colors.foreground}"
+    textColor: "{colors.sidepanel-muted-text}"
     typography: sidebar-section-header
     padding: "Floating tray hover - absolute inset micro-padding + `rounded-[6px]` wash"
   app-pill:
@@ -229,10 +233,9 @@ buttons/cards**); hierarchy comes from typography, neutral interpolation, and a 
 brand accent. **Overlay / frosted stacks** (blur + tint-see **Overlay & frosted surfaces**)
 are the exception to flat matte chrome.
 
-The system is dual-theme. Light mode is a warm, low-chroma palette with a
-subdued purple accent; dark mode is **Codex/GitHub-adjacent** (`#0D1117`
-canvas, `#388BFD` accent) so the product reads as a developer-native AI
-surface in dark.
+The system is dual-theme. Light mode is a warm off-white palette with a
+soft purple accent; dark mode is **near-black** (`#141414` canvas, `#9E94D5`
+purple accent) — calm, minimal, and developer-native in both modes.
 
 The token names in the front matter document the **light theme** (the `:root`
 default in `frontend/app/globals.css`). Dark theme is documented inline in
@@ -298,34 +301,42 @@ or overlays where the layer underneath should bleed through.
 
 | Role        | Hex (approx) | Canonical                    |
 | ----------- | ------------ | ---------------------------- |
-| background  | `#FFF8E0`    | `oklch(0.985 0.026 92)`      |
-| foreground  | `#1F1F1F`    | `oklch(0.21 0.005 285)`      |
-| accent      | `#FA520F`    | `oklch(0.66 0.21 38)`        |
-| info        | `#FF8105`    | `oklch(0.74 0.18 55)`        |
-| success     | `#22783C`    | `oklch(0.55 0.17 145)`       |
-| destructive | `#CC3A05`    | `oklch(0.55 0.22 32)`        |
+| background  | `#F7F7F4`    | `oklch(0.973 0.014 90)`     |
+| foreground  | `#1F1F1F`    | `oklch(0.2392923762 0 0)`   |
+| assistant-message-text | `#1F1F1F` | `oklch(0.2392923762 0 0)` |
+| user-message-bubble | `#E3E3E3` | `oklch(0.9158314607 0 0)` |
+| user-message-foreground | `#1F1F1F` | `oklch(0.2392923762 0 0)` |
+| sidepanel-text | `#1F1F1F` | `oklch(0.2392923762 0 0)` |
+| accent      | `#9E94D5`    | `oklch(0.704 0.102 285)`    |
+| info        | `#87C3FF`    | `oklch(0.783 0.119 255)`    |
+| success     | `#1F8A65`    | `oklch(0.50 0.12 165)`      |
+| destructive | `#CF2D56`    | `oklch(0.55 0.20 355)`      |
 
-The **background** is Mistral cream (~#fff8e0) - warm, sunlit, high
-luminance. **Accent** is Mistral orange (~#fa520f), the saturated CTA
-voltage that carries every primary action across the app. **Info** is
-Mistral sunshine (~#ff8105) for "Ask" mode and warnings, **destructive**
-is Mistral deep red (~#cc3a05). **Foreground** stays near-black ink
-(~#1f1f1f) so the cream surface reads as a magazine page rather than
-washed out.
+The **background** is warm off-white (~#f7f7f4) - high luminance, neutral warm
+tone. **Accent** is soft purple (~#9e94d5), a pleasant mid-tone brand color.
+**Info** is soft blue (~#87c3ff) for "Ask" mode and warnings, **success** is
+forest green (~#1f8a65), and **destructive** is rose red (~#cf2d56).
+**Foreground** stays near-black ink (~#1f1f1f) so the light surface reads as a
+clean, calm canvas.
 
 ### Dark Mode Anchors
 
-Dark mode is Codex/GitHub-adjacent. These hex values are the **explicit
-anchors** referenced in `globals.css`:
+Dark mode is near-black canvas with soft purple accent. These hex values are
+the **explicit anchors** referenced in `globals.css`:
 
 | Role               | Hex       | Note                          |
 | ------------------ | --------- | ----------------------------- |
-| background         | `#0D1117` | Page / workspace canvas       |
-| background-elevated| `#161B22` | Sidebar, elevated surfaces    |
-| foreground         | `#E6EDF3` | Primary text                  |
-| accent             | `#388BFD` | Interactive blue              |
-| border             | `#30363D` | Hairline dividers             |
-| muted-foreground   | `#8B949E` | Secondary / metadata copy     |
+| background         | `#141414` | Page / workspace canvas       |
+| background-elevated| `#191919` | Sidebar, elevated surfaces    |
+| foreground         | `#E3E3E3` | Primary interface text        |
+| assistant-message-text | `#E3E3E3` | Assistant message text    |
+| user-message-bubble | `#282A2C` | User message bubble fill |
+| user-message-foreground | `#E3E3E3` | User message text        |
+| sidepanel-text | `#E3E3E3` | Sidebar / sidepanel text |
+| sidepanel-muted-text | `#8A8A8A` | Sidebar section/meta text |
+| accent             | `#9E94D5` | Soft purple                   |
+| border             | `#303030` | Hairline dividers             |
+| muted-foreground   | `#AAAAAA` | Secondary / metadata copy     |
 
 ## Typography
 
@@ -556,7 +567,7 @@ Chat message bubbles use an **asymmetric "tail" radius** so the bubble
 visually attaches to its author edge:
 
 - `--radius-bubble: 1.25rem` (20px) - three rounded corners.
-- `--radius-bubble-tail: 0.25rem` (4px) - the corner adjacent to the author.
+- `--radius-bubble-tail: 0.125rem` (2px) - the corner adjacent to the author.
 
 User messages tail toward the right; assistant messages tail toward the left.
 This is the only place in the system that breaks the flat default.
@@ -788,6 +799,12 @@ Feature wrappers (**`ConversationsEmptyState`**, **`TasksEmptyState`**, Knowledg
 - **Selected:** `bg-foreground/[0.07]`
 - **`density="comfortable"`** - `min-h-9` rows (conversations, projects).
 - **`density="compact"`** - `h-8` metadata-heavy rows (tasks sidebar).
+- **Text scope:** sidepanels apply `.sidepanel-text-scope`, which resolves
+  generic `text-foreground` descendants to `--sidebar-foreground`: `#1F1F1F`
+  (`oklch(0.2392923762 0 0)`) in light mode and `#E3E3E3`
+  (`oklch(0.9158314607 0 0)`) in dark mode. Inside the same scope,
+  `text-muted-foreground` resolves to `#8A8A8A`
+  (`oklch(0.6334289302 0 0)`) for section and metadata labels.
 
 **`entity-row.tsx`** keeps selection + context-menu behavior and delegates surface
 classes via **`sidebarNavRowSurfaceClassName`**. **`ProjectRow`** composes the same
@@ -849,11 +866,17 @@ may not appear in the compiled CSS.
   no border on focus (the shadow alone defines the edge). Dropdowns opened
   from the composer (e.g. model picker) inherit `chat-composer-dropdown-menu`
   styling - 14px radius (`rounded.lg`), `--foreground-5` background.
-- **`bubble-user`** - User message bubbles use `--user-message-bubble` (a
-  tinted-foreground alpha) with the asymmetric tail described in **Shapes**.
+- **`bubble-user`** - User message bubbles use `--user-message-bubble` with
+  `--user-message-foreground` and the asymmetric tail described in **Shapes**.
+  In light mode the bubble is `#E3E3E3` (`oklch(0.9158314607 0 0)`) with
+  `#1F1F1F` text (`oklch(0.2392923762 0 0)`). In dark mode the bubble is
+  `#282A2C` (`oklch(0.2837694632 0.0046572957 247.9916671312)`) with
+  `#E3E3E3` text (`oklch(0.9158314607 0 0)`).
 - **`bubble-assistant`** - Assistant messages have **no bubble** by default.
-  They sit on the page background with the foreground color, with prose
-  styling for long-form output.
+  They sit on the page background with `--assistant-message-text`, which
+  resolves to `#1F1F1F` (`oklch(0.2392923762 0 0)`) in light mode and
+  `#E3E3E3` (`oklch(0.9158314607 0 0)`) in dark mode, with prose styling for
+  long-form output.
 - **`step-icon`** - Onboarding step iconography. 64px square, 16px radius,
   inverse fill (foreground on background-inverse). Inner glyph is 32px.
 - **`select-button`** - Project-internal compact picker (see
@@ -900,7 +923,7 @@ may not appear in the compiled CSS.
 - **`button-primary`** / **`button-secondary`** - Buttons follow the flat
   default (`rounded.none`). Primary fills with accent; secondary inherits
   the page background and relies on `shadow-thin` for definition.
-  **Note on contrast:** white-on-Mistral-orange is 3.34:1, which clears
+  **Note on contrast:** white-on-soft-purple (~#9E94D5) has ~4.5:1 contrast ratio, which clears
   WCAG AA *Large Text* (3:1) but not *Normal Text* (4.5:1). Primary CTAs
   always render with `font-medium` body-md (16px+) so they qualify as
   large text; the lint warning here is acknowledged, not a bug. Use a

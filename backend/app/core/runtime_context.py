@@ -56,6 +56,12 @@ class ProviderIdentity:
     #: (e.g. ``"Claude Sonnet 4.6"``). Falls back to ``model_id`` when
     #: unset so the rendered block is never blank.
     display_name: str | None = None
+    #: Optional reasoning-effort level the provider is being called with
+    #: this turn (``"low" | "medium" | "high" | "extra-high"``). ``None``
+    #: means the provider was called without a knob and is using its
+    #: default. Surfaced in the active-model block so the model can
+    #: calibrate response depth to what was actually requested.
+    reasoning_effort: str | None = None
 
 
 def compose_current_time_block(now: _dt.datetime | None = None) -> str:
@@ -106,6 +112,8 @@ def compose_runtime_identity_block(identity: ProviderIdentity | None) -> str | N
     lines.append(f"- Model id: {identity.model_id}")
     if identity.display_name and identity.display_name != identity.model_id:
         lines.append(f"- Display name: {display}")
+    if identity.reasoning_effort:
+        lines.append(f"- Reasoning effort: {identity.reasoning_effort}")
     lines.append(
         "- This metadata is injected by the runtime — trust it over any "
         "model identity you would infer from training data."

@@ -98,8 +98,8 @@ def build_agent_tools(
         workspace_id: Active workspace UUID.  When supplied alongside
             ``user_id``, plugin tools (additive integrations registered
             under :mod:`app.core.plugins`) are appended after the core
-            tools.  When ``None`` — including in legacy tests that
-            haven't been updated yet — plugin tools are skipped; core
+        tools.  When ``None`` — including in tests that
+        don't need plugin tools — plugin tools are skipped; core
             tool composition is unaffected.
         send_fn: Optional channel delivery callback.  When supplied the
             ``send_message`` tool is added to the list so the agent can
@@ -302,8 +302,8 @@ def _build_plugin_tools(
 ) -> list[AgentTool]:
     """Walk the plugin registry and return every activated plugin's tools.
 
-    Skipped entirely when the workspace context isn't available (legacy
-    callers, background jobs): plugins gate on workspace-scoped env keys,
+    Skipped entirely when the workspace context isn't available
+    (background jobs, tests without a workspace): plugins gate on workspace-scoped env keys,
     so they have nothing to resolve without a ``workspace_id + user_id``
     pair.
     """

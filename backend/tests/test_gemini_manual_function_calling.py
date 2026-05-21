@@ -88,7 +88,7 @@ def test_gemini_contents_replay_function_call_and_function_response() -> None:
         ),
     ]
 
-    contents = gemini_provider._build_gemini_contents(messages)
+    contents = gemini_provider.build_gemini_contents(messages)
 
     assert len(contents) == 3
     assert contents[0].role == "user"
@@ -132,7 +132,7 @@ def test_gemini_contents_preserve_text_and_function_call_parts() -> None:
         )
     ]
 
-    contents = gemini_provider._build_gemini_contents(messages)
+    contents = gemini_provider.build_gemini_contents(messages)
 
     assert len(contents) == 1
     assert contents[0].role == "model"
@@ -145,7 +145,7 @@ def test_gemini_contents_preserve_text_and_function_call_parts() -> None:
 
 def test_gemini_tool_declarations_use_parameters_json_schema() -> None:
     """Function declarations should pass raw JSON Schema to google-genai."""
-    gemini_tools = gemini_provider._build_gemini_tool_declarations([_make_search_tool()])
+    gemini_tools = gemini_provider.build_gemini_tool_declarations([_make_search_tool()])
 
     assert gemini_tools is not None
     declarations = gemini_tools[0].function_declarations or []
@@ -198,7 +198,7 @@ async def test_stream_config_disables_sdk_automatic_function_calling(
             self.aio = SimpleNamespace(models=captured_models)
 
     monkeypatch.setattr(gemini_provider.genai, "Client", CapturingClient)
-    monkeypatch.setattr(gemini_provider, "_resolve_gemini_api_key", lambda _user_id: "test-key")
+    monkeypatch.setattr(gemini_provider, "resolve_gemini_api_key", lambda _user_id: "test-key")
 
     stream_fn = gemini_provider.make_gemini_stream_fn(
         "gemini-test",
@@ -243,7 +243,7 @@ async def test_stream_threads_system_prompt_into_gemini_config(
             self.aio = SimpleNamespace(models=captured_models)
 
     monkeypatch.setattr(gemini_provider.genai, "Client", CapturingClient)
-    monkeypatch.setattr(gemini_provider, "_resolve_gemini_api_key", lambda _user_id: "test-key")
+    monkeypatch.setattr(gemini_provider, "resolve_gemini_api_key", lambda _user_id: "test-key")
 
     workspace_prompt = "You are PAWRRTAL, the assistant for octavian's workspace."
     stream_fn = gemini_provider.make_gemini_stream_fn(

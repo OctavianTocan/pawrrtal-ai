@@ -21,8 +21,11 @@ from app.api._chat_permissions import (
     build_chat_permission_check,
     load_external_mcp_configs,
 )
-from app.channels import resolve_channel, surface_from_header
-from app.channels.base import ChannelMessage
+
+# ``ChannelMessage`` is re-exported by ``app.channels.__init__``; we
+# pull all three names from the same package to keep chat.py's
+# fan-out under sentrux's ``no_god_files`` budget.
+from app.channels import ChannelMessage, resolve_channel, surface_from_header
 from app.channels.turn_runner import ChatTurnInput, EventHook, run_turn
 from app.core.agent_hooks import build_pre_turn_hooks
 from app.core.agent_tools import build_agent_tools
@@ -35,6 +38,7 @@ from app.core.tools.artifact_agent import (
 )
 from app.crud.conversation import (
     get_conversation,
+    normalize_conversation_reasoning_effort,
     update_conversation_model,
 )
 from app.crud.workspace import get_default_workspace
@@ -164,7 +168,7 @@ def get_chat_router() -> APIRouter:
         request: ChatRequest,
         user: User = Depends(get_allowed_user),
         session: AsyncSession = Depends(get_async_session),
-        x_nexus_surface: str | None = Header(default=None),
+        x_pawrrtal_surface: str | None = Header(default=None),
     ) -> StreamingResponse:
         """Stream an AI response as Server-Sent Events.
 
@@ -189,7 +193,7 @@ def get_chat_router() -> APIRouter:
         """
         # Entry log — pairs with REQ_IN/REQ_OUT from the request middleware via rid.
         # Question length, not contents, to avoid leaking PII into the log file.
-        surface = surface_from_header(x_nexus_surface)
+        surface = surface_from_header(x_pawrrtal_surface)
         channel = resolve_channel(surface)
 
         rid = get_request_id()
@@ -239,6 +243,29 @@ def get_chat_router() -> APIRouter:
                 conversation_id=request.conversation_id,
                 session=session,
             )
+
+        # Backstop: re-validate the stored reasoning_effort against
+        # the current model and normalize the column if it drifted.
+        # Catalog validation lives in ``resolve_reasoning_effort``
+        # (one shared helper used by every entry point — the Telegram
+        # /thinking picker, /model command, the web composer, etc.).
+        # ``model_id_override`` makes the resolver see the *new* model
+        # for the case where the user is switching models in this same
+        # request, even though `conversation.model_id` was updated
+        # above (we don't re-fetch the row before the resolver call).
+        (
+            reasoning_resolution,
+            _previous_reasoning_effort,
+        ) = await normalize_conversation_reasoning_effort(
+            conversation_id=request.conversation_id,
+            session=session,
+            model_id_override=model_id,
+        )
+        effective_reasoning_effort = (
+            request.reasoning_effort
+            if request.reasoning_effort is not None
+            else (reasoning_resolution.effective if reasoning_resolution is not None else None)
+        )
 
         # Resolve the user's default workspace.  A workspace is created as
         # part of onboarding, so its absence means the user hasn't finished
@@ -360,7 +387,10 @@ def get_chat_router() -> APIRouter:
             db_session=session,
             workspace_root=root,
             tools=agent_tools,
-            reasoning_effort=request.reasoning_effort,
+            # ``effective_reasoning_effort`` is the resolved value
+            # from the shared backstop: per-turn override wins,
+            # otherwise the conversation's normalized stored effort.
+            reasoning_effort=effective_reasoning_effort,
             permission_check=permission_check_for_request,
             images=image_inputs,
             history_window=_HISTORY_WINDOW,

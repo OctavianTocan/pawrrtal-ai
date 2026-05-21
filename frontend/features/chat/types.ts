@@ -12,28 +12,11 @@
  * The generic message-shape types (`ChatToolCallBase`, `ChatTimelineEntry`,
  * `AssistantMessageStatus`, `ChatArtifactPayload`, `ChatToolCallStatus`)
  * live in `@/lib/types` so the chat layer doesn't sit above its own data
- * model. We re-export them here so existing importers (`chat-reducer`,
- * `AssistantMessage`, the artifact components) keep working without
- * rewriting their imports.
+ * model. Feature code imports them directly from `@/lib/types`.
  */
 
-import type {
-	AssistantMessageStatus,
-	ChatArtifactPayload,
-	ChatTimelineEntry,
-	ChatToolCallBase,
-	ChatToolCallStatus,
-	ToolDisplayPayload,
-} from '@/lib/types';
+import type { ChatArtifactPayload, ChatToolCallBase, ToolDisplayPayload } from '@/lib/types';
 import type { CalendarEventInfo, MemoryResultInfo, WebSourceInfo } from './tool-result-parsers';
-
-export type {
-	AssistantMessageStatus,
-	ChatArtifactPayload,
-	ChatTimelineEntry,
-	ChatToolCallStatus,
-	ToolDisplayPayload,
-};
 
 /** Plain text chunk from the assistant's main response. */
 export interface ChatDeltaEvent {

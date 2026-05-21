@@ -11,7 +11,7 @@
 
 import { ExpandIcon, FileTextIcon } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import type { ChatArtifactPayload } from '../types';
+import type { ChatArtifactPayload } from '@/lib/types';
 import { ArtifactDialog } from './ArtifactDialog';
 
 interface ArtifactCardProps {

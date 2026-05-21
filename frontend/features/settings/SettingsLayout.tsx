@@ -87,7 +87,7 @@ export function SettingsLayout(): React.JSX.Element {
 			    settings nav, not a project list. The rail divider uses
 			    `border-border/60` so it tints itself per active theme
 			    instead of stamping a hard `foreground/8` line. */}
-			<aside className="flex h-full flex-col gap-4 overflow-y-auto border-r border-border/60 px-3 pb-4 pt-4">
+			<aside className="sidepanel-text-scope flex h-full flex-col gap-4 overflow-y-auto border-r border-border/60 px-3 pb-4 pt-4">
 				<button
 					className="flex w-full cursor-pointer items-center gap-2 rounded-[8px] px-2 py-1.5 text-sm text-muted-foreground transition-colors duration-150 hover:bg-foreground/[0.05] hover:text-foreground"
 					onClick={() => push('/')}
