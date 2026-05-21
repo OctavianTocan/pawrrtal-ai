@@ -1,11 +1,11 @@
 ---
 # pawrrtal-jkxd
 title: 'Active Recall step 7: thread recalled context into the system prompt'
-status: todo
+status: completed
 type: task
 priority: high
 created_at: 2026-05-19T07:16:01Z
-updated_at: 2026-05-19T07:41:49Z
+updated_at: 2026-05-21T22:20:37Z
 parent: pawrrtal-1cfl
 blocked_by:
     - pawrrtal-ikqt

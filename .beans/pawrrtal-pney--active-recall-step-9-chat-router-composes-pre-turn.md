@@ -1,11 +1,11 @@
 ---
 # pawrrtal-pney
 title: 'Active Recall step 9: chat router composes pre_turn_hooks for the turn'
-status: todo
+status: completed
 type: task
 priority: high
 created_at: 2026-05-19T07:16:02Z
-updated_at: 2026-05-20T10:56:18Z
+updated_at: 2026-05-21T22:20:37Z
 parent: pawrrtal-1cfl
 blocked_by:
     - pawrrtal-4cbt

@@ -1,11 +1,11 @@
 ---
 # pawrrtal-fbpz
 title: 'Active Recall step 11: ADR + docs handbook entry'
-status: todo
+status: completed
 type: task
 priority: normal
 created_at: 2026-05-19T07:16:02Z
-updated_at: 2026-05-19T07:42:07Z
+updated_at: 2026-05-21T22:20:37Z
 parent: pawrrtal-1cfl
 blocked_by:
     - pawrrtal-rpxw

@@ -1,11 +1,11 @@
 ---
 # pawrrtal-143e
 title: 'Active Recall step 12: local gate + commit'
-status: todo
+status: completed
 type: task
 priority: normal
 created_at: 2026-05-19T07:16:02Z
-updated_at: 2026-05-19T07:42:09Z
+updated_at: 2026-05-21T22:20:37Z
 parent: pawrrtal-1cfl
 blocked_by:
     - pawrrtal-fbpz

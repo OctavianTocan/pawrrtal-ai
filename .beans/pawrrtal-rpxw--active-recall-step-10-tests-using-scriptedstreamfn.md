@@ -1,11 +1,11 @@
 ---
 # pawrrtal-rpxw
 title: 'Active Recall step 10: tests using ScriptedStreamFn'
-status: todo
+status: completed
 type: task
 priority: high
 created_at: 2026-05-19T07:16:02Z
-updated_at: 2026-05-19T07:42:05Z
+updated_at: 2026-05-21T22:20:37Z
 parent: pawrrtal-1cfl
 blocked_by:
     - pawrrtal-pney

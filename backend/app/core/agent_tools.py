@@ -33,7 +33,12 @@ from typing import Any
 from app.core.agent_loop.types import AgentTool
 from app.core.config import settings
 from app.core.keys import resolve_api_key
-from app.core.plugins import ToolContext, all_plugins, is_activated_by_env_keys
+from app.core.plugins import (
+    PreTurnHook,
+    ToolContext,
+    all_plugins,
+    is_activated_by_env_keys,
+)
 from app.core.providers.catalog import default_model
 from app.core.tools.artifact_agent import make_artifact_tool
 from app.core.tools.exa_search_agent import make_exa_search_tool
@@ -317,4 +322,12 @@ def _build_plugin_tools(
         if not predicate(ctx):
             continue
         out.extend(factory(ctx) for factory in plugin.tool_factories)
+    return out
+
+
+def build_pre_turn_hooks() -> list[PreTurnHook]:
+    """Build the pre-turn hooks from the plugin registry."""
+    out: list[PreTurnHook] = []
+    for plugin in all_plugins():
+        out.extend(plugin.pre_turn_hooks)
     return out

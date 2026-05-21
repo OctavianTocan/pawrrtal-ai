@@ -29,15 +29,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from app.channels import resolve_channel
-from app.channels.base import ChannelMessage
+from app.channels import ChannelMessage, resolve_channel
 from app.channels.telegram import SURFACE_TELEGRAM, make_telegram_sender
-from app.channels.telegram_progress import render_initial
 from app.channels.turn_runner import ChatTurnInput, run_turn
-from app.core.agent_hooks import build_pre_turn_hooks
-from app.core.agent_tools import build_agent_tools
+from app.core.agent_tools import build_agent_tools, build_pre_turn_hooks
 from app.core.config import settings
-from app.core.plugins.types import PreTurnHook
 from app.crud.workspace import get_default_workspace
 from app.db import async_session_maker
 from app.integrations.telegram.bot_permissions import build_telegram_permission_check
@@ -204,7 +200,7 @@ async def _run_llm_turn(
     if message.bot is None:
         raise RuntimeError("Telegram message has no bot; refusing to stream.")
     thinking_msg = await message.answer(
-        render_initial(),
+        "🤔 Processing your request...",
         reply_parameters=_reply_parameters(message.message_id),
     )
 
@@ -228,7 +224,7 @@ async def _run_llm_turn(
         if workspace is not None
         else []
     )
-    pre_turn_hooks: list[PreTurnHook] = build_pre_turn_hooks()
+    pre_turn_hooks = build_pre_turn_hooks()
 
     provider, warning = await resolve_provider_with_auto_clear(
         context,

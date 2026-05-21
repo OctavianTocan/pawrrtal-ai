@@ -1,11 +1,11 @@
 ---
 # pawrrtal-8ijt
 title: 'Active Recall step 6: wire pre-turn hooks into turn_runner.run_turn'
-status: todo
+status: completed
 type: task
 priority: high
 created_at: 2026-05-19T07:16:01Z
-updated_at: 2026-05-19T07:41:47Z
+updated_at: 2026-05-21T22:20:37Z
 parent: pawrrtal-1cfl
 blocked_by:
     - pawrrtal-jkxd

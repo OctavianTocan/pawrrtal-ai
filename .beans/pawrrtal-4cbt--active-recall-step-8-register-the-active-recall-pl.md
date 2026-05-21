@@ -1,11 +1,11 @@
 ---
 # pawrrtal-4cbt
 title: 'Active Recall step 8: register the Active Recall plugin manifest'
-status: todo
+status: completed
 type: task
 priority: high
 created_at: 2026-05-19T07:16:02Z
-updated_at: 2026-05-19T07:41:59Z
+updated_at: 2026-05-21T22:20:37Z
 parent: pawrrtal-1cfl
 blocked_by:
     - pawrrtal-8ijt
