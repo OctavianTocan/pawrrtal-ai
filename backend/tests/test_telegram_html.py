@@ -67,6 +67,34 @@ class TestMdToTelegramHtml:
         result = md_to_telegram_html(md)
         assert result == "Intro.\n\n• item one\n• item two\n\nOutro."
 
+    def test_loose_list_keeps_bullet_with_content(self) -> None:
+        """Loose-list markdown (blank line between items) must render the
+        bullet on the same line as the item content. Regression for #417 —
+        markdown-it wraps each loose-list item in ``<p>``, which used to push
+        the bullet onto its own line above the bold/text content.
+        """
+        md = "- **Foo**: blah\n\n- **Baz**: more"
+        result = md_to_telegram_html(md)
+        assert result == "• <b>Foo</b>: blah\n• <b>Baz</b>: more"
+
+    def test_loose_list_matches_tight_list_output(self) -> None:
+        """Loose and tight list rendering should be visually identical in
+        Telegram — both produce single-newline-separated bullets, even when
+        the source markdown switched markdown-it into loose-list mode.
+        """
+        tight = md_to_telegram_html("- alpha\n- beta")
+        loose = md_to_telegram_html("- alpha\n\n- beta")
+        assert tight == loose == "• alpha\n• beta"
+
+    def test_loose_list_between_paragraphs(self) -> None:
+        """A loose bullet list embedded between intro and outro paragraphs
+        keeps the surrounding blank-line separators but never inserts an
+        empty line between bullets.
+        """
+        md = "Intro.\n\n- item one\n\n- item two\n\nOutro."
+        result = md_to_telegram_html(md)
+        assert result == "Intro.\n\n• item one\n• item two\n\nOutro."
+
     def test_blockquote(self) -> None:
         result = md_to_telegram_html("> quoted text")
         assert "<blockquote>" in result

@@ -51,7 +51,6 @@ _TEXT_PRESERVING_TAGS = frozenset(
         "del",
         "em",
         "i",
-        "li",
         "p",
         "pre",
         "s",
@@ -61,6 +60,12 @@ _TEXT_PRESERVING_TAGS = frozenset(
         *_HEADING_TAGS,
     }
 )
+# ``<li>`` is intentionally **not** in this set.  markdown-it switches lists
+# to *loose* mode when items are separated by a blank line and emits each
+# item as ``<li>\n<p>…</p>\n</li>``.  Those ``\n`` chunks between ``<li>``
+# and the inner ``<p>`` are layout artefacts, not content — keeping ``li``
+# out of the set lets ``_is_inter_block_whitespace`` filter them so the
+# bullet stays on the same line as the item text (issue #417).
 
 
 class _TelegramRenderer(HTMLParser):
@@ -171,7 +176,12 @@ class _TelegramRenderer(HTMLParser):
             case "ul" | "ol":
                 self._buf.append("\n\n")
             case "p":
-                self._buf.append("\n\n")
+                # Inside a loose-list ``<li>`` the surrounding ``<p>`` is a
+                # markdown-it artefact, not a real paragraph break — emitting
+                # ``\n\n`` here would push the bullet onto its own line (#417).
+                # Top-level paragraphs still get the blank-line separator.
+                if "li" not in self._open_tags:
+                    self._buf.append("\n\n")
             case "li":
                 pass
             case "a":
