@@ -8,9 +8,9 @@
 
 In `backend/app/api/chat.py`:
 
-1. **System prompt** — full content of `SOUL.md` + `AGENTS.md`
-   from the user's workspace root (via
-   `assemble_workspace_prompt`).  Each capped at 64 KB.
+1. **System prompt** — full content of `SOUL.md`, `AGENTS.md`,
+   `USER.md`, and `PREFERENCES.md` from the user's workspace root
+   (via `assemble_workspace_prompt`). Each file is capped at 64 KB.
 2. **History** — the last `_HISTORY_WINDOW = 20` messages from the
    `chat_messages` table, role + content only.  Thinking text,
    tool_calls, timeline, attachments are stripped before being

@@ -278,32 +278,22 @@ class Settings(BaseSettings):
     # ── Governance: workspace context (PR 06) ────────────────────────────
     # When True, the chat router calls
     # ``governance.workspace_context.load_workspace_context`` to read
-    # the agentic-stack ``.agent/`` tree (AGENTS.md + skills/ + protocols/)
-    # and assemble the unified system prompt.
+    # root prompt files plus the internal ``.agent/`` skills/protocols
+    # tree and assemble the unified system prompt.
     workspace_context_enabled: bool = True
     # Workspace-relative path to the skills directory. Each subdirectory
-    # is expected to contain a ``SKILL.md`` file. Defaults to the
-    # agentic-stack canonical location.
+    # is expected to contain a ``SKILL.md`` file.
     workspace_skills_dir_name: str = ".agent/skills"
     # Workspace-relative path to the permissions file. Today the loader
     # only treats it as documentation for the agent; a Markdown →
-    # allowlist parser is future work. ``.agent/protocols/permissions.md``
-    # is the agentic-stack canonical location.
+    # allowlist parser is future work.
     workspace_settings_filename: str = ".agent/protocols/permissions.md"
 
     # ── Workspace seeding: template sources ──────────────────────────────
-    # The seeder copies ``{agentic_stack_template_dir}/.agent`` wholesale
-    # into each new workspace, then layers ``{paw_overlay_template_dir}``
-    # on top to add Paw-specific files (HEARTBEAT.md, paw-persona,
-    # paw-bootstrap, the identity block in PREFERENCES.md). Updating
-    # the agentic-stack template is
-    # ``git submodule update --remote vendor/agentic-stack``; updating
-    # Paw bits is editing the overlay folder directly.
-    agentic_stack_template_dir: str = str(
-        Path(__file__).resolve().parents[3] / "vendor" / "agentic-stack"
-    )
-    paw_overlay_template_dir: str = str(
-        Path(__file__).resolve().parents[3] / "backend" / "templates" / "paw-overlay"
+    # The seeder copies this Pawrrtal-owned template into each new
+    # workspace without overwriting existing files.
+    workspace_template_dir: str = str(
+        Path(__file__).resolve().parents[3] / "backend" / "templates" / "workspace"
     )
 
     # ── Ops platform: webhooks (PR 11) ───────────────────────────────────

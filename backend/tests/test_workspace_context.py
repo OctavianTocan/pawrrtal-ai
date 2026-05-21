@@ -1,8 +1,9 @@
 """Tests for ``app.core.governance.workspace_context``.
 
-The loader walks the workspace's ``.agent/`` tree and produces a single
-struct. These tests exercise every combination of present / missing
-files and confirm the system prompt + permissions roll up correctly.
+The loader reads root context files plus the workspace's internal
+``.agent/`` skills/protocols tree and produces a single struct. These
+tests exercise every combination of present / missing files and confirm
+the system prompt + permissions roll up correctly.
 """
 
 from __future__ import annotations
@@ -25,8 +26,7 @@ def _write(path: Path, body: str) -> None:
 
 
 def _write_identity_block(workspace_root: Path, *, completed: bool) -> None:
-    prefs = workspace_root / ".agent" / "memory" / "personal" / "PREFERENCES.md"
-    prefs.parent.mkdir(parents=True, exist_ok=True)
+    prefs = workspace_root / "PREFERENCES.md"
     payload = (
         '{"name": "Paw", "vibe": "balanced", "emoji": null, '
         f'"bootstrap_completed": {"true" if completed else "false"}}}'
@@ -50,7 +50,7 @@ class TestEmptyWorkspace:
         self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         # Even with files present, the disabled flag short-circuits.
-        _write(tmp_path / ".agent" / "AGENTS.md", "rules")
+        _write(tmp_path / "AGENTS.md", "rules")
         monkeypatch.setattr(settings, "workspace_context_enabled", False)
         ctx = load_workspace_context(tmp_path)
         assert ctx.is_empty
@@ -58,21 +58,46 @@ class TestEmptyWorkspace:
 
 class TestPromptAssembly:
     def test_agents_md_only(self, tmp_path: Path) -> None:
-        _write(tmp_path / ".agent" / "AGENTS.md", "operating rules")
+        _write(tmp_path / "AGENTS.md", "operating rules")
         ctx = load_workspace_context(tmp_path)
         assert ctx.system_prompt == "operating rules"
         assert ctx.enabled_tools is None
 
     def test_skills_index_appended_after_agents(self, tmp_path: Path) -> None:
-        _write(tmp_path / ".agent" / "AGENTS.md", "operating rules")
+        _write(tmp_path / "AGENTS.md", "operating rules")
         _write(tmp_path / ".agent" / "skills" / "_index.md", "skill catalogue")
         ctx = load_workspace_context(tmp_path)
         assert ctx.system_prompt is not None
         assert "operating rules" in ctx.system_prompt
         assert "skill catalogue" in ctx.system_prompt
 
+    def test_root_context_files_are_loaded(self, tmp_path: Path) -> None:
+        _write(tmp_path / "SOUL.md", "soul")
+        _write(tmp_path / "AGENTS.md", "rules")
+        _write(tmp_path / "USER.md", "user")
+        _write(tmp_path / "PREFERENCES.md", "prefs")
+
+        ctx = load_workspace_context(tmp_path)
+
+        assert ctx.system_prompt == "soul\n\n---\n\nrules\n\n---\n\nuser\n\n---\n\nprefs"
+        assert {path.name for path in ctx.loaded_from} == {
+            "SOUL.md",
+            "AGENTS.md",
+            "USER.md",
+            "PREFERENCES.md",
+        }
+
+    def test_loaded_from_omits_empty_root_files(self, tmp_path: Path) -> None:
+        _write(tmp_path / "AGENTS.md", "rules")
+        _write(tmp_path / "PREFERENCES.md", "")
+
+        ctx = load_workspace_context(tmp_path)
+
+        assert ctx.system_prompt == "rules"
+        assert [path.name for path in ctx.loaded_from] == ["AGENTS.md"]
+
     def test_bootstrap_injected_while_identity_pending(self, tmp_path: Path) -> None:
-        _write(tmp_path / ".agent" / "AGENTS.md", "operating rules")
+        _write(tmp_path / "AGENTS.md", "operating rules")
         _write(
             tmp_path / ".agent" / "skills" / "paw-bootstrap" / "SKILL.md",
             "first-run setup body",
@@ -82,14 +107,12 @@ class TestPromptAssembly:
         assert ctx.system_prompt is not None
         assert "first-run setup body" in ctx.system_prompt
 
-    def test_bootstrap_injection_suppressed_after_identity_completed(
-        self, tmp_path: Path
-    ) -> None:
+    def test_bootstrap_injection_suppressed_after_identity_completed(self, tmp_path: Path) -> None:
         """When bootstrap is done, the bootstrap body must not be force-
         injected ahead of the skill catalogue. (It still appears inside
         the catalogue because every skill body lands there.)
         """
-        _write(tmp_path / ".agent" / "AGENTS.md", "operating rules")
+        _write(tmp_path / "AGENTS.md", "operating rules")
         _write(
             tmp_path / ".agent" / "skills" / "paw-bootstrap" / "SKILL.md",
             "first-run setup body",
@@ -127,11 +150,10 @@ class TestSkillsCatalogue:
 
 
 class TestPermissions:
-    """The Markdown permissions file is read for record-keeping only.
+    """The Markdown permissions file is appended as conversational context.
 
     A future PR will land a Markdown→allowlist parser; until then the
-    mechanical gate stays permissive and only the file's presence is
-    recorded in ``loaded_from``.
+    mechanical gate stays permissive.
     """
 
     def test_no_permissions_file(self, tmp_path: Path) -> None:
@@ -139,17 +161,19 @@ class TestPermissions:
         assert ctx.permissions == SettingsPermissions()
         assert ctx.enabled_tools is None
 
-    def test_permissions_md_present_is_recorded_but_does_not_gate(
-        self, tmp_path: Path
-    ) -> None:
+    def test_permissions_md_present_is_recorded_but_does_not_gate(self, tmp_path: Path) -> None:
         _write(
             tmp_path / ".agent" / "protocols" / "permissions.md",
             "# Permissions\n\n## Never allowed\n- Bash(rm -rf /)\n",
         )
         ctx = load_workspace_context(tmp_path)
-        # Permissions stay empty (no Markdown parser yet) but the path
-        # appears in loaded_from so operators can see it was read.
+        # Permissions stay empty (no Markdown parser yet), but the
+        # content is still included in the prompt for the agent to honor
+        # conversationally.
         assert ctx.permissions == SettingsPermissions()
         assert ctx.enabled_tools is None
+        assert ctx.system_prompt == (
+            "## Workspace Permissions\n\n# Permissions\n\n## Never allowed\n- Bash(rm -rf /)"
+        )
         loaded_paths = {str(p) for p in ctx.loaded_from}
         assert any("protocols/permissions.md" in p for p in loaded_paths)

@@ -282,6 +282,18 @@ def migrate_user_keyed_env_file(
 
     dst = base / str(default_workspace_id) / ".env"
     if dst.exists():
+        if load_workspace_env(dst.parent) == {}:
+            dst.write_bytes(src.read_bytes())
+            dst.chmod(0o600)
+            migrated_suffix = f".migrated-{int(time.time())}"
+            src.rename(src.with_name(src.name + migrated_suffix))
+            logger.info(
+                "workspace_env: migrated user-keyed env file over empty workspace env "
+                "user_id=%s -> workspace_id=%s",
+                user_id,
+                default_workspace_id,
+            )
+            return True
         # Already-migrated workspace; quarantine the legacy source so a
         # second run cannot accidentally overwrite the newer file.
         _quarantine_corrupt_file(src)

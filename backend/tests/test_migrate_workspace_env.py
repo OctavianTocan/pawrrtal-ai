@@ -116,3 +116,23 @@ class TestMigrateUserKeyedEnvFile:
         assert keys.load_workspace_env(ws_root) == {"EXA_API_KEY": "workspace-value"}
         # Legacy file was quarantined.
         assert not legacy_path.exists()
+
+    def test_empty_seeded_destination_is_replaced_by_legacy_source(
+        self, isolate_workspace_base: Path
+    ) -> None:
+        """An empty seeded workspace .env should not block credential migration."""
+        user_id = uuid.uuid4()
+        workspace_id = uuid.uuid4()
+        ws_root = isolate_workspace_base / str(workspace_id)
+        keys.save_workspace_env(ws_root, {})
+        legacy_path = _write_legacy_env(
+            isolate_workspace_base, user_id, {"GEMINI_API_KEY": "legacy-value"}
+        )
+
+        result = keys.migrate_user_keyed_env_file(
+            user_id=user_id, default_workspace_id=workspace_id
+        )
+
+        assert result is True
+        assert keys.load_workspace_env(ws_root) == {"GEMINI_API_KEY": "legacy-value"}
+        assert not legacy_path.exists()

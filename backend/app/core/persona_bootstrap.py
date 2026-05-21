@@ -1,9 +1,8 @@
 """First-run persona bootstrap helpers for Paw workspaces.
 
 The Paw's identity (name, vibe, emoji, bootstrap-completion flag) lives
-as a single-line JSON block inside the workspace's
-``.agent/memory/personal/PREFERENCES.md`` file, between the marker
-comments:
+as a single-line JSON block inside the workspace root ``PREFERENCES.md``
+file, between the marker comments:
 
     <!-- pawrrtal:identity:begin -->
     {"name": null, "vibe": null, "emoji": null, "bootstrap_completed": false}
@@ -26,7 +25,7 @@ from app.core.fs import read_capped_utf8
 
 log = logging.getLogger(__name__)
 
-PREFERENCES_PATH = ".agent/memory/personal/PREFERENCES.md"
+PREFERENCES_PATH = "PREFERENCES.md"
 BOOTSTRAP_SKILL_PATH = ".agent/skills/paw-bootstrap/SKILL.md"
 IDENTITY_BEGIN = "<!-- pawrrtal:identity:begin -->"
 IDENTITY_END = "<!-- pawrrtal:identity:end -->"
@@ -77,9 +76,7 @@ def _read_identity_block(root: Path) -> dict[str, object] | None:
     try:
         payload = json.loads(match.group(1))
     except json.JSONDecodeError as exc:
-        log.warning(
-            "IDENTITY_BLOCK_INVALID path=%s error=%s", root / PREFERENCES_PATH, exc
-        )
+        log.warning("IDENTITY_BLOCK_INVALID path=%s error=%s", root / PREFERENCES_PATH, exc)
         return None
     if not isinstance(payload, dict):
         log.warning("IDENTITY_BLOCK_NOT_OBJECT path=%s", root / PREFERENCES_PATH)

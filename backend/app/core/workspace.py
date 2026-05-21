@@ -1,52 +1,54 @@
 """Workspace management service.
 
-A workspace is an agentic-stack-compatible agent home directory. Each
-user can have multiple workspaces; each workspace is a self-contained
-tree at ``{workspace_base_dir}/{uuid}/`` whose entire agent surface
-lives under ``.agent/`` — the canonical layout from
-https://github.com/codejunkie99/agentic-stack.
+Each workspace is a Pawrrtal-owned agent home at
+``{workspace_base_dir}/{uuid}/``. User-facing context files live at the
+workspace root; internal agent assets live under ``.agent/``.
 
 Standard file layout::
 
     {workspace_root}/
-    └── .agent/                              # agentic-stack canonical brain
-        ├── AGENTS.md                        # operating contract (upstream)
-        ├── HEARTBEAT.md                     # Paw heartbeat schedule (overlay)
-        ├── state/                           # bootstrap markers etc. (overlay)
-        ├── memory/                          # personal/working/episodic/semantic/candidates
-        │   └── personal/PREFERENCES.md      # overlay: identity JSON block + user profile
-        ├── skills/                          # 10 upstream skills + paw-persona + paw-bootstrap
-        ├── protocols/                       # permissions.md, delegation.md, hook_patterns.json
-        ├── harness/                         # hooks + conductor (upstream)
-        └── tools/                           # CLI utilities (upstream)
-
-Seeding is two ``copytree`` calls + a one-time PREFERENCES.md render
-+ an append into the upstream skill registry. The agentic-stack
-template lives at ``vendor/agentic-stack/`` (git submodule); the Paw
-overlay lives at ``backend/templates/paw-overlay/``. Updating
-upstream: ``git submodule update --remote vendor/agentic-stack``.
-Updating Paw bits: edit the overlay files directly — no Python
-changes needed for content edits.
+    ├── .env
+    ├── AGENTS.md
+    ├── CLAUDE.md -> AGENTS.md
+    ├── HEARTBEAT.md
+    ├── PREFERENCES.md
+    ├── SOUL.md
+    ├── USER.md
+    ├── .agents/skills -> ../.agent/skills
+    ├── .claude/skills -> ../.agent/skills
+    └── .agent/
+        ├── memory/
+        ├── protocols/
+        ├── harness/
+        ├── tools/
+        └── skills/
 
 Idempotent: re-running ``seed_workspace`` skips files that already
-exist (so agent-authored memory and skills survive) and only appends
-to the skill registry if the Paw entries aren't there yet.
+exist, so agent-authored memory, skills, and user edits survive.
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 import uuid
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from app.core.config import settings
+from app.core.keys import save_workspace_env
 
 log = logging.getLogger(__name__)
 
-PAW_MANIFEST_ENTRIES_FILENAME = "_paw_manifest_entries.jsonl"
-PAW_INDEX_ENTRIES_FILENAME = "_paw_index_entries.md"
+PREFERENCES_FILENAME = "PREFERENCES.md"
+WORKSPACE_ENV_FILENAME = ".env"
+
+_SYMLINKS: tuple[tuple[str, str], ...] = (
+    ("CLAUDE.md", "AGENTS.md"),
+    (".agents/skills", "../.agent/skills"),
+    (".claude/skills", "../.agent/skills"),
+)
 
 
 @runtime_checkable
@@ -75,14 +77,9 @@ def _workspace_path(workspace_id: uuid.UUID) -> Path:
     return Path(settings.workspace_base_dir) / str(workspace_id)
 
 
-def _agentic_stack_src() -> Path:
-    """Return the agentic-stack template root (contains ``.agent/``)."""
-    return Path(settings.agentic_stack_template_dir)
-
-
-def _paw_overlay_src() -> Path:
-    """Return the Paw overlay root (contains ``.agent/`` mirroring destination)."""
-    return Path(settings.paw_overlay_template_dir)
+def _workspace_template_src() -> Path:
+    """Return the Pawrrtal-owned workspace template root."""
+    return Path(settings.workspace_template_dir)
 
 
 def seed_workspace(
@@ -105,29 +102,21 @@ def seed_workspace(
     root = path if path is not None else _workspace_path(workspace_id)
     root.mkdir(parents=True, exist_ok=True)
 
-    agentic_src = _agentic_stack_src() / ".agent"
-    overlay_src = _paw_overlay_src() / ".agent"
-
-    if not agentic_src.is_dir():
+    template_src = _workspace_template_src()
+    if not template_src.is_dir():
         raise FileNotFoundError(
-            f"agentic-stack template missing at {agentic_src}. "
-            "Did you run `git submodule update --init --recursive`?"
+            f"workspace template missing at {template_src}. "
+            "Expected backend/templates/workspace to be present."
         )
 
-    # 1. Lay down the canonical agentic-stack `.agent/` tree.
-    _copy_tree_skip_existing(agentic_src, root / ".agent")
-
-    # 2. Layer the Paw overlay (HEARTBEAT.md, paw-persona, paw-bootstrap,
-    #    PREFERENCES.md placeholder) — also skip-existing so user edits
-    #    survive on re-seed.
-    if overlay_src.is_dir():
-        _copy_tree_skip_existing(overlay_src, root / ".agent")
-
-    # 3. Render PREFERENCES.md with personalization data on first seed only.
-    _render_preferences_on_first_seed(root, personalization)
-
-    # 4. Append Paw skills to the upstream skill registry (idempotent).
-    _register_paw_skills(root)
+    preferences_existed = _path_exists(root / PREFERENCES_FILENAME)
+    env_existed = _path_exists(root / WORKSPACE_ENV_FILENAME)
+    _copy_tree_skip_existing(template_src, root)
+    if not preferences_existed:
+        _write_preferences(root, personalization)
+    if not env_existed:
+        save_workspace_env(root, {})
+    _ensure_required_symlinks(root)
 
     return root
 
@@ -144,43 +133,61 @@ def _copy_tree_skip_existing(src: Path, dst: Path) -> None:
     for entry in src.iterdir():
         target = dst / entry.name
         if entry.is_dir():
+            if _path_exists(target) and not target.is_dir():
+                raise FileExistsError(
+                    f"Cannot seed directory {entry} over existing non-directory {target}"
+                )
             _copy_tree_skip_existing(entry, target)
-        elif not target.exists():
+        elif _path_exists(target):
+            if target.is_dir():
+                raise FileExistsError(f"Cannot seed file {entry} over existing directory {target}")
+        else:
             shutil.copy2(entry, target)
 
 
-def _render_preferences_on_first_seed(
+def _path_exists(path: Path) -> bool:
+    """Return True for real paths and symlinks, including broken symlinks."""
+    return os.path.lexists(path)
+
+
+def _write_preferences(
     root: Path,
     personalization: PersonalizationFields | None,
 ) -> None:
-    """Render the Paw-flavored PREFERENCES.md on first seed.
+    """Render the root-level PREFERENCES.md on first seed."""
+    target = root / PREFERENCES_FILENAME
+    target.write_text(_build_preferences_md(personalization), encoding="utf-8")
 
-    The agentic-stack template ships its own stub PREFERENCES.md that
-    the copytree step lays down first. We replace it with the Paw
-    template (identity JSON block + personalization data) **only** when
-    the file is still byte-identical to the upstream stub — i.e. no
-    one has touched it. Once the agent, user, or an earlier seed has
-    edited PREFERENCES.md (including the Paw render itself, which
-    introduces the identity marker), the file diverges from the stub
-    and this function is a no-op so the existing content survives
-    every re-seed.
-    """
-    target = root / ".agent" / "memory" / "personal" / "PREFERENCES.md"
-    agentic_stub = _agentic_stack_src() / ".agent" / "memory" / "personal" / "PREFERENCES.md"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if not target.exists():
-        target.write_text(_build_preferences_md(personalization), encoding="utf-8")
-        return
-    if not agentic_stub.exists():
-        return
+
+def _ensure_required_symlinks(root: Path) -> None:
+    """Create required compatibility symlinks without accepting real conflicts."""
+    for link_name, target_name in _SYMLINKS:
+        _ensure_symlink(root / link_name, target_name)
+
+
+def _ensure_symlink(link_path: Path, target_name: str) -> None:
+    link_path.parent.mkdir(parents=True, exist_ok=True)
+    if link_path.is_symlink():
+        existing_target = link_path.readlink()
+        if existing_target == Path(target_name):
+            return
+        raise FileExistsError(
+            f"Symlink {link_path} points to {existing_target!r}, expected {target_name!r}"
+        )
+    if _path_exists(link_path):
+        raise FileExistsError(
+            f"Cannot create symlink {link_path} -> {target_name}: path already exists"
+        )
     try:
-        existing = target.read_text(encoding="utf-8")
-        stub = agentic_stub.read_text(encoding="utf-8")
+        link_path.symlink_to(target_name)
     except OSError:
-        log.warning("PREFERENCES_RENDER_READ_FAILED path=%s", target, exc_info=True)
-        return
-    if existing == stub:
-        target.write_text(_build_preferences_md(personalization), encoding="utf-8")
+        log.warning(
+            "WORKSPACE_SYMLINK_CREATE_FAILED path=%s target=%s",
+            link_path,
+            target_name,
+            exc_info=True,
+        )
+        raise
 
 
 def _build_preferences_md(personalization: PersonalizationFields | None) -> str:
@@ -248,9 +255,7 @@ def _has_personalization_data(personalization: PersonalizationFields) -> bool:
     )
 
 
-def _append_personalization_lines(
-    lines: list[str], personalization: PersonalizationFields
-) -> None:
+def _append_personalization_lines(lines: list[str], personalization: PersonalizationFields) -> None:
     """Append the ``About you`` bullets and ``Custom instructions`` block."""
     if personalization.name:
         lines.append(f"- **Name:** {personalization.name}")
@@ -266,57 +271,3 @@ def _append_personalization_lines(
         lines.append(f"- **Goals:** {rendered}")
     if personalization.custom_instructions:
         lines.extend(["", "## Custom instructions", "", personalization.custom_instructions])
-
-
-def _register_paw_skills(root: Path) -> None:
-    """Append paw-persona and paw-bootstrap entries to upstream skill registries.
-
-    Idempotent: skips entries already present in either file. The
-    entries themselves live as overlay artifacts
-    (``_paw_manifest_entries.jsonl`` and ``_paw_index_entries.md``) so
-    updating them is a Markdown/JSONL edit, not a Python change.
-    """
-    skills_dir = root / ".agent" / "skills"
-    manifest_path = skills_dir / "_manifest.jsonl"
-    index_path = skills_dir / "_index.md"
-    overlay_manifest = (
-        _paw_overlay_src() / ".agent" / "skills" / PAW_MANIFEST_ENTRIES_FILENAME
-    )
-    overlay_index = _paw_overlay_src() / ".agent" / "skills" / PAW_INDEX_ENTRIES_FILENAME
-
-    _append_paw_manifest_entries(manifest_path, overlay_manifest)
-    _append_paw_index_entries(index_path, overlay_index)
-
-    # The overlay copy carries the entry files into the workspace's
-    # skills dir; remove them so they don't confuse skill discovery
-    # (which treats any non-underscore directory as a skill).
-    for stray in (skills_dir / PAW_MANIFEST_ENTRIES_FILENAME, skills_dir / PAW_INDEX_ENTRIES_FILENAME):
-        if stray.exists():
-            stray.unlink()
-
-
-def _append_paw_manifest_entries(manifest_path: Path, overlay_manifest: Path) -> None:
-    if not overlay_manifest.exists() or not manifest_path.exists():
-        return
-    existing = manifest_path.read_text(encoding="utf-8")
-    new_lines = [
-        line for line in overlay_manifest.read_text(encoding="utf-8").splitlines() if line.strip()
-    ]
-    additions = [line for line in new_lines if line not in existing]
-    if not additions:
-        return
-    suffix = "" if existing.endswith("\n") or not existing else "\n"
-    with manifest_path.open("a", encoding="utf-8") as fh:
-        fh.write(suffix + "\n".join(additions) + "\n")
-
-
-def _append_paw_index_entries(index_path: Path, overlay_index: Path) -> None:
-    if not overlay_index.exists() or not index_path.exists():
-        return
-    existing = index_path.read_text(encoding="utf-8")
-    addition = overlay_index.read_text(encoding="utf-8").strip()
-    if not addition or "## paw-persona" in existing or "## paw-bootstrap" in existing:
-        return
-    suffix = "" if existing.endswith("\n") else "\n"
-    with index_path.open("a", encoding="utf-8") as fh:
-        fh.write(suffix + "\n" + addition + "\n")

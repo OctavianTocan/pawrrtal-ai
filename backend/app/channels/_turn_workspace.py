@@ -12,10 +12,9 @@ from app.core.tools.agents_md import assemble_workspace_prompt
 def workspace_system_prompt(workspace_root: Path | None) -> str | None:
     """Load workspace prompt files when a workspace root is available.
 
-    Uses :func:`load_workspace_context` so ``.agent/AGENTS.md`` and the
-    agentic-stack skill catalogue (plus the Paw overlay's bootstrap
-    skill when the identity block is still pending) are merged into one
-    provider-neutral system prompt. Falls back to
+    Uses :func:`load_workspace_context` so root prompt files and the
+    Paw skill catalogue (plus the bootstrap skill when the identity
+    block is still pending) are merged into one provider-neutral system prompt. Falls back to
     :func:`assemble_workspace_prompt` when WorkspaceContext is disabled.
     """
     if workspace_root is None:

@@ -31,10 +31,8 @@ def test_workspace_system_prompt_includes_bootstrap_when_identity_pending(
     tmp_path: Path,
 ) -> None:
     """Workspaces with bootstrap_completed=false get the bootstrap skill body."""
-    (tmp_path / ".agent").mkdir()
-    (tmp_path / ".agent" / "AGENTS.md").write_text("operating rules", encoding="utf-8")
-    prefs = tmp_path / ".agent" / "memory" / "personal" / "PREFERENCES.md"
-    prefs.parent.mkdir(parents=True)
+    (tmp_path / "AGENTS.md").write_text("operating rules", encoding="utf-8")
+    prefs = tmp_path / "PREFERENCES.md"
     prefs.write_text(
         f"# Prefs\n\n{IDENTITY_BEGIN}\n"
         '{"name": null, "vibe": null, "emoji": null, "bootstrap_completed": false}'

@@ -275,9 +275,8 @@ async def test_sync_workspace_heartbeats_handles_missing_file(
 
 def _write_heartbeat_md(workspace_path: Path, content: str) -> None:
     """Drop a HEARTBEAT.md into a fake workspace dir for sync tests."""
-    agent_dir = workspace_path / ".agent"
-    agent_dir.mkdir(parents=True, exist_ok=True)
-    (agent_dir / "HEARTBEAT.md").write_text(content, encoding="utf-8")
+    workspace_path.mkdir(parents=True, exist_ok=True)
+    (workspace_path / "HEARTBEAT.md").write_text(content, encoding="utf-8")
 
 
 async def _make_workspace(session: AsyncSession, user: User, root: Path) -> Workspace:

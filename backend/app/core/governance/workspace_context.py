@@ -2,14 +2,17 @@
 
 Single source of truth for "what does this workspace tell the agent
 it can do" — every provider (Claude, Gemini, future) consumes the
-same :class:`WorkspaceContext` so an agentic-stack workspace works the
-same across all backends.
+same :class:`WorkspaceContext` so a Pawrrtal workspace works the same
+across all backends.
 
 What we read
 ------------
 1. **System prompt** — concatenation of (in order), via
    :func:`app.core.tools.agents_md.assemble_workspace_prompt`:
-   * ``.agent/AGENTS.md`` — operating contract.
+   * ``SOUL.md`` — durable Paw identity.
+   * ``AGENTS.md`` — operating contract.
+   * ``USER.md`` — user profile.
+   * ``PREFERENCES.md`` — standing preferences and bootstrap state.
    * ``.agent/skills/paw-bootstrap/SKILL.md`` — first-run Paw persona
      setup, only until the identity block in PREFERENCES.md flips
      ``bootstrap_completed: true``.
@@ -18,11 +21,10 @@ What we read
    The body of each SKILL.md is appended to the system prompt under
    a "## Available Skills" section so providers without native skill
    loading (Gemini, future) still surface the skill catalogue.
-3. **Permissions** — read from ``.agent/protocols/permissions.md``
-   for context only. The mechanical allow/deny gate currently returns
-   "no opinion" (permissive default); a Markdown→allowlist parser is
-   future work. The agent honours the rules conversationally because
-   AGENTS.md references the protocols file.
+3. **Permissions** — ``.agent/protocols/permissions.md`` is appended
+   to the prompt for conversational guidance. The mechanical allow/deny
+   gate currently returns "no opinion" (permissive default); a
+   Markdown→allowlist parser is future work.
 
 Writes
 ------
@@ -148,19 +150,30 @@ def load_workspace_context(root: Path) -> WorkspaceContext:
     loaded: list[Path] = []
     base_prompt = assemble_workspace_prompt(root)
     if base_prompt is not None:
-        # ``assemble_workspace_prompt`` concatenates AGENTS.md, the
-        # paw-bootstrap skill body (while pending), and skills/_index.md.
-        if (root / ".agent/AGENTS.md").exists():
-            loaded.append(root / ".agent/AGENTS.md")
-        if is_persona_bootstrap_pending(root):
-            loaded.append(root / ".agent/skills/paw-bootstrap/SKILL.md")
-        if (root / ".agent/skills/_index.md").exists():
-            loaded.append(root / ".agent/skills/_index.md")
+        # ``assemble_workspace_prompt`` concatenates root context files,
+        # the paw-bootstrap skill body (while pending), and skills/_index.md.
+        for filename in ("SOUL.md", "AGENTS.md", "USER.md", "PREFERENCES.md"):
+            path = root / filename
+            if read_capped_utf8(path, max_bytes=_MAX_BYTES) is not None:
+                loaded.append(path)
+        bootstrap_path = root / ".agent/skills/paw-bootstrap/SKILL.md"
+        if (
+            is_persona_bootstrap_pending(root)
+            and read_capped_utf8(bootstrap_path, max_bytes=_MAX_BYTES) is not None
+        ):
+            loaded.append(bootstrap_path)
+        skills_index_path = root / ".agent/skills/_index.md"
+        if read_capped_utf8(skills_index_path, max_bytes=_MAX_BYTES) is not None:
+            loaded.append(skills_index_path)
 
     skills = _load_skills(root, loaded)
-    permissions = _load_permissions(root, loaded)
+    permissions, permissions_text = _load_permissions(root, loaded)
 
-    system_prompt = _assemble_system_prompt(base_prompt=base_prompt, skills=skills)
+    system_prompt = _assemble_system_prompt(
+        base_prompt=base_prompt,
+        permissions_text=permissions_text,
+        skills=skills,
+    )
     enabled_tools = _resolve_enabled_tools(permissions)
 
     if loaded:
@@ -240,38 +253,41 @@ def _extract_description(body: str) -> str | None:
     return None
 
 
-def _load_permissions(root: Path, loaded: list[Path]) -> SettingsPermissions:
+def _load_permissions(root: Path, loaded: list[Path]) -> tuple[SettingsPermissions, str | None]:
     """Read ``.agent/protocols/permissions.md`` for context.
 
     Returns the default-shaped :class:`SettingsPermissions` (empty
-    allow/deny) when the file is missing. When present the file is
-    recorded in ``loaded`` so callers can see it was read, but no
-    Markdown→tool-allowlist parser is implemented yet — the
-    mechanical gate stays permissive and the agent honours the
-    file's rules conversationally because AGENTS.md references it.
+    allow/deny) when the file is missing. When present and readable,
+    the file is recorded in ``loaded`` and appended to the prompt, but
+    no Markdown→tool-allowlist parser is implemented yet — the
+    mechanical gate stays permissive.
     """
     settings_path = root / settings.workspace_settings_filename
-    if not settings_path.exists():
-        return SettingsPermissions()
+    text = read_capped_utf8(settings_path, max_bytes=_MAX_BYTES)
+    if text is None:
+        return SettingsPermissions(), None
     loaded.append(settings_path)
-    return SettingsPermissions()
+    return SettingsPermissions(), f"## Workspace Permissions\n\n{text}"
 
 
 def _assemble_system_prompt(
     *,
     base_prompt: str | None,
+    permissions_text: str | None,
     skills: list[SkillDef],
 ) -> str | None:
     """Concatenate the base prompt + skills catalogue.
 
     Order matches the load priority: AGENTS.md + bootstrap +
     skills/_index.md (already concatenated by
-    ``assemble_workspace_prompt``) → skills catalogue. Returns
+    ``assemble_workspace_prompt``) -> skills catalogue. Returns
     ``None`` when neither contributed text.
     """
     parts: list[str] = []
     if base_prompt is not None:
         parts.append(base_prompt)
+    if permissions_text is not None:
+        parts.append(permissions_text)
     if skills:
         parts.append(_format_skills_catalogue(skills))
     if not parts:

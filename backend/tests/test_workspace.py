@@ -2,7 +2,7 @@
 
 Covers:
 
-- ``seed_workspace``: agentic-stack ``.agent/`` shape + Paw overlay layered on top.
+- ``seed_workspace``: Pawrrtal-owned root context files plus internal ``.agent`` shape.
 - ``ensure_default_workspace`` / ``ensure_dev_admin_workspace``: idempotency, DB rows, orphan cleanup.
 - Workspace API: list / tree / file read & write / skill discovery / path-traversal guard.
 """
@@ -21,6 +21,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.keys import load_workspace_env
 from app.core.persona_bootstrap import IDENTITY_BEGIN, IDENTITY_END
 from app.core.workspace import _build_preferences_md, seed_workspace
 from app.crud.workspace import (
@@ -66,29 +67,40 @@ def _patch_workspace_base(tmp_path: Path) -> Any:
 
 
 class TestSeedWorkspace:
-    def test_creates_agent_directory(self, tmp_path: Path) -> None:
+    def test_creates_required_root_files_and_symlinks(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()
         with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id)
-        assert (root / ".agent").is_dir()
-        assert (root / ".agent" / "AGENTS.md").exists()
+        for filename in (
+            "AGENTS.md",
+            "HEARTBEAT.md",
+            "SOUL.md",
+            "PREFERENCES.md",
+            "USER.md",
+        ):
+            assert (root / filename).is_file(), f"missing {filename}"
+        assert (root / ".env").is_file()
+        assert load_workspace_env(root) == {}
+        assert (root / "CLAUDE.md").is_symlink()
+        assert (root / "CLAUDE.md").readlink() == Path("AGENTS.md")
+        assert (root / ".agents" / "skills").is_symlink()
+        assert (root / ".agents" / "skills").readlink() == Path("../.agent/skills")
+        assert (root / ".claude" / "skills").is_symlink()
+        assert (root / ".claude" / "skills").readlink() == Path("../.agent/skills")
 
-    def test_copies_agentic_stack_memory_layers(self, tmp_path: Path) -> None:
+    def test_agent_directory_contains_only_internal_roots(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()
         with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id)
-        for layer in ("personal", "working", "episodic", "semantic", "candidates"):
-            assert (root / ".agent" / "memory" / layer).is_dir(), f"missing {layer}/"
+        agent_children = {entry.name for entry in (root / ".agent").iterdir()}
+        assert agent_children == {"memory", "protocols", "harness", "tools", "skills"}
 
-    def test_copies_semantic_memory_canonical_files(self, tmp_path: Path) -> None:
+    def test_creates_internal_directories(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()
         with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id)
-        semantic = root / ".agent" / "memory" / "semantic"
-        assert (semantic / "LESSONS.md").exists()
-        assert (semantic / "DECISIONS.md").exists()
-        assert (semantic / "DOMAIN_KNOWLEDGE.md").exists()
-        assert (semantic / "lessons.jsonl").exists()
+        for directory in ("memory", "protocols", "harness", "tools", "skills"):
+            assert (root / ".agent" / directory).is_dir(), f"missing {directory}/"
 
     def test_copies_protocols(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()
@@ -99,76 +111,27 @@ class TestSeedWorkspace:
         assert (protocols / "delegation.md").exists()
         assert (protocols / "hook_patterns.json").exists()
 
-    def test_copies_upstream_skills(self, tmp_path: Path) -> None:
-        ws_id = uuid.uuid4()
-        with _patch_workspace_base(tmp_path):
-            root = seed_workspace(ws_id)
-        # Sample three upstream skills to confirm the wholesale copy worked.
-        for name in ("brain", "memory-manager", "debug-investigator"):
-            assert (root / ".agent" / "skills" / name / "SKILL.md").exists()
-
-    def test_layers_paw_heartbeat_overlay(self, tmp_path: Path) -> None:
-        ws_id = uuid.uuid4()
-        with _patch_workspace_base(tmp_path):
-            root = seed_workspace(ws_id)
-        heartbeat = root / ".agent" / "HEARTBEAT.md"
-        assert heartbeat.exists()
-        assert "checks:" in heartbeat.read_text(encoding="utf-8")
-
-    def test_layers_paw_skills(self, tmp_path: Path) -> None:
+    def test_copies_paw_skills(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()
         with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id)
         for name in ("paw-persona", "paw-bootstrap"):
             assert (root / ".agent" / "skills" / name / "SKILL.md").exists()
+        assert (root / ".agent" / "skills" / "_index.md").exists()
 
-    def test_appends_paw_entries_to_skill_registry(self, tmp_path: Path) -> None:
+    def test_seeds_root_heartbeat(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()
         with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id)
-        manifest = (root / ".agent" / "skills" / "_manifest.jsonl").read_text(encoding="utf-8")
-        index = (root / ".agent" / "skills" / "_index.md").read_text(encoding="utf-8")
-        # Manifest gets one JSON object per skill on its own line.
-        names = {json.loads(line)["name"] for line in manifest.splitlines() if line.strip()}
-        assert {"paw-persona", "paw-bootstrap"}.issubset(names)
-        # Index gets a Markdown section per skill.
-        assert "## paw-persona" in index
-        assert "## paw-bootstrap" in index
-
-    def test_skill_registry_append_is_idempotent(self, tmp_path: Path) -> None:
-        ws_id = uuid.uuid4()
-        with _patch_workspace_base(tmp_path):
-            root = seed_workspace(ws_id)
-            seed_workspace(ws_id)
-            seed_workspace(ws_id)
-        manifest_lines = [
-            line
-            for line in (root / ".agent" / "skills" / "_manifest.jsonl")
-            .read_text(encoding="utf-8")
-            .splitlines()
-            if line.strip()
-        ]
-        names = [json.loads(line)["name"] for line in manifest_lines]
-        assert names.count("paw-persona") == 1
-        assert names.count("paw-bootstrap") == 1
-
-    def test_overlay_entry_files_are_pruned_from_workspace(self, tmp_path: Path) -> None:
-        """The overlay's ``_paw_*_entries.*`` files must not survive in the
-        seeded workspace — they're build artifacts, not skill content."""
-        ws_id = uuid.uuid4()
-        with _patch_workspace_base(tmp_path):
-            root = seed_workspace(ws_id)
-        skills_dir = root / ".agent" / "skills"
-        assert not (skills_dir / "_paw_manifest_entries.jsonl").exists()
-        assert not (skills_dir / "_paw_index_entries.md").exists()
+        heartbeat = root / "HEARTBEAT.md"
+        assert heartbeat.exists()
+        assert "checks:" in heartbeat.read_text(encoding="utf-8")
 
     def test_preferences_md_seeded_with_identity_block(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()
         with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id)
-        prefs = (root / ".agent" / "memory" / "personal" / "PREFERENCES.md").read_text(
-            encoding="utf-8"
-        )
+        prefs = (root / "PREFERENCES.md").read_text(encoding="utf-8")
         assert IDENTITY_BEGIN in prefs
         assert IDENTITY_END in prefs
         # The block is parseable JSON with bootstrap_completed false on first seed.
@@ -181,9 +144,7 @@ class TestSeedWorkspace:
         p = _make_personalization(name="Alice", role="PM")
         with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id, personalization=p)
-        prefs = (root / ".agent" / "memory" / "personal" / "PREFERENCES.md").read_text(
-            encoding="utf-8"
-        )
+        prefs = (root / "PREFERENCES.md").read_text(encoding="utf-8")
         assert "Alice" in prefs
         assert "PM" in prefs
 
@@ -193,16 +154,14 @@ class TestSeedWorkspace:
         ws_id = uuid.uuid4()
         with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id, personalization=None)
-        prefs = (root / ".agent" / "memory" / "personal" / "PREFERENCES.md").read_text(
-            encoding="utf-8"
-        )
+        prefs = (root / "PREFERENCES.md").read_text(encoding="utf-8")
         assert "first-run setup" in prefs
 
     def test_reseed_does_not_overwrite_edited_files(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()
         with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id)
-            edited = root / ".agent" / "AGENTS.md"
+            edited = root / "AGENTS.md"
             edited.write_text("hand-edited", encoding="utf-8")
             seed_workspace(ws_id)
         assert edited.read_text(encoding="utf-8") == "hand-edited"
@@ -211,10 +170,17 @@ class TestSeedWorkspace:
         ws_id = uuid.uuid4()
         with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id)
-            prefs = root / ".agent" / "memory" / "personal" / "PREFERENCES.md"
+            prefs = root / "PREFERENCES.md"
             prefs.write_text("user has typed in here", encoding="utf-8")
             seed_workspace(ws_id, personalization=_make_personalization(name="Bob"))
         assert prefs.read_text(encoding="utf-8") == "user has typed in here"
+
+    def test_conflicting_real_symlink_path_raises(self, tmp_path: Path) -> None:
+        ws_id = uuid.uuid4()
+        root = tmp_path / str(ws_id)
+        (root / ".agents" / "skills").mkdir(parents=True)
+        with _patch_workspace_base(tmp_path), pytest.raises(FileExistsError):
+            seed_workspace(ws_id)
 
 
 # ---------------------------------------------------------------------------
@@ -231,9 +197,7 @@ class TestBuildPreferencesMd:
         assert json.loads(block)["bootstrap_completed"] is False
 
     def test_includes_name_role_company(self) -> None:
-        p = _make_personalization(
-            name="Bob", role="CTO", company_website="https://acme.com"
-        )
+        p = _make_personalization(name="Bob", role="CTO", company_website="https://acme.com")
         md = _build_preferences_md(p)
         assert "Bob" in md
         assert "CTO" in md
@@ -283,7 +247,7 @@ class TestWorkspaceService:
             await db_session.commit()
 
         root = Path(ws.path)
-        assert (root / ".agent" / "AGENTS.md").exists()
+        assert (root / "AGENTS.md").exists()
         assert (root / ".agent" / "memory").is_dir()
 
     @pytest.mark.anyio
@@ -331,7 +295,7 @@ class TestWorkspaceService:
             await db_session.commit()
 
         assert ws.path == str(tmp_path / DEV_ADMIN_WORKSPACE_DIRNAME)
-        assert (Path(ws.path) / ".agent" / "AGENTS.md").exists()
+        assert (Path(ws.path) / "AGENTS.md").exists()
 
     @pytest.mark.anyio
     async def test_ensure_dev_admin_workspace_preserves_existing_files(
@@ -342,12 +306,12 @@ class TestWorkspaceService:
         from app.crud import workspace as crud_workspace
 
         stable_root = tmp_path / DEV_ADMIN_WORKSPACE_DIRNAME
-        (stable_root / ".agent").mkdir(parents=True)
+        stable_root.mkdir(parents=True)
         user_file = stable_root / ".agent" / "memory" / "personal" / "my-notes.md"
         user_file.parent.mkdir(parents=True)
         user_file.write_text("important user content", encoding="utf-8")
         # Pre-existing seed file with edited content must not be clobbered.
-        edited_agents = stable_root / ".agent" / "AGENTS.md"
+        edited_agents = stable_root / "AGENTS.md"
         edited_agents.write_text("hand-edited", encoding="utf-8")
 
         with (
@@ -580,11 +544,9 @@ class TestWorkspaceAPI:
             ws = await create_workspace(test_user.id, db_session)
             await db_session.commit()
 
-        resp = await client.get(f"/api/v1/workspaces/{ws.id}/files/.agent/AGENTS.md")
+        resp = await client.get(f"/api/v1/workspaces/{ws.id}/files/AGENTS.md")
         assert resp.status_code == 200
-        # Upstream AGENTS.md begins with "# Agent Infrastructure" — assert
-        # we got non-trivial content rather than locking to a specific line.
-        assert len(resp.json()["content"]) > 100
+        assert "Pawrrtal workspace" in resp.json()["content"]
 
     @pytest.mark.anyio
     async def test_read_file_404_for_missing(
@@ -627,6 +589,47 @@ class TestWorkspaceAPI:
         assert get_resp.json()["content"] == content
 
     @pytest.mark.anyio
+    async def test_write_symlink_path_is_rejected(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        test_user: User,
+        tmp_path: Path,
+    ) -> None:
+        with _patch_workspace_base(tmp_path):
+            ws = await create_workspace(test_user.id, db_session)
+            await db_session.commit()
+
+        resp = await client.put(
+            f"/api/v1/workspaces/{ws.id}/files/CLAUDE.md",
+            json={"content": "do not alias"},
+        )
+
+        assert resp.status_code == 400
+        assert (Path(ws.path) / "CLAUDE.md").is_symlink()
+        assert "do not alias" not in (Path(ws.path) / "AGENTS.md").read_text(encoding="utf-8")
+
+    @pytest.mark.anyio
+    async def test_write_through_symlink_directory_is_rejected(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        test_user: User,
+        tmp_path: Path,
+    ) -> None:
+        with _patch_workspace_base(tmp_path):
+            ws = await create_workspace(test_user.id, db_session)
+            await db_session.commit()
+
+        resp = await client.put(
+            f"/api/v1/workspaces/{ws.id}/files/.claude/skills/new/SKILL.md",
+            json={"content": "do not alias"},
+        )
+
+        assert resp.status_code == 400
+        assert not (Path(ws.path) / ".agent" / "skills" / "new" / "SKILL.md").exists()
+
+    @pytest.mark.anyio
     async def test_delete_file(
         self,
         client: AsyncClient,
@@ -651,6 +654,45 @@ class TestWorkspaceAPI:
             f"/api/v1/workspaces/{ws.id}/files/.agent/memory/working/output.txt"
         )
         assert get_resp.status_code == 404
+
+    @pytest.mark.anyio
+    async def test_delete_symlink_removes_link_not_target(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        test_user: User,
+        tmp_path: Path,
+    ) -> None:
+        with _patch_workspace_base(tmp_path):
+            ws = await create_workspace(test_user.id, db_session)
+            await db_session.commit()
+
+        root = Path(ws.path)
+        del_resp = await client.delete(f"/api/v1/workspaces/{ws.id}/files/CLAUDE.md")
+
+        assert del_resp.status_code == 204
+        assert not (root / "CLAUDE.md").exists()
+        assert (root / "AGENTS.md").exists()
+
+    @pytest.mark.anyio
+    async def test_delete_through_symlink_directory_is_rejected(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        test_user: User,
+        tmp_path: Path,
+    ) -> None:
+        with _patch_workspace_base(tmp_path):
+            ws = await create_workspace(test_user.id, db_session)
+            await db_session.commit()
+
+        target = Path(ws.path) / ".agent" / "skills" / "paw-bootstrap" / "SKILL.md"
+        del_resp = await client.delete(
+            f"/api/v1/workspaces/{ws.id}/files/.claude/skills/paw-bootstrap/SKILL.md"
+        )
+
+        assert del_resp.status_code == 400
+        assert target.exists()
 
     @pytest.mark.anyio
     async def test_path_traversal_is_rejected(
@@ -682,6 +724,4 @@ class TestWorkspaceAPI:
         resp = await client.get(f"/api/v1/workspaces/{ws.id}/skills")
         assert resp.status_code == 200
         names = {row["name"] for row in resp.json()}
-        # Seeded workspaces ship the 10 agentic-stack defaults plus the
-        # two Paw skills. Assert a representative subset.
-        assert {"brain", "memory-manager", "paw-persona", "paw-bootstrap"}.issubset(names)
+        assert names == {"paw-persona", "paw-bootstrap"}

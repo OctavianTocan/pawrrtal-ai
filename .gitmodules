@@ -4,6 +4,3 @@
 [submodule "frontend/lib/react-overlay"]
 	path = frontend/lib/react-overlay
 	url = https://github.com/OctavianTocan/react-overlay.git
-[submodule "vendor/agentic-stack"]
-	path = vendor/agentic-stack
-	url = https://github.com/codejunkie99/agentic-stack.git

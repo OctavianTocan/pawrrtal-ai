@@ -136,11 +136,11 @@ header), `ALLOWED_EMAILS` (comma-separated email allowlist),
 `CLAUDE_RETRY_BASE_DELAY_SECONDS`, `CLAUDE_RETRY_MAX_DELAY_SECONDS`,
 `CLAUDE_RETRY_BACKOFF_FACTOR`.
 
-### Workspace context (CLAUDE.md / AGENTS.md / SOUL.md / skills / settings.json)
+### Workspace context (AGENTS.md / SOUL.md / USER.md / PREFERENCES.md / skills / protocols)
 
 `WORKSPACE_CONTEXT_ENABLED=true`,
-`WORKSPACE_SKILLS_DIR_NAME=.claude/skills`,
-`WORKSPACE_SETTINGS_FILENAME=.claude/settings.json`.
+`WORKSPACE_SKILLS_DIR_NAME=.agent/skills`,
+`WORKSPACE_SETTINGS_FILENAME=.agent/protocols/permissions.md`.
 
 ### In-process `python` tool (opt-in, NOT sandboxed)
 

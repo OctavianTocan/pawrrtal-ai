@@ -276,8 +276,8 @@ class Workspace(Base):
     """An agent workspace.
 
     A named directory on the host filesystem containing the standard
-    OpenClaw-style file structure (AGENTS.md, SOUL.md, USER.md, IDENTITY.md,
-    memory/, skills/, artifacts/).
+    Pawrrtal workspace structure: root prompt files plus internal
+    ``.agent`` memory, protocols, harness, tools, and skills.
 
     One user can own many workspaces.  The first workspace created for a user
     is flagged ``is_default=True`` and seeded automatically at the end of the
