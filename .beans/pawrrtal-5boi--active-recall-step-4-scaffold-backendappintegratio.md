@@ -1,11 +1,11 @@
 ---
 # pawrrtal-5boi
 title: 'Active Recall step 4: scaffold backend/app/plugins/active_recall/ package'
-status: todo
+status: completed
 type: task
 priority: high
 created_at: 2026-05-19T07:16:01Z
-updated_at: 2026-05-19T07:41:44Z
+updated_at: 2026-05-21T21:43:15Z
 parent: pawrrtal-1cfl
 blocked_by:
     - pawrrtal-ym8n

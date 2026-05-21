@@ -69,7 +69,6 @@ async def resolve_provider_with_auto_clear(
         require_known(context.model_id)
         provider = resolve_llm(
             context.model_id,
-            workspace_id=workspace_id,
             workspace_root=workspace_root,
         )
     except (InvalidModelId, UnknownModelId) as exc:
@@ -91,7 +90,6 @@ async def resolve_provider_with_auto_clear(
         )
         provider = resolve_llm(
             fallback_id,
-            workspace_id=workspace_id,
             workspace_root=workspace_root,
         )
         return provider, warning

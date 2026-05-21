@@ -1,11 +1,11 @@
 ---
 # pawrrtal-ikqt
 title: 'Active Recall step 5: implement the recall sub-agent driver'
-status: todo
+status: completed
 type: task
 priority: high
 created_at: 2026-05-19T07:16:01Z
-updated_at: 2026-05-19T07:41:46Z
+updated_at: 2026-05-21T21:51:45Z
 parent: pawrrtal-1cfl
 blocked_by:
     - pawrrtal-5boi
@@ -59,3 +59,9 @@ async def run_active_recall(
 ## Safety rule
 
 Wrap the **whole thing** in `try/except`. On any failure: log a warning and return `None`. Recall **must never** break the main turn.
+
+## Summary of Changes
+
+- Simplified sub-agent driver in recall_agent.py to use provider.stream and _collect_stream_telemetry.
+- Implemented Wide Event (Canonical Log Line) logging pattern for Active Recall pre-turn hook execution.
+- Logged ACTIVE_RECALL_START, ACTIVE_RECALL_OUT, and ACTIVE_RECALL_SKIP wide events.
