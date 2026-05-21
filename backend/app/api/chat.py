@@ -37,9 +37,8 @@ from app.core.tools.artifact_agent import (
     build_artifact,
 )
 from app.crud.conversation import (
+    apply_model_switch_and_normalize_reasoning,
     get_conversation,
-    normalize_conversation_reasoning_effort,
-    update_conversation_model,
 )
 from app.crud.workspace import get_default_workspace
 from app.db import User, get_async_session
@@ -235,36 +234,26 @@ def get_chat_router() -> APIRouter:
         # is the canonical wire form of the catalog default.
         model_id = request.model_id or conversation.model_id or default_model().id
 
-        # Persist model change if it differs from what is stored
-        if model_id != conversation.model_id:
-            await update_conversation_model(
-                model_id=model_id,
-                user_id=user.id,
-                conversation_id=request.conversation_id,
-                session=session,
-            )
-
-        # Backstop: re-validate the stored reasoning_effort against
-        # the current model and normalize the column if it drifted.
-        # Catalog validation lives in ``resolve_reasoning_effort``
-        # (one shared helper used by every entry point — the Telegram
-        # /thinking picker, /model command, the web composer, etc.).
-        # ``model_id_override`` makes the resolver see the *new* model
-        # for the case where the user is switching models in this same
-        # request, even though `conversation.model_id` was updated
-        # above (we don't re-fetch the row before the resolver call).
+        # Apply the model switch (if any) and re-normalize the stored
+        # reasoning_effort against the current model in a *single*
+        # transaction (#366). Previously this was two consecutive
+        # ``session.commit`` calls — a crash between them left the row
+        # with a fresh ``model_id`` but a stale ``reasoning_effort``
+        # belonging to the previous model. Catalog validation lives in
+        # ``resolve_reasoning_effort``, the same helper used by the
+        # Telegram /thinking picker and /model command.
         (
             reasoning_resolution,
             _previous_reasoning_effort,
-        ) = await normalize_conversation_reasoning_effort(
-            conversation_id=request.conversation_id,
+        ) = await apply_model_switch_and_normalize_reasoning(
+            conversation=conversation,
+            new_model_id=model_id,
             session=session,
-            model_id_override=model_id,
         )
         effective_reasoning_effort = (
             request.reasoning_effort
             if request.reasoning_effort is not None
-            else (reasoning_resolution.effective if reasoning_resolution is not None else None)
+            else reasoning_resolution.effective
         )
 
         # Resolve the user's default workspace.  A workspace is created as
