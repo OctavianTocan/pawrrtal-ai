@@ -93,7 +93,7 @@ async def lcm_expand_query(
 
     expansion_prompt = f"CONVERSATION HISTORY:\n{_format_turns(turns)}\n\nQUESTION:\n{prompt}"
     expand_model = _settings.lcm_summary_model or model_id
-    provider = resolve_llm(expand_model, user_id=user_id)
+    provider = resolve_llm(expand_model)
 
     try:
         stream = provider.stream(

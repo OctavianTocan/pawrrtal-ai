@@ -221,6 +221,7 @@ def _format_turns(messages: list[dict[str, str]]) -> str:
     return "\n\n".join(parts)
 
 
+# TODO: It's a little crazy that this is in the LCM part of things, particularly because it's completely unrelated, and useful for many other things.
 async def _collect_stream(stream: AsyncIterator[Any]) -> str:
     """Consume a provider stream and return all concatenated delta text."""
     parts: list[str] = []
@@ -362,7 +363,7 @@ async def compact_leaf_if_needed(
 
     # ------------------------------------------------------------------ 5
     summary_model = _settings.lcm_summary_model or model_id
-    provider = resolve_llm(summary_model, user_id=user_id)
+    provider = resolve_llm(summary_model)
     turns_text = _format_turns(selected_messages)
     summary_text, summary_kind = await _summarize(provider, turns_text, user_id)
 

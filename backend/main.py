@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.types import ASGIApp
 
+import app.plugins
 from app.api.appearance import get_appearance_router
 from app.api.audit import get_audit_router
 from app.api.auth import get_auth_router
@@ -143,7 +144,7 @@ def create_app() -> FastAPI:
     # are rejected before route/auth work. Disabled when BACKEND_API_KEY is unset.
     fastapi_app.add_middleware(BackendApiKeyMiddleware)
     fastapi_app.include_router(
-        fastapi_users.get_auth_router(auth_backend), prefix="/auth/jwt", tags=["auth"]
+        fastapi_users.get_auth_router(backend=auth_backend), prefix="/auth/jwt", tags=["auth"]
     )
     fastapi_app.include_router(
         get_auth_router(),
