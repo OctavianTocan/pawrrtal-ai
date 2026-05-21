@@ -132,27 +132,7 @@ class _EventCounter:
         self.by_type[event.get("type", "unknown")] += 1
 
 
-async def run_turn(
-    turn_input: ChatTurnInput,
-    *,
-    event_hooks: list[EventHook] | None = None,
-) -> AsyncIterator[bytes]:
-    """Persist, stream, deliver, and finalize one chat turn.
-
-    Wraps the turn body in a Workshop-compatible OTel ``turn_span`` so
-    every LLM stream and tool call dispatched downstream lands in the
-    same trace.  When telemetry is disabled the spans are no-ops and
-    add zero overhead (see ``app.core.telemetry.setup_tracing``).
-
-    ``_finalize_turn`` runs **inside** ``turn_span`` but **outside**
-    ``llm_span``: a database failure during persist + cost-ledger write
-    is a turn-level problem, not an LLM problem, so it must not bleed
-    into ``llm_span``'s error path (which would otherwise mark a
-    successful LLM call as ``Status.ERROR`` with a database message).
-    """
-    started_at = time.perf_counter()
-    history, assistant_message_id = await _load_history_and_persist(turn_input)
-
+async def _run_pre_turn_hooks(turn_input: ChatTurnInput) -> str:
     # --- Pre-turn hooks ---
     pre_turn_added_context = ""
     for hook in turn_input.pre_turn_hooks or []:
@@ -174,7 +154,7 @@ async def run_turn(
                         conversation_id=turn_input.conversation_id,
                         user_id=turn_input.user_id,
                         question=turn_input.question,
-                        workspace_root=turn_input.workspace_root,
+                        workspace_root=turn_input.workspace_root or Path(),
                     )
                 )
                 # We use this for hooks that return a string of context to add to the system prompt. (Like Active Recall.)
@@ -199,7 +179,32 @@ async def run_turn(
                     turn_input.question,
                 )
                 continue
-    # --- End pre-turn hooks ---
+    return pre_turn_added_context
+
+
+async def run_turn(
+    turn_input: ChatTurnInput,
+    *,
+    event_hooks: list[EventHook] | None = None,
+) -> AsyncIterator[bytes]:
+    """Persist, stream, deliver, and finalize one chat turn.
+
+    Wraps the turn body in a Workshop-compatible OTel ``turn_span`` so
+    every LLM stream and tool call dispatched downstream lands in the
+    same trace.  When telemetry is disabled the spans are no-ops and
+    add zero overhead (see ``app.core.telemetry.setup_tracing``).
+
+    ``_finalize_turn`` runs **inside** ``turn_span`` but **outside**
+    ``llm_span``: a database failure during persist + cost-ledger write
+    is a turn-level problem, not an LLM problem, so it must not bleed
+    into ``llm_span``'s error path (which would otherwise mark a
+    successful LLM call as ``Status.ERROR`` with a database message).
+    """
+    started_at = time.perf_counter()
+    history, assistant_message_id = await _load_history_and_persist(turn_input)
+
+    # --- Pre-turn hooks ---
+    pre_turn_added_context: str | None = await _run_pre_turn_hooks(turn_input)
 
     # --- Main turn ---
     aggregator = ChatTurnAggregator()
@@ -369,7 +374,7 @@ def _channel_model_id(channel_message: ChannelMessage | None) -> str | None:
     if not channel_message:
         return None
     model_id = channel_message.get("model_id")
-    return str(model_id) if model_id else None
+    return model_id
 
 
 def _expand_hook_events(
