@@ -134,7 +134,7 @@ class _EventCounter:
 
 async def _run_pre_turn_hooks(turn_input: ChatTurnInput) -> str:
     # --- Pre-turn hooks ---
-    pre_turn_added_context = ""
+    pre_turn_added_context = []
     for hook in turn_input.pre_turn_hooks or []:
         # For easier debugging.
         hook_name = hook.__name__
@@ -159,7 +159,7 @@ async def _run_pre_turn_hooks(turn_input: ChatTurnInput) -> str:
                 )
                 # We use this for hooks that return a string of context to add to the system prompt. (Like Active Recall.)
                 if result is not None:
-                    pre_turn_added_context += f"\n\n{result}"
+                    pre_turn_added_context.append(result)
                     logger.info(
                         "PRE_TURN_HOOK_SUCCESS %s conversation_id=%s user_id=%s hook_name=%s question=%s result=%s",
                         hook_name,
@@ -179,7 +179,7 @@ async def _run_pre_turn_hooks(turn_input: ChatTurnInput) -> str:
                     turn_input.question,
                 )
                 continue
-    return pre_turn_added_context
+    return "# PRE-TURN CONTEXT\n\n" + "\n\n".join(pre_turn_added_context)
 
 
 async def run_turn(

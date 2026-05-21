@@ -15,7 +15,14 @@ from app.core.tools.workspace_files import make_list_dir_tool, make_read_file_to
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """
-You search long-term conversation memory and workspace memory using your tools. Return EITHER a single short summary (<=600 chars) of context relevant to the user message OR the literal string NONE. No preamble.
+You are the Active Recall Agent running as a pre-turn hook for a personal AI assistant.
+Your job is to search the conversation history and workspace memory for context relevant to the user's question before the main agent runs.
+
+Instructions:
+1. Role: Search conversation history and workspace files for relevant context (preferences, projects, past decisions, domain knowledge, people).
+2. Output: Return EITHER a single, highly-compressed summary (max 600 characters) of relevant context, or the literal string "NONE".
+3. Style: No preamble (do not say "Here is the context"). Output only the raw context or "NONE". Be extremely concise.
+4. Tools: Use search/grep/file tools efficiently. Stop as soon as you have enough context.
 """
 
 
@@ -81,9 +88,7 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
         )
         # We're using a very fast, very cheap Google AI model to do the heavy lifting of the search.
         provider = resolve_llm("google-ai:google/gemini-3.1-flash-lite-preview")
-
-        search_prompt = f"Search the conversation history and workspace memory (such as 'memory/personal/PREFERENCES.md', 'memory/ai/CREATIVE_INSPIRATION.md', 'memory/projects/', etc) using your tools for context relevant to the user's question: {ctx.question}"
-
+        # We give the agent its tools.
         lcm_tools: list[AgentTool] = [
             make_lcm_grep_tool(conversation_id=ctx.conversation_id),
             make_lcm_search_tool(conversation_id=ctx.conversation_id),
@@ -92,7 +97,7 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
         ]
 
         stream = provider.stream(
-            question=search_prompt,
+            question=ctx.question,
             conversation_id=uuid.uuid4(),  # isolated; not a real turn TODO: This should be easier to do. (Making a subagent that doesn't use real turns).
             user_id=ctx.user_id,
             history=None,
@@ -125,7 +130,7 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
                 cost_usd,
                 error_msg,
             )
-            return f"lcm_expand_query: expansion call failed — {error_msg}"
+            return f"active_recall: expansion call failed — {error_msg}"
 
         if not answer:
             logger.info(
@@ -139,7 +144,7 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
                 output_tokens,
                 cost_usd,
             )
-            return "lcm_expand_query: the model returned an empty response."
+            return "active_recall: the model returned an empty response."
 
         logger.info(
             "ACTIVE_RECALL_OUT conversation_id=%s user_id=%s status=success "
@@ -153,7 +158,8 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
             cost_usd,
             len(answer),
         )
-        return answer
+        # Intentionally mentioning the active recall agent in the response so the assistant knows where it came from.
+        return f"Here's some context that your Active Recall agent found: {answer}"
 
     except Exception as exc:
         duration_ms = (time.perf_counter() - start_time) * 1000.0
@@ -169,4 +175,4 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
             output_tokens,
             cost_usd,
         )
-        return f"lcm_expand_query: expansion call failed — {exc}"
+        return f"active_recall: expansion call failed — {exc}"
