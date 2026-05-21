@@ -53,7 +53,7 @@ from app.core.providers.gemini_cli import (
     is_gemini_cli_available,
     render_history_prefix,
 )
-from app.core.providers.gemini_cli.acp import _drain_queue
+from app.core.providers.gemini_cli.acp import AcpFatalError, _drain_queue, open_session
 from app.core.providers.gemini_cli.client import (
     PawrrtalAcpClient,
     _stream_event_for_update,
@@ -64,6 +64,7 @@ from app.core.providers.gemini_cli.client import (
     text_from_tool_content_item,
 )
 from app.core.providers.gemini_cli.fs import ensure_workspace_path, slice_text
+from app.core.providers.gemini_cli.provider import _spawn_subprocess
 from app.core.providers.model_id import Host, Vendor
 
 # ---------------------------------------------------------------------------
@@ -707,6 +708,76 @@ async def test_drain_queue_yields_until_none_sentinel() -> None:
         {"type": "delta", "content": "a"},
         {"type": "delta", "content": "b"},
     ]
+
+
+# ---------------------------------------------------------------------------
+# ACP cwd handling
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_spawn_subprocess_resolves_relative_workspace_root(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspaces" / "dev-admin"
+    workspace.mkdir(parents=True)
+    captured: dict[str, Any] = {}
+
+    async def fake_create_subprocess_exec(*args: str, **kwargs: Any) -> object:
+        captured["args"] = args
+        captured["cwd"] = kwargs["cwd"]
+        return object()
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "app.core.providers.gemini_cli.provider.asyncio.create_subprocess_exec",
+        fake_create_subprocess_exec,
+    )
+
+    proc = await _spawn_subprocess("gemini-2.5-flash", Path("workspaces/dev-admin"))
+
+    assert proc is not None
+    assert captured["cwd"] == str(workspace.resolve())
+
+
+@pytest.mark.anyio
+async def test_open_session_sends_absolute_cwd_for_relative_workspace_root(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspaces" / "dev-admin"
+    workspace.mkdir(parents=True)
+
+    class FakeConn:
+        async def initialize(self, **_kwargs: Any) -> object:
+            return object()
+
+        async def new_session(self, *, cwd: str, mcp_servers: list[Any]) -> object:
+            assert cwd == str(workspace.resolve())
+            assert mcp_servers == []
+            return type("Session", (), {"session_id": "session-1"})()
+
+    monkeypatch.chdir(tmp_path)
+
+    assert await open_session(FakeConn(), Path("workspaces/dev-admin")) == "session-1"
+
+
+@pytest.mark.anyio
+async def test_open_session_surfaces_structured_request_error_detail() -> None:
+    class FakeConn:
+        async def initialize(self, **_kwargs: Any) -> object:
+            return object()
+
+        async def new_session(self, **_kwargs: Any) -> object:
+            raise RequestError(
+                -32603,
+                "Internal error",
+                {"details": "Directory does not exist: x/y"},
+            )
+
+    with pytest.raises(AcpFatalError, match="Directory does not exist: x/y"):
+        await open_session(FakeConn(), Path("workspaces/dev-admin"))
 
 
 # ---------------------------------------------------------------------------

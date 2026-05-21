@@ -53,6 +53,7 @@ from ._gemini_usage import (
     absorb_request_usage,
     gemini_catalog_entry,
 )
+from ._stream_logging import log_provider_stream_event
 from .base import ReasoningEffort, StreamEvent
 
 __all__ = [
@@ -409,10 +410,25 @@ class GeminiLLM:
             async for event in agent_loop([prompt], context, config, stream_fn):
                 stream_event = agent_event_to_stream_event(event)
                 if stream_event is not None:
+                    log_provider_stream_event(
+                        logger,
+                        provider="GEMINI",
+                        model=self._model_id,
+                        conversation_id=conversation_id,
+                        event=stream_event,
+                    )
                     yield stream_event
 
         except Exception as exc:
-            yield StreamEvent(type="error", content=f"Gemini provider error: {exc}")
+            stream_event = StreamEvent(type="error", content=f"Gemini provider error: {exc}")
+            log_provider_stream_event(
+                logger,
+                provider="GEMINI",
+                model=self._model_id,
+                conversation_id=conversation_id,
+                event=stream_event,
+            )
+            yield stream_event
             return
 
         # Emit one terminal ``usage`` event so the chat aggregator can
@@ -431,9 +447,17 @@ class GeminiLLM:
                 input_tokens=usage.input_tokens,
                 output_tokens=usage.output_tokens,
             )
-            yield StreamEvent(
+            stream_event = StreamEvent(
                 type="usage",
                 input_tokens=usage.input_tokens,
                 output_tokens=usage.output_tokens,
                 cost_usd=cost_usd,
             )
+            log_provider_stream_event(
+                logger,
+                provider="GEMINI",
+                model=self._model_id,
+                conversation_id=conversation_id,
+                event=stream_event,
+            )
+            yield stream_event

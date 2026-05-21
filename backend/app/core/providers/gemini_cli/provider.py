@@ -27,6 +27,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import TYPE_CHECKING, NoReturn
 
+import anyio
 from acp import connect_to_agent
 
 from app.core.agent_loop.types import AgentTool, PermissionCheckFn
@@ -265,7 +266,7 @@ async def _spawn_subprocess(
     a user-visible error event; we keep the function ``None``-returning
     so the caller can decide message phrasing.
     """
-    cwd = str(workspace_root) if workspace_root is not None else None
+    cwd = str(await anyio.Path(workspace_root).resolve()) if workspace_root is not None else None
     cmd = [
         GEMINI_BINARY_NAME,
         GEMINI_ACP_FLAG,

@@ -19,6 +19,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+import anyio
 from acp import PROTOCOL_VERSION, RequestError, text_block
 from acp.schema import ClientCapabilities, FileSystemCapabilities
 
@@ -81,7 +82,11 @@ async def open_session(conn: ClientSideConnection, workspace_root: Path | None) 
         getattr(init_resp, "protocol_version", "?"),
     )
 
-    cwd = str(workspace_root) if workspace_root is not None else str(Path.cwd())
+    cwd = str(
+        await anyio.Path(workspace_root).resolve()
+        if workspace_root is not None
+        else await anyio.Path.cwd().resolve()
+    )
     try:
         session = await asyncio.wait_for(
             conn.new_session(cwd=cwd, mcp_servers=[]),
@@ -106,14 +111,28 @@ async def open_session(conn: ClientSideConnection, workspace_root: Path | None) 
             getattr(exc, "message", str(exc)),
             getattr(exc, "data", None),
         )
-        raise AcpFatalError(
-            f"Gemini CLI session/new failed: {exc}. "
-            f"This usually means the CLI can't reach its configured Google account, "
-            f"API key, or Code Assist license. Run `gemini` once in a shell to "
-            f"verify it can authenticate, or set GEMINI_API_KEY in the environment.",
-        ) from exc
+        detail = _request_error_detail(exc)
+        suffix = (
+            f" Details: {detail}"
+            if detail is not None
+            else (
+                " This usually means the CLI can't reach its configured Google account, "
+                "API key, or Code Assist license. Run `gemini` once in a shell to "
+                "verify it can authenticate, or set GEMINI_API_KEY in the environment."
+            )
+        )
+        raise AcpFatalError(f"Gemini CLI session/new failed: {exc}.{suffix}") from exc
 
     return session.session_id
+
+
+def _request_error_detail(exc: RequestError) -> str | None:
+    """Return Gemini CLI's structured error detail when it supplies one."""
+    data = getattr(exc, "data", None)
+    if not isinstance(data, dict):
+        return None
+    detail = data.get("details")
+    return detail if isinstance(detail, str) and detail else None
 
 
 async def run_prompt_and_drain(

@@ -49,6 +49,7 @@ from app.core.config import settings
 from app.core.keys import resolve_api_key
 
 from ._gemini_events import agent_event_to_stream_event, identity_convert
+from ._stream_logging import log_provider_stream_event
 from .base import ReasoningEffort, StreamEvent
 from .model_id import Vendor
 
@@ -395,6 +396,13 @@ class LiteLLMLLM:
             async for event in agent_loop([prompt], context, config, stream_fn):
                 stream_event = agent_event_to_stream_event(event)
                 if stream_event is not None:
+                    log_provider_stream_event(
+                        logger,
+                        provider="LITELLM",
+                        model=f"{self._vendor.value}/{self._model}",
+                        conversation_id=conversation_id,
+                        event=stream_event,
+                    )
                     yield stream_event
 
         except Exception as exc:
@@ -405,4 +413,12 @@ class LiteLLMLLM:
                 exc,
                 exc_info=True,
             )
-            yield StreamEvent(type="error", content=f"LiteLLM provider error: {exc}")
+            stream_event = StreamEvent(type="error", content=f"LiteLLM provider error: {exc}")
+            log_provider_stream_event(
+                logger,
+                provider="LITELLM",
+                model=f"{self._vendor.value}/{self._model}",
+                conversation_id=conversation_id,
+                event=stream_event,
+            )
+            yield stream_event

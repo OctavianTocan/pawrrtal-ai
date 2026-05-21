@@ -75,6 +75,7 @@ from ._claude_tool_bridge import (
     claude_tool_id,
     make_can_use_tool,
 )
+from ._stream_logging import log_provider_stream_event
 from .base import ReasoningEffort, StreamEvent
 
 logger = logging.getLogger(__name__)
@@ -320,11 +321,13 @@ class ClaudeLLM:
                     display_by_name=display_by_name,
                 ):
                     any_event_yielded = True
+                    self._log_stream_event(conversation_id, event)
                     yield event
                 return
             except CLINotFoundError as error:
                 logger.exception("Claude CLI binary not found")
-                yield _error_event(
+                yield self._logged_error_event(
+                    conversation_id,
                     "Claude Code CLI binary is not installed in this environment. "
                     "Install it with `npm i -g @anthropic-ai/claude-code` and ensure "
                     "the executable is on PATH, or set ClaudeAgentOptions.cli_path. "
@@ -360,7 +363,8 @@ class ClaudeLLM:
                     await asyncio.sleep(delay)
                     continue
                 logger.warning("Claude CLI subprocess connection lost: %s", error)
-                yield _error_event(
+                yield self._logged_error_event(
+                    conversation_id,
                     f"Lost connection to the Claude Code CLI subprocess. Underlying error: {error}",
                 )
                 return
@@ -374,7 +378,8 @@ class ClaudeLLM:
                     stderr,
                     stderr_tail,
                 )
-                yield _error_event(
+                yield self._logged_error_event(
+                    conversation_id,
                     "Claude Code CLI exited with an error. Verify CLAUDE_CODE_OAUTH_TOKEN "
                     "is configured and your account has access to the requested model. "
                     f"Exit code: {exit_code}. stderr: {stderr or stderr_tail!r}",
@@ -382,14 +387,33 @@ class ClaudeLLM:
                 return
             except CLIJSONDecodeError:
                 logger.exception("Claude CLI returned non-JSON message")
-                yield _error_event("Failed to parse a JSON message from the Claude Code CLI.")
+                yield self._logged_error_event(
+                    conversation_id,
+                    "Failed to parse a JSON message from the Claude Code CLI.",
+                )
                 return
             except ClaudeSDKError as error:
                 logger.exception("Claude SDK error during stream")
-                yield _error_event(f"Claude SDK error: {error}")
+                yield self._logged_error_event(conversation_id, f"Claude SDK error: {error}")
                 return
 
     # -- internal --------------------------------------------------------
+
+    def _log_stream_event(self, conversation_id: uuid.UUID, event: StreamEvent) -> None:
+        """Log one Claude stream event using the shared provider format."""
+        log_provider_stream_event(
+            logger,
+            provider="CLAUDE",
+            model=self._model_id,
+            conversation_id=conversation_id,
+            event=event,
+        )
+
+    def _logged_error_event(self, conversation_id: uuid.UUID, message: str) -> StreamEvent:
+        """Build and log a Claude error event."""
+        event = _error_event(message)
+        self._log_stream_event(conversation_id, event)
+        return event
 
     def _build_options(
         self,

@@ -83,6 +83,8 @@ from app.core.providers.gemini_cli.fs import (
 
 logger = logging.getLogger(__name__)
 
+_LOG_SNIPPET_CHARS = 240
+
 
 PermissionOptionKind = Literal["allow_once", "allow_always", "reject_once", "reject_always"]
 """The four ACP permission option kinds. Modelling as a ``Literal``
@@ -213,6 +215,7 @@ class PawrrtalAcpClient:
         **kwargs: Any,
     ) -> None:
         """Translate an ACP session update into a Pawrrtal StreamEvent."""
+        _log_session_update(session_id, update)
         event = _stream_event_for_update(update)
         if event is not None:
             await self._event_queue.put(event)
@@ -234,6 +237,13 @@ class PawrrtalAcpClient:
         offers no allow options we deny.
         """
         tool_name = tool_call.title or "<unknown>"
+        logger.info(
+            "GEMINI_CLI_PERMISSION_REQUEST session_id=%s tool_call_id=%s tool=%s options=%s",
+            session_id,
+            tool_call.tool_call_id,
+            tool_name,
+            [option.kind for option in options],
+        )
         if self._permission_check is not None:
             arguments = tool_call.raw_input if isinstance(tool_call.raw_input, dict) else {}
             decision = await self._permission_check(tool_name, arguments)
@@ -268,6 +278,13 @@ class PawrrtalAcpClient:
                 ),
             )
             return RequestPermissionResponse(outcome=DeniedOutcome(outcome=_DENY_OUTCOME))
+        logger.info(
+            "GEMINI_CLI_PERMISSION_ALLOWED session_id=%s tool_call_id=%s tool=%s option_kind=%s",
+            session_id,
+            tool_call.tool_call_id,
+            tool_name,
+            option.kind,
+        )
         return RequestPermissionResponse(
             outcome=AllowedOutcome(option_id=option.option_id, outcome=_ALLOW_OUTCOME),
         )
@@ -285,6 +302,15 @@ class PawrrtalAcpClient:
         text = read_text_or_raise(resolved, path)
         if line is not None or limit is not None:
             text = slice_text(text, line, limit)
+        logger.info(
+            "GEMINI_CLI_FS_READ session_id=%s path=%s resolved=%s chars=%d line=%s limit=%s",
+            session_id,
+            path,
+            resolved,
+            len(text),
+            line,
+            limit,
+        )
         return ReadTextFileResponse(content=text)
 
     async def write_text_file(
@@ -297,6 +323,13 @@ class PawrrtalAcpClient:
         """Write a workspace-scoped file on the agent's behalf."""
         resolved = ensure_workspace_path(path, self._workspace_root)
         write_text_or_raise(resolved, content, path)
+        logger.info(
+            "GEMINI_CLI_FS_WRITE session_id=%s path=%s resolved=%s chars=%d",
+            session_id,
+            path,
+            resolved,
+            len(content),
+        )
         return WriteTextFileResponse()
 
     # Terminal methods all raise ``method_not_found``; the ACP
@@ -392,6 +425,72 @@ def _stream_event_for_update(update: object) -> StreamEvent | None:
     if not isinstance(update, _DROPPED_UPDATE_TYPES):
         logger.debug("GEMINI_CLI_UPDATE_DROPPED type=%s", type(update).__name__)
     return None
+
+
+def _log_session_update(session_id: str, update: object) -> None:
+    """Emit a structured operator log for every Gemini CLI ACP update."""
+    if isinstance(update, AgentMessageChunk):
+        text = text_from_content_block(update.content)
+        logger.info(
+            "GEMINI_CLI_UPDATE_AGENT_MESSAGE session_id=%s chars=%d snippet=%r",
+            session_id,
+            len(text),
+            _snippet(text),
+        )
+        return
+    if isinstance(update, AgentThoughtChunk):
+        text = text_from_content_block(update.content)
+        logger.info(
+            "GEMINI_CLI_UPDATE_THOUGHT session_id=%s chars=%d snippet=%r",
+            session_id,
+            len(text),
+            _snippet(text),
+        )
+        return
+    if isinstance(update, ToolCallStart):
+        raw_input = update.raw_input if isinstance(update.raw_input, dict) else {}
+        logger.info(
+            "GEMINI_CLI_UPDATE_TOOL_START session_id=%s tool_call_id=%s kind=%s title=%s input_keys=%s",
+            session_id,
+            update.tool_call_id,
+            update.kind,
+            update.title,
+            sorted(raw_input.keys()),
+        )
+        return
+    if isinstance(update, ToolCallProgress):
+        content_count = len(update.content or [])
+        logger.info(
+            "GEMINI_CLI_UPDATE_TOOL_PROGRESS session_id=%s tool_call_id=%s status=%s content_items=%d",
+            session_id,
+            update.tool_call_id,
+            update.status,
+            content_count,
+        )
+        return
+    if isinstance(update, UsageUpdate):
+        cost = getattr(update.cost, "amount", None) if update.cost is not None else None
+        logger.info(
+            "GEMINI_CLI_UPDATE_USAGE session_id=%s used=%s size=%s cost=%s",
+            session_id,
+            getattr(update, "used", None),
+            getattr(update, "size", None),
+            cost,
+        )
+        return
+    logger.info(
+        "GEMINI_CLI_UPDATE_META session_id=%s type=%s",
+        session_id,
+        type(update).__name__,
+    )
+
+
+def _snippet(text: str) -> str:
+    """Return a single-line, bounded log preview."""
+    compact = " ".join(text.split())
+    if len(compact) <= _LOG_SNIPPET_CHARS:
+        return compact
+    return f"{compact[:_LOG_SNIPPET_CHARS]}..."
 
 
 def _delta_or_none(event_type: str, text: str) -> StreamEvent | None:

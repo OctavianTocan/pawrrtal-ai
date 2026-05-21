@@ -87,6 +87,7 @@ from app.core.agent_system_prompt import (
 from app.core.config import settings
 from app.core.keys import resolve_api_key
 
+from ._stream_logging import log_provider_stream_event
 from ._xai_events import agent_event_to_stream_event, identity_convert
 from ._xai_messages import build_xai_messages, build_xai_tools
 from ._xai_stream import (
@@ -385,10 +386,25 @@ class XaiLLM:
             async for event in agent_loop([prompt], context, config, stream_fn):
                 stream_event = agent_event_to_stream_event(event)
                 if stream_event is not None:
+                    log_provider_stream_event(
+                        logger,
+                        provider="XAI",
+                        model=self._model_id,
+                        conversation_id=conversation_id,
+                        event=stream_event,
+                    )
                     yield stream_event
 
         except Exception as exc:
-            yield StreamEvent(type="error", content=f"xAI provider error: {exc}")
+            stream_event = StreamEvent(type="error", content=f"xAI provider error: {exc}")
+            log_provider_stream_event(
+                logger,
+                provider="XAI",
+                model=self._model_id,
+                conversation_id=conversation_id,
+                event=stream_event,
+            )
+            yield stream_event
             return
 
         # Terminal usage event — the chat aggregator folds it into the
@@ -397,9 +413,17 @@ class XaiLLM:
         # Skip when no chunk reported usage (test scripts, error-only
         # turns) so the ledger doesn't see spurious zero rows.
         if usage_sink.saw_any:
-            yield StreamEvent(
+            stream_event = StreamEvent(
                 type="usage",
                 input_tokens=usage_sink.input_tokens,
                 output_tokens=usage_sink.output_tokens,
                 cost_usd=usage_sink.cost_usd,
             )
+            log_provider_stream_event(
+                logger,
+                provider="XAI",
+                model=self._model_id,
+                conversation_id=conversation_id,
+                event=stream_event,
+            )
+            yield stream_event

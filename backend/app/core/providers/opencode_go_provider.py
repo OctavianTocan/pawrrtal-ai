@@ -72,6 +72,7 @@ from ._opencode_go_events import (
     compute_cost_usd,
     read_reasoning,
 )
+from ._stream_logging import log_provider_stream_event
 from .base import ReasoningEffort, StreamEvent
 
 logger = logging.getLogger(__name__)
@@ -435,6 +436,13 @@ class OpencodeGoLLM:
             async for event in agent_loop([prompt], context, config, stream_fn):
                 stream_event = agent_event_to_stream_event(event)
                 if stream_event is not None:
+                    log_provider_stream_event(
+                        logger,
+                        provider="OPENCODE_GO",
+                        model=self._model_id,
+                        conversation_id=conversation_id,
+                        event=stream_event,
+                    )
                     yield stream_event
         except Exception as exc:
             logger.error(
@@ -443,11 +451,22 @@ class OpencodeGoLLM:
                 exc,
                 exc_info=True,
             )
-            yield StreamEvent(type="error", content=f"OpenCode Go provider error: {exc}")
+            stream_event = StreamEvent(
+                type="error",
+                content=f"OpenCode Go provider error: {exc}",
+            )
+            log_provider_stream_event(
+                logger,
+                provider="OPENCODE_GO",
+                model=self._model_id,
+                conversation_id=conversation_id,
+                event=stream_event,
+            )
+            yield stream_event
             return
 
         if usage_acc.input_tokens or usage_acc.output_tokens:
-            yield StreamEvent(
+            stream_event = StreamEvent(
                 type="usage",
                 input_tokens=usage_acc.input_tokens,
                 output_tokens=usage_acc.output_tokens,
@@ -458,3 +477,11 @@ class OpencodeGoLLM:
                     cost_per_mtok_out_usd=self._config.cost_per_mtok_out_usd,
                 ),
             )
+            log_provider_stream_event(
+                logger,
+                provider="OPENCODE_GO",
+                model=self._model_id,
+                conversation_id=conversation_id,
+                event=stream_event,
+            )
+            yield stream_event
