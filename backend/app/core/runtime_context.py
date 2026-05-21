@@ -205,6 +205,7 @@ def compose_runtime_context_block(
     safety: AgentSafetyConfig | None = None,
     tools: Iterable[AgentTool] | None = None,
     now: _dt.datetime | None = None,
+    extra_context: str | None = None,
 ) -> str:
     """Compose the full runtime-metadata block appended to the system prompt.
 
@@ -218,6 +219,7 @@ def compose_runtime_context_block(
         safety: Agent-loop safety caps for this turn (#291).
         tools: Tools bound for this turn (#289).
         now: Override for the current datetime (tests only).
+        extra_context: Extra context to add to the system prompt. (This comes from pre-turn hooks, for example.)
 
     Returns:
         Markdown block. Always non-empty (the time section is
@@ -228,6 +230,7 @@ def compose_runtime_context_block(
         compose_runtime_identity_block(identity),
         compose_resource_budget_block(safety),
         compose_tool_inventory_block(tools),
+        extra_context,
     )
     sections.extend(section for section in optional_sections if section)
     return "\n\n".join(sections)
@@ -240,6 +243,7 @@ def append_runtime_context(
     safety: AgentSafetyConfig | None = None,
     tools: Iterable[AgentTool] | None = None,
     now: _dt.datetime | None = None,
+    extra_context: str | None = None,
 ) -> str | None:
     """Return ``system_prompt`` with the runtime context block appended.
 
@@ -254,6 +258,7 @@ def append_runtime_context(
         safety: Optional agent-loop safety config.
         tools: Optional tool inventory.
         now: Override for the current datetime (tests only).
+        extra_context: Extra context to add to the system prompt.
 
     Returns:
         The prompt with runtime context appended, or ``None`` if the
@@ -266,6 +271,7 @@ def append_runtime_context(
         safety=safety,
         tools=tools,
         now=now,
+        extra_context=extra_context,
     )
     return f"{system_prompt}\n\n{block}"
 

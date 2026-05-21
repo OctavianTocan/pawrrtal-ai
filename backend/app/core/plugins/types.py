@@ -14,10 +14,10 @@ factory is responsible for its own JSON-Schema and execute callable.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from app.core.agent_loop.types import AgentTool
@@ -90,6 +90,27 @@ ToolFactory = Callable[[ToolContext], "AgentTool"]
 
 
 @dataclass(frozen=True)
+class PreTurnHookContext:
+    """The per-call binding passed into every plugin pre-turn hook.
+
+    Attributes:
+        conversation_id: The conversation UUID.
+        user_id: The user UUID.
+        workspace_root: The workspace root path.
+        question: The question.
+    """
+
+    conversation_id: uuid.UUID
+    user_id: uuid.UUID
+    workspace_root: Path
+    question: str
+
+
+# A PreTurnHook is a coroutine that returns a string or None.
+PreTurnHook = Callable[[PreTurnHookContext], Coroutine[Any, Any, str | None]]
+
+
+@dataclass(frozen=True)
 class Plugin:
     """One registered integration.
 
@@ -117,4 +138,5 @@ class Plugin:
     description: str
     env_keys: tuple[EnvKeySpec, ...] = field(default_factory=tuple)
     tool_factories: tuple[ToolFactory, ...] = field(default_factory=tuple)
+    pre_turn_hooks: tuple[PreTurnHook, ...] = field(default_factory=tuple)
     is_activated: Callable[[ToolContext], bool] | None = None

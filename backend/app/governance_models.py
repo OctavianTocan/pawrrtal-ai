@@ -2,6 +2,7 @@
 
 Split out of :mod:`app.models` to keep that module under the project's
 500-line file budget. Imports stay backwards-compatible — every name
+TODO: I do not want this backwards compatibility crap.
 exported here is re-exported from :mod:`app.models`, so any code still
 doing ``from app.models import AuditEvent`` continues to work.
 

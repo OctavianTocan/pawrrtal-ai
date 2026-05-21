@@ -32,6 +32,7 @@ def system_prompt_for_turn(
     *,
     model_id: str | None,
     tools: list[AgentTool] | None,
+    extra_context: str | None = None,
     reasoning_effort: str | None = None,
 ) -> str | None:
     """Return the workspace prompt with runtime metadata appended.
@@ -46,6 +47,7 @@ def system_prompt_for_turn(
             tool-inventory block entirely; the empty list still renders
             an explicit "no tools" notice so the model doesn't fall
             back to filesystem discovery.
+        extra_context: Extra context to add to the system prompt.
         reasoning_effort: The reasoning-effort level the provider is
             being called with this turn, after the resolver backstop
             has normalized it against the model's catalog support
@@ -64,6 +66,7 @@ def system_prompt_for_turn(
         identity=_provider_identity_for(model_id, reasoning_effort=reasoning_effort),
         safety=safety_from_settings(settings),
         tools=tools,
+        extra_context=extra_context,
     )
 
 

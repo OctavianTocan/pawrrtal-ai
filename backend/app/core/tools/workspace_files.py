@@ -354,6 +354,116 @@ async def _list_dir_body(*, target: Path, raw_path: str, root: Path, **_: Any) -
 # ---------------------------------------------------------------------------
 
 
+def make_read_file_tool(workspace_root: Path) -> AgentTool:
+    """Make a tool that reads the text content of a file in the workspace."""
+    root = Path(workspace_root).resolve()
+    return _wrap_workspace_tool(
+        name="read_file",
+        description=(
+            "Read the text content of a file in the workspace. "
+            "Paths are relative to the workspace root. "
+            "Binary files and files larger than 128 KB are rejected or truncated."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": (
+                        "File path relative to the workspace root, e.g. 'AGENTS.md' "
+                        "or 'memory/2026-05-07.md'."
+                    ),
+                }
+            },
+            "required": ["path"],
+        },
+        body=_read_file_body,
+        root=root,
+        path_required=True,
+        display=make_tool_display(
+            icon="📖",
+            label="Read file",
+            present=lambda args: f"📖 Reading {summarize_path(args.get('path'))}",
+            compact=lambda args: f"Read file -> {summarize_path(args.get('path'))}",
+        ),
+    )
+
+
+def make_write_file_tool(workspace_root: Path) -> AgentTool:
+    """Make a tool that writes text content to a file in the workspace."""
+    root = Path(workspace_root).resolve()
+    return _wrap_workspace_tool(
+        name="write_file",
+        description=(
+            "Write text content to a file in the workspace, creating it if it "
+            "does not exist and overwriting it if it does. "
+            "Parent directories are created automatically. "
+            "Paths are relative to the workspace root."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": "File path relative to the workspace root.",
+                },
+                "content": {
+                    "type": "string",
+                    "description": "Full text content to write. Overwrites the existing file.",
+                },
+            },
+            "required": ["path", "content"],
+        },
+        body=_write_file_body,
+        root=root,
+        path_required=True,
+        display=make_tool_display(
+            icon="✍️",
+            label="Write file",
+            present=lambda args: f"✍️ Writing {summarize_path(args.get('path'))}",
+            compact=lambda args: f"Write file -> {summarize_path(args.get('path'))}",
+        ),
+    )
+
+
+def make_list_dir_tool(workspace_root: Path) -> AgentTool:
+    """Make a tool that lists the contents of a directory in the workspace."""
+    root = Path(workspace_root).resolve()
+    return _wrap_workspace_tool(
+        name="list_dir",
+        description=(
+            "List the contents of a directory in the workspace. "
+            "Shows directories with a trailing '/' and files with their sizes. "
+            "Call with no path (or empty string) to list the workspace root."
+        ),
+        parameters={
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string",
+                    "description": (
+                        "Directory path relative to the workspace root. "
+                        "Omit or pass '' to list the root."
+                    ),
+                }
+            },
+            "required": [],
+        },
+        # list_dir's body needs ``root`` for ``relative_to`` formatting.
+        body=lambda target, raw_path, **kw: _list_dir_body(
+            target=target, raw_path=raw_path, root=root, **kw
+        ),
+        root=root,
+        path_required=False,
+        display=make_tool_display(
+            icon="📁",
+            label="List folder",
+            present=lambda args: f"📁 Inspecting {summarize_path(args.get('path'))}",
+            compact=lambda args: f"List folder -> {summarize_path(args.get('path'))}",
+        ),
+    )
+
+
 def make_workspace_tools(workspace_root: Path) -> list[AgentTool]:
     """Return a list of file-access AgentTools scoped to *workspace_root*.
 
@@ -371,99 +481,7 @@ def make_workspace_tools(workspace_root: Path) -> list[AgentTool]:
     root = Path(workspace_root).resolve()
 
     return [
-        _wrap_workspace_tool(
-            name="read_file",
-            description=(
-                "Read the text content of a file in the workspace. "
-                "Paths are relative to the workspace root. "
-                "Binary files and files larger than 128 KB are rejected or truncated."
-            ),
-            parameters={
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": (
-                            "File path relative to the workspace root, e.g. 'AGENTS.md' "
-                            "or 'memory/2026-05-07.md'."
-                        ),
-                    }
-                },
-                "required": ["path"],
-            },
-            body=_read_file_body,
-            root=root,
-            path_required=True,
-            display=make_tool_display(
-                icon="📖",
-                label="Read file",
-                present=lambda args: f"📖 Reading {summarize_path(args.get('path'))}",
-                compact=lambda args: f"Read file -> {summarize_path(args.get('path'))}",
-            ),
-        ),
-        _wrap_workspace_tool(
-            name="write_file",
-            description=(
-                "Write text content to a file in the workspace, creating it if it "
-                "does not exist and overwriting it if it does. "
-                "Parent directories are created automatically. "
-                "Paths are relative to the workspace root."
-            ),
-            parameters={
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": "File path relative to the workspace root.",
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": "Full text content to write. Overwrites the existing file.",
-                    },
-                },
-                "required": ["path", "content"],
-            },
-            body=_write_file_body,
-            root=root,
-            path_required=True,
-            display=make_tool_display(
-                icon="✍️",
-                label="Write file",
-                present=lambda args: f"✍️ Writing {summarize_path(args.get('path'))}",
-                compact=lambda args: f"Write file -> {summarize_path(args.get('path'))}",
-            ),
-        ),
-        _wrap_workspace_tool(
-            name="list_dir",
-            description=(
-                "List the contents of a directory in the workspace. "
-                "Shows directories with a trailing '/' and files with their sizes. "
-                "Call with no path (or empty string) to list the workspace root."
-            ),
-            parameters={
-                "type": "object",
-                "properties": {
-                    "path": {
-                        "type": "string",
-                        "description": (
-                            "Directory path relative to the workspace root. "
-                            "Omit or pass '' to list the root."
-                        ),
-                    }
-                },
-                "required": [],
-            },
-            # list_dir's body needs ``root`` for ``relative_to`` formatting.
-            body=lambda target, raw_path, **kw: _list_dir_body(
-                target=target, raw_path=raw_path, root=root, **kw
-            ),
-            root=root,
-            path_required=False,
-            display=make_tool_display(
-                icon="📁",
-                label="List folder",
-                present=lambda args: f"📁 Inspecting {summarize_path(args.get('path'))}",
-                compact=lambda args: f"List folder -> {summarize_path(args.get('path'))}",
-            ),
-        ),
+        make_read_file_tool(root),
+        make_write_file_tool(root),
+        make_list_dir_tool(root),
     ]

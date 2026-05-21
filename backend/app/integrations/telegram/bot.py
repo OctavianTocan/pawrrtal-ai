@@ -39,6 +39,7 @@ from app.channels import ChannelMessage, resolve_channel
 # to keep bot.py under sentrux's ``no_god_files`` fan-out budget.
 from app.channels.telegram import SURFACE_TELEGRAM, make_telegram_sender, render_initial
 from app.channels.turn_runner import ChatTurnInput, run_turn
+from app.core.agent_hooks import build_pre_turn_hooks
 from app.core.agent_tools import build_agent_tools
 from app.core.config import settings
 from app.crud.workspace import get_default_workspace
@@ -183,7 +184,7 @@ async def _maintain_typing_indicator(
     so a single failed ``sendChatAction`` never breaks the agent run.
     The whole task is cancelled by the caller's finally block.
     """
-    refresh = float(settings.telegram_typing_refresh_seconds)
+    refresh = settings.telegram_typing_refresh_seconds
     try:
         while True:
             await _send_one_typing_action(bot, chat_id, thread_id)
@@ -261,6 +262,7 @@ async def _run_llm_turn(
         if workspace is not None
         else []
     )
+    pre_turn_hooks = build_pre_turn_hooks()
 
     provider, warning = await resolve_provider_with_auto_clear(
         context,
@@ -320,6 +322,7 @@ async def _run_llm_turn(
             if context.verbose_level is not None
             else settings.telegram_verbose_default
         ),
+        pre_turn_hooks=pre_turn_hooks,
         reasoning_effort=effective_effort,
     )
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 import uuid
@@ -31,6 +32,7 @@ from app.core.observability import (
     turn_span,
     workshop_event_hook,
 )
+from app.core.plugins.types import PreTurnHook, PreTurnHookContext
 from app.crud.chat_message import (
     append_assistant_placeholder,
     append_user_message,
@@ -69,7 +71,27 @@ _TTFT_LOG_MISSING = "-"
 
 @dataclass(frozen=True)
 class ChatTurnInput:
-    """Resolved inputs for one persisted user/assistant turn."""
+    """Resolved inputs for one persisted user/assistant turn.
+
+    Attributes:
+        conversation_id: The conversation UUID.
+        user_id: The user UUID.
+        question: The user message.
+        provider: The LLM provider.
+        channel: The channel.
+        channel_message: The channel message.
+        db_session: The database session.
+        workspace_root: The workspace root path.
+        tools: The workspace-scoped agent tools.
+        reasoning_effort: The reasoning effort.
+        permission_check: The permission check function.
+        images: The multimodal image inputs.
+        history_window: The history window.
+        log_tag: The log tag.
+        log_extras: The log extras.
+        verbose_level: The verbose level.
+        pre_turn_hooks: The pre-turn hooks.
+    """
 
     conversation_id: uuid.UUID
     user_id: uuid.UUID
@@ -96,6 +118,8 @@ class ChatTurnInput:
     log_tag: str = "TURN"
     log_extras: dict[str, Any] = field(default_factory=dict)
     verbose_level: int | None = None
+    # These are the pre-turn hooks that will be run before the turn is started. They come from the plugin registry (for now).
+    pre_turn_hooks: list[PreTurnHook] | None = None
 
 
 @dataclass
@@ -118,6 +142,64 @@ class _EventCounter:
         self.by_type[event.get("type", "unknown")] += 1
 
 
+async def _run_pre_turn_hooks(turn_input: ChatTurnInput) -> str | None:
+    # --- Pre-turn hooks ---
+    if not turn_input.pre_turn_hooks:
+        return None
+
+    async def _run_single_hook(hook: PreTurnHook) -> str | None:
+        hook_name = hook.__name__
+        logger.info(
+            "PRE_TURN_HOOK %s conversation_id=%s user_id=%s question=%s",
+            hook_name,
+            turn_input.conversation_id,
+            turn_input.user_id,
+            turn_input.question,
+        )
+        try:
+            async with asyncio.timeout(settings.pre_turn_hook_timeout_seconds or 10):
+                result = await hook(
+                    PreTurnHookContext(
+                        conversation_id=turn_input.conversation_id,
+                        user_id=turn_input.user_id,
+                        question=turn_input.question,
+                        workspace_root=turn_input.workspace_root or Path(),
+                    )
+                )
+                if result is not None:
+                    logger.info(
+                        "PRE_TURN_HOOK_SUCCESS %s conversation_id=%s user_id=%s hook_name=%s question=%s result=%s",
+                        hook_name,
+                        turn_input.conversation_id,
+                        turn_input.user_id,
+                        hook_name,
+                        turn_input.question,
+                        result,
+                    )
+                return result
+        except Exception:
+            logger.exception(
+                "PRE_TURN_HOOK_ERR %s conversation_id=%s user_id=%s hook_name=%s question=%s",
+                hook_name,
+                turn_input.conversation_id,
+                turn_input.user_id,
+                hook_name,
+                turn_input.question,
+            )
+            return None
+
+    results = await asyncio.gather(
+        *[_run_single_hook(hook) for hook in turn_input.pre_turn_hooks],
+        return_exceptions=False,
+    )
+
+    pre_turn_added_context = [res for res in results if res is not None]
+    if not pre_turn_added_context:
+        return None
+
+    return "# PRE-TURN CONTEXT\n\n" + "\n\n".join(pre_turn_added_context)
+
+
 async def run_turn(
     turn_input: ChatTurnInput,
     *,
@@ -138,6 +220,11 @@ async def run_turn(
     """
     started_at = time.perf_counter()
     history, assistant_message_id = await _load_history_and_persist(turn_input)
+
+    # --- Pre-turn hooks ---
+    pre_turn_added_context: str | None = await _run_pre_turn_hooks(turn_input)
+
+    # --- Main turn ---
     aggregator = ChatTurnAggregator()
     counter = _EventCounter()
     model_id = _channel_model_id(turn_input.channel_message)
@@ -150,6 +237,7 @@ async def run_turn(
         turn_input.workspace_root,
         model_id=model_id,
         tools=turn_input.tools,
+        extra_context=pre_turn_added_context,
         reasoning_effort=turn_input.reasoning_effort,
     )
 
@@ -305,7 +393,7 @@ def _channel_model_id(channel_message: ChannelMessage | None) -> str | None:
     if not channel_message:
         return None
     model_id = channel_message.get("model_id")
-    return str(model_id) if model_id else None
+    return model_id
 
 
 def _expand_hook_events(

@@ -33,7 +33,11 @@ from typing import Any
 from app.core.agent_loop.types import AgentTool
 from app.core.config import settings
 from app.core.keys import resolve_api_key
-from app.core.plugins import ToolContext, all_plugins, is_activated_by_env_keys
+from app.core.plugins import (
+    ToolContext,
+    all_plugins,
+    is_activated_by_env_keys,
+)
 from app.core.providers.catalog import default_model
 from app.core.tools.artifact_agent import make_artifact_tool
 from app.core.tools.exa_search_agent import make_exa_search_tool

@@ -36,11 +36,20 @@ from app.core.plugins.registry import (
     is_activated_by_env_keys,
     register_plugin,
 )
-from app.core.plugins.types import EnvKeySpec, Plugin, ToolContext, ToolFactory
+from app.core.plugins.types import (
+    EnvKeySpec,
+    Plugin,
+    PreTurnHook,
+    PreTurnHookContext,
+    ToolContext,
+    ToolFactory,
+)
 
 __all__ = [
     "EnvKeySpec",
     "Plugin",
+    "PreTurnHook",
+    "PreTurnHookContext",
     "ToolContext",
     "ToolFactory",
     "all_plugins",
