@@ -142,11 +142,12 @@ class _EventCounter:
         self.by_type[event.get("type", "unknown")] += 1
 
 
-async def _run_pre_turn_hooks(turn_input: ChatTurnInput) -> str:
+async def _run_pre_turn_hooks(turn_input: ChatTurnInput) -> str | None:
     # --- Pre-turn hooks ---
-    pre_turn_added_context = []
-    for hook in turn_input.pre_turn_hooks or []:
-        # For easier debugging.
+    if not turn_input.pre_turn_hooks:
+        return None
+
+    async def _run_single_hook(hook: PreTurnHook) -> str | None:
         hook_name = hook.__name__
         logger.info(
             "PRE_TURN_HOOK %s conversation_id=%s user_id=%s question=%s",
@@ -155,11 +156,9 @@ async def _run_pre_turn_hooks(turn_input: ChatTurnInput) -> str:
             turn_input.user_id,
             turn_input.question,
         )
-        # TODO: Each hook should have its own timeout.
-        async with asyncio.timeout(settings.pre_turn_hook_timeout_seconds or 10):
-            try:
-                # Currently awaiting all hooks, to ensure they're synchronous.
-                result: str | None = await hook(
+        try:
+            async with asyncio.timeout(settings.pre_turn_hook_timeout_seconds or 10):
+                result = await hook(
                     PreTurnHookContext(
                         conversation_id=turn_input.conversation_id,
                         user_id=turn_input.user_id,
@@ -167,9 +166,7 @@ async def _run_pre_turn_hooks(turn_input: ChatTurnInput) -> str:
                         workspace_root=turn_input.workspace_root or Path(),
                     )
                 )
-                # We use this for hooks that return a string of context to add to the system prompt. (Like Active Recall.)
                 if result is not None:
-                    pre_turn_added_context.append(result)
                     logger.info(
                         "PRE_TURN_HOOK_SUCCESS %s conversation_id=%s user_id=%s hook_name=%s question=%s result=%s",
                         hook_name,
@@ -179,16 +176,27 @@ async def _run_pre_turn_hooks(turn_input: ChatTurnInput) -> str:
                         turn_input.question,
                         result,
                     )
-            except Exception:
-                logger.exception(
-                    "PRE_TURN_HOOK_ERR %s conversation_id=%s user_id=%s hook_name=%s question=%s",
-                    hook_name,
-                    turn_input.conversation_id,
-                    turn_input.user_id,
-                    hook_name,
-                    turn_input.question,
-                )
-                continue
+                return result
+        except Exception:
+            logger.exception(
+                "PRE_TURN_HOOK_ERR %s conversation_id=%s user_id=%s hook_name=%s question=%s",
+                hook_name,
+                turn_input.conversation_id,
+                turn_input.user_id,
+                hook_name,
+                turn_input.question,
+            )
+            return None
+
+    results = await asyncio.gather(
+        *[_run_single_hook(hook) for hook in turn_input.pre_turn_hooks],
+        return_exceptions=False,
+    )
+
+    pre_turn_added_context = [res for res in results if res is not None]
+    if not pre_turn_added_context:
+        return None
+
     return "# PRE-TURN CONTEXT\n\n" + "\n\n".join(pre_turn_added_context)
 
 

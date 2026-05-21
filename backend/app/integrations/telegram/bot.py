@@ -238,7 +238,7 @@ async def _run_llm_turn(
     if message.bot is None:
         raise RuntimeError("Telegram message has no bot; refusing to stream.")
     thinking_msg = await message.answer(
-        "🤔 Processing your request...",
+        render_initial(),
         reply_parameters=_reply_parameters(message.message_id),
     )
 
