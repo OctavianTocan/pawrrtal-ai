@@ -174,6 +174,7 @@ async def run_turn(
                         conversation_id=turn_input.conversation_id,
                         user_id=turn_input.user_id,
                         question=turn_input.question,
+                        workspace_root=turn_input.workspace_root,
                     )
                 )
                 # We use this for hooks that return a string of context to add to the system prompt. (Like Active Recall.)

@@ -96,19 +96,14 @@ class PreTurnHookContext:
     Attributes:
         conversation_id: The conversation UUID.
         user_id: The user UUID.
-        workspace_id: The workspace UUID.
         workspace_root: The workspace root path.
         question: The question.
-        model_id: The model ID.
-        timeout_seconds: The timeout in seconds.
     """
 
     conversation_id: uuid.UUID
     user_id: uuid.UUID
-    # workspace_id: uuid.UUID
-    # workspace_root: Path
+    workspace_root: Path
     question: str
-    # model_id: str
 
 
 # A PreTurnHook is a coroutine that returns a string or None.
