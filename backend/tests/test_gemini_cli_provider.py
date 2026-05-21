@@ -56,10 +56,12 @@ from app.core.providers.gemini_cli import (
 from app.core.providers.gemini_cli.acp import AcpFatalError, _drain_queue, open_session
 from app.core.providers.gemini_cli.client import (
     PawrrtalAcpClient,
+    pick_allow_option,
+)
+from app.core.providers.gemini_cli.events import (
     _stream_event_for_update,
     _tool_progress_event,
     _usage_event,
-    pick_allow_option,
     text_from_content_block,
     text_from_tool_content_item,
 )
