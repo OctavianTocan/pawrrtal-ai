@@ -92,7 +92,26 @@ async def open_session(conn: ClientSideConnection, workspace_root: Path | None) 
             f"Gemini CLI did not respond to session/new within {_NEW_SESSION_TIMEOUT_SECONDS:.0f}s.",
         ) from exc
     except RequestError as exc:
-        raise AcpFatalError(f"Gemini CLI session/new failed: {exc}") from exc
+        # The gemini-cli binary frequently surfaces a bare "Internal
+        # error" RequestError on session/new when it can't reach the
+        # Google account / API key / Code Assist license configured on
+        # disk (#369). Bare "Internal error" reaches the user with no
+        # actionable hint, so log the structured RequestError fields
+        # alongside cwd for ops triage and surface a hint pointing at
+        # the most common cause.
+        logger.warning(
+            "GEMINI_CLI_NEW_SESSION_FAILED cwd=%s code=%s message=%s data=%s",
+            cwd,
+            getattr(exc, "code", "?"),
+            getattr(exc, "message", str(exc)),
+            getattr(exc, "data", None),
+        )
+        raise AcpFatalError(
+            f"Gemini CLI session/new failed: {exc}. "
+            f"This usually means the CLI can't reach its configured Google account, "
+            f"API key, or Code Assist license. Run `gemini` once in a shell to "
+            f"verify it can authenticate, or set GEMINI_API_KEY in the environment.",
+        ) from exc
 
     return session.session_id
 
