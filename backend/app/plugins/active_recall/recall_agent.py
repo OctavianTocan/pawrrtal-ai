@@ -10,11 +10,12 @@ from app.core.plugins.types import PreTurnHookContext
 from app.core.providers.factory import resolve_llm
 from app.core.tools.lcm_grep_agent import make_lcm_grep_tool
 from app.core.tools.lcm_search_agent import make_lcm_search_tool
+from app.core.tools.workspace_files import make_list_dir_tool, make_read_file_tool
 
 logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """
-You search long-term conversation memory. Return EITHER a single short summary (<=600 chars) of context relevant to the user message OR the literal string NONE. No preamble.
+You search long-term conversation memory and workspace memory using your tools. Return EITHER a single short summary (<=600 chars) of context relevant to the user message OR the literal string NONE. No preamble.
 """
 
 
@@ -81,13 +82,13 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
         # We're using a very fast, very cheap Google AI model to do the heavy lifting of the search.
         provider = resolve_llm("google-ai:google/gemini-3.1-flash-lite-preview")
 
-        # TODO: This needs to be passed through the ctx, so that we can support searching for the user's memory. (Without LCM).
-        search_prompt = f"Search the conversation history using your LCM tools for context relevant to the user's question: {ctx.question}"
+        search_prompt = f"Search the conversation history and workspace memory (such as 'memory/personal/PREFERENCES.md', 'memory/ai/CREATIVE_INSPIRATION.md', 'memory/projects/', etc) using your tools for context relevant to the user's question: {ctx.question}"
 
-        # The set of tools, restricted to LCM only.
         lcm_tools: list[AgentTool] = [
             make_lcm_grep_tool(conversation_id=ctx.conversation_id),
             make_lcm_search_tool(conversation_id=ctx.conversation_id),
+            make_read_file_tool(ctx.workspace_root),
+            make_list_dir_tool(ctx.workspace_root),
         ]
 
         stream = provider.stream(
