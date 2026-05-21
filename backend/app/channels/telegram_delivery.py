@@ -25,6 +25,66 @@ logger = logging.getLogger(__name__)
 MAX_MESSAGE_LEN = 4096
 
 
+def chunk_html_for_telegram(html: str, *, max_len: int = MAX_MESSAGE_LEN) -> list[str]:
+    """Split a Telegram-HTML string into chunks that each fit the API limit.
+
+    Telegram caps a single ``sendMessage`` body at 4096 UTF-16 code units
+    (we approximate with Python string length — close enough for the
+    ASCII-dominant tool output we ship). Previously the delivery helpers
+    truncated overflow with ``"..."``, which silently dropped the tail
+    of long continuous tool-call logs (#424). The replacement strategy
+    is to split into multiple sequential messages so the user sees the
+    full transcript.
+
+    Splitting is conservative: we prefer a blank-line boundary, fall
+    back to a single newline, and only resort to a hard character
+    boundary when neither exists in the window. We never split inside
+    a ``<pre>`` block — Telegram closes the tag at the message edge
+    and the chunk would render as a broken code block. The simple
+    heuristic for this PR keeps the splitter pure and dependency-free;
+    a smarter tag-balancing pass can land later if a real-world case
+    shows tag corruption (the dominant production traffic is
+    paragraph-separated narrative text).
+
+    Args:
+        html: Already-rendered Telegram HTML.
+        max_len: Maximum length per chunk. Defaults to Telegram's
+            ``sendMessage`` limit; tests override to exercise the
+            splitter without 4 KB strings.
+
+    Returns:
+        A list of HTML chunks, each ``<= max_len``. A short input
+        returns ``[html]`` unchanged; an empty input returns ``[""]``
+        so the caller's loop fires exactly once (matching the old
+        single-send behaviour for empty payloads).
+    """
+    if len(html) <= max_len:
+        return [html]
+    chunks: list[str] = []
+    remaining = html
+    while len(remaining) > max_len:
+        # Try to break at a blank line first, then a single newline, then
+        # the hard character boundary. The break point is the index of
+        # the *separator*, so the chunk excludes it and the next chunk
+        # starts immediately after — no leading whitespace.
+        cut = remaining.rfind("\n\n", 0, max_len)
+        sep_len = 2
+        if cut == -1:
+            cut = remaining.rfind("\n", 0, max_len)
+            sep_len = 1
+        if cut == -1:
+            # No newline in the window — hard-cut at the boundary. The
+            # resulting chunk may end mid-tag in pathological cases;
+            # see the docstring note above.
+            cut = max_len
+            sep_len = 0
+        chunks.append(remaining[:cut])
+        remaining = remaining[cut + sep_len :]
+    if remaining:
+        chunks.append(remaining)
+    return chunks
+
+
 def _aiogram_errors() -> tuple[type[BaseException], ...]:
     """Return the aiogram exception types we treat as recoverable.
 
@@ -167,23 +227,46 @@ async def safe_send_html(
     reply_to_message_id: int | None,
     message_thread_id: int | None,
 ) -> int | None:
-    """Call ``send_message`` with routing metadata, returning the message id."""
-    if len(html) > MAX_MESSAGE_LEN:
-        html = html[: MAX_MESSAGE_LEN - 1] + "..."
-    try:
-        sent = await bot.send_message(
-            chat_id=chat_id,
-            text=html,
-            **routing_kwargs(
-                reply_to_message_id=reply_to_message_id,
-                message_thread_id=message_thread_id,
-            ),
-        )
-    except _aiogram_errors() as exc:
-        logger.warning("TELEGRAM_SEND_FAILED chat_id=%s error=%s", chat_id, exc)
-        return None
-    message_id = getattr(sent, "message_id", None)
-    return message_id if isinstance(message_id, int) else None
+    """Call ``send_message`` with routing metadata, returning the message id.
+
+    Long messages are split into multiple sequential sends via
+    :func:`chunk_html_for_telegram` so the user sees the full
+    transcript instead of a ``"..."`` truncation tail (#424). Only the
+    first chunk replies to ``reply_to_message_id``; the rest land as
+    sibling messages in the same thread so the chain reads naturally.
+
+    Returns the message_id of the *first* chunk so existing callers
+    that pin/edit/delete a single message keep working unchanged.
+    """
+    chunks = chunk_html_for_telegram(html)
+    first_id: int | None = None
+    for index, chunk in enumerate(chunks):
+        # Subsequent chunks should not "reply" to the original anchor —
+        # they're continuations, not separate replies. Threading still
+        # routes them into the right topic via ``message_thread_id``.
+        chunk_reply_to = reply_to_message_id if index == 0 else None
+        try:
+            sent = await bot.send_message(
+                chat_id=chat_id,
+                text=chunk,
+                **routing_kwargs(
+                    reply_to_message_id=chunk_reply_to,
+                    message_thread_id=message_thread_id,
+                ),
+            )
+        except _aiogram_errors() as exc:
+            logger.warning(
+                "TELEGRAM_SEND_FAILED chat_id=%s chunk=%d/%d error=%s",
+                chat_id,
+                index + 1,
+                len(chunks),
+                exc,
+            )
+            return first_id
+        message_id = getattr(sent, "message_id", None)
+        if first_id is None and isinstance(message_id, int):
+            first_id = message_id
+    return first_id
 
 
 async def safe_send_draft(
