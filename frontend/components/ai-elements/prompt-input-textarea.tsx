@@ -21,14 +21,80 @@ import {
 	usePromptInputAttachments,
 } from './prompt-input-context';
 
+/**
+ * Handle Tab / Escape for ghost-text accept and dismiss.
+ *
+ * Returns `true` when the key was consumed (the textarea's keydown
+ * handler should early-return). Extracted from `PromptInputTextarea`
+ * so its `handleKeyDown` stays under Biome's cognitive-complexity
+ * budget — the original sat at 28 once two new branches were added.
+ */
+function handleGhostSuggestionKey({
+	event,
+	ghostSuggestion,
+	onAcceptSuggestion,
+	onDismissSuggestion,
+}: {
+	event: React.KeyboardEvent<HTMLTextAreaElement>;
+	ghostSuggestion: string | undefined;
+	onAcceptSuggestion: (() => void) | undefined;
+	onDismissSuggestion: (() => void) | undefined;
+}): boolean {
+	if (!ghostSuggestion) {
+		return false;
+	}
+	if (event.key === 'Tab' && onAcceptSuggestion) {
+		const ta = event.currentTarget;
+		const cursorAtEnd =
+			ta.selectionStart === ta.value.length && ta.selectionEnd === ta.value.length;
+		if (cursorAtEnd) {
+			event.preventDefault();
+			onAcceptSuggestion();
+			return true;
+		}
+	}
+	if (event.key === 'Escape') {
+		event.preventDefault();
+		onDismissSuggestion?.();
+		return true;
+	}
+	return false;
+}
+
 /** Props for the prompt input textarea. */
-export type PromptInputTextareaProps = ComponentProps<typeof InputGroupTextarea>;
+export type PromptInputTextareaProps = ComponentProps<typeof InputGroupTextarea> & {
+	/**
+	 * Active ghost-text suggestion controlled by the parent (e.g. via
+	 * `useGhostCompletion`). The textarea itself does NOT render the
+	 * suggestion — it only uses the value to gate the Tab / Escape
+	 * keyboard interception. The overlay is rendered by the parent so
+	 * its layout can be co-located with the textarea's exact padding
+	 * and typography.
+	 */
+	ghostSuggestion?: string;
+	/**
+	 * Called when the user presses Tab while a ghost suggestion is
+	 * showing AND the caret is at the end of the current value. Tab
+	 * falls through to the browser's default focus-shift behavior in
+	 * every other case.
+	 */
+	onAcceptSuggestion?: () => void;
+	/**
+	 * Called when the user presses Escape while a ghost suggestion is
+	 * showing. Escape only fires when a suggestion is active so it
+	 * stays available for higher-level shortcuts otherwise.
+	 */
+	onDismissSuggestion?: () => void;
+};
 
 /** Textarea that submits on Enter and supports pasted files. */
 export const PromptInputTextarea = ({
 	onChange,
 	className,
 	placeholder = 'What would you like to know?',
+	ghostSuggestion,
+	onAcceptSuggestion,
+	onDismissSuggestion,
 	...props
 }: PromptInputTextareaProps) => {
 	const controller = useOptionalPromptInputController();
@@ -44,6 +110,17 @@ export const PromptInputTextarea = ({
 	const { canScrollUp, canScrollDown } = useScrollEdges(textareaRef);
 
 	const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
+		if (
+			handleGhostSuggestionKey({
+				event: e,
+				ghostSuggestion,
+				onAcceptSuggestion,
+				onDismissSuggestion,
+			})
+		) {
+			return;
+		}
+
 		if (e.key === 'Enter') {
 			if (isComposingRef.current || e.nativeEvent.isComposing) {
 				return;

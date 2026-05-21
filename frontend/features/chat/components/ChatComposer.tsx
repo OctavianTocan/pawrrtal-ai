@@ -10,7 +10,6 @@ import {
 	PromptInputFooter,
 	type PromptInputMessage,
 	PromptInputSubmit,
-	PromptInputTextarea,
 } from '@/components/ai-elements/prompt-input';
 import { Button } from '@/components/ui/button';
 import { usePersistedState } from '@/hooks/use-persisted-state';
@@ -26,6 +25,7 @@ import {
 	PlanButton,
 	VoiceMeter,
 } from './ChatComposerControls';
+import { ComposerTextareaRow, useComposerGhostCompletion } from './ComposerTextareaRow';
 import { ConnectAppsStrip } from './ConnectAppsStrip';
 import { type ChatReasoningLevel, ModelSelectorPopover } from './ModelSelectorPopover';
 
@@ -140,32 +140,6 @@ function useRotatingPlaceholder(hasContent: boolean): string {
 	}
 
 	return EMPTY_COMPOSER_PLACEHOLDERS[placeholderIndex] ?? DEFAULT_EMPTY_COMPOSER_PLACEHOLDER;
-}
-
-function AnimatedComposerPlaceholder({
-	isVisible,
-	text,
-}: {
-	isVisible: boolean;
-	text: string;
-}): React.JSX.Element | null {
-	if (!isVisible) {
-		return null;
-	}
-
-	return (
-		<div
-			// `top-2` matches the textarea's `pt-2` so the placeholder sits on
-			// the same baseline as the user's first line of text; `top-3` left
-			// the placeholder a pixel off when the textarea was tightened.
-			className="pointer-events-none absolute top-2 left-3 z-10 pr-6 text-[14px] leading-6 text-muted-foreground/70"
-			aria-hidden="true"
-		>
-			<span className="composer-placeholder-enter block" key={text}>
-				{text}
-			</span>
-		</div>
-	);
 }
 
 /**
@@ -353,6 +327,14 @@ export function ChatComposer({
 		setIsPlanTagVisible((visible) => !visible);
 	};
 
+	const ghost = useComposerGhostCompletion({
+		content: message.content,
+		// Disabled during streaming + voice so the textarea isn't racing
+		// another input source for the same draft.
+		enabled: !isLoading && !isRecording && !isTranscribing && !isSubmitBlockedResolved,
+		onReplaceMessageContent,
+	});
+
 	return (
 		// Stacks the composer above the connect-apps strip via z-index so
 		// the strip looks layered behind the chat box (see ConnectAppsStrip).
@@ -370,20 +352,13 @@ export function ChatComposer({
 				<PromptInputAttachments className="px-3 pt-2 pb-0">
 					{(attachment) => <PromptInputAttachment data={attachment} />}
 				</PromptInputAttachments>
-				<div className="relative w-full self-stretch">
-					<AnimatedComposerPlaceholder isVisible={!hasContent} text={placeholder} />
-					{/* `min-h-11` (44px) + `pt-2` lets a one-line draft sit
-				    comfortably without the textarea reading as a tall card on
-				    its own. The placeholder absolutely-positioned at `top-3`
-				    is shifted to `top-2` to track this in the parent. */}
-					<PromptInputTextarea
-						aria-label={placeholder}
-						className="max-h-48 min-h-11 w-full overflow-y-auto px-3 pt-2 pb-1 text-[14px] leading-6 outline-none placeholder:text-transparent focus-visible:outline-none"
-						onChange={onUpdateMessage}
-						placeholder=""
-						value={message.content}
-					/>
-				</div>
+				<ComposerTextareaRow
+					ghost={ghost}
+					hasContent={hasContent}
+					onChange={onUpdateMessage}
+					placeholder={placeholder}
+					value={message.content}
+				/>
 				{/* `min-h-8` (32px) + `py-1` keeps the controls vertically
 			    centered without giving the footer the extra 4px of slack
 			    `min-h-9` was reading as. */}

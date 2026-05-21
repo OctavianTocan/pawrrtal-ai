@@ -16,6 +16,7 @@ from app.api.audit import get_audit_router
 from app.api.auth import get_auth_router
 from app.api.channels import get_channels_router
 from app.api.chat import get_chat_router
+from app.api.completions import get_completions_router
 from app.api.conversations import get_conversations_router
 from app.api.cost import get_cost_router
 from app.api.exports import get_exports_router
@@ -202,6 +203,9 @@ def create_app() -> FastAPI:
     )
     fastapi_app.include_router(
         get_chat_router(),
+    )
+    fastapi_app.include_router(
+        get_completions_router(),
     )
     fastapi_app.include_router(
         get_models_router(),
