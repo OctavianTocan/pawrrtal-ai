@@ -9,7 +9,17 @@ from datetime import UTC, datetime
 from enum import Enum
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, Uuid
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    UniqueConstraint,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import Text
 
@@ -34,6 +44,9 @@ class SenderType(Enum):
     USER = "user"
 
 
+_REASONING_EFFORT_VALUES = ("minimal", "low", "medium", "high", "extra-high")
+
+
 class Conversation(Base):
     """Conversation metadata stored in the application database.
 
@@ -42,6 +55,18 @@ class Conversation(Base):
     """
 
     __tablename__ = "conversations"
+    __table_args__ = (
+        # Pin ``reasoning_effort`` to the ``ReasoningEffort`` literal values
+        # (or NULL). The setter in ``app.crud.channel`` accepts ``str | None``,
+        # so without this constraint a typo or stale enum value could land in
+        # the DB and silently break provider resolution. SQL ``CHECK`` allows
+        # NULL by default, which is what we want for "let the provider pick".
+        # Issue #367.
+        CheckConstraint(
+            "reasoning_effort IN (" + ", ".join(f"'{v}'" for v in _REASONING_EFFORT_VALUES) + ")",
+            name="ck_conversations_reasoning_effort_values",
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
     user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("user.id", ondelete="CASCADE"))
@@ -82,10 +107,12 @@ class Conversation(Base):
     # settings.telegram_verbose_default (or 1 if unset).
     verbose_level: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Per-conversation reasoning depth. One of the ReasoningEffort literal
-    # values ("low" | "medium" | "high" | "extra-high") or NULL to let the
-    # provider pick its default. Mirrors verbose_level's plumbing: a chat
-    # request may still override per-turn, but absent that the persisted
-    # value is what the turn runner forwards to the provider.
+    # values ("minimal" | "low" | "medium" | "high" | "extra-high") or NULL
+    # to let the provider pick its default. Pinned by the
+    # ``ck_conversations_reasoning_effort_values`` CHECK constraint above
+    # so bad enum strings never make it to the DB. Mirrors verbose_level's
+    # plumbing: a chat request may still override per-turn, but absent that
+    # the persisted value is what the turn runner forwards to the provider.
     reasoning_effort: Mapped[str | None] = mapped_column(String(16), nullable=True)
 
 
