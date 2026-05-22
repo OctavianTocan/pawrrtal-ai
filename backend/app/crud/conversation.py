@@ -7,9 +7,13 @@ their own conversations.
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio.session import AsyncSession
+
+if TYPE_CHECKING:
+    from app.core.providers.reasoning import ReasoningResolution
 
 # Re-export so the chat router imports the normalize seam from
 # ``crud.conversation`` — which it's already importing — instead of
@@ -253,6 +257,58 @@ async def update_conversation_model(
     await session.commit()
     await session.refresh(conversation)
     return conversation
+
+
+async def apply_model_switch_and_normalize_reasoning(
+    *,
+    conversation: Conversation,
+    new_model_id: str,
+    session: AsyncSession,
+) -> tuple["ReasoningResolution", str | None]:
+    """Apply a model switch and re-normalize ``reasoning_effort`` atomically.
+
+    Replaces what was previously two back-to-back transactions in the
+    chat router (``update_conversation_model`` → ``normalize_conversation_
+    reasoning_effort``) with a single ``session.commit``. A crash,
+    cancellation, or constraint violation between the two writes can no
+    longer leave the row in a state where the persisted
+    ``reasoning_effort`` belongs to the *previous* model. Issue #366.
+
+    The session must already own ``conversation`` — i.e. it came from
+    a query / get on the same session, so mutations propagate without
+    another ``session.add``. ``updated_at`` is bumped only when
+    ``model_id`` actually changes, matching the prior helper's
+    semantics so the sidebar's "recent" ordering isn't perturbed by a
+    no-op chat round.
+
+    Returns ``(resolution, previous_effort)`` to mirror the existing
+    ``normalize_conversation_reasoning_effort`` return shape — the chat
+    router renders a "from → to" notice off ``previous_effort``.
+    """
+    # Local imports keep the cycle-free guarantee with ``providers/``:
+    # ``crud.conversation`` is consumed by the chat router, which also
+    # consumes provider modules. Resolving the catalog lazily here
+    # mirrors the original lazy import in ``normalize_conversation_
+    # reasoning_effort`` for the same reason.
+    from app.core.providers.reasoning import (  # noqa: PLC0415
+        resolve_reasoning_effort,
+    )
+
+    previous_effort: str | None = conversation.reasoning_effort
+
+    if new_model_id != conversation.model_id:
+        conversation.model_id = new_model_id
+        conversation.updated_at = datetime.now()
+
+    resolution = resolve_reasoning_effort(
+        model_id=new_model_id,
+        stored_effort=previous_effort,
+    )
+    if resolution.action in ("adapted", "cleared"):
+        conversation.reasoning_effort = resolution.next_stored
+
+    await session.commit()
+    return resolution, previous_effort
 
 
 async def get_conversation_status(

@@ -8,7 +8,10 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.providers.catalog import MODEL_CATALOG
+from app.core.providers.model_id import Host
 from app.crud.conversation import (
+    apply_model_switch_and_normalize_reasoning,
     create_conversation,
     delete_conversation,
     get_conversation,
@@ -20,6 +23,12 @@ from app.crud.conversation import (
 from app.db import User
 from app.models import Conversation
 from app.schemas import ConversationCreate, ConversationUpdate
+
+
+def _model_id_for(host: Host, model: str) -> str:
+    """Canonical ``host:vendor/model`` id from the catalog (test helper)."""
+    entry = next(e for e in MODEL_CATALOG if e.host is host and e.model == model)
+    return entry.id
 
 
 @pytest.mark.anyio
@@ -269,3 +278,145 @@ async def test_reasoning_effort_rejects_unknown_value(
     db_session.add(conv)
     with pytest.raises(IntegrityError):
         await db_session.commit()
+
+
+# ---------------------------------------------------------------------------
+# apply_model_switch_and_normalize_reasoning (#366)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_apply_model_switch_updates_model_and_bumps_timestamp(
+    db_session: AsyncSession, test_user: User
+) -> None:
+    """A real model switch updates both ``model_id`` and ``updated_at``."""
+    original_model = _model_id_for(Host.xai, "grok-4.3")
+    new_model = _model_id_for(Host.agent_sdk, "claude-opus-4-7")
+    conv = Conversation(
+        id=uuid.uuid4(),
+        user_id=test_user.id,
+        title="switch",
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+        model_id=original_model,
+        reasoning_effort="medium",
+    )
+    db_session.add(conv)
+    await db_session.commit()
+    original_updated_at = conv.updated_at
+
+    resolution, previous_effort = await apply_model_switch_and_normalize_reasoning(
+        conversation=conv,
+        new_model_id=new_model,
+        session=db_session,
+    )
+
+    assert conv.model_id == new_model
+    assert conv.updated_at >= original_updated_at
+    assert previous_effort == "medium"
+    # claude-opus-4-7 supports "medium" — the stored value is used as-is.
+    assert resolution.action == "use"
+    assert resolution.effective == "medium"
+
+
+@pytest.mark.anyio
+async def test_apply_model_switch_noop_does_not_bump_timestamp(
+    db_session: AsyncSession, test_user: User
+) -> None:
+    """A no-op call (same model) leaves ``updated_at`` untouched.
+
+    The original helpers bumped ``updated_at`` only when ``model_id``
+    actually changed; preserving that semantic prevents every chat
+    round from re-ordering the sidebar's recency-sorted list.
+    """
+    same_model = _model_id_for(Host.agent_sdk, "claude-opus-4-7")
+    conv = Conversation(
+        id=uuid.uuid4(),
+        user_id=test_user.id,
+        title="noop",
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+        model_id=same_model,
+        reasoning_effort="high",
+    )
+    db_session.add(conv)
+    await db_session.commit()
+    original_updated_at = conv.updated_at
+
+    await apply_model_switch_and_normalize_reasoning(
+        conversation=conv,
+        new_model_id=same_model,
+        session=db_session,
+    )
+
+    assert conv.updated_at == original_updated_at
+
+
+@pytest.mark.anyio
+async def test_apply_model_switch_normalizes_unsupported_effort(
+    db_session: AsyncSession, test_user: User
+) -> None:
+    """A model that doesn't honour the stored effort gets cleared atomically.
+
+    Regression for #366 — previously this was two ``session.commit``
+    calls. Now both the new ``model_id`` and the normalized
+    ``reasoning_effort`` land in the same transaction, so a crash
+    between writes can't leave the row holding a stale effort that
+    belongs to the previous model.
+    """
+    grok_supports_reasoning = _model_id_for(Host.xai, "grok-4.3")
+    haiku_no_reasoning = _model_id_for(Host.agent_sdk, "claude-haiku-4-5")
+    conv = Conversation(
+        id=uuid.uuid4(),
+        user_id=test_user.id,
+        title="normalize",
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+        model_id=grok_supports_reasoning,
+        reasoning_effort="high",
+    )
+    db_session.add(conv)
+    await db_session.commit()
+
+    resolution, previous_effort = await apply_model_switch_and_normalize_reasoning(
+        conversation=conv,
+        new_model_id=haiku_no_reasoning,
+        session=db_session,
+    )
+
+    assert conv.model_id == haiku_no_reasoning
+    # claude-haiku-4-5 has ``supports_reasoning=()`` — the stored
+    # override gets cleared so the next turn picks up the provider default.
+    assert conv.reasoning_effort is None
+    assert resolution.action == "cleared"
+    assert previous_effort == "high"
+
+
+@pytest.mark.anyio
+async def test_apply_model_switch_persists_after_session_refresh(
+    db_session: AsyncSession, test_user: User
+) -> None:
+    """The combined write survives a session refresh (commit happened)."""
+    original_model = _model_id_for(Host.xai, "grok-4.3")
+    new_model = _model_id_for(Host.agent_sdk, "claude-opus-4-7")
+    conv = Conversation(
+        id=uuid.uuid4(),
+        user_id=test_user.id,
+        title="persist",
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+        model_id=original_model,
+        reasoning_effort="low",
+    )
+    db_session.add(conv)
+    await db_session.commit()
+
+    await apply_model_switch_and_normalize_reasoning(
+        conversation=conv,
+        new_model_id=new_model,
+        session=db_session,
+    )
+
+    await db_session.refresh(conv)
+    assert conv.model_id == new_model
+    assert conv.reasoning_effort == "low"  # claude-opus honours low
