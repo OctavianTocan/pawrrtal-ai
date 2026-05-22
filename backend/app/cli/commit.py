@@ -9,11 +9,10 @@ import asyncio
 import os
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 from dotenv import load_dotenv
-from google import genai
-from google.genai import types
 
 # Load .env from project root (two levels up from backend/app/cli/)
 _project_root = Path(__file__).resolve().parents[2]
@@ -24,7 +23,9 @@ if not os.environ.get("GOOGLE_API_KEY"):
     print("GOOGLE_API_KEY not found in environment or .env file.", file=sys.stderr)
     sys.exit(1)
 
-COMMIT_AGENT_MODEL = os.environ.get("COMMIT_AGENT_MODEL", "gemini-3.1-flash-lite")
+from app.core.providers import resolve_llm  # noqa: E402
+
+COMMIT_AGENT_MODEL = os.environ.get("COMMIT_AGENT_MODEL", "google-ai:google/gemini-3.1-flash-lite")
 
 COMMIT_PROMPT = """\
 You are a commit message generator. Given the staged git diff below, produce a single \
@@ -69,21 +70,31 @@ def get_staged_diff() -> tuple[str, str]:
 
 
 async def generate_message(stat: str, diff: str) -> str:
-    """Send the diff to Gemini and return the commit message."""
-    client = genai.Client(api_key=os.environ["GOOGLE_API_KEY"])
+    """Send the diff to the model via provider.stream and return the commit message."""
+    model_id = COMMIT_AGENT_MODEL
+    provider = resolve_llm(model_id)
     prompt = COMMIT_PROMPT.format(stat=stat, diff=diff)
-    # See ``app/core/gemini_utils.py`` — same reason for the explicit
-    # ``ContentUnion`` annotation here.
-    contents: list[types.ContentUnion] = [
-        types.Content(role="user", parts=[types.Part.from_text(text=prompt)])
-    ]
-    response = await client.aio.models.generate_content(
-        model=COMMIT_AGENT_MODEL,
-        contents=contents,
-    )
-    text = (response.text or "").strip()
+
+    pieces: list[str] = []
+
+    # Use a dummy UUID for conversation and user, as we are in a CLI context.
+    dummy_conv_id = uuid.uuid4()
+    dummy_user_id = uuid.uuid4()
+
+    async for event in provider.stream(
+        question=prompt,
+        conversation_id=dummy_conv_id,
+        user_id=dummy_user_id,
+        reasoning_effort="minimal",
+    ):
+        if event.get("type") == "delta":
+            content = event.get("content", "")
+            if content:
+                pieces.append(content)
+
+    text = "".join(pieces).strip()
     if not text:
-        raise RuntimeError("Gemini returned an empty response.")
+        raise RuntimeError("LLM returned an empty response.")
 
     # Remove markdown code block wrappers (e.g., ``` or ```git)
     if text.startswith("```"):
