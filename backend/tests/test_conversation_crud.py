@@ -1,8 +1,11 @@
 """CRUD service tests for conversations."""
 
+import uuid
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.conversation import (
@@ -15,6 +18,7 @@ from app.crud.conversation import (
     update_conversation_title,
 )
 from app.db import User
+from app.models import Conversation
 from app.schemas import ConversationCreate, ConversationUpdate
 
 
@@ -214,3 +218,54 @@ async def test_delete_conversation_removes_owned_row(
 
     assert deleted is True
     assert await get_conversation(test_user.id, db_session, conversation.id) is None
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "value",
+    ["minimal", "low", "medium", "high", "extra-high", None],
+)
+async def test_reasoning_effort_accepts_literal_values(
+    db_session: AsyncSession, test_user: User, value: str | None
+) -> None:
+    """Every ``ReasoningEffort`` literal value (and NULL) survives a round-trip.
+
+    The CHECK constraint added in migration 021 (#367) must not reject any
+    of the documented literal values, including NULL for "let the provider
+    pick its default".
+    """
+    conv = Conversation(
+        id=uuid.uuid4(),
+        user_id=test_user.id,
+        title="reasoning",
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        reasoning_effort=value,
+    )
+    db_session.add(conv)
+    await db_session.commit()
+    await db_session.refresh(conv)
+    assert conv.reasoning_effort == value
+
+
+@pytest.mark.anyio
+async def test_reasoning_effort_rejects_unknown_value(
+    db_session: AsyncSession, test_user: User
+) -> None:
+    """The DB-level CHECK constraint blocks values outside the literal set.
+
+    Regression for #367 — without this gate, a typo or stale enum string
+    from the CRUD setter would silently land in the column and only blow
+    up later during provider resolution.
+    """
+    conv = Conversation(
+        id=uuid.uuid4(),
+        user_id=test_user.id,
+        title="bad effort",
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
+        reasoning_effort="ultra-mega-high",  # not in the literal
+    )
+    db_session.add(conv)
+    with pytest.raises(IntegrityError):
+        await db_session.commit()
