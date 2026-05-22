@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { apiFetch } from '@/lib/api';
+import { API_ENDPOINTS } from '@/lib/api';
+import { useAuthedFetch } from '@/hooks/use-authed-fetch';
 
 /**
  * Delay between the last keystroke and the autocomplete fetch.
@@ -38,6 +39,9 @@ interface UseGhostCompletionArgs {
 	enabled: boolean;
 }
 
+/**
+ * @internal This is used by the chat composer.
+ */
 interface UseGhostCompletionResult {
 	/** Predicted continuation of ``text``, or empty when none is available. */
 	suggestion: string;
@@ -79,6 +83,10 @@ export function useGhostCompletion({
 	const controllerRef = useRef<AbortController | null>(null);
 	const cacheRef = useRef<Map<string, string>>(new Map());
 	const latestRequestedRef = useRef<string>('');
+	const authedFetch = useAuthedFetch();
+
+	const prevTextRef = useRef('');
+	const prevSuggestionRef = useRef('');
 
 	const fetchSuggestion = useCallback(async (prefix: string): Promise<void> => {
 		// Abort the previous in-flight call so its result can never
@@ -91,15 +99,22 @@ export function useGhostCompletion({
 		latestRequestedRef.current = prefix;
 
 		try {
-			const res = await apiFetch('/api/v1/completions/autocomplete', {
+			// If
+
+			// Get the completion suggestion from the backend.
+			const response = await authedFetch(API_ENDPOINTS.autocomplete, {
 				method: 'POST',
-				headers: { 'Content-Type': 'application/json' },
+				headers: {
+					'Content-Type': 'application/json',
+				},
 				body: JSON.stringify({ text: prefix }),
 				signal: controller.signal,
 			});
-			if (!res.ok) return;
 
-			const body = (await res.json()) as AutocompleteResponseBody;
+			if (!response.ok) return;
+			console.log('autocomplete', response.body);
+
+			const body = (await response.json()) as AutocompleteResponseBody;
 			if (typeof body?.suggestion !== 'string') return;
 
 			// Discard if the user typed past this prefix while the
@@ -122,21 +137,46 @@ export function useGhostCompletion({
 	}, []);
 
 	useEffect(() => {
+		// Checking if the user is still typing the prediction. (We don't want to hide it if they are).
+		const isTypingExact = prevTextRef.current && text.startsWith(prevTextRef.current) && prevSuggestionRef.current.startsWith(text.slice(prevTextRef.current.length));
+
 		if (!enabled) {
 			setSuggestion('');
+			prevTextRef.current = '';
+			prevSuggestionRef.current = '';
 			return;
 		}
 
 		if (text.trimEnd().length < MIN_PREFIX_CHARS) {
 			setSuggestion('');
+			prevTextRef.current = '';
+			prevSuggestionRef.current = '';
+			return;
+		}
+
+		if (isTypingExact) {
+			const added = text.slice(prevTextRef.current.length);
+			const newSuggestion = prevSuggestionRef.current.slice(added.length);
+			setSuggestion(newSuggestion);
+
+			cacheRef.current.set(text, newSuggestion);
+			prevTextRef.current = text;
+			prevSuggestionRef.current = newSuggestion;
 			return;
 		}
 
 		const cached = cacheRef.current.get(text);
 		if (cached !== undefined) {
 			setSuggestion(cached);
+			prevTextRef.current = text;
+			prevSuggestionRef.current = cached;
 			return;
 		}
+
+		// Hides the suggestion entirely the moment the user stops following it (so we can recompute it in the meantime).
+		setSuggestion('');
+		prevTextRef.current = text;
+		prevSuggestionRef.current = '';
 
 		const handle = window.setTimeout(() => {
 			void fetchSuggestion(text);
@@ -158,10 +198,25 @@ export function useGhostCompletion({
 
 	const acceptSuggestion = useCallback((): string | null => {
 		if (!suggestion) return null;
-		const accepted = suggestion;
-		setSuggestion('');
+
+		// We only want to accept the first word, not trailing punctuation. (e.g. if suggestion is "dogs, cats, and " we just want to accept "dogs")
+		const match = suggestion.match(/^(\s*\S+)/);
+		const accepted = match?.[1] ?? suggestion;
+
+		// Update suggestion state with the remainder.
+		const remaining = match ? suggestion.slice(accepted.length) : '';
+		setSuggestion(remaining);
+
+		// Update refs to match the new state so typing will "follow" the completion.
+		const nextText = text + accepted;
+		prevTextRef.current = nextText;
+		prevSuggestionRef.current = remaining;
+
+		// Cache the remaining text so it can be used if the user backspaces to that point.
+		cacheRef.current.set(nextText, remaining);
+
 		return accepted;
-	}, [suggestion]);
+	}, [suggestion, text]);
 
 	const dismissSuggestion = useCallback((): void => {
 		setSuggestion('');

@@ -153,6 +153,7 @@ export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
  * and plain string properties for static endpoints.
  */
 export const API_ENDPOINTS = {
+	autocomplete: '/api/v1/completions/autocomplete',
 	/** Endpoints related to chat functionality */
 	chat: {
 		/**

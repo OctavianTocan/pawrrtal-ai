@@ -61,10 +61,11 @@ AUTOCOMPLETE_SYSTEM_PROMPT = (
     "Rules:\n"
     "- Output ONLY the continuation — never echo what the user already typed.\n"
     "- Keep it short: 1 to 12 words.\n"
-    "- No quotes, no markdown, no preamble, no trailing punctuation.\n"
     "- If the user's text already ends with a complete thought, return an empty string.\n"
     "- If the user's text ends mid-word, complete that word naturally.\n"
-    "- Match the user's tone and language."
+    "- Match the user's tone and language.\n"
+    "- Continue naturally. If there's no space after the user's last word, make sure your suggestion starts with a space.\n"
+    "- Start with capital letter if it is the beginning of the sentence. Basically, write normally."
 )
 
 
@@ -85,14 +86,12 @@ class AutocompleteResponse(BaseModel):
 
 
 def _clean_suggestion(raw: str) -> str:
-    """Trim whitespace and stray quoting from a model-generated suggestion.
+    """Trim stray quoting from a model-generated suggestion.
 
     Flash-Lite occasionally wraps its output in matching quotes or
-    backticks despite the system prompt. Strip those and any leading
-    / trailing whitespace, then truncate to ``MAX_SUGGESTION_CHARS``.
+    backticks despite the system prompt. Truncate to ``MAX_SUGGESTION_CHARS``.
     """
-    stripped = raw.strip().strip("\"'`")
-    return stripped[:MAX_SUGGESTION_CHARS]
+    return raw.strip("\"'`")[:MAX_SUGGESTION_CHARS]
 
 
 async def _collect_suggestion(*, text: str, user_id: uuid.UUID) -> str:
