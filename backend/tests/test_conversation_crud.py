@@ -1,7 +1,7 @@
 """CRUD service tests for conversations."""
 
 import uuid
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
@@ -247,8 +247,8 @@ async def test_reasoning_effort_accepts_literal_values(
         id=uuid.uuid4(),
         user_id=test_user.id,
         title="reasoning",
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         reasoning_effort=value,
     )
     db_session.add(conv)
@@ -271,8 +271,8 @@ async def test_reasoning_effort_rejects_unknown_value(
         id=uuid.uuid4(),
         user_id=test_user.id,
         title="bad effort",
-        created_at=datetime.now(),
-        updated_at=datetime.now(),
+        created_at=datetime.now(UTC),
+        updated_at=datetime.now(UTC),
         reasoning_effort="ultra-mega-high",  # not in the literal
     )
     db_session.add(conv)
