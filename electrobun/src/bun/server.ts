@@ -16,14 +16,17 @@
 
 import { createServer } from 'node:net';
 import path from 'node:path';
+import { DEV_FRONTEND_PORT } from '../../../scripts/dev-ports';
 
 export interface StartedServer {
 	url: string;
 	stop: () => Promise<void>;
 }
 
-/** Must match `frontend/package.json` → `scripts.dev` --port value. */
-const DEV_FRONTEND_PORT = 3001;
+// ``DEV_FRONTEND_PORT`` is the canonical shared constant — imported from
+// the monorepo's ``scripts/dev-ports.ts`` so this shell, dev.ts, and any
+// future consumer agree on the value without having to keep three
+// literal copies in sync.
 
 // ---------------------------------------------------------------------------
 // Port helpers
