@@ -5,13 +5,19 @@ from __future__ import annotations
 import pytest
 from httpx import AsyncClient
 
-from app.api.models import ETAG_HEADER
 from app.core.providers.catalog import MODEL_CATALOG
 from app.core.providers.factory import host_authenticated
+from app.core.providers.model_id import Host
 
 
 def _authed_catalog_count() -> int:
-    """How many catalog rows survive the ``host_authenticated`` filter."""
+    """How many catalog rows survive the ``host_authenticated`` filter.
+
+    No workspace context is passed: the test client doesn't go through
+    the workspace bootstrap, so the endpoint sees ``workspace_root=None``
+    and the filter falls back to global ``settings.*`` only. Mirror that
+    here so the expected count matches the response.
+    """
     return sum(1 for entry in MODEL_CATALOG if host_authenticated(entry.host))
 
 
@@ -47,8 +53,6 @@ async def test_models_endpoint_omits_unauthenticated_hosts(client: AsyncClient) 
     for host_value in returned_hosts:
         # ``host_value`` is the StrEnum value (e.g. ``"google-ai"``);
         # construct the enum member back to feed the gate.
-        from app.core.providers.model_id import Host
-
         assert host_authenticated(Host(host_value)), (
             f"unauthenticated host {host_value!r} leaked through the filter"
         )
@@ -57,7 +61,11 @@ async def test_models_endpoint_omits_unauthenticated_hosts(client: AsyncClient) 
 @pytest.mark.anyio
 async def test_models_endpoint_sets_etag(client: AsyncClient) -> None:
     response = await client.get("/api/v1/models")
-    assert response.headers["etag"] == ETAG_HEADER
+    etag = response.headers["etag"]
+    # Auth-fingerprinted shape: ``"<catalog-hash>-<bitstring>"``.
+    assert etag.startswith('"')
+    assert etag.endswith('"')
+    assert "-" in etag
     assert "private" in response.headers["cache-control"]
 
 
@@ -65,10 +73,16 @@ async def test_models_endpoint_sets_etag(client: AsyncClient) -> None:
 async def test_models_endpoint_returns_304_when_etag_matches(
     client: AsyncClient,
 ) -> None:
-    response = await client.get(
-        "/api/v1/models",
-        headers={"If-None-Match": ETAG_HEADER},
-    )
+    """An ``If-None-Match`` matching the live ETag round-trips to 304.
+
+    The ETag is computed per-request now (so a workspace key landing
+    after boot doesn't get masked by a stale 304 — review feedback on
+    #370). Re-issuing the same request with the returned ETag must
+    still produce a clean 304 with no body.
+    """
+    first = await client.get("/api/v1/models")
+    etag = first.headers["etag"]
+    response = await client.get("/api/v1/models", headers={"If-None-Match": etag})
     assert response.status_code == 304
     assert response.content == b""  # 304 must have empty body
 
@@ -105,3 +119,31 @@ async def test_default_entry_present_when_default_host_authenticated(
     response = await client.get("/api/v1/models")
     defaults = [m for m in response.json()["models"] if m["is_default"]]
     assert len(defaults) == 1
+
+
+def test_host_authenticated_with_workspace_uses_workspace_key(
+    tmp_path: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``workspace_root`` opens the documented per-workspace key path.
+
+    Even when global ``settings.xai_api_key`` is empty, a workspace
+    that wrote ``XAI_API_KEY=...`` to its encrypted ``.env`` should
+    pass the gate — otherwise the picker hides providers that
+    actually work for that workspace (review feedback on #370).
+    """
+    from pathlib import Path
+    from unittest.mock import patch
+
+    workspace_root = Path(str(tmp_path))
+    # Force global setting empty so the gate can't accidentally pass
+    # via the fallback path; the test would be silently weak otherwise.
+    from app.core.providers.factory import settings as factory_settings
+
+    monkeypatch.setattr(factory_settings, "xai_api_key", "")
+    # Stub the shared key resolver to simulate a workspace-keyed
+    # deployment: workspace has the key, global doesn't.
+    with patch("app.core.keys.resolve_api_key", return_value="ws-only-token"):
+        assert host_authenticated(Host.xai, workspace_root=workspace_root) is True
+    # Sanity check: without the workspace path, the gate stays False
+    # because global settings is still empty.
+    assert host_authenticated(Host.xai) is False
