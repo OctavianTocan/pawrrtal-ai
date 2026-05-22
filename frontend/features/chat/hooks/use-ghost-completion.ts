@@ -1,8 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { API_ENDPOINTS } from '@/lib/api';
 import { useAuthedFetch } from '@/hooks/use-authed-fetch';
+import { API_ENDPOINTS } from '@/lib/api';
 
 /**
  * Delay between the last keystroke and the autocomplete fetch.
@@ -56,6 +56,20 @@ interface UseGhostCompletionResult {
 	dismissSuggestion: () => void;
 }
 
+class GhostCache {
+	private map = new Map<string, string>();
+	get(key: string) {
+		return this.map.get(key);
+	}
+	set(key: string, value: string) {
+		this.map.set(key, value);
+		if (this.map.size > CACHE_MAX_ENTRIES) {
+			const oldestKey = this.map.keys().next().value;
+			if (oldestKey !== undefined) this.map.delete(oldestKey);
+		}
+	}
+}
+
 /**
  * IDE-style ghost-text autocomplete for the chat composer.
  *
@@ -81,73 +95,67 @@ export function useGhostCompletion({
 }: UseGhostCompletionArgs): UseGhostCompletionResult {
 	const [suggestion, setSuggestion] = useState('');
 	const controllerRef = useRef<AbortController | null>(null);
-	const cacheRef = useRef<Map<string, string>>(new Map());
+	const cacheRef = useRef(new GhostCache());
 	const latestRequestedRef = useRef<string>('');
 	const authedFetch = useAuthedFetch();
 
 	const prevTextRef = useRef('');
 	const prevSuggestionRef = useRef('');
 
-	const fetchSuggestion = useCallback(async (prefix: string): Promise<void> => {
-		// Abort the previous in-flight call so its result can never
-		// overwrite a newer one. We create a fresh controller per
-		// request — sharing a controller would cancel sibling fetches
-		// after the first abort.
-		controllerRef.current?.abort();
-		const controller = new AbortController();
-		controllerRef.current = controller;
-		latestRequestedRef.current = prefix;
+	const fetchSuggestion = useCallback(
+		async (prefix: string): Promise<void> => {
+			// Abort the previous in-flight call so its result can never
+			// overwrite a newer one. We create a fresh controller per
+			// request — sharing a controller would cancel sibling fetches
+			// after the first abort.
+			controllerRef.current?.abort();
+			const controller = new AbortController();
+			controllerRef.current = controller;
+			latestRequestedRef.current = prefix;
 
-		try {
-			// If
+			try {
+				// If
 
-			// Get the completion suggestion from the backend.
-			const response = await authedFetch(API_ENDPOINTS.autocomplete, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-				body: JSON.stringify({ text: prefix }),
-				signal: controller.signal,
-			});
+				// Get the completion suggestion from the backend.
+				const response = await authedFetch(API_ENDPOINTS.autocomplete, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+					},
+					body: JSON.stringify({ text: prefix }),
+					signal: controller.signal,
+				});
 
-			if (!response.ok) return;
-			console.log('autocomplete', response.body);
+				if (!response.ok) return;
 
-			const body = (await response.json()) as AutocompleteResponseBody;
-			if (typeof body?.suggestion !== 'string') return;
+				const body = (await response.json()) as AutocompleteResponseBody;
+				if (typeof body?.suggestion !== 'string') return;
 
-			// Discard if the user typed past this prefix while the
-			// request was in flight — a stale suggestion would render
-			// the wrong continuation against the current value.
-			if (latestRequestedRef.current !== prefix) return;
+				// Discard if the user typed past this prefix while the
+				// request was in flight — a stale suggestion would render
+				// the wrong continuation against the current value.
+				if (latestRequestedRef.current !== prefix) return;
 
-			cacheRef.current.set(prefix, body.suggestion);
-			if (cacheRef.current.size > CACHE_MAX_ENTRIES) {
-				const oldestKey = cacheRef.current.keys().next().value;
-				if (oldestKey !== undefined) cacheRef.current.delete(oldestKey);
+				cacheRef.current.set(prefix, body.suggestion);
+				setSuggestion(body.suggestion);
+			} catch (err) {
+				// AbortError is the expected signal that we cancelled the
+				// fetch — silently drop it. Other errors leave the
+				// suggestion empty so the UI degrades gracefully.
+				if (err instanceof DOMException && err.name === 'AbortError') return;
 			}
-			setSuggestion(body.suggestion);
-		} catch (err) {
-			// AbortError is the expected signal that we cancelled the
-			// fetch — silently drop it. Other errors leave the
-			// suggestion empty so the UI degrades gracefully.
-			if (err instanceof DOMException && err.name === 'AbortError') return;
-		}
-	}, []);
+		},
+		[authedFetch]
+	);
 
 	useEffect(() => {
 		// Checking if the user is still typing the prediction. (We don't want to hide it if they are).
-		const isTypingExact = prevTextRef.current && text.startsWith(prevTextRef.current) && prevSuggestionRef.current.startsWith(text.slice(prevTextRef.current.length));
+		const isTypingExact =
+			prevTextRef.current &&
+			text.startsWith(prevTextRef.current) &&
+			prevSuggestionRef.current.startsWith(text.slice(prevTextRef.current.length));
 
-		if (!enabled) {
-			setSuggestion('');
-			prevTextRef.current = '';
-			prevSuggestionRef.current = '';
-			return;
-		}
-
-		if (text.trimEnd().length < MIN_PREFIX_CHARS) {
+		if (!enabled || text.trimEnd().length < MIN_PREFIX_CHARS) {
 			setSuggestion('');
 			prevTextRef.current = '';
 			prevSuggestionRef.current = '';
@@ -218,9 +226,7 @@ export function useGhostCompletion({
 		return accepted;
 	}, [suggestion, text]);
 
-	const dismissSuggestion = useCallback((): void => {
-		setSuggestion('');
-	}, []);
+	const dismissSuggestion = useCallback(() => setSuggestion(''), []);
 
 	return { suggestion, acceptSuggestion, dismissSuggestion };
 }
