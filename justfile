@@ -15,8 +15,8 @@ dev-telegram:
     TELEGRAM_MODE=polling bun run dev.ts
 
 # Auto-generate conventional commit via Gemini
-commit:
-    cd backend && uv run python -m app.cli.commit
+commit *ARGS:
+    cd backend && uv run python -m app.cli.commit {{ARGS}}
 
 # Push to remote
 push:
