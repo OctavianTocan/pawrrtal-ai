@@ -64,7 +64,7 @@ function GhostSuggestionOverlay({
 	return (
 		<div
 			aria-hidden="true"
-			className="pointer-events-none absolute inset-0 z-0 max-h-48 min-h-11 overflow-hidden px-3 pt-2 pb-1 text-[14px] leading-6 whitespace-pre-wrap break-words"
+			className="pointer-events-none col-start-1 row-start-1 z-0 max-h-48 min-h-11 overflow-hidden px-3 pt-2 pb-1 text-[14px] leading-6 whitespace-pre-wrap break-words"
 		>
 			<span className="invisible">{value}</span>
 			<span className="text-muted-foreground/50">{suggestion}</span>
@@ -139,7 +139,7 @@ export function ComposerTextareaRow({
 	ghost,
 }: ComposerTextareaRowProps): React.JSX.Element {
 	return (
-		<div className="relative w-full self-stretch">
+		<div className="relative grid grid-cols-1 grid-rows-1 w-full self-stretch">
 			<AnimatedComposerPlaceholder isVisible={!hasContent} text={placeholder} />
 			<GhostSuggestionOverlay suggestion={ghost.suggestion} value={value} />
 			{/* `min-h-11` (44px) + `pt-2` lets a one-line draft sit
@@ -148,7 +148,7 @@ export function ComposerTextareaRow({
 			is shifted to `top-2` to track this in the parent. */}
 			<PromptInputTextarea
 				aria-label={placeholder}
-				className="relative z-10 max-h-48 min-h-11 w-full overflow-y-auto px-3 pt-2 pb-1 text-[14px] leading-6 outline-none placeholder:text-transparent focus-visible:outline-none"
+				className="col-start-1 row-start-1 relative z-10 max-h-48 min-h-11 w-full overflow-y-auto px-3 pt-2 pb-1 text-[14px] leading-6 outline-none placeholder:text-transparent focus-visible:outline-none"
 				ghostSuggestion={ghost.suggestion}
 				onAcceptSuggestion={ghost.handleAccept}
 				onChange={onChange}
