@@ -38,8 +38,8 @@ import {
 	OPEN_ONBOARDING_FLOW_EVENT,
 	OPEN_ONBOARDING_SERVER_STEP_EVENT,
 } from '@/features/onboarding/v2/OnboardingFlow';
-import { useGetPersonalization } from '@/lib/personalization/use-personalization';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { useGetPersonalization } from '@/lib/personalization/use-personalization';
 import { cn } from '@/lib/utils';
 import { AppShellHeader } from './AppShellHeader';
 

@@ -4,8 +4,8 @@ import type * as React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useGetPersonalization } from '@/lib/personalization/use-personalization';
 import { useCurrentUser } from '@/hooks/use-current-user';
+import { useGetPersonalization } from '@/lib/personalization/use-personalization';
 import { getInitials } from '@/lib/user-utils';
 import {
 	SettingsCard,
