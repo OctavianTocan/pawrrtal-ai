@@ -1,6 +1,7 @@
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ConversationStatusGlyph, STATUS_SUBMENU } from './ConversationStatusGlyph';
+import { ConversationStatusGlyph } from './ConversationStatusGlyph';
+import { STATUS_SUBMENU } from './conversation-status-data';
 
 describe('ConversationStatusGlyph', () => {
 	it('renders the todo glyph in the info color', () => {

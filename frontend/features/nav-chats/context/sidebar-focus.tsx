@@ -15,7 +15,16 @@
 'use client';
 
 import type React from 'react';
-import { createContext, use, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+	createContext,
+	use,
+	useCallback,
+	useEffect,
+	useEffectEvent,
+	useMemo,
+	useRef,
+	useState,
+} from 'react';
 
 /** Identifies one of the three focusable regions. */
 export type FocusZoneId = 'sidebar' | 'navigator' | 'chat';
@@ -174,7 +183,7 @@ export function SidebarFocusProvider({
 }
 
 /** Access the focus context. Throws if called outside SidebarFocusProvider. */
-export function useSidebarFocusContext(): FocusContextValue {
+function useSidebarFocusContext(): FocusContextValue {
 	const context = use(FocusContext);
 	if (!context) {
 		throw new Error('useSidebarFocusContext must be used within SidebarFocusProvider.');
@@ -223,6 +232,12 @@ export function useFocusZone({
 		enabled && focusState.zone === zoneId && focusState.shouldMoveDOMFocus;
 	const intent = focusState.zone === zoneId ? focusState.intent : null;
 	const previousIsFocused = useRef(isFocused);
+	const fireOnFocus = useEffectEvent((): void => {
+		onFocus?.();
+	});
+	const fireOnBlur = useEffectEvent((): void => {
+		onBlur?.();
+	});
 
 	// Register/unregister this zone as it mounts, unmounts, or toggles enabled.
 	useEffect(() => {
@@ -248,15 +263,15 @@ export function useFocusZone({
 	// Fire onFocus/onBlur callbacks when the zone's active state changes.
 	useEffect(() => {
 		if (isFocused && !previousIsFocused.current) {
-			onFocus?.();
+			fireOnFocus();
 		}
 
 		if (!isFocused && previousIsFocused.current) {
-			onBlur?.();
+			fireOnBlur();
 		}
 
 		previousIsFocused.current = isFocused;
-	}, [isFocused, onBlur, onFocus]);
+	}, [isFocused]);
 
 	return {
 		zoneRef,

@@ -37,18 +37,18 @@ import {
 import { cn } from '@/lib/utils';
 
 /** Props for the prompt input body slot. */
-export type PromptInputBodyProps = HTMLAttributes<HTMLDivElement>;
+type PromptInputBodyProps = HTMLAttributes<HTMLDivElement>;
 
 /** Body slot for prompt input content. */
-export const PromptInputBody = ({ className, ...props }: PromptInputBodyProps) => (
+const _PromptInputBody = ({ className, ...props }: PromptInputBodyProps) => (
 	<div className={cn('contents', className)} {...props} />
 );
 
 /** Props for the prompt input header slot. */
-export type PromptInputHeaderProps = Omit<ComponentProps<typeof InputGroupAddon>, 'align'>;
+type PromptInputHeaderProps = Omit<ComponentProps<typeof InputGroupAddon>, 'align'>;
 
 /** Header slot rendered at the block start of the input group. */
-export const PromptInputHeader = ({ className, ...props }: PromptInputHeaderProps) => (
+const _PromptInputHeader = ({ className, ...props }: PromptInputHeaderProps) => (
 	<InputGroupAddon
 		align="block-end"
 		className={cn('order-first flex-wrap gap-1', className)}
@@ -72,10 +72,10 @@ export const PromptInputFooter = ({ className, ...props }: PromptInputFooterProp
 );
 
 /** Props for tool groups in the prompt input footer. */
-export type PromptInputToolsProps = HTMLAttributes<HTMLDivElement>;
+type PromptInputToolsProps = HTMLAttributes<HTMLDivElement>;
 
 /** Horizontal tool group for prompt input actions. */
-export const PromptInputTools = ({ className, ...props }: PromptInputToolsProps) => (
+const _PromptInputTools = ({ className, ...props }: PromptInputToolsProps) => (
 	<div className={cn('flex items-center gap-1', className)} {...props} />
 );
 
@@ -128,7 +128,7 @@ function PromptInputActionMenuContentSlot({
 PromptInputActionMenuContentSlot.displayName = 'PromptInputActionMenuContentSlot';
 
 /** Props for the prompt input action dropdown menu. */
-export type PromptInputActionMenuProps = {
+type PromptInputActionMenuProps = {
 	children?: ReactNode;
 	className?: string;
 	onOpenChange?: (isOpen: boolean) => void;
@@ -141,7 +141,7 @@ export type PromptInputActionMenuProps = {
  * single `DropdownPanelMenu` so the compound API consumers expect keeps
  * working unchanged.
  */
-export const PromptInputActionMenu = ({
+const _PromptInputActionMenu = ({
 	children,
 	className,
 	onOpenChange,
@@ -173,10 +173,10 @@ export const PromptInputActionMenu = ({
 };
 
 /** Props for the prompt input action menu trigger. */
-export type PromptInputActionMenuTriggerProps = PromptInputButtonProps;
+type PromptInputActionMenuTriggerProps = PromptInputButtonProps;
 
 /** Default trigger button for prompt input action menus. */
-export const PromptInputActionMenuTrigger = ({
+const _PromptInputActionMenuTrigger = ({
 	className,
 	children,
 	...props
@@ -189,7 +189,7 @@ export const PromptInputActionMenuTrigger = ({
 );
 
 /** Props for the prompt input action menu content. */
-export type PromptInputActionMenuContentProps = {
+type PromptInputActionMenuContentProps = {
 	children?: ReactNode;
 	className?: string;
 };
@@ -198,18 +198,17 @@ export type PromptInputActionMenuContentProps = {
  * Menu content for prompt input actions. Children are forwarded into the
  * underlying `DropdownPanelMenu` panel via the slot sentinel pattern.
  */
-export const PromptInputActionMenuContent = ({ children }: PromptInputActionMenuContentProps) => (
+const _PromptInputActionMenuContent = ({ children }: PromptInputActionMenuContentProps) => (
 	<PromptInputActionMenuContentSlot>{children}</PromptInputActionMenuContentSlot>
 );
 
 /** Props for a prompt input action menu item. */
-export type PromptInputActionMenuItemProps = ComponentProps<typeof DropdownMenuItem>;
+type PromptInputActionMenuItemProps = ComponentProps<typeof DropdownMenuItem>;
 
 /** Menu item for prompt input actions. */
-export const PromptInputActionMenuItem = ({
-	className,
-	...props
-}: PromptInputActionMenuItemProps) => <DropdownMenuItem className={cn(className)} {...props} />;
+const _PromptInputActionMenuItem = ({ className, ...props }: PromptInputActionMenuItemProps) => (
+	<DropdownMenuItem className={cn(className)} {...props} />
+);
 
 /** Props for the prompt input submit button. */
 export type PromptInputSubmitProps = ComponentProps<typeof InputGroupButton> & {
@@ -250,19 +249,16 @@ export const PromptInputSubmit = ({
 };
 
 /** Props for prompt input select roots. */
-export type PromptInputSelectProps = ComponentProps<typeof Select>;
+type PromptInputSelectProps = ComponentProps<typeof Select>;
 
 /** Select root for prompt input controls. */
-export const PromptInputSelect = (props: PromptInputSelectProps) => <Select {...props} />;
+const _PromptInputSelect = (props: PromptInputSelectProps) => <Select {...props} />;
 
 /** Props for prompt input select triggers. */
-export type PromptInputSelectTriggerProps = ComponentProps<typeof SelectTrigger>;
+type PromptInputSelectTriggerProps = ComponentProps<typeof SelectTrigger>;
 
 /** Select trigger styled for prompt input toolbars. */
-export const PromptInputSelectTrigger = ({
-	className,
-	...props
-}: PromptInputSelectTriggerProps) => (
+const _PromptInputSelectTrigger = ({ className, ...props }: PromptInputSelectTriggerProps) => (
 	<SelectTrigger
 		className={cn(
 			'border-none bg-transparent font-medium text-muted-foreground shadow-none transition-colors',
@@ -274,27 +270,26 @@ export const PromptInputSelectTrigger = ({
 );
 
 /** Props for prompt input select content. */
-export type PromptInputSelectContentProps = ComponentProps<typeof SelectContent>;
+type PromptInputSelectContentProps = ComponentProps<typeof SelectContent>;
 
 /** Select content for prompt input menus. */
-export const PromptInputSelectContent = ({
-	className,
-	...props
-}: PromptInputSelectContentProps) => <SelectContent className={cn(className)} {...props} />;
+const _PromptInputSelectContent = ({ className, ...props }: PromptInputSelectContentProps) => (
+	<SelectContent className={cn(className)} {...props} />
+);
 
 /** Props for prompt input select items. */
-export type PromptInputSelectItemProps = ComponentProps<typeof SelectItem>;
+type PromptInputSelectItemProps = ComponentProps<typeof SelectItem>;
 
 /** Select item for prompt input menus. */
-export const PromptInputSelectItem = ({ className, ...props }: PromptInputSelectItemProps) => (
+const _PromptInputSelectItem = ({ className, ...props }: PromptInputSelectItemProps) => (
 	<SelectItem className={cn(className)} {...props} />
 );
 
 /** Props for prompt input select values. */
-export type PromptInputSelectValueProps = ComponentProps<typeof SelectValue>;
+type PromptInputSelectValueProps = ComponentProps<typeof SelectValue>;
 
 /** Select value display for prompt input controls. */
-export const PromptInputSelectValue = ({ className, ...props }: PromptInputSelectValueProps) => (
+const _PromptInputSelectValue = ({ className, ...props }: PromptInputSelectValueProps) => (
 	<SelectValue className={cn(className)} {...props} />
 );
 
@@ -328,26 +323,26 @@ export const PromptInputHoverCardContent = ({
 }: PromptInputHoverCardContentProps) => <HoverCardContent align={align} {...props} />;
 
 /** Props for prompt input tab lists. */
-export type PromptInputTabsListProps = HTMLAttributes<HTMLDivElement>;
+type PromptInputTabsListProps = HTMLAttributes<HTMLDivElement>;
 
 /** Container for prompt input tabs. */
-export const PromptInputTabsList = ({ className, ...props }: PromptInputTabsListProps) => (
+const _PromptInputTabsList = ({ className, ...props }: PromptInputTabsListProps) => (
 	<div className={cn(className)} {...props} />
 );
 
 /** Props for prompt input tab groups. */
-export type PromptInputTabProps = HTMLAttributes<HTMLDivElement>;
+type PromptInputTabProps = HTMLAttributes<HTMLDivElement>;
 
 /** Tab group for prompt input menus. */
-export const PromptInputTab = ({ className, ...props }: PromptInputTabProps) => (
+const _PromptInputTab = ({ className, ...props }: PromptInputTabProps) => (
 	<div className={cn(className)} {...props} />
 );
 
 /** Props for prompt input tab labels. */
-export type PromptInputTabLabelProps = HTMLAttributes<HTMLHeadingElement>;
+type PromptInputTabLabelProps = HTMLAttributes<HTMLHeadingElement>;
 
 /** Label for a prompt input tab section. */
-export const PromptInputTabLabel = ({
+const _PromptInputTabLabel = ({
 	children = 'Prompt input options',
 	className,
 	...props
@@ -358,18 +353,18 @@ export const PromptInputTabLabel = ({
 );
 
 /** Props for prompt input tab bodies. */
-export type PromptInputTabBodyProps = HTMLAttributes<HTMLDivElement>;
+type PromptInputTabBodyProps = HTMLAttributes<HTMLDivElement>;
 
 /** Body for a prompt input tab section. */
-export const PromptInputTabBody = ({ className, ...props }: PromptInputTabBodyProps) => (
+const _PromptInputTabBody = ({ className, ...props }: PromptInputTabBodyProps) => (
 	<div className={cn('space-y-1', className)} {...props} />
 );
 
 /** Props for prompt input tab items. */
-export type PromptInputTabItemProps = HTMLAttributes<HTMLDivElement>;
+type PromptInputTabItemProps = HTMLAttributes<HTMLDivElement>;
 
 /** Clickable row inside a prompt input tab section. */
-export const PromptInputTabItem = ({ className, ...props }: PromptInputTabItemProps) => (
+const _PromptInputTabItem = ({ className, ...props }: PromptInputTabItemProps) => (
 	<div
 		className={cn('flex items-center gap-2 px-3 py-2 text-xs hover:bg-accent', className)}
 		{...props}
@@ -377,58 +372,58 @@ export const PromptInputTabItem = ({ className, ...props }: PromptInputTabItemPr
 );
 
 /** Props for prompt input command roots. */
-export type PromptInputCommandProps = ComponentProps<typeof Command>;
+type PromptInputCommandProps = ComponentProps<typeof Command>;
 
 /** Command root for prompt input search menus. */
-export const PromptInputCommand = ({ className, ...props }: PromptInputCommandProps) => (
+const _PromptInputCommand = ({ className, ...props }: PromptInputCommandProps) => (
 	<Command className={cn(className)} {...props} />
 );
 
 /** Props for prompt input command search fields. */
-export type PromptInputCommandInputProps = ComponentProps<typeof CommandInput>;
+type PromptInputCommandInputProps = ComponentProps<typeof CommandInput>;
 
 /** Command search field for prompt input menus. */
-export const PromptInputCommandInput = ({ className, ...props }: PromptInputCommandInputProps) => (
+const _PromptInputCommandInput = ({ className, ...props }: PromptInputCommandInputProps) => (
 	<CommandInput className={cn(className)} {...props} />
 );
 
 /** Props for prompt input command lists. */
-export type PromptInputCommandListProps = ComponentProps<typeof CommandList>;
+type PromptInputCommandListProps = ComponentProps<typeof CommandList>;
 
 /** Command list for prompt input menus. */
-export const PromptInputCommandList = ({ className, ...props }: PromptInputCommandListProps) => (
+const _PromptInputCommandList = ({ className, ...props }: PromptInputCommandListProps) => (
 	<CommandList className={cn(className)} {...props} />
 );
 
 /** Props for prompt input command empty states. */
-export type PromptInputCommandEmptyProps = ComponentProps<typeof CommandEmpty>;
+type PromptInputCommandEmptyProps = ComponentProps<typeof CommandEmpty>;
 
 /** Command empty state for prompt input menus. */
-export const PromptInputCommandEmpty = ({ className, ...props }: PromptInputCommandEmptyProps) => (
+const _PromptInputCommandEmpty = ({ className, ...props }: PromptInputCommandEmptyProps) => (
 	<CommandEmpty className={cn(className)} {...props} />
 );
 
 /** Props for prompt input command groups. */
-export type PromptInputCommandGroupProps = ComponentProps<typeof CommandGroup>;
+type PromptInputCommandGroupProps = ComponentProps<typeof CommandGroup>;
 
 /** Command group for prompt input menus. */
-export const PromptInputCommandGroup = ({ className, ...props }: PromptInputCommandGroupProps) => (
+const _PromptInputCommandGroup = ({ className, ...props }: PromptInputCommandGroupProps) => (
 	<CommandGroup className={cn(className)} {...props} />
 );
 
 /** Props for prompt input command items. */
-export type PromptInputCommandItemProps = ComponentProps<typeof CommandItem>;
+type PromptInputCommandItemProps = ComponentProps<typeof CommandItem>;
 
 /** Command item for prompt input menus. */
-export const PromptInputCommandItem = ({ className, ...props }: PromptInputCommandItemProps) => (
+const _PromptInputCommandItem = ({ className, ...props }: PromptInputCommandItemProps) => (
 	<CommandItem className={cn(className)} {...props} />
 );
 
 /** Props for prompt input command separators. */
-export type PromptInputCommandSeparatorProps = ComponentProps<typeof CommandSeparator>;
+type PromptInputCommandSeparatorProps = ComponentProps<typeof CommandSeparator>;
 
 /** Command separator for prompt input menus. */
-export const PromptInputCommandSeparator = ({
+const _PromptInputCommandSeparator = ({
 	className,
 	...props
 }: PromptInputCommandSeparatorProps) => <CommandSeparator className={cn(className)} {...props} />;

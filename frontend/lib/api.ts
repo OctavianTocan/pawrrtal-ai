@@ -113,7 +113,7 @@ export function saveBackendConfig(config: BackendConfig): void {
 }
 
 /** Clear the runtime backend config override (reverts to build-time defaults). */
-export function clearBackendConfig(): void {
+function clearBackendConfig(): void {
 	try {
 		window.localStorage.removeItem(BACKEND_CONFIG_STORAGE_KEY);
 		emitBackendConfigChange();

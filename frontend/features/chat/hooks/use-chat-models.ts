@@ -9,7 +9,7 @@ import { API_ENDPOINTS, getBackendConfigFingerprint } from '@/lib/api';
  * needs to invalidate the catalog (e.g. an admin tool flipping a
  * `is_default` flag).
  */
-export const CHAT_MODELS_QUERY_KEY = 'models' as const;
+const CHAT_MODELS_QUERY_KEY = 'models' as const;
 
 /** One entry from `GET /api/v1/models`. */
 export interface ChatModelOption {

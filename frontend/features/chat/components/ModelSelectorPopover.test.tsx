@@ -15,8 +15,9 @@
 
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { CHAT_REASONING_LEVELS } from '../constants';
 import type { ChatModelOption } from '../hooks/use-chat-models';
-import { CHAT_REASONING_LEVELS, ModelSelectorPopover } from './ModelSelectorPopover';
+import { ModelSelectorPopover } from './ModelSelectorPopover';
 
 /**
  * Fixture catalog passed via the `models` prop. Now exercises the

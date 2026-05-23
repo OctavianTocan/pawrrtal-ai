@@ -285,9 +285,10 @@ const usePromptInputAttachmentState = ({
 
 	useDocumentDropTarget({ add, globalDrop });
 	useEffect(() => {
+		const ref = filesRef;
 		return () => {
 			if (!usingProvider) {
-				for (const file of filesRef.current) revokeFileUrl(file);
+				for (const file of ref.current) revokeFileUrl(file);
 			}
 		};
 	}, [usingProvider]);

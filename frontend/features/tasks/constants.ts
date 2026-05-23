@@ -89,4 +89,4 @@ export const TASK_STORAGE_KEYS = {
  * 96 characters preserves the editorial feel without letting a single row
  * dominate the list height.
  */
-export const TASK_TITLE_MAX_LENGTH = 96;
+const _TASK_TITLE_MAX_LENGTH = 96;

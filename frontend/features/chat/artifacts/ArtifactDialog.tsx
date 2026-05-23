@@ -46,8 +46,8 @@ export function ArtifactDialog({ artifact, onClose }: ArtifactDialogProps): Reac
 	}, [onClose]);
 
 	return createPortal(
-		<div
-			role="dialog"
+		<dialog
+			open
 			aria-modal="true"
 			aria-label={artifact.title}
 			className="artifact-dialog-overlay"
@@ -79,7 +79,7 @@ export function ArtifactDialog({ artifact, onClose }: ArtifactDialogProps): Reac
 					<ArtifactRenderer artifact={artifact} onInteractionSubmitted={onClose} />
 				</div>
 			</div>
-		</div>,
+		</dialog>,
 		document.body
 	);
 }

@@ -50,6 +50,7 @@ export function TaskQuickAdd({ onAdd }: TaskQuickAddProps): ReactNode {
 				<PlusIcon aria-hidden="true" className="size-3" strokeWidth={2.5} />
 			</span>
 			<input
+				aria-label="Add a task"
 				type="text"
 				value={value}
 				onChange={(event) => setValue(event.target.value)}

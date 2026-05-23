@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Image from 'next/image';
 import type React from 'react';
 import { WHIMSY_PRESETS, whimsyPresetUrl } from '@/lib/whimsy-presets';
 import {
@@ -187,16 +188,13 @@ export default function WhimsyTilePage(): React.JSX.Element {
 
 								<details className="text-xs text-muted-foreground">
 									<summary className="cursor-pointer">Single tile (raw)</summary>
-									<div
-										aria-label={`Single ${label} tile`}
+									<Image
+										alt={`Single ${label} tile`}
 										className="mt-2 inline-block rounded border border-border bg-background p-2 text-foreground"
-										role="img"
-										style={{
-											width: TILE_SIZE,
-											height: TILE_SIZE,
-											backgroundImage: `url("${uri}")`,
-											backgroundRepeat: 'no-repeat',
-										}}
+										height={TILE_SIZE}
+										src={uri}
+										unoptimized
+										width={TILE_SIZE}
 									/>
 								</details>
 							</div>

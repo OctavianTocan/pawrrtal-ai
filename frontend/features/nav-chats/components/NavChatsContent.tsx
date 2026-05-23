@@ -13,7 +13,7 @@ import type {
 	MouseEvent as ReactMouseEvent,
 	RefObject,
 } from 'react';
-import { Fragment } from 'react';
+import { Fragment, useMemo } from 'react';
 import type { ConversationGroup } from '@/lib/conversation-groups';
 import { highlightMatch } from '@/lib/highlight-match';
 import type { Conversation, ConversationStatus } from '@/lib/types';
@@ -152,6 +152,14 @@ function ConversationRow({
 		conversation.last_message_role === 'plan' ||
 		(conversation.pending_prompt_count ?? 0) > 0;
 
+	const searchCountBadge = useMemo(
+		() =>
+			searchCount && searchCount > 0 ? (
+				<SearchCountBadge count={searchCount} isSelected={isSelected} />
+			) : undefined,
+		[searchCount, isSelected]
+	);
+
 	return (
 		<ConversationSidebarItem
 			id={conversation.id}
@@ -183,11 +191,7 @@ function ConversationRow({
 						})
 					: undefined
 			}
-			titleTrailing={
-				searchCount && searchCount > 0 ? (
-					<SearchCountBadge count={searchCount} isSelected={isSelected} />
-				) : undefined
-			}
+			titleTrailing={searchCountBadge}
 			state={{
 				isArchived: conversation.is_archived,
 				isFlagged: conversation.is_flagged,
@@ -309,8 +313,9 @@ export function NavChatsContent({
 				ref={navigatorRef}
 				className={CONVERSATION_LIST_CLASS}
 				role="listbox"
+				tabIndex={0}
 				aria-label="Sessions"
-				aria-multiselectable="true"
+				aria-multiselectable={true}
 				onMouseDown={onNavigatorMouseDown}
 			>
 				<ul className="flex w-full min-w-0 flex-col gap-0">

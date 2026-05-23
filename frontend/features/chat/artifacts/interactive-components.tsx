@@ -145,6 +145,7 @@ export function ChoiceGroupRenderer(raw: LooseProps): ReactNode {
 							key={option.value}
 						>
 							<input
+								aria-label={option.label}
 								checked={selected.includes(option.value)}
 								id={inputId}
 								name={groupId}
@@ -206,6 +207,7 @@ export function TextFieldRenderer(raw: LooseProps): ReactNode {
 			</label>
 			{props.multiline ? (
 				<textarea
+					aria-label={props.label}
 					className="artifact-text-field-control"
 					id={inputId}
 					onChange={(e) => setDraft(e.target.value)}
@@ -215,6 +217,7 @@ export function TextFieldRenderer(raw: LooseProps): ReactNode {
 				/>
 			) : (
 				<input
+					aria-label={props.label}
 					className="artifact-text-field-control"
 					id={inputId}
 					onChange={(e) => setDraft(e.target.value)}
@@ -287,6 +290,7 @@ export function NumberFieldRenderer(raw: LooseProps): ReactNode {
 				<span className="artifact-number-field-value">{value}</span>
 			</label>
 			<input
+				aria-label={props.label}
 				className={`artifact-number-field-control artifact-number-field-${props.kind}`}
 				id={inputId}
 				max={props.max ?? undefined}

@@ -60,6 +60,7 @@ export function AddIntegrationModal({
 							className="absolute left-2.5 size-4 text-muted-foreground"
 						/>
 						<input
+							aria-label="Search integrations"
 							className="h-9 w-full rounded-[8px] border border-foreground/10 bg-foreground/[0.03] py-1 pr-3 pl-8 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
 							onChange={(event) => setQuery(event.target.value)}
 							placeholder="Search integrations..."

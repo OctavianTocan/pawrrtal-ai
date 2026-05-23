@@ -11,7 +11,7 @@ import {
 	DropdownContextMenuContent,
 } from '@octavian-tocan/react-dropdown';
 import { DropdownMenuProvider, ContextMenuProvider } from '@/components/ui/menu-context';
-import { sidebarNavRowSurfaceClassName } from '@/components/ui/sidebar-nav-row';
+import { sidebarNavRowSurfaceClassName } from '@/components/ui/sidebar-nav-row-surface';
 import { cn } from '@/lib/utils';
 
 export interface EntityRowProps {

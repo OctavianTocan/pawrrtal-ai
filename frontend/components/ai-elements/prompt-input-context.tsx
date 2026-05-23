@@ -7,19 +7,8 @@
 'use client';
 
 import type { FileUIPart } from 'ai';
-import { nanoid } from 'nanoid';
-import {
-	createContext,
-	type PropsWithChildren,
-	type RefObject,
-	use,
-	useCallback,
-	useEffect,
-	useMemo,
-	useReducer,
-	useRef,
-	useState,
-} from 'react';
+import { createContext, type PropsWithChildren, type RefObject, use } from 'react';
+import { LocalAttachmentsContext } from './prompt-input-attachments-context';
 
 /** Attachment controller exposed to prompt input child components. */
 export type AttachmentsContext = {
@@ -51,52 +40,17 @@ export type PromptInputProviderProps = PropsWithChildren<{
 	initialInput?: string;
 }>;
 
-export const PromptInputController = createContext<PromptInputControllerProps | null>(null);
-export const ProviderAttachmentsContext = createContext<AttachmentsContext | null>(null);
-export const LocalAttachmentsContext = createContext<AttachmentsContext | null>(null);
-const replaceTextInput = (_current: string, next: string): string => next;
+const PromptInputController = createContext<PromptInputControllerProps | null>(null);
+const ProviderAttachmentsContext = createContext<AttachmentsContext | null>(null);
 
-const revokeFileUrl = (file: { url?: string }) => {
-	if (file.url) {
-		URL.revokeObjectURL(file.url);
-	}
-};
-
-const createFilePart = (file: File): FileUIPart & { id: string } => ({
-	id: nanoid(),
-	type: 'file',
-	url: URL.createObjectURL(file),
-	mediaType: file.type,
-	filename: file.name,
-});
-
-/** Read the nearest provider-backed prompt input controller. */
-export const usePromptInputController = () => {
-	const ctx = use(PromptInputController);
-	if (!ctx) {
-		throw new Error(
-			'Wrap your component inside <PromptInputProvider> to use usePromptInputController().'
-		);
-	}
-	return ctx;
-};
+// Re-export from dedicated module so this file remains components-only for Fast Refresh.
+export { LocalAttachmentsContext } from './prompt-input-attachments-context';
 
 /** Read the provider-backed prompt input controller when one exists. */
 export const useOptionalPromptInputController = () => use(PromptInputController);
 
-/** Read the provider-level attachment controller. */
-export const useProviderAttachments = () => {
-	const ctx = use(ProviderAttachmentsContext);
-	if (!ctx) {
-		throw new Error(
-			'Wrap your component inside <PromptInputProvider> to use useProviderAttachments().'
-		);
-	}
-	return ctx;
-};
-
 /** Read provider-level attachments when the component is wrapped by a provider. */
-export const useOptionalProviderAttachments = () => use(ProviderAttachmentsContext);
+const useOptionalProviderAttachments = () => use(ProviderAttachmentsContext);
 
 /** Read the attachment controller for the current prompt input. */
 export const usePromptInputAttachments = () => {
@@ -110,98 +64,3 @@ export const usePromptInputAttachments = () => {
 	}
 	return context;
 };
-
-/**
- * Optional global provider that lifts PromptInput state outside of PromptInput.
- * If you don't use it, PromptInput stays fully self-managed.
- */
-export function PromptInputProvider({
-	initialInput: initialTextInput = '',
-	children,
-}: PromptInputProviderProps) {
-	const [textInput, setTextInput] = useReducer(replaceTextInput, initialTextInput);
-	const clearInput = useCallback(() => setTextInput(''), []);
-	const [attachmentFiles, setAttachmentFiles] = useState<(FileUIPart & { id: string })[]>([]);
-	const fileInputRef = useRef<HTMLInputElement | null>(null);
-	const openRef = useRef<() => void>(() => {
-		/* opener wired via PromptInputController */
-	});
-
-	const add = useCallback((files: File[] | FileList) => {
-		const incoming = Array.from(files);
-		if (incoming.length === 0) {
-			return;
-		}
-
-		setAttachmentFiles((prev) => prev.concat(incoming.map(createFilePart)));
-	}, []);
-
-	const remove = useCallback((id: string) => {
-		setAttachmentFiles((prev) => {
-			const found = prev.find((file) => file.id === id);
-			if (found) revokeFileUrl(found);
-			return prev.filter((file) => file.id !== id);
-		});
-	}, []);
-
-	const clear = useCallback(() => {
-		setAttachmentFiles((prev) => {
-			for (const file of prev) revokeFileUrl(file);
-			return [];
-		});
-	}, []);
-
-	const attachmentsRef = useRef(attachmentFiles);
-	attachmentsRef.current = attachmentFiles;
-
-	useEffect(() => {
-		return () => {
-			for (const file of attachmentsRef.current) revokeFileUrl(file);
-		};
-	}, []);
-
-	const openFileDialog = useCallback(() => {
-		openRef.current?.();
-	}, []);
-
-	const attachments = useMemo<AttachmentsContext>(
-		() => ({
-			files: attachmentFiles,
-			add,
-			remove,
-			clear,
-			openFileDialog,
-			fileInputRef,
-		}),
-		[attachmentFiles, add, remove, clear, openFileDialog]
-	);
-
-	const __registerFileInput = useCallback(
-		(ref: RefObject<HTMLInputElement | null>, open: () => void) => {
-			fileInputRef.current = ref.current;
-			openRef.current = open;
-		},
-		[]
-	);
-
-	const controller = useMemo<PromptInputControllerProps>(
-		() => ({
-			textInput: {
-				value: textInput,
-				setInput: setTextInput,
-				clear: clearInput,
-			},
-			attachments,
-			__registerFileInput,
-		}),
-		[textInput, clearInput, attachments, __registerFileInput]
-	);
-
-	return (
-		<PromptInputController.Provider value={controller}>
-			<ProviderAttachmentsContext.Provider value={attachments}>
-				{children}
-			</ProviderAttachmentsContext.Provider>
-		</PromptInputController.Provider>
-	);
-}

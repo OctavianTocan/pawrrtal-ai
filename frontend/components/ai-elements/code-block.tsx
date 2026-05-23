@@ -14,6 +14,7 @@ import {
 	type HTMLAttributes,
 	use,
 	useEffect,
+	useMemo,
 	useRef,
 	useState,
 } from 'react';
@@ -46,7 +47,7 @@ const CodeBlockContext = createContext<CodeBlockContextType>({
 	code: '',
 });
 
-export async function highlightCode(
+async function highlightCode(
 	code: string,
 	language: BundledLanguage
 ): Promise<[HighlightedCode, HighlightedCode]> {
@@ -104,14 +105,20 @@ function HighlightedCodeView({
 			<pre className="m-0 bg-background! p-4 text-foreground! text-sm">
 				<code className="font-mono text-sm">
 					{highlighted?.tokens.map((line, lineIndex) => (
-						<span className="block min-h-[1lh]" key={lineIndex}>
+						<span
+							className="block min-h-[1lh]"
+							key={`line-${lineIndex}-${line.map((t) => t.content).join('')}`}
+						>
 							{showLineNumbers ? (
 								<span className="mr-4 inline-block min-w-10 select-none text-right text-muted-foreground">
 									{lineIndex + 1}
 								</span>
 							) : null}
-							{line.map((token, tokenIndex) => (
-								<span key={tokenIndex} style={tokenStyle(token)}>
+							{line.map((token) => (
+								<span
+									key={`${token.content}-${token.color ?? ''}`}
+									style={tokenStyle(token)}
+								>
 									{token.content}
 								</span>
 							))}
@@ -152,8 +159,10 @@ export const CodeBlock = ({
 		};
 	}, [code, language]);
 
+	const contextValue = useMemo(() => ({ code }), [code]);
+
 	return (
-		<CodeBlockContext.Provider value={{ code }}>
+		<CodeBlockContext.Provider value={contextValue}>
 			<div
 				className={cn(
 					'group relative w-full overflow-hidden rounded-md border bg-background text-foreground',
@@ -207,8 +216,9 @@ export const CodeBlockCopyButton = ({
 	const revertTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
 	useEffect(() => {
+		const timerRef = revertTimerRef;
 		return () => {
-			if (revertTimerRef.current !== null) clearTimeout(revertTimerRef.current);
+			if (timerRef.current !== null) clearTimeout(timerRef.current);
 		};
 	}, []);
 

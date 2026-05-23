@@ -81,7 +81,7 @@ const FALLBACK_VENDOR_LOGO: ComponentType<SVGProps<SVGSVGElement>> =
  * by `GET /api/v1/models`). New vendors fall back to
  * {@link FALLBACK_VENDOR_LOGO} via {@link vendorLogo}.
  */
-export const VENDOR_LOGOS: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
+const VENDOR_LOGOS: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
 	anthropic: FALLBACK_VENDOR_LOGO,
 	google: createModelsDevLogo('google'),
 	openai: createModelsDevLogo('openai'),

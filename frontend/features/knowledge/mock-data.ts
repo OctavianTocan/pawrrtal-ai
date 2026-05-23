@@ -100,7 +100,7 @@ last used.
  * Two top-level folders mirror the screenshots from the design reference:
  * `Misc` (long-running scratchpad) and `onboarding` (introductory docs).
  */
-export const KNOWLEDGE_FILE_TREE: FileTreeNode = {
+const _KNOWLEDGE_FILE_TREE: FileTreeNode = {
 	kind: 'folder',
 	name: 'My Files',
 	updatedLabel: 'Today',

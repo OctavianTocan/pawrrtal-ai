@@ -122,6 +122,7 @@ export function WorkspacesSectionView({
 							</div>
 							<div className="relative flex items-center">
 								<input
+									aria-label={label}
 									className="flex h-9 w-full rounded-md border border-border bg-background px-3 pr-10 text-foreground text-sm placeholder:text-muted-foreground"
 									id={`env-${key}`}
 									onChange={(e) => {
