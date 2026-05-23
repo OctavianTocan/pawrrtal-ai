@@ -16,7 +16,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useCallback, useEffectEvent, useRef, useState } from 'react';
+import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { useAuthedQuery } from '@/hooks/use-authed-query';
 import { API_ENDPOINTS } from '@/lib/api';
 import {
@@ -83,18 +83,18 @@ export function useTelegramBinding(options: UseTelegramBindingOptions = {}): Tel
 
 	const binding = channelsQuery.data?.find((row) => row.provider === PROVIDER) ?? null;
 
-	if (binding && pendingCode) {
-		const bindingKey = [
-			binding.provider,
-			binding.external_user_id,
-			binding.external_chat_id ?? '',
-		].join(':');
-		if (notifiedBindingKeyRef.current !== bindingKey) {
-			notifiedBindingKeyRef.current = bindingKey;
-			setPendingCode(null);
-			fireConnected();
-		}
-	}
+	const bindingKey =
+		binding && pendingCode
+			? [binding.provider, binding.external_user_id, binding.external_chat_id ?? ''].join(':')
+			: null;
+
+	useEffect(() => {
+		if (!bindingKey) return;
+		if (notifiedBindingKeyRef.current === bindingKey) return;
+		notifiedBindingKeyRef.current = bindingKey;
+		setPendingCode(null);
+		fireConnected();
+	}, [bindingKey]);
 
 	const linkMutation = useMutation({
 		mutationFn: () => issueTelegramLinkCode(),
@@ -144,6 +144,7 @@ export function useTelegramBinding(options: UseTelegramBindingOptions = {}): Tel
 
 	const startConnect = useCallback(async (): Promise<void> => {
 		setError(null);
+		notifiedBindingKeyRef.current = null;
 		await linkMutation.mutateAsync();
 	}, [linkMutation]);
 

@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { render } from '@testing-library/react';
+import { render, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { GeneralSection } from './GeneralSection';
 
-const { mockCurrentUser, mockPersonalization } = vi.hoisted(() => ({
+const { mockCurrentUser, mockPersonalization, mockUpsert } = vi.hoisted(() => ({
 	mockCurrentUser: {
 		data: {
 			id: '1',
@@ -16,10 +16,11 @@ const { mockCurrentUser, mockPersonalization } = vi.hoisted(() => ({
 		isError: false,
 	},
 	mockPersonalization: {
-		data: { name: 'Test User', role: 'Design' },
+		data: { name: 'Test User', role: 'Design', customInstructions: '' },
 		isLoading: false,
 		isError: false,
 	},
+	mockUpsert: { mutate: vi.fn(), isPending: false },
 }));
 
 vi.mock('@/hooks/use-current-user', () => ({
@@ -28,6 +29,7 @@ vi.mock('@/hooks/use-current-user', () => ({
 
 vi.mock('@/lib/personalization/use-personalization', () => ({
 	useGetPersonalization: () => mockPersonalization,
+	useUpsertPersonalization: () => mockUpsert,
 }));
 
 function createWrapper(): React.ComponentType<{ children: React.ReactNode }> {
@@ -45,18 +47,25 @@ describe('GeneralSection', () => {
 		expect(getByText('Notifications')).toBeTruthy();
 	});
 
-	it('renders dynamic profile data from hooks', () => {
+	it('hydrates profile data after mount', async () => {
 		const { getByDisplayValue } = render(<GeneralSection />, { wrapper: createWrapper() });
-		expect(getByDisplayValue('Test User')).toBeTruthy();
+		await waitFor(() => {
+			expect(getByDisplayValue('Test User')).toBeTruthy();
+		});
 		expect(getByDisplayValue('Test')).toBeTruthy();
 		expect(getByDisplayValue('Design')).toBeTruthy();
 	});
 
-	it('falls back to email when personalization has no name', () => {
+	it('renders empty inputs when personalization has no name or role', async () => {
 		const prevData = mockPersonalization.data;
 		mockPersonalization.data = {} as never;
-		const { getByDisplayValue } = render(<GeneralSection />, { wrapper: createWrapper() });
-		expect(getByDisplayValue('user@example.com')).toBeTruthy();
+		const { container } = render(<GeneralSection />, { wrapper: createWrapper() });
+		await waitFor(() => {
+			const inputs = container.querySelectorAll('input');
+			const nameInput = inputs[0];
+			expect(nameInput).toBeTruthy();
+			expect((nameInput as HTMLInputElement).value).toBe('');
+		});
 		mockPersonalization.data = prevData;
 	});
 
