@@ -17,7 +17,7 @@
 		"fix": "bunx --bun @biomejs/biome check --write",
 		"check": "bunx --bun @biomejs/biome check && tsc --noEmit && node ../scripts/check-file-lines.mjs && node ../scripts/check-nesting.mjs && node ../scripts/check-view-container.mjs",
 		"generate:docs": "node ../node_modules/.bin/fumadocs-mdx source.config.ts",
-		"arch:check": "depcruise --config .dependency-cruiser.cjs --validate .dependency-cruiser.cjs app features components lib hooks"
+		"arch:check": "bunx dependency-cruiser --config .dependency-cruiser.cjs --validate .dependency-cruiser.cjs app features components lib hooks"
 	},
 	"dependencies": {
 		"@hugeicons/core-free-icons": "^4.1.2",
@@ -70,7 +70,6 @@
 		"@vitejs/plugin-react": "^5.2.0",
 		"@vitest/coverage-v8": "^4.1.5",
 		"agentation": "^3.0.2",
-		"dependency-cruiser": "^17.4.0",
 		"jsdom": "^29.1.1",
 		"tailwindcss": "^4.3.0",
 		"typescript": "^6.0.3",
