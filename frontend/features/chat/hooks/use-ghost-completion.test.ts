@@ -3,7 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGhostCompletion } from './use-ghost-completion';
 
 const { mockRouter } = vi.hoisted(() => ({
-	mockRouter: { replace: vi.fn(), push: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() },
+	mockRouter: {
+		replace: vi.fn(),
+		push: vi.fn(),
+		back: vi.fn(),
+		forward: vi.fn(),
+		refresh: vi.fn(),
+		prefetch: vi.fn(),
+	},
 }));
 
 vi.mock('next/navigation', () => ({

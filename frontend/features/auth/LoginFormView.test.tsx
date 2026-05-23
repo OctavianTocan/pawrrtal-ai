@@ -49,7 +49,9 @@ describe('LoginFormView', () => {
 
 	it('disables submit button when isLoading is true', () => {
 		const { getByRole } = render(<LoginFormView {...baseProps} isLoading />);
-		expect((getByRole('button', { name: /logging in/i }) as HTMLButtonElement).disabled).toBe(true);
+		expect((getByRole('button', { name: /logging in/i }) as HTMLButtonElement).disabled).toBe(
+			true
+		);
 	});
 
 	it('fires onEmailChange/onPasswordChange when fields are typed into', async () => {
