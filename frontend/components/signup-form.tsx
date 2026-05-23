@@ -14,30 +14,27 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { API_ENDPOINTS, apiFetch } from '@/lib/api';
+import { useSignupMutation } from '@/features/auth/hooks/use-signup-mutations';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 
 /** Self-service registration form. */
 export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
 	const [errorMessage, setErrorMessage] = useState('');
-	// To disable buttons while submitting.
-	const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'submitting'>('idle');
 	// Get the router.
 	const { push } = useRouter();
+	const signupMutation = useSignupMutation();
+	const isSubmitting = signupMutation.isPending;
+
 	// SSR-stable unique IDs so each Field's label and input pair correctly even
 	// if the form is rendered more than once on the same page.
 	const nameId = useId();
 	const emailId = useId();
 	const passwordId = useId();
 	const confirmPasswordId = useId();
-	const isSubmitting = submissionStatus === 'submitting';
 
 	const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
 		// Stops the page from refreshing.
 		event.preventDefault();
-
-		// Disable the button while submitting.
-		setSubmissionStatus('submitting');
 
 		const formData = new FormData(event.target as HTMLFormElement);
 		const email = formData.get('email')?.toString() ?? '';
@@ -45,60 +42,22 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
 		const confirmPassword = formData.get('confirm-password')?.toString() ?? '';
 		if (password !== confirmPassword) {
 			setErrorMessage('Passwords do not match');
-			// Enable the button again.
-			setSubmissionStatus('idle');
 			return;
 		}
 
-		// TODO: This inline fetch needs to be moved to a custom hook.
-		const response = await apiFetch(API_ENDPOINTS.auth.register, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({
-				email: email,
-				password: password,
-			}),
-		});
-
-		// TODO: Check detail for error. ({"detail":"REGISTER_USER_ALREADY_EXISTS"}
-		// TODO: Check response for success: ({
-		//     "id": "73946aca-98f2-45e8-8690-4da5b62cffbd",
-		//     "email": "tocanoctavian@gmail.com",
-		//     "is_active": true,
-		//     "is_superuser": false,
-		//     "is_verified": false
-		// }))
-		// TODO: If success, redirect back to where the user came from, but with a success message.
-		if (!response.ok) {
-			const error = await response.json();
-			setErrorMessage(error.detail);
-			// Enable the button again.
-			setSubmissionStatus('idle');
-			return;
-		}
-
-		// Reset the error message.
-		// We do it here, so the Alert component doesn't jump unnecessarily every time we press the submit button.
 		setErrorMessage('');
-
-		// We need to log the user in after we've created the account.
-		// Otherwise, it'll feel odd to still need to log in after signing up.
-		await apiFetch(API_ENDPOINTS.auth.login, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/x-www-form-urlencoded',
-			},
-			body: new URLSearchParams({
-				username: email,
-				password: password,
-			}),
-			credentials: 'include',
-		});
-
-		// Redirect to the homepage.
-		push('/');
+		signupMutation.mutate(
+			{ email, password },
+			{
+				onSuccess: () => {
+					// Redirect to the homepage.
+					push('/');
+				},
+				onError: (error) => {
+					setErrorMessage(error.message);
+				},
+			}
+		);
 	};
 
 	return (
