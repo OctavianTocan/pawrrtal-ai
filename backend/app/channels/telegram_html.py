@@ -22,11 +22,29 @@ Telegram markup (double newline, bullet prefix, bold, respectively).
 from __future__ import annotations
 
 import html as _html
+import re
 from html.parser import HTMLParser
 
 from markdown_it import MarkdownIt
 
 _md = MarkdownIt()
+
+_BLANK_LINE_RUN = re.compile(r"\n{3,}")
+
+
+def _collapse_blank_lines(text: str) -> str:
+    r"""Collapse runs of 3+ newlines down to ``\n\n``.
+
+    Several dispatch helpers emit ``\n\n`` independently for adjacent
+    constructs (``</p>`` close, ``</ul>`` close, heading close). When
+    they stack — e.g. a loose-list's last ``</p>`` followed by the
+    enclosing ``</ul>`` — the output picks up 3+ newlines, which
+    Telegram renders as multiple blank lines and looks like rendering
+    debris. Two newlines is the maximum vertical break the channel
+    treats as meaningful; clamp the rest.
+    """
+    return _BLANK_LINE_RUN.sub("\n\n", text)
+
 
 _INLINE_TAG_MAP: dict[str, str] = {
     "b": "b",
@@ -61,6 +79,11 @@ _TEXT_PRESERVING_TAGS = frozenset(
         *_HEADING_TAGS,
     }
 )
+# ``<li>`` IS in this set so single-space text nodes between inline
+# fragments inside a bullet (``<strong>Foo</strong> <em>bar</em>``)
+# survive. The pure-newline loose-list artifact (``<li>\n<p>…</p>\n``)
+# is filtered separately in ``_is_inter_block_whitespace`` — see the
+# special case there. Issue #417.
 
 
 class _TelegramRenderer(HTMLParser):
@@ -103,8 +126,18 @@ class _TelegramRenderer(HTMLParser):
         self._buf.append(_html.escape(data))
 
     def result(self) -> str:
-        """Return the accumulated Telegram-safe HTML string."""
-        return "".join(self._buf).strip()
+        r"""Return the accumulated Telegram-safe HTML string.
+
+        Collapses runs of 3+ newlines down to ``\n\n``. The dispatch
+        helpers emit ``\n\n`` independently for several constructs that
+        can stack (``</p>`` close inside ``<li>`` plus a sibling
+        ``</ul>`` close, ``</p>`` close before another block-level tag,
+        etc.). Two newlines is the maximum vertical break Telegram
+        renders meaningfully — beyond that the user sees walls of
+        whitespace.
+        """
+        rendered = "".join(self._buf).strip()
+        return _collapse_blank_lines(rendered)
 
     # ------------------------------------------------------------------
     # Dispatch helpers (keep individual methods under complexity limit)
@@ -112,10 +145,24 @@ class _TelegramRenderer(HTMLParser):
 
     def _is_inter_block_whitespace(self, data: str) -> bool:
         """Return true for markdown-it's formatting whitespace between blocks."""
-        is_container_whitespace = data.isspace() and not (
-            set(self._open_tags) & _TEXT_PRESERVING_TAGS
-        )
-        return not self._in_pre and is_container_whitespace
+        if self._in_pre or not data.isspace():
+            return False
+        # Loose-list artifact: markdown-it emits ``<li>\n<p>…</p>\n</li>``
+        # when items are blank-line-separated. The ``\n`` chunks directly
+        # under ``<li>`` (no inline tags open) are layout, not content;
+        # keeping them puts the bullet on its own line above the text
+        # (issue #417). We narrowly target *pure-newline* whitespace so
+        # the legitimate single space between ``<strong>Foo</strong>`` and
+        # ``<em>bar</em>`` inside a bullet still survives.
+        if (
+            self._open_tags
+            and self._open_tags[-1] == "li"
+            and "\n" in data
+            and " " not in data
+            and "\t" not in data
+        ):
+            return True
+        return not (set(self._open_tags) & _TEXT_PRESERVING_TAGS)
 
     def _pop_open_tag(self, tag: str) -> None:
         if self._open_tags and self._open_tags[-1] == tag:

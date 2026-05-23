@@ -67,6 +67,77 @@ class TestMdToTelegramHtml:
         result = md_to_telegram_html(md)
         assert result == "Intro.\n\n• item one\n• item two\n\nOutro."
 
+    def test_loose_list_keeps_bullet_with_content(self) -> None:
+        """Loose-list markdown (blank line between items) must render the
+        bullet on the same line as the item content. Regression for #417 —
+        markdown-it wraps each loose-list item in ``<p>``, which used to push
+        the bullet onto its own line above the bold/text content.
+
+        A blank line between bullets is honoured (loose-list markdown is an
+        explicit "add spacing" by the author); the key invariant is that the
+        ``•`` and the item text share a single line.
+        """
+        md = "- **Foo**: blah\n\n- **Baz**: more"
+        result = md_to_telegram_html(md)
+        assert result == "• <b>Foo</b>: blah\n\n• <b>Baz</b>: more"
+
+    def test_loose_and_tight_lists_both_keep_bullet_with_content(self) -> None:
+        """Tight and loose list rendering may differ in inter-bullet spacing
+        (loose preserves the author's blank line) but both must keep the
+        bullet on the same line as the item content.
+        """
+        tight = md_to_telegram_html("- alpha\n- beta")
+        loose = md_to_telegram_html("- alpha\n\n- beta")
+        assert tight == "• alpha\n• beta"
+        assert loose == "• alpha\n\n• beta"
+        # The shared invariant: no chunk ever ends with ``• \n``.
+        for rendered in (tight, loose):
+            assert "• \n" not in rendered
+
+    def test_loose_list_between_paragraphs(self) -> None:
+        """A loose bullet list embedded between intro and outro paragraphs
+        keeps the surrounding blank-line separators *and* the author's
+        intra-list spacing.
+        """
+        md = "Intro.\n\n- item one\n\n- item two\n\nOutro."
+        result = md_to_telegram_html(md)
+        assert result == "Intro.\n\n• item one\n\n• item two\n\nOutro."
+
+    def test_inline_space_between_fragments_in_list_item_survives(self) -> None:
+        """Removing whitespace under ``<li>`` must not strip the single space
+        that markdown-it emits between adjacent inline tags inside a bullet.
+
+        Regression for the codex P1 review on #438 — an earlier draft removed
+        ``"li"`` from the text-preserving set and turned ``- **Foo** *bar*``
+        into ``• <b>Foo</b><i>bar</i>`` instead of ``• <b>Foo</b> <i>bar</i>``.
+        """
+        result = md_to_telegram_html("- **Foo** *bar*")
+        assert result == "• <b>Foo</b> <i>bar</i>"
+
+    def test_multi_paragraph_list_item_preserves_paragraph_break(self) -> None:
+        """A list item with two real paragraphs keeps the ``\\n\\n`` between
+        them. Regression for the codex P2 review on #438 — an earlier draft
+        suppressed every ``</p>`` close inside a ``<li>``, which collapsed
+        legitimate multi-paragraph items into a single line.
+        """
+        md = "- first paragraph\n\n  second paragraph"
+        result = md_to_telegram_html(md)
+        # The author wrote two paragraphs in one bullet; honour the break.
+        assert "first paragraph\n\nsecond paragraph" in result
+
+    def test_nested_block_after_paragraph_in_list_item_keeps_separator(self) -> None:
+        """A code block following a paragraph inside the same ``<li>`` must
+        keep the break between them. Regression for the codex P2 review on
+        #438 — the previous suppression flattened ``• text<pre>...`` with
+        no visible boundary.
+        """
+        md = "- text\n\n  ```\n  code\n  ```"
+        result = md_to_telegram_html(md)
+        assert "• text" in result
+        # The boundary between the paragraph and the code block survives —
+        # no direct ``text<pre>`` concatenation.
+        assert "text<pre>" not in result
+
     def test_blockquote(self) -> None:
         result = md_to_telegram_html("> quoted text")
         assert "<blockquote>" in result
