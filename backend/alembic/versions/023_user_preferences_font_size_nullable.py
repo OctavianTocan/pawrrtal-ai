@@ -5,8 +5,8 @@ own the canonical default value. Previously the column was NOT NULL
 with no schema default, which forced anyone seeding the row on
 demand to duplicate the frontend's default literal in Python.
 
-Revision ID: 022_user_preferences_font_size_nullable
-Revises: 021_add_user_preferences_default_model_id
+Revision ID: 023_user_preferences_font_size_nullable
+Revises: 022_add_user_preferences_default_model_id
 """
 
 from __future__ import annotations
@@ -14,8 +14,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "022_user_preferences_font_size_nullable"
-down_revision = "021_add_user_preferences_default_model_id"
+revision = "023_user_preferences_font_size_nullable"
+down_revision = "022_add_user_preferences_default_model_id"
 branch_labels = None
 depends_on = None
 
