@@ -340,7 +340,7 @@ def test_resolve_select_rejects_stale_catalog_token() -> None:
 
 
 def test_resolve_select_rejects_effort_not_supported_by_model() -> None:
-    entry = _entry(Host.xai, "grok-4.3")  # only low + high
+    entry = _entry(Host.xai, "grok-4.3")  # minimal + low + high
     callback = ThinkingCallback(action="select", catalog_token=catalog_token(), effort="medium")
     assert resolve_select(callback, entry=entry) is None
 

@@ -170,7 +170,7 @@ def make_xai_stream_fn(
             StreamFn per request so the workspace-assembled prompt
             (SOUL.md + AGENTS.md + skills) is what the model sees.
         reasoning_effort: Optional reasoning-depth knob for grok-4.3.
-            Mapped onto xAI's two-level proto enum via
+            Mapped onto xAI's three-tier proto enum via
             :func:`_map_reasoning_effort`.  ``None`` lets xAI pick the
             model default.
         usage_sink: Optional mutable :class:`UsageAccumulator` the
@@ -333,7 +333,7 @@ class XaiLLM:
                 back to :data:`DEFAULT_AGENT_SYSTEM_PROMPT` so bare
                 unit tests still work.
             reasoning_effort: Optional reasoning-depth knob.  Mapped
-                onto grok-4.3's two-level enum via
+                onto grok-4.3's three-tier enum via
                 :func:`_map_reasoning_effort` and passed to xai-sdk.
                 The model's chain-of-thought streams back as
                 ``reasoning_content`` deltas and surfaces as

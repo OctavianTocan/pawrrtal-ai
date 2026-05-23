@@ -216,8 +216,8 @@ GOOGLE_ENTRIES: tuple[ModelEntry, ...] = (
     ),
 )
 
-# xAI's SDK exposes two reasoning levels; ``_map_reasoning_effort`` in
-# xai_provider.py collapses pawrrtal's four levels into these two
+# xAI's SDK exposes three reasoning tiers; ``_map_reasoning_effort`` in
+# xai_provider.py collapses pawrrtal's five levels into these three
 # before the call, so the picker should match what the model actually
 # honours.
 XAI_ENTRIES: tuple[ModelEntry, ...] = (
