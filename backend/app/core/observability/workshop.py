@@ -145,6 +145,7 @@ def reset_tracer_for_tests() -> None:
     global _tracer_override  # noqa: PLW0603 — test seam by design
     _tracer_override = None
 
+
 # Per-conversation memory of the previous turn's span context so
 # successive turns in the same conversation are linked.  OTel span
 # links are the standard way to connect traces without forcing them
