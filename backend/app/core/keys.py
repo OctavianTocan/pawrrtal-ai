@@ -66,6 +66,7 @@ OVERRIDABLE_KEYS: frozenset[str] = frozenset(
         # allowlist remains the source of truth for the HTTP layer.
         "NOTION_API_KEY",
         "OPENCODE_API_KEY",
+        "GITHUB_TOKEN",
     }
 )
 
@@ -80,6 +81,7 @@ _SETTINGS_ATTR_MAP: dict[str, str] = {
     "XAI_API_KEY": "xai_api_key",
     "OPENAI_API_KEY": "openai_api_key",
     "OPENCODE_API_KEY": "opencode_api_key",
+    "GITHUB_TOKEN": "github_token",
     # OPENAI_CODEX_OAUTH_TOKEN intentionally absent — workspace-only, no
     # global settings fallback.  resolve_api_key() returns None for keys
     # missing from this map after the workspace lookup fails.

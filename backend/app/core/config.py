@@ -298,6 +298,12 @@ class Settings(BaseSettings):
     webhook_api_secret: str = ""
     # HMAC-SHA256 shared secret for GitHub deliveries.
     github_webhook_secret: str = ""
+    # Personal access token for creating GitHub issues via the
+    # ``report_issue`` agent tool. Requires ``repo`` scope (or
+    # ``public_repo`` for public repos). Leave empty to disable.
+    github_token: str = ""
+    # Target repository for agent-reported issues (owner/repo).
+    github_issues_repo: str = "octaviantocan/pawrrtal-ai"
 
     # ── Ops platform: scheduler (PR 12) ──────────────────────────────────
     # When False the scheduler lifespan task never starts; the API

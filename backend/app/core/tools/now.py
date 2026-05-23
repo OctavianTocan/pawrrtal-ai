@@ -42,6 +42,11 @@ from app.core.tools.display import make_tool_display
 from app.core.tools.external_mcp import (
     build_external_mcp_tools as build_external_mcp_tools,  # noqa: PLC0414
 )
+
+# Re-export for agent_tools — alphabetically after tasks_md.
+from app.core.tools.report_issue import (
+    make_report_issue_tool as make_report_issue_tool,  # noqa: PLC0414
+)
 from app.core.tools.skill_invocation import (
     make_invoke_skill_tool as make_invoke_skill_tool,  # noqa: PLC0414
 )
