@@ -156,3 +156,57 @@ class TestPermissions:
         )
         ctx = load_workspace_context(tmp_path)
         assert ctx.enabled_tools is None
+
+
+class TestMemoryFilePromptWiring:
+    """USER.md, IDENTITY.md, and MEMORY.md are loaded into the system prompt."""
+
+    def test_user_md_appears_in_prompt_with_fill_header(self, tmp_path: Path) -> None:
+        _write(tmp_path / "AGENTS.md", "rules")
+        _write(tmp_path / "USER.md", "Name: Alice")
+        ctx = load_workspace_context(tmp_path)
+        assert ctx.system_prompt is not None
+        assert "Name: Alice" in ctx.system_prompt
+        assert "## User" in ctx.system_prompt
+        assert "1375" in ctx.system_prompt
+
+    def test_memory_md_appears_in_prompt_with_fill_header(self, tmp_path: Path) -> None:
+        _write(tmp_path / "AGENTS.md", "rules")
+        _write(tmp_path / "MEMORY.md", "Prefers dark mode")
+        ctx = load_workspace_context(tmp_path)
+        assert ctx.system_prompt is not None
+        assert "Prefers dark mode" in ctx.system_prompt
+        assert "## Memory" in ctx.system_prompt
+        assert "2200" in ctx.system_prompt
+
+    def test_identity_md_appears_after_base_prompt(self, tmp_path: Path) -> None:
+        _write(tmp_path / "SOUL.md", "I am Paw")
+        _write(tmp_path / "IDENTITY.md", "Friendly assistant")
+        _write(tmp_path / "CLAUDE.md", "claude instructions")
+        ctx = load_workspace_context(tmp_path)
+        assert ctx.system_prompt is not None
+        assert "Friendly assistant" in ctx.system_prompt
+        identity_pos = ctx.system_prompt.index("Friendly assistant")
+        claude_pos = ctx.system_prompt.index("claude instructions")
+        assert identity_pos < claude_pos
+
+    def test_memory_files_appear_after_skills(self, tmp_path: Path) -> None:
+        _write(tmp_path / "AGENTS.md", "rules")
+        _write(
+            tmp_path / ".claude" / "skills" / "search" / "SKILL.md",
+            "description: search docs\n\nSearch body",
+        )
+        _write(tmp_path / "USER.md", "Name: Alice")
+        ctx = load_workspace_context(tmp_path)
+        assert ctx.system_prompt is not None
+        skills_pos = ctx.system_prompt.index("## Available Skills")
+        user_pos = ctx.system_prompt.index("## User")
+        assert skills_pos < user_pos
+
+    def test_missing_memory_files_omitted_gracefully(self, tmp_path: Path) -> None:
+        _write(tmp_path / "AGENTS.md", "rules")
+        ctx = load_workspace_context(tmp_path)
+        assert ctx.system_prompt is not None
+        assert "## User" not in ctx.system_prompt
+        assert "## Memory" not in ctx.system_prompt
+        assert "## Identity" not in ctx.system_prompt

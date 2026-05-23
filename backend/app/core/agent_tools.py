@@ -50,6 +50,7 @@ from app.core.tools.lcm_agents import (
     make_lcm_search_tool,
 )
 from app.core.tools.markitdown_convert import make_markitdown_tool
+from app.core.tools.memory_tool import make_memory_tool
 from app.core.tools.now import (
     build_external_mcp_tools,
     make_add_task_tool,
@@ -63,8 +64,11 @@ from app.core.tools.now import (
     make_now_tool,
     make_read_skill_tool,
 )
+from app.core.tools.process import make_process_tool
 from app.core.tools.python_exec import make_virtual_python_tool
+from app.core.tools.search_files import make_search_files_tool
 from app.core.tools.send_message import SendFn, make_send_message_tool
+from app.core.tools.terminal import make_terminal_tool
 from app.core.tools.workspace_files import make_workspace_tools
 
 
@@ -139,6 +143,23 @@ def build_agent_tools(
     # the agent is fundamentally a notebook editor, and these are the
     # primitives it edits with.
     tools.extend(make_workspace_tools(workspace_root))
+
+    # Structured memory for cross-conversation context.  Always present.
+    tools.append(make_memory_tool(workspace_root=workspace_root))
+
+    # Workspace file search via ripgrep.  Always present.
+    tools.append(make_search_files_tool(workspace_root=workspace_root))
+
+    # Foreground shell.  Always present.
+    conv_id = str(conversation_id) if conversation_id is not None else "default"
+    tools.append(
+        make_terminal_tool(workspace_root=workspace_root, conversation_id=conv_id)
+    )
+
+    # Background process management.  Always present.
+    tools.append(
+        make_process_tool(workspace_root=workspace_root, conversation_id=conv_id)
+    )
 
     # Web search via Exa.  Capability-gated on a key being configured —
     # either per-workspace or globally.  When `user_id` is supplied,

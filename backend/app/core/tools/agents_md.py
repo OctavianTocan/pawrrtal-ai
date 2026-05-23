@@ -40,6 +40,7 @@ PROTECTED_FILENAMES: frozenset[str] = frozenset(
         _SOUL_MD,
         "USER.md",
         "IDENTITY.md",
+        "MEMORY.md",
         _SKILLS_INDEX_MD,
     }
 )

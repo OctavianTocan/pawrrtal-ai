@@ -75,6 +75,12 @@ _SKILL_MANIFEST = "SKILL.md"
 # operating-rules text from AGENTS.md / CLAUDE.md.
 _SKILLS_HEADING = "## Available Skills"
 
+_IDENTITY_MD = "IDENTITY.md"
+_USER_MD = "USER.md"
+_MEMORY_MD = "MEMORY.md"
+_USER_MD_CAP_CHARS = 1375
+_MEMORY_MD_CAP_CHARS = 2200
+
 
 @dataclass(frozen=True)
 class SkillDef:
@@ -166,17 +172,32 @@ def load_workspace_context(root: Path) -> WorkspaceContext:
         if (root / "skills/_index.md").exists():
             loaded.append(root / "skills/_index.md")
 
+    identity_md = read_capped_utf8(root / _IDENTITY_MD, max_bytes=_MAX_BYTES)
+    if identity_md is not None:
+        loaded.append(root / _IDENTITY_MD)
+
     claude_md = read_capped_utf8(root / _CLAUDE_MD, max_bytes=_MAX_BYTES)
     if claude_md is not None:
         loaded.append(root / _CLAUDE_MD)
+
+    user_md = read_capped_utf8(root / _USER_MD, max_bytes=_MAX_BYTES)
+    if user_md is not None:
+        loaded.append(root / _USER_MD)
+
+    memory_md = read_capped_utf8(root / _MEMORY_MD, max_bytes=_MAX_BYTES)
+    if memory_md is not None:
+        loaded.append(root / _MEMORY_MD)
 
     skills = _load_skills(root, loaded)
     permissions = _load_permissions(root, loaded)
 
     system_prompt = _assemble_system_prompt(
         base_prompt=base_prompt,
+        identity_md=identity_md,
         claude_md=claude_md,
         skills=skills,
+        user_md=user_md,
+        memory_md=memory_md,
     )
     enabled_tools = _resolve_enabled_tools(permissions)
 
@@ -305,26 +326,42 @@ def _as_optional_str(value: object) -> str | None:
 def _assemble_system_prompt(
     *,
     base_prompt: str | None,
+    identity_md: str | None,
     claude_md: str | None,
     skills: list[SkillDef],
+    user_md: str | None,
+    memory_md: str | None,
 ) -> str | None:
-    """Concatenate the base prompt + CLAUDE.md + skills catalogue.
+    """Concatenate workspace prompt sections in canonical order.
 
-    Order matches the load priority: SOUL.md + AGENTS.md (already
-    concatenated by ``assemble_workspace_prompt``) → CLAUDE.md →
-    skills catalogue.  Returns ``None`` when none of the three
-    sources contributed text.
+    Order: base (SOUL + AGENTS + BOOTSTRAP + skills_index) → IDENTITY.md
+    → CLAUDE.md → skills catalogue → USER.md → MEMORY.md.  Memory
+    sections appear last so the model reads them as current working
+    context, not identity configuration.  Returns ``None`` when no
+    source contributed text.
     """
     parts: list[str] = []
     if base_prompt is not None:
         parts.append(base_prompt)
+    if identity_md is not None:
+        parts.append(f"## Identity\n{identity_md}")
     if claude_md is not None:
         parts.append(claude_md)
     if skills:
         parts.append(_format_skills_catalogue(skills))
+    if user_md is not None:
+        parts.append(_format_memory_section("User", user_md, _USER_MD_CAP_CHARS))
+    if memory_md is not None:
+        parts.append(_format_memory_section("Memory", memory_md, _MEMORY_MD_CAP_CHARS))
     if not parts:
         return None
     return "\n\n---\n\n".join(parts)
+
+
+def _format_memory_section(heading: str, content: str, cap: int) -> str:
+    """Render a memory file as a headed Markdown section with fill state."""
+    fill_pct = min(int(len(content) / cap * 100), 100)
+    return f"## {heading} [{fill_pct}% — {len(content)}/{cap} chars]\n{content}"
 
 
 def _format_skills_catalogue(skills: list[SkillDef]) -> str:
