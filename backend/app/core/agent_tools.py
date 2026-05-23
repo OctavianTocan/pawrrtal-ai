@@ -62,6 +62,7 @@ from app.core.tools.now import (
     make_list_tasks_tool,
     make_now_tool,
     make_read_skill_tool,
+    make_report_issue_tool,
 )
 from app.core.tools.python_exec import make_virtual_python_tool
 from app.core.tools.send_message import SendFn, make_send_message_tool
@@ -205,6 +206,12 @@ def build_agent_tools(
     tools.append(make_list_skills_tool(workspace_root=workspace_root))
     tools.append(make_read_skill_tool(workspace_root=workspace_root))
     tools.append(make_invoke_skill_tool(workspace_root=workspace_root))
+
+    # GitHub issue reporting.  Always present — the tool resolves
+    # GITHUB_TOKEN at call time and returns a clear error when the
+    # token is not configured, same pattern as cron tools with a
+    # missing scheduler.
+    tools.append(make_report_issue_tool(workspace_root=workspace_root))
 
     # Cron scheduling (#313).  Three tools that wrap the live
     # JobScheduler — registered via ``set_active_scheduler`` in
