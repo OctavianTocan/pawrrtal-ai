@@ -25,7 +25,7 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from '@/components/ui/sheet';
-import { SkeletonBlock } from '@/components/ui/skeleton';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { TopBarButton } from '@/components/ui/top-bar-button';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -671,31 +671,28 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<'div'> & {
 	showIcon?: boolean;
 }) {
-	// Random width between 50 to 90%.
 	const [width] = React.useState(() => {
 		return `${Math.floor(Math.random() * 40) + 50}%`;
 	});
 
 	return (
-		<div
-			data-slot="sidebar-menu-skeleton"
-			data-sidebar="menu-skeleton"
-			className={cn('h-8 gap-2 rounded-md px-2 flex items-center', className)}
-			{...props}
-		>
-			{showIcon && (
-				<SkeletonBlock className="size-4 rounded-md" data-sidebar="menu-skeleton-icon" />
-			)}
-			<SkeletonBlock
-				className="h-4 max-w-(--skeleton-width) flex-1"
-				data-sidebar="menu-skeleton-text"
-				style={
-					{
-						'--skeleton-width': width,
-					} as React.CSSProperties
-				}
-			/>
-		</div>
+		<Skeleton loading name="sidebar-menu" animate="pulse">
+			<div
+				data-slot="sidebar-menu-skeleton"
+				data-sidebar="menu-skeleton"
+				className={cn('h-8 gap-2 rounded-md px-2 flex items-center', className)}
+				{...props}
+			>
+				{showIcon && (
+					<div className="size-4 rounded-md" data-sidebar="menu-skeleton-icon" />
+				)}
+				<div
+					className="h-4 flex-1"
+					data-sidebar="menu-skeleton-text"
+					style={{ maxWidth: width }}
+				/>
+			</div>
+		</Skeleton>
 	);
 }
 
