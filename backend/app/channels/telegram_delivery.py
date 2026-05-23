@@ -101,17 +101,25 @@ def _aiogram_errors() -> tuple[type[BaseException], ...]:
     return (TelegramAPIError, TelegramNetworkError)
 
 
-def format_tool_use(event: StreamEvent) -> str:
+def format_tool_use(event: StreamEvent, *, state: str = "present") -> str:
     """Render a tool call with shared display metadata or a safe fallback."""
     tool_name = str(event.get("name") or "tool")
     raw_display = event.get("display")
     if isinstance(raw_display, dict):
-        present = str(raw_display.get("present") or "").strip()
-        if present:
-            return present
+        icon = str(raw_display.get("icon") or "").strip()
+        val = str(raw_display.get(state) or "").strip()
+        if val:
+            if icon and not val.startswith(icon):
+                val = f"{icon} {val}"
+            return val
     raw_input = event.get("input") or {}
     arguments = raw_input if isinstance(raw_input, dict) else {"input": raw_input}
-    return str(fallback_tool_display(tool_name, arguments).get("present") or tool_name)
+    fallback = fallback_tool_display(tool_name, arguments)
+    val = str(fallback.get(state) or tool_name)
+    fallback_icon = str(fallback.get("icon") or "").strip()
+    if fallback_icon and not val.startswith(fallback_icon):
+        val = f"{fallback_icon} {val}"
+    return val
 
 
 def final_reply_text(
