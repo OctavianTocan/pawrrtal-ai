@@ -54,6 +54,10 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Setup Node
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v6.0.0
+        with:
+          node-version: '22'
 
       - name: Build local libs (frontend/lib/* submodules)
         run: bash scripts/build-local-libs.sh
@@ -107,6 +111,10 @@ jobs:
           DATABASE_URL: 'sqlite+aiosqlite:///./e2e.db'
           ADMIN_EMAIL: e2e-admin@example.com
           ADMIN_PASSWORD: e2e-admin-password
+          # workspace_base_dir defaults to /data/workspaces which the CI
+          # runner cannot write to. Point at a temp directory so the
+          # dev-login workspace seed succeeds.
+          WORKSPACE_BASE_DIR: /tmp/pawrrtal-e2e-workspaces
           COOKIE_SAMESITE: lax
           COOKIE_SECURE: 'false'
         run: |
@@ -123,6 +131,10 @@ jobs:
           done
           echo "::error::Backend did not start within 30s"
           exit 1
+
+      - name: Generate Fumadocs source files
+        working-directory: frontend
+        run: bun run generate:docs
 
       - name: Build frontend (Next.js)
         working-directory: frontend

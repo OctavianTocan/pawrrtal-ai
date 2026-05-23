@@ -13,11 +13,12 @@ test.describe('settings page', () => {
 		expect(response.ok()).toBe(true);
 	});
 
-	test('General tab renders Profile / Preferences / Notifications groups', async ({ page }) => {
+	test('General tab renders Profile and Notifications groups', async ({ page }) => {
 		await page.goto('/settings');
 		await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
 		await expect(page.getByText('Profile', { exact: true })).toBeVisible();
-		await expect(page.getByText('Preferences', { exact: true })).toBeVisible();
+		// "Preferences" card was removed — it duplicated the Appearance
+		// rail item. See GeneralSection.tsx for the rationale.
 		await expect(page.getByText('Notifications', { exact: true })).toBeVisible();
 	});
 
