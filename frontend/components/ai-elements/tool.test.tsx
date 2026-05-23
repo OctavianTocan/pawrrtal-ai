@@ -28,4 +28,45 @@ describe('Tool', () => {
 		);
 		expect(getByText(/boom/)).toBeTruthy();
 	});
+
+	describe('ToolHeader status labels (#360)', () => {
+		// Past-tense labels on the terminal states so the transcript reads
+		// as a log of what happened, paired with the active verb ("Running"
+		// while in-flight, "Ran" once done).
+		it('shows "Ran" once a tool completes successfully', () => {
+			const { getByText } = render(
+				<Tool defaultOpen>
+					<ToolHeader state="output-available" type="tool-search" title="search-web" />
+				</Tool>
+			);
+			expect(getByText('Ran')).toBeTruthy();
+		});
+
+		it('shows "Failed" when a tool errors', () => {
+			const { getByText } = render(
+				<Tool defaultOpen>
+					<ToolHeader state="output-error" type="tool-search" title="search-web" />
+				</Tool>
+			);
+			expect(getByText('Failed')).toBeTruthy();
+		});
+
+		it('still shows "Running" while a tool is in flight', () => {
+			const { getByText } = render(
+				<Tool defaultOpen>
+					<ToolHeader state="input-available" type="tool-search" title="search-web" />
+				</Tool>
+			);
+			expect(getByText('Running')).toBeTruthy();
+		});
+
+		it('shows "Denied" when the user blocks a tool call', () => {
+			const { getByText } = render(
+				<Tool defaultOpen>
+					<ToolHeader state="output-denied" type="tool-search" title="search-web" />
+				</Tool>
+			);
+			expect(getByText('Denied')).toBeTruthy();
+		});
+	});
 });
