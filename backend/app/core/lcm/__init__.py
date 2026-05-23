@@ -21,7 +21,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings as _settings
+from app.core.config import settings
 from app.core.lcm.condense import run_condensation_cascade
 from app.core.providers import resolve_llm
 from app.models import ChatMessage, LCMContextItem, LCMSummary, LCMSummarySource
@@ -362,7 +362,7 @@ async def compact_leaf_if_needed(
         return False
 
     # ------------------------------------------------------------------ 5
-    summary_model = _settings.lcm_summary_model or model_id
+    summary_model = settings.lcm_summary_model or model_id
     # resolve_llm currently does not accept user_id; per-user API key
     # resolution flows through workspace_root, which the chat router
     # passes in. Drop the kwarg at the call site to silence mypy.
