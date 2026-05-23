@@ -6,8 +6,8 @@ explicit ``model_id``.  Used primarily by the Telegram ``/model``
 command so a user can pin a preferred model once and have every
 new Telegram conversation default to it.
 
-Revision ID: 021_add_user_preferences_default_model_id
-Revises: 020_add_conversation_reasoning_effort
+Revision ID: 022_add_user_preferences_default_model_id
+Revises: 021_conversation_reasoning_effort_check
 """
 
 from __future__ import annotations
@@ -15,8 +15,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "021_add_user_preferences_default_model_id"
-down_revision = "020_add_conversation_reasoning_effort"
+revision = "022_add_user_preferences_default_model_id"
+down_revision = "021_conversation_reasoning_effort_check"
 branch_labels = None
 depends_on = None
 
