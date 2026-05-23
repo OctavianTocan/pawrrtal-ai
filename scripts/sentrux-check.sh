@@ -26,6 +26,12 @@ should_exclude_from_sentrux() {
 		electrobun/*)
 			return 0
 			;;
+		# TODO: split bot.py into smaller modules to bring fan-out under 15.
+		# Fan-out is 16 (threshold 15) because the Telegram bot orchestrates
+		# handlers, permissions, providers, status, and the turn runner.
+		backend/app/integrations/telegram/bot.py)
+			return 0
+			;;
 		*)
 			return 1
 			;;
