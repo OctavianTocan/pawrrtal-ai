@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from app.core.agent_loop.display import ToolDisplay, ToolDisplayPayload
 from app.core.agent_loop.types import AgentTool
 from app.core.keys import resolve_api_key
 from app.core.plugins.types import ToolContext
@@ -67,6 +68,171 @@ NTN_TOOL_DESCRIPTION = (
     "`stdout` yourself — most commands return JSON, but `pages get` / "
     "`pages create` return Markdown."
 )
+
+
+MIN_ARGS_FOR_SUBCMD = 2
+ID_DISPLAY_LENGTH = 8
+TEXT_TRUNCATE_LENGTH = 20
+
+
+def _parse_pages_command(cmd_args: list[str]) -> ToolDisplayPayload | None:
+    """Parse pages command arguments."""
+    if len(cmd_args) < MIN_ARGS_FOR_SUBCMD or cmd_args[0] != "pages":
+        return None
+
+    subcmd = cmd_args[1]
+    if subcmd == "get":
+        page_id = cmd_args[MIN_ARGS_FOR_SUBCMD] if len(cmd_args) > MIN_ARGS_FOR_SUBCMD else ""
+        display_id = page_id[:ID_DISPLAY_LENGTH] if len(page_id) > ID_DISPLAY_LENGTH else page_id
+        suffix = f" {display_id}" if display_id else ""
+        return ToolDisplayPayload(
+            present=f"Reading Notion page{suffix}...",
+            compact=f"Read Notion page{suffix}",
+            icon="📖",
+        )
+    if subcmd == "create":
+        title = ""
+        try:
+            if "--title" in cmd_args:
+                idx = cmd_args.index("--title")
+                if idx + 1 < len(cmd_args):
+                    title = cmd_args[idx + 1]
+        except (ValueError, IndexError):
+            pass
+        display_title = (
+            f' "{title[:TEXT_TRUNCATE_LENGTH]}..."'
+            if len(title) > TEXT_TRUNCATE_LENGTH
+            else f' "{title}"'
+            if title
+            else ""
+        )
+        return ToolDisplayPayload(
+            present=f"Creating Notion page{display_title}...",
+            compact=f"Created Notion page{display_title}",
+            icon="📝",
+        )
+    if subcmd in ("update", "append"):
+        page_id = cmd_args[MIN_ARGS_FOR_SUBCMD] if len(cmd_args) > MIN_ARGS_FOR_SUBCMD else ""
+        display_id = page_id[:ID_DISPLAY_LENGTH] if len(page_id) > ID_DISPLAY_LENGTH else page_id
+        suffix = f" {display_id}" if display_id else ""
+        if subcmd == "update":
+            return ToolDisplayPayload(
+                present=f"Updating Notion page{suffix}...",
+                compact=f"Updated Notion page{suffix}",
+                icon="✏️",
+            )
+        return ToolDisplayPayload(
+            present=f"Appending to Notion page{suffix}...",
+            compact=f"Appended to Notion page{suffix}",
+            icon="📝",
+        )
+    return None
+
+
+def _parse_databases_command(cmd_args: list[str]) -> ToolDisplayPayload | None:
+    """Parse databases command arguments."""
+    if len(cmd_args) < MIN_ARGS_FOR_SUBCMD or cmd_args[0] != "databases":
+        return None
+
+    subcmd = cmd_args[1]
+    if subcmd == "query":
+        db_id = cmd_args[MIN_ARGS_FOR_SUBCMD] if len(cmd_args) > MIN_ARGS_FOR_SUBCMD else ""
+        display_id = db_id[:ID_DISPLAY_LENGTH] if len(db_id) > ID_DISPLAY_LENGTH else db_id
+        suffix = f" {display_id}" if display_id else ""
+        return ToolDisplayPayload(
+            present=f"Querying Notion database{suffix}...",
+            compact=f"Queried Notion database{suffix}",
+            icon="🔍",
+        )
+    if subcmd == "list":
+        return ToolDisplayPayload(
+            present="Listing Notion databases...",
+            compact="Listed Notion databases",
+            icon="🔍",
+        )
+    return None
+
+
+def _parse_api_command(cmd_args: list[str]) -> ToolDisplayPayload | None:
+    """Parse raw API command arguments."""
+    if len(cmd_args) < MIN_ARGS_FOR_SUBCMD or cmd_args[0] != "api":
+        return None
+
+    path = cmd_args[1].split("?")[0]
+    if "search" in path:
+        return ToolDisplayPayload(
+            present="Searching Notion...",
+            compact="Searched Notion",
+            icon="🔍",
+        )
+    if "databases" in path:
+        return ToolDisplayPayload(
+            present="Querying Notion database...",
+            compact="Queried Notion database",
+            icon="🔍",
+        )
+    if "pages" in path:
+        is_write = any(val in "".join(cmd_args).lower() for val in ["post", "patch", "delete"])
+        return ToolDisplayPayload(
+            present="Updating Notion page..." if is_write else "Reading Notion page...",
+            compact="Updated Notion page" if is_write else "Read Notion page",
+            icon="📝" if is_write else "📖",
+        )
+    return ToolDisplayPayload(
+        present=f"Calling Notion API ({path})...",
+        compact=f"Called Notion API ({path})",
+        icon="📓",
+    )
+
+
+def _format_ntn_display(arguments: dict[str, Any]) -> ToolDisplayPayload:
+    """Format Notion tool calls dynamically for user-facing UI."""
+    raw_args = arguments.get("args")
+    fallback = ToolDisplayPayload(
+        present="Running Notion command...",
+        compact="Notion command",
+        icon="📓",
+    )
+
+    cmd_args = []
+    if isinstance(raw_args, str):
+        cmd_args = [raw_args.strip()]
+    elif isinstance(raw_args, list):
+        cmd_args = [str(a).strip() for a in raw_args]
+
+    if not cmd_args:
+        return fallback
+
+    pages_payload = _parse_pages_command(cmd_args)
+    if pages_payload:
+        return pages_payload
+
+    databases_payload = _parse_databases_command(cmd_args)
+    if databases_payload:
+        return databases_payload
+
+    api_payload = _parse_api_command(cmd_args)
+    if api_payload:
+        return api_payload
+
+    if "search" in cmd_args:
+        return ToolDisplayPayload(
+            present="Searching Notion...",
+            compact="Searched Notion",
+            icon="🔍",
+        )
+
+    joined = " ".join(cmd_args)
+    display_cmd = (
+        f" '{joined[:TEXT_TRUNCATE_LENGTH]}...'"
+        if len(joined) > TEXT_TRUNCATE_LENGTH
+        else f" '{joined}'"
+    )
+    return ToolDisplayPayload(
+        present=f"Running Notion command{display_cmd}...",
+        compact=f"Ran Notion command{display_cmd}",
+        icon="📓",
+    )
 
 
 def make_ntn_tool(ctx: ToolContext) -> AgentTool:
@@ -145,6 +311,11 @@ def make_ntn_tool(ctx: ToolContext) -> AgentTool:
             "required": ["args"],
         },
         execute=execute,
+        display=ToolDisplay(
+            icon="📓",
+            label="Notion",
+            formatter=_format_ntn_display,
+        ),
     )
 
 
