@@ -197,7 +197,13 @@ class TestNtnTool:
         )
         captured: list[list[str]] = []
 
-        async def fake_call(args, *, token, stdin=None):  # type: ignore[no-untyped-def]
+        async def fake_call(
+            args: Sequence[str],
+            *,
+            token: str,
+            stdin: bytes | None = None,
+            **_: Any,
+        ) -> NtnResult:
             captured.append(list(args))
             return NtnResult(stdout=b"ok", stderr=b"")
 
