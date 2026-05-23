@@ -5,29 +5,31 @@
  * pending a redemption, connected) and the periodic poll that flips
  * the UI to "connected" once the bot finishes redeeming the code.
  *
- * Polling is deliberately unsophisticated — every two seconds, hit
- * `/api/v1/channels`, look for a `telegram` row. The endpoint is cheap
- * and the dialog is only ever open while the user is actively waiting,
- * so there's no need to invent a websocket. BEAN: revisit once the
- * core exposes an SSE channel-status stream.
+ * Uses TanStack Query for the channel list so that connection state is
+ * shared across all consumers (onboarding + settings) via the cache.
+ * During the pending-code phase, `refetchInterval` polls every 2 s;
+ * outside that window the query uses default stale-while-revalidate.
  *
  * @fileoverview React hook that wraps the channels API for the UI layer.
  */
 
 'use client';
 
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffectEvent, useRef, useState } from 'react';
+import { useAuthedQuery } from '@/hooks/use-authed-query';
+import { API_ENDPOINTS } from '@/lib/api';
 import {
 	type ChannelBinding,
 	ChannelNotConfiguredError,
 	issueTelegramLinkCode,
-	listChannels,
 	type TelegramLinkCode,
 	unlinkTelegram,
 } from '@/lib/channels';
 
 const POLL_INTERVAL_MS = 2000;
 const PROVIDER = 'telegram';
+const CHANNELS_QUERY_KEY = ['channels'] as const;
 
 interface UseTelegramBindingOptions {
 	onConnected?: () => void;
@@ -58,103 +60,102 @@ export interface TelegramBindingState {
 /**
  * Hook that owns the Telegram binding state machine.
  *
- * Mounted at most twice per app — once in the onboarding step and once in
- * the Settings → Channels section — so it intentionally stays
- * un-cached. If we ever surface the same state in three+ places we'll
- * lift it into a context.
+ * Backed by TanStack Query so channel state is shared across all
+ * consumers via the `['channels']` cache key. The onboarding step and
+ * Settings Channels section both read from the same cache entry.
  */
 export function useTelegramBinding(options: UseTelegramBindingOptions = {}): TelegramBindingState {
-	const [binding, setBinding] = useState<ChannelBinding | null>(null);
+	const queryClient = useQueryClient();
 	const [pendingCode, setPendingCode] = useState<TelegramLinkCode | null>(null);
-	const [isBusy, setIsBusy] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 	const [notConfigured, setNotConfigured] = useState(false);
-	const pollTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 	const notifiedBindingKeyRef = useRef<string | null>(null);
+
 	const fireConnected = useEffectEvent((): void => {
 		options.onConnected?.();
 	});
 
-	const stopPolling = useCallback(() => {
-		if (pollTimerRef.current !== null) {
-			clearInterval(pollTimerRef.current);
-			pollTimerRef.current = null;
+	const channelsQuery = useAuthedQuery<ChannelBinding[]>(
+		CHANNELS_QUERY_KEY,
+		API_ENDPOINTS.channels.list,
+		{ refetchInterval: pendingCode ? POLL_INTERVAL_MS : undefined }
+	);
+
+	const binding = channelsQuery.data?.find((row) => row.provider === PROVIDER) ?? null;
+
+	if (binding && pendingCode) {
+		const bindingKey = [
+			binding.provider,
+			binding.external_user_id,
+			binding.external_chat_id ?? '',
+		].join(':');
+		if (notifiedBindingKeyRef.current !== bindingKey) {
+			notifiedBindingKeyRef.current = bindingKey;
+			setPendingCode(null);
+			fireConnected();
 		}
-	}, []);
+	}
 
-	const refresh = useCallback(async () => {
-		try {
-			const rows = await listChannels();
-			const next = rows.find((row) => row.provider === PROVIDER) ?? null;
-			setBinding(next);
-			if (next !== null) {
-				const bindingKey = [
-					next.provider,
-					next.external_user_id,
-					next.external_chat_id ?? '',
-				].join(':');
-				if (notifiedBindingKeyRef.current !== bindingKey) {
-					notifiedBindingKeyRef.current = bindingKey;
-					fireConnected();
-				}
-				// Bot finished the bind — close the polling loop and clear
-				// the now-redundant code so the dialog snaps to "Connected".
-				setPendingCode(null);
-				stopPolling();
-			}
-		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : 'Unable to load channels.');
-		}
-	}, [stopPolling]);
-
-	useEffect(() => {
-		void refresh();
-		return stopPolling;
-	}, [refresh, stopPolling]);
-
-	const startConnect = useCallback(async () => {
-		setIsBusy(true);
-		setError(null);
-		try {
-			const code = await issueTelegramLinkCode();
+	const linkMutation = useMutation({
+		mutationFn: () => issueTelegramLinkCode(),
+		onSuccess: (code) => {
 			setPendingCode(code);
 			setNotConfigured(false);
-			stopPolling();
-			pollTimerRef.current = setInterval(() => {
-				void refresh();
-			}, POLL_INTERVAL_MS);
-		} catch (cause) {
+			setError(null);
+		},
+		onError: (cause) => {
 			if (cause instanceof ChannelNotConfiguredError) {
 				setNotConfigured(true);
 				setError(cause.message);
 			} else {
 				setError(cause instanceof Error ? cause.message : 'Failed to start connection.');
 			}
-		} finally {
-			setIsBusy(false);
-		}
-	}, [refresh, stopPolling]);
+		},
+	});
 
-	const cancelConnect = useCallback(() => {
-		stopPolling();
+	const unlinkMutation = useMutation({
+		mutationFn: () => unlinkTelegram(),
+		onMutate: async () => {
+			await queryClient.cancelQueries({ queryKey: CHANNELS_QUERY_KEY });
+			const previous = queryClient.getQueryData<ChannelBinding[]>(CHANNELS_QUERY_KEY);
+			queryClient.setQueryData<ChannelBinding[]>(
+				CHANNELS_QUERY_KEY,
+				(old) => old?.filter((row) => row.provider !== PROVIDER) ?? []
+			);
+			setPendingCode(null);
+			return { previous };
+		},
+		onError: (_err, _vars, context) => {
+			if (context?.previous) {
+				queryClient.setQueryData(CHANNELS_QUERY_KEY, context.previous);
+			}
+			setError('Failed to disconnect.');
+		},
+		onSettled: () => {
+			void queryClient.invalidateQueries({ queryKey: CHANNELS_QUERY_KEY });
+		},
+	});
+
+	const isBusy = linkMutation.isPending || unlinkMutation.isPending;
+
+	const refresh = useCallback(async (): Promise<void> => {
+		await queryClient.invalidateQueries({ queryKey: CHANNELS_QUERY_KEY });
+	}, [queryClient]);
+
+	const startConnect = useCallback(async (): Promise<void> => {
+		setError(null);
+		await linkMutation.mutateAsync();
+	}, [linkMutation]);
+
+	const cancelConnect = useCallback((): void => {
 		setPendingCode(null);
 		setError(null);
-	}, [stopPolling]);
+	}, []);
 
-	const disconnect = useCallback(async () => {
-		setIsBusy(true);
+	const disconnect = useCallback(async (): Promise<void> => {
 		setError(null);
-		try {
-			await unlinkTelegram();
-			setBinding(null);
-			setPendingCode(null);
-			stopPolling();
-		} catch (cause) {
-			setError(cause instanceof Error ? cause.message : 'Failed to disconnect.');
-		} finally {
-			setIsBusy(false);
-		}
-	}, [stopPolling]);
+		await unlinkMutation.mutateAsync();
+	}, [unlinkMutation]);
 
 	return {
 		binding,

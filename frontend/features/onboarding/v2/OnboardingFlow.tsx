@@ -230,6 +230,10 @@ export function OnboardingFlow({
 		// fresh — without this the user would land on whatever step they
 		// last left off, which is jarring for a "new workspace" intent.
 		dispatchFlowState({ type: 'set-step', step: 'identity' });
+		// Full-page navigation resets the app shell with the session cookie
+		// fully committed — prevents the blank-page race where authed queries
+		// fire before the browser has flushed the Set-Cookie response.
+		window.location.replace('/');
 	}, []);
 
 	const handleOpenChange = useCallback((nextOpen: boolean) => {

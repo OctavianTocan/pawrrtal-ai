@@ -16,6 +16,7 @@
 
 'use client';
 
+import { Skeleton } from 'boneyard-js/react';
 import React from 'react';
 import { NavUser, type NavUserIdentity } from '@/components/nav-user';
 import { NewSessionButton } from '@/components/new-session-button';
@@ -37,21 +38,32 @@ import {
 	OPEN_ONBOARDING_FLOW_EVENT,
 	OPEN_ONBOARDING_SERVER_STEP_EVENT,
 } from '@/features/onboarding/v2/OnboardingFlow';
+import { useGetPersonalization } from '@/lib/personalization/use-personalization';
+import { useCurrentUser } from '@/hooks/use-current-user';
 import { cn } from '@/lib/utils';
 import { AppShellHeader } from './AppShellHeader';
 
 /**
- * Placeholder identity rendered in the sidebar footer.
- *
- * The frontend has no client-side auth context yet — once a `useCurrentUser`
- * (or equivalent) hook lands, replace this with the resolved value. Keeping
- * the shape declared here means swapping the source is a one-line change.
+ * Sidebar footer profile row — resolves the authenticated user's identity
+ * from `GET /users/me` + the personalization profile and renders `NavUser`.
+ * Shows a boneyard skeleton while either query is loading.
  */
-const SIDEBAR_USER: NavUserIdentity = {
-	name: 'Octavian Tocan',
-	email: 'tocanoctavian@gmail.com',
-	plan: 'Studio plan',
-};
+function SidebarFooterUser(): React.JSX.Element {
+	const { data: currentUser, isLoading: isUserLoading } = useCurrentUser();
+	const { data: personalization } = useGetPersonalization();
+
+	const sidebarUser: NavUserIdentity = {
+		name: personalization?.name ?? currentUser?.email ?? '',
+		email: currentUser?.email ?? '',
+		plan: 'Pawrrtal',
+	};
+
+	return (
+		<Skeleton loading={isUserLoading} name="sidebar-user" animate="pulse">
+			<NavUser user={sidebarUser} />
+		</Skeleton>
+	);
+}
 
 /**
  * Wraps sidebar content in a focus zone so keyboard navigation (Tab/Shift+Tab)
@@ -170,7 +182,7 @@ function ResizableSidebarContent({ children }: { children: React.ReactNode }): R
 						<SidebarContent>
 							<NavChats />
 						</SidebarContent>
-						<NavUser user={SIDEBAR_USER} />
+						<SidebarFooterUser />
 					</SidebarFocusShell>
 				</Sidebar>
 				<div className="size-full min-w-0 pt-10">
@@ -231,7 +243,7 @@ function ResizableSidebarContent({ children }: { children: React.ReactNode }): R
 						<SidebarContent>
 							<NavChats />
 						</SidebarContent>
-						<NavUser user={SIDEBAR_USER} />
+						<SidebarFooterUser />
 					</div>
 				</SidebarFocusShell>
 

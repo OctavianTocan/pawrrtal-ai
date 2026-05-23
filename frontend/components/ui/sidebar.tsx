@@ -25,7 +25,7 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from '@/components/ui/sheet';
-import { Skeleton } from '@/components/ui/skeleton';
+import { SkeletonBlock } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { TopBarButton } from '@/components/ui/top-bar-button';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -684,9 +684,9 @@ function SidebarMenuSkeleton({
 			{...props}
 		>
 			{showIcon && (
-				<Skeleton className="size-4 rounded-md" data-sidebar="menu-skeleton-icon" />
+				<SkeletonBlock className="size-4 rounded-md" data-sidebar="menu-skeleton-icon" />
 			)}
-			<Skeleton
+			<SkeletonBlock
 				className="h-4 max-w-(--skeleton-width) flex-1"
 				data-sidebar="menu-skeleton-text"
 				style={

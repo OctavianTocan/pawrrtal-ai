@@ -4,6 +4,9 @@ import type * as React from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { useGetPersonalization } from '@/lib/personalization/use-personalization';
+import { useCurrentUser } from '@/hooks/use-current-user';
+import { getInitials } from '@/lib/user-utils';
 import {
 	SettingsCard,
 	SettingsPage,
@@ -13,13 +16,21 @@ import {
 } from '../primitives';
 
 /**
- * Visual-only General settings section.
+ * General settings section — profile, preferences, and notifications.
  *
- * Mirrors the Codex-style "Profile / Preferences / Notifications" layout
- * from the reference screenshot. State is local + cosmetic — no real
- * persistence wired this round.
+ * Pulls the authenticated user's email from `GET /users/me` and display
+ * name / role from the personalization profile. Fields are pre-populated
+ * but not yet wired to a save mutation (visual-only persistence).
  */
 export function GeneralSection(): React.JSX.Element {
+	const { data: currentUser } = useCurrentUser();
+	const { data: personalization } = useGetPersonalization();
+
+	const name = personalization?.name ?? currentUser?.email ?? '';
+	const nickname = personalization?.name?.split(' ')[0] ?? '';
+	const role = personalization?.role ?? '';
+	const initials = getInitials(name);
+
 	return (
 		<SettingsPage
 			description="Profile, preferences, and notifications for your account."
@@ -33,17 +44,17 @@ export function GeneralSection(): React.JSX.Element {
 				<SettingsRow label="Avatar">
 					<Avatar className="size-9">
 						<AvatarImage alt="Avatar" src="" />
-						<AvatarFallback className="text-xs">OT</AvatarFallback>
+						<AvatarFallback className="text-xs">{initials}</AvatarFallback>
 					</Avatar>
 				</SettingsRow>
 				<SettingsRow label="Full name">
-					<Input className="w-56" defaultValue="Octavian Tocan" />
+					<Input className="w-56" defaultValue={name} />
 				</SettingsRow>
 				<SettingsRow label="What should we call you?">
-					<Input className="w-56" defaultValue="Tavi" />
+					<Input className="w-56" defaultValue={nickname} />
 				</SettingsRow>
 				<SettingsRow label="What best describes your work?">
-					<Input className="w-56" defaultValue="Engineering" />
+					<Input className="w-56" defaultValue={role} />
 				</SettingsRow>
 				<SettingsRow
 					className="items-start"
@@ -52,6 +63,7 @@ export function GeneralSection(): React.JSX.Element {
 				>
 					<Textarea
 						className="min-h-24 w-72 resize-none"
+						defaultValue={personalization?.customInstructions ?? ''}
 						placeholder="e.g. keep explanations brief and to the point"
 					/>
 				</SettingsRow>

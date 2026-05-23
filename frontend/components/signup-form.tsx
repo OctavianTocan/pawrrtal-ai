@@ -8,7 +8,6 @@
 
 import { Loader2Icon } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,8 +21,6 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
 	const [errorMessage, setErrorMessage] = useState('');
 	// To disable buttons while submitting.
 	const [submissionStatus, setSubmissionStatus] = useState<'idle' | 'submitting'>('idle');
-	// Get the router.
-	const { push } = useRouter();
 	// SSR-stable unique IDs so each Field's label and input pair correctly even
 	// if the form is rendered more than once on the same page.
 	const nameId = useId();
@@ -83,9 +80,8 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
 		// We do it here, so the Alert component doesn't jump unnecessarily every time we press the submit button.
 		setErrorMessage('');
 
-		// We need to log the user in after we've created the account.
-		// Otherwise, it'll feel odd to still need to log in after signing up.
-		await apiFetch(API_ENDPOINTS.auth.login, {
+		// Auto-login so the user doesn't need to sign in again after registering.
+		const loginResponse = await apiFetch(API_ENDPOINTS.auth.login, {
 			method: 'POST',
 			headers: {
 				'Content-Type': 'application/x-www-form-urlencoded',
@@ -97,8 +93,15 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
 			credentials: 'include',
 		});
 
-		// Redirect to the homepage.
-		push('/');
+		if (!loginResponse.ok) {
+			setErrorMessage('Account created but sign-in failed. Please log in manually.');
+			setSubmissionStatus('idle');
+			return;
+		}
+
+		// Full-page navigation ensures the session cookie is committed before
+		// any authed queries fire. Client-side routing races cookie propagation.
+		window.location.replace('/');
 	};
 
 	return (

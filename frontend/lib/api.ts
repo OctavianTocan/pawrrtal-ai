@@ -226,10 +226,10 @@ export const API_ENDPOINTS = {
 		 */
 		logout: '/auth/logout',
 		/**
-		 * Get current user info.
-		 * @returns `/me`
+		 * Get current user info (FastAPI-Users router at `/users`).
+		 * @returns `/users/me`
 		 */
-		me: '/me',
+		me: '/users/me',
 	},
 	/** Endpoints related to user management */
 	users: {
