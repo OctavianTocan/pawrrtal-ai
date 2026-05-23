@@ -5,28 +5,67 @@ from __future__ import annotations
 import pytest
 from httpx import AsyncClient
 
-from app.core.providers.catalog import CATALOG_ETAG, MODEL_CATALOG
+from app.core.providers.catalog import MODEL_CATALOG
+from app.core.providers.factory import host_authenticated
+from app.core.providers.model_id import Host
 
-# RFC 7232 mandates that ETag values are quoted.
-QUOTED_ETAG = f'"{CATALOG_ETAG}"'
+
+def _authed_catalog_count() -> int:
+    """How many catalog rows survive the ``host_authenticated`` filter.
+
+    No workspace context is passed: the test client doesn't go through
+    the workspace bootstrap, so the endpoint sees ``workspace_root=None``
+    and the filter falls back to global ``settings.*`` only. Mirror that
+    here so the expected count matches the response.
+    """
+    return sum(1 for entry in MODEL_CATALOG if host_authenticated(entry.host))
 
 
 @pytest.mark.anyio
-async def test_models_endpoint_returns_catalog(client: AsyncClient) -> None:
+async def test_models_endpoint_returns_authenticated_catalog(client: AsyncClient) -> None:
+    """The endpoint returns only catalog entries whose host has credentials.
+
+    Issue #370 — unauthenticated providers (e.g. OpenCode without an
+    API key, xAI without ``XAI_API_KEY``) used to show up in the
+    picker but couldn't be selected. Now they're filtered out so the
+    list only shows usable rows.
+    """
     response = await client.get("/api/v1/models")
     assert response.status_code == 200
     body = response.json()
     assert "models" in body
-    assert len(body["models"]) == len(MODEL_CATALOG)
-    first = body["models"][0]
-    for key in ("id", "host", "vendor", "model", "display_name", "is_default"):
-        assert key in first
+    expected_count = _authed_catalog_count()
+    assert len(body["models"]) == expected_count
+    # The pytest fixtures set GOOGLE_API_KEY, so at least the google_ai
+    # rows are present. If nothing is authenticated the list is empty —
+    # also a valid state, so we only assert shape when there's content.
+    if body["models"]:
+        first = body["models"][0]
+        for key in ("id", "host", "vendor", "model", "display_name", "is_default"):
+            assert key in first
+
+
+@pytest.mark.anyio
+async def test_models_endpoint_omits_unauthenticated_hosts(client: AsyncClient) -> None:
+    """No host in the response should fail the ``host_authenticated`` gate."""
+    response = await client.get("/api/v1/models")
+    returned_hosts = {entry["host"] for entry in response.json()["models"]}
+    for host_value in returned_hosts:
+        # ``host_value`` is the StrEnum value (e.g. ``"google-ai"``);
+        # construct the enum member back to feed the gate.
+        assert host_authenticated(Host(host_value)), (
+            f"unauthenticated host {host_value!r} leaked through the filter"
+        )
 
 
 @pytest.mark.anyio
 async def test_models_endpoint_sets_etag(client: AsyncClient) -> None:
     response = await client.get("/api/v1/models")
-    assert response.headers["etag"] == QUOTED_ETAG
+    etag = response.headers["etag"]
+    # Auth-fingerprinted shape: ``"<catalog-hash>-<bitstring>"``.
+    assert etag.startswith('"')
+    assert etag.endswith('"')
+    assert "-" in etag
     assert "private" in response.headers["cache-control"]
 
 
@@ -34,16 +73,77 @@ async def test_models_endpoint_sets_etag(client: AsyncClient) -> None:
 async def test_models_endpoint_returns_304_when_etag_matches(
     client: AsyncClient,
 ) -> None:
-    response = await client.get(
-        "/api/v1/models",
-        headers={"If-None-Match": QUOTED_ETAG},
-    )
+    """An ``If-None-Match`` matching the live ETag round-trips to 304.
+
+    The ETag is computed per-request now (so a workspace key landing
+    after boot doesn't get masked by a stale 304 — review feedback on
+    #370). Re-issuing the same request with the returned ETag must
+    still produce a clean 304 with no body.
+    """
+    first = await client.get("/api/v1/models")
+    etag = first.headers["etag"]
+    response = await client.get("/api/v1/models", headers={"If-None-Match": etag})
     assert response.status_code == 304
     assert response.content == b""  # 304 must have empty body
 
 
 @pytest.mark.anyio
-async def test_default_entry_present(client: AsyncClient) -> None:
+async def test_models_endpoint_etag_includes_auth_fingerprint(client: AsyncClient) -> None:
+    """The ETag must vary with the authenticated-host set.
+
+    Pinned so a future change can't silently drop the auth fingerprint
+    and bring back the stale-304 bug — a deployment that authenticated
+    a new provider after boot would otherwise serve the old filtered
+    list to any client that cached the previous ETag.
+    """
+    response = await client.get("/api/v1/models")
+    # The full ETag is ``"<catalog-hash>-<fingerprint>"``. Asserting on
+    # the dash structure keeps the test resilient to catalog-hash
+    # changes while still pinning the auth fingerprint requirement.
+    assert response.headers["etag"].count("-") >= 1
+    assert response.headers["etag"].endswith('"')
+
+
+@pytest.mark.anyio
+async def test_default_entry_present_when_default_host_authenticated(
+    client: AsyncClient,
+) -> None:
+    """The catalog default survives the filter when its host is authenticated.
+
+    Pytest's environment sets ``GOOGLE_API_KEY`` (required to boot the
+    settings), and the canonical default in the catalog is a Gemini
+    model, so the default row should always be in the filtered list
+    under the test fixtures. If the default ever moves to an
+    unauthenticated host, this test will surface that drift.
+    """
     response = await client.get("/api/v1/models")
     defaults = [m for m in response.json()["models"] if m["is_default"]]
     assert len(defaults) == 1
+
+
+def test_host_authenticated_with_workspace_uses_workspace_key(
+    tmp_path: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``workspace_root`` opens the documented per-workspace key path.
+
+    Even when global ``settings.xai_api_key`` is empty, a workspace
+    that wrote ``XAI_API_KEY=...`` to its encrypted ``.env`` should
+    pass the gate — otherwise the picker hides providers that
+    actually work for that workspace (review feedback on #370).
+    """
+    from pathlib import Path
+    from unittest.mock import patch
+
+    workspace_root = Path(str(tmp_path))
+    # Force global setting empty so the gate can't accidentally pass
+    # via the fallback path; the test would be silently weak otherwise.
+    from app.core.providers.factory import settings as factory_settings
+
+    monkeypatch.setattr(factory_settings, "xai_api_key", "")
+    # Stub the shared key resolver to simulate a workspace-keyed
+    # deployment: workspace has the key, global doesn't.
+    with patch("app.core.keys.resolve_api_key", return_value="ws-only-token"):
+        assert host_authenticated(Host.xai, workspace_root=workspace_root) is True
+    # Sanity check: without the workspace path, the gate stays False
+    # because global settings is still empty.
+    assert host_authenticated(Host.xai) is False

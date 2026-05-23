@@ -41,6 +41,79 @@ Add a new entry when adding a new :class:`Host` — the catalog and
 this table must always agree.
 """
 
+
+# Host → (workspace env-key, settings attribute) used by the picker
+# filter (issue #370). The env-key path is what every provider invokes
+# at request time via :func:`app.core.keys.resolve_api_key` — keeping
+# the same key here means the picker's "has credentials" answer can
+# never disagree with the provider's. The settings attribute is the
+# fallback when there is no workspace context (system callers).
+#
+# Add a new row when introducing a new :class:`Host` member.
+_HOST_AUTH_KEYS: dict[Host, tuple[str, str]] = {
+    Host.agent_sdk: ("CLAUDE_CODE_OAUTH_TOKEN", "claude_code_oauth_token"),
+    Host.google_ai: ("GEMINI_API_KEY", "google_api_key"),
+    Host.litellm: ("OPENAI_API_KEY", "openai_api_key"),
+    Host.opencode_go: ("OPENCODE_API_KEY", "opencode_api_key"),
+    Host.xai: ("XAI_API_KEY", "xai_api_key"),
+}
+
+
+def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> bool:
+    """Return whether ``host`` has credentials reachable for this request.
+
+    Drives the "only show authenticated providers" filter on the
+    ``/api/v1/models`` endpoint (issue #370) so users don't see catalog
+    entries they can't actually pick.
+
+    When ``workspace_root`` is provided, the gate uses the same
+    workspace → settings resolver that every provider invokes at
+    request time (:func:`app.core.keys.resolve_api_key`). This is the
+    contract the picker must match: a user who configures
+    ``XAI_API_KEY`` in their workspace ``.env`` (the documented path)
+    still gets xAI in the picker even when the gateway-global
+    ``settings.xai_api_key`` is empty. Without ``workspace_root`` the
+    gate falls back to global ``settings`` only, which is the right
+    default for callers without a workspace (system bootstrap, audit
+    log emitters).
+
+    Mapping:
+
+    * ``agent_sdk`` (Claude): non-empty ``CLAUDE_CODE_OAUTH_TOKEN``.
+    * ``gemini_cli``: the ``gemini`` binary is on ``PATH`` (probed
+      via :func:`is_gemini_cli_available`). Workspace overrides don't
+      apply — the binary is a process-level dependency.
+    * ``google_ai`` (native Gemini): non-empty ``GEMINI_API_KEY``.
+    * ``litellm``: non-empty ``OPENAI_API_KEY``. LiteLLM in this
+      catalog only routes OpenAI models, so the OpenAI key is the
+      single credential we need.
+    * ``opencode_go``: non-empty ``OPENCODE_API_KEY``.
+    * ``xai``: non-empty ``XAI_API_KEY``.
+
+    Add a new entry to :data:`_HOST_ENV_KEY` when introducing a new
+    :class:`Host`.
+    """
+    if host is Host.gemini_cli:
+        # Local import: ``gemini_cli`` imports the agent loop which
+        # would re-enter the factory module on a top-level import.
+        from .gemini_cli import is_gemini_cli_available  # noqa: PLC0415
+
+        return is_gemini_cli_available()
+    keys = _HOST_AUTH_KEYS.get(host)
+    if keys is None:
+        return False
+    env_key, settings_attr = keys
+    if workspace_root is not None:
+        # ``resolve_api_key`` already does workspace → settings fallback,
+        # so this single call covers both the per-workspace and the
+        # global-default paths in one pass.
+        from app.core.keys import resolve_api_key  # noqa: PLC0415
+
+        return bool(resolve_api_key(workspace_root, env_key))
+    # No workspace context — gate on the gateway-global setting only.
+    return bool(getattr(settings, settings_attr))
+
+
 # Module-import-time exhaustiveness check — converts the "every
 # ``Host`` member must have a provider class" invariant from an
 # implicit runtime ``KeyError`` in :func:`resolve_llm` into a clear
