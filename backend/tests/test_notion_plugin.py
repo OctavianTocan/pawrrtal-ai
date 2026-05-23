@@ -328,3 +328,112 @@ class TestNtnTool:
         body = json.loads(raw)
         assert "error" in body
         assert "command not found" in body["error"]
+
+
+class TestFormatter:
+    def test_formatter_pages_get(self) -> None:
+        from app.plugins.notion.tool import _format_ntn_display
+
+        payload = _format_ntn_display(
+            {"args": ["pages", "get", "3673c065-308b-4153-92a5-e21c625cfe74"]}
+        )
+        assert payload["icon"] == "📖"
+        assert "Reading Notion page 3673c065" in payload["present"]
+        assert "Read Notion page 3673c065" in payload["compact"]
+
+    def test_formatter_pages_create_short_flag(self) -> None:
+        from app.plugins.notion.tool import _format_ntn_display
+
+        payload = _format_ntn_display({"args": ["pages", "create", "-t", "My Title"]})
+        assert payload["icon"] == "📝"
+        assert 'Creating Notion page "My Title"' in payload["present"]
+
+    def test_formatter_pages_create_inline_flag(self) -> None:
+        from app.plugins.notion.tool import _format_ntn_display
+
+        payload = _format_ntn_display({"args": ["pages", "create", "--title=Some Title"]})
+        assert payload["icon"] == "📝"
+        assert 'Creating Notion page "Some Title"' in payload["present"]
+
+    def test_formatter_api_uuid_truncation(self) -> None:
+        from app.plugins.notion.tool import _format_ntn_display
+
+        payload = _format_ntn_display(
+            {"args": ["api", "v1/pages/3673c065-308b-4153-92a5-e21c625cfe74"]}
+        )
+        assert payload["icon"] == "📖"
+        assert "Reading Notion page (v1/pages/3673c065...)" in payload["present"]
+
+    def test_formatter_help_commands(self) -> None:
+        from app.plugins.notion.tool import _format_ntn_display
+
+        payload = _format_ntn_display({"args": ["pages", "--help"]})
+        assert payload["icon"] == "ℹ️"  # noqa: RUF001
+        assert "Displaying help for Notion pages" in payload["present"]
+
+        payload_general = _format_ntn_display({"args": ["--help"]})
+        assert payload_general["icon"] == "ℹ️"  # noqa: RUF001
+        assert "Displaying Notion help..." in payload_general["present"]
+
+    def test_formatter_global_flags_filtering(self) -> None:
+        from app.plugins.notion.tool import _format_ntn_display
+
+        payload = _format_ntn_display({"args": ["--json", "--verbose", "pages", "get", "3673c065"]})
+        assert payload["icon"] == "📖"
+        assert "Reading Notion page 3673c065" in payload["present"]
+
+    def test_formatter_piped_stdin(self) -> None:
+        from app.plugins.notion.tool import _format_ntn_display
+
+        payload = _format_ntn_display(
+            {
+                "args": ["pages", "update", "3673c065"],
+                "stdin": "some content",
+            }
+        )
+        assert "Updating Notion page 3673c065 (piped stdin)" in payload["present"]
+        assert "Updated Notion page 3673c065 (piped stdin)" in payload["compact"]
+
+    def test_formatter_doctor(self) -> None:
+        from app.plugins.notion.tool import _format_ntn_display
+
+        payload = _format_ntn_display({"args": ["doctor"]})
+        assert payload["icon"] == "🩺"
+        assert "Running Notion diagnostics" in payload["present"]
+        assert "Ran Notion diagnostics" in payload["compact"]
+
+    def test_formatter_pages_list(self) -> None:
+        from app.plugins.notion.tool import _format_ntn_display
+
+        payload = _format_ntn_display({"args": ["pages", "list"]})
+        assert payload["icon"] == "📖"
+        assert "Listing Notion pages" in payload["present"]
+        assert "Listed Notion pages" in payload["compact"]
+
+    def test_formatter_api_ls(self) -> None:
+        from app.plugins.notion.tool import _format_ntn_display
+
+        payload = _format_ntn_display({"args": ["api", "ls"]})
+        assert payload["icon"] == "📋"
+        assert "Listing Notion API endpoints" in payload["present"]
+        assert "Listed Notion API endpoints" in payload["compact"]
+
+    def test_formatter_api_database_query(self) -> None:
+        from app.plugins.notion.tool import _format_ntn_display
+
+        payload = _format_ntn_display(
+            {"args": ["api", "v1/databases/3673c065-308b-4153-92a5-e21c625cfe74/query"]}
+        )
+        assert payload["icon"] == "🔍"
+        assert "Querying Notion database 3673c065" in payload["present"]
+        assert "Queried Notion database 3673c065" in payload["compact"]
+
+    def test_formatter_api_database_schema(self) -> None:
+        from app.plugins.notion.tool import _format_ntn_display
+
+        payload = _format_ntn_display(
+            {"args": ["api", "v1/databases/3673c065-308b-4153-92a5-e21c625cfe74"]}
+        )
+        assert payload["icon"] == "🗂️"
+        assert "Reading Notion database schema 3673c065" in payload["present"]
+        assert "Read Notion database schema 3673c065" in payload["compact"]
