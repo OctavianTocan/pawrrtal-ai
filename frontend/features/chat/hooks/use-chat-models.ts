@@ -112,11 +112,8 @@ export function useChatModels(): UseChatModelsResult {
 		queryKey: [CHAT_MODELS_QUERY_KEY, backendConfigFingerprint],
 		staleTime: Number.POSITIVE_INFINITY,
 		queryFn: async (): Promise<{ models: ChatModelOption[] }> => {
-			// Disable browser caching for this call so revalidation never returns 304
-			// with an empty body (which would otherwise break JSON parsing).
-			const response = await authedFetch(API_ENDPOINTS.chat.models, {
-				cache: 'no-store',
-			});
+			// Caching is disabled by default.
+			const response = await authedFetch(API_ENDPOINTS.chat.models);
 
 			if (response.status === 304 || response.status === 204) {
 				throw new Error(`Model catalog response returned status ${response.status}`);
