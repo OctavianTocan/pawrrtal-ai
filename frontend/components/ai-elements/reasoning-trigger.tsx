@@ -11,7 +11,7 @@ import type { ComponentProps, ReactNode } from 'react';
 import { memo } from 'react';
 import { CollapsibleTrigger } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
-import { useReasoning } from './reasoning';
+import { useReasoning } from './reasoning-context';
 import { Shimmer } from './shimmer';
 
 export type ReasoningTriggerProps = ComponentProps<typeof CollapsibleTrigger> & {

@@ -8,29 +8,14 @@
 
 import { useControllableState } from '@radix-ui/react-use-controllable-state';
 import type { ComponentProps } from 'react';
-import { createContext, memo, use, useEffect, useMemo, useRef } from 'react';
+import { memo, useEffect, useMemo, useRef } from 'react';
 import { Collapsible } from '@/components/ui/collapsible';
 import { cn } from '@/lib/utils';
+import { ReasoningContext } from './reasoning-context';
 
 export { ReasoningContent, type ReasoningContentProps } from './reasoning-content';
+export { useReasoning } from './reasoning-context';
 export { ReasoningTrigger, type ReasoningTriggerProps } from './reasoning-trigger';
-
-type ReasoningContextValue = {
-	isStreaming: boolean;
-	isOpen: boolean;
-	setIsOpen: (open: boolean) => void;
-	duration: number | undefined;
-};
-
-const ReasoningContext = createContext<ReasoningContextValue | null>(null);
-
-export const useReasoning = () => {
-	const context = use(ReasoningContext);
-	if (!context) {
-		throw new Error('Reasoning components must be used within Reasoning');
-	}
-	return context;
-};
 
 export type ReasoningProps = ComponentProps<typeof Collapsible> & {
 	isStreaming?: boolean;

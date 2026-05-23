@@ -6,19 +6,11 @@
 
 'use client';
 
-import type { FileUIPart } from 'ai';
 import { createContext, type PropsWithChildren, type RefObject, use } from 'react';
-import { LocalAttachmentsContext } from './prompt-input-attachments-context';
-
-/** Attachment controller exposed to prompt input child components. */
-export type AttachmentsContext = {
-	files: (FileUIPart & { id: string })[];
-	add: (files: File[] | FileList) => void;
-	remove: (id: string) => void;
-	clear: () => void;
-	openFileDialog: () => void;
-	fileInputRef: RefObject<HTMLInputElement | null>;
-};
+import {
+	type AttachmentsContext,
+	LocalAttachmentsContext,
+} from './prompt-input-attachments-context';
 
 /** Controlled textarea value used by provider-backed prompt inputs. */
 export type TextInputContext = {
@@ -44,7 +36,10 @@ const PromptInputController = createContext<PromptInputControllerProps | null>(n
 const ProviderAttachmentsContext = createContext<AttachmentsContext | null>(null);
 
 // Re-export from dedicated module so this file remains components-only for Fast Refresh.
-export { LocalAttachmentsContext } from './prompt-input-attachments-context';
+export {
+	type AttachmentsContext,
+	LocalAttachmentsContext,
+} from './prompt-input-attachments-context';
 
 /** Read the provider-backed prompt input controller when one exists. */
 export const useOptionalPromptInputController = () => use(PromptInputController);
