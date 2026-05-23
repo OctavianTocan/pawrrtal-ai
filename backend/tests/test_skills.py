@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 from app.core.tools.skills import read_skill_manifest
 
@@ -17,7 +18,7 @@ def _make_skill_dir(skills_dir: Path, name: str, with_skill_md: bool = True) -> 
     return skill_dir
 
 
-def _write_manifest(skills_dir: Path, entries: list[dict]) -> None:
+def _write_manifest(skills_dir: Path, entries: list[dict[str, Any]]) -> None:
     """Write JSONL entries to _manifest.jsonl."""
     lines = "\n".join(json.dumps(e) for e in entries)
     (skills_dir / "_manifest.jsonl").write_text(lines, encoding="utf-8")

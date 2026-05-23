@@ -97,7 +97,8 @@ class TestRedactSecretsStrings:
     def test_non_string_passthrough(self) -> None:
         """Non-strings are returned unchanged (the chat aggregator hands heterogeneous values)."""
         assert redact_secrets(None) is None  # type: ignore[arg-type]
-        assert redact_secrets(42) == 42  # type: ignore[arg-type]
+        # The redact_secrets function returns non-strings unchanged.
+        assert redact_secrets(42) == 42  # type: ignore[arg-type,comparison-overlap]
 
 
 class TestRedactMapping:

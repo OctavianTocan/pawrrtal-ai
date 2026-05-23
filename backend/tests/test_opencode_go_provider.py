@@ -14,11 +14,12 @@ from __future__ import annotations
 
 import json
 from types import SimpleNamespace
+from typing import cast
 from uuid import uuid4
 
 import pytest
 
-from app.core.agent_loop.types import AgentTool
+from app.core.agent_loop.types import AgentMessage, AgentTool
 from app.core.providers._opencode_go_events import (
     ToolCallBuffer,
     build_openai_messages,
@@ -218,7 +219,12 @@ def test_build_openai_messages_prepends_system_and_renders_all_roles() -> None:
         ),
     ]
 
-    rendered = build_openai_messages(system_prompt="be helpful", messages=history)
+    # mypy infers the heterogeneous TypedDict list as the empty TypedDict union;
+    # cast back to the AgentMessage union the function expects.
+    rendered = build_openai_messages(
+        system_prompt="be helpful",
+        messages=cast("list[AgentMessage]", history),
+    )
 
     assert rendered[0] == {"role": "system", "content": "be helpful"}
     assert rendered[1] == {"role": "user", "content": "hi"}

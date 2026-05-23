@@ -152,6 +152,7 @@ class TestHandleTextDeltaDraft:
             # Should have been called with empty text for native "Thinking…" placeholder
             mock_draft.assert_awaited_once()
             call_kwargs = mock_draft.await_args
+            assert call_kwargs is not None
             assert call_kwargs.args[3] == ""  # html arg is empty string
 
     async def test_over_debounce_flushes_rendered_html(self) -> None:
@@ -168,6 +169,7 @@ class TestHandleTextDeltaDraft:
             # Should flush non-empty HTML
             mock_draft.assert_awaited_once()
             call_kwargs = mock_draft.await_args
+            assert call_kwargs is not None
             passed_html = call_kwargs.args[3]
             assert passed_html  # non-empty
             # chars_since_edit reset to 0 after flush

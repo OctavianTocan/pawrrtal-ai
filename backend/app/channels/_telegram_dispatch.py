@@ -188,7 +188,7 @@ async def handle_tool_use(
     Returns the updated ``(tool_trace, chars_since_edit, last_edit_at)``
     triple.
     """
-    call_id = str(event.get("id") or event.get("tool_use_id") or "")
+    call_id = str(event.get("tool_use_id") or "")
     line = format_tool_use(event)
 
     # Track whether this event introduces a NEW tool so we can flush
@@ -234,7 +234,7 @@ async def handle_tool_result(
     Computes elapsed time from the corresponding ``tool_use`` start,
     renders the success/error line, and forces an edit.
     """
-    call_id = str(event.get("tool_use_id") or event.get("id") or "")
+    call_id = str(event.get("tool_use_id") or "")
     state = tool_states.get(call_id)
     if state is None:
         logger.debug(

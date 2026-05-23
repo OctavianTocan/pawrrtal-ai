@@ -377,12 +377,16 @@ async def _resolve_excerpts(
 
     messages: dict[uuid.UUID, ChatMessage] = {}
     if message_ids:
-        result = await session.execute(select(ChatMessage).where(ChatMessage.id.in_(message_ids)))
-        messages = {m.id: m for m in result.scalars().all()}
+        msg_result = await session.execute(
+            select(ChatMessage).where(ChatMessage.id.in_(message_ids))
+        )
+        messages = {m.id: m for m in msg_result.scalars().all()}
     summaries: dict[uuid.UUID, LCMSummary] = {}
     if summary_ids:
-        result = await session.execute(select(LCMSummary).where(LCMSummary.id.in_(summary_ids)))
-        summaries = {s.id: s for s in result.scalars().all()}
+        summ_result = await session.execute(
+            select(LCMSummary).where(LCMSummary.id.in_(summary_ids))
+        )
+        summaries = {s.id: s for s in summ_result.scalars().all()}
 
     tokens = _tokenize_query(query)
     out: list[tuple[LCMEmbedding, str, dict[str, object]]] = []

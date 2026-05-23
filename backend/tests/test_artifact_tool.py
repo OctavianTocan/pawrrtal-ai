@@ -19,6 +19,7 @@ Covers three layers:
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 import pytest
 
@@ -280,7 +281,7 @@ def test_maybe_artifact_event_returns_none_for_non_tool_events() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_artifact_tool_is_registered_in_build_agent_tools(tmp_path) -> None:
+def test_artifact_tool_is_registered_in_build_agent_tools(tmp_path: Path) -> None:
     """The render_artifact tool must appear in the live tool catalogue.
 
     This test guards against accidental removal from ``build_agent_tools``.

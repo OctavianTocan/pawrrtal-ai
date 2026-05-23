@@ -82,24 +82,6 @@ DEFAULT_MAX_DEPTH = int(os.environ.get("MAX_DEPTH", "3"))
 # under the budget; if you genuinely cannot, raise it in review.
 EXEMPT_FUNCTIONS: frozenset[str] = frozenset(
     {
-        # TODO(pawrrtal): flatten Gemini provider stream + helper.
-        # `make_gemini_stream_fn` and its inner `stream_fn` close over
-        # 6 levels because the Google SDK's event surface is a switch
-        # statement nested inside the streaming for-loop.  Extract
-        # event-type handlers (text / function-call / safety) into
-        # module-level helpers.
-        "backend/app/core/providers/gemini_provider.py::make_gemini_stream_fn",
-        "backend/app/core/providers/gemini_provider.py::stream_fn",
-        "backend/app/core/providers/gemini_provider.py::stream",
-        # TODO(pawrrtal): flatten the agent loop's event drain.
-        "backend/app/core/agent_loop/loop.py::_run_loop",
-        # TODO(pawrrtal): flatten the Claude SDK event translators.
-        # All three walk a discriminated union from the Anthropic SDK
-        # via repeated isinstance checks; would benefit from a small
-        # dispatch table.
-        "backend/app/core/providers/claude_provider.py::_events_from_assistant",
-        "backend/app/core/providers/claude_provider.py::_events_from_message",
-        "backend/app/core/providers/claude_provider.py::_tool_result_to_text",
         # TODO(pawrrtal): flatten the Telegram channel's event loop.
         # ``deliver`` walks the LLM stream with one branch per event
         # kind (``tool_use``/``tool_result``/``thinking``/``delta``…)

@@ -35,7 +35,19 @@ class StreamEvent(TypedDict, total=False):
     name: str  # for tool_use
     input: dict[str, Any]  # for tool_use
     display: ToolDisplayPayload  # for tool_use
-    tool_use_id: str  # for tool_result
+    tool_use_id: str  # for tool_use + tool_result — provider-native call id
+    # ``True`` when a ``tool_result`` carries an error payload — set by the
+    # Claude bridge (``_block_to_tool_result``) from
+    # ``ToolResultBlock.is_error`` so downstream renderers can mark the turn
+    # as failed without re-parsing the content. Other providers (Gemini, xAI,
+    # opencode-go, gemini-cli) currently don't surface error / non-error on
+    # tool results, so consumers should treat a missing key as ``False``.
+    is_error: bool
+    # Provider-supplied error category on ``type="error"`` events. Currently
+    # opt-in (no provider emits it yet) — ``classify_error`` reads it as the
+    # first hint before falling back to heuristic matching on the exception
+    # type. Mirrors the public ``ErrorKind`` enum (see ``telegram_errors``).
+    error_code: str
     artifact: dict[str, Any]  # for artifact (id, title, spec)
     # ``message`` events emitted by the chat router's ``send_fn`` for
     # mid-turn pushes (text + optional file attachment back to the user).

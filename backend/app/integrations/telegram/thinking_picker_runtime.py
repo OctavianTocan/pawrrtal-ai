@@ -7,13 +7,17 @@ aiogram, while this file owns the aiogram-shaped IO.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from app.crud.channel import update_conversation_reasoning_effort
 from app.db import async_session_maker
 from app.integrations.telegram.handlers import TelegramSender
+
+# Re-exported so bot.py imports both via one module.
 from app.integrations.telegram.thinking_picker import (
-    THINKING_CALLBACK_PREFIX,  # noqa: F401  # re-exported so bot.py imports both via one module
+    THINKING_CALLBACK_PREFIX as THINKING_CALLBACK_PREFIX,  # noqa: PLC0414
+)
+from app.integrations.telegram.thinking_picker import (
     ThinkingButton,
     ThinkingCallback,
     ThinkingPickerState,
@@ -30,7 +34,12 @@ from app.integrations.telegram.thinking_picker import (
 )
 
 if TYPE_CHECKING:
-    from aiogram.types import CallbackQuery, Message
+    from aiogram.types import (
+        CallbackQuery,
+        InlineKeyboardMarkup,
+        Message,
+        ReplyParameters,
+    )
 
 _CLEAR_NOTICE = "Reasoning level cleared"
 
@@ -160,7 +169,7 @@ async def _persist_effort(*, state: ThinkingPickerState, effort: str | None) -> 
         )
 
 
-def _inline_keyboard(rows: list[list[ThinkingButton]]) -> object:
+def _inline_keyboard(rows: list[list[ThinkingButton]]) -> InlineKeyboardMarkup:
     from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup  # noqa: PLC0415
 
     return InlineKeyboardMarkup(
@@ -205,10 +214,12 @@ def _callback_message(callback: CallbackQuery) -> Message | None:
     message = callback.message
     if message is None or not hasattr(message, "edit_text"):
         return None
-    return message
+    # ``callback.message`` is typed ``Message | InaccessibleMessage``; the
+    # hasattr() guard above narrows to the accessible Message at runtime.
+    return cast("Message", message)
 
 
-def _reply_parameters(message_id: int) -> object:
+def _reply_parameters(message_id: int) -> ReplyParameters:
     from aiogram.types import ReplyParameters  # noqa: PLC0415
 
     return ReplyParameters(message_id=message_id)

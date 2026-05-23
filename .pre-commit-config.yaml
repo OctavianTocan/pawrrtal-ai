@@ -85,9 +85,9 @@ repos:
   - repo: local
     hooks:
       - id: mypy
-        name: mypy (backend, advisory)
+        name: mypy (backend)
         language: system
-        entry: bash -c 'cd backend && uv run mypy "$@" || true' --
+        entry: bash -c 'cd backend && uv run mypy "$@"' --
         types: [python]
         files: ^backend/.*\.py$
         pass_filenames: false  # mypy reads files= from pyproject.toml

@@ -20,7 +20,7 @@ import uuid
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings as _settings
+from app.core.config import settings as settings  # noqa: PLC0414
 from app.core.providers import resolve_llm
 from app.models import LCMContextItem, LCMSummary, LCMSummarySource
 
@@ -54,11 +54,11 @@ async def run_condensation_cascade(
     * ``1``  — one pass (leaf → depth-1) [default]
     * ``-1`` — unlimited cascade, capped at :data:`_CONDENSATION_HARD_CAP`
     """
-    if _settings.lcm_incremental_max_depth == 0:
+    if settings.lcm_incremental_max_depth == 0:
         return
     passes = (
-        _settings.lcm_incremental_max_depth
-        if _settings.lcm_incremental_max_depth > 0
+        settings.lcm_incremental_max_depth
+        if settings.lcm_incremental_max_depth > 0
         else _CONDENSATION_HARD_CAP
     )
     for depth in range(passes):
@@ -155,7 +155,9 @@ async def _condense_at_depth(
 
     turns_text = _format_turns(selected_messages)
     summary_text, summary_kind = await _summarize(
-        resolve_llm(_settings.lcm_summary_model or model_id, user_id=user_id),
+        # resolve_llm does not accept user_id; kept as unused param for
+        # call-site symmetry with workspace key resolution upstream.
+        resolve_llm(settings.lcm_summary_model or model_id),
         turns_text,
         user_id,
     )
@@ -173,7 +175,7 @@ async def _condense_at_depth(
         depth=depth + 1,
         content=summary_text,
         token_count=_approx_tokens(summary_text),
-        model_id=_settings.lcm_summary_model or model_id,
+        model_id=settings.lcm_summary_model or model_id,
         summary_kind=summary_kind,
     )
     session.add(parent)

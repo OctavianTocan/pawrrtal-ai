@@ -93,6 +93,9 @@ async def lcm_expand_query(
 
     expansion_prompt = f"CONVERSATION HISTORY:\n{_format_turns(turns)}\n\nQUESTION:\n{prompt}"
     expand_model = _settings.lcm_summary_model or model_id
+    # resolve_llm does not accept user_id; per-user key resolution flows
+    # through workspace_root upstream. Drop the kwarg to silence mypy.
+    _ = user_id
     provider = resolve_llm(expand_model)
 
     try:

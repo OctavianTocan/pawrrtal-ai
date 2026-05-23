@@ -107,7 +107,7 @@ async def _make_summary_item(
 
 
 def _make_provider(answer: str) -> Any:
-    async def _stream(*args: Any, **kwargs: Any) -> AsyncIterator:
+    async def _stream(*args: Any, **kwargs: Any) -> AsyncIterator[Any]:
         yield {"type": "delta", "content": answer}
 
     p = MagicMock()
@@ -116,7 +116,7 @@ def _make_provider(answer: str) -> Any:
 
 
 def _make_failing_provider() -> Any:
-    async def _stream(*args: Any, **kwargs: Any) -> AsyncIterator:
+    async def _stream(*args: Any, **kwargs: Any) -> AsyncIterator[Any]:
         raise RuntimeError("provider down")
         yield
 
@@ -207,7 +207,7 @@ async def test_expand_prompt_contains_full_history(
 
     captured_questions: list[str] = []
 
-    async def _capturing_stream(*args: Any, **kwargs: Any) -> AsyncIterator:
+    async def _capturing_stream(*args: Any, **kwargs: Any) -> AsyncIterator[Any]:
         captured_questions.append(kwargs.get("question", ""))
         yield {"type": "delta", "content": "captured"}
 
