@@ -33,6 +33,7 @@ from app.crud.channel import (
     get_or_create_telegram_conversation_full,
     get_user_id_for_external,
 )
+from app.integrations.telegram.model_defaults import resolve_effective_model_id
 
 PROVIDER = "telegram"
 THINKING_CALLBACK_PREFIX = "thk:"
@@ -135,7 +136,11 @@ async def get_thinking_picker_state(
         thread_id=sender.thread_id,
     )
 
-    model_id = conversation.model_id or default_model().id
+    model_id = await resolve_effective_model_id(
+        session=session,
+        user_id=pawrrtal_user_id,
+        conversation_model_id=conversation.model_id,
+    )
     entry = _resolve_entry(model_id) or default_model()
     return ThinkingPickerState(
         model_entry=entry,

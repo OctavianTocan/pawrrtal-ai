@@ -67,6 +67,10 @@ async def test_returns_nothing_to_compact_when_compactor_returns_false() -> None
             AsyncMock(return_value=fake_conversation),
         ),
         patch(
+            "app.integrations.telegram.compact_command.resolve_effective_model_id",
+            AsyncMock(return_value="agent-sdk:anthropic/claude-sonnet-4-6"),
+        ),
+        patch(
             "app.integrations.telegram.compact_command.compact_leaf_if_needed",
             AsyncMock(return_value=False),
         ),
@@ -107,6 +111,10 @@ async def test_returns_compacted_message_on_success() -> None:
         patch(
             "app.integrations.telegram.compact_command.get_or_create_telegram_conversation_full",
             AsyncMock(return_value=fake_conversation),
+        ),
+        patch(
+            "app.integrations.telegram.compact_command.resolve_effective_model_id",
+            AsyncMock(return_value="agent-sdk:anthropic/claude-sonnet-4-6"),
         ),
         patch(
             "app.integrations.telegram.compact_command.compact_leaf_if_needed",

@@ -40,6 +40,7 @@ from app.integrations.telegram.compact_command import (
 from app.integrations.telegram.lcm_status import (
     handle_lcm_command as handle_lcm_command,  # noqa: PLC0414
 )
+from app.integrations.telegram.model_defaults import resolve_effective_model_id
 
 
 class _TelegramSenderLike(Protocol):
@@ -222,9 +223,18 @@ def _render_status_message(
     run_active: bool,
     thread_id: int | None,
     now: datetime,
+    effective_model_id: str | None = None,
 ) -> str:
-    """Pure formatter used by ``handle_status_command`` and its tests."""
-    model_display, model_canonical, model_warning = _format_model_display(status.model_id)
+    """Pure formatter used by ``handle_status_command`` and its tests.
+
+    ``effective_model_id`` is the resolved canonical ID after walking
+    the conversation → user-default → catalog chain. Callers should
+    pre-resolve via :func:`resolve_effective_model_id`; if omitted,
+    the formatter falls back to ``status.model_id`` directly (used by
+    the existing test suite that doesn't model the user-default path).
+    """
+    rendered_model_id = effective_model_id if effective_model_id is not None else status.model_id
+    model_display, model_canonical, model_warning = _format_model_display(rendered_model_id)
     verbose_level, verbose_label = _resolve_verbose(status.verbose_level)
     # ``Conversation.created_at`` is a tz-naive DateTime column in the DB —
     # all timestamps in this app are written in UTC. Normalize so the
@@ -248,7 +258,7 @@ def _render_status_message(
             f"{_format_token_count(status.total_output_tokens)} out"
         )
 
-    reasoning_label = _resolve_reasoning_label(status.reasoning_effort, model_id=status.model_id)
+    reasoning_label = _resolve_reasoning_label(status.reasoning_effort, model_id=rendered_model_id)
     cost_line = _format_cost_usd(
         status.total_cost_usd, has_messages=has_messages, has_usage=has_usage
     )
@@ -315,10 +325,16 @@ async def handle_status_command(
         # unlikely but render the gateway-only view rather than crashing.
         return _STATUS_NO_CONVERSATION_MESSAGE.format(uptime=_format_duration(bot_uptime_seconds))
 
+    effective_model_id = await resolve_effective_model_id(
+        session=session,
+        user_id=pawrrtal_user_id,
+        conversation_model_id=status.model_id,
+    )
     return _render_status_message(
         bot_uptime_seconds=bot_uptime_seconds,
         status=status,
         run_active=is_chat_run_active(sender.chat_id),
         thread_id=sender.thread_id,
         now=_now_utc(),
+        effective_model_id=effective_model_id,
     )

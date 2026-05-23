@@ -144,7 +144,16 @@ class UserPreferences(Base):
     )
     custom_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
     accent_color: Mapped[str | None] = mapped_column(String(7), nullable=True)
-    font_size: Mapped[int] = mapped_column()
+    # NULL = "use the UI default" — the frontend appearance settings
+    # own the canonical value, so seed-on-demand CRUD doesn't need to
+    # duplicate that literal in Python. Migration 022.
+    font_size: Mapped[int | None] = mapped_column(nullable=True)
+    # User-level default model. When NULL, conversation model resolution
+    # falls back to ``catalog.default_model()``. When set, this is the
+    # canonical "host:vendor/model" form picked by the user via the
+    # Telegram ``/model ... default`` command or the picker's "Set as
+    # default" button.
+    default_model_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
 
 class UserPersonalization(Base):
