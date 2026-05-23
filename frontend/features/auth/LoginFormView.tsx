@@ -1,3 +1,4 @@
+import { Loader2Icon } from 'lucide-react';
 import Link from 'next/link';
 import type React from 'react';
 import { AppleIcon } from '@/components/brand-icons/AppleIcon';
@@ -122,7 +123,13 @@ export function LoginFormView({
 									type="submit"
 									disabled={isLoading}
 								>
-									Login
+									{isLoading && (
+										<Loader2Icon
+											className="mr-2 size-4 animate-spin"
+											aria-hidden="true"
+										/>
+									)}
+									{isLoading ? 'Logging in...' : 'Login'}
 								</Button>
 								{canUseDevAdminLogin && (
 									<>
