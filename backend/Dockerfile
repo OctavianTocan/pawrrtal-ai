@@ -41,7 +41,7 @@ WORKDIR /app
 #   * ``ntn`` — the official Notion CLI used by the Notion plugin.
 #     The plugin subprocesses ``ntn`` per tool call with the workspace's
 #     token injected via ``NOTION_API_TOKEN``; see
-#     ``app/integrations/notion/ntn_client.py``.  Pinned by date so the
+#     ``app/plugins/notion/ntn_client.py``.  Pinned by date so the
 #     install layer is reproducible — bump the env var to refresh.
 #     The upstream installer (https://ntn.dev) writes ``ntn`` directly to
 #     ``/usr/local/bin/ntn`` when run as root (the container build case),

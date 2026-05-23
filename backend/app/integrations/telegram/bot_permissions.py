@@ -18,11 +18,10 @@ from app.core.governance.permissions import (
     build_default_permission_check,
 )
 from app.core.governance.workspace_context import load_workspace_context
-from app.integrations.telegram.handlers import TelegramTurnContext
 
 
 def build_telegram_permission_check(
-    context: TelegramTurnContext,
+    context: Any,
     workspace_root: Path | None,
 ) -> PermissionCheckFn | None:
     """Return a permission gate bound to this turn's user / workspace.

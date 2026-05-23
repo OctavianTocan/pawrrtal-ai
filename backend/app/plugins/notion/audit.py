@@ -23,8 +23,8 @@ from datetime import UTC, datetime
 from typing import Any
 
 from app.db import async_session_maker
-from app.integrations.notion.ntn_client import NtnError
 from app.models import NotionOperationLog
+from app.plugins.notion.ntn_client import NtnError
 
 logger = logging.getLogger(__name__)
 

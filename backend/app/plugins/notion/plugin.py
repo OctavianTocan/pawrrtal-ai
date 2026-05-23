@@ -1,7 +1,7 @@
 """Plugin manifest for the Notion integration.
 
 Importing this module registers the plugin against the global
-:mod:`app.core.plugins.registry`.  ``app.integrations.__init__`` is
+:mod:`app.core.plugins.registry`.  ``app.plugins.__init__`` is
 responsible for triggering the import; nothing else should import this
 file directly (importing it twice would attempt a duplicate
 registration and raise).
@@ -14,7 +14,7 @@ from app.core.plugins import (
     Plugin,
     register_plugin,
 )
-from app.integrations.notion.tool import make_ntn_tool
+from app.plugins.notion.tool import make_ntn_tool
 
 NOTION_INTEGRATION_URL = "https://www.notion.so/profile/integrations"
 

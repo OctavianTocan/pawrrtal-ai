@@ -92,7 +92,7 @@ Migration:
 
 ### 3. Notion plugin — wraps `ntn` CLI
 
-The plugin lives at `backend/app/integrations/notion/`. It registers 18 tools matching openclaw-notion's contract exactly (same names, same parameter shapes, same return format), so anything written against that contract works against Pawrrtal with no change.
+The plugin lives at `backend/app/plugins/notion/`. It registers 18 tools matching openclaw-notion's contract exactly (same names, same parameter shapes, same return format), so anything written against that contract works against Pawrrtal with no change.
 
 Execution maps each tool to a `ntn` invocation:
 
@@ -208,7 +208,7 @@ What stayed:
 
 What's gone:
 
-- `backend/app/integrations/notion/tools/` (the per-category factory files and `_helpers.py`).
+- `backend/app/plugins/notion/tools/` (the per-category factory files and `_helpers.py`).
 - The agent-facing `notion_help`, `notion_doctor`, and `notion_logs_read` surfaces. Operators inspect `notion_operation_logs` directly; the agent runs `ntn --help` if it wants to discover commands.
 - `call_ntn_json` / `call_ntn_text` / `format_query_params` (unused once the wrappers were removed).
 

@@ -7,7 +7,7 @@ description: How to add a tools-only integration to Pawrrtal via the plugin regi
 
 Plugins are additive integrations that contribute agent tools at runtime.
 The Notion plugin
-(`backend/app/integrations/notion/`) is the canonical example; this page
+(`backend/app/plugins/notion/`) is the canonical example; this page
 captures the moving parts so the next integration is mechanical.
 
 The design rationale is in
@@ -18,14 +18,14 @@ how, not the why.
 ## The shape
 
 A plugin is a Python package under
-`backend/app/integrations/<plugin_id>/`. The package exports a single
+`backend/app/plugins/<plugin_id>/`. The package exports a single
 `Plugin` object built from
 [`app.core.plugins.types`](../../../../../backend/app/core/plugins/types.py):
 
 ```python
-# backend/app/integrations/my_plugin/plugin.py
+# backend/app/plugins/my_plugin/plugin.py
 from app.core.plugins import EnvKeySpec, Plugin, register_plugin
-from app.integrations.my_plugin.tools import factories
+from app.plugins.my_plugin.tools import factories
 
 my_plugin = Plugin(
     id="my_plugin",
@@ -46,7 +46,7 @@ register_plugin(my_plugin)
 ```
 
 Importing the plugin package runs `register_plugin(...)` as a side
-effect. Make `backend/app/integrations/__init__.py` import your
+effect. Make `backend/app/plugins/__init__.py` import your
 subpackage so the side effect fires at app startup.
 
 ## Tool factories
@@ -60,8 +60,8 @@ ID, and (optionally) the channel send callback. Use it for env-key
 resolution and per-call audit logging.
 
 ```python
-# backend/app/integrations/my_plugin/tools/__init__.py
-from app.integrations.my_plugin.tools.search import make_search_tool
+# backend/app/plugins/my_plugin/tools/__init__.py
+from app.plugins.my_plugin.tools.search import make_search_tool
 
 factories = (make_search_tool,)
 ```
@@ -137,7 +137,7 @@ gates out at activation time with no UI clue.
 ## Audit logging
 
 Notion's plugin runs every tool call through
-[`with_audit`](../../../../../backend/app/integrations/notion/audit.py)
+[`with_audit`](../../../../../backend/app/plugins/notion/audit.py)
 to write a row to a dedicated `*_operation_logs` table.  This is
 optional but recommended for any plugin where "what did this
 workspace do recently?" is a useful question (Notion, Slack, Linear).

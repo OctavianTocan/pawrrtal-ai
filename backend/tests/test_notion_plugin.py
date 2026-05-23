@@ -28,11 +28,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.plugins import ToolContext, all_plugins
 from app.db import User
-from app.integrations.notion import notion_plugin
-from app.integrations.notion.audit import STATUS_ERROR, STATUS_OK
-from app.integrations.notion.ntn_client import NtnError, NtnResult, call_ntn
-from app.integrations.notion.tool import make_ntn_tool
 from app.models import NotionOperationLog, Workspace
+from app.plugins.notion import notion_plugin
+from app.plugins.notion.audit import STATUS_ERROR, STATUS_OK
+from app.plugins.notion.ntn_client import NtnError, NtnResult, call_ntn
+from app.plugins.notion.tool import make_ntn_tool
 
 NTN_BINARY_ENV_VAR = "NTN_BINARY"
 
@@ -73,7 +73,7 @@ def patch_audit_sessionmaker(monkeypatch: pytest.MonkeyPatch, db_session: AsyncS
     def fake_maker() -> _TestSessionContext:
         return _TestSessionContext()
 
-    monkeypatch.setattr("app.integrations.notion.audit.async_session_maker", fake_maker)
+    monkeypatch.setattr("app.plugins.notion.audit.async_session_maker", fake_maker)
 
 
 @pytest.fixture
@@ -153,7 +153,7 @@ class TestNtnTool:
         self, ctx: ToolContext, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         monkeypatch.setattr(
-            "app.integrations.notion.tool.resolve_api_key",
+            "app.plugins.notion.tool.resolve_api_key",
             lambda *_, **__: "tok",
         )
         tool = make_ntn_tool(ctx)
@@ -171,7 +171,7 @@ class TestNtnTool:
         clear validation error instead of an opaque ``ntn`` failure.
         """
         monkeypatch.setattr(
-            "app.integrations.notion.tool.resolve_api_key",
+            "app.plugins.notion.tool.resolve_api_key",
             lambda *_, **__: "tok",
         )
         tool = make_ntn_tool(ctx)
@@ -192,7 +192,7 @@ class TestNtnTool:
         patch_audit_sessionmaker: None,
     ) -> None:
         monkeypatch.setattr(
-            "app.integrations.notion.tool.resolve_api_key",
+            "app.plugins.notion.tool.resolve_api_key",
             lambda *_, **__: "tok",
         )
         captured: list[list[str]] = []
@@ -201,7 +201,7 @@ class TestNtnTool:
             captured.append(list(args))
             return NtnResult(stdout=b"ok", stderr=b"")
 
-        monkeypatch.setattr("app.integrations.notion.tool.call_ntn", fake_call)
+        monkeypatch.setattr("app.plugins.notion.tool.call_ntn", fake_call)
 
         tool = make_ntn_tool(ctx)
         await tool.execute("call-1", args="--help")
@@ -217,7 +217,7 @@ class TestNtnTool:
         patch_audit_sessionmaker: None,
     ) -> None:
         monkeypatch.setattr(
-            "app.integrations.notion.tool.resolve_api_key",
+            "app.plugins.notion.tool.resolve_api_key",
             lambda *_, **__: "tok-abc",
         )
         captured_args: list[list[str]] = []
@@ -235,7 +235,7 @@ class TestNtnTool:
             assert token == "tok-abc"
             return NtnResult(stdout=b'{"results":[]}\n', stderr=b"warn\n")
 
-        monkeypatch.setattr("app.integrations.notion.tool.call_ntn", fake_call)
+        monkeypatch.setattr("app.plugins.notion.tool.call_ntn", fake_call)
 
         tool = make_ntn_tool(ctx)
         raw = await tool.execute(
@@ -275,14 +275,14 @@ class TestNtnTool:
         patch_audit_sessionmaker: None,
     ) -> None:
         monkeypatch.setattr(
-            "app.integrations.notion.tool.resolve_api_key",
+            "app.plugins.notion.tool.resolve_api_key",
             lambda *_, **__: "tok-abc",
         )
 
         async def fake_call(*_: Any, **__: Any) -> Any:
             raise NtnError(2, "unauthorized")
 
-        monkeypatch.setattr("app.integrations.notion.tool.call_ntn", fake_call)
+        monkeypatch.setattr("app.plugins.notion.tool.call_ntn", fake_call)
 
         tool = make_ntn_tool(ctx)
         raw = await tool.execute("call-1", args=["api", "v1/users/me"])
@@ -315,14 +315,14 @@ class TestNtnTool:
     ) -> None:
         """An OSError (e.g. binary missing) is surfaced cleanly to the agent."""
         monkeypatch.setattr(
-            "app.integrations.notion.tool.resolve_api_key",
+            "app.plugins.notion.tool.resolve_api_key",
             lambda *_, **__: "tok",
         )
 
         async def fake_call(*_: Any, **__: Any) -> Any:
             raise FileNotFoundError("ntn: command not found")
 
-        monkeypatch.setattr("app.integrations.notion.tool.call_ntn", fake_call)
+        monkeypatch.setattr("app.plugins.notion.tool.call_ntn", fake_call)
         tool = make_ntn_tool(ctx)
         raw = await tool.execute("call-1", args=["api", "v1/users/me"])
         body = json.loads(raw)

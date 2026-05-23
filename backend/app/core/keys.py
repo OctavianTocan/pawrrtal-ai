@@ -61,7 +61,7 @@ OVERRIDABLE_KEYS: frozenset[str] = frozenset(
         "XAI_API_KEY",
         "OPENAI_API_KEY",
         "OPENAI_CODEX_OAUTH_TOKEN",
-        # Notion plugin (see backend/app/integrations/notion/).  The plugin
+        # Notion plugin (see backend/app/plugins/notion/).  The plugin
         # registry declares the same key via its EnvKeySpec; this central
         # allowlist remains the source of truth for the HTTP layer.
         "NOTION_API_KEY",

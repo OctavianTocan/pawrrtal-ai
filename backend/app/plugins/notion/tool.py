@@ -26,8 +26,8 @@ from app.core.agent_loop.display import ToolDisplay, ToolDisplayPayload
 from app.core.agent_loop.types import AgentTool
 from app.core.keys import resolve_api_key
 from app.core.plugins.types import ToolContext
-from app.integrations.notion.audit import with_audit
-from app.integrations.notion.ntn_client import NtnError, call_ntn
+from app.plugins.notion.audit import with_audit
+from app.plugins.notion.ntn_client import NtnError, call_ntn
 
 NOTION_API_KEY_NAME = "NOTION_API_KEY"
 
