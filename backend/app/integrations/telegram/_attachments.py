@@ -315,10 +315,15 @@ async def _transcribe_audio(audio_bytes: bytes) -> str | None:
     """Transcribe via the configured backend, returning ``None`` on failure.
 
     Resolves :func:`app.integrations.voice.resolve_transcriber` once
-    per call so a deployment with ``voice_provider == "xai"`` (legacy
-    proxy) silently skips — the bot will fall back to the
-    metadata-only annotation. Any backend failure is logged and
-    swallowed; voice ingestion must never break a turn.
+    per call.  When the resolver returns ``None`` (operator hasn't
+    configured a voice backend or the corresponding API key is unset)
+    the bot falls back to the metadata-only annotation.  Any backend
+    failure is logged and swallowed; voice ingestion must never break
+    a turn.
+
+    All four backends — xAI, Mistral, OpenAI, local whisper.cpp — are
+    valid here; the previous behaviour where ``voice_provider == "xai"``
+    silently skipped was the reported Telegram-voice bug.
     """
     from app.integrations.voice import (  # noqa: PLC0415 — optional dep
         TranscriptionError,
