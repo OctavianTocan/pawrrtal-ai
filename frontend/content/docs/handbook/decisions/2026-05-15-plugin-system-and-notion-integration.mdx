@@ -92,7 +92,7 @@ Migration:
 
 ### 3. Notion plugin — wraps `ntn` CLI
 
-The plugin lives at `backend/app/integrations/notion/`. It registers 18 tools matching openclaw-notion's contract exactly (same names, same parameter shapes, same return format), so anything written against that contract works against Pawrrtal with no change.
+The plugin lives at `backend/app/plugins/notion/`. It registers 18 tools matching openclaw-notion's contract exactly (same names, same parameter shapes, same return format), so anything written against that contract works against Pawrrtal with no change.
 
 Execution maps each tool to a `ntn` invocation:
 
@@ -195,3 +195,21 @@ Tests follow the `ScriptedStreamFn` pattern (per `.claude/rules/testing/agent-lo
 
 - Does `ntn.dev`'s install script accept Docker build contexts (no human UA)? If not, we need a direct binary download URL — to be confirmed during PR #7.
 - Should secondary workspaces inherit env keys from the default workspace on first creation, or always start blank? Current proposal: blank (forces explicit configuration; matches "isolated workspace" intent).
+
+## Update (2026-05-20) — collapse 18 wrappers into one `ntn` tool
+
+The 18-tool layer that mirrored openclaw-notion's contract turned out to add cost without paying for itself: every wrapper had its own JSON-schema and argument shaping that could drift from the underlying CLI, and the agent was never reaching subcommands we hadn't pre-wired — it was just running fewer of them. The plugin now exposes a single `ntn` tool that takes an `args` array (and optional `stdin`) and pipes the resulting stdout / stderr back to the agent. The official CLI is the contract; we don't maintain a parallel one.
+
+What stayed:
+
+- Workspace-scoped `NOTION_API_TOKEN` injection + ephemeral `HOME` per call (`ntn_client.call_ntn`).
+- The `notion_operation_logs` audit table (alembic `013`) and the `with_audit` wrapper. New rows carry `tool_name="ntn"` and `operation="cli"`; historical rows from the per-tool era keep their original `tool_name`.
+- Plugin activation predicate (workspace `NOTION_API_KEY` must resolve) and Settings UI row.
+
+What's gone:
+
+- `backend/app/plugins/notion/tools/` (the per-category factory files and `_helpers.py`).
+- The agent-facing `notion_help`, `notion_doctor`, and `notion_logs_read` surfaces. Operators inspect `notion_operation_logs` directly; the agent runs `ntn --help` if it wants to discover commands.
+- `call_ntn_json` / `call_ntn_text` / `format_query_params` (unused once the wrappers were removed).
+
+The mapping table above (`notion_search` → `ntn api v1/search …`, etc.) reads as a useful reference for what the agent can still drive through the `ntn` tool, but the LHS column no longer corresponds to live tool names.

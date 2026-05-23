@@ -193,8 +193,7 @@ class TestHandleModelSelectButtonBranching:
         assert kwargs.get("reply_markup") is None
         # And the operator gets a breadcrumb.
         assert any(
-            "MODEL_PICKER_STALE_DEFAULT_KEYBOARD" in record.message
-            for record in caplog.records
+            "MODEL_PICKER_STALE_DEFAULT_KEYBOARD" in record.message for record in caplog.records
         )
 
     async def test_button_present_when_selection_is_new_default(self) -> None:

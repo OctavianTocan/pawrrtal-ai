@@ -22,7 +22,7 @@ import { ToolResultChipsRow } from './ToolResultChipsRow';
  */
 function ToolStep({ call, chips }: { call: ChatToolCall; chips: ToolResultChips }): ReactNode {
 	const Icon = getToolIcon(call.name);
-	const isComplete = call.status === 'completed';
+	const isComplete = call.status !== 'pending';
 	const label = toolStepLabel(call);
 	const emojiIcon = call.display?.icon;
 
@@ -65,7 +65,9 @@ function ToolStep({ call, chips }: { call: ChatToolCall; chips: ToolResultChips 
 }
 
 function toolStepLabel(call: ChatToolCall): string {
-	const displayText = call.display?.present;
+	const isComplete = call.status !== 'pending';
+	const displayText =
+		(isComplete ? call.display?.compact : call.display?.present) || call.display?.present;
 	if (displayText) {
 		return stripLeadingIcon(displayText, call.display?.icon);
 	}

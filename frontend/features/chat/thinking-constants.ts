@@ -14,6 +14,7 @@ import {
 	GlobeIcon,
 	type LucideIcon,
 	MessageSquareIcon,
+	NotebookText,
 	SearchIcon,
 } from 'lucide-react';
 
@@ -36,6 +37,7 @@ export const KNOWN_TOOL_NAMES = {
 	FILE_SEARCH: 'file_search',
 	SEARCH_CHAT_HISTORY: 'search_chat_history',
 	READ_DOCUMENT: 'read_document',
+	NOTION: 'ntn',
 } as const;
 
 /** Union of the tool names we ship custom UI metadata for. */
@@ -67,6 +69,7 @@ const TOOL_LABELS: Record<string, string> = {
 	[KNOWN_TOOL_NAMES.FILE_SEARCH]: 'Searching files',
 	[KNOWN_TOOL_NAMES.SEARCH_CHAT_HISTORY]: 'Searching chat history',
 	[KNOWN_TOOL_NAMES.READ_DOCUMENT]: 'Reading document',
+	[KNOWN_TOOL_NAMES.NOTION]: 'Running Notion command',
 };
 
 /** Past-tense labels rendered once a tool has finished. */
@@ -80,6 +83,7 @@ const TOOL_LABELS_PAST: Record<string, string> = {
 	[KNOWN_TOOL_NAMES.FILE_SEARCH]: 'Searched files',
 	[KNOWN_TOOL_NAMES.SEARCH_CHAT_HISTORY]: 'Searched chat history',
 	[KNOWN_TOOL_NAMES.READ_DOCUMENT]: 'Read document',
+	[KNOWN_TOOL_NAMES.NOTION]: 'Ran Notion command',
 };
 
 /** Lucide icons keyed by tool name — fall back to {@link SearchIcon}. */
@@ -93,6 +97,7 @@ const TOOL_ICONS: Record<string, LucideIcon> = {
 	[KNOWN_TOOL_NAMES.FILE_SEARCH]: FileIcon,
 	[KNOWN_TOOL_NAMES.SEARCH_CHAT_HISTORY]: MessageSquareIcon,
 	[KNOWN_TOOL_NAMES.READ_DOCUMENT]: FileIcon,
+	[KNOWN_TOOL_NAMES.NOTION]: NotebookText,
 };
 
 /** Get the present-tense label for a tool, or its raw name if unknown. */

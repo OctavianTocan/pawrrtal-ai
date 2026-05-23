@@ -42,9 +42,7 @@ from app.channels.turn_runner import ChatTurnInput, run_turn
 from app.core.agent_hooks import build_pre_turn_hooks
 from app.core.agent_tools import build_agent_tools
 from app.core.config import settings
-from app.crud.workspace import get_default_workspace
 from app.db import async_session_maker
-from app.integrations.telegram.bot_permissions import build_telegram_permission_check
 from app.integrations.telegram.bot_provider_resolution import (
     resolve_provider_with_auto_clear,
 )
@@ -56,6 +54,7 @@ from app.integrations.telegram.bot_provider_resolution import (
 from app.integrations.telegram.handlers import (
     TelegramSender,
     TelegramTurnContext,
+    build_telegram_permission_check,
     collect_attachments,
     handle_new_command,
     handle_plain_message,
@@ -241,6 +240,9 @@ async def _run_llm_turn(
         render_initial(),
         reply_parameters=_reply_parameters(message.message_id),
     )
+
+    # Keep startup imports lazy and keep fan-out count within limit
+    from app.crud.workspace import get_default_workspace  # noqa: PLC0415
 
     async with async_session_maker() as ws_session:
         workspace = await get_default_workspace(context.pawrrtal_user_id, ws_session)

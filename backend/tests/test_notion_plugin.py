@@ -2,19 +2,15 @@
 
 Three concerns are exercised:
 
-  * Registration — the plugin lands in :func:`all_plugins` with all 18
-    tool factories.
+  * Registration — the plugin lands in :func:`all_plugins` with a
+    single ``ntn`` tool factory.
   * ``call_ntn`` subprocess wrapping — token env injection, isolated
     ``HOME``, error surfacing.  Each test points ``NTN_BINARY`` at a
     small shell script written into the test tmpdir so we never need a
     real ``ntn`` install in CI.
-  * Tool execute paths — every category gets one representative test
-    that monkeypatches the ``call_ntn_*`` seam, runs ``tool.execute()``,
-    and asserts the returned JSON shape + that an audit row was written.
-
-Heavier scenario tests (multi-turn agent loop with the Notion plugin
-loaded) belong in test_agent_loop_scenarios.py; this file stays at the
-unit level.
+  * Tool execute paths — covers the missing-token gate, the happy path
+    (audit row written, stdout/stderr returned), and the failure path
+    (NtnError surfaced + error audit row).
 """
 
 from __future__ import annotations
@@ -23,7 +19,6 @@ import json
 import os
 import stat
 from collections.abc import Generator, Sequence
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -33,19 +28,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.plugins import ToolContext, all_plugins
 from app.db import User
-from app.integrations.notion import notion_plugin
-from app.integrations.notion.audit import STATUS_ERROR, STATUS_OK
-from app.integrations.notion.ntn_client import NtnError, call_ntn
-from app.integrations.notion.tools.comments import make_notion_comment_create_tool
-from app.integrations.notion.tools.database import make_notion_query_tool
-from app.integrations.notion.tools.diagnostics import (
-    make_notion_help_tool,
-    make_notion_logs_read_tool,
-)
-from app.integrations.notion.tools.lifecycle import make_notion_delete_tool
-from app.integrations.notion.tools.read import make_notion_search_tool
-from app.integrations.notion.tools.write import make_notion_create_tool
 from app.models import NotionOperationLog, Workspace
+from app.plugins.notion import notion_plugin
+from app.plugins.notion.audit import STATUS_ERROR, STATUS_OK
+from app.plugins.notion.display import _format_ntn_display
+from app.plugins.notion.ntn_client import NtnError, NtnResult, call_ntn
+from app.plugins.notion.tool import make_ntn_tool
 
 NTN_BINARY_ENV_VAR = "NTN_BINARY"
 
@@ -86,17 +74,16 @@ def patch_audit_sessionmaker(monkeypatch: pytest.MonkeyPatch, db_session: AsyncS
     def fake_maker() -> _TestSessionContext:
         return _TestSessionContext()
 
-    monkeypatch.setattr("app.integrations.notion.audit.async_session_maker", fake_maker)
-    monkeypatch.setattr("app.integrations.notion.tools.diagnostics.async_session_maker", fake_maker)
+    monkeypatch.setattr("app.plugins.notion.audit.async_session_maker", fake_maker)
 
 
 @pytest.fixture
 def fake_ntn_binary(tmp_path: Path) -> Generator[Path]:
     """Create a shell stub at ``tmp_path/ntn`` that echoes a known string.
 
-    Used by the ``call_ntn`` tests; tests that exercise tool factories
-    monkeypatch the ``call_ntn_json`` / ``call_ntn_text`` seam directly
-    and don't need this fixture.
+    Used by the ``call_ntn`` tests; tests that exercise the tool
+    factory monkeypatch the ``call_ntn`` seam directly and don't need
+    this fixture.
     """
     script = tmp_path / "ntn"
     script.write_text(
@@ -117,13 +104,13 @@ def fake_ntn_binary(tmp_path: Path) -> Generator[Path]:
 
 
 class TestRegistration:
-    def test_plugin_is_registered_with_eighteen_tools(self) -> None:
+    def test_plugin_is_registered_with_single_ntn_tool(self) -> None:
         ids = [p.id for p in all_plugins()]
         assert "notion" in ids
         # The registry is module-global and the plugin self-registers on
         # import; assert against the imported handle so an accidental
         # re-import wouldn't double-count.
-        assert len(notion_plugin.tool_factories) == 18
+        assert len(notion_plugin.tool_factories) == 1
 
 
 class TestCallNtn:
@@ -153,29 +140,82 @@ class TestCallNtn:
                 os.environ[NTN_BINARY_ENV_VAR] = previous
 
 
-class TestToolFactories:
+class TestNtnTool:
     @pytest.mark.anyio
-    async def test_help_tool_returns_static_catalogue(self, ctx: ToolContext) -> None:
-        tool = make_notion_help_tool(ctx)
-        raw = await tool.execute("call-1")
-        payload = json.loads(raw)
-        names = {t["name"] for t in payload["tools"]}
-        assert "notion_search" in names
-        assert "notion_help" in names
-        assert len(payload["tools"]) == 18
-
-    @pytest.mark.anyio
-    async def test_search_returns_missing_token_error_when_unconfigured(
-        self, ctx: ToolContext
-    ) -> None:
-        tool = make_notion_search_tool(ctx)
-        raw = await tool.execute("call-1", query="anything")
+    async def test_returns_missing_token_error_when_unconfigured(self, ctx: ToolContext) -> None:
+        tool = make_ntn_tool(ctx)
+        raw = await tool.execute("call-1", args=["api", "v1/users/me"])
         body = json.loads(raw)
         assert "error" in body
         assert "Notion is not configured" in body["error"]
 
     @pytest.mark.anyio
-    async def test_search_writes_audit_row_on_success(
+    async def test_rejects_empty_args(
+        self, ctx: ToolContext, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(
+            "app.plugins.notion.tool.resolve_api_key",
+            lambda *_, **__: "tok",
+        )
+        tool = make_ntn_tool(ctx)
+        raw = await tool.execute("call-1", args=[])
+        body = json.loads(raw)
+        assert "error" in body
+        assert "non-empty list" in body["error"]
+
+    @pytest.mark.anyio
+    async def test_rejects_non_string_args_item(
+        self, ctx: ToolContext, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A dict in the args array would otherwise be Python-repr'd into
+        an invalid CLI token. Reject explicitly so the agent gets a
+        clear validation error instead of an opaque ``ntn`` failure.
+        """
+        monkeypatch.setattr(
+            "app.plugins.notion.tool.resolve_api_key",
+            lambda *_, **__: "tok",
+        )
+        tool = make_ntn_tool(ctx)
+        raw = await tool.execute(
+            "call-1",
+            args=["api", "v1/pages/abc", "-X", "PATCH", "-d", {"archived": True}],
+        )
+        body = json.loads(raw)
+        assert "error" in body
+        assert "args[5]" in body["error"]
+        assert "string" in body["error"]
+
+    @pytest.mark.anyio
+    async def test_coerces_single_string_into_one_arg(
+        self,
+        ctx: ToolContext,
+        monkeypatch: pytest.MonkeyPatch,
+        patch_audit_sessionmaker: None,
+    ) -> None:
+        monkeypatch.setattr(
+            "app.plugins.notion.tool.resolve_api_key",
+            lambda *_, **__: "tok",
+        )
+        captured: list[list[str]] = []
+
+        async def fake_call(
+            args: Sequence[str],
+            *,
+            token: str,
+            stdin: bytes | None = None,
+            **_: Any,
+        ) -> NtnResult:
+            captured.append(list(args))
+            return NtnResult(stdout=b"ok", stderr=b"")
+
+        monkeypatch.setattr("app.plugins.notion.tool.call_ntn", fake_call)
+
+        tool = make_ntn_tool(ctx)
+        await tool.execute("call-1", args="--help")
+        assert captured == [["--help"]]
+
+    @pytest.mark.anyio
+    async def test_passes_args_verbatim_and_returns_stdout_stderr(
         self,
         ctx: ToolContext,
         seeded_default_workspace: Workspace,
@@ -183,25 +223,38 @@ class TestToolFactories:
         monkeypatch: pytest.MonkeyPatch,
         patch_audit_sessionmaker: None,
     ) -> None:
-        # Pretend the workspace has a token configured.
         monkeypatch.setattr(
-            "app.integrations.notion.tools._helpers.resolve_api_key",
+            "app.plugins.notion.tool.resolve_api_key",
             lambda *_, **__: "tok-abc",
         )
-        # Mock the subprocess seam so we don't need a real ntn binary.
         captured_args: list[list[str]] = []
+        captured_stdin: list[bytes | None] = []
 
-        async def fake_call(args: Sequence[str], *, token: str, **_: Any) -> dict[str, Any]:
+        async def fake_call(
+            args: Sequence[str],
+            *,
+            token: str,
+            stdin: bytes | None = None,
+            **_: Any,
+        ) -> NtnResult:
             captured_args.append(list(args))
-            return {"results": [{"id": "page-1", "object": "page"}]}
+            captured_stdin.append(stdin)
+            assert token == "tok-abc"
+            return NtnResult(stdout=b'{"results":[]}\n', stderr=b"warn\n")
 
-        monkeypatch.setattr("app.integrations.notion.tools.read.call_ntn_json", fake_call)
+        monkeypatch.setattr("app.plugins.notion.tool.call_ntn", fake_call)
 
-        tool = make_notion_search_tool(ctx)
-        raw = await tool.execute("call-1", query="hello")
+        tool = make_ntn_tool(ctx)
+        raw = await tool.execute(
+            "call-1",
+            args=["api", "v1/search", "query==hello"],
+            stdin="payload",
+        )
         body = json.loads(raw)
-        assert body["results"][0]["id"] == "page-1"
-        assert captured_args[0][:2] == ["api", "v1/search"]
+        assert body["stdout"] == '{"results":[]}\n'
+        assert body["stderr"] == "warn\n"
+        assert captured_args[0] == ["api", "v1/search", "query==hello"]
+        assert captured_stdin[0] == b"payload"
 
         rows = (
             (
@@ -215,11 +268,12 @@ class TestToolFactories:
             .all()
         )
         assert len(rows) == 1
-        assert rows[0].tool_name == "notion_search"
+        assert rows[0].tool_name == "ntn"
+        assert rows[0].operation == "cli"
         assert rows[0].status == STATUS_OK
 
     @pytest.mark.anyio
-    async def test_search_writes_error_row_when_ntn_fails(
+    async def test_writes_error_row_when_ntn_fails(
         self,
         ctx: ToolContext,
         seeded_default_workspace: Workspace,
@@ -228,19 +282,21 @@ class TestToolFactories:
         patch_audit_sessionmaker: None,
     ) -> None:
         monkeypatch.setattr(
-            "app.integrations.notion.tools._helpers.resolve_api_key",
+            "app.plugins.notion.tool.resolve_api_key",
             lambda *_, **__: "tok-abc",
         )
 
         async def fake_call(*_: Any, **__: Any) -> Any:
             raise NtnError(2, "unauthorized")
 
-        monkeypatch.setattr("app.integrations.notion.tools.read.call_ntn_json", fake_call)
+        monkeypatch.setattr("app.plugins.notion.tool.call_ntn", fake_call)
 
-        tool = make_notion_search_tool(ctx)
-        raw = await tool.execute("call-1", query="hello")
+        tool = make_ntn_tool(ctx)
+        raw = await tool.execute("call-1", args=["api", "v1/users/me"])
         body = json.loads(raw)
         assert "error" in body
+        assert body["returncode"] == 2
+        assert "unauthorized" in body["error"]
 
         rows = (
             (
@@ -258,111 +314,197 @@ class TestToolFactories:
         assert rows[0].error and "unauthorized" in rows[0].error
 
     @pytest.mark.anyio
-    async def test_create_invokes_ntn_pages_create_with_markdown_arg(
+    async def test_surfaces_os_error_without_writing_audit_failure_row(
         self,
         ctx: ToolContext,
         monkeypatch: pytest.MonkeyPatch,
         patch_audit_sessionmaker: None,
     ) -> None:
+        """An OSError (e.g. binary missing) is surfaced cleanly to the agent."""
         monkeypatch.setattr(
-            "app.integrations.notion.tools._helpers.resolve_api_key",
+            "app.plugins.notion.tool.resolve_api_key",
             lambda *_, **__: "tok",
         )
-        captured: list[list[str]] = []
 
-        async def fake_call_text(args: Sequence[str], *, token: str, **_: Any) -> str:
-            captured.append(list(args))
-            return "Created page https://www.notion.so/abc"
+        async def fake_call(*_: Any, **__: Any) -> Any:
+            raise FileNotFoundError("ntn: command not found")
 
-        monkeypatch.setattr("app.integrations.notion.tools.write.call_ntn_text", fake_call_text)
-
-        tool = make_notion_create_tool(ctx)
-        raw = await tool.execute(
-            "call-1",
-            parent_page_id="parent-id",
-            title="Hello",
-            markdown="# H1",
-        )
+        monkeypatch.setattr("app.plugins.notion.tool.call_ntn", fake_call)
+        tool = make_ntn_tool(ctx)
+        raw = await tool.execute("call-1", args=["api", "v1/users/me"])
         body = json.loads(raw)
-        assert "Created page" in body["output"]
-        # ``--content`` arg carries the markdown verbatim — sanity-check
-        # that we didn't accidentally drop it.
-        assert "# H1" in captured[0]
+        assert "error" in body
+        assert "command not found" in body["error"]
 
-    @pytest.mark.anyio
-    async def test_query_rejects_missing_database_id(
-        self, ctx: ToolContext, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setattr(
-            "app.integrations.notion.tools._helpers.resolve_api_key",
-            lambda *_, **__: "tok",
+
+class TestFormatter:
+    def test_formatter_pages_get(self) -> None:
+        payload = _format_ntn_display(
+            {"args": ["pages", "get", "3673c065-308b-4153-92a5-e21c625cfe74"]}
         )
-        tool = make_notion_query_tool(ctx)
-        raw = await tool.execute("call-1")
-        assert "database_id is required" in json.loads(raw)["error"]
+        assert payload["icon"] == "📖"
+        assert "Reading Notion page 3673c065..." in payload["present"]
+        assert "Read Notion page 3673c065..." in payload["compact"]
 
-    @pytest.mark.anyio
-    async def test_comment_create_validates_text(
-        self, ctx: ToolContext, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        monkeypatch.setattr(
-            "app.integrations.notion.tools._helpers.resolve_api_key",
-            lambda *_, **__: "tok",
+    def test_formatter_pages_create_with_markdown_title(self) -> None:
+        payload = _format_ntn_display(
+            {
+                "args": [
+                    "pages",
+                    "create",
+                    "--parent",
+                    "database:3673c065-308b-4153-92a5-e21c625cfe74",
+                    "--content",
+                    "# Romanian Verbs\nSome verbs here",
+                ]
+            }
         )
-        tool = make_notion_comment_create_tool(ctx)
-        raw = await tool.execute("call-1", page_id="p", text="")
-        assert "required" in json.loads(raw)["error"]
-
-    @pytest.mark.anyio
-    async def test_delete_sends_archived_true(
-        self,
-        ctx: ToolContext,
-        monkeypatch: pytest.MonkeyPatch,
-        patch_audit_sessionmaker: None,
-    ) -> None:
-        monkeypatch.setattr(
-            "app.integrations.notion.tools._helpers.resolve_api_key",
-            lambda *_, **__: "tok",
+        assert payload["icon"] == "📝"
+        assert (
+            'Creating Notion page "Romanian Verbs" under database 3673c065...' in payload["present"]
         )
-        captured: list[list[str]] = []
+        assert (
+            'Created Notion page "Romanian Verbs" under database 3673c065...' in payload["compact"]
+        )
 
-        async def fake_call(args: Sequence[str], *, token: str, **_: Any) -> dict[str, Any]:
-            captured.append(list(args))
-            return {"id": "p", "archived": True}
+    def test_formatter_api_uuid_truncation(self) -> None:
+        payload = _format_ntn_display(
+            {"args": ["api", "v1/pages/3673c065-308b-4153-92a5-e21c625cfe74"]}
+        )
+        assert payload["icon"] == "📖"
+        assert "Reading Notion page 3673c065..." in payload["present"]
 
-        monkeypatch.setattr("app.integrations.notion.tools.lifecycle.call_ntn_json", fake_call)
-        tool = make_notion_delete_tool(ctx)
-        await tool.execute("call-1", page_id="p")
-        # The PATCH body sits as the last arg (-d <body>).
-        body_arg = captured[0][-1]
-        assert json.loads(body_arg) == {"archived": True}
+    def test_formatter_help_commands(self) -> None:
+        payload = _format_ntn_display({"args": ["pages", "--help"]})
+        assert payload["icon"] == "ℹ️"  # noqa: RUF001
+        assert "Displaying help for Notion pages" in payload["present"]
 
-    @pytest.mark.anyio
-    async def test_logs_read_returns_workspace_scoped_history(
-        self,
-        ctx: ToolContext,
-        seeded_default_workspace: Workspace,
-        db_session: AsyncSession,
-        patch_audit_sessionmaker: None,
-    ) -> None:
-        # Seed two rows directly — bypasses the audit wrapper since
-        # logs_read shouldn't depend on its own behaviour for the data
-        # it surfaces.
-        for tool_name in ("notion_search", "notion_read"):
-            db_session.add(
-                NotionOperationLog(
-                    workspace_id=seeded_default_workspace.id,
-                    tool_name=tool_name,
-                    operation="read",
-                    status=STATUS_OK,
-                    duration_ms=12,
-                    created_at=datetime.now(UTC).replace(tzinfo=None),
-                )
-            )
-        await db_session.commit()
+        payload_general = _format_ntn_display({"args": ["--help"]})
+        assert payload_general["icon"] == "ℹ️"  # noqa: RUF001
+        assert "Displaying Notion help..." in payload_general["present"]
 
-        tool = make_notion_logs_read_tool(ctx)
-        raw = await tool.execute("call-1", limit=10)
-        payload = json.loads(raw)
-        names = {entry["tool_name"] for entry in payload["logs"]}
-        assert names == {"notion_search", "notion_read"}
+    def test_formatter_global_flags_filtering(self) -> None:
+        payload = _format_ntn_display({"args": ["--json", "--verbose", "pages", "get", "3673c065"]})
+        assert payload["icon"] == "📖"
+        assert "Reading Notion page 3673c065..." in payload["present"]
+
+    def test_formatter_piped_stdin(self) -> None:
+        payload = _format_ntn_display(
+            {
+                "args": ["pages", "update", "3673c065"],
+                "stdin": "some content",
+            }
+        )
+        assert "Updating Notion page 3673c065 (piped stdin)" in payload["present"]
+        assert "Updated Notion page 3673c065 (piped stdin)" in payload["compact"]
+
+    def test_formatter_doctor(self) -> None:
+        payload = _format_ntn_display({"args": ["doctor"]})
+        assert payload["icon"] == "🩺"
+        assert "Running Notion diagnostics" in payload["present"]
+        assert "Ran Notion diagnostics" in payload["compact"]
+
+    def test_formatter_pages_list(self) -> None:
+        payload = _format_ntn_display({"args": ["pages", "list"]})
+        assert payload["icon"] == "📖"
+        assert "Listing Notion pages" in payload["present"]
+        assert "Listed Notion pages" in payload["compact"]
+
+    def test_formatter_api_ls(self) -> None:
+        payload = _format_ntn_display({"args": ["api", "ls"]})
+        assert payload["icon"] == "📋"
+        assert "Listing Notion API endpoints" in payload["present"]
+        assert "Listed Notion API endpoints" in payload["compact"]
+
+    def test_formatter_api_database_query(self) -> None:
+        payload = _format_ntn_display(
+            {"args": ["api", "v1/databases/3673c065-308b-4153-92a5-e21c625cfe74/query"]}
+        )
+        assert payload["icon"] == "🔍"
+        assert "Querying Notion database 3673c065..." in payload["present"]
+        assert "Queried Notion database 3673c065..." in payload["compact"]
+
+    def test_formatter_api_database_schema(self) -> None:
+        payload = _format_ntn_display(
+            {"args": ["api", "v1/databases/3673c065-308b-4153-92a5-e21c625cfe74"]}
+        )
+        assert payload["icon"] == "🗂️"
+        assert "Reading Notion database schema 3673c065..." in payload["present"]
+        assert "Read Notion database schema 3673c065..." in payload["compact"]
+
+    def test_formatter_slugified_id_resolution(self) -> None:
+        payload = _format_ntn_display(
+            {"args": ["pages", "get", "My-Page-Title-3673c065308b415392a5e21c625cfe74"]}
+        )
+        assert payload["icon"] == "📖"
+        assert 'Reading Notion page "My Page Title"' in payload["present"]
+        assert 'Read Notion page "My Page Title"' in payload["compact"]
+
+        payload_db = _format_ntn_display(
+            {"args": ["databases", "query", "My-Db-Title-3673c065-308b-4153-92a5-e21c625cfe74"]}
+        )
+        assert payload_db["icon"] == "🔍"
+        assert 'Querying Notion database "My Db Title"' in payload_db["present"]
+        assert 'Queried Notion database "My Db Title"' in payload_db["compact"]
+
+    def test_formatter_nested_help_commands(self) -> None:
+        payload = _format_ntn_display({"args": ["pages", "create", "--help"]})
+        assert payload["icon"] == "ℹ️"  # noqa: RUF001
+        assert "Displaying help for Notion pages create" in payload["present"]
+        assert "Displayed help for Notion pages create" in payload["compact"]
+
+    def test_formatter_search_command_with_query(self) -> None:
+        payload = _format_ntn_display({"args": ["search", "my query string"]})
+        assert payload["icon"] == "🔍"
+        assert 'Searching Notion for "my query string"' in payload["present"]
+        assert 'Searched Notion for "my query string"' in payload["compact"]
+
+        # Truncation test
+        payload_long = _format_ntn_display(
+            {"args": ["search", "this is a very long search query string"]}
+        )
+        assert 'Searching Notion for "this is a very long ..."' in payload_long["present"]
+
+    def test_formatter_api_search_with_query(self) -> None:
+        payload = _format_ntn_display(
+            {"args": ["api", "v1/search", "-d", '{"query": "api query string"}']}
+        )
+        assert payload["icon"] == "🔍"
+        assert 'Searching Notion for "api query string"' in payload["present"]
+        assert 'Searched Notion for "api query string"' in payload["compact"]
+
+    def test_formatter_api_search_rejects_http_methods(self) -> None:
+        # api search with HTTP POST should not capture POST as search query
+        payload = _format_ntn_display({"args": ["api", "v1/search", "-X", "POST"]})
+        assert payload["icon"] == "🔍"
+        assert "Searching Notion" in payload["present"]
+        assert 'for "POST"' not in payload["present"]
+
+    def test_formatter_files_command(self) -> None:
+        payload_list = _format_ntn_display({"args": ["files", "list"]})
+        assert payload_list["icon"] == "📁"
+        assert "Listing Notion file uploads" in payload_list["present"]
+        assert "Listed Notion file uploads" in payload_list["compact"]
+
+        payload_get = _format_ntn_display({"args": ["files", "get", "3673c065"]})
+        assert payload_get["icon"] == "📁"
+        assert "Retrieving Notion file upload 3673c065" in payload_get["present"]
+        assert "Retrieved Notion file upload 3673c065" in payload_get["compact"]
+
+        payload_create = _format_ntn_display(
+            {"args": ["files", "create", "--filename", "photo.png"]}
+        )
+        assert payload_create["icon"] == "📤"
+        assert 'Creating Notion file upload "photo.png"' in payload_create["present"]
+        assert 'Created Notion file upload "photo.png"' in payload_create["compact"]
+
+    def test_formatter_datasources_command(self) -> None:
+        payload_query = _format_ntn_display({"args": ["datasources", "query", "3673c065"]})
+        assert payload_query["icon"] == "🔍"
+        assert "Querying Notion data source 3673c065" in payload_query["present"]
+        assert "Queried Notion data source 3673c065" in payload_query["compact"]
+
+        payload_resolve = _format_ntn_display({"args": ["datasources", "resolve", "3673c065"]})
+        assert payload_resolve["icon"] == "🔍"
+        assert "Resolving Notion database 3673c065 to data source IDs" in payload_resolve["present"]
+        assert "Resolved Notion database 3673c065 to data source IDs" in payload_resolve["compact"]

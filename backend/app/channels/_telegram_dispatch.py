@@ -92,6 +92,8 @@ class ToolLineState:
     call_id: str
     display: str
     """Formatted display string (icon + label) for the in-flight state."""
+    compact: str | None = None
+    """Formatted display string for the completed state (compact/past tense)."""
     started_at: float = field(default_factory=time.monotonic)
     result_line: str | None = None
     """Set to the rendered success/error HTML when the result arrives."""
@@ -190,13 +192,14 @@ async def handle_tool_use(
     """
     call_id = str(event.get("tool_use_id") or "")
     line = format_tool_use(event)
+    compact_line = format_tool_use(event, state="compact")
 
     # Track whether this event introduces a NEW tool so we can flush
     # the trace immediately — single short tool names never reach the
     # 40-char debounce threshold otherwise.
     if tool_states is not None and call_id:
         is_new_tool = call_id not in tool_states
-        tool_states[call_id] = ToolLineState(call_id=call_id, display=line)
+        tool_states[call_id] = ToolLineState(call_id=call_id, display=line, compact=compact_line)
         in_flight = [s.display for s in tool_states.values() if s.result_line is None]
         tool_trace = _render_tools_block(tool_states, in_flight)
     else:
@@ -247,11 +250,12 @@ async def handle_tool_result(
     elapsed_ms = int((time.monotonic() - state.started_at) * 1000)
     is_error = bool(event.get("is_error"))
 
+    display_str = state.compact if state.compact else state.display
     if is_error:
         raw_error = str(event.get("content") or "Error")
-        state.result_line = render_tool_error(state.display, raw_error)
+        state.result_line = render_tool_error(display_str, raw_error)
     else:
-        state.result_line = render_tool_success(state.display, elapsed_ms)
+        state.result_line = render_tool_success(display_str, elapsed_ms)
 
     in_flight = [s.display for s in tool_states.values() if s.result_line is None]
     tool_trace = _render_tools_block(tool_states, in_flight)
