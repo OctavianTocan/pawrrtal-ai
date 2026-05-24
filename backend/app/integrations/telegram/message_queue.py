@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # How many seconds the worker waits for the next item before tearing
 # itself down. Without this, an idle chat keeps a worker task alive
 # forever (small but bounded leak). Workers re-spawn on demand when
-# the next message arrives, so the user-visible behaviour is
+# the next message arrives, so the user-visible behavior is
 # unchanged.
 _WORKER_IDLE_TIMEOUT_SECONDS = 60.0
 
@@ -44,7 +44,7 @@ class QueuedTurn:
     ``payload`` is opaque to the dispatcher — the consumer (bot.py)
     decides what to put in it. Today it's the inbound aiogram
     ``Message`` object; future producers can wrap any shape the
-    consumer recognises (e.g. a regenerate request from issue #368).
+    consumer recognizes (e.g. a regenerate request from issue #368).
     """
 
     chat_id: int
