@@ -33,6 +33,7 @@ import { NavChats } from '@/features/nav-chats/NavChats';
 import { useOnboardingReadiness } from '@/features/onboarding/hooks/use-onboarding-readiness';
 import { OnboardingModal } from '@/features/onboarding/OnboardingModal';
 import {
+	E2E_SKIP_ONBOARDING_STORAGE_KEY,
 	OnboardingFlow,
 	OPEN_ONBOARDING_FLOW_EVENT,
 	OPEN_ONBOARDING_SERVER_STEP_EVENT,
@@ -273,12 +274,25 @@ function ResizableSidebarContent({ children }: { children: React.ReactNode }): R
  */
 export function AppShell({ children }: { children: React.ReactNode }): React.JSX.Element {
 	const onboardingReadiness = useOnboardingReadiness();
+	const [e2eBypass, setE2eBypass] = React.useState(false);
+	React.useEffect(() => {
+		try {
+			if (window.localStorage.getItem(E2E_SKIP_ONBOARDING_STORAGE_KEY) === '1') {
+				setE2eBypass(true);
+			}
+		} catch {
+			/* private browsing */
+		}
+	}, []);
+
 	const isAppReady =
-		!onboardingReadiness.isLoading &&
-		onboardingReadiness.hasBackendConfig &&
-		onboardingReadiness.hasWorkspaceReady;
+		e2eBypass ||
+		(!onboardingReadiness.isLoading &&
+			onboardingReadiness.hasBackendConfig &&
+			onboardingReadiness.hasWorkspaceReady);
 
 	React.useEffect(() => {
+		if (e2eBypass) return;
 		if (onboardingReadiness.isLoading) return;
 
 		if (!onboardingReadiness.hasBackendConfig) {
@@ -289,6 +303,7 @@ export function AppShell({ children }: { children: React.ReactNode }): React.JSX
 			window.dispatchEvent(new Event(OPEN_ONBOARDING_FLOW_EVENT));
 		}
 	}, [
+		e2eBypass,
 		onboardingReadiness.hasBackendConfig,
 		onboardingReadiness.hasWorkspaceReady,
 		onboardingReadiness.isLoading,

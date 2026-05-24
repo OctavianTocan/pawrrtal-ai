@@ -32,9 +32,9 @@ test.describe('authenticated landing', () => {
 		);
 		expect(response.ok()).toBe(true);
 		await page.goto('/');
-		// The chat composer is visible from the home page once authenticated.
-		await expect(
-			page.getByPlaceholder(/^(Ask|Type|Send)/i).or(page.getByRole('textbox'))
-		).toBeVisible();
+		// The sidebar "New Session" button confirms the authenticated shell loaded.
+		await expect(page.getByRole('button', { name: /New Session/i })).toBeVisible();
+		// The chat surface renders its empty-state heading.
+		await expect(page.getByText(/What should we build/i)).toBeVisible();
 	});
 });

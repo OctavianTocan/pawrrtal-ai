@@ -24,11 +24,6 @@ const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
 test.describe('a11y smoke', () => {
 	test('login page has no auto-detectable a11y violations', async ({ page }) => {
 		await page.goto('/login');
-		// AxeBuilder's `Page` type comes from `playwright-core`'s d.ts; our
-		// fixture's `page` comes from `@playwright/test`. The two are
-		// structurally compatible but TS sees them as distinct nominal
-		// types — cast through `as never` to silence the duplicate-module
-		// noise without `as any`.
 		const results = await new AxeBuilder({ page: page as never }).withTags(WCAG_TAGS).analyze();
 		expect(results.violations).toEqual([]);
 	});
@@ -42,14 +37,7 @@ test.describe('a11y smoke', () => {
 		);
 		expect(response.ok()).toBe(true);
 		await page.goto('/');
-		await expect(
-			page.getByPlaceholder(/^(Ask|Type|Send)/i).or(page.getByRole('textbox'))
-		).toBeVisible();
-		// AxeBuilder's `Page` type comes from `playwright-core`'s d.ts; our
-		// fixture's `page` comes from `@playwright/test`. The two are
-		// structurally compatible but TS sees them as distinct nominal
-		// types — cast through `as never` to silence the duplicate-module
-		// noise without `as any`.
+		await expect(page.getByRole('button', { name: /New Session/i })).toBeVisible();
 		const results = await new AxeBuilder({ page: page as never }).withTags(WCAG_TAGS).analyze();
 		expect(results.violations).toEqual([]);
 	});
@@ -60,11 +48,7 @@ test.describe('a11y smoke', () => {
 		);
 		expect(response.ok()).toBe(true);
 		await page.goto('/settings');
-		// AxeBuilder's `Page` type comes from `playwright-core`'s d.ts; our
-		// fixture's `page` comes from `@playwright/test`. The two are
-		// structurally compatible but TS sees them as distinct nominal
-		// types — cast through `as never` to silence the duplicate-module
-		// noise without `as any`.
+		await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
 		const results = await new AxeBuilder({ page: page as never }).withTags(WCAG_TAGS).analyze();
 		expect(results.violations).toEqual([]);
 	});
@@ -78,16 +62,9 @@ test.describe('a11y smoke', () => {
 		);
 		expect(response.ok()).toBe(true);
 		await page.goto('/');
-		const composer = page
-			.getByPlaceholder(/^(Ask|Type|Send)/i)
-			.or(page.getByRole('textbox'))
-			.first();
+		await expect(page.getByRole('button', { name: /New Session/i })).toBeVisible();
+		const composer = page.locator('textarea').first();
 		await composer.fill('Hello — this is an a11y smoke draft.');
-		// AxeBuilder's `Page` type comes from `playwright-core`'s d.ts; our
-		// fixture's `page` comes from `@playwright/test`. The two are
-		// structurally compatible but TS sees them as distinct nominal
-		// types — cast through `as never` to silence the duplicate-module
-		// noise without `as any`.
 		const results = await new AxeBuilder({ page: page as never }).withTags(WCAG_TAGS).analyze();
 		expect(results.violations).toEqual([]);
 	});
