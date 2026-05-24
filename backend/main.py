@@ -44,7 +44,7 @@ from app.core.providers.gemini_cli import (
 )
 from app.core.rate_limit import ChatRateLimitMiddleware
 from app.core.request_logging import RequestLoggingMiddleware
-from app.core.scheduler import JobScheduler
+from app.core.scheduler import JobScheduler, set_active_scheduler
 from app.core.telemetry import setup_tracing, shutdown_tracing
 from app.db import create_db_and_tables
 from app.integrations.telegram import telegram_lifespan
@@ -128,8 +128,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         scheduler = JobScheduler()
         await scheduler.start()
         app.state.scheduler = scheduler
+        set_active_scheduler(scheduler)
     else:
         app.state.scheduler = None
+        set_active_scheduler(None)
     # Bring the Telegram channel up alongside the HTTP server when a bot
     # token is configured. The context manager yields None and is a no-op
     # when the channel is disabled, so this stays safe for stripped-down
@@ -153,6 +155,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         finally:
             if scheduler is not None:
                 await scheduler.stop()
+            set_active_scheduler(None)
             set_event_bus(None)
             await event_bus.stop()
             shutdown_tracing()
