@@ -12,6 +12,7 @@ import pytest
 from app.core.config import settings
 from app.core.providers.catalog import MODEL_CATALOG, default_model
 from app.core.providers.model_id import Host
+from app.integrations.telegram.model_auth import is_host_authenticated
 from app.integrations.telegram.model_picker import (
     ModelButton,
     ModelCallback,
@@ -26,7 +27,6 @@ from app.integrations.telegram.model_picker import (
     get_model_picker_state,
     has_host,
     has_vendor_in_host,
-    is_host_authenticated,
     parse_model_callback_data,
     resolve_model_selection,
 )
@@ -174,6 +174,8 @@ def test_stale_model_selection_is_rejected() -> None:
 def test_has_host_and_has_vendor_in_host_guards() -> None:
     assert has_host(Host.agent_sdk.value) is True
     assert has_host("totally-fake") is False
+    assert has_vendor_in_host(host=Host.opencode_go.value, vendor="zai") is True
+    assert has_vendor_in_host(host=Host.opencode_go.value, vendor="anthropic") is False
 
 
 def test_is_host_authenticated_reports_gateway_key_presence(
@@ -211,8 +213,6 @@ def test_host_keyboard_hides_unauthenticated_providers(
     # Hosts that DO have keys configured stay visible.
     assert any("Gemini API" in label for label in labels)
     assert any("Anthropic Agent SDK" in label for label in labels)
-    assert has_vendor_in_host(host=Host.opencode_go.value, vendor="zai") is True
-    assert has_vendor_in_host(host=Host.opencode_go.value, vendor="anthropic") is False
 
 
 def test_host_picker_text_displays_known_model_name() -> None:
