@@ -274,16 +274,20 @@ function ResizableSidebarContent({ children }: { children: React.ReactNode }): R
  */
 export function AppShell({ children }: { children: React.ReactNode }): React.JSX.Element {
 	const onboardingReadiness = useOnboardingReadiness();
-	const [e2eBypass, setE2eBypass] = React.useState(false);
-	React.useEffect(() => {
-		try {
-			if (window.localStorage.getItem(E2E_SKIP_ONBOARDING_STORAGE_KEY) === '1') {
-				setE2eBypass(true);
+	const e2eBypass = React.useSyncExternalStore(
+		React.useCallback((cb: () => void) => {
+			window.addEventListener('storage', cb);
+			return () => window.removeEventListener('storage', cb);
+		}, []),
+		() => {
+			try {
+				return window.localStorage.getItem(E2E_SKIP_ONBOARDING_STORAGE_KEY) === '1';
+			} catch {
+				return false;
 			}
-		} catch {
-			/* private browsing */
-		}
-	}, []);
+		},
+		() => false
+	);
 
 	const isAppReady =
 		e2eBypass ||
