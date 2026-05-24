@@ -12,6 +12,8 @@ from app.integrations.xai.oauth import (
     request_device_code,
 )
 
+_RealAsyncClient = httpx.AsyncClient
+
 
 @pytest.mark.anyio
 async def test_request_device_code_returns_payload_on_success(
@@ -34,7 +36,7 @@ async def test_request_device_code_returns_payload_on_success(
     transport = httpx.MockTransport(_handler)
     monkeypatch.setattr(
         "httpx.AsyncClient",
-        lambda **_: httpx.AsyncClient(transport=transport),
+        lambda **_: _RealAsyncClient(transport=transport),
     )
 
     result = await request_device_code(client_id="pawrrtal-client")
@@ -50,12 +52,10 @@ async def test_request_device_code_raises_on_non_200(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An upstream error body surfaces as :class:`OAuthError`."""
-    transport = httpx.MockTransport(
-        lambda _: httpx.Response(500, text="upstream borked")
-    )
+    transport = httpx.MockTransport(lambda _: httpx.Response(500, text="upstream borked"))
     monkeypatch.setattr(
         "httpx.AsyncClient",
-        lambda **_: httpx.AsyncClient(transport=transport),
+        lambda **_: _RealAsyncClient(transport=transport),
     )
     with pytest.raises(OAuthError):
         await request_device_code(client_id="pawrrtal-client")
@@ -81,7 +81,7 @@ async def test_poll_for_token_returns_grant_on_first_authorised_response(
     transport = httpx.MockTransport(_handler)
     monkeypatch.setattr(
         "httpx.AsyncClient",
-        lambda **_: httpx.AsyncClient(transport=transport),
+        lambda **_: _RealAsyncClient(transport=transport),
     )
 
     grant = await poll_for_token(
@@ -99,12 +99,10 @@ async def test_poll_for_token_raises_on_access_denied(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``access_denied`` is terminal — surface as ``OAuthError(code='access_denied')``."""
-    transport = httpx.MockTransport(
-        lambda _: httpx.Response(400, json={"error": "access_denied"})
-    )
+    transport = httpx.MockTransport(lambda _: httpx.Response(400, json={"error": "access_denied"}))
     monkeypatch.setattr(
         "httpx.AsyncClient",
-        lambda **_: httpx.AsyncClient(transport=transport),
+        lambda **_: _RealAsyncClient(transport=transport),
     )
     with pytest.raises(OAuthError) as exc_info:
         await poll_for_token(client_id="x", device_code="y", interval=1)
@@ -125,7 +123,7 @@ async def test_poll_for_token_expires_when_deadline_exceeded(
     )
     monkeypatch.setattr(
         "httpx.AsyncClient",
-        lambda **_: httpx.AsyncClient(transport=transport),
+        lambda **_: _RealAsyncClient(transport=transport),
     )
     with pytest.raises(OAuthError) as exc_info:
         await poll_for_token(
@@ -156,7 +154,7 @@ async def test_refresh_token_returns_new_access_token(
     transport = httpx.MockTransport(_handler)
     monkeypatch.setattr(
         "httpx.AsyncClient",
-        lambda **_: httpx.AsyncClient(transport=transport),
+        lambda **_: _RealAsyncClient(transport=transport),
     )
 
     grant = await refresh_token(
@@ -172,12 +170,10 @@ async def test_refresh_token_raises_on_invalid_grant(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Expired / revoked refresh token surfaces as terminal failure."""
-    transport = httpx.MockTransport(
-        lambda _: httpx.Response(400, json={"error": "invalid_grant"})
-    )
+    transport = httpx.MockTransport(lambda _: httpx.Response(400, json={"error": "invalid_grant"}))
     monkeypatch.setattr(
         "httpx.AsyncClient",
-        lambda **_: httpx.AsyncClient(transport=transport),
+        lambda **_: _RealAsyncClient(transport=transport),
     )
     with pytest.raises(OAuthError) as exc_info:
         await refresh_token(client_id="x", refresh_token_value="EXPIRED")
