@@ -76,7 +76,7 @@ jobs:
       # was failing on `npm: command not found`.  setup-node provides
       # both binaries on PATH for the duration of the job, with caching.
       - name: Setup Node.js (for npm install of the Claude CLI)
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version: '22'
 

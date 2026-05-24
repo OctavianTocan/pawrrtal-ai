@@ -58,7 +58,7 @@ jobs:
           bun-version: latest
 
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@v6.4.0
         with:
           node-version: '22'
 
@@ -93,7 +93,7 @@ jobs:
         # yet; that ratchet lands in a follow-up once the baseline
         # stabilises.
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-coverage
           path: frontend/coverage
