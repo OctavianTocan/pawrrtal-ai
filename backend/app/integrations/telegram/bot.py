@@ -46,15 +46,6 @@ from app.db import async_session_maker
 from app.integrations.telegram.bot_provider_resolution import (
     resolve_provider_with_auto_clear,
 )
-
-# ``TelegramSender`` is re-exported via :mod:`handlers` (which already
-# imports it from :mod:`sender`) so bot.py imports both
-# ``handle_plain_message`` and ``TelegramSender`` from the same module
-# — keeps bot.py under sentrux's ``no_god_files`` fan-out budget.
-from app.integrations.telegram.message_queue import (
-    ChatMessageQueueDispatcher,
-    QueuedTurn,
-)
 from app.integrations.telegram.handlers import (
     TelegramSender,
     TelegramTurnContext,
@@ -65,6 +56,15 @@ from app.integrations.telegram.handlers import (
     handle_start_command,
     handle_stop_command,
     handle_verbose_command,
+)
+
+# ``TelegramSender`` is re-exported via :mod:`handlers` (which already
+# imports it from :mod:`sender`) so bot.py imports both
+# ``handle_plain_message`` and ``TelegramSender`` from the same module
+# — keeps bot.py under sentrux's ``no_god_files`` fan-out budget.
+from app.integrations.telegram.message_queue import (
+    ChatMessageQueueDispatcher,
+    QueuedTurn,
 )
 
 # ``MODEL_CALLBACK_PREFIX`` is re-exported via
@@ -905,6 +905,7 @@ async def telegram_lifespan() -> AsyncIterator[TelegramService | None]:
     try:
         yield service
     finally:
+        await shutdown_chat_queue_dispatcher()
         if service.polling_task is not None:
             service.polling_task.cancel()
             # The task either finishes cleanly (CancelledError) or surfaces
