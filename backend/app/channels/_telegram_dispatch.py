@@ -276,10 +276,10 @@ async def handle_thinking(
     message_thread_id: int | None,
 ) -> tuple[str, int | None]:
     """Send or edit the separate italic thinking message."""
-    chunk = str(event.get("content") or "").strip()
+    chunk = str(event.get("content") or "")
     if not chunk:
         return thinking_text, thinking_message_id
-    thinking_text = f"{thinking_text}\n{chunk}" if thinking_text else chunk
+    thinking_text = f"{thinking_text}{chunk}"
     rendered = thinking_html(thinking_text)
     if thinking_message_id is None:
         message_id = await safe_send_html(
@@ -375,7 +375,7 @@ async def dispatch_text_delta(
     # Legacy editMessageText path: only open / continue an interleaved text
     # message on a block transition. Pure-text or same-block deltas keep
     # accumulating into ``answer_text`` for the closing reply.
-    if previous_block_kind in (None, "text"):
+    if previous_block_kind is None or (previous_block_kind == "text" and text_message_id is None):
         return text_buffer, text_message_id, chars_since_edit, last_edit_at, False
     if previous_block_kind != "text":
         text_message_id = None

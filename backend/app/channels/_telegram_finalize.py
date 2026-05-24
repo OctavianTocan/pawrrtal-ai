@@ -18,6 +18,7 @@ from .telegram_delivery import (
     safe_edit,
     safe_edit_html,
     safe_send_text,
+    thinking_html,
 )
 
 if TYPE_CHECKING:
@@ -61,7 +62,9 @@ async def finalize_turn_delivery(
 
     if first_block_kind == "tools":
         await safe_edit_html(bot, chat_id, placeholder_message_id, tool_trace)
-    elif first_block_kind in ("thinking", "text") or final_text:
+    elif first_block_kind == "thinking":
+        await safe_edit_html(bot, chat_id, placeholder_message_id, thinking_html(thinking_text))
+    elif first_block_kind == "text" or final_text:
         await safe_delete(bot, chat_id, placeholder_message_id)
     else:
         await safe_edit(bot, chat_id, placeholder_message_id, _EMPTY_RESPONSE_FALLBACK)

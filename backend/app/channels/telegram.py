@@ -137,7 +137,7 @@ class TelegramChannel:
         tool_message_id: int = message_id
         answer_text = ""
         thinking_text = ""
-        thinking_message_id: int | None = None
+        thinking_message_id: int | None = message_id
         # #306/#307: interleaved text deltas open their own Telegram
         # messages in chronological order. ``text_message_id`` tracks
         # the open text message; ``text_chars_since_edit`` and
@@ -189,7 +189,9 @@ class TelegramChannel:
             etype = event.get("type")
 
             if etype == "tool_use":
-                first_block_kind = first_block_kind or "tools"
+                first_block_kind = (
+                    "tools" if first_block_kind in (None, "text") else first_block_kind
+                )
                 (
                     tool_trace,
                     tool_message_id,
@@ -233,7 +235,9 @@ class TelegramChannel:
                 continue
 
             if etype == "thinking":
-                first_block_kind = first_block_kind or "thinking"
+                first_block_kind = (
+                    "thinking" if first_block_kind in (None, "text") else first_block_kind
+                )
                 thinking_text, thinking_message_id = prepare_thinking_block(
                     previous_block_kind=previous_block_kind,
                     thinking_text=thinking_text,

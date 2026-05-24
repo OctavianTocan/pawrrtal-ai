@@ -151,12 +151,12 @@ def make_cron_create_tool(*, user_id: uuid.UUID) -> AgentTool:
         execute=execute,
         display=make_tool_display(
             icon="⏰",
-            label="Schedule cron",
+            label="Schedule Cron Job",
             present=lambda args: (
-                f"⏰ Scheduling: {str(args.get('name') or '')[:60]}"
+                f"⏰ Scheduling Cron Job '{str(args.get('name') or '')[:60]}'"
                 f" ({args.get('cron_expression') or ''!s})"
             ),
-            compact=lambda args: f"cron_create({str(args.get('name') or '')[:40]})",
+            compact=lambda args: f"Scheduled Cron Job '{str(args.get('name') or '')[:40]}'",
         ),
     )
 
@@ -199,13 +199,13 @@ def make_cron_list_tool(*, user_id: uuid.UUID) -> AgentTool:
         execute=execute,
         display=make_tool_display(
             icon="📅",
-            label="List cron jobs",
+            label="List Cron Jobs",
             present=lambda args: (
-                "📅 Listing all cron jobs"
+                "📅 Listing All Cron Jobs"
                 if args.get("include_inactive")
-                else "📅 Listing active cron jobs"
+                else "📅 Listing Active Cron Jobs"
             ),
-            compact=lambda args: "cron_list()",
+            compact=lambda args: "Listed Cron Jobs",
         ),
     )
 
@@ -259,8 +259,8 @@ def make_cron_delete_tool(*, user_id: uuid.UUID) -> AgentTool:
         execute=execute,
         display=make_tool_display(
             icon="🗑",
-            label="Cancel cron job",
-            present=lambda args: f"🗑 Cancelling cron job {str(args.get('job_id') or '')[:36]}",
-            compact=lambda args: f"cron_delete({str(args.get('job_id') or '')[:8]}…)",
+            label="Cancel Cron Job",
+            present=lambda args: f"🗑 Canceling Cron Job {str(args.get('job_id') or '')[:36]}",
+            compact=lambda args: f"Canceled Cron Job {str(args.get('job_id') or '')[:8]}…",
         ),
     )

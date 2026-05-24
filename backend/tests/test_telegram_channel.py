@@ -269,10 +269,17 @@ class TestTelegramChannelDeliver:
         async for _ in channel.deliver(_stream(*events), msg):
             pass
 
-        first_send = bot.send_message.await_args_list[0].kwargs
-        assert first_send["text"] == "<i>checking the workspace</i>"
-        final_send = bot.send_message.await_args_list[-1].kwargs
-        assert final_send["text"] == "answer"
+        # The placeholder is edited to show the thinking content
+        bot.edit_message_text.assert_any_call(
+            chat_id=123,
+            message_id=456,
+            text="<i>checking the workspace</i>",
+        )
+        # The final answer is sent as a new message
+        bot.send_message.assert_awaited_once_with(
+            chat_id=123,
+            text="answer",
+        )
 
     async def test_block_transitions_open_new_telegram_messages(self) -> None:
         """Thinking → tools → thinking emits three separate Telegram messages (#288).
@@ -299,26 +306,28 @@ class TestTelegramChannelDeliver:
         async for _ in channel.deliver(_stream(*events), msg):
             pass
 
-        # Every block transition (thinking → tools → thinking) plus the
-        # final answer = at least three ``send_message`` calls (initial
-        # thinking, new tools placeholder, fresh second thinking, then
-        # the final answer message).
-        send_count = bot.send_message.await_count
-        assert send_count >= 4, f"expected >=4 send_message calls, got {send_count}"
+        # The first thinking block edits the placeholder in-place:
+        bot.edit_message_text.assert_any_call(
+            chat_id=88,
+            message_id=11,
+            text="<i>let me check the workspace</i>",
+        )
 
-        # The two thinking messages must target separate Telegram messages
-        # — the chat shouldn't read as one big thinking blob.
-        thinking_sends = [
-            call.kwargs["text"]
-            for call in bot.send_message.await_args_list
-            if call.kwargs.get("text", "").startswith("<i>")
-        ]
-        assert len(thinking_sends) >= 2
-        assert "let me check the workspace" in thinking_sends[0]
-        assert "now I understand" in thinking_sends[-1]
-        # The two thinking messages don't share content — i.e., the
-        # second thinking isn't an accumulation of both.
-        assert "let me check the workspace" not in thinking_sends[-1]
+        # The second thinking block and final answer call send_message:
+        send_count = bot.send_message.await_count
+        assert send_count == 3, f"expected exactly 3 send_message calls, got {send_count}"
+
+        # Get all text sent in send_message calls
+        sent_texts = [call.kwargs.get("text", "") for call in bot.send_message.await_args_list]
+
+        # The second thinking message should be sent as a separate message
+        thinking_sends = [text for text in sent_texts if text.startswith("<i>")]
+        assert len(thinking_sends) == 1
+        assert "now I understand" in thinking_sends[0]
+        assert "let me check the workspace" not in thinking_sends[0]
+
+        # The final answer message should be sent
+        assert "Answer." in sent_texts
 
     async def test_agent_terminated_replaces_placeholder(self) -> None:
         """``agent_terminated`` without text must send a final warning reply."""
@@ -371,13 +380,25 @@ class TestTelegramChannelDeliver:
         async for _ in channel.deliver(_stream(*events), msg):
             pass
 
-        first_send = bot.send_message.await_args_list[0].kwargs["text"]
+        # Find the edit call that corresponds to the thinking block
+        thinking_edits = [
+            call.kwargs["text"]
+            for call in bot.edit_message_text.await_args_list
+            if "weighing" in call.kwargs.get("text", "")
+        ]
+        assert len(thinking_edits) > 0
+        first_edit = thinking_edits[0]
         # The literal ``**`` markers must not leak into the rendered
         # thinking message — they should be converted to Telegram's
         # ``<b>`` tag while the surrounding italic envelope is preserved.
-        assert "**bold**" not in first_send
-        assert "<i>" in first_send and "</i>" in first_send
-        assert "<b>bold</b>" in first_send
+        assert "**bold**" not in first_edit
+        assert "<i>" in first_edit and "</i>" in first_edit
+        assert "<b>bold</b>" in first_edit
+        # The final answer is sent as a new message
+        bot.send_message.assert_awaited_once_with(
+            chat_id=123,
+            text="done",
+        )
 
     async def test_tool_only_turn_surfaces_fallback_reply(self) -> None:
         """Tool calls without any answer text must produce a closing message (#293).
@@ -472,6 +493,66 @@ class TestTelegramChannelDeliver:
             _stream({"type": "tool_use", "name": "read_file", "input": {"path": "a.txt"}}), msg
         ):
             pass  # Must not raise
+
+    async def test_thinking_promoted_over_leading_delta_events(self) -> None:
+        """A thinking event must override/promote over leading delta/whitespace events.
+
+        If a model returns a leading newline or whitespace delta before it emits
+        thinking events, the placeholder should NOT be deleted at the end of
+        the turn. The thinking block should take precedence.
+        """
+        bot = _make_bot()
+        msg = _make_channel_message(bot, chat_id=42, message_id=99)
+        channel = TelegramChannel()
+
+        events: list[StreamEvent] = [
+            {"type": "delta", "content": "\n"},
+            {"type": "thinking", "content": "thinking content"},
+            {"type": "delta", "content": "actual answer"},
+        ]
+        async for _ in channel.deliver(_stream(*events), msg):
+            pass
+
+        # The placeholder message (99) should be edited with the thinking trace:
+        bot.edit_message_text.assert_any_call(
+            chat_id=42,
+            message_id=99,
+            text="<i>thinking content</i>",
+        )
+        # And the placeholder MUST NOT be deleted:
+        bot.delete_message.assert_not_called()
+        # The final answer is sent as a new message:
+        bot.send_message.assert_awaited_once()
+        sent_texts = [call.kwargs.get("text", "") for call in bot.send_message.await_args_list]
+        assert "actual answer" in sent_texts
+
+    async def test_thinking_concatenates_stream_without_strip_or_newlines(self) -> None:
+        """Thinking deltas must be concatenated exactly as-is, preserving spaces/formatting.
+
+        Verifies that we don't call strip() or insert newlines between streaming thinking
+        tokens, so the thinking trace reads naturally as one block of text.
+        """
+        bot = _make_bot()
+        msg = _make_channel_message(bot, chat_id=42, message_id=99)
+        channel = TelegramChannel()
+
+        events: list[StreamEvent] = [
+            {"type": "thinking", "content": "The"},
+            {"type": "thinking", "content": " user"},
+            {"type": "thinking", "content": " said"},
+            {"type": "thinking", "content": "\n"},
+            {"type": "thinking", "content": "hello."},
+            {"type": "delta", "content": "done"},
+        ]
+        async for _ in channel.deliver(_stream(*events), msg):
+            pass
+
+        # The thinking text should be concatenated properly with spacing intact:
+        bot.edit_message_text.assert_any_call(
+            chat_id=42,
+            message_id=99,
+            text="<i>The user said\nhello.</i>",
+        )
 
 
 # ---------------------------------------------------------------------------
