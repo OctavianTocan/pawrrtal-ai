@@ -163,13 +163,13 @@ jobs:
           STAGEHAND_HEADLESS: '1'
           E2E_BASE_URL: http://127.0.0.1:3001
           E2E_API_URL: http://127.0.0.1:8000
-          # Provide ANY of these — `_selectModel()` in fixtures picks
-          # the first one set, in priority order Google → OpenAI →
-          # Anthropic. If none are present, the suite SKIPs cleanly
-          # (which we treat as a soft pass — see the next step).
-          GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Stagehand uses dedicated STAGEHAND_*_API_KEY env vars so
+          # the backend's GOOGLE_API_KEY (used for pydantic-settings
+          # validation) doesn't accidentally trigger LLM calls.
+          # If none are set, all 11 tests skip cleanly (exit 0).
+          STAGEHAND_GOOGLE_API_KEY: ${{ secrets.STAGEHAND_GOOGLE_API_KEY }}
+          STAGEHAND_OPENAI_API_KEY: ${{ secrets.STAGEHAND_OPENAI_API_KEY }}
+          STAGEHAND_ANTHROPIC_API_KEY: ${{ secrets.STAGEHAND_ANTHROPIC_API_KEY }}
         run: bun run e2e:stagehand
 
       # Always upload artifacts even on failure — the trace / report /
