@@ -16,7 +16,7 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Any
 
-from app.models import ChatMessage, Conversation
+from app.core.exporters.types import ConversationLike, MessageLike
 
 # Truncate long tool-call results to keep the export readable.
 # Anything longer is replaced with the head + an ellipsis.
@@ -25,8 +25,8 @@ _TOOL_RESULT_PREVIEW_CHARS = 200
 
 def render_markdown(
     *,
-    conversation: Conversation,
-    messages: Sequence[ChatMessage],
+    conversation: ConversationLike,
+    messages: Sequence[MessageLike],
 ) -> str:
     """Return a self-contained Markdown export of the conversation."""
     lines: list[str] = []
@@ -50,7 +50,7 @@ def render_markdown(
     return "\n".join(lines).rstrip() + "\n"
 
 
-def _render_message(message: ChatMessage) -> list[str]:
+def _render_message(message: MessageLike) -> list[str]:
     """Render one message as a Markdown block."""
     role_label = "You" if message.role == "user" else "Assistant"
     timestamp = _fmt_dt(message.created_at)
