@@ -1,0 +1,179 @@
+---
+title: Proactively write memories during chat turns
+description: ADR — adopt a per-turn memory-write loop that captures user preferences, project decisions, and feedback without explicit "remember this" prompts.
+---
+
+# ADR: Proactively write memories during chat turns
+
+- **Date:** 2026-05-20
+- **Owners:** OctavianTocan
+- **Tracking:** Issue [#340](https://github.com/OctavianTocan/Pawrrtal-AI/issues/340)
+
+<Callout type="info" title="Status: Accepted (design)">
+The Paw will write memory entries proactively during normal chat turns
+— capturing user preferences, project decisions, and explicit feedback
+without waiting for a literal "remember this." The mechanism is a
+post-turn classifier driven by the existing LCM background pipeline,
+not a runtime tool the assistant must remember to call. Memories are
+typed (`feedback` / `project` / `user`) and de-duplicated against
+existing rows before write. Implementation lands in stacked PRs after
+this ADR — see "Implementation plan" below.
+</Callout>
+
+## Context
+
+Pawrrtal already has two memory systems:
+
+- **LCM** (per-conversation): summary nodes, ranked lexical search,
+  embeddings. Backed by `backend/app/core/lcm/` and exposed to the
+  agent as a tool surface today (`lcm_grep`, `lcm_search`,
+  `lcm_describe`, `lcm_expand_query`, `lcm_list_summaries`).
+- **Workspace identity files** (`SOUL.md`, `AGENTS.md`, `USER.md`):
+  durable, human-edited text the agent reads as part of the system
+  prompt every turn.
+
+Neither captures *non-obvious facts that emerged in a conversation*.
+The user has to remember to invoke `/save`, edit `USER.md` by hand, or
+phrase a literal "remember this." Real conversations are full of
+implicit signal that gets lost:
+
+- The user corrects an approach (`"actually, I prefer X over Y"`) —
+  that's feedback the agent should keep.
+- An architectural decision is made (`"let's use Postgres for the
+  cost ledger"`) — that's project state.
+- The user shares context (`"I'm dyslexic, so big walls of text are
+  hard for me"`) — that's a preference.
+
+Today these all evaporate at session end.
+
+## Decision
+
+Add a **post-turn classifier** to the LCM background pipeline. The
+classifier:
+
+1. Runs *after* the turn streams its reply to the user (zero
+   user-visible latency cost).
+2. Reads the last user + assistant message pair.
+3. Decides whether the pair contains a candidate memory of type
+   `feedback` / `project` / `user`. The classifier model is the same
+   cheap default the LCM `expand_query` agent uses today, not a
+   per-call settings knob.
+4. Writes accepted candidates to a new `memories` table with a
+   deduplication check against existing entries (cosine similarity on
+   embeddings, threshold tuned from `settings.lcm_*` analogues).
+5. Surfaces a brief inline acknowledgment in chat ("📝 Saved
+   feedback") so the user knows what was kept.
+
+Memories are surfaced to subsequent turns by:
+
+- Including the user's most-relevant top-K memories in the system
+  prompt assembly (alongside `USER.md`).
+- Exposing a `memory_query` tool so the agent can pull the long tail
+  on demand.
+
+## Why post-turn instead of a runtime tool
+
+The Paw is a Telegram-first agent. Asking the model to remember to
+call `save_memory` mid-turn:
+
+- Burns a tool call slot every turn the model thinks something is
+  worth saving.
+- Drifts: most chats produce zero memories and the model wastes
+  context deliberating; other chats produce a lot and the model
+  forgets to save.
+- Couples memory quality to model identity (Claude vs Gemini vs
+  Grok all reason differently about "should I save this?").
+
+A post-turn classifier sidesteps all three: the path runs
+deterministically, doesn't burn turn-time tool slots, and is keyed on
+a single shared model regardless of which provider produced the
+reply.
+
+## Why types
+
+The three types map to three different *consumers*:
+
+- `feedback` — used by the auto-review path to learn the user's
+  taste over time.
+- `project` — used by the system prompt assembler to ground
+  architectural decisions in the workspace's actual history.
+- `user` — used by personalisation (display copy, default voice,
+  reply length).
+
+Untyped memories would force every consumer to filter on text
+content, which is brittle and re-implements the classifier downstream.
+
+## Schema sketch
+
+```sql
+CREATE TABLE memories (
+    id UUID PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    workspace_id UUID NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    conversation_id UUID NULL REFERENCES conversations(id) ON DELETE SET NULL,
+    kind VARCHAR(16) NOT NULL CHECK (kind IN ('feedback', 'project', 'user')),
+    text TEXT NOT NULL,
+    embedding VECTOR(EMBED_DIM) NULL,  -- pgvector when available, sentinel otherwise
+    source_message_id UUID NULL REFERENCES chat_messages(id) ON DELETE SET NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_referenced_at TIMESTAMPTZ NULL
+);
+CREATE INDEX ix_memories_user_kind ON memories(user_id, kind);
+```
+
+Embeddings use the same provider as the LCM pipeline today
+(`backend/app/core/lcm/embeddings.py`).
+
+## Implementation plan (stacked PRs)
+
+1. **Migration + ORM** — add `memories` table + SQLAlchemy model.
+   Settings knobs: `memories_enabled`, `memories_dedupe_threshold`,
+   `memories_classifier_model`.
+2. **Post-turn classifier hook** — register a new event hook in
+   `turn_runner.py`; on `TurnCompletedEvent` enqueue a background classifier
+   task per the LCM `background.py` pattern.
+3. **`memory_query` tool** — `make_memory_query_tool(user_id)`,
+   appended in `build_agent_tools` next to the LCM family.
+4. **System prompt assembly** — surface top-K memories in
+   `app.core.agent_system_prompt.compose_agent_system_prompt`.
+5. **Acknowledgment line** — small inline notice ("📝 Saved feedback")
+   posted via `safe_send_text` after the assistant reply.
+
+Each stage is independently reviewable; the schema PR can land first
+and accept manually-written rows while the classifier is being
+developed.
+
+## Out of scope
+
+- **Sharing memories across users** (multi-user vault). Out of
+  scope; memories are per-user.
+- **Inline edit UI** on the web composer. Out of scope; CLI / API
+  fixes only for now.
+- **Background reflection / dreaming** (issue
+  [#341](https://github.com/OctavianTocan/Pawrrtal-AI/issues/341)).
+  Dreaming consolidates memories on a schedule; this ADR only
+  introduces the write path. The two systems will share the
+  `memories` table.
+
+## Consequences
+
+- Each turn now triggers one background classifier call. The
+  classifier model is set to the cheapest reasoning-capable SKU by
+  default (Gemini Flash Lite or Haiku 4.5) so the cost is bounded;
+  the per-user spend gate already in place catches runaway growth.
+- The `memories` table grows monotonically. A separate cleanup task
+  (similar to LCM summary compaction) is implied but not part of
+  this ADR.
+- The acknowledgment line changes the visible chat surface for every
+  user the moment the feature is enabled. The
+  `memories_enabled=False` default lets us roll it out per-user.
+
+## References
+
+- Issue [#340](https://github.com/OctavianTocan/Pawrrtal-AI/issues/340)
+- Issue [#341](https://github.com/OctavianTocan/Pawrrtal-AI/issues/341)
+  (dreaming — depends on this schema)
+- `backend/app/core/lcm/background.py` — the post-turn hook pattern
+  to mirror
+- `backend/app/core/agent_tools.py:258-278` — where the
+  `memory_query` tool will land alongside the LCM family
