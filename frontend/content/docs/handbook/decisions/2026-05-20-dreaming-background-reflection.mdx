@@ -1,0 +1,182 @@
+---
+title: Dreaming — background reflection that consolidates memories between sessions
+description: ADR — adopt a scheduled background job that reflects on recent turns, consolidates memories, identifies patterns, and surfaces follow-up work without an explicit user prompt.
+---
+
+# ADR: Dreaming — background reflection between sessions
+
+- **Date:** 2026-05-20
+- **Owners:** OctavianTocan
+- **Tracking:** Issue [#341](https://github.com/OctavianTocan/Pawrrtal-AI/issues/341)
+
+<Callout type="info" title="Status: Accepted (design)">
+The Paw runs a background reflection pass between active sessions:
+consolidates fragmented per-turn memories into durable long-term
+ones, identifies recurring themes across conversations, and surfaces
+follow-up work as beans / tasks. The pass piggybacks on the existing
+LCM background scheduler so we don't grow a second cron surface. The
+write target is the same ``memories`` table introduced by
+[#340](https://github.com/OctavianTocan/Pawrrtal-AI/issues/340).
+</Callout>
+
+## Context
+
+OpenClaw and the older Agentic Stack both shipped a *dreaming* loop —
+a between-sessions reflection pass that:
+
+1. Reads recent conversation history.
+2. Distills repeated patterns into durable observations.
+3. Notices follow-up work the model thought about but didn't act on.
+4. Stores the output as **consolidated** memories that survive across
+   sessions.
+
+Pawrrtal's two existing memory layers don't cover this:
+
+- **LCM** runs on a per-conversation summary cadence. It compacts
+  the *current* conversation; it doesn't reflect across
+  conversations.
+- **Memories** (from issue [#340](https://github.com/OctavianTocan/Pawrrtal-AI/issues/340))
+  capture single-turn signal but don't deduplicate or evolve over
+  time. Five "user wants concise replies" memories from five
+  different turns sit as five rows until someone collapses them.
+
+Without a consolidation pass, the user re-explains preferences,
+the agent re-derives architectural state every session, and
+proactive follow-up work just gets lost in the timeline.
+
+## Decision
+
+Adopt a **scheduled dreaming pass** with the following shape:
+
+### Trigger
+
+- **Session-end signal**: when a conversation goes idle for
+  ``settings.dreaming_idle_minutes`` (default: 30), the LCM
+  background worker enqueues a dreaming job for that conversation.
+- **Daily roll-up**: a per-user cron job (``DAILY``) runs an
+  account-wide reflection across the prior 24h. Drives cross-
+  conversation pattern detection.
+
+Both feed the same ``DreamingJob`` shape; the difference is the
+fetch window.
+
+### Pass body
+
+1. **Gather**: fetch (a) the last N turns from the conversation
+   (session-end mode) OR (b) the prior 24h of turns across the user's
+   conversations (daily mode).
+2. **Reflect**: invoke a single shared reasoning model
+   (``settings.dreaming_model`` — defaults to the LCM expand-query
+   model) with a fixed system prompt asking it to produce four
+   structured outputs:
+   - **`consolidated_memories`**: short statements of durable
+     preference / fact / project state. Each carries a ``kind``
+     matching the [#340](https://github.com/OctavianTocan/Pawrrtal-AI/issues/340)
+     enum (feedback / project / user).
+   - **`patterns`**: recurring themes the model noticed across
+     turns. Stored as ``kind="project"`` memories with a
+     ``source="dreaming"`` provenance flag.
+   - **`followups`**: deferred work the model spotted but didn't
+     do (e.g. "the user mentioned wanting tests for X but we never
+     wrote them"). Surfaced as beans via the existing CLI.
+   - **`session_summary`**: a one-paragraph "what I learned" line
+     stored on the conversation for the next session's context.
+3. **Write**: each output goes through the same dedupe pipeline as
+   the per-turn classifier from [#340](https://github.com/OctavianTocan/Pawrrtal-AI/issues/340)
+   so we don't write duplicates of memories the classifier already
+   captured.
+4. **Notify (optional)**: when
+   ``settings.dreaming_notify_on_followups`` is set, surface a
+   single Telegram message: "🌙 Pawrrtal dreamed about your day:
+   3 new memories, 1 follow-up task." Tap opens a thread to review.
+
+### Provenance
+
+Every dreaming-produced row carries ``source="dreaming"`` on the
+``memories`` table (the column is added by issue
+[#340](https://github.com/OctavianTocan/Pawrrtal-AI/issues/340)'s
+schema). That lets:
+
+- Reviewers filter "what did Pawrrtal write proactively vs what did
+  the user write?"
+- Tests assert that the dreaming pass actually wrote the rows it
+  said it did.
+- Future cleanup jobs treat dreaming-written rows more conservatively
+  (older row > 90d gets archived; user-written rows never expire).
+
+## Why piggyback on LCM background
+
+`backend/app/core/lcm/background.py` already runs a per-turn
+condense pass with per-conversation concurrency locks. Adding
+"dreaming" as a second job kind on the same scheduler:
+
+- Avoids a second cron surface (and the operational burden of
+  monitoring two of them).
+- Reuses the existing per-conversation compaction pipeline.
+- Keeps the worker logic local to one module.
+
+The LCM scheduler already has a settings knob
+(``settings.lcm_enabled``); dreaming gets its own
+(``settings.dreaming_enabled``) so they can be rolled out
+independently.
+
+## Implementation plan (stacked PRs)
+
+1. **Schema**: add ``source`` + ``provenance_job_id`` columns to
+   the ``memories`` table (depends on
+   [#340](https://github.com/OctavianTocan/Pawrrtal-AI/issues/340)
+   landing the table). New ``dreaming_jobs`` table tracks each pass
+   (timestamp, scope, output counts, model id).
+2. **Settings**: ``dreaming_enabled`` (default off),
+   ``dreaming_idle_minutes`` (30), ``dreaming_model`` (default the
+   LCM expand-query model), ``dreaming_daily_cron`` (default
+   ``"0 4 * * *"`` — 4am local).
+3. **Job kind on the LCM scheduler**: ``DreamingJob`` payload +
+   handler in ``lcm/background.py``.
+4. **Reflection prompt + parser**: a Pydantic schema for the
+   structured output; the prompt is stored in a `.md` file
+   alongside ``compose_agent_system_prompt``.
+5. **Bean writer**: hook the ``followups`` output into the
+   ``beans`` CLI; one bean per follow-up.
+6. **Telegram notice**: optional, behind
+   ``dreaming_notify_on_followups=True``.
+7. **Status panel**: add a "Dreaming" row to the ``/status``
+   inline keyboard ([#361](https://github.com/OctavianTocan/Pawrrtal-AI/issues/361))
+   showing last run + counts.
+
+Each stage is independently reviewable. Stages 1+2 unblock
+proof-of-concept; the full set lands the feature.
+
+## Out of scope
+
+- **Live "agent is dreaming" indicator** mid-session — dreaming
+  runs in the idle window only, so there's nothing to show in
+  chat. The Telegram notice (step 6) is the user-facing surface.
+- **Per-user scheduling preferences** (e.g. "dream during my
+  evening, not at 4am"). The default cron is good enough for v1;
+  a settings page lands separately if users ask.
+- **Hindsight / cross-session search** as a runtime tool (see
+  issue [#359](https://github.com/OctavianTocan/Pawrrtal-AI/issues/359)).
+  That's a separate per-user memory layer — dreaming writes *into*
+  the memory table, hindsight *reads from* it.
+
+## Consequences
+
+- One extra LLM call per session-end and per user-day. The model is
+  the cheap default; spend is bounded by the existing per-user cost
+  gate.
+- The first dreaming pass on a heavy user can be slow (24h of turn
+  history is a lot of tokens). The pass is bounded by
+  ``settings.dreaming_max_input_tokens`` — when exceeded, the pass
+  reads the *most-recent* slice and logs the truncation.
+- The ``memories`` table grows monotonically; a cleanup job is
+  implied (also called out in [#340](https://github.com/OctavianTocan/Pawrrtal-AI/issues/340)).
+
+## References
+
+- Issue [#341](https://github.com/OctavianTocan/Pawrrtal-AI/issues/341)
+- Issue [#340](https://github.com/OctavianTocan/Pawrrtal-AI/issues/340)
+  (memory write path — dependency)
+- `backend/app/core/lcm/background.py` — the scheduler this rides on
+- OpenClaw's `dreaming.py` and Agentic Stack's `reflect.py` — prior
+  art that informed the prompt + output shape
