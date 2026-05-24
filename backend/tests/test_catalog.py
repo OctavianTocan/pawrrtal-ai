@@ -177,12 +177,3 @@ def test_every_catalog_entry_has_non_empty_display_metadata() -> None:
         assert entry.description.strip(), f"{entry.id} has empty description"
 
 
-def test_every_catalog_entry_canonicalises_back_to_itself() -> None:
-    """``parse_model_id(entry.id).id == entry.id`` for every catalog entry.
-
-    Already covered field-by-field above; this is the cheap second
-    assertion that the canonical wire form is byte-identical so logs /
-    DB rows / SSE frames never drift.
-    """
-    for entry in MODEL_CATALOG:
-        assert parse_model_id(entry.id).id == entry.id
