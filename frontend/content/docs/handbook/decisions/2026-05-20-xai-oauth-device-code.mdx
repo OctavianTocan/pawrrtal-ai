@@ -136,12 +136,14 @@ runs the **device-code flow**:
   underneath). No new secrets surface.
 - The verification URL + user code are surfaced to the user in
   plain text; they're single-use and short-lived (xAI's docs say
-  ≤15 min). Logging the device code at INFO is fine; logging the
-  access token is not (we already mask bearer tokens in the
-  logging pipeline).
-- The poll interval is honoured exactly (`interval` from the
-  device-code response); polling faster races the RFC 8628
-  `slow_down` response.
+  ≤15 min). The device code itself (the polling secret) must not
+  be logged — it can be used to race the client for the grant.
+  We already mask bearer tokens in the logging pipeline; the
+  device code gets the same treatment.
+- The poll interval is honoured as-is from the device-code
+  response; polling faster races the RFC 8628 `slow_down`
+  response. On a `slow_down` reply, the client increases the
+  interval by 5 seconds per RFC 8628 Section 3.5.
 
 ## Out of scope
 
@@ -165,8 +167,8 @@ runs the **device-code flow**:
   files without them keep working through the legacy
   `XAI_API_KEY` path.
 - One new background poll task per active device-code grant.
-  Bounded by the 15-minute upstream expiry — at worst we burn
-  ≤15 polls per login attempt.
+  Bounded by the 15-minute upstream expiry — with the default
+  5-second interval that's ~180 polls per login attempt.
 
 ## References
 
