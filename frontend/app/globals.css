@@ -308,7 +308,7 @@
 	--secondary: oklch(from var(--foreground) l c h / 0.05);
 	--secondary-foreground: var(--foreground);
 	--muted: oklch(from var(--foreground) l c h / 0.05);
-	--muted-foreground: var(--foreground-65);
+	--muted-foreground: var(--foreground-70);
 	--card: var(--background);
 	--card-foreground: var(--foreground);
 	--popover: var(--background);
@@ -572,7 +572,7 @@ html[data-theme-mismatch]::before {
 
 .sidepanel-text-scope {
 	--foreground: var(--sidebar-foreground);
-	--muted-foreground: oklch(0.6334289302 0 0);
+	--muted-foreground: var(--foreground-70);
 }
 
 /* =============================================================================
