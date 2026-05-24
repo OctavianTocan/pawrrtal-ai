@@ -253,6 +253,7 @@ function BehaviorCard({
 				label="Use pointer cursors"
 			>
 				<Switch
+					aria-label="Use pointer cursors"
 					checked={pointerCursors}
 					onCheckedChange={(checked) => onOptionChange('pointer_cursors', checked)}
 				/>
@@ -262,6 +263,7 @@ function BehaviorCard({
 				label="Translucent sidebar"
 			>
 				<Switch
+					aria-label="Translucent sidebar"
 					checked={translucentSidebar}
 					onCheckedChange={(checked) => onOptionChange('translucent_sidebar', checked)}
 				/>

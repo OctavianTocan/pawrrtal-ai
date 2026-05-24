@@ -72,7 +72,7 @@ export function GeneralSection(): React.JSX.Element {
 					description="Get notified when Pawrrtal has finished a response. Useful for long-running tasks."
 					label="Response completions"
 				>
-					<Switch defaultChecked />
+					<Switch aria-label="Response completions" defaultChecked />
 				</SettingsRow>
 			</SettingsCard>
 		</SettingsPage>

@@ -151,13 +151,21 @@ export function PersonalizationSection(): React.JSX.Element {
 					description="Generate new memories from chats and bring them into new chats."
 					label="Enable memories"
 				>
-					<Switch checked={enableMemories} onCheckedChange={setEnableMemories} />
+					<Switch
+						aria-label="Enable memories"
+						checked={enableMemories}
+						onCheckedChange={setEnableMemories}
+					/>
 				</SettingsRow>
 				<SettingsRow
 					description="Do not generate memories from chats that used MCP tools or web search."
 					label="Skip tool-assisted chats"
 				>
-					<Switch checked={skipToolChats} onCheckedChange={setSkipToolChats} />
+					<Switch
+						aria-label="Skip tool-assisted chats"
+						checked={skipToolChats}
+						onCheckedChange={setSkipToolChats}
+					/>
 				</SettingsRow>
 				<SettingsRow description="Delete all stored memories." label="Reset memories">
 					<Button
