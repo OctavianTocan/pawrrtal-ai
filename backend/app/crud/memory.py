@@ -1,6 +1,6 @@
 """CRUD operations for proactive memory rows (#340).
 
-The schema lives in migration 021 and the ORM model in
+The schema lives in migration 024 and the ORM model in
 :mod:`app.models`. This module owns the small surface every
 consumer (the post-turn classifier hook, the ``memory_query``
 tool, the system-prompt assembler) shares: insert with dedupe,
@@ -21,6 +21,8 @@ from app.models import Memory
 
 MemoryKind = Literal["feedback", "project", "user"]
 MemorySource = Literal["classifier", "dreaming", "user"]
+
+_DEDUPE_SUBSTRING_MAX_LEN = 120
 
 
 async def insert_memory(
@@ -76,14 +78,10 @@ async def list_memories_for_user(
     (preferences as bullet points, project decisions as inline
     statements, etc.).
     """
-    stmt = (
-        select(Memory)
-        .where(Memory.user_id == user_id)
-        .order_by(Memory.created_at.desc())
-        .limit(limit)
-    )
+    stmt = select(Memory).where(Memory.user_id == user_id)
     if kind is not None:
         stmt = stmt.where(Memory.kind == kind)
+    stmt = stmt.order_by(Memory.created_at.desc()).limit(limit)
     result = await session.execute(stmt)
     return list(result.scalars().all())
 
@@ -105,11 +103,12 @@ async def find_similar_memories(
     to emit short, deterministic statements that share substrings
     when restating the same fact).
     """
+    escaped = text[:_DEDUPE_SUBSTRING_MAX_LEN].replace("%", r"\%").replace("_", r"\_")
     stmt = (
         select(Memory)
         .where(Memory.user_id == user_id)
         .where(Memory.kind == kind)
-        .where(Memory.text.ilike(f"%{text[:120]}%"))
+        .where(Memory.text.ilike(f"%{escaped}%", escape="\\"))
         .order_by(Memory.created_at.desc())
         .limit(limit)
     )

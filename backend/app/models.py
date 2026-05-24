@@ -16,6 +16,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     UniqueConstraint,
     Uuid,
@@ -448,27 +449,25 @@ class Memory(Base):
         Uuid, ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True, index=True
     )
     # One of ``feedback`` / ``project`` / ``user``. Pinned to that
-    # set by ``ck_memories_kind_valid`` in migration 021.
+    # set by ``ck_memories_kind_valid`` in migration 024.
     kind: Mapped[str] = mapped_column(String(16), nullable=False)
     # ``classifier`` (per-turn) | ``dreaming`` (between-sessions) |
     # ``user`` (manual). Pinned by ``ck_memories_source_valid``.
-    source: Mapped[str] = mapped_column(String(16), nullable=False, default="classifier")
+    source: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="classifier", server_default="classifier"
+    )
     # Set when ``source == "dreaming"`` — ties the row back to the
     # ``DreamingJob`` that wrote it (table introduced by #341).
     provenance_job_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     # Opaque bytes; the existing ``lcm/embeddings.py`` pipeline does
     # the per-provider serialisation. Promoted to ``pgvector`` later.
-    embedding: Mapped[bytes | None] = mapped_column(nullable=True)
+    embedding: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
     source_message_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("chat_messages.id", ondelete="SET NULL"), nullable=True
     )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, default=_utcnow
-    )
-    last_referenced_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=_utcnow)
+    last_referenced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 __all__ = [

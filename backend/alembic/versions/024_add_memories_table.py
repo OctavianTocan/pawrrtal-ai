@@ -18,8 +18,8 @@ serialisation per provider). A future migration can promote the
 column to ``pgvector`` once the operator deployment confirms the
 extension is installed.
 
-Revision ID: 021_add_memories_table
-Revises: 020_add_conversation_reasoning_effort
+Revision ID: 024_add_memories_table
+Revises: 023_user_preferences_font_size_nullable
 """
 
 from __future__ import annotations
@@ -27,8 +27,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "021_add_memories_table"
-down_revision = "020_add_conversation_reasoning_effort"
+revision = "024_add_memories_table"
+down_revision = "023_user_preferences_font_size_nullable"
 branch_labels = None
 depends_on = None
 
@@ -60,11 +60,11 @@ def upgrade() -> None:
         sa.Column("source_message_id", sa.Uuid(), nullable=True),
         sa.Column(
             "created_at",
-            sa.DateTime(timezone=True),
+            sa.DateTime(),
             nullable=False,
             server_default=sa.text("CURRENT_TIMESTAMP"),
         ),
-        sa.Column("last_referenced_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("last_referenced_at", sa.DateTime(), nullable=True),
         # fastapi-users names the user table ``user`` (singular) — not
         # ``users`` — so every cross-table FK uses that. Workspace
         # uses ``workspaces``; see ``__tablename__`` in models.py.
