@@ -6,9 +6,9 @@ button hands the conversation back to the turn pipeline with the
 same user input that produced the (now stale) answer, so the user
 can ask the model to try again without retyping the prompt.
 
-The framework-free shape mirrors :mod:`thinking_picker` and
-:mod:`verbose_picker` — pure dataclasses + callback parsing here,
-aiogram glue in :mod:`regenerate_runtime`.
+The framework-free shape mirrors :mod:`thinking_picker` — pure
+dataclasses + callback parsing here, aiogram glue in
+:mod:`regenerate_runtime`.
 """
 
 from __future__ import annotations
