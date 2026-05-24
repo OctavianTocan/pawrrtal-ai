@@ -36,6 +36,7 @@ _HTTP_TIMEOUT_SECONDS = 30.0
 _MIN_POLL_INTERVAL_SECONDS = 1.0
 _MAX_POLL_INTERVAL_SECONDS = 30.0
 _MAX_POLL_DEADLINE_SECONDS = 900.0  # 15 min — xAI's documented device-code lifetime.
+_SLOW_DOWN_INCREMENT_SECONDS = 5  # RFC 8628 S3.5: add 5s on ``slow_down``.
 
 
 class OAuthError(RuntimeError):
@@ -130,7 +131,10 @@ async def request_device_code(
             interval=_clamp_interval(payload.get("interval", 5)),
         )
     except (KeyError, TypeError, ValueError) as exc:
-        logger.warning("XAI_OAUTH_DEVICE_CODE_MALFORMED payload=%s", payload)
+        logger.warning(
+            "XAI_OAUTH_DEVICE_CODE_MALFORMED keys=%s",
+            list(payload.keys()) if isinstance(payload, dict) else type(payload).__name__,
+        )
         raise OAuthError("xAI returned a malformed device-code payload.") from exc
 
 
@@ -148,14 +152,14 @@ async def poll_for_token(
     bounds the wait so the worker can't loop forever on a
     misbehaving server. Per RFC 8628 the server may answer
     ``authorization_pending`` (keep polling) or ``slow_down``
-    (double the interval).
+    (increment the interval by 5s per RFC 8628 S3.5).
     """
     waited = 0.0
     current_interval = _clamp_interval(interval)
 
-    while waited < deadline_seconds:
-        try:
-            async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
+    async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT_SECONDS) as client:
+        while waited < deadline_seconds:
+            try:
                 response = await client.post(
                     url,
                     data={
@@ -164,47 +168,47 @@ async def poll_for_token(
                         "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
                     },
                 )
-        except httpx.RequestError as exc:
-            logger.warning("XAI_OAUTH_TOKEN_REQUEST_FAIL error=%s", exc)
-            raise OAuthError("xAI OAuth token endpoint unreachable.") from exc
+            except httpx.RequestError as exc:
+                logger.warning("XAI_OAUTH_TOKEN_REQUEST_FAIL error=%s", exc)
+                raise OAuthError("xAI OAuth token endpoint unreachable.") from exc
 
-        if response.status_code == 200:
-            payload = response.json()
-            return DeviceCodeGrant(
-                access_token=str(payload["access_token"]),
-                refresh_token=payload.get("refresh_token"),
-                expires_in=int(payload.get("expires_in", 3600)),
-                scope=payload.get("scope"),
+            if response.status_code == 200:
+                payload = response.json()
+                return DeviceCodeGrant(
+                    access_token=str(payload["access_token"]),
+                    refresh_token=payload.get("refresh_token"),
+                    expires_in=int(payload.get("expires_in", 3600)),
+                    scope=payload.get("scope"),
+                )
+
+            # Per RFC 8628 the pending / slow-down branches surface as
+            # 400 + an ``error`` discriminator. Anything else is terminal.
+            error_payload = _safe_json(response)
+            code = error_payload.get("error") if isinstance(error_payload, dict) else None
+            if code == "authorization_pending":
+                await asyncio.sleep(current_interval)
+                waited += current_interval
+                continue
+            if code == "slow_down":
+                current_interval = _clamp_interval(current_interval + _SLOW_DOWN_INCREMENT_SECONDS)
+                await asyncio.sleep(current_interval)
+                waited += current_interval
+                continue
+            if code in ("access_denied", "expired_token", "invalid_grant"):
+                raise OAuthError(f"xAI OAuth grant failed: {code}.", code=code)
+            # Unknown error -- log + bail so we don't loop on a permanent
+            # failure that doesn't match the RFC's error vocabulary.
+            logger.warning(
+                "XAI_OAUTH_TOKEN_UNKNOWN_ERR status=%s code=%s body=%s",
+                response.status_code,
+                code,
+                response.text[:200],
             )
-
-        # Per RFC 8628 the pending / slow-down branches surface as
-        # 400 + an ``error`` discriminator. Anything else is terminal.
-        error_payload = _safe_json(response)
-        code = error_payload.get("error") if isinstance(error_payload, dict) else None
-        if code == "authorization_pending":
-            await asyncio.sleep(current_interval)
-            waited += current_interval
-            continue
-        if code == "slow_down":
-            current_interval = _clamp_interval(current_interval * 2)
-            await asyncio.sleep(current_interval)
-            waited += current_interval
-            continue
-        if code in ("access_denied", "expired_token", "invalid_grant"):
-            raise OAuthError(f"xAI OAuth grant failed: {code}.", code=code)
-        # Unknown error — log + bail so we don't loop on a permanent
-        # failure that doesn't match the RFC's error vocabulary.
-        logger.warning(
-            "XAI_OAUTH_TOKEN_UNKNOWN_ERR status=%s code=%s body=%s",
-            response.status_code,
-            code,
-            response.text[:200],
-        )
-        raise OAuthError(
-            f"xAI OAuth token endpoint returned unexpected status "
-            f"{response.status_code} (code={code!r}).",
-            code=code,
-        )
+            raise OAuthError(
+                f"xAI OAuth token endpoint returned unexpected status "
+                f"{response.status_code} (code={code!r}).",
+                code=code,
+            )
 
     raise OAuthError("xAI device code expired before authorisation.", code="expired_token")
 
