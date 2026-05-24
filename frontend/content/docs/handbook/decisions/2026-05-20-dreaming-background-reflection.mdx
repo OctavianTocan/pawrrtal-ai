@@ -25,7 +25,7 @@ OpenClaw and the older Agentic Stack both shipped a *dreaming* loop —
 a between-sessions reflection pass that:
 
 1. Reads recent conversation history.
-2. Distils repeated patterns into durable observations.
+2. Distills repeated patterns into durable observations.
 3. Notices follow-up work the model thought about but didn't act on.
 4. Stores the output as **consolidated** memories that survive across
    sessions.
@@ -107,16 +107,16 @@ schema). That lets:
 ## Why piggyback on LCM background
 
 `backend/app/core/lcm/background.py` already runs a per-turn
-condense pass on a deferred queue + per-user idle detection. Adding
+condense pass with per-conversation concurrency locks. Adding
 "dreaming" as a second job kind on the same scheduler:
 
 - Avoids a second cron surface (and the operational burden of
   monitoring two of them).
-- Reuses the existing per-user fan-out + retry budget.
+- Reuses the existing per-conversation compaction pipeline.
 - Keeps the worker logic local to one module.
 
 The LCM scheduler already has a settings knob
-(``settings.lcm_background_enabled``); dreaming gets its own
+(``settings.lcm_enabled``); dreaming gets its own
 (``settings.dreaming_enabled``) so they can be rolled out
 independently.
 
