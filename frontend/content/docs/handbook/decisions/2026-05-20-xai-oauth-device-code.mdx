@@ -1,0 +1,181 @@
+---
+title: Use xAI OAuth device-code login alongside long-lived API keys
+description: ADR — add an OAuth device-code login flow as an alternative to a pasted ``XAI_API_KEY`` so users can authenticate xAI without copy-pasting a long-lived secret.
+---
+
+# ADR: Use xAI OAuth device-code login alongside long-lived API keys
+
+- **Date:** 2026-05-20
+- **Owners:** OctavianTocan
+- **Tracking:** Issue [#372](https://github.com/OctavianTocan/Pawrrtal-AI/issues/372)
+
+<Callout type="info" title="Status: Accepted (design)">
+Add an xAI OAuth device-code login flow as an **alternative** to the
+existing pasted ``XAI_API_KEY``. The user runs ``/login xai`` on
+Telegram (or hits a button in the web composer), Pawrrtal fetches a
+device code from xAI, surfaces the verification URL + user code,
+polls until the user authorises, and stores the resulting token +
+refresh token in the user's encrypted workspace ``.env``. Existing
+``XAI_API_KEY`` callers continue to work; the OAuth path is the
+new preferred surface for users who don't want to manage a long-
+lived secret. The pasted-key path is not removed.
+</Callout>
+
+## Context
+
+Today every xAI feature (chat via `xai_provider`, STT via the
+`api/stt.py` proxy and the new `XaiSttTranscriber` from
+[#374](https://github.com/OctavianTocan/Pawrrtal-AI/issues/374), the
+recently-added `EFFORT_NONE` mapping from
+[#373](https://github.com/OctavianTocan/Pawrrtal-AI/issues/373))
+authenticates with a single long-lived `XAI_API_KEY` value either
+on the gateway env or in a workspace `.env` override
+(`resolve_api_key(workspace_root, "XAI_API_KEY")`).
+
+That works but has three friction points:
+
+1. **Onboarding tax** — a new user has to create an xAI account,
+   navigate to the API keys page, generate a key, copy it, and
+   paste it into a TUI / web form. About half of "I tried Pawrrtal
+   but couldn't get models to work" support reports trace back to
+   this step.
+2. **Rotation burden** — when a key leaks or is sunsetted, every
+   workspace has to be manually updated. There's no automatic
+   refresh.
+3. **Audit / revocation** — a single static key blends into the
+   user's xAI dashboard; revoking access requires removing the key
+   manually. OAuth tokens have a proper "this app accesses your
+   account" surface upstream.
+
+xAI exposes an OAuth 2.0 device-code flow (RFC 8628 shape) which is
+the natural fit for Telegram / TUI clients that don't own a browser
+session. The user gets a short code + a URL, opens the URL in any
+browser, and the device polls the token endpoint until granted.
+
+## Decision
+
+Add an `xai` provider to the workspace authentication surface that
+runs the **device-code flow**:
+
+1. **`/login xai`** on Telegram (or a button on the web composer
+   workspace settings page) calls a new
+   `backend/app/integrations/xai/oauth.py::request_device_code()`.
+2. The handler posts to xAI's device-code endpoint, gets back the
+   verification URL + user code + device code + polling interval,
+   and surfaces *only* the verification URL + user code to the
+   user.
+3. A background polling task hits the token endpoint every
+   `interval` seconds until the response flips from
+   `authorization_pending` → `access_token`.
+4. On grant, the access_token + refresh_token + expiry are written
+   to the workspace's encrypted `.env` under
+   `XAI_OAUTH_ACCESS_TOKEN` + `XAI_OAUTH_REFRESH_TOKEN` +
+   `XAI_OAUTH_EXPIRES_AT`.
+5. `resolve_api_key("XAI_API_KEY")` is replaced by a new
+   `resolve_xai_credentials(workspace_root)` that returns:
+   - the OAuth access token (refreshing it if `XAI_OAUTH_EXPIRES_AT
+     < now + 60s`), OR
+   - the legacy `XAI_API_KEY` value when no OAuth token is present.
+6. The xAI SDK / HTTP client receives the chosen credential the
+   same way it does today (`Authorization: Bearer <token>`); xAI
+   accepts both shapes at the protocol layer.
+
+### Why device-code, not authorization-code
+
+- **Authorization-code** needs a callback URL. Telegram bots don't
+  own one; the user would have to open a browser, authorise,
+  bounce back through a redirect URL we'd have to serve and route
+  back to Telegram. Three round trips and an HTTPS redirect surface
+  we don't otherwise need.
+- **Device-code** is the standard "headless device" flow. The
+  Telegram surface and the web composer can both surface the same
+  URL + user code; the user authorises once and any client polls
+  for the result. Same flow Claude Code and GitHub CLI use.
+- **PKCE** is not relevant — device-code doesn't have a code
+  exchange step to protect.
+
+### Why we keep the pasted-key path
+
+- Existing deployments work. Yanking the static key surface forces
+  every workspace to re-authenticate on the next deploy.
+- Gateway-global `XAI_API_KEY` is the right shape for the
+  multi-user dev gateway (one paid xAI account serves everyone) —
+  OAuth would require per-user enrolment.
+- Some scripts (the cost-ledger backfill cron, future integrations)
+  run without a user in scope; they need a static key.
+
+## Implementation plan (stacked PRs)
+
+1. **xAI OAuth client** —
+   `backend/app/integrations/xai/oauth.py` with
+   `request_device_code()`, `poll_for_token()`, `refresh_token()`,
+   each returning structured dataclasses. Lazy `httpx` client per
+   call (matches the pattern in `XaiSttTranscriber`).
+2. **Encrypted env keys** — add `XAI_OAUTH_ACCESS_TOKEN`,
+   `XAI_OAUTH_REFRESH_TOKEN`, `XAI_OAUTH_EXPIRES_AT` to the
+   keys-registry whitelist so `resolve_api_key` recognises them.
+3. **`resolve_xai_credentials`** — single helper used by the
+   provider, the STT route, and `XaiSttTranscriber`. Refreshes
+   transparently when the access token is near expiry.
+4. **`/login xai` Telegram command** — opens the device-code flow,
+   replies with the verification URL + user code, kicks off the
+   background polling task. On grant: replies "✅ Connected to
+   xAI." On timeout / deny: surfaces the upstream error reason.
+5. **Web composer button** — workspace-settings page button that
+   runs the same flow and shows the same URL + code in-line.
+6. **Tests** — the OAuth client gets a unit-test pass using
+   `httpx.MockTransport`; the Telegram command + web button get
+   integration tests that drive the polling state machine with a
+   scripted token-endpoint sequence.
+
+## Security notes
+
+- The access token + refresh token live in the same encrypted
+  workspace `.env` that holds existing API keys today
+  (`workspace_encryption_key` settings knob, `cryptography.Fernet`
+  underneath). No new secrets surface.
+- The verification URL + user code are surfaced to the user in
+  plain text; they're single-use and short-lived (xAI's docs say
+  ≤15 min). The device code itself (the polling secret) must not
+  be logged — it can be used to race the client for the grant.
+  We already mask bearer tokens in the logging pipeline; the
+  device code gets the same treatment.
+- The poll interval is honoured as-is from the device-code
+  response; polling faster races the RFC 8628 `slow_down`
+  response. On a `slow_down` reply, the client increases the
+  interval by 5 seconds per RFC 8628 Section 3.5.
+
+## Out of scope
+
+- **OAuth for Google / Anthropic / OpenAI / OpenCode Go**. Each
+  vendor has its own flow shape; this ADR is xAI-specific. The
+  `resolve_xai_credentials` pattern generalises later, but the
+  ADR for that lives on the vendor's own issue.
+- **Token storage outside the workspace `.env`**. We could move
+  tokens to a separate per-user `oauth_tokens` table; deferred
+  until a second provider lands and the per-provider surface
+  starts to look duplicative.
+- **Browser-side authorize-and-bounce flow**. Possible follow-up
+  if the device-code UX turns out to be friction on web; the
+  device-code surface ships first because it serves both Telegram
+  and web from one path.
+
+## Consequences
+
+- The xAI dependency footprint stays the same (xai-sdk + httpx).
+- Workspace `.env` files gain three new optional fields. Existing
+  files without them keep working through the legacy
+  `XAI_API_KEY` path.
+- One new background poll task per active device-code grant.
+  Bounded by the 15-minute upstream expiry — with the default
+  5-second interval that's ~180 polls per login attempt.
+
+## References
+
+- Issue [#372](https://github.com/OctavianTocan/Pawrrtal-AI/issues/372)
+- [RFC 8628 — OAuth 2.0 Device Authorization Grant](https://datatracker.ietf.org/doc/html/rfc8628)
+- `backend/app/core/keys.py` — the existing `resolve_api_key`
+  surface this design extends
+- `backend/app/core/providers/xai_provider.py:104-113` — current
+  `_resolve_xai_api_key` helper that `resolve_xai_credentials`
+  supersedes
