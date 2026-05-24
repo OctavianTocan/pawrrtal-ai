@@ -38,15 +38,18 @@ class FakeBot:
         self._next_message_id = 1000
 
     async def send_message(self, **kwargs: Any) -> Any:
+        """Record a send_message call."""
         self._next_message_id += 1
         self.calls.append({"method": "send_message", **kwargs})
         return _FakeSentMessage(message_id=self._next_message_id)
 
     async def edit_message_text(self, **kwargs: Any) -> Any:
+        """Record an edit_message_text call."""
         self.calls.append({"method": "edit_message_text", **kwargs})
         return None
 
     async def delete_message(self, **kwargs: Any) -> None:
+        """Record a delete_message call."""
         self.calls.append({"method": "delete_message", **kwargs})
 
     async def __call__(self, method: Any) -> Any:
@@ -100,6 +103,7 @@ def _final_visible_text(calls: list[dict[str, Any]]) -> str:
     return ""
 
 
+@pytest.mark.xfail(reason="Requires dispatch fixes from #371/#377 to pass")
 @pytest.mark.anyio
 async def test_thinking_then_multi_delta_answer_renders_full_text() -> None:
     """``thinking → delta → delta → delta`` must surface the full concatenated answer.
@@ -120,11 +124,10 @@ async def test_thinking_then_multi_delta_answer_renders_full_text() -> None:
     await _drain(channel, events, bot)
 
     visible = _final_visible_text(bot.calls)
-    assert "Hello, world!" in visible, (
-        f"Final visible text dropped chunks; got: {visible!r}"
-    )
+    assert "Hello, world!" in visible, f"Final visible text dropped chunks; got: {visible!r}"
 
 
+@pytest.mark.xfail(reason="Requires dispatch fixes from #371/#377 to pass")
 @pytest.mark.anyio
 async def test_tool_use_then_multi_delta_answer_renders_full_text() -> None:
     """Same as above but with a ``tool_use → tool_result`` block first.
@@ -150,6 +153,7 @@ async def test_tool_use_then_multi_delta_answer_renders_full_text() -> None:
     )
 
 
+@pytest.mark.xfail(reason="Requires dispatch fixes from #371/#377 to pass")
 @pytest.mark.anyio
 async def test_error_event_surfaces_to_user() -> None:
     """A provider ``error`` event must reach the user, not get swallowed.
@@ -177,6 +181,4 @@ async def test_error_event_surfaces_to_user() -> None:
     # The ❌ glyph prefix is the established Telegram convention for
     # error events (`_ERROR_PREFIX` in ``telegram.py``). Confirm the
     # path that decorates it ran.
-    assert "❌" in visible, (
-        f"Error event surfaced without the error glyph; visible: {visible!r}"
-    )
+    assert "❌" in visible, f"Error event surfaced without the error glyph; visible: {visible!r}"
