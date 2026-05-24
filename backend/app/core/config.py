@@ -159,7 +159,7 @@ class Settings(BaseSettings):
 
     # Where to send the user after a successful OAuth sign-in. Override in
     # production to point at the deployed frontend (e.g. https://app/...).
-    oauth_post_login_redirect: str = "http://localhost:3001/"
+    oauth_post_login_redirect: str = "http://localhost:53001/"
 
     # --- Channels: Telegram --------------------------------------------------
     # Bot token issued by @BotFather. Leaving this empty disables the

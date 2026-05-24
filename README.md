@@ -266,7 +266,7 @@ just dev
 bun run dev
 ```
 
-The dev orchestrator clears stale ports, removes the Next.js dev lock, and launches Next.js on `:3001` plus FastAPI on `:8000` with hot reload. Local dev uses plain `localhost`.
+The dev orchestrator clears stale ports, removes the Next.js dev lock, and launches Next.js on `:53001` plus FastAPI on `:8000` with hot reload. Local dev uses plain `localhost`.
 
 ### Docker
 
@@ -322,7 +322,7 @@ OPENAI_CODEX_OAUTH_TOKEN=        # workspace-only by default
 NOTION_API_KEY=                  # workspace-only plugin key
 
 # CORS / cookies
-CORS_ORIGINS=["http://localhost:3001"]
+CORS_ORIGINS=["http://localhost:53001"]
 CORS_ORIGIN_REGEX=^https:\/\/.*\.vercel\.app$
 COOKIE_DOMAIN=
 COOKIE_SAMESITE=lax
@@ -383,7 +383,7 @@ APPLE_OAUTH_TEAM_ID=
 APPLE_OAUTH_KEY_ID=
 APPLE_OAUTH_PRIVATE_KEY=
 APPLE_OAUTH_REDIRECT_URI=
-OAUTH_POST_LOGIN_REDIRECT=http://localhost:3001/
+OAUTH_POST_LOGIN_REDIRECT=http://localhost:53001/
 
 # Voice / STT
 VOICE_PROVIDER=xai
@@ -428,7 +428,7 @@ Provider and integration keys can be stored per workspace in the encrypted `.env
 ### Request to response, web chat turn
 
 ```
-Browser ─SSE─▶ Next.js (:3001) ─fetch─▶ FastAPI /api/v1/chat
+Browser ─SSE─▶ Next.js (:53001) ─fetch─▶ FastAPI /api/v1/chat
                                               │
                        ┌──────────────────────┼──────────────────────┐
                        ▼                      ▼                      ▼

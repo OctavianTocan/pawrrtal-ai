@@ -8,7 +8,7 @@
  * and stops drift between repo root, frontend, and desktop shell.
  *
  * The frontend dev port also appears in `frontend/package.json`
- * (`scripts.dev`: `next dev --port 3001`). That value must stay in
+ * (`scripts.dev`: `next dev --port 53001`). That value must stay in
  * sync with {@link DEV_FRONTEND_PORT}; the verification helper below
  * is the gate for that constraint — call it from CI or pre-commit if
  * needed.
@@ -25,7 +25,7 @@
  * Must match the `--port` flag in `frontend/package.json` → `scripts.dev`.
  * Verified by {@link assertFrontendPortMatchesPackageJson}.
  */
-export const DEV_FRONTEND_PORT = 3001;
+export const DEV_FRONTEND_PORT = 53001;
 
 /**
  * Port the FastAPI dev server listens on locally.

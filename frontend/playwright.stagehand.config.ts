@@ -14,7 +14,7 @@
 
 import { defineConfig } from '@playwright/test';
 
-const FRONTEND_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3001';
+const FRONTEND_URL = process.env.E2E_BASE_URL ?? 'http://localhost:53001';
 const BACKEND_URL = process.env.E2E_API_URL ?? 'http://localhost:8000';
 
 export default defineConfig({
