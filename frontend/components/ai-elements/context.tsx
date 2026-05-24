@@ -7,7 +7,7 @@
 'use client';
 
 import type { LanguageModelUsage } from 'ai';
-import { type ComponentProps, createContext, use } from 'react';
+import { type ComponentProps, createContext, use, useMemo } from 'react';
 import { getUsage } from 'tokenlens';
 import { Button } from '@/components/ui/button';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
@@ -54,18 +54,18 @@ const useContextValue = () => {
 
 export type ContextProps = ComponentProps<typeof HoverCard> & ContextSchema;
 
-export const Context = ({ usedTokens, maxTokens, usage, modelId, ...props }: ContextProps) => (
-	<ContextContext.Provider
-		value={{
-			usedTokens,
-			maxTokens,
-			usage,
-			modelId,
-		}}
-	>
-		<HoverCard closeDelay={0} openDelay={0} {...props} />
-	</ContextContext.Provider>
-);
+export const Context = ({ usedTokens, maxTokens, usage, modelId, ...props }: ContextProps) => {
+	const contextValue = useMemo(
+		() => ({ usedTokens, maxTokens, usage, modelId }),
+		[usedTokens, maxTokens, usage, modelId]
+	);
+
+	return (
+		<ContextContext.Provider value={contextValue}>
+			<HoverCard closeDelay={0} openDelay={0} {...props} />
+		</ContextContext.Provider>
+	);
+};
 
 const ContextIcon = () => {
 	const { usedTokens, maxTokens } = useContextValue();

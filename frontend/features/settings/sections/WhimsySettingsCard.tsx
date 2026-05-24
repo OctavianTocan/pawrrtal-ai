@@ -361,6 +361,7 @@ export function WhimsySettingsCard(): React.JSX.Element {
 
 			<SettingsRow description="Toggle the texture overlay on or off." label="Show texture">
 				<Switch
+					aria-label="Show texture"
 					checked={config.enabled}
 					onCheckedChange={(enabled) => setConfig((c) => ({ ...c, enabled }))}
 				/>

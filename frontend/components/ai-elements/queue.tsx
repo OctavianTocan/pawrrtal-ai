@@ -105,15 +105,15 @@ export const QueueItemDescription = ({
 	/>
 );
 
-export type QueueItemActionsProps = ComponentProps<'div'>;
+type QueueItemActionsProps = ComponentProps<'div'>;
 
-export const QueueItemActions = ({ className, ...props }: QueueItemActionsProps) => (
+const _QueueItemActions = ({ className, ...props }: QueueItemActionsProps) => (
 	<div className={cn('flex gap-1', className)} {...props} />
 );
 
-export type QueueItemActionProps = Omit<ComponentProps<typeof Button>, 'variant' | 'size'>;
+type QueueItemActionProps = Omit<ComponentProps<typeof Button>, 'variant' | 'size'>;
 
-export const QueueItemAction = ({ className, ...props }: QueueItemActionProps) => (
+const _QueueItemAction = ({ className, ...props }: QueueItemActionProps) => (
 	<Button
 		className={cn(
 			'size-auto rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-muted-foreground/10 hover:text-foreground group-hover:opacity-100',
@@ -126,9 +126,9 @@ export const QueueItemAction = ({ className, ...props }: QueueItemActionProps) =
 	/>
 );
 
-export type QueueItemAttachmentProps = ComponentProps<'div'>;
+type QueueItemAttachmentProps = ComponentProps<'div'>;
 
-export const QueueItemAttachment = ({ className, ...props }: QueueItemAttachmentProps) => (
+const _QueueItemAttachment = ({ className, ...props }: QueueItemAttachmentProps) => (
 	<div className={cn('mt-1 flex flex-wrap gap-2', className)} {...props} />
 );
 
@@ -173,20 +173,16 @@ export const QueueList = ({ children, className, ...props }: QueueListProps) => 
 );
 
 // QueueSection - collapsible section container
-export type QueueSectionProps = ComponentProps<typeof Collapsible>;
+type QueueSectionProps = ComponentProps<typeof Collapsible>;
 
-export const QueueSection = ({ className, defaultOpen = true, ...props }: QueueSectionProps) => (
+const _QueueSection = ({ className, defaultOpen = true, ...props }: QueueSectionProps) => (
 	<Collapsible className={cn(className)} defaultOpen={defaultOpen} {...props} />
 );
 
 // QueueSectionTrigger - section header/trigger
-export type QueueSectionTriggerProps = ComponentProps<'button'>;
+type QueueSectionTriggerProps = ComponentProps<'button'>;
 
-export const QueueSectionTrigger = ({
-	children,
-	className,
-	...props
-}: QueueSectionTriggerProps) => (
+const _QueueSectionTrigger = ({ children, className, ...props }: QueueSectionTriggerProps) => (
 	<CollapsibleTrigger asChild>
 		<button
 			className={cn(
@@ -202,13 +198,13 @@ export const QueueSectionTrigger = ({
 );
 
 // QueueSectionLabel - label content with icon and count
-export type QueueSectionLabelProps = ComponentProps<'span'> & {
+type QueueSectionLabelProps = ComponentProps<'span'> & {
 	count?: number;
 	label: string;
 	icon?: React.ReactNode;
 };
 
-export const QueueSectionLabel = ({
+const _QueueSectionLabel = ({
 	count,
 	label,
 	icon,
@@ -225,15 +221,15 @@ export const QueueSectionLabel = ({
 );
 
 // QueueSectionContent - collapsible content area
-export type QueueSectionContentProps = ComponentProps<typeof CollapsibleContent>;
+type QueueSectionContentProps = ComponentProps<typeof CollapsibleContent>;
 
-export const QueueSectionContent = ({ className, ...props }: QueueSectionContentProps) => (
+const _QueueSectionContent = ({ className, ...props }: QueueSectionContentProps) => (
 	<CollapsibleContent className={cn(className)} {...props} />
 );
 
-export type QueueProps = ComponentProps<'div'>;
+type QueueProps = ComponentProps<'div'>;
 
-export const Queue = ({ className, ...props }: QueueProps) => (
+const _Queue = ({ className, ...props }: QueueProps) => (
 	<div
 		className={cn(
 			'flex flex-col gap-2 rounded-xl border border-border bg-background px-3 pt-2 pb-2 shadow-xs',

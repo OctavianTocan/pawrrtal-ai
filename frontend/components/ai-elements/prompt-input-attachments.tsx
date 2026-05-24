@@ -6,11 +6,10 @@
 
 'use client';
 
-import { DropdownMenuItem } from '@octavian-tocan/react-dropdown';
 import type { FileUIPart } from 'ai';
-import { ImageIcon, PaperclipIcon, XIcon } from 'lucide-react';
+import { PaperclipIcon, XIcon } from 'lucide-react';
 import Image from 'next/image';
-import { type ComponentProps, Fragment, type HTMLAttributes, type ReactNode } from 'react';
+import type { HTMLAttributes } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { usePromptInputAttachments } from './prompt-input-context';
@@ -19,6 +18,15 @@ import {
 	PromptInputHoverCardContent,
 	PromptInputHoverCardTrigger,
 } from './prompt-input-layout';
+
+export {
+	PromptInputActionAddAttachments,
+	type PromptInputActionAddAttachmentsProps,
+} from './prompt-input-action-add-attachments';
+export {
+	PromptInputAttachments,
+	type PromptInputAttachmentsProps,
+} from './prompt-input-attachments-list';
 
 /** Props for a single prompt input attachment chip. */
 export type PromptInputAttachmentProps = HTMLAttributes<HTMLDivElement> & {
@@ -111,54 +119,3 @@ export function PromptInputAttachment({ data, className, ...props }: PromptInput
 		</PromptInputHoverCard>
 	);
 }
-
-/** Props for rendering the current attachment list. */
-export type PromptInputAttachmentsProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
-	children: (attachment: FileUIPart & { id: string }) => ReactNode;
-};
-
-/** Attachment list renderer for the current prompt input. */
-export function PromptInputAttachments({
-	children,
-	className,
-	...props
-}: PromptInputAttachmentsProps) {
-	const attachments = usePromptInputAttachments();
-
-	if (!attachments.files.length) {
-		return null;
-	}
-
-	return (
-		<div className={cn('flex w-full flex-wrap items-center gap-2 p-3', className)} {...props}>
-			{attachments.files.map((file) => (
-				<Fragment key={file.id}>{children(file)}</Fragment>
-			))}
-		</div>
-	);
-}
-
-/** Props for the action that opens the prompt input file chooser. */
-export type PromptInputActionAddAttachmentsProps = ComponentProps<typeof DropdownMenuItem> & {
-	label?: string;
-};
-
-/** Menu item that opens the prompt input file chooser. */
-export const PromptInputActionAddAttachments = ({
-	label = 'Add photos or files',
-	...props
-}: PromptInputActionAddAttachmentsProps) => {
-	const attachments = usePromptInputAttachments();
-
-	return (
-		<DropdownMenuItem
-			{...props}
-			onSelect={(e) => {
-				e.preventDefault();
-				attachments.openFileDialog();
-			}}
-		>
-			<ImageIcon className="mr-2 size-4" /> {label}
-		</DropdownMenuItem>
-	);
-};

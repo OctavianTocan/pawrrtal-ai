@@ -20,11 +20,6 @@ interface RenameProjectVariables {
 	name: string;
 }
 
-/** Variables required to delete a project. */
-interface DeleteProjectVariables {
-	projectId: string;
-}
-
 /** Variables required to assign / unassign a conversation to a project. */
 interface AssignConversationVariables {
 	conversationId: string;
@@ -87,28 +82,6 @@ export function useRenameProject(): UseMutationResult<Project, Error, RenameProj
 				current?.map((project) => (project.id === updated.id ? updated : project))
 			);
 			queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY });
-		},
-	});
-}
-
-/**
- * Delete a project. Linked conversations have their `project_id` cleared
- * by the FK's ON DELETE SET NULL, so we also invalidate `['conversations']`
- * to refresh the unattached list.
- */
-export function useDeleteProject(): UseMutationResult<string, Error, DeleteProjectVariables> {
-	const fetcher = useAuthedFetch();
-	const queryClient = useQueryClient();
-
-	return useMutation({
-		mutationKey: ['projects', 'delete'],
-		mutationFn: async ({ projectId }: DeleteProjectVariables): Promise<string> => {
-			await fetcher(API_ENDPOINTS.projects.delete(projectId), { method: 'DELETE' });
-			return projectId;
-		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: PROJECTS_QUERY_KEY });
-			queryClient.invalidateQueries({ queryKey: ['conversations'] });
 		},
 	});
 }

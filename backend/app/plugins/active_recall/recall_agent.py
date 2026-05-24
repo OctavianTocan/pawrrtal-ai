@@ -2,6 +2,7 @@ import logging
 import time
 import uuid
 from collections.abc import AsyncIterator
+from dataclasses import dataclass, field
 from typing import Any
 
 from app.core.agent_loop.types import AgentTool
@@ -26,42 +27,59 @@ Instructions:
 """
 
 
+@dataclass
+class _StreamTelemetry:
+    parts: list[str] = field(default_factory=list)
+    tools_called: list[str] = field(default_factory=list)
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cost_usd: float = 0.0
+    error_msg: str | None = None
+
+
+def _apply_stream_event(tel: _StreamTelemetry, event: dict[str, Any]) -> None:
+    """Apply a single stream event to the running telemetry accumulator."""
+    event_type = event.get("type")
+
+    if event_type == "delta":
+        chunk = event.get("content") or ""
+        if chunk:
+            tel.parts.append(chunk)
+        return
+
+    if event_type == "tool_use":
+        tel.tools_called.append(event.get("name") or "unknown")
+        return
+
+    if event_type == "usage":
+        tel.input_tokens += event.get("input_tokens", 0)
+        tel.output_tokens += event.get("output_tokens", 0)
+        tel.cost_usd += event.get("cost_usd", 0.0)
+        return
+
+    if event_type == "error":
+        tel.error_msg = event.get("content")
+        return
+
+    if event_type == "agent_terminated":
+        tel.error_msg = f"agent_terminated: {event.get('content')}"
+
+
 async def _collect_stream_telemetry(
     stream: AsyncIterator[Any],
 ) -> tuple[str, list[str], int, int, float, str | None]:
     """Consume provider stream, aggregate text, and collect wide-event telemetry."""
-    parts: list[str] = []
-    tools_called: list[str] = []
-    input_tokens = 0
-    output_tokens = 0
-    cost_usd = 0.0
-    error_msg: str | None = None
-
+    tel = _StreamTelemetry()
     async for event in stream:
-        event_type = event.get("type")
-        if event_type == "delta":
-            chunk = event.get("content") or ""
-            if chunk:
-                parts.append(chunk)
-        elif event_type == "tool_use":
-            tool_name = event.get("name") or "unknown"
-            tools_called.append(tool_name)
-        elif event_type == "usage":
-            input_tokens += event.get("input_tokens", 0)
-            output_tokens += event.get("output_tokens", 0)
-            cost_usd += event.get("cost_usd", 0.0)
-        elif event_type == "error":
-            error_msg = event.get("content")
-        elif event_type == "agent_terminated":
-            error_msg = f"agent_terminated: {event.get('content')}"
+        _apply_stream_event(tel, event)
 
     return (
-        "".join(parts).strip(),
-        tools_called,
-        input_tokens,
-        output_tokens,
-        cost_usd,
-        error_msg,
+        "".join(tel.parts).strip(),
+        tel.tools_called,
+        tel.input_tokens,
+        tel.output_tokens,
+        tel.cost_usd,
+        tel.error_msg,
     )
 
 

@@ -111,8 +111,9 @@ function ColorRowDraft({
 	}, []);
 
 	useEffect(() => {
+		const rafRef = pickerRafRef;
 		return () => {
-			if (pickerRafRef.current !== null) cancelAnimationFrame(pickerRafRef.current);
+			if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
 		};
 	}, []);
 

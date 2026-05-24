@@ -25,7 +25,7 @@ export function isOverdue(date: Date, now: Date): boolean {
  * Returns `true` if `date` falls within the same calendar day as `now`,
  * regardless of timezone. Used to bin tasks into the Today section.
  */
-export function isSameDay(date: Date, now: Date): boolean {
+function isSameDay(date: Date, now: Date): boolean {
 	return (
 		date.getFullYear() === now.getFullYear() &&
 		date.getMonth() === now.getMonth() &&

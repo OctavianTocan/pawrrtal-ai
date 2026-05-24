@@ -242,7 +242,7 @@ export function extractToolChips(toolName: string, content: string): ToolResultC
 }
 
 /** Whether a chip aggregate is empty — handy for hiding source chip rows. */
-export function hasAnyChip(chips: ToolResultChips): boolean {
+function _hasAnyChip(chips: ToolResultChips): boolean {
 	return (
 		chips.webSources.length > 0 ||
 		chips.calendarEvents.length > 0 ||

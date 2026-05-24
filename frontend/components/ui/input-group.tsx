@@ -7,11 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
-function InputGroup({ className, ...props }: React.ComponentProps<'div'>) {
+function InputGroup({ className, ...props }: React.ComponentProps<'fieldset'>) {
 	return (
-		<div
+		<fieldset
 			data-slot="input-group"
-			role="group"
 			// `overflow-hidden` clips the `block-end` / `block-start` addons to
 			// the InputGroup's rounded corners — without it, the footer's
 			// background paints flat against the bottom edge while the parent
@@ -59,9 +58,9 @@ function InputGroupAddon({
 }: React.ComponentProps<'div'> & VariantProps<typeof inputGroupAddonVariants>) {
 	return (
 		<div
-			role="group"
 			data-slot="input-group-addon"
 			data-align={align}
+			role="presentation"
 			className={cn(inputGroupAddonVariants({ align }), className)}
 			onClick={(e) => {
 				if ((e.target as HTMLElement).closest('button')) {

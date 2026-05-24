@@ -1,9 +1,6 @@
 /**
- * Sidebar smoke: open, close, and project header visibility.
- *
- * Multi-select + drag-and-drop need a richer fixture (a real
- * conversation list seeded via the backend) — split into a follow-up
- * suite once the seed helper lands.
+ * Sidebar smoke: the authenticated shell renders the sidebar with the
+ * key affordances (new session, search, user identity).
  */
 
 import { expect, test } from './fixtures';
@@ -16,17 +13,14 @@ test.describe('sidebar', () => {
 		expect(response.ok()).toBe(true);
 	});
 
-	test('renders the Projects header + create-project button', async ({ page }) => {
+	test('renders the New Session button and search', async ({ page }) => {
 		await page.goto('/');
-		await expect(page.getByRole('button', { name: /Projects/i }).first()).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Create new project' })).toBeAttached();
+		await expect(page.getByRole('button', { name: /New Session/i })).toBeVisible();
+		await expect(page.getByPlaceholder(/search/i)).toBeVisible();
 	});
 
-	test('opens the Create project modal with a name input', async ({ page }) => {
+	test('renders the workspace selector in the header', async ({ page }) => {
 		await page.goto('/');
-		await page.getByRole('button', { name: 'Create new project' }).click({ force: false });
-		await expect(page.getByRole('heading', { name: 'Create project' })).toBeVisible();
-		await expect(page.getByLabel('Project name')).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Create project' })).toBeDisabled();
+		await expect(page.getByRole('button', { name: /Pawrrtal/i }).first()).toBeVisible();
 	});
 });

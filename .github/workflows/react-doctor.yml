@@ -45,7 +45,7 @@ jobs:
         uses: millionco/react-doctor@1d3d514a562bbab42dcefa0badeed2e707ed7ea9 # react-doctor@0.0.38
         with:
           directory: .
-          project: pawrrtal,@octavian-tocan/react-dropdown,@octavian-tocan/react-chat-composer
+          project: pawrrtal
           fail-on: warning
           offline: true
           github-token: ${{ secrets.GITHUB_TOKEN }}

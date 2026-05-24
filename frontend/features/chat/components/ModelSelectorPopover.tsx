@@ -14,20 +14,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { usePointerDownCommit } from '@/hooks/use-pointer-down-commit';
 import { useTooltipDropdown } from '@/hooks/use-tooltip-dropdown';
 import { cn } from '@/lib/utils';
+import type { ChatReasoningLevel } from '../constants';
 import type { ChatModelOption } from '../hooks/use-chat-models';
 import { hostLabel } from './model-picker-labels';
-import {
-	groupModelsByHost,
-	type ModelRowSlotProps,
-	MultiVendorHostMenuRow,
-	SingleVendorHostMenuRow,
-} from './model-selector-host-rows';
-
-/** Reasoning levels displayed next to the selected model. */
-export const CHAT_REASONING_LEVELS = ['low', 'medium', 'high', 'extra-high'] as const;
-
-/** Reasoning levels displayed next to the selected model. */
-export type ChatReasoningLevel = (typeof CHAT_REASONING_LEVELS)[number];
+import { MultiVendorHostMenuRow, SingleVendorHostMenuRow } from './model-selector-host-rows';
+import { groupModelsByHost, type ModelRowSlotProps } from './model-selector-types';
 
 type ReasoningOption = {
 	/** Stable reasoning value. */

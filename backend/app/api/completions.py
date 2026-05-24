@@ -91,7 +91,7 @@ def _clean_suggestion(raw: str) -> str:
     Flash-Lite occasionally wraps its output in matching quotes or
     backticks despite the system prompt. Truncate to ``MAX_SUGGESTION_CHARS``.
     """
-    return raw.strip("\"'`")[:MAX_SUGGESTION_CHARS]
+    return raw.strip().strip("\"'`")[:MAX_SUGGESTION_CHARS]
 
 
 async def _collect_suggestion(*, text: str, user_id: uuid.UUID) -> str:

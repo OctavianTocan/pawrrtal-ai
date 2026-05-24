@@ -74,6 +74,7 @@ export function BrainAccessPanel(): ReactNode {
 
 				<div className="mt-4 flex flex-wrap items-center gap-2">
 					<input
+						aria-label="Invite email address"
 						type="email"
 						placeholder="email@example.com"
 						className="h-9 flex-1 min-w-[200px] cursor-text rounded-md border border-border bg-background px-3 text-[13px] text-foreground outline-none transition-colors duration-150 placeholder:text-muted-foreground focus-visible:border-ring"

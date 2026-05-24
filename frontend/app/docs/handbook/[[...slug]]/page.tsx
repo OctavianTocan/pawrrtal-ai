@@ -23,14 +23,14 @@ export default async function HandbookPage(props: {
 	const page = handbookSource.getPage(params.slug);
 	if (!page) notFound();
 
-	const MDX = page.data.body;
+	const MdxContent = page.data.body;
 
 	return (
 		<DocsPage toc={page.data.toc} full={page.data.full}>
 			<DocsTitle>{page.data.title}</DocsTitle>
 			<DocsDescription>{page.data.description}</DocsDescription>
 			<DocsBody>
-				<MDX
+				<MdxContent
 					components={getMDXComponents({
 						a: createRelativeLink(handbookSource, page),
 					})}

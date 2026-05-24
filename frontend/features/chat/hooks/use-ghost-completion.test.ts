@@ -2,6 +2,23 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useGhostCompletion } from './use-ghost-completion';
 
+const { mockRouter } = vi.hoisted(() => ({
+	mockRouter: {
+		replace: vi.fn(),
+		push: vi.fn(),
+		back: vi.fn(),
+		forward: vi.fn(),
+		refresh: vi.fn(),
+		prefetch: vi.fn(),
+	},
+}));
+
+vi.mock('next/navigation', () => ({
+	useRouter: () => mockRouter,
+	usePathname: () => '/',
+	useSearchParams: () => new URLSearchParams(),
+}));
+
 /**
  * Helper: build a `Response` that resolves with the given suggestion.
  *

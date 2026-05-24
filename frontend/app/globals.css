@@ -290,6 +290,7 @@
 	--foreground-40: color-mix(in srgb, var(--foreground) 40%, var(--background));
 	--foreground-50: color-mix(in srgb, var(--foreground) 50%, var(--background));
 	--foreground-60: color-mix(in srgb, var(--foreground) 60%, var(--background));
+	--foreground-65: color-mix(in srgb, var(--foreground) 65%, var(--background));
 	--foreground-70: color-mix(in srgb, var(--foreground) 70%, var(--background));
 	--foreground-80: color-mix(in srgb, var(--foreground) 80%, var(--background));
 	--foreground-90: color-mix(in srgb, var(--foreground) 90%, var(--background));
@@ -307,7 +308,7 @@
 	--secondary: oklch(from var(--foreground) l c h / 0.05);
 	--secondary-foreground: var(--foreground);
 	--muted: oklch(from var(--foreground) l c h / 0.05);
-	--muted-foreground: var(--foreground-50);
+	--muted-foreground: var(--foreground-70);
 	--card: var(--background);
 	--card-foreground: var(--foreground);
 	--popover: var(--background);
@@ -469,6 +470,7 @@
 	--foreground-40: color-mix(in srgb, var(--foreground) 40%, var(--background));
 	--foreground-50: color-mix(in srgb, var(--foreground) 50%, var(--background));
 	--foreground-60: color-mix(in srgb, var(--foreground) 60%, var(--background));
+	--foreground-65: color-mix(in srgb, var(--foreground) 65%, var(--background));
 	--foreground-70: color-mix(in srgb, var(--foreground) 70%, var(--background));
 	--foreground-80: color-mix(in srgb, var(--foreground) 80%, var(--background));
 	--foreground-90: color-mix(in srgb, var(--foreground) 90%, var(--background));
@@ -570,7 +572,7 @@ html[data-theme-mismatch]::before {
 
 .sidepanel-text-scope {
 	--foreground: var(--sidebar-foreground);
-	--muted-foreground: oklch(0.6334289302 0 0);
+	--muted-foreground: var(--foreground-70);
 }
 
 /* =============================================================================

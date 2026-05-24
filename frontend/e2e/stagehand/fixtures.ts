@@ -97,13 +97,13 @@ const GIF_FRAME_INTERVAL_MS = 500;
  * upgraded billing or want the bigger model for a specific run.
  */
 function _selectModel(): string | null {
-	if (process.env.GOOGLE_API_KEY) {
+	if (process.env.STAGEHAND_GOOGLE_API_KEY) {
 		return `google/${process.env.GOOGLE_MODEL ?? 'gemini-3-flash-preview'}`;
 	}
-	if (process.env.OPENAI_API_KEY) {
+	if (process.env.STAGEHAND_OPENAI_API_KEY) {
 		return `openai/${process.env.OPENAI_MODEL ?? 'gpt-5.4'}`;
 	}
-	if (process.env.ANTHROPIC_API_KEY) return 'anthropic/claude-haiku-4-5';
+	if (process.env.STAGEHAND_ANTHROPIC_API_KEY) return 'anthropic/claude-haiku-4-5';
 	return null;
 }
 

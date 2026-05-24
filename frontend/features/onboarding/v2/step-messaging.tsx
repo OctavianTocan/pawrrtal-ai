@@ -2,7 +2,7 @@
 
 import { Check, Loader2 } from 'lucide-react';
 import type * as React from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { TelegramConnectDialog } from '@/features/channels/TelegramConnectDialog';
 import { listChannels } from '@/lib/channels';
@@ -39,6 +39,11 @@ export function StepMessaging({
 	const [channelsReady, setChannelsReady] = useState(false);
 	const [serverTelegramConnected, setServerTelegramConnected] = useState(false);
 
+	const connectedRef = useRef(connected);
+	connectedRef.current = connected;
+	const onPatchRef = useRef(onPatch);
+	onPatchRef.current = onPatch;
+
 	const refreshTelegramSnapshot = useCallback(async (): Promise<void> => {
 		let hasServerTelegramConnection = false;
 		try {
@@ -50,10 +55,11 @@ export function StepMessaging({
 		} finally {
 			setChannelsReady(true);
 		}
-		if (hasServerTelegramConnection && !connected.includes('telegram')) {
-			onPatch({ connectedChannels: [...connected, 'telegram'] });
+		const current = connectedRef.current;
+		if (hasServerTelegramConnection && !current.includes('telegram')) {
+			onPatchRef.current({ connectedChannels: [...current, 'telegram'] });
 		}
-	}, [connected, onPatch]);
+	}, []);
 
 	useEffect(() => {
 		if (telegramDialogOpen) return;

@@ -17,7 +17,7 @@
 'use client';
 
 import type * as React from 'react';
-import { useEffect, useState } from 'react';
+import { useRef, useState } from 'react';
 import {
 	extractApiErrorMessage,
 	useUpsertWorkspaceEnv,
@@ -116,14 +116,17 @@ export function WorkspacesSection(): React.JSX.Element {
 	const [values, setValues] = useState<Record<WorkspaceEnvKey, string>>(emptyEnvRecord);
 	const [showTokens, setShowTokens] = useState<Partial<Record<WorkspaceEnvKey, boolean>>>({});
 	const [isDirty, setIsDirty] = useState(false);
+	// Track the last query data we synced so we can detect when the server
+	// response changes and sync it inline during render instead of via effect.
+	const lastSyncedDataRef = useRef(query.data);
 
 	// Sync server data into the working copy when it arrives or refreshes,
 	// but only while the form is clean. Without the `isDirty` guard, a
 	// background refetch (e.g. on window focus) would clobber unsaved edits.
-	useEffect(() => {
-		if (!query.data || isDirty) return;
+	if (query.data && query.data !== lastSyncedDataRef.current && !isDirty) {
+		lastSyncedDataRef.current = query.data;
 		setValues({ ...emptyEnvRecord(), ...query.data.vars });
-	}, [query.data, isDirty]);
+	}
 
 	const handleValueChange = (key: WorkspaceEnvKey, value: string): void => {
 		setValues((current) => ({ ...current, [key]: value }));

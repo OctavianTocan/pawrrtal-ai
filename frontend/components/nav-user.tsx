@@ -139,7 +139,7 @@ export function NavUser({ user }: { user: NavUserIdentity }): React.JSX.Element 
 	}, [fetcher, queryClient, replace]);
 
 	const trigger = (
-		<div
+		<button
 			className={cn(
 				'group flex w-full cursor-pointer items-center gap-2.5 rounded-[8px] p-2 text-left',
 				'transition-[background-color,color] duration-150',
@@ -147,6 +147,7 @@ export function NavUser({ user }: { user: NavUserIdentity }): React.JSX.Element 
 				isOpen && 'bg-foreground/[0.09]',
 				'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40'
 			)}
+			type="button"
 		>
 			<Avatar className="size-7 shrink-0">
 				{user.avatar ? <AvatarImage alt={user.name} src={user.avatar} /> : null}
@@ -160,7 +161,7 @@ export function NavUser({ user }: { user: NavUserIdentity }): React.JSX.Element 
 				aria-hidden="true"
 				className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-foreground"
 			/>
-		</div>
+		</button>
 	);
 
 	// Desktop relies on the parent `<ResizablePanel>`'s `overflow:hidden`

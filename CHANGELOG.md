@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Fixed
+- **CI: all 16 checks green from a clean branch off `development`.** Fixed 206 React Doctor warnings (unused exports, missing aria-labels, non-semantic HTML, circular dependencies, file splits for oversized components), flattened backend nesting-depth violations, fixed MDX build failures from angle-bracket URLs and unquoted YAML frontmatter, fixed backend pytest key-set assertion to use canonical `OVERRIDABLE_KEYS`, removed stale Playwright assertion for deleted "Preferences" UI, added `WORKSPACE_BASE_DIR` / `generate:docs` / Node setup to Stagehand workflow, added `aria-label` to all settings Switch toggles, and namespaced Stagehand API keys (`STAGEHAND_GOOGLE_API_KEY` etc.) so the backend's `GOOGLE_API_KEY` doesn't leak into the E2E LLM fixture.
+
 ### Changed
 - **Notion plugin collapsed to a single `ntn` tool and relocated to plugins folder.** The 18 hand-rolled wrappers (`notion_search`, `notion_read`, `notion_create`, `notion_doctor`, `notion_logs_read`, …) are replaced by one `ntn` tool that proxies arbitrary args to the official Notion CLI, reducing tool parameter bloat. The Notion integration has been relocated from `backend/app/integrations/notion/` to `backend/app/plugins/notion/`, breaking static import cycles with the Telegram bot. Token isolation, ephemeral `HOME`, and `notion_operation_logs` auditing remain in place.
 - **Improved Notion tool rendering and display formatting on Web and Telegram.** Added specific formatting and icons for common Notion commands, including:

@@ -35,6 +35,7 @@ export function ConversationSearchHeader({
 			<div className="relative rounded-soft shadow-minimal bg-muted/50 has-[:focus-visible]:bg-background">
 				<Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
 				<input
+					aria-label="Search conversations"
 					type="text"
 					value={searchQuery}
 					onChange={(event) => onSearchChange(event.target.value)}

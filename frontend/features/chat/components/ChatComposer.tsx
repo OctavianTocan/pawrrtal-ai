@@ -14,20 +14,24 @@ import {
 import { Button } from '@/components/ui/button';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { cn } from '@/lib/utils';
-import { CHAT_STORAGE_KEYS, DEFAULT_PLAN_MODE_VISIBLE } from '../constants';
+import {
+	CHAT_STORAGE_KEYS,
+	type ChatReasoningLevel,
+	DEFAULT_PLAN_MODE_VISIBLE,
+} from '../constants';
 import type { ChatModelOption } from '../hooks/use-chat-models';
 import { useVoiceTranscribe } from '../hooks/use-voice-transcribe';
 import {
 	AttachButton,
 	AutoReviewSelector,
-	buildTranscriptContent,
 	ComposerTooltip,
 	PlanButton,
 	VoiceMeter,
 } from './ChatComposerControls';
 import { ComposerTextareaRow, useComposerGhostCompletion } from './ComposerTextareaRow';
 import { ConnectAppsStrip } from './ConnectAppsStrip';
-import { type ChatReasoningLevel, ModelSelectorPopover } from './ModelSelectorPopover';
+import { buildTranscriptContent } from './chat-composer-speech';
+import { ModelSelectorPopover } from './ModelSelectorPopover';
 
 /**
  * Discriminated state for the model-catalog request.
@@ -122,11 +126,13 @@ const PLACEHOLDER_ROTATION_INTERVAL_MS = 5200;
 function useRotatingPlaceholder(hasContent: boolean): string {
 	const [placeholderIndex, setPlaceholderIndex] = useState(0);
 
+	// Reset inline during render when content appears, instead of via effect.
+	if (hasContent && placeholderIndex !== 0) {
+		setPlaceholderIndex(0);
+	}
+
 	useEffect(() => {
-		if (hasContent) {
-			setPlaceholderIndex(0);
-			return;
-		}
+		if (hasContent) return;
 
 		const intervalId = window.setInterval(() => {
 			setPlaceholderIndex((index) => (index + 1) % EMPTY_COMPOSER_PLACEHOLDERS.length);

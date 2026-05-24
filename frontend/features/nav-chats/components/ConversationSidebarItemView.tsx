@@ -17,7 +17,7 @@ import {
 	Tag,
 	Trash2,
 } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { EntityRow } from '@/components/ui/entity-row';
 import { useMenuComponents } from '@/components/ui/menu-context';
 import { SidebarMenuItem } from '@/components/ui/sidebar';
@@ -25,8 +25,9 @@ import { NAV_CHATS_LABELS } from '@/features/nav-chats/constants';
 import { CONVERSATION_DRAG_MIME } from '@/lib/conversations/drag';
 import { TOAST_IDS, toast } from '@/lib/toast';
 import type { ConversationStatus } from '@/lib/types';
-import { ConversationStatusGlyph, STATUS_SUBMENU } from './ConversationStatusGlyph';
+import { ConversationStatusGlyph } from './ConversationStatusGlyph';
 import { ConversationUnreadGlyph } from './ConversationUnreadGlyph';
+import { STATUS_SUBMENU } from './conversation-status-data';
 
 /** Props for the conversation sidebar row presentation component. */
 export interface ConversationSidebarItemViewProps {
@@ -357,15 +358,19 @@ export function ConversationSidebarItemView({
 	};
 
 	const hasTrailing = Boolean(titleTrailing) || Boolean(badges) || Boolean(age);
-	const resolvedTrailing = hasTrailing ? (
-		<div className="flex items-center gap-1.5">
-			{titleTrailing}
-			{badges}
-			{age ? (
-				<span className="whitespace-nowrap text-sm text-foreground/40">{age}</span>
-			) : null}
-		</div>
-	) : undefined;
+	const resolvedTrailing = useMemo(
+		() =>
+			hasTrailing ? (
+				<div className="flex items-center gap-1.5">
+					{titleTrailing}
+					{badges}
+					{age ? (
+						<span className="whitespace-nowrap text-sm text-foreground/40">{age}</span>
+					) : null}
+				</div>
+			) : undefined,
+		[hasTrailing, titleTrailing, badges, age]
+	);
 
 	// Unread = bolder title weight. The unread glyph itself is hoisted to the
 	// LEFT of the title (see the `title` prop below) instead of the trailing
@@ -381,6 +386,28 @@ export function ConversationSidebarItemView({
 		</span>
 	) : (
 		title
+	);
+
+	const conversationMenu = (
+		<ConversationMenuContent
+			href={href}
+			absoluteHref={absoluteHref}
+			isArchived={isArchived}
+			isFlagged={isFlagged}
+			isUnread={isUnread}
+			status={status}
+			appliedLabelIds={appliedLabelIds}
+			onNavigate={handleMenuNavigate}
+			onRename={onRename}
+			onDelete={onDelete}
+			onArchive={onArchive}
+			onFlag={onFlag}
+			onSetStatus={onSetStatus}
+			onMarkUnread={onMarkUnread}
+			onRegenerateTitle={onRegenerateTitle}
+			onToggleLabel={onToggleLabel}
+			onExportMarkdown={onExportMarkdown}
+		/>
 	);
 
 	return (
@@ -403,27 +430,7 @@ export function ConversationSidebarItemView({
 				title={resolvedTitle}
 				titleClassName={titleClassName}
 				titleTrailing={resolvedTrailing}
-				menuContent={
-					<ConversationMenuContent
-						href={href}
-						absoluteHref={absoluteHref}
-						isArchived={isArchived}
-						isFlagged={isFlagged}
-						isUnread={isUnread}
-						status={status}
-						appliedLabelIds={appliedLabelIds}
-						onNavigate={handleMenuNavigate}
-						onRename={onRename}
-						onDelete={onDelete}
-						onArchive={onArchive}
-						onFlag={onFlag}
-						onSetStatus={onSetStatus}
-						onMarkUnread={onMarkUnread}
-						onRegenerateTitle={onRegenerateTitle}
-						onToggleLabel={onToggleLabel}
-						onExportMarkdown={onExportMarkdown}
-					/>
-				}
+				menuContent={conversationMenu}
 				buttonProps={buttonProps}
 			/>
 		</SidebarMenuItem>

@@ -37,13 +37,21 @@ export function GeneralSection(): React.JSX.Element {
 					</Avatar>
 				</SettingsRow>
 				<SettingsRow label="Full name">
-					<Input className="w-56" defaultValue="Octavian Tocan" />
+					<Input aria-label="Full name" className="w-56" defaultValue="Octavian Tocan" />
 				</SettingsRow>
 				<SettingsRow label="What should we call you?">
-					<Input className="w-56" defaultValue="Tavi" />
+					<Input
+						aria-label="What should we call you?"
+						className="w-56"
+						defaultValue="Tavi"
+					/>
 				</SettingsRow>
 				<SettingsRow label="What best describes your work?">
-					<Input className="w-56" defaultValue="Engineering" />
+					<Input
+						aria-label="What best describes your work?"
+						className="w-56"
+						defaultValue="Engineering"
+					/>
 				</SettingsRow>
 				<SettingsRow
 					className="items-start"
@@ -51,6 +59,7 @@ export function GeneralSection(): React.JSX.Element {
 					label="Instructions for Pawrrtal"
 				>
 					<Textarea
+						aria-label="Instructions for Pawrrtal"
 						className="min-h-24 w-72 resize-none"
 						placeholder="e.g. keep explanations brief and to the point"
 					/>
@@ -72,7 +81,7 @@ export function GeneralSection(): React.JSX.Element {
 					description="Get notified when Pawrrtal has finished a response. Useful for long-running tasks."
 					label="Response completions"
 				>
-					<Switch defaultChecked />
+					<Switch aria-label="Response completions" defaultChecked />
 				</SettingsRow>
 			</SettingsCard>
 		</SettingsPage>

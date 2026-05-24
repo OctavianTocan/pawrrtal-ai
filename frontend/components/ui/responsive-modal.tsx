@@ -119,16 +119,19 @@ export function ResponsiveModal({
 			children
 		) : (
 			// BottomSheet has no aria* props of its own — wrap body in a labelled
-			// `role="dialog"` region when we are not using explicit header/footer slots.
-			<div
-				role="dialog"
+			// dialog region when we are not using explicit header/footer slots.
+			// Uses <dialog> with `open` for semantic markup without the built-in
+			// modal overlay (the BottomSheet itself handles that).
+			<dialog
+				open
 				aria-modal="true"
 				aria-label={ariaLabel}
 				aria-labelledby={ariaLabelledBy}
 				aria-describedby={ariaDescribedBy}
+				style={{ display: 'contents' }}
 			>
 				{children}
-			</div>
+			</dialog>
 		);
 		return (
 			<BottomSheet

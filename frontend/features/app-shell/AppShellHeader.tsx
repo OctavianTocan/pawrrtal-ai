@@ -154,12 +154,9 @@ function WorkspaceSelector(): React.JSX.Element {
 
 function HelpMenu(): React.JSX.Element {
 	const [shortcutsOpen, setShortcutsOpen] = React.useState(false);
-	const [isAppleLike, setIsAppleLike] = React.useState(false);
-
-	React.useEffect(() => {
-		if (typeof navigator === 'undefined') return;
-		setIsAppleLike(/Mac|iPhone|iPad|iPod/i.test(navigator.userAgent));
-	}, []);
+	const [isAppleLike] = React.useState(
+		() => typeof navigator !== 'undefined' && /Mac|iPhone|iPad|iPod/i.test(navigator.userAgent)
+	);
 
 	return (
 		<>

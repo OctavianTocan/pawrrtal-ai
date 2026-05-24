@@ -83,28 +83,43 @@ def _extract_inline_query(cmd_args: list[str]) -> str:
 
 def _extract_search_query(cmd_args: list[str]) -> str:
     """Extract search query from CLI arguments or API payload."""
+    result = _search_query_from_subcmd(cmd_args)
+    if result:
+        return result
+    result = _search_query_from_data_flag(cmd_args)
+    if result:
+        return result
+    return _extract_inline_query(cmd_args)
+
+
+def _search_query_from_subcmd(cmd_args: list[str]) -> str:
+    """Try extracting the query from positional args after 'search'."""
     try:
         subcmd = next((a for a in cmd_args if not a.startswith("-")), None)
-        if subcmd == "search":
-            idx = cmd_args.index("search")
-            query_args = [a for a in cmd_args[idx + 1 :] if not a.startswith("-")]
-            if query_args:
-                return query_args[0]
+        if subcmd != "search":
+            return ""
+        idx = cmd_args.index("search")
+        query_args = [a for a in cmd_args[idx + 1 :] if not a.startswith("-")]
+        return query_args[0] if query_args else ""
     except ValueError:
-        pass
+        return ""
 
+
+def _search_query_from_data_flag(cmd_args: list[str]) -> str:
+    """Try extracting the query from a -d/--data JSON payload."""
     for flag in ("-d", "--data"):
-        if flag in cmd_args:
-            try:
-                idx = cmd_args.index(flag)
-                if idx + 1 < len(cmd_args):
-                    data = json.loads(cmd_args[idx + 1])
-                    if isinstance(data, dict) and "query" in data:
-                        return str(data["query"])
-            except (json.JSONDecodeError, KeyError, ValueError, TypeError):
-                pass
-
-    return _extract_inline_query(cmd_args)
+        if flag not in cmd_args:
+            continue
+        try:
+            idx = cmd_args.index(flag)
+            if idx + 1 >= len(cmd_args):
+                continue
+            data = json.loads(cmd_args[idx + 1])
+            if isinstance(data, dict) and "query" in data:
+                return str(data["query"])
+        except (json.JSONDecodeError, KeyError, ValueError, TypeError):
+            pass
+    return ""
 
 
 def _format_api_path(path: str) -> str:
@@ -238,27 +253,37 @@ def _parse_files_command(cmd_args: list[str]) -> ToolDisplayPayload | None:
             icon="📁",
         )
     if subcmd == "create":
-        filename = ""
-        try:
-            if "--filename" in cmd_args:
-                idx = cmd_args.index("--filename")
-                if idx + 1 < len(cmd_args):
-                    filename = cmd_args[idx + 1].strip("'\"")
-            elif "--external-url" in cmd_args:
-                idx = cmd_args.index("--external-url")
-                if idx + 1 < len(cmd_args):
-                    filename = cmd_args[idx + 1].strip("'\"")
-                    if len(filename) > TEXT_TRUNCATE_LENGTH:
-                        filename = f"{filename[:TEXT_TRUNCATE_LENGTH]}..."
-        except (ValueError, IndexError):
-            pass
-
+        filename = _extract_file_create_name(cmd_args)
         suffix = f' "{filename}"' if filename else ""
         return ToolDisplayPayload(
             present=_make_present_label(f"Creating Notion file upload{suffix}"),
             compact=f"Created Notion file upload{suffix}",
             icon="📤",
         )
+    return None
+
+
+def _extract_file_create_name(cmd_args: list[str]) -> str:
+    """Extract filename or URL from a files-create command."""
+    for flag in ("--filename", "--external-url"):
+        name = _flag_value(cmd_args, flag)
+        if not name:
+            continue
+        name = name.strip("'\"")
+        if flag == "--external-url" and len(name) > TEXT_TRUNCATE_LENGTH:
+            return f"{name[:TEXT_TRUNCATE_LENGTH]}..."
+        return name
+    return ""
+
+
+def _flag_value(cmd_args: list[str], flag: str) -> str | None:
+    """Return the value following *flag* in *cmd_args*, or ``None``."""
+    try:
+        idx = cmd_args.index(flag)
+        if idx + 1 < len(cmd_args):
+            return cmd_args[idx + 1]
+    except (ValueError, IndexError):
+        pass
     return None
 
 

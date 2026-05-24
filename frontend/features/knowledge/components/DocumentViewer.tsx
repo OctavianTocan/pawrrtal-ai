@@ -232,6 +232,7 @@ function DocumentBody({
 			<div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10">
 				<div className="mx-auto max-w-[680px]">
 					<textarea
+						aria-label="Document content editor"
 						value={editContent}
 						onChange={(e) => onChangeContent(e.target.value)}
 						disabled={isSaving}

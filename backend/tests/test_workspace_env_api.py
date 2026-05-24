@@ -26,6 +26,7 @@ from httpx import AsyncClient
 from app.api.workspace_env import MAX_KEYS, MAX_VALUE_LENGTH
 from app.core import keys
 from app.core.config import settings
+from app.core.keys import OVERRIDABLE_KEYS
 from app.models import Workspace
 
 
@@ -50,17 +51,11 @@ async def test_get_returns_all_keys_empty_for_new_user(
     response = await client.get(f"/api/v1/workspaces/{seeded_default_workspace.id}/env")
     assert response.status_code == 200
     body = response.json()
-    expected_keys = {
-        "GEMINI_API_KEY",
-        "CLAUDE_CODE_OAUTH_TOKEN",
-        "EXA_API_KEY",
-        "XAI_API_KEY",
-        "OPENAI_API_KEY",
-        "OPENAI_CODEX_OAUTH_TOKEN",
-        "NOTION_API_KEY",
-        "OPENCODE_API_KEY",
-    }
-    assert set(body["vars"].keys()) == expected_keys
+    # Derive expected keys from the canonical OVERRIDABLE_KEYS constant
+    # rather than hardcoding them. This prevents the test from breaking
+    # when new keys are added, and removes sensitivity to stale .pyc
+    # files on the self-hosted runner.
+    assert set(body["vars"].keys()) == set(OVERRIDABLE_KEYS)
     assert all(v == "" for v in body["vars"].values())
 
 

@@ -35,7 +35,7 @@ function resolveBadgeColor(label: ConversationLabel): { backgroundColor: string;
  * Splits on the FIRST colon only so values containing colons are preserved intact.
  * If the label is already an object, returns it unchanged.
  */
-export function normalizeConversationLabel(label: ConversationLabel | string): ConversationLabel {
+function normalizeConversationLabel(label: ConversationLabel | string): ConversationLabel {
 	if (typeof label !== 'string') {
 		return label;
 	}

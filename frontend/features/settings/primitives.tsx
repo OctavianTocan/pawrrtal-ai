@@ -435,6 +435,7 @@ export function ColorPill({
 			    the `pickerSeed` effect above for why this is NOT
 			    controlled. */}
 			<input
+				aria-label={`${ariaLabel} color picker`}
 				className="absolute inset-0 size-full cursor-pointer opacity-0"
 				defaultValue={pickerSeed}
 				onChange={handlePickerChange}
