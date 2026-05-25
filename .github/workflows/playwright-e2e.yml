@@ -146,14 +146,14 @@ jobs:
         run: |
           PORT=53001 bun run start &
           echo $! > /tmp/frontend.pid
-          for i in $(seq 1 30); do
+          for i in $(seq 1 60); do
             if curl -sSf http://127.0.0.1:53001 > /dev/null 2>&1; then
               echo "Frontend ready after ${i}s"
               exit 0
             fi
             sleep 1
           done
-          echo "::error::Frontend did not start within 30s"
+          echo "::error::Frontend did not start within 60s"
           exit 1
 
       - name: Run Playwright suite
