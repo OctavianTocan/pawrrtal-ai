@@ -43,8 +43,6 @@ test.describe('authenticated landing', () => {
 
 		await page.goto('/');
 		// The chat composer is visible from the home page once authenticated.
-		await expect(
-			page.getByPlaceholder(/^(Ask|Type|Send)/i).or(page.getByRole('textbox'))
-		).toBeVisible();
+		await expect(page.getByRole('textbox', { name: /Ask Pawrrtal/i })).toBeVisible();
 	});
 });

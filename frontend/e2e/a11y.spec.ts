@@ -52,9 +52,7 @@ test.describe('a11y smoke', () => {
 	}) => {
 		await seedAuthenticatedHomeShell(context);
 		await page.goto('/');
-		await expect(
-			page.getByPlaceholder(/^(Ask|Type|Send)/i).or(page.getByRole('textbox'))
-		).toBeVisible();
+		await expect(page.getByRole('textbox', { name: /Ask Pawrrtal/i })).toBeVisible();
 		const results = await new AxeBuilder({ page: page as never }).withTags(WCAG_TAGS).analyze();
 		expect(results.violations).toEqual([]);
 	});
@@ -72,10 +70,7 @@ test.describe('a11y smoke', () => {
 	}) => {
 		await seedAuthenticatedHomeShell(context);
 		await page.goto('/');
-		const composer = page
-			.getByPlaceholder(/^(Ask|Type|Send)/i)
-			.or(page.getByRole('textbox'))
-			.first();
+		const composer = page.getByRole('textbox', { name: /Ask Pawrrtal/i });
 		await composer.fill('Hello — this is an a11y smoke draft.');
 		const results = await new AxeBuilder({ page: page as never }).withTags(WCAG_TAGS).analyze();
 		expect(results.violations).toEqual([]);
