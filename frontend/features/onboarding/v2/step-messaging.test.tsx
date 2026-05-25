@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
@@ -7,6 +8,13 @@ vi.mock('@/lib/channels', () => ({
 	listChannels: vi.fn().mockResolvedValue([]),
 }));
 
+function createWrapper(): React.ComponentType<{ children: React.ReactNode }> {
+	const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+	return function Wrapper({ children }: { children: React.ReactNode }): React.JSX.Element {
+		return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+	};
+}
+
 describe('StepMessaging', () => {
 	it('renders every channel as a Connect row', () => {
 		const { getByText } = render(
@@ -14,7 +22,8 @@ describe('StepMessaging', () => {
 				onFinish={vi.fn()}
 				onPatch={vi.fn()}
 				profile={{ connectedChannels: [] }}
-			/>
+			/>,
+			{ wrapper: createWrapper() },
 		);
 		expect(getByText('Connect Slack')).toBeTruthy();
 		expect(getByText('Connect Telegram')).toBeTruthy();
@@ -23,12 +32,14 @@ describe('StepMessaging', () => {
 	});
 
 	it('disables Continue until at least one channel is connected', () => {
+		const Wrapper = createWrapper();
 		const { getByRole, rerender } = render(
 			<StepMessaging
 				onFinish={vi.fn()}
 				onPatch={vi.fn()}
 				profile={{ connectedChannels: [] }}
-			/>
+			/>,
+			{ wrapper: Wrapper },
 		);
 		const continueButton = getByRole('button', {
 			name: 'Finish messaging setup',
@@ -55,7 +66,8 @@ describe('StepMessaging', () => {
 				onFinish={vi.fn()}
 				onPatch={onPatch}
 				profile={{ connectedChannels: [] }}
-			/>
+			/>,
+			{ wrapper: createWrapper() },
 		);
 		const buttons = getAllByRole('button', { name: 'Connect' });
 		const first = buttons[0];
@@ -72,7 +84,8 @@ describe('StepMessaging', () => {
 				onFinish={onFinish}
 				onPatch={vi.fn()}
 				profile={{ connectedChannels: ['slack'] }}
-			/>
+			/>,
+			{ wrapper: createWrapper() },
 		);
 		await user.click(getByRole('button', { name: 'Finish messaging setup' }));
 		expect(onFinish).toHaveBeenCalled();

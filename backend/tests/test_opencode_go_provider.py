@@ -313,6 +313,14 @@ def test_resolve_llm_returns_opencodego_with_catalog_costs(
 # ---------------------------------------------------------------------------
 
 
+@pytest.fixture(autouse=True)
+def _set_opencode_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Provide a dummy API key so the fail-fast guard does not short-circuit."""
+    from app.core.config import settings as _settings
+
+    monkeypatch.setattr(_settings, "opencode_api_key", "test-key")
+
+
 @pytest.mark.anyio
 async def test_provider_yields_delta_events_from_loop(
     monkeypatch: pytest.MonkeyPatch,

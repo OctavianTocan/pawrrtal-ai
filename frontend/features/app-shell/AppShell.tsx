@@ -16,10 +16,10 @@
 
 'use client';
 
-import { Skeleton } from 'boneyard-js/react';
 import React from 'react';
 import { NavUser, type NavUserIdentity } from '@/components/nav-user';
 import { NewSessionButton } from '@/components/new-session-button';
+import { Skeleton } from '@/components/ui/skeleton';
 import {
 	Sidebar,
 	SidebarContent,
@@ -47,11 +47,15 @@ import { AppShellHeader } from './AppShellHeader';
 /**
  * Sidebar footer profile row — resolves the authenticated user's identity
  * from `GET /users/me` + the personalization profile and renders `NavUser`.
- * Shows a boneyard skeleton while either query is loading.
+ * Shows a skeleton placeholder while the user query is loading.
  */
 function SidebarFooterUser(): React.JSX.Element {
 	const { data: currentUser, isLoading: isUserLoading } = useCurrentUser();
 	const { data: personalization } = useGetPersonalization();
+
+	if (isUserLoading) {
+		return <Skeleton className="mx-2 h-12 rounded-lg" />;
+	}
 
 	const sidebarUser: NavUserIdentity = {
 		name: personalization?.name ?? currentUser?.email ?? '',
@@ -59,11 +63,7 @@ function SidebarFooterUser(): React.JSX.Element {
 		plan: 'Pawrrtal',
 	};
 
-	return (
-		<Skeleton loading={isUserLoading} name="sidebar-user" animate="pulse">
-			<NavUser user={sidebarUser} />
-		</Skeleton>
-	);
+	return <NavUser user={sidebarUser} />;
 }
 
 /**

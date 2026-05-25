@@ -1,6 +1,5 @@
 'use client';
 
-import { Skeleton } from 'boneyard-js/react';
 import type * as React from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -83,58 +82,56 @@ export function GeneralSection(): React.JSX.Element {
 			description="Profile, preferences, and notifications for your account."
 			title="General"
 		>
-			<Skeleton loading={isLoading} name="general-settings-profile" animate="pulse">
-				<SettingsCard key={profileKey}>
-					<SettingsSectionHeader
-						description="How you appear inside Pawrrtal and how it should address you."
-						title="Profile"
+			<SettingsCard key={profileKey}>
+				<SettingsSectionHeader
+					description="How you appear inside Pawrrtal and how it should address you."
+					title="Profile"
+				/>
+				<SettingsRow label="Avatar">
+					<Avatar className="size-9">
+						<AvatarImage alt="Avatar" src="" />
+						<AvatarFallback className="text-xs">{initials}</AvatarFallback>
+					</Avatar>
+				</SettingsRow>
+				<SettingsRow label="Full name">
+					<Input
+						className="w-56"
+						value={name}
+						onChange={(e) => {
+							setName(e.target.value);
+							save({ name: e.target.value });
+						}}
 					/>
-					<SettingsRow label="Avatar">
-						<Avatar className="size-9">
-							<AvatarImage alt="Avatar" src="" />
-							<AvatarFallback className="text-xs">{initials}</AvatarFallback>
-						</Avatar>
-					</SettingsRow>
-					<SettingsRow label="Full name">
-						<Input
-							className="w-56"
-							value={name}
-							onChange={(e) => {
-								setName(e.target.value);
-								save({ name: e.target.value });
-							}}
-						/>
-					</SettingsRow>
-					<SettingsRow label="What should we call you?">
-						<Input className="w-56" value={nickname} readOnly />
-					</SettingsRow>
-					<SettingsRow label="What best describes your work?">
-						<Input
-							className="w-56"
-							value={role}
-							onChange={(e) => {
-								setRole(e.target.value);
-								save({ role: e.target.value });
-							}}
-						/>
-					</SettingsRow>
-					<SettingsRow
-						className="items-start"
-						description="Kept in mind across chats."
-						label="Instructions for Pawrrtal"
-					>
-						<Textarea
-							className="min-h-24 w-72 resize-none"
-							value={customInstructions}
-							onChange={(e) => {
-								setCustomInstructions(e.target.value);
-								save({ customInstructions: e.target.value });
-							}}
-							placeholder="e.g. keep explanations brief and to the point"
-						/>
-					</SettingsRow>
-				</SettingsCard>
-			</Skeleton>
+				</SettingsRow>
+				<SettingsRow label="What should we call you?">
+					<Input className="w-56" value={nickname} readOnly />
+				</SettingsRow>
+				<SettingsRow label="What best describes your work?">
+					<Input
+						className="w-56"
+						value={role}
+						onChange={(e) => {
+							setRole(e.target.value);
+							save({ role: e.target.value });
+						}}
+					/>
+				</SettingsRow>
+				<SettingsRow
+					className="items-start"
+					description="Kept in mind across chats."
+					label="Instructions for Pawrrtal"
+				>
+					<Textarea
+						className="min-h-24 w-72 resize-none"
+						value={customInstructions}
+						onChange={(e) => {
+							setCustomInstructions(e.target.value);
+							save({ customInstructions: e.target.value });
+						}}
+						placeholder="e.g. keep explanations brief and to the point"
+					/>
+				</SettingsRow>
+			</SettingsCard>
 
 			{/* The "Preferences" card was removed — it duplicated the live
 			    Appearance section (theme mode, chat font, voice) with a
