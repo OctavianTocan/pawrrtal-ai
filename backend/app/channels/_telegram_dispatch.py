@@ -28,11 +28,6 @@ from typing import TYPE_CHECKING
 
 from app.core.providers.base import StreamEvent
 
-from ._telegram_draft import (
-    _TEXT_DRAFT_ID,
-    DraftStreamState,
-    handle_text_delta_draft,
-)
 from ._telegram_finalize import finalize_turn_delivery
 from .telegram_delivery import (
     format_tool_use,
@@ -55,8 +50,6 @@ logger = logging.getLogger(__name__)
 
 # Re-export for callers that import directly from this module.
 __all__ = [
-    "_TEXT_DRAFT_ID",
-    "DraftStreamState",
     "ToolLineState",
     "capture_terminal_event",
     "dispatch_text_delta",
@@ -380,7 +373,6 @@ async def dispatch_text_delta(
     last_edit_at: float,
     reply_to_message_id: int | None,
     message_thread_id: int | None,
-    draft_state: DraftStreamState | None = None,
 ) -> tuple[str, int | None, int, float, bool]:
     """Apply the #306 fresh-block reset (if needed) and stream the chunk.
 
@@ -389,32 +381,8 @@ async def dispatch_text_delta(
     * ``rendered=False`` for the legacy accumulate path — when no thinking
       or tool block has rendered yet we keep "send the final answer at
       the end" UX.
-    * ``rendered=True`` when an interleaved text block was opened or edited
-      OR the chunk was streamed to a Bot API 9.3+ ``sendMessageDraft``.
+    * ``rendered=True`` when an interleaved text block was opened or edited.
     """
-    # Draft mode: every delta streams into the same draft regardless of
-    # the previous block kind. The draft animates updates in place and is
-    # persisted by ``finalize_turn_delivery`` via a separate ``sendMessage``.
-    if draft_state is not None:
-        (
-            text_buffer,
-            text_message_id,
-            chars_since_edit,
-            last_edit_at,
-        ) = await handle_text_delta(
-            chunk=chunk,
-            bot=bot,
-            chat_id=chat_id,
-            text_buffer=text_buffer,
-            text_message_id=text_message_id,
-            chars_since_edit=chars_since_edit,
-            last_edit_at=last_edit_at,
-            reply_to_message_id=reply_to_message_id,
-            message_thread_id=message_thread_id,
-            draft_state=draft_state,
-        )
-        return text_buffer, text_message_id, chars_since_edit, last_edit_at, True
-
     # Legacy editMessageText path: only open an interleaved text
     # message on a block transition. Pure-text turns (no prior block)
     # keep accumulating into ``answer_text`` for the closing reply.
@@ -445,7 +413,6 @@ async def dispatch_text_delta(
         last_edit_at=last_edit_at,
         reply_to_message_id=reply_to_message_id,
         message_thread_id=message_thread_id,
-        draft_state=draft_state,
     )
     return text_buffer, text_message_id, chars_since_edit, last_edit_at, True
 
@@ -461,26 +428,11 @@ async def handle_text_delta(
     last_edit_at: float,
     reply_to_message_id: int | None,
     message_thread_id: int | None,
-    draft_state: DraftStreamState | None = None,
 ) -> tuple[str, int | None, int, float]:
-    """Append ``chunk`` to the live text message — open one if needed (#306).
-
-    When ``draft_state`` is provided (``telegram_use_draft_streaming=True``),
-    chunks route through ``sendMessageDraft`` instead of ``editMessageText``.
-    """
+    """Append ``chunk`` to the live text message — open one if needed (#306)."""
     if not chunk:
         return text_buffer, text_message_id, chars_since_edit, last_edit_at
     text_buffer = f"{text_buffer}{chunk}"
-
-    if draft_state is not None:
-        return await handle_text_delta_draft(
-            bot=bot,
-            text_buffer=text_buffer,
-            chunk=chunk,
-            chars_since_edit=chars_since_edit,
-            last_edit_at=last_edit_at,
-            draft_state=draft_state,
-        )
 
     # Legacy editMessageText path.
     if text_message_id is None:

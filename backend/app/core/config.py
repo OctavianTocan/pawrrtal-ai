@@ -333,10 +333,7 @@ class Settings(BaseSettings):
     # How often the persistent typing indicator is refreshed. Telegram
     # auto-clears typing after ~5 s so the refresh must be faster.
     telegram_typing_refresh_seconds: float = 2.5
-    # When True, the Telegram channel uses Bot API 9.3+ ``sendMessageDraft``
-    # for animated streaming. Falls back to ``editMessageText`` when
-    # aiogram doesn't expose the binding.
-    telegram_use_draft_streaming: bool = False
+
     # When True, every assistant reply on Telegram carries a "🔄 Regenerate"
     # inline-keyboard button (#368). Tapping the button replays the last
     # user message through the turn pipeline. Off by default so the

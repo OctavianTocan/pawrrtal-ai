@@ -25,7 +25,6 @@ from app.core.providers.base import StreamEvent
 from app.core.tools.send_message import SendFn
 
 from ._telegram_dispatch import (
-    DraftStreamState,
     ToolLineState,
     capture_terminal_event,
     dispatch_text_delta,
@@ -36,7 +35,6 @@ from ._telegram_dispatch import (
     prepare_thinking_block,
     prepare_tools_block,
 )
-from ._telegram_draft import _TEXT_DRAFT_ID
 from .base import ChannelMessage
 from .telegram_delivery import (
     final_reply_text,
@@ -128,17 +126,7 @@ class TelegramChannel:
         # Keyed by tool call_id; maps to ToolLineState so tool_result
         # events can mutate in-flight lines to show timing/errors.
         tool_states: dict[str, ToolLineState] = {}
-        # Workstream 1: draft streaming state. Created only when the flag
-        # is enabled so the legacy editMessageText path is unchanged.
-        draft_state: DraftStreamState | None = (
-            DraftStreamState(
-                chat_id=chat_id,
-                draft_id=_TEXT_DRAFT_ID,
-                message_thread_id=message_thread_id,
-            )
-            if settings.telegram_use_draft_streaming
-            else None
-        )
+
         # ``tool_message_id`` starts as the placeholder so the FIRST tools
         # block consumes the ⏳; on a thinking→tools transition (issue #288)
         # we open a fresh Telegram message for the new tools block and
@@ -292,7 +280,7 @@ class TelegramChannel:
                 # so we don't hammer Telegram's rate limit.
                 # Skipped in draft mode — the animated draft already
                 # shows the streaming answer.
-                if first_block_kind is None and chunk and draft_state is None:
+                if first_block_kind is None and chunk:
                     preview_now = asyncio.get_event_loop().time()
                     if progress_state == ProgressState.INITIAL:
                         progress_state = ProgressState.WORKING
@@ -328,19 +316,14 @@ class TelegramChannel:
                     last_edit_at=text_last_edit_at,
                     reply_to_message_id=reply_to_message_id,
                     message_thread_id=message_thread_id,
-                    draft_state=draft_state,
                 )
-                if rendered and draft_state is None:
+                if rendered:
                     # Legacy interleaved-text path: the chunk landed in a
                     # separate Telegram message, so the placeholder is now
                     # "consumed" and the next tool/thinking block must open
                     # a fresh message.
                     first_block_kind = first_block_kind or "text"
                     previous_block_kind = "text"
-                # Draft mode: rendered=True but the text went to a separate
-                # ephemeral draft, NOT the placeholder. Don't update block-
-                # kind tracking — leave the placeholder available for the
-                # tools/thinking flow.
                 continue
 
             captured = capture_terminal_event(
@@ -378,7 +361,6 @@ class TelegramChannel:
             final_text=final_text,
             reply_to_message_id=reply_to_message_id,
             message_thread_id=message_thread_id,
-            draft_state=draft_state,
             reply_markup=reply_markup,
         )
 

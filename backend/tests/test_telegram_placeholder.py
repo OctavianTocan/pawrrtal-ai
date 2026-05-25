@@ -21,21 +21,7 @@ import pytest
 from app.channels.base import ChannelMessage
 from app.channels.telegram import TelegramChannel
 from app.channels.telegram_progress import PREVIEW_MAX_CHARS
-from app.core.config import settings
 from app.core.providers.base import StreamEvent
-
-
-@pytest.fixture
-def _legacy_streaming(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Force legacy editMessageText streaming for the placeholder-preview tests.
-
-    The placeholder content-preview only fires in legacy mode — in draft
-    mode (Bot API 9.3+) the animated draft already shows the streaming
-    answer, so we deliberately skip re-painting the placeholder.
-    These tests target the legacy preview flow specifically.
-    """
-    monkeypatch.setattr(settings, "telegram_use_draft_streaming", False)
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -76,7 +62,6 @@ def _make_channel_message(bot: AsyncMock, model_id: str = "test-model") -> Chann
 
 
 @pytest.mark.anyio
-@pytest.mark.usefixtures("_legacy_streaming")
 class TestContentPreviewPlaceholder:
     async def test_initial_state_sent_on_stream_open(self) -> None:
         """Placeholder is updated to render_initial() before any event."""

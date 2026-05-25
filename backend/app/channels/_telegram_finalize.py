@@ -7,12 +7,9 @@ budget. The function is mechanically identical to its previous form
 
 from __future__ import annotations
 
-import asyncio
-import contextlib
 import logging
 from typing import TYPE_CHECKING, Any
 
-from ._telegram_draft import DraftStreamState
 from .telegram_delivery import (
     safe_delete,
     safe_edit,
@@ -43,14 +40,9 @@ async def finalize_turn_delivery(
     final_text: str,
     reply_to_message_id: int | None,
     message_thread_id: int | None,
-    draft_state: DraftStreamState | None = None,
     reply_markup: Any | None = None,
 ) -> None:
     """Resolve the ⏳ placeholder and send the closing reply (#288, #293, #306).
-
-    When ``draft_state`` is set, the keepalive task is cancelled and the
-    final text is persisted via ``sendMessage`` (drafts auto-expire and
-    never appear in the user's message history).
 
     When ``text_message_id`` is set, we flush its final buffer in place
     and skip the closing ``final_text`` send so the user doesn't see the
@@ -63,11 +55,6 @@ async def finalize_turn_delivery(
     that's the existing ``text_message_id`` edit, otherwise it's the
     closing ``safe_send_text``.
     """
-    if draft_state is not None and draft_state.keepalive_task is not None:
-        draft_state.keepalive_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError, Exception):
-            await draft_state.keepalive_task
-
     if first_block_kind == "tools":
         await safe_edit_html(bot, chat_id, placeholder_message_id, tool_trace)
     elif first_block_kind == "thinking":
