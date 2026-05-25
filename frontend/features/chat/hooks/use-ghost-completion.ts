@@ -83,11 +83,9 @@ class GhostCache {
  * stale response collapses to an empty suggestion so the UI never
  * renders broken ghost text.
  *
- * @remarks
- * This hook reaches for ``useEffect`` directly (vs. ``useQuery``) because
- * autocomplete needs debounce + AbortController + tiny prefix-keyed cache
- * — a combination TanStack Query doesn't compose cleanly. The effect's
- * only job is to schedule a debounced fetch; it doesn't sync derived state.
+ * @remarks Uses `useEffect` directly (not `useQuery`) because autocomplete
+ * needs debounce + AbortController + prefix-keyed cache that TanStack Query
+ * doesn't compose cleanly.
  */
 export function useGhostCompletion({
 	text,
@@ -98,10 +96,8 @@ export function useGhostCompletion({
 	const cacheRef = useRef(new GhostCache());
 	const latestRequestedRef = useRef<string>('');
 	const authedFetch = useAuthedFetch();
-
 	const prevTextRef = useRef('');
 	const prevSuggestionRef = useRef('');
-
 	const fetchSuggestion = useCallback(
 		async (prefix: string): Promise<void> => {
 			// Abort the previous in-flight call so its result can never
@@ -112,10 +108,8 @@ export function useGhostCompletion({
 			const controller = new AbortController();
 			controllerRef.current = controller;
 			latestRequestedRef.current = prefix;
-
 			try {
 				// If
-
 				// Get the completion suggestion from the backend.
 				const response = await authedFetch(API_ENDPOINTS.autocomplete, {
 					method: 'POST',
@@ -125,17 +119,13 @@ export function useGhostCompletion({
 					body: JSON.stringify({ text: prefix }),
 					signal: controller.signal,
 				});
-
 				if (!response.ok) return;
-
 				const body = (await response.json()) as AutocompleteResponseBody;
 				if (typeof body?.suggestion !== 'string') return;
-
 				// Discard if the user typed past this prefix while the
 				// request was in flight — a stale suggestion would render
 				// the wrong continuation against the current value.
 				if (latestRequestedRef.current !== prefix) return;
-
 				cacheRef.current.set(prefix, body.suggestion);
 				setSuggestion(body.suggestion);
 			} catch (err) {
@@ -147,32 +137,27 @@ export function useGhostCompletion({
 		},
 		[authedFetch]
 	);
-
 	useEffect(() => {
 		// Checking if the user is still typing the prediction. (We don't want to hide it if they are).
 		const isTypingExact =
 			prevTextRef.current &&
 			text.startsWith(prevTextRef.current) &&
 			prevSuggestionRef.current.startsWith(text.slice(prevTextRef.current.length));
-
 		if (!enabled || text.trimEnd().length < MIN_PREFIX_CHARS) {
 			setSuggestion('');
 			prevTextRef.current = '';
 			prevSuggestionRef.current = '';
 			return;
 		}
-
 		if (isTypingExact) {
 			const added = text.slice(prevTextRef.current.length);
 			const newSuggestion = prevSuggestionRef.current.slice(added.length);
 			setSuggestion(newSuggestion);
-
 			cacheRef.current.set(text, newSuggestion);
 			prevTextRef.current = text;
 			prevSuggestionRef.current = newSuggestion;
 			return;
 		}
-
 		const cached = cacheRef.current.get(text);
 		if (cached !== undefined) {
 			setSuggestion(cached);
@@ -180,12 +165,10 @@ export function useGhostCompletion({
 			prevSuggestionRef.current = cached;
 			return;
 		}
-
 		// Hides the suggestion entirely the moment the user stops following it (so we can recompute it in the meantime).
 		setSuggestion('');
 		prevTextRef.current = text;
 		prevSuggestionRef.current = '';
-
 		const handle = window.setTimeout(() => {
 			void fetchSuggestion(text);
 		}, DEBOUNCE_MS);
@@ -206,20 +189,14 @@ export function useGhostCompletion({
 
 	const acceptSuggestion = useCallback((): string | null => {
 		if (!suggestion) return null;
-
-		// We only want to accept the first word, not trailing punctuation. (e.g. if suggestion is "dogs, cats, and " we just want to accept "dogs")
 		const match = suggestion.match(/^(\s*\S+)/);
 		const accepted = match?.[1] ?? suggestion;
-
-		// Update suggestion state with the remainder.
 		const remaining = match ? suggestion.slice(accepted.length) : '';
 		setSuggestion(remaining);
-
 		// Update refs to match the new state so typing will "follow" the completion.
 		const nextText = text + accepted;
 		prevTextRef.current = nextText;
 		prevSuggestionRef.current = remaining;
-
 		// Cache the remaining text so it can be used if the user backspaces to that point.
 		cacheRef.current.set(nextText, remaining);
 
