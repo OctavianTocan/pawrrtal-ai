@@ -452,7 +452,7 @@ class DreamingJob(Base):
         Uuid, ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True
     )
     # ``session_end`` | ``daily_rollup``. Pinned by
-    # ``ck_dreaming_jobs_scope_valid`` in migration 022.
+    # ``ck_dreaming_jobs_scope_valid`` in migration 025.
     scope: Mapped[str] = mapped_column(String(24), nullable=False)
     # ``pending`` | ``running`` | ``completed`` | ``failed``.
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
