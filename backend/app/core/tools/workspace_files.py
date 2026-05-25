@@ -328,11 +328,12 @@ def _list_dir_sync(target: Path, raw_path: str, root: Path) -> str:
             f"'{raw_path}' is a file, not a directory. Use read_file to read it.",
         )
     entries = sorted(target.iterdir(), key=lambda p: (p.is_file(), p.name))
-    if not entries:
+    visible_entries = [p for p in entries if not matches_forbidden_filename(p.name)]
+    if not visible_entries:
         return f"'{raw_path or '.'}' is empty."
 
     lines: list[str] = []
-    for entry in entries[:_MAX_LIST_ENTRIES]:
+    for entry in visible_entries[:_MAX_LIST_ENTRIES]:
         rel = entry.relative_to(root)
         if entry.is_dir():
             lines.append(f"[dir]  {rel}/")
@@ -340,8 +341,8 @@ def _list_dir_sync(target: Path, raw_path: str, root: Path) -> str:
             size = _fmt_size(entry.stat().st_size)
             lines.append(f"[file] {rel}  ({size})")
 
-    if len(entries) > _MAX_LIST_ENTRIES:
-        lines.append(f"... and {len(entries) - _MAX_LIST_ENTRIES} more entries")
+    if len(visible_entries) > _MAX_LIST_ENTRIES:
+        lines.append(f"... and {len(visible_entries) - _MAX_LIST_ENTRIES} more entries")
     return "\n".join(lines)
 
 

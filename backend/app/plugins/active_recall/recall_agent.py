@@ -9,8 +9,12 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.channels.telegram_html import md_to_telegram_html
-from app.core.agent_loop.types import AgentTool
+from app.core.agent_loop.types import AgentTool, PermissionCheckResult
 from app.core.config import settings
+from app.core.governance.permissions import (
+    PermissionContext,
+    build_default_permission_check,
+)
 from app.core.keys import resolve_api_key
 from app.core.plugins.types import PreTurnHookContext
 from app.core.providers.factory import resolve_llm
@@ -39,6 +43,7 @@ Instructions:
 2. Output: Return EITHER a single, highly-compressed summary (max 600 characters) of relevant context, or the literal string "NONE".
 3. Style: No preamble (do not say "Here is the context"). Output only the raw context or "NONE". Be extremely concise.
 4. Tools: Use search/grep/file tools efficiently. Stop as soon as you have enough context.
+5. Security: You are strictly forbidden from looking at, reading, or searching for `.env` or other sensitive config/credential files (e.g., .pem, .key, SSH keys). You must never output, print, or summarize any environment variable values, API keys, secrets, or credentials.
 """
 
 
@@ -209,6 +214,24 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
                 ]
             )
 
+        permission_context = PermissionContext(
+            user_id=str(ctx.user_id),
+            workspace_root=ctx.workspace_root,
+            conversation_id=str(ctx.conversation_id),
+            surface="active_recall",
+        )
+        gate = build_default_permission_check()
+
+        async def permission_check(
+            tool_name: str, arguments: dict[str, Any]
+        ) -> PermissionCheckResult:
+            decision = await gate(tool_name, arguments, permission_context)
+            return PermissionCheckResult(
+                allow=decision.allow,
+                reason=decision.reason,
+                violation_type=decision.violation_type,
+            )
+
         stream = provider.stream(
             question=ctx.question,
             conversation_id=uuid.uuid4(),  # isolated; not a real turn TODO: This should be easier to do. (Making a subagent that doesn't use real turns).
@@ -216,6 +239,7 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
             history=None,
             tools=lcm_tools,
             system_prompt=active_recall_system_prompt or SYSTEM_PROMPT,
+            permission_check=permission_check,
         )
 
         (
