@@ -116,12 +116,13 @@ every turn; doing so spends 4-6 tool calls on context you already have.
 
 Read them only when you intend to **write** changes (preference updates,
 new skills, fresh learnings) or when you specifically need the verbatim
-form (e.g. quoting a passage back to the user). Memory files under
-`memory/` can be read on demand when you need older context that didn't
-make it into this turn's snapshot.
+form (e.g. quoting a passage back to the user).
 
-When in doubt, address the user's current question first — only branch
-into memory reads when the question requires it.
+Because we have active recall, you do not need to proactively read or search
+for memory files under `memory/` or store daily memory notes. If you feel like,
+even with the context and information you are automatically provided with,
+you still need more context to answer the user's question, only then should you
+search for or read memory files.
 
 ## Memory
 
@@ -130,7 +131,7 @@ Memory is split into four layers:
 - **personal/** — User conventions and preferences (indefinite lifespan).
   Edit `memory/personal/PREFERENCES.md` when the user states a standing preference.
 - **working/** — Current task state (~2-day lifespan).
-  Update `memory/working/WORKSPACE.md` at the start and end of every session.
+  Update `memory/working/WORKSPACE.md` only when working on tasks that require tracking in-progress state.
   Use `memory/working/REVIEW_QUEUE.md` for items needing user approval.
 - **episodic/** — Raw experience log.
   Append events, corrections, and learnings to `memory/episodic/AGENT_LEARNINGS.jsonl`.
