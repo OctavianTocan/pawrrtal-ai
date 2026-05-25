@@ -8,7 +8,6 @@
 
 import { Loader2Icon } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useId, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,8 +19,6 @@ import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 /** Self-service registration form. */
 export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
 	const [errorMessage, setErrorMessage] = useState('');
-	// Get the router.
-	const { push } = useRouter();
 	const signupMutation = useSignupMutation();
 	const isSubmitting = signupMutation.isPending;
 
@@ -50,8 +47,9 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
 			{ email, password },
 			{
 				onSuccess: () => {
-					// Redirect to the homepage.
-					push('/');
+					// Full-page navigation ensures the session cookie is committed before
+					// any authed queries fire. Client-side routing races cookie propagation.
+					window.location.replace('/');
 				},
 				onError: (error) => {
 					setErrorMessage(error.message);

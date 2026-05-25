@@ -38,6 +38,7 @@ import { useCallback, useState } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuthedFetch } from '@/hooks/use-authed-fetch';
 import { toast } from '@/lib/toast';
+import { getInitials } from '@/lib/user-utils';
 import { cn } from '@/lib/utils';
 
 /**
@@ -76,15 +77,6 @@ const LEARN_MORE_LINKS = [
 /** Stub for menu items whose actions are not yet implemented. */
 function noop(): void {
 	// Intentionally empty — placeholder for unimplemented menu actions.
-}
-
-/** First letter of each space-separated word, capped at two — for AvatarFallback. */
-function getInitials(name: string): string {
-	const parts = name.trim().split(/\s+/).filter(Boolean);
-	if (parts.length === 0) return '?';
-	const first = parts[0]?.[0] ?? '';
-	const second = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
-	return `${first}${second}`.toUpperCase();
 }
 
 /** Shared className for the Language / Learn-more submenu trigger rows. */
