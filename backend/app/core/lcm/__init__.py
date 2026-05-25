@@ -21,7 +21,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
+from app.core.config import settings as settings
 from app.core.lcm.condense import run_condensation_cascade
 from app.core.providers import resolve_llm
 from app.models import ChatMessage, LCMContextItem, LCMSummary, LCMSummarySource
@@ -76,6 +76,55 @@ async def ingest_message(
     return item
 
 
+async def _ensure_lcm_context_items_backfilled(
+    session: AsyncSession,
+    conversation_id: uuid.UUID,
+) -> list[LCMContextItem]:
+    """Ensure that LCMContextItems are backfilled from ChatMessages if empty."""
+    result = await session.execute(
+        select(LCMContextItem)
+        .where(LCMContextItem.conversation_id == conversation_id)
+        .order_by(LCMContextItem.ordinal.asc())
+    )
+    all_items = list(result.scalars().all())
+    if all_items:
+        return all_items
+
+    # If empty, check if ChatMessages exist and backfill them
+    msg_result = await session.execute(
+        select(ChatMessage)
+        .where(ChatMessage.conversation_id == conversation_id)
+        .order_by(ChatMessage.ordinal.asc())
+    )
+    messages = list(msg_result.scalars().all())
+    if not messages:
+        return []
+
+    _log.info(
+        "LCM_BACKFILL_START conversation_id=%s messages=%d",
+        conversation_id,
+        len(messages),
+    )
+    backfilled_items = []
+    for idx, msg in enumerate(messages):
+        item = LCMContextItem(
+            conversation_id=conversation_id,
+            ordinal=idx,
+            item_kind="message",
+            item_id=msg.id,
+        )
+        session.add(item)
+        backfilled_items.append(item)
+
+    await session.flush()
+    _log.info(
+        "LCM_BACKFILL_COMPLETE conversation_id=%s items=%d",
+        conversation_id,
+        len(backfilled_items),
+    )
+    return backfilled_items
+
+
 async def assemble_context(
     session: AsyncSession,
     *,
@@ -106,12 +155,7 @@ async def assemble_context(
 
     Returns an empty list if no items exist yet.
     """
-    result = await session.execute(
-        select(LCMContextItem)
-        .where(LCMContextItem.conversation_id == conversation_id)
-        .order_by(LCMContextItem.ordinal.asc())
-    )
-    all_items = list(result.scalars().all())
+    all_items = await _ensure_lcm_context_items_backfilled(session, conversation_id)
     if not all_items:
         return []
 
@@ -317,15 +361,16 @@ async def compact_leaf_if_needed(
         compact or the eligible window contained no un-compacted messages.
     """
     # ------------------------------------------------------------------ 1+2
-    all_items_result = await session.execute(
-        select(LCMContextItem)
-        .where(LCMContextItem.conversation_id == conversation_id)
-        .order_by(LCMContextItem.ordinal.asc())
-    )
-    all_items = list(all_items_result.scalars().all())
+    all_items = await _ensure_lcm_context_items_backfilled(session, conversation_id)
     total = len(all_items)
 
     if total <= fresh_tail_count:
+        _log.info(
+            "LCM_COMPACT_SKIP conversation_id=%s reason=too_few_items total=%d fresh_tail_limit=%d",
+            conversation_id,
+            total,
+            fresh_tail_count,
+        )
         return False
 
     # ------------------------------------------------------------------ 3
@@ -333,6 +378,11 @@ async def compact_leaf_if_needed(
     eligible_message_ids = [item.item_id for item in eligible if item.item_kind == "message"]
 
     if not eligible_message_ids:
+        _log.info(
+            "LCM_COMPACT_SKIP conversation_id=%s reason=no_raw_messages_in_eligible total_eligible=%d",
+            conversation_id,
+            len(eligible),
+        )
         return False  # Only summaries outside the fresh tail — nothing to do.
 
     # ------------------------------------------------------------------ 4
@@ -359,6 +409,11 @@ async def compact_leaf_if_needed(
         running_tokens += msg_tokens
 
     if not selected_items:
+        _log.info(
+            "LCM_COMPACT_SKIP conversation_id=%s reason=no_selected_items eligible_message_count=%d",
+            conversation_id,
+            len(eligible_message_ids),
+        )
         return False
 
     # ------------------------------------------------------------------ 5

@@ -21,7 +21,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 from unittest.mock import MagicMock
 
 import pytest
@@ -505,3 +505,212 @@ async def test_assemble_after_compaction_returns_summary_plus_fresh(
     # Then the fresh-tail messages.
     assert context[1] == {"role": "assistant", "content": "tail1"}
     assert context[2] == {"role": "user", "content": "tail2"}
+
+
+# ---------------------------------------------------------------------------
+# Background scheduling & integration tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_schedule_lcm_compaction_runs_background_task_under_lock(
+    db_session: AsyncSession, test_user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Verifies that schedule_lcm_compaction runs asynchronously in the background.
+
+    It should use a shared connection via the mock db session, execute compaction,
+    and update the database.
+    """
+    import asyncio
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    import app.core.lcm.background as bg_mod
+
+    conv = await _make_conversation(db_session, test_user)
+    conv_id = conv.id
+    # Seed 3 messages (fresh_tail_count=2, so 1 is eligible)
+    await _seed_context(
+        db_session,
+        test_user,
+        conv,
+        [("user", "msg0"), ("assistant", "msg1"), ("user", "msg2")],
+    )
+
+    # Enable LCM settings for background scheduler
+    monkeypatch.setattr(bg_mod.settings, "lcm_enabled", True)
+    monkeypatch.setattr(bg_mod.settings, "lcm_fresh_tail_count", 2)
+    monkeypatch.setattr(bg_mod.settings, "lcm_leaf_chunk_tokens", 100_000)
+
+    # Patch the LLM provider for compaction
+    _patch_resolve_llm(monkeypatch, _make_fake_provider("compacted"))
+
+    # Patch async_session_maker in the background module to use our test engine
+    shared_maker = async_sessionmaker(db_session.bind, expire_on_commit=False)
+    monkeypatch.setattr(bg_mod, "async_session_maker", shared_maker)
+
+    # Clear task tracker
+    bg_mod._LCM_COMPACT_TASKS.clear()
+
+    # Schedule compaction
+    bg_mod.schedule_lcm_compaction(
+        conversation_id=conv_id,
+        user_id=test_user.id,
+        model_id="gemini-2.5-flash",
+    )
+
+    # Verify task was registered
+    assert len(bg_mod._LCM_COMPACT_TASKS) == 1
+
+    # Wait for the background task to finish
+    while bg_mod._LCM_COMPACT_TASKS:
+        await asyncio.gather(*list(bg_mod._LCM_COMPACT_TASKS))
+
+    # Assert that the task has been cleaned up
+    assert len(bg_mod._LCM_COMPACT_TASKS) == 0
+
+    # Refresh DB session state to see compaction results
+    db_session.expire_all()
+
+    summaries = (
+        (await db_session.execute(select(LCMSummary).where(LCMSummary.conversation_id == conv_id)))
+        .scalars()
+        .all()
+    )
+    assert len(summaries) == 1
+    assert summaries[0].content == "compacted"
+
+
+@pytest.mark.anyio
+async def test_schedule_lcm_compaction_serializes_concurrent_calls(
+    db_session: AsyncSession, test_user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Two concurrent compaction requests for the same conversation are serialized by the lock."""
+    import asyncio
+
+    from sqlalchemy.ext.asyncio import async_sessionmaker
+
+    import app.core.lcm.background as bg_mod
+
+    conv = await _make_conversation(db_session, test_user)
+    await _seed_context(
+        db_session,
+        test_user,
+        conv,
+        [("user", "msg0"), ("assistant", "msg1"), ("user", "msg2")],
+    )
+
+    monkeypatch.setattr(bg_mod.settings, "lcm_enabled", True)
+    monkeypatch.setattr(bg_mod.settings, "lcm_fresh_tail_count", 2)
+    monkeypatch.setattr(bg_mod.settings, "lcm_leaf_chunk_tokens", 100_000)
+
+    shared_maker = async_sessionmaker(db_session.bind, expire_on_commit=False)
+    monkeypatch.setattr(bg_mod, "async_session_maker", shared_maker)
+
+    active_runs = 0
+    max_concurrent = 0
+
+    async def mock_compact_leaf(*args: Any, **kwargs: Any) -> bool:
+        nonlocal active_runs, max_concurrent
+        active_runs += 1
+        max_concurrent = max(max_concurrent, active_runs)
+        await asyncio.sleep(0.05)  # yield control to allow concurrency
+        active_runs -= 1
+        return True
+
+    monkeypatch.setattr(bg_mod, "compact_leaf_if_needed", mock_compact_leaf)
+
+    bg_mod._LCM_COMPACT_TASKS.clear()
+
+    # Schedule two compactions for the SAME conversation back-to-back
+    bg_mod.schedule_lcm_compaction(
+        conversation_id=conv.id,
+        user_id=test_user.id,
+        model_id="gemini-2.5-flash",
+    )
+    bg_mod.schedule_lcm_compaction(
+        conversation_id=conv.id,
+        user_id=test_user.id,
+        model_id="gemini-2.5-flash",
+    )
+
+    assert len(bg_mod._LCM_COMPACT_TASKS) == 2
+
+    # Wait for completion
+    while bg_mod._LCM_COMPACT_TASKS:
+        await asyncio.gather(*list(bg_mod._LCM_COMPACT_TASKS))
+
+    # Concurrency must be exactly 1 due to per-conversation lock
+    assert max_concurrent == 1
+    assert active_runs == 0
+
+
+@pytest.mark.anyio
+async def test_schedule_lcm_compaction_disabled_is_noop(
+    db_session: AsyncSession, test_user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """When lcm_enabled is False, schedule_lcm_compaction is a no-op."""
+    import app.core.lcm.background as bg_mod
+
+    conv = await _make_conversation(db_session, test_user)
+    monkeypatch.setattr(bg_mod.settings, "lcm_enabled", False)
+
+    bg_mod._LCM_COMPACT_TASKS.clear()
+    bg_mod.schedule_lcm_compaction(
+        conversation_id=conv.id,
+        user_id=test_user.id,
+        model_id="gemini-2.5-flash",
+    )
+
+    assert len(bg_mod._LCM_COMPACT_TASKS) == 0
+
+
+@pytest.mark.anyio
+async def test_finalize_turn_triggers_lcm_compaction(
+    db_session: AsyncSession, test_user: User, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Verifies that _finalize_turn schedules LCM compaction at the correct moment."""
+    import time
+    from collections import Counter
+    from unittest.mock import AsyncMock
+
+    from app.channels.turn_runner import ChatTurnInput, _finalize_turn
+    from app.core.chat_aggregator import ChatTurnAggregator
+
+    conv = await _make_conversation(db_session, test_user)
+
+    monkeypatch.setattr("app.channels.turn_runner.finalize_assistant_message", AsyncMock())
+    monkeypatch.setattr("app.channels.turn_runner.record_turn_cost_if_enabled", AsyncMock())
+    monkeypatch.setattr("app.channels.turn_runner.publish_if_available", AsyncMock())
+
+    schedule_mock = MagicMock()
+    monkeypatch.setattr("app.channels.turn_runner.schedule_lcm_compaction", schedule_mock)
+
+    turn_input = ChatTurnInput(
+        conversation_id=conv.id,
+        user_id=test_user.id,
+        question="hello",
+        provider=MagicMock(),
+        channel=MagicMock(),
+        channel_message=cast(Any, {"model_id": "gemini-2.5-flash", "surface": "telegram"}),
+        db_session=db_session,
+    )
+
+    aggregator = ChatTurnAggregator()
+    assistant_message_id = uuid.uuid4()
+
+    await _finalize_turn(
+        turn_input=turn_input,
+        aggregator=aggregator,
+        assistant_message_id=assistant_message_id,
+        started_at=time.perf_counter(),
+        event_count=0,
+        event_breakdown=Counter(),
+        ttft_ms=None,
+    )
+
+    schedule_mock.assert_called_once_with(
+        conversation_id=conv.id,
+        user_id=test_user.id,
+        model_id="gemini-2.5-flash",
+    )
