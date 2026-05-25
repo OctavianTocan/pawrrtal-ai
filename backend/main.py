@@ -47,6 +47,7 @@ from app.core.request_logging import RequestLoggingMiddleware
 from app.core.scheduler import JobScheduler, set_active_scheduler
 from app.core.telemetry import setup_tracing, shutdown_tracing
 from app.db import create_db_and_tables
+from app.integrations.event_bus_deps import persist_assistant_response, run_agent_turn
 from app.integrations.telegram import telegram_lifespan
 from app.integrations.webhooks import get_webhooks_router
 from app.logger_setup import (
@@ -144,7 +145,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         # bot instance.  Both are no-ops when the relevant pieces are
         # disabled (no bot → notifications skip; no default user → agent
         # handler logs + skips).
-        agent_handler = AgentHandler()
+        agent_handler = AgentHandler(
+            run_turn_fn=run_agent_turn,
+            persist_response_fn=persist_assistant_response,
+        )
         agent_handler.register(event_bus)
         notification_service = NotificationService(
             telegram_bot=telegram_service.bot if telegram_service is not None else None

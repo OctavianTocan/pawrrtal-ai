@@ -117,7 +117,14 @@ class TestAgentHandlerRouting:
 
     async def test_subscribes_to_both_event_types(self) -> None:
         bus = EventBus()
-        AgentHandler().register(bus)
+
+        async def dummy_run(prompt: str, user_id: uuid.UUID) -> str:
+            return "dummy"
+
+        async def dummy_persist(conversation_id: uuid.UUID, user_id: uuid.UUID, text: str, event_id: str) -> None:
+            pass
+
+        AgentHandler(run_turn_fn=dummy_run, persist_response_fn=dummy_persist).register(bus)
         # Internal check — the handler registered subscribers for
         # both event types, not just one.
         subs = bus._handlers
@@ -129,7 +136,14 @@ class TestAgentHandlerRouting:
         bus = EventBus()
         await bus.start()
         bot = _RecordingBot()
-        AgentHandler().register(bus)
+
+        async def dummy_run(prompt: str, user_id: uuid.UUID) -> str:
+            return "dummy"
+
+        async def dummy_persist(conversation_id: uuid.UUID, user_id: uuid.UUID, text: str, event_id: str) -> None:
+            pass
+
+        AgentHandler(run_turn_fn=dummy_run, persist_response_fn=dummy_persist).register(bus)
         NotificationService(telegram_bot=bot).register(bus)
         await bus.publish(WebhookEvent(provider="github", event_type_name="push", payload={}))
         await _drain(bus)
@@ -144,7 +158,14 @@ class TestAgentHandlerRouting:
         # the handler dispatches without crashing on a no-user event.
         bus = EventBus()
         await bus.start()
-        AgentHandler().register(bus)
+
+        async def dummy_run(prompt: str, user_id: uuid.UUID) -> str:
+            return "dummy"
+
+        async def dummy_persist(conversation_id: uuid.UUID, user_id: uuid.UUID, text: str, event_id: str) -> None:
+            pass
+
+        AgentHandler(run_turn_fn=dummy_run, persist_response_fn=dummy_persist).register(bus)
         await bus.publish(
             ScheduledEvent(
                 job_id=uuid.uuid4(),
