@@ -1,8 +1,6 @@
 """Catalog-backed Telegram model picker helpers.
 
-The picker is a three-level walk: provider (host) → vendor → models.
-Hosts that serve a single vendor collapse to two levels (host → models),
-because forcing a single-button vendor screen is just an extra tap.
+Three-level walk: host → vendor → models (single-vendor hosts collapse to two levels).
 """
 
 from __future__ import annotations
@@ -18,6 +16,7 @@ from app.core.providers.catalog import CATALOG_ETAG, MODEL_CATALOG, ModelEntry
 from app.core.providers.labels import host_label_from_slug, vendor_label_from_slug
 from app.crud.channel import get_or_create_telegram_conversation_full, get_user_id_for_external
 from app.crud.user_preferences import get_user_default_model_id
+from app.integrations.telegram.model_auth import is_host_authenticated
 from app.integrations.telegram.model_defaults import resolve_effective_model_id
 
 ModelCallbackAction = Literal["providers", "vendors", "list", "select", "set_default"]
@@ -144,12 +143,7 @@ def build_host_keyboard() -> list[list[ModelButton]]:
 
 
 def build_vendor_keyboard(*, host: str) -> list[list[ModelButton]]:
-    """Build the vendor keyboard for a host that has multiple vendors.
-
-    For single-vendor hosts the caller should jump straight to
-    :func:`build_models_keyboard`; this function still works in that
-    case but produces a one-button screen.
-    """
+    """Build the vendor keyboard for a host with multiple vendors."""
     vendors = _host_to_vendors().get(host, {})
     rows: list[list[ModelButton]] = []
     current_row: list[ModelButton] = []
@@ -327,12 +321,17 @@ def picker_stale_message() -> str:
 def _host_to_vendors() -> dict[str, dict[str, list[ModelEntry]]]:
     """Group the catalog as ``{host_slug: {vendor_slug: [entries]}}``.
 
-    Both layers preserve a stable, alphabetised order so the keyboards
-    are deterministic.
+    Hosts whose gateway-global API key is absent are filtered out so
+    the picker only shows providers the user can actually invoke
+    (#370). Both layers preserve a stable, alphabetised order so the
+    keyboards are deterministic.
     """
     grouped: dict[str, dict[str, list[ModelEntry]]] = {}
     for entry in MODEL_CATALOG:
-        host_bucket = grouped.setdefault(entry.host.value, {})
+        host_slug = entry.host.value
+        if not is_host_authenticated(host_slug):
+            continue
+        host_bucket = grouped.setdefault(host_slug, {})
         host_bucket.setdefault(entry.vendor.value, []).append(entry)
     return {host: dict(sorted(vendors.items())) for host, vendors in sorted(grouped.items())}
 
@@ -351,10 +350,8 @@ def _model_label(entry: ModelEntry, current_model_id: str) -> str:
 
 
 def _display_name_for_model(model_id: str) -> str:
-    for entry in MODEL_CATALOG:
-        if entry.id == model_id:
-            return entry.display_name
-    return model_id
+    entry = _entry_by_id(model_id)
+    return entry.display_name if entry else model_id
 
 
 def _catalog_index(entry: ModelEntry) -> int:
