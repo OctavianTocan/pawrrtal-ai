@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 # fastest Gemini tier and accepts ``reasoning_effort="minimal"``, so
 # total round-trip stays in the low hundreds of milliseconds for the
 # short prefixes a composer typically sends.
-AUTOCOMPLETE_MODEL_ID = "google-ai:google/gemini-3.1-flash-lite-preview"
+AUTOCOMPLETE_MODEL_ID = "google-ai:google/gemini-3.1-flash-lite"
 
 # Hard cap on how long the provider can stream before we give up.
 # Autocomplete is a low-stakes hot path — a suggestion that isn't

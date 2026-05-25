@@ -158,7 +158,7 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
             ctx.user_id,
         )
         # We're using a very fast, very cheap Google AI model to do the heavy lifting of the search.
-        provider = resolve_llm("google-ai:google/gemini-3.1-flash-lite-preview")
+        provider = resolve_llm("google-ai:google/gemini-3.1-flash-lite")
         # We give the agent its tools.
         lcm_tools: list[AgentTool] = [
             make_lcm_grep_tool(conversation_id=ctx.conversation_id),
