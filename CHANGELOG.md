@@ -3,6 +3,10 @@
 ## Unreleased
 
 ### Fixed
+- **Telegram thinking blocks now render with proper block separation.** Providers emit `block_index` on every thinking/delta event; the Telegram dispatch layer inserts `\n\n---\n\n` between distinct thinking blocks instead of concatenating them into one blob. Fixes the spacing/newline issues in multi-block thinking output (#371).
+- **Text after thinking/tool blocks no longer silently dropped on Telegram.** The `dispatch_text_delta` guard was short-circuiting when `previous_block_kind == "text"`, preventing interleaved text messages from opening. The fix also makes `finalize_turn_delivery` prefer `final_text` over `text_buffer` (#377).
+- **Workshop hooks fire before verbose filter.** OTel spans now capture all provider events regardless of verbose level (#377).
+- **OpenCode Go provider fails fast on missing API key.** Instead of silently hitting the gateway with no auth, the provider yields an error event explaining the issue (#371).
 - **CI: all 16 checks green from a clean branch off `development`.** Fixed 206 React Doctor warnings (unused exports, missing aria-labels, non-semantic HTML, circular dependencies, file splits for oversized components), flattened backend nesting-depth violations, fixed MDX build failures from angle-bracket URLs and unquoted YAML frontmatter, fixed backend pytest key-set assertion to use canonical `OVERRIDABLE_KEYS`, removed stale Playwright assertion for deleted "Preferences" UI, added `WORKSPACE_BASE_DIR` / `generate:docs` / Node setup to Stagehand workflow, added `aria-label` to all settings Switch toggles, and namespaced Stagehand API keys (`STAGEHAND_GOOGLE_API_KEY` etc.) so the backend's `GOOGLE_API_KEY` doesn't leak into the E2E LLM fixture.
 - **Telegram thinking block logic:** Refined telegram thinking block streaming and delivery logic to fix odd spacing/newlines.
 - **Job Scheduler startup:** Register active JobScheduler singleton during startup.
@@ -18,8 +22,18 @@
 - **Truncation of page and database UUIDs.** Display labels for database queries and schema reads now truncate UUIDs to their first 8 characters to keep user-facing text clean.
 - **Tightened `ntn` tool arguments validation.** The `ntn` tool now rejects non-string arguments explicitly, and its description has been clarified to ensure the agent uses correct formatting.
 - **Frontend dev port swap:** Swapped the frontend dev port from 3001 to 53001.
+- **Workspace template refactored.** Replaced vendor/submodule approach with `backend/templates/workspace/` seed tree. `seed_workspace` now copies from the template directory (skip-existing). New layout: `SOUL.md`, `AGENTS.md`, `USER.md`, `PREFERENCES.md`, `HEARTBEAT.md`, `.agent/` tree (#423).
+- **Dynamic user identity on web.** Sidebar footer and settings page now show live authenticated user data instead of hardcoded placeholder. `useCurrentUser` hook, `getInitials` utility, auto-saving profile edits, `window.location.replace` on onboarding completion (#452).
+- **Playwright E2E fixture refactor.** Decoupled dev-login from workspace provisioning; explicit `authenticatedPageWithWorkspace` and `authenticatedPageWithWorkspaceAndChat` fixtures (#334).
 - **Deps bump:** Bumped GitHub actions dependencies (#465).
 - **Testing:** Pinned must-have model ids for the catalog test (#385), closed out integration test gaps (#393).
+
+### Added
+- **Telegram regenerate button.** "🔄 Regenerate" inline button on the assistant's closing Telegram reply. Tapping replays the last user message through the agent pipeline with ownership validation. Gated behind `settings.telegram_regenerate_button_enabled` (default off) (#408, #411, #414).
+- **xAI OAuth credentials resolver.** `resolve_xai_credentials(workspace_root)` — three-tier resolution: OAuth access token (with transparent 60s-lead refresh) → workspace `XAI_API_KEY` → gateway-global `settings.xai_api_key`. Builds on the OAuth device-code client (#397). New `settings.xai_oauth_client_id` controls device-code availability (#402).
+- **Dreaming reflection prompt + schema.** `backend/app/core/dreaming/` package with `DreamingOutput` Pydantic model, `parse_dreaming_output()` robust parser, and the reflection prompt template. Handles clean JSON, Markdown-fenced JSON, leading prose, and malformed input (#406).
+- **System prompt verification + timekeeping guidance.** Agents now receive verification instructions and timekeeping context in the system prompt (#371).
+- **ADR: workspace tool sandboxing.** Architecture decision for how workspace tools are sandboxed (#371).
 
 - **Telegram voice notes are now transcribed under the default xAI deployment.** Previously the Telegram bot only attempted transcription when `VOICE_PROVIDER` was set to `mistral`, `openai`, or `local`; the default `xai` value made `resolve_transcriber()` return `None` and the bot fell back to the "Transcription is not available on this surface yet" stub annotation, so the agent never saw the spoken content. A new `XaiSttTranscriber` wraps xAI's HTTP STT endpoint (`https://api.x.ai/v1/stt`) and is now returned by `resolve_transcriber()` whenever `voice_provider == "xai"` and `settings.xai_api_key` is set. The web `POST /api/v1/stt` route was refactored to use the same transcriber class with workspace-first `XAI_API_KEY` resolution — same observable behaviour for web users, less duplicated code. Image and document attachment paths were diagnosed at the same time: images already forward correctly through `ChatTurnInput.images` for Claude (other providers still log-and-drop, tracked as a follow-up); documents already extract via markitdown when the optional dep is installed.
 
