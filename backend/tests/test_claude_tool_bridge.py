@@ -25,14 +25,14 @@ from uuid import uuid4
 import pytest
 
 from app.core.agent_loop.types import AgentTool
-from app.core.providers import _claude_tool_bridge as bridge
-from app.core.providers._claude_tool_bridge import (
+from app.core.providers.claude import ClaudeLLM, ClaudeLLMConfig
+from app.core.providers.claude import tool_bridge as bridge
+from app.core.providers.claude.tool_bridge import (
     MCP_SERVER_NAME,
     allowed_tool_ids,
     build_mcp_server,
     claude_tool_id,
 )
-from app.core.providers.claude_provider import ClaudeLLM, ClaudeLLMConfig
 
 
 def _make_agent_tool(name: str = "echo") -> AgentTool:

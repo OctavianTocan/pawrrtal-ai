@@ -16,7 +16,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 import pytest
@@ -113,7 +113,7 @@ def test_factory_routes_gemini_cli_host_to_gemini_cli_llm(model: str) -> None:
 def test_factory_keeps_google_ai_host_on_native_provider() -> None:
     # Sanity check — adding gemini-cli must not steal the canonical
     # google-ai routing from the native SDK provider.
-    from app.core.providers.gemini_provider import GeminiLLM
+    from app.core.providers.gemini import GeminiLLM
 
     native = resolve_llm("google-ai:google/gemini-3-flash-preview")
     assert isinstance(native, GeminiLLM)
@@ -764,7 +764,7 @@ async def test_open_session_sends_absolute_cwd_for_relative_workspace_root(
 
     monkeypatch.chdir(tmp_path)
 
-    assert await open_session(FakeConn(), Path("workspaces/dev-admin")) == "session-1"
+    assert await open_session(cast(Any, FakeConn()), Path("workspaces/dev-admin")) == "session-1"
 
 
 @pytest.mark.anyio
@@ -781,7 +781,7 @@ async def test_open_session_surfaces_structured_request_error_detail() -> None:
             )
 
     with pytest.raises(AcpFatalError, match="Directory does not exist: x/y"):
-        await open_session(FakeConn(), Path("workspaces/dev-admin"))
+        await open_session(cast(Any, FakeConn()), Path("workspaces/dev-admin"))
 
 
 # ---------------------------------------------------------------------------

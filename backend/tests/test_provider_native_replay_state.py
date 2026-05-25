@@ -29,7 +29,7 @@ from app.core.agent_loop.types import (
     ToolCallContent,
     UserMessage,
 )
-from app.core.providers import gemini_provider
+from app.core.providers.gemini import provider as gemini_provider
 
 
 async def _execute_noop(tool_call_id: str, **kwargs: object) -> str:

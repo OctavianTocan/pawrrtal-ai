@@ -88,7 +88,7 @@ const EXEMPT_PATH_FRAGMENTS = [
 	//   - integrations/telegram/bot.py → split typing-indicator + permission helpers (PR 03 + PR 07)
 	// TODO(pawrrtal-cct follow-up): split these and remove the exemption.
 	'backend/app/core/agent_loop/loop.py',
-	'backend/app/core/providers/claude_provider.py',
+	'backend/app/core/providers/claude/provider.py',
 	'backend/app/integrations/telegram/bot.py',
 	// LCM retrieval lab (PR #258) — two files still over budget. ``evals.py``
 	// is the largest (873 lines: harness + scenarios + answerer + retrievers

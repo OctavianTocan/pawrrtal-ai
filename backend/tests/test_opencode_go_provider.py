@@ -20,18 +20,18 @@ from uuid import uuid4
 import pytest
 
 from app.core.agent_loop.types import AgentMessage, AgentTool
-from app.core.providers._opencode_go_events import (
+from app.core.providers.base import StreamEvent
+from app.core.providers.catalog import find
+from app.core.providers.factory import resolve_llm
+from app.core.providers.model_id import Host, Vendor, parse_model_id
+from app.core.providers.opencode_go.events import (
     ToolCallBuffer,
     build_openai_messages,
     build_openai_tools,
     compute_cost_usd,
     read_reasoning,
 )
-from app.core.providers.base import StreamEvent
-from app.core.providers.catalog import find
-from app.core.providers.factory import resolve_llm
-from app.core.providers.model_id import Host, Vendor, parse_model_id
-from app.core.providers.opencode_go_provider import (
+from app.core.providers.opencode_go.provider import (
     OpencodeGoLLM,
     OpencodeGoLLMConfig,
     _UsageAccumulator,

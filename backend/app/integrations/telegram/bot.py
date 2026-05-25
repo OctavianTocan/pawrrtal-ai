@@ -40,8 +40,8 @@ from app.channels import ChannelMessage, resolve_channel
 from app.channels.telegram import SURFACE_TELEGRAM, make_telegram_sender, render_initial
 from app.channels.telegram_delivery import safe_edit_html
 from app.channels.turn_runner import ChatTurnInput, run_turn
-from app.core.agent_hooks import build_pre_turn_hooks
-from app.core.agent_tools import build_agent_tools
+from app.core.agent_loop.hooks import build_pre_turn_hooks
+from app.core.agent_loop.tools import build_agent_tools
 from app.core.config import settings
 from app.db import async_session_maker
 from app.integrations.telegram.bot_provider_resolution import (
@@ -204,8 +204,10 @@ async def _execute_turn_body(
     the dispatcher does on its own).
     """
     chat_id = message.chat.id
+    bot = message.bot
+    assert bot is not None
     typing_task = asyncio.create_task(
-        _maintain_typing_indicator(message.bot, chat_id, context.thread_id),
+        _maintain_typing_indicator(bot, chat_id, context.thread_id),
         name=f"telegram-typing-{chat_id}",
     )
     try:
@@ -221,7 +223,7 @@ async def _execute_turn_body(
 
     try:
         await _maybe_set_auto_title(
-            bot=message.bot,
+            bot=bot,
             conversation_id=context.conversation_id,
             user_text=user_text,
             chat_id=chat_id,

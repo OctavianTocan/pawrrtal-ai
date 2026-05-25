@@ -23,6 +23,7 @@ import pytest
 from app.core.providers.catalog import MODEL_CATALOG
 from app.integrations.telegram.model_picker import (
     NOOP_CALLBACK,
+    ModelCallback,
     ModelPickerState,
     build_set_default_keyboard,
 )
@@ -235,10 +236,8 @@ def _catalog_token() -> str:
     return CATALOG_ETAG[:8]
 
 
-def _select_callback_for_entry(index: int):
+def _select_callback_for_entry(index: int) -> ModelCallback:
     """Build the ModelCallback object that the runtime would receive."""
-    from app.integrations.telegram.model_picker import ModelCallback
-
     return ModelCallback(action="select", index=index, catalog_token=_catalog_token())
 
 

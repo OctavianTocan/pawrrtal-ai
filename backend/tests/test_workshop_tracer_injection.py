@@ -64,6 +64,7 @@ def test_turn_span_emits_through_injected_tracer(
     assert len(spans) == 1
     span = spans[0]
     assert span.name == "pawrrtal.turn"
+    assert span.attributes is not None
     assert span.attributes.get("pawrrtal.surface") == "telegram"
 
 

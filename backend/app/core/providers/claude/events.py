@@ -34,8 +34,7 @@ from claude_agent_sdk import (
 )
 
 from app.core.agent_loop.display import ToolDisplay, render_display_from_map
-
-from .base import StreamEvent
+from app.core.providers.base import StreamEvent
 
 logger = logging.getLogger(__name__)
 

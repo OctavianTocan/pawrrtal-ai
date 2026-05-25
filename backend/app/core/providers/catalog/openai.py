@@ -26,8 +26,9 @@ the cutoff so they cap at ``high``; the resolver maps ``extra-high``
 
 from __future__ import annotations
 
-from ._catalog_entries import ModelEntry
-from .model_id import Host, Vendor
+from app.core.providers.model_id import Host, Vendor
+
+from .entries import ModelEntry
 
 # OpenAI cost rates routed via LiteLLM. Sourced from the LiteLLM
 # pricing JSON

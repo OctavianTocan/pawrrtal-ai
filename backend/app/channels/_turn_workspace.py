@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.core.agent_system_prompt import compose_agent_system_prompt
+from app.core.agent_loop import compose_agent_system_prompt
 from app.core.governance.workspace_context import load_workspace_context
 from app.core.persona_bootstrap import ensure_persona_bootstrap_seeded
 from app.core.tools.agents_md import assemble_workspace_prompt

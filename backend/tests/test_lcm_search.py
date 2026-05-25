@@ -30,7 +30,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.agent_tools import build_agent_tools
+from app.core.agent_loop.tools import build_agent_tools
 from app.core.config import settings
 from app.core.tools.lcm_search import (
     LCMSearchResult,

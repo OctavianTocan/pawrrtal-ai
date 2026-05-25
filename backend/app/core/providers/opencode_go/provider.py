@@ -38,6 +38,9 @@ from typing import Any
 from openai import AsyncOpenAI
 
 from app.core.agent_loop import (
+    DEFAULT_AGENT_SYSTEM_PROMPT as _FALLBACK_SYSTEM_PROMPT,
+)
+from app.core.agent_loop import (
     AgentContext,
     AgentLoopConfig,
     AgentMessage,
@@ -58,22 +61,19 @@ from app.core.agent_loop.types import (
     TextContent,
     ToolCallContent,
 )
-from app.core.agent_system_prompt import (
-    DEFAULT_AGENT_SYSTEM_PROMPT as _FALLBACK_SYSTEM_PROMPT,
-)
 from app.core.config import settings
 from app.core.keys import resolve_api_key
+from app.core.providers._stream_logging import log_provider_stream_event
+from app.core.providers.base import ReasoningEffort, StreamEvent
+from app.core.providers.gemini.events import agent_event_to_stream_event, identity_convert
 
-from ._gemini_events import agent_event_to_stream_event, identity_convert
-from ._opencode_go_events import (
+from .events import (
     ToolCallBuffer,
     build_openai_messages,
     build_openai_tools,
     compute_cost_usd,
     read_reasoning,
 )
-from ._stream_logging import log_provider_stream_event
-from .base import ReasoningEffort, StreamEvent
 
 logger = logging.getLogger(__name__)
 

@@ -28,6 +28,9 @@ import litellm
 from litellm.exceptions import APIError as LiteLLMAPIError
 
 from app.core.agent_loop import (
+    DEFAULT_AGENT_SYSTEM_PROMPT as _FALLBACK_SYSTEM_PROMPT,
+)
+from app.core.agent_loop import (
     AgentContext,
     AgentLoopConfig,
     AgentMessage,
@@ -42,15 +45,12 @@ from app.core.agent_loop import (
 )
 from app.core.agent_loop.safety_factory import safety_from_settings
 from app.core.agent_loop.types import PermissionCheckFn, TextContent
-from app.core.agent_system_prompt import (
-    DEFAULT_AGENT_SYSTEM_PROMPT as _FALLBACK_SYSTEM_PROMPT,
-)
 from app.core.config import settings
 from app.core.keys import resolve_api_key
 
-from ._gemini_events import agent_event_to_stream_event, identity_convert
 from ._stream_logging import log_provider_stream_event
 from .base import ReasoningEffort, StreamEvent
+from .gemini.events import agent_event_to_stream_event, identity_convert
 from .model_id import Vendor
 
 if TYPE_CHECKING:

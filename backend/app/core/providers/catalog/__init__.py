@@ -1,10 +1,8 @@
 """Single source of truth for which models pawrrtal supports.
 
 Catalog entries carry the canonical ``host:vendor/model`` identity
-plus display metadata. Adding a model is a one-file change in
-``_catalog_entries.py``; this module just composes the per-host
-tuples into the public :data:`MODEL_CATALOG` and exposes the lookup
-helpers.
+plus display metadata. Composes the per-host tuples into the public
+:data:`MODEL_CATALOG` and exposes the lookup helpers.
 """
 
 from __future__ import annotations
@@ -13,16 +11,18 @@ import hashlib
 import json
 from dataclasses import asdict
 
-from ._catalog_entries import (
+from app.core.providers.model_id import ParsedModelId, UnknownModelId, parse_model_id
+
+from .agy_cli import AGY_CLI_ENTRIES
+from .entries import (
     ANTHROPIC_ENTRIES,
     GOOGLE_ENTRIES,
     XAI_ENTRIES,
     ModelEntry,
 )
-from ._catalog_gemini_cli import GEMINI_CLI_ENTRIES
-from ._catalog_openai import OPENAI_ENTRIES
-from ._catalog_opencode_go import OPENCODE_GO_ENTRIES
-from .model_id import ParsedModelId, UnknownModelId, parse_model_id
+from .gemini_cli import GEMINI_CLI_ENTRIES
+from .openai import OPENAI_ENTRIES
+from .opencode_go import OPENCODE_GO_ENTRIES
 
 __all__ = [
     "CATALOG_ETAG",
@@ -39,6 +39,7 @@ MODEL_CATALOG: tuple[ModelEntry, ...] = (
     *ANTHROPIC_ENTRIES,
     *GOOGLE_ENTRIES,
     *GEMINI_CLI_ENTRIES,
+    *AGY_CLI_ENTRIES,
     *XAI_ENTRIES,
     *OPENAI_ENTRIES,
     *OPENCODE_GO_ENTRIES,
@@ -65,7 +66,7 @@ def _hash_catalog(catalog: tuple[ModelEntry, ...]) -> str:
 CATALOG_ETAG: str = _hash_catalog(MODEL_CATALOG)
 """Catalog hash, computed once at import. Exposed via the ``ETag``
 response header so clients can revalidate cheaply with
-``If-None-Match``."""
+`If-None-Match`."""
 
 
 def default_model() -> ModelEntry:

@@ -10,8 +10,7 @@ import logging
 from typing import Any
 
 from app.core.agent_loop.types import AgentMessage
-
-from .base import StreamEvent
+from app.core.providers.base import StreamEvent
 
 logger = logging.getLogger(__name__)
 

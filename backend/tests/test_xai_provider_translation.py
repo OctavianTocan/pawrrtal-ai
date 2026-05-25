@@ -31,22 +31,22 @@ from app.core.agent_loop.types import (
     ToolResultMessage,
     UserMessage,
 )
-from app.core.providers._xai_messages import (
+from app.core.providers.xai.messages import (
     build_xai_messages,
     build_xai_tools,
 )
-from app.core.providers._xai_stream import (
+from app.core.providers.xai.provider import (
+    XaiLLM,
+    _map_reasoning_effort,
+    _resolve_xai_api_key,
+    make_xai_stream_fn,
+)
+from app.core.providers.xai.stream import (
     UsageAccumulator,
     deltas_from_chunk,
     done_event_from_response,
     tool_call_events_from_response,
     usage_record_from_response,
-)
-from app.core.providers.xai_provider import (
-    XaiLLM,
-    _map_reasoning_effort,
-    _resolve_xai_api_key,
-    make_xai_stream_fn,
 )
 
 # ---------------------------------------------------------------------------
@@ -167,7 +167,7 @@ def _patch_async_client(
     """Patch ``AsyncClient`` in the provider module and return the fake."""
     fake = _FakeAsyncClient(steps)
     monkeypatch.setattr(
-        "app.core.providers.xai_provider.AsyncClient",
+        "app.core.providers.xai.provider.AsyncClient",
         lambda **_kwargs: fake,
     )
     return fake
@@ -309,7 +309,7 @@ def test_resolve_api_key_uses_settings_when_no_workspace(
 ) -> None:
     """No workspace_id → use the gateway-global key from Settings."""
     monkeypatch.setattr(
-        "app.core.providers.xai_provider.settings",
+        "app.core.providers.xai.provider.settings",
         SimpleNamespace(xai_api_key="gateway-key"),
     )
     assert _resolve_xai_api_key(None) == "gateway-key"
@@ -321,7 +321,7 @@ def test_resolve_api_key_workspace_override(
     """workspace_root present → delegate to resolve_api_key (mocked)."""
     workspace_root = Path("/tmp/some-workspace")
     monkeypatch.setattr(
-        "app.core.providers.xai_provider.resolve_api_key",
+        "app.core.providers.xai.provider.resolve_api_key",
         lambda wr, key: "workspace-key" if (wr, key) == (workspace_root, "XAI_API_KEY") else None,
     )
     assert _resolve_xai_api_key(workspace_root) == "workspace-key"
@@ -459,7 +459,7 @@ def test_usage_record_returns_none_when_nothing_reported() -> None:
 
 def test_usage_accumulator_sums_across_iterations() -> None:
     """The accumulator sums multiple :class:`UsageRecord` instances."""
-    from app.core.providers._xai_stream import UsageRecord
+    from app.core.providers.xai.stream import UsageRecord
 
     sink = UsageAccumulator()
     sink.absorb(UsageRecord(input_tokens=10, output_tokens=5, cost_usd=0.001))
@@ -614,7 +614,7 @@ async def test_stream_fn_surfaces_upstream_error_as_done_event(
             return None
 
     monkeypatch.setattr(
-        "app.core.providers.xai_provider.AsyncClient",
+        "app.core.providers.xai.provider.AsyncClient",
         lambda **_kwargs: _ExplodingClient(),
     )
 

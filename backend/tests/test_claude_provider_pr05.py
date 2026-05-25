@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.core.providers.claude_provider import (
+from app.core.providers.claude.provider import (
     _aiter_user_prompt,
     _is_retryable_cli_connection,
     _retry_backoff_seconds,

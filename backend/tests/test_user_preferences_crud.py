@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.user_preferences import (
     get_user_default_model_id,
@@ -13,7 +14,7 @@ from app.db import User
 
 @pytest.mark.anyio
 async def test_get_default_model_id_returns_none_when_no_row(
-    db_session,
+    db_session: AsyncSession,
     test_user: User,
 ) -> None:
     """A user without a preferences row reads back ``None``."""
@@ -23,7 +24,7 @@ async def test_get_default_model_id_returns_none_when_no_row(
 
 @pytest.mark.anyio
 async def test_set_default_model_id_creates_row_on_first_write(
-    db_session,
+    db_session: AsyncSession,
     test_user: User,
 ) -> None:
     """Writing the first preference creates the row on demand."""
@@ -38,7 +39,7 @@ async def test_set_default_model_id_creates_row_on_first_write(
 
 @pytest.mark.anyio
 async def test_set_default_model_id_updates_existing_row(
-    db_session,
+    db_session: AsyncSession,
     test_user: User,
 ) -> None:
     """A second write updates the column in place, no duplicate row."""
@@ -58,7 +59,7 @@ async def test_set_default_model_id_updates_existing_row(
 
 @pytest.mark.anyio
 async def test_set_default_model_id_clears_when_passed_none(
-    db_session,
+    db_session: AsyncSession,
     test_user: User,
 ) -> None:
     """Passing ``None`` clears the override back to NULL."""

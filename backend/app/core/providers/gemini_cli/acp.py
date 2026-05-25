@@ -82,11 +82,11 @@ async def open_session(conn: ClientSideConnection, workspace_root: Path | None) 
         getattr(init_resp, "protocol_version", "?"),
     )
 
-    cwd = str(
-        await anyio.Path(workspace_root).resolve()
-        if workspace_root is not None
-        else await anyio.Path.cwd().resolve()
-    )
+    if workspace_root is not None:
+        path = anyio.Path(workspace_root)
+    else:
+        path = await anyio.Path.cwd()
+    cwd = str(await path.resolve())
     try:
         session = await asyncio.wait_for(
             conn.new_session(cwd=cwd, mcp_servers=[]),

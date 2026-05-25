@@ -17,8 +17,9 @@ its empty default.
 
 from __future__ import annotations
 
-from ._catalog_entries import ModelEntry
-from .model_id import Host, Vendor
+from app.core.providers.model_id import Host, Vendor
+
+from .entries import ModelEntry
 
 OPENCODE_GO_ENTRIES: tuple[ModelEntry, ...] = (
     ModelEntry(

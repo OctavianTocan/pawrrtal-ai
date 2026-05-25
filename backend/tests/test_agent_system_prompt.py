@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.channels.turn_runner import _workspace_system_prompt
-from app.core.agent_system_prompt import (
+from app.core.agent_loop import (
     DEFAULT_AGENT_SYSTEM_PROMPT,
     PAW_CORE_SYSTEM_PROMPT,
     compose_agent_system_prompt,

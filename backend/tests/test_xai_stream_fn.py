@@ -40,7 +40,7 @@ async def test_xai_provider_yields_delta_events_from_loop(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """XaiLLM.stream() translates agent_loop text_deltas to StreamEvent deltas."""
-    from app.core.providers.xai_provider import XaiLLM
+    from app.core.providers.xai import XaiLLM
 
     provider = XaiLLM("grok-test")
     monkeypatch.setattr(provider, "_stream_fn", ScriptedStreamFn([text_turn("hello")]))
@@ -65,7 +65,7 @@ async def test_xai_provider_passes_history_to_loop(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Prior messages in history are included in what the StreamFn sees."""
-    from app.core.providers.xai_provider import XaiLLM
+    from app.core.providers.xai import XaiLLM
 
     seen_messages: list[list[AgentMessage]] = []
 
@@ -106,7 +106,7 @@ async def test_xai_provider_emits_tool_use_and_result_events(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Tool call lifecycle events translate from AgentEvents to StreamEvents."""
-    from app.core.providers.xai_provider import XaiLLM
+    from app.core.providers.xai import XaiLLM
 
     executed: list[str] = []
 
@@ -175,7 +175,7 @@ async def test_xai_provider_surfaces_agent_terminated_from_safety_config(
 ) -> None:
     """safety_from_settings flows through XaiLLM to agent_loop."""
     from app.core.agent_loop import AgentSafetyConfig
-    from app.core.providers.xai_provider import XaiLLM
+    from app.core.providers.xai import XaiLLM
 
     turns = [tool_call_turn("ping", {}, turn_id=f"tc-{i}") for i in range(10)]
     script = ScriptedStreamFn(turns)
@@ -184,7 +184,7 @@ async def test_xai_provider_surfaces_agent_terminated_from_safety_config(
     monkeypatch.setattr(provider, "_stream_fn", script)
 
     monkeypatch.setattr(
-        "app.core.providers.xai_provider.safety_from_settings",
+        "app.core.providers.xai.provider.safety_from_settings",
         lambda _settings: AgentSafetyConfig(
             max_iterations=3,
             max_wall_clock_seconds=None,
@@ -220,7 +220,7 @@ async def test_xai_provider_accumulates_tool_result_in_context(
     Proves the tool-result message accumulates in the loop's context
     even though xAI itself has no native session concept.
     """
-    from app.core.providers.xai_provider import XaiLLM
+    from app.core.providers.xai import XaiLLM
 
     seen_per_call: list[int] = []
     second_call_roles: list[str] = []

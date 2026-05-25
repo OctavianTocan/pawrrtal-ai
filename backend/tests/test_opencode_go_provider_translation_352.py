@@ -24,7 +24,7 @@ from unittest.mock import patch
 import pytest
 
 from app.core.config import settings
-from app.core.providers.opencode_go_provider import OpencodeGoLLM, OpencodeGoLLMConfig
+from app.core.providers.opencode_go import OpencodeGoLLM, OpencodeGoLLMConfig
 
 
 @pytest.mark.xfail(reason="Requires error-event shortcut from #371 to pass")
@@ -99,7 +99,7 @@ async def test_missing_api_key_does_not_invoke_agent_loop(
         workspace_root=None,
     )
 
-    with patch("app.core.providers.opencode_go_provider.agent_loop") as patched_loop:
+    with patch("app.core.providers.opencode_go.provider.agent_loop") as patched_loop:
         events = [
             event
             async for event in llm.stream(

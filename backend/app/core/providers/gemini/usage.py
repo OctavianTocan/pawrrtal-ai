@@ -16,8 +16,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from .catalog import MODEL_CATALOG, ModelEntry
-from .model_id import Host
+from app.core.providers.catalog import MODEL_CATALOG, ModelEntry
+from app.core.providers.model_id import Host
 
 
 class GeminiUsageAccumulator:

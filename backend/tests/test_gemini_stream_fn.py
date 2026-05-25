@@ -42,7 +42,7 @@ async def test_gemini_provider_yields_delta_events_from_loop(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """GeminiLLM.stream() translates agent_loop text_deltas to StreamEvent deltas."""
-    from app.core.providers.gemini_provider import GeminiLLM
+    from app.core.providers.gemini import GeminiLLM
 
     provider = GeminiLLM("gemini-test")
     monkeypatch.setattr(provider, "_stream_fn", ScriptedStreamFn([text_turn("hello")]))
@@ -72,7 +72,7 @@ async def test_gemini_provider_passes_history_to_loop(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Prior messages in history are included in what the StreamFn sees."""
-    from app.core.providers.gemini_provider import GeminiLLM
+    from app.core.providers.gemini import GeminiLLM
 
     seen_messages: list[list[AgentMessage]] = []
 
@@ -122,7 +122,7 @@ async def test_gemini_provider_emits_tool_use_and_result_events(
     Uses the real GeminiLLM.stream() with a ScriptedStreamFn so we exercise
     the provider's own translation code, not a hand-rolled reimplementation.
     """
-    from app.core.providers.gemini_provider import GeminiLLM
+    from app.core.providers.gemini import GeminiLLM
 
     executed: list[str] = []
 
@@ -210,7 +210,7 @@ async def test_gemini_provider_surfaces_agent_terminated_from_safety_config(
         AgentTerminatedEvent → GeminiLLM.stream() → StreamEvent("agent_terminated")
     """
     from app.core.agent_loop import AgentSafetyConfig
-    from app.core.providers.gemini_provider import GeminiLLM
+    from app.core.providers.gemini import GeminiLLM
 
     # 10-turn runaway script — much more than the 3-iteration limit.
     turns = [tool_call_turn("ping", {}, turn_id=f"tc-{i}") for i in range(10)]
@@ -221,7 +221,7 @@ async def test_gemini_provider_surfaces_agent_terminated_from_safety_config(
 
     # Patch the safety factory to inject a tight limit.
     monkeypatch.setattr(
-        "app.core.providers.gemini_provider.safety_from_settings",
+        "app.core.providers.gemini.provider.safety_from_settings",
         lambda _settings: AgentSafetyConfig(
             max_iterations=3,
             max_wall_clock_seconds=None,
@@ -275,7 +275,7 @@ async def test_gemini_provider_emits_thinking_events(
     (it would render in the assistant transcript otherwise) and the
     user-visible reply must still flow through as ``delta``.
     """
-    from app.core.providers.gemini_provider import GeminiLLM
+    from app.core.providers.gemini import GeminiLLM
 
     provider = GeminiLLM("gemini-test")
     monkeypatch.setattr(
@@ -323,7 +323,7 @@ async def test_gemini_provider_accumulates_tool_result_in_context(
     ``toolResult`` role, proving history accumulation flows through
     GeminiLLM.stream() → agent_loop.
     """
-    from app.core.providers.gemini_provider import GeminiLLM
+    from app.core.providers.gemini import GeminiLLM
 
     seen_per_call: list[int] = []
     second_call_roles: list[str] = []
@@ -421,7 +421,7 @@ def test_compose_thinking_config_defaults_per_model() -> None:
     on internal reasoning. We pin per-model defaults so an unconfigured
     chat turn stays interactive.
     """
-    from app.core.providers.gemini_provider import compose_thinking_config
+    from app.core.providers.gemini.provider import compose_thinking_config
 
     flash_lite = compose_thinking_config(reasoning_effort=None, model_id="gemini-3.1-flash-lite")
     assert _thinking_level(flash_lite) == "minimal"
@@ -439,7 +439,7 @@ def test_compose_thinking_config_defaults_per_model() -> None:
 def test_compose_thinking_config_honours_explicit_override() -> None:
     """An explicit ``reasoning_effort`` from the /thinking picker
     always wins over the per-model default."""
-    from app.core.providers.gemini_provider import compose_thinking_config
+    from app.core.providers.gemini.provider import compose_thinking_config
 
     cfg = compose_thinking_config(reasoning_effort="high", model_id="gemini-3.1-flash-lite")
     assert _thinking_level(cfg) == "high"
@@ -449,7 +449,7 @@ def test_compose_thinking_config_maps_minimal_and_extra_high() -> None:
     """Pawrrtal's five-level enum collapses onto Gemini's four-level
     enum: ``minimal`` rides through unchanged, ``extra-high`` saturates
     at ``high``."""
-    from app.core.providers.gemini_provider import compose_thinking_config
+    from app.core.providers.gemini.provider import compose_thinking_config
 
     cfg_min = compose_thinking_config(reasoning_effort="minimal", model_id="gemini-3.5-flash")
     assert _thinking_level(cfg_min) == "minimal"
@@ -464,7 +464,7 @@ def test_gemini_usage_accumulator_sums_across_requests() -> None:
     accumulator sums per-request totals across requests, with
     thinking tokens billed as output (per the Gemini Thinking docs).
     """
-    from app.core.providers.gemini_provider import GeminiUsageAccumulator
+    from app.core.providers.gemini.provider import GeminiUsageAccumulator
 
     acc = GeminiUsageAccumulator()
     acc.absorb_request(prompt_tokens=100, candidates_tokens=50, thoughts_tokens=20)
@@ -480,7 +480,7 @@ def test_gemini_usage_accumulator_sums_across_requests() -> None:
 def test_gemini_usage_accumulator_ignores_empty_records() -> None:
     """Pure-failure paths (no tokens at all) leave ``saw_any`` false so
     the provider skips emitting a zero-token usage event."""
-    from app.core.providers.gemini_provider import GeminiUsageAccumulator
+    from app.core.providers.gemini.provider import GeminiUsageAccumulator
 
     acc = GeminiUsageAccumulator()
     acc.absorb_request(prompt_tokens=0, candidates_tokens=0, thoughts_tokens=0)

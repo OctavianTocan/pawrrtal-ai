@@ -21,8 +21,8 @@ from uuid import UUID
 
 import pytest
 
+from app.core.agent_loop.tools import build_agent_tools
 from app.core.agent_loop.types import AgentTool
-from app.core.agent_tools import build_agent_tools
 from app.core.plugins import (
     EnvKeySpec,
     Plugin,

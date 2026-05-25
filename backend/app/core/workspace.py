@@ -48,7 +48,7 @@ from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from app.core.config import settings
-from app.core.heartbeat_template import HEARTBEAT_MD
+from app.core.heartbeat import HEARTBEAT_MD
 from app.core.persona_bootstrap import seed_persona_bootstrap
 
 log = logging.getLogger(__name__)

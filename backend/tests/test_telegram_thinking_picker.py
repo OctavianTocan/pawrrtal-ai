@@ -279,7 +279,7 @@ def test_grok_picker_minimal_button_maps_to_no_thinking_for_xai() -> None:
     boundary here keeps the picker UI and the provider mapping
     locked in step.
     """
-    from app.core.providers.xai_provider import _map_reasoning_effort
+    from app.core.providers.xai.provider import _map_reasoning_effort
 
     try:
         from xai_sdk.proto.v6 import chat_pb2

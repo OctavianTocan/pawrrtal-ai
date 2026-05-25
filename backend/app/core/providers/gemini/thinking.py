@@ -11,7 +11,7 @@ The safe-default lookup table exists because Gemini 3 series models
 default to ``thinking_level=high`` upstream, which counts thinking
 tokens against ``maxOutputTokens``. On tool follow-up turns the model
 routinely exhausts that budget on internal reasoning and returns
-``stop_reason=stop`` with an empty text part — the
+`stop_reason=stop` with an empty text part — the
 ``TELEGRAM_TOOL_ONLY_TURN`` empty-bubble bug. We pin per-model
 defaults so an unconfigured chat turn stays interactive; users who
 want deeper reasoning opt in via ``/thinking``.
@@ -21,7 +21,7 @@ from __future__ import annotations
 
 from google.genai import types as gtypes
 
-from .base import ReasoningEffort
+from app.core.providers.base import ReasoningEffort
 
 # Map Pawrrtal's five-level ``ReasoningEffort`` literal onto Gemini 3's
 # four-level ``thinking_level`` enum. ``extra-high`` saturates at

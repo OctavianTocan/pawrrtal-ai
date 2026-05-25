@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.core.agent_tools import build_agent_tools
+from app.core.agent_loop.tools import build_agent_tools
 
 
 @pytest.fixture
@@ -79,7 +79,7 @@ class TestVirtualPythonGate:
         # regardless of any local .env override.
         with (
             patch("app.core.keys.resolve_api_key", return_value=None),
-            patch("app.core.agent_tools.settings.virtual_python_enabled", False),
+            patch("app.core.agent_loop.tools.settings.virtual_python_enabled", False),
         ):
             tools = build_agent_tools(workspace_root=tmp_workspace)
 
@@ -89,7 +89,7 @@ class TestVirtualPythonGate:
     def test_python_present_when_enabled(self, tmp_workspace: Path) -> None:
         with (
             patch("app.core.keys.resolve_api_key", return_value=None),
-            patch("app.core.agent_tools.settings.virtual_python_enabled", True),
+            patch("app.core.agent_loop.tools.settings.virtual_python_enabled", True),
         ):
             tools = build_agent_tools(workspace_root=tmp_workspace)
 
@@ -101,7 +101,7 @@ class TestVirtualPythonGate:
         send_fn = _make_send_fn()
         with (
             patch("app.core.keys.resolve_api_key", return_value=None),
-            patch("app.core.agent_tools.settings.virtual_python_enabled", True),
+            patch("app.core.agent_loop.tools.settings.virtual_python_enabled", True),
         ):
             tools = build_agent_tools(workspace_root=tmp_workspace, send_fn=send_fn)
 

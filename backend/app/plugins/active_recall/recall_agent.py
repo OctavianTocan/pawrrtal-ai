@@ -7,6 +7,7 @@ from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.channels.telegram_html import md_to_telegram_html
 from app.core.agent_loop.types import AgentTool
 from app.core.config import settings
 from app.core.plugins.types import PreTurnHookContext
@@ -94,8 +95,10 @@ async def _collect_stream_telemetry(
 
         reply = "".join(tel.parts).strip()
         if reply:
-            safe_reply = html_lib.escape(reply)
-            html += f"\n\n<i>{safe_reply}</i>"
+            rendered_reply = md_to_telegram_html(reply)
+            if rendered_reply is reply:
+                rendered_reply = html_lib.escape(reply)
+            html += f"\n\n<i>{rendered_reply}</i>"
 
         with contextlib.suppress(Exception):
             await draft_updater(html)

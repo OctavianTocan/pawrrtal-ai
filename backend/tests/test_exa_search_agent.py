@@ -159,7 +159,7 @@ class TestGeminiToolPassthrough:
         import uuid
 
         from app.core.agent_loop.types import AgentMessage
-        from app.core.providers.gemini_provider import GeminiLLM
+        from app.core.providers.gemini import GeminiLLM
 
         in_tools = [make_exa_search_tool()]
         captured_tools: list[AgentTool] | None = None
@@ -202,7 +202,7 @@ class TestGeminiToolPassthrough:
         import uuid
 
         from app.core.agent_loop.types import AgentMessage
-        from app.core.providers.gemini_provider import GeminiLLM
+        from app.core.providers.gemini import GeminiLLM
 
         captured_tools: list[AgentTool] | None = None
 
@@ -240,7 +240,7 @@ class TestGeminiToolPassthrough:
         """
         import uuid
 
-        from app.core.providers.gemini_provider import GeminiLLM
+        from app.core.providers.gemini import GeminiLLM
         from tests.agent_harness import ScriptedStreamFn, text_turn, tool_call_turn
 
         exa_tool = make_exa_search_tool()

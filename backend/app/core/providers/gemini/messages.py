@@ -27,7 +27,7 @@ from app.core.agent_loop.types import (
 from app.core.config import settings
 from app.core.keys import resolve_api_key
 
-from ._gemini_replay import replay_content_for
+from .replay import replay_content_for
 
 logger = logging.getLogger(__name__)
 

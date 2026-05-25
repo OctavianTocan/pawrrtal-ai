@@ -12,6 +12,7 @@ import logging
 import uuid
 
 import pytest
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.providers.catalog import MODEL_CATALOG, default_model
 from app.db import User
@@ -19,7 +20,9 @@ from app.integrations.telegram.model_defaults import resolve_effective_model_id
 
 
 @pytest.mark.anyio
-async def test_resolve_returns_conversation_override_when_set(db_session, test_user: User) -> None:
+async def test_resolve_returns_conversation_override_when_set(
+    db_session: AsyncSession, test_user: User
+) -> None:
     """Conversation override beats user default beats catalog default."""
     pinned = MODEL_CATALOG[1].id
     resolved = await resolve_effective_model_id(
@@ -32,7 +35,7 @@ async def test_resolve_returns_conversation_override_when_set(db_session, test_u
 
 @pytest.mark.anyio
 async def test_resolve_falls_back_to_user_default_when_no_override(
-    db_session, test_user: User
+    db_session: AsyncSession, test_user: User
 ) -> None:
     """When conversation has no override, the user's pinned default wins."""
     from app.crud.user_preferences import set_user_default_model_id
@@ -53,7 +56,7 @@ async def test_resolve_falls_back_to_user_default_when_no_override(
 
 @pytest.mark.anyio
 async def test_resolve_falls_back_to_catalog_default_when_user_default_unset(
-    db_session, test_user: User
+    db_session: AsyncSession, test_user: User
 ) -> None:
     """No conversation override + no user default → catalog default."""
     resolved = await resolve_effective_model_id(
@@ -66,7 +69,7 @@ async def test_resolve_falls_back_to_catalog_default_when_user_default_unset(
 
 @pytest.mark.anyio
 async def test_resolve_skips_stale_user_default_and_logs(
-    db_session,
+    db_session: AsyncSession,
     test_user: User,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -97,7 +100,7 @@ async def test_resolve_skips_stale_user_default_and_logs(
 
 @pytest.mark.anyio
 async def test_resolve_does_not_log_when_no_user_default(
-    db_session,
+    db_session: AsyncSession,
     test_user: User,
     caplog: pytest.LogCaptureFixture,
 ) -> None:

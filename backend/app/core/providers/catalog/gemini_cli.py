@@ -17,8 +17,9 @@ Models exposed match Gemini CLI's ``--model`` accept list.
 
 from __future__ import annotations
 
-from ._catalog_entries import ModelEntry
-from .model_id import Host, Vendor
+from app.core.providers.model_id import Host, Vendor
+
+from .entries import ModelEntry
 
 _GEMINI_CLI_IN_USD = 0.0
 _GEMINI_CLI_OUT_USD = 0.0

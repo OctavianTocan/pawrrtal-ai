@@ -8,7 +8,7 @@ from httpx import AsyncClient
 
 from app.core.agent_loop.types import AgentSafetyConfig
 from app.core.providers.catalog import default_model
-from app.core.providers.gemini_provider import GeminiLLM
+from app.core.providers.gemini import GeminiLLM
 from app.models import Workspace  # used via fixture type hint
 from tests.agent_harness import ScriptedStreamFn, echo_tool, text_turn, tool_call_turn
 
@@ -347,7 +347,7 @@ async def test_chat_safety_layer_fires_and_surfaces_agent_terminated(
 
     # Limit to 3 iterations via the safety factory.
     monkeypatch.setattr(
-        "app.core.providers.gemini_provider.safety_from_settings",
+        "app.core.providers.gemini.provider.safety_from_settings",
         lambda _settings: AgentSafetyConfig(
             max_iterations=3,
             max_wall_clock_seconds=None,

@@ -264,10 +264,10 @@ async def refresh_token(
 def _clamp_interval(value: object) -> int:
     """Coerce + clamp the poll-interval value to the safe range."""
     try:
-        interval = int(value)  # type: ignore[arg-type]
+        interval = int(value)  # type: ignore[call-overload]
     except (TypeError, ValueError):
         interval = int(_MIN_POLL_INTERVAL_SECONDS)
-    return max(int(_MIN_POLL_INTERVAL_SECONDS), min(int(_MAX_POLL_INTERVAL_SECONDS), interval))
+    return int(max(int(_MIN_POLL_INTERVAL_SECONDS), min(int(_MAX_POLL_INTERVAL_SECONDS), interval)))
 
 
 def _safe_json(response: httpx.Response) -> object:

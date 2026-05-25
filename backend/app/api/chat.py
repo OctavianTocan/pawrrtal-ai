@@ -27,8 +27,8 @@ from app.api._chat_permissions import (
 # fan-out under sentrux's ``no_god_files`` budget.
 from app.channels import ChannelMessage, resolve_channel, surface_from_header
 from app.channels.turn_runner import ChatTurnInput, EventHook, run_turn
-from app.core.agent_hooks import build_pre_turn_hooks
-from app.core.agent_tools import build_agent_tools
+from app.core.agent_loop.hooks import build_pre_turn_hooks
+from app.core.agent_loop.tools import build_agent_tools
 from app.core.providers import StreamEvent, default_model, resolve_llm
 from app.core.request_logging import get_request_id
 from app.core.tools.artifact_agent import (

@@ -288,7 +288,7 @@ def test_artifact_tool_is_registered_in_build_agent_tools(tmp_path: Path) -> Non
     It also verifies no duplicate tool names are registered.
     """
 
-    from app.core.agent_tools import build_agent_tools
+    from app.core.agent_loop.tools import build_agent_tools
 
     tools = build_agent_tools(workspace_root=tmp_path)
     tool_names = [t.name for t in tools]

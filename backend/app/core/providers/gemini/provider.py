@@ -13,6 +13,9 @@ from google import genai as genai  # noqa: PLC0414
 from google.genai import types as gtypes
 
 from app.core.agent_loop import (
+    DEFAULT_AGENT_SYSTEM_PROMPT as _FALLBACK_SYSTEM_PROMPT,
+)
+from app.core.agent_loop import (
     AgentContext,
     AgentLoopConfig,
     AgentMessage,
@@ -33,29 +36,26 @@ from app.core.agent_loop.types import (
     TextContent,
     ToolCallContent,
 )
-from app.core.agent_system_prompt import (
-    DEFAULT_AGENT_SYSTEM_PROMPT as _FALLBACK_SYSTEM_PROMPT,
-)
 from app.core.config import settings
 from app.core.governance.cost_tracker import compute_cost_usd
+from app.core.providers._stream_logging import log_provider_stream_event
+from app.core.providers.base import ReasoningEffort, StreamEvent
 
-from ._gemini_events import agent_event_to_stream_event, identity_convert
-from ._gemini_messages import (
+from .events import agent_event_to_stream_event, identity_convert
+from .messages import (
     build_gemini_contents,
     build_gemini_tool_declarations,
     resolve_gemini_api_key,
     split_chunk_text,
     tool_calls_from_chunk,
 )
-from ._gemini_replay import function_call_content_for
-from ._gemini_thinking import compose_thinking_config
-from ._gemini_usage import (
+from .replay import function_call_content_for
+from .thinking import compose_thinking_config
+from .usage import (
     GeminiUsageAccumulator,
     absorb_request_usage,
     gemini_catalog_entry,
 )
-from ._stream_logging import log_provider_stream_event
-from .base import ReasoningEffort, StreamEvent
 
 __all__ = [
     "GeminiLLM",

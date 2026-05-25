@@ -58,25 +58,25 @@ from claude_agent_sdk import (
     query,
 )
 
-from app.core.agent_loop.display import tool_display_map
-from app.core.agent_loop.types import AgentTool, PermissionCheckFn
-from app.core.agent_system_prompt import (
+from app.core.agent_loop import (
     DEFAULT_AGENT_SYSTEM_PROMPT as _DEFAULT_SYSTEM_PROMPT,
 )
+from app.core.agent_loop.display import tool_display_map
+from app.core.agent_loop.types import AgentTool, PermissionCheckFn
 from app.core.config import settings as _settings
 from app.core.keys import resolve_api_key
+from app.core.providers._stream_logging import log_provider_stream_event
+from app.core.providers.base import ReasoningEffort, StreamEvent
 
-from ._claude_tool_bridge import (
+from .tool_bridge import (
     MCP_SERVER_NAME as AGENT_TOOL_MCP_SERVER_NAME,
 )
-from ._claude_tool_bridge import (
+from .tool_bridge import (
     allowed_tool_ids,
     build_mcp_server,
     claude_tool_id,
     make_can_use_tool,
 )
-from ._stream_logging import log_provider_stream_event
-from .base import ReasoningEffort, StreamEvent
 
 logger = logging.getLogger(__name__)
 
@@ -567,8 +567,9 @@ class ClaudeLLM:
 
         # First turn: seed a brand-new SDK session that uses the same UUID
         # as our conversation. Subsequent turns: resume it.  ``force_fresh_session``
-        # (PR 05) skips the resume probe so the resume-failure fallback path
-        # in :meth:`stream` can re-issue the same conversation as a fresh session.
+        # (PR 05) skips the resume probe and
+        # seeds a brand-new SDK session.  Used by the resume-failure
+        # fallback path in :meth:`stream` so a single conversation
         if not force_fresh_session and _session_exists(session_id, self._config.cwd):
             kwargs["resume"] = session_id
         else:
@@ -799,14 +800,14 @@ def _session_exists(session_id: str, directory: str | None) -> bool:
         return False
 
 
-# Event-translation helpers live in ``_claude_events`` so this file
-# stays under the 500-line gate.  Re-exported here because the existing
+# Event-translation helpers live in ``events`` so this file
+# stays under the 500-line gate (exempted). Re-exported here because the existing
 # tests + provider code import them from this module — keeping the
 # import surface stable means the split is internal-only. Late import is
 # intentional: it must follow the class definitions above so the module
 # graph round-trips without a circular reference; ruff's E402 doesn't
 # express this constraint, so it's silenced explicitly.
-from ._claude_events import (  # noqa: E402  (deliberate post-class re-export)
+from .events import (  # noqa: E402  (deliberate post-class re-export)
     _error_event,
     _events_from_assistant,
     _events_from_message,

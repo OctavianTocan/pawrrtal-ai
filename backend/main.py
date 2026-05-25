@@ -281,4 +281,4 @@ def with_cors(asgi_app: ASGIApp) -> ASGIApp:
 
 
 # Create the app instance.
-app = with_cors(create_app())
+app = with_cors(create_app())  # type: ignore[assignment]

@@ -65,6 +65,9 @@ from xai_sdk import AsyncClient
 from xai_sdk.proto import chat_pb2
 
 from app.core.agent_loop import (
+    DEFAULT_AGENT_SYSTEM_PROMPT as _FALLBACK_SYSTEM_PROMPT,
+)
+from app.core.agent_loop import (
     AgentContext,
     AgentLoopConfig,
     AgentMessage,
@@ -83,23 +86,20 @@ from app.core.agent_loop.types import (
     PermissionCheckFn,
     TextContent,
 )
-from app.core.agent_system_prompt import (
-    DEFAULT_AGENT_SYSTEM_PROMPT as _FALLBACK_SYSTEM_PROMPT,
-)
 from app.core.config import settings
 from app.core.keys import resolve_api_key
+from app.core.providers._stream_logging import log_provider_stream_event
+from app.core.providers.base import ReasoningEffort, StreamEvent
 
-from ._stream_logging import log_provider_stream_event
-from ._xai_events import agent_event_to_stream_event, identity_convert
-from ._xai_messages import build_xai_messages, build_xai_tools
-from ._xai_stream import (
+from .events import agent_event_to_stream_event, identity_convert
+from .messages import build_xai_messages, build_xai_tools
+from .stream import (
     UsageAccumulator,
     deltas_from_chunk,
     done_event_from_response,
     tool_call_events_from_response,
     usage_record_from_response,
 )
-from .base import ReasoningEffort, StreamEvent
 
 logger = logging.getLogger(__name__)
 

@@ -72,7 +72,7 @@ _THIS_FILE = Path(__file__)
 
 logger = logging.getLogger(__name__)
 
-_BACKEND_DIR = _THIS_FILE.resolve().parents[2]
+_BACKEND_DIR = _THIS_FILE.resolve().parents[3]
 
 _initialised = False
 _tracer_provider: TracerProvider | None = None
