@@ -20,7 +20,7 @@
 [![Linted with Biome](https://img.shields.io/badge/Linted_with-Biome-60a5fa?style=flat&logo=biome)](https://biomejs.dev)
 [![Sentrux](https://img.shields.io/badge/Architecture-Sentrux-7c3aed?style=flat)](https://github.com/sentrux/sentrux)
 
-**Pawrrtal** is a personal AI assistant, a "Paw" of your own, that runs across the web, desktop shells, Telegram, scheduled jobs, and webhook-triggered workflows. Every user gets their own **workspace**: a filesystem-backed agent home with memory, skills, artifacts, tasks, and encrypted credentials. The agent reads and writes through a workspace-scoped tool layer, calls curated tools, and reasons against workspace context (`SOUL.md`, `AGENTS.md`, `BOOTSTRAP.md`, skills) instead of a one-size-fits-all system prompt.
+**Pawrrtal** is a personal AI assistant, a "Paw" of your own, that runs across the web, desktop shells, Telegram, scheduled jobs, and webhook-triggered workflows. Every user gets their own **workspace**: a filesystem-backed agent home with memory, skills, artifacts, tasks, and encrypted credentials. The agent reads and writes through a workspace-scoped tool layer, calls curated tools, and reasons against workspace context (`SOUL.md`, `AGENTS.md`, `USER.md`, `PREFERENCES.md`, and `.agent/skills`) instead of a one-size-fits-all system prompt.
 
 > **Pawrrtal vs an "AI chatbot"**: Pawrrtal is not just a Gemini wrapper. It runs a provider-agnostic agent loop over a stable `AgentTool` contract, supports Claude and Gemini through one model catalog, resolves provider keys per workspace, exposes plugin tools, streams over web/electron and Telegram, and keeps governance data such as cost, audit events, and traces in the same FastAPI core.
 
@@ -90,11 +90,11 @@ Telegram is a first-class channel, not just a notification bridge.
 - **Default workspace required for chat**: The chat endpoint returns 412 when onboarding has not produced a default workspace or the workspace directory is missing.
 - **Multiple workspaces**: Users can list owned workspaces. The UI currently treats the default workspace as the active agent home.
 - **Filesystem-backed agent home**: Workspaces are real directories under `{WORKSPACE_BASE_DIR}/{workspace_id}`.
-- **Seeded context files**: Workspace prompt context is assembled from the workspace files, including core agent instructions, `SOUL.md`, `AGENTS.md`, `BOOTSTRAP.md`, settings, and skills metadata.
+- **Seeded context files**: Workspace prompt context is assembled from root workspace files (`SOUL.md`, `AGENTS.md`, `USER.md`, `PREFERENCES.md`) plus `.agent/skills` and `.agent/protocols`.
 - **File tree API**: The web app can list workspace files as a flat tree.
 - **Text file API**: UTF-8 files can be read, created/replaced, and deleted through authenticated workspace routes.
 - **Binary serving**: Files from the default workspace can be served back with detected MIME type for images, audio, and other agent-produced artifacts.
-- **Skill listing**: The workspace skill endpoint reads `skills/_manifest.jsonl` and falls back to directory discovery.
+- **Skill listing**: The workspace skill endpoint discovers skill directories under `.agent/skills`.
 - **Encrypted workspace env**: Each workspace has its own Fernet-encrypted `.env` file with `0600` permissions.
 - **Env resolution order**: workspace override, then gateway fallback where supported, then absent.
 - **Overridable keys**: `GEMINI_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`, `OPENAI_API_KEY`, `XAI_API_KEY`, `OPENCODE_API_KEY`, `EXA_API_KEY`, `OPENAI_CODEX_OAUTH_TOKEN`, and `NOTION_API_KEY`.

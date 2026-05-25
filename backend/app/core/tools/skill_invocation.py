@@ -44,7 +44,7 @@ log = logging.getLogger(__name__)
 _MAX_SKILL_BODY_BYTES = 32_000
 _MAX_SKILL_BODY_LINES = 800
 _SKILL_MD_NAME = "SKILL.md"
-_SKILLS_DIR = "skills"
+_SKILLS_DIR = ".agent/skills"
 
 
 def _resolve_skill_path(workspace_root: Path, skill_name: str) -> Path:

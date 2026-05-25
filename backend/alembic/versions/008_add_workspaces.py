@@ -21,9 +21,9 @@ def upgrade() -> None:
     """Create the workspaces table.
 
     One user can own many workspaces.  Each workspace is a named agent home
-    directory on the host filesystem following the OpenClaw standard layout
-    (AGENTS.md, SOUL.md, IDENTITY.md, USER.md, TOOLS.md, memory/, skills/,
-    artifacts/).
+    directory on the host filesystem following the Pawrrtal workspace layout
+    (root prompt files plus internal memory, protocols, harness, tools, and
+    skills under ``.agent``).
 
     The ``path`` column stores the absolute filesystem path so agents and API
     endpoints can resolve files without reconstructing the path from user IDs.
