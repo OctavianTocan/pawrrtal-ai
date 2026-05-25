@@ -74,8 +74,14 @@ async def finalize_turn_delivery(
             placeholder_message_id,
         )
 
-    if text_message_id is not None and text_buffer:
-        await safe_edit(bot, chat_id, text_message_id, text_buffer)
+    # Prefer ``final_text`` (the caller's authoritative ``answer_text``)
+    # over ``text_buffer`` when both diverge — defence in depth against
+    # the #346 regression class where ``text_buffer`` lagged the live
+    # accumulator. ``text_buffer`` is the fallback for callers that
+    # opened an interleaved message without producing a separate
+    # ``final_text`` for the closing reply.
+    if text_message_id is not None and (final_text or text_buffer):
+        await safe_edit(bot, chat_id, text_message_id, final_text or text_buffer)
         return
 
     if final_text:

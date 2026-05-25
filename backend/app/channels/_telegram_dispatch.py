@@ -415,10 +415,15 @@ async def dispatch_text_delta(
         )
         return text_buffer, text_message_id, chars_since_edit, last_edit_at, True
 
-    # Legacy editMessageText path: only open / continue an interleaved text
-    # message on a block transition. Pure-text or same-block deltas keep
-    # accumulating into ``answer_text`` for the closing reply.
-    if previous_block_kind is None or (previous_block_kind == "text" and text_message_id is None):
+    # Legacy editMessageText path: only open an interleaved text
+    # message on a block transition. Pure-text turns (no prior block)
+    # keep accumulating into ``answer_text`` for the closing reply.
+    # ``previous_block_kind == "text"`` now FALLS THROUGH so subsequent
+    # same-block deltas EXTEND the open interleaved message instead of
+    # being dropped (#346): the previous short-circuit on ``"text"``
+    # caused only the first chunk to render whenever text followed a
+    # thinking / tools block.
+    if previous_block_kind is None:
         return text_buffer, text_message_id, chars_since_edit, last_edit_at, False
     if previous_block_kind != "text":
         text_message_id = None
