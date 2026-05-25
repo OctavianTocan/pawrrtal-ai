@@ -28,6 +28,17 @@ from html.parser import HTMLParser
 from markdown_it import MarkdownIt
 
 _md = MarkdownIt()
+_original_validate = _md.validateLink
+
+
+def _custom_validate_link(url: str) -> bool:
+    url_lower = url.strip().lower()
+    if url_lower.startswith("file:"):
+        return True
+    return _original_validate(url)
+
+
+_md.validateLink = _custom_validate_link  # type: ignore[method-assign]
 
 _BLANK_LINE_RUN = re.compile(r"\n{3,}")
 
@@ -95,6 +106,7 @@ class _TelegramRenderer(HTMLParser):
         self._open_tags: list[str] = []
         self._in_pre = False
         self._skip_stack: list[str] = []
+        self._link_is_file: list[bool] = []
 
     # ------------------------------------------------------------------
     # HTMLParser overrides
@@ -185,7 +197,12 @@ class _TelegramRenderer(HTMLParser):
                 self._buf.append("\n")
             case "a":
                 href = _html.escape(dict(attrs).get("href", "") or "")
-                self._buf.append(f'<a href="{href}">')
+                if href.startswith("file://"):
+                    self._link_is_file.append(True)
+                    self._buf.append("<u>")
+                else:
+                    self._link_is_file.append(False)
+                    self._buf.append(f'<a href="{href}">')
             case "blockquote":
                 self._buf.append("<blockquote>")
             case "pre":
@@ -222,7 +239,11 @@ class _TelegramRenderer(HTMLParser):
             case "li":
                 pass
             case "a":
-                self._buf.append("</a>")
+                is_file = self._link_is_file.pop() if self._link_is_file else False
+                if is_file:
+                    self._buf.append("</u>")
+                else:
+                    self._buf.append("</a>")
             case "blockquote":
                 self._buf.append("</blockquote>")
             case "pre":
