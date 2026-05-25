@@ -216,6 +216,7 @@ async def safe_send_text(
     *,
     reply_to_message_id: int | None,
     message_thread_id: int | None,
+    reply_markup: Any | None = None,
 ) -> int | None:
     """Send Markdown-ish text after converting it to Telegram HTML."""
     return await safe_send_html(
@@ -224,6 +225,7 @@ async def safe_send_text(
         md_to_telegram_html(text),
         reply_to_message_id=reply_to_message_id,
         message_thread_id=message_thread_id,
+        reply_markup=reply_markup,
     )
 
 
@@ -234,6 +236,7 @@ async def safe_send_html(
     *,
     reply_to_message_id: int | None,
     message_thread_id: int | None,
+    reply_markup: Any | None = None,
 ) -> int | None:
     """Call ``send_message`` with routing metadata, returning the message id.
 
@@ -243,25 +246,35 @@ async def safe_send_html(
     first chunk replies to ``reply_to_message_id``; the rest land as
     sibling messages in the same thread so the chain reads naturally.
 
+    ``reply_markup`` (#368) attaches an inline keyboard (e.g. the
+    regenerate button) to the *last* chunk so the button sits directly
+    below the final answer text.
+
     Returns the message_id of the *first* chunk so existing callers
     that pin/edit/delete a single message keep working unchanged.
     """
     chunks = chunk_html_for_telegram(html)
     first_id: int | None = None
+    last_index = len(chunks) - 1
     for index, chunk in enumerate(chunks):
         # Subsequent chunks should not "reply" to the original anchor —
         # they're continuations, not separate replies. Threading still
         # routes them into the right topic via ``message_thread_id``.
         chunk_reply_to = reply_to_message_id if index == 0 else None
+        send_kwargs: dict[str, Any] = {
+            "chat_id": chat_id,
+            "text": chunk,
+            **routing_kwargs(
+                reply_to_message_id=chunk_reply_to,
+                message_thread_id=message_thread_id,
+            ),
+        }
+        # Attach the markup to the last chunk only so the button
+        # appears directly below the complete answer.
+        if reply_markup is not None and index == last_index:
+            send_kwargs["reply_markup"] = reply_markup
         try:
-            sent = await bot.send_message(
-                chat_id=chat_id,
-                text=chunk,
-                **routing_kwargs(
-                    reply_to_message_id=chunk_reply_to,
-                    message_thread_id=message_thread_id,
-                ),
-            )
+            sent = await bot.send_message(**send_kwargs)
         except _aiogram_errors() as exc:
             logger.warning(
                 "TELEGRAM_SEND_FAILED chat_id=%s chunk=%d/%d error=%s",

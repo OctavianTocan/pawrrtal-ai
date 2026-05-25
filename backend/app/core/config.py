@@ -325,6 +325,11 @@ class Settings(BaseSettings):
     # for animated streaming. Falls back to ``editMessageText`` when
     # aiogram doesn't expose the binding.
     telegram_use_draft_streaming: bool = False
+    # When True, every assistant reply on Telegram carries a "🔄 Regenerate"
+    # inline-keyboard button (#368). Tapping the button replays the last
+    # user message through the turn pipeline. Off by default so the
+    # rollout is gradual.
+    telegram_regenerate_button_enabled: bool = False
     # When True, the Telegram bot uses a per-chat FIFO turn queue
     # (``ChatMessageQueueDispatcher``) instead of the legacy
     # "cancel previous task" behaviour. Mid-turn user messages
