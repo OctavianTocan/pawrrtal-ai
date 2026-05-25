@@ -24,7 +24,7 @@ async def test_cron_create_returns_disabled_when_scheduler_off(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(cron_tools, "get_active_scheduler", lambda: None)
-    tool = cron_tools.make_cron_create_tool(user_id=_USER_ID)
+    tool = cron_tools.make_reminder_schedule_tool(user_id=_USER_ID)
     result = await tool.execute(
         "call-1",
         name="daily standup",
@@ -39,7 +39,7 @@ async def test_cron_create_rejects_missing_required_fields(
 ) -> None:
     scheduler = AsyncMock()
     monkeypatch.setattr(cron_tools, "get_active_scheduler", lambda: scheduler)
-    tool = cron_tools.make_cron_create_tool(user_id=_USER_ID)
+    tool = cron_tools.make_reminder_schedule_tool(user_id=_USER_ID)
     result = await tool.execute("call-1", name="x")
     assert "requires" in result.lower()
     scheduler.add_job.assert_not_called()
@@ -55,7 +55,7 @@ async def test_cron_create_invokes_scheduler_add_job(
     row.cron_expression = "0 9 * * 1-5"
     scheduler.add_job.return_value = row
     monkeypatch.setattr(cron_tools, "get_active_scheduler", lambda: scheduler)
-    tool = cron_tools.make_cron_create_tool(user_id=_USER_ID)
+    tool = cron_tools.make_reminder_schedule_tool(user_id=_USER_ID)
     result = await tool.execute(
         "call-1",
         name="daily standup",
@@ -77,21 +77,21 @@ async def test_cron_create_surfaces_invalid_cron_expression(
     scheduler = AsyncMock()
     scheduler.add_job.side_effect = ValueError("bad cron")
     monkeypatch.setattr(cron_tools, "get_active_scheduler", lambda: scheduler)
-    tool = cron_tools.make_cron_create_tool(user_id=_USER_ID)
+    tool = cron_tools.make_reminder_schedule_tool(user_id=_USER_ID)
     result = await tool.execute(
         "call-1",
         name="oops",
         cron_expression="not a cron",
         prompt="prompt",
     )
-    assert "[invalid_cron]" in result
+    assert "[invalid_schedule]" in result
 
 
 async def test_cron_list_returns_disabled_when_scheduler_off(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(cron_tools, "get_active_scheduler", lambda: None)
-    tool = cron_tools.make_cron_list_tool(user_id=_USER_ID)
+    tool = cron_tools.make_reminder_list_tool(user_id=_USER_ID)
     result = await tool.execute("call-1")
     assert "[scheduler_disabled]" in result
 
@@ -101,7 +101,7 @@ async def test_cron_delete_rejects_empty_job_id(
 ) -> None:
     scheduler = AsyncMock()
     monkeypatch.setattr(cron_tools, "get_active_scheduler", lambda: scheduler)
-    tool = cron_tools.make_cron_delete_tool(user_id=_USER_ID)
+    tool = cron_tools.make_reminder_cancel_tool(user_id=_USER_ID)
     result = await tool.execute("call-1", job_id="")
     assert "requires" in result.lower()
     scheduler.remove_job.assert_not_called()
@@ -112,7 +112,7 @@ async def test_cron_delete_rejects_malformed_uuid(
 ) -> None:
     scheduler = AsyncMock()
     monkeypatch.setattr(cron_tools, "get_active_scheduler", lambda: scheduler)
-    tool = cron_tools.make_cron_delete_tool(user_id=_USER_ID)
+    tool = cron_tools.make_reminder_cancel_tool(user_id=_USER_ID)
     result = await tool.execute("call-1", job_id="not-a-uuid")
     assert "[invalid_job_id]" in result
 
@@ -121,6 +121,6 @@ async def test_cron_delete_disabled_when_scheduler_off(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(cron_tools, "get_active_scheduler", lambda: None)
-    tool = cron_tools.make_cron_delete_tool(user_id=_USER_ID)
+    tool = cron_tools.make_reminder_cancel_tool(user_id=_USER_ID)
     result = await tool.execute("call-1", job_id=str(_JOB_ID))
     assert "[scheduler_disabled]" in result

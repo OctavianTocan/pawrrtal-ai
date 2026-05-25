@@ -78,7 +78,8 @@ class ScheduledJobRead(BaseModel):
 
     id: uuid.UUID
     name: str
-    cron_expression: str
+    cron_expression: str | None = None
+    fire_at: datetime | None = None
     prompt: str
     skill_name: str | None = None
     target_chat_ids: list[str] = []
@@ -104,8 +105,9 @@ class ScheduledJobCreate(BaseModel):
 
     name: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128)]
     cron_expression: Annotated[
-        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128)
-    ]
+        str | None, StringConstraints(strip_whitespace=True, min_length=1, max_length=128)
+    ] = None
+    fire_at: datetime | None = None
     prompt: Annotated[str, StringConstraints(min_length=1)]
     skill_name: str | None = None
     target_chat_ids: list[str] = []
@@ -118,6 +120,7 @@ class ScheduledJobUpdate(BaseModel):
 
     name: str | None = None
     cron_expression: str | None = None
+    fire_at: datetime | None = None
     prompt: str | None = None
     skill_name: str | None = None
     target_chat_ids: list[str] | None = None

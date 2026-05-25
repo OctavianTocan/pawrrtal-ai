@@ -38,6 +38,7 @@ from app.channels import ChannelMessage, resolve_channel
 # ``render_initial`` is re-exported via :mod:`app.channels.telegram`
 # to keep bot.py under sentrux's ``no_god_files`` fan-out budget.
 from app.channels.telegram import SURFACE_TELEGRAM, make_telegram_sender, render_initial
+from app.channels.telegram_delivery import safe_edit_html
 from app.channels.turn_runner import ChatTurnInput, run_turn
 from app.core.agent_hooks import build_pre_turn_hooks
 from app.core.agent_tools import build_agent_tools
@@ -300,7 +301,7 @@ def _reply_parameters(message_id: int) -> ReplyParameters:
 
 
 # TODO: This is pretty nonsensical. We have a custom entire chat impkementation that just duplicates the logic here.
-async def _run_llm_turn(
+async def _run_llm_turn(  # noqa: C901, PLR0915
     *,
     message: Message,
     context: TelegramTurnContext,
@@ -338,7 +339,6 @@ async def _run_llm_turn(
         raise RuntimeError("Telegram message has no bot; refusing to stream.")
     thinking_msg = await message.answer(
         render_initial(),
-        reply_parameters=_reply_parameters(message.message_id),
     )
 
     # Keep startup imports lazy and keep fan-out count within limit
@@ -403,6 +403,23 @@ async def _run_llm_turn(
         model_id=context.model_id,
     )
 
+    has_active_recall = False
+
+    async def _draft_updater(html: str) -> None:
+        nonlocal has_active_recall
+        has_active_recall = True
+        if message.bot:
+            await safe_edit_html(message.bot, message.chat.id, thinking_msg.message_id, html)
+
+    async def _on_pre_turn_finished() -> None:
+        if has_active_recall:
+            nonlocal thinking_msg
+            # Spawn a new placeholder so the active recall message stays in the chat history
+            thinking_msg = await message.answer(
+                render_initial(),
+            )
+            channel_message["metadata"]["message_id"] = thinking_msg.message_id
+
     turn_input = ChatTurnInput(
         conversation_id=context.conversation_id,
         user_id=context.pawrrtal_user_id,
@@ -417,6 +434,9 @@ async def _run_llm_turn(
             context,
             Path(workspace.path) if workspace is not None else None,
         ),
+        # Helper to let pre-turn hooks stream progress into the placeholder message
+        draft_updater=_draft_updater,
+        on_pre_turn_finished=_on_pre_turn_finished,
         log_tag="TELEGRAM",
         log_extras={"chat_id": message.chat.id},
         verbose_level=(

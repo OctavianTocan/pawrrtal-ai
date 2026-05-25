@@ -20,6 +20,7 @@ The split is by concern, not implementation detail:
 from __future__ import annotations
 
 import logging
+from typing import Any
 
 from acp.schema import (
     AgentMessageChunk,
@@ -99,7 +100,10 @@ _DROPPED_UPDATE_TYPES: tuple[type, ...] = (
 )
 
 
-def _stream_event_for_update(update: object) -> StreamEvent | None:
+def _stream_event_for_update(
+    update: object,
+    display_by_name: dict[str, Any] | None = None,
+) -> StreamEvent | None:
     """Map one ACP session-update variant to a Pawrrtal StreamEvent.
 
     Unknown variants are logged at DEBUG so a future ACP-SDK addition
@@ -110,7 +114,7 @@ def _stream_event_for_update(update: object) -> StreamEvent | None:
     if isinstance(update, AgentThoughtChunk):
         return _delta_or_none("thinking", text_from_content_block(update.content))
     if isinstance(update, ToolCallStart):
-        return _tool_start_event(update)
+        return _tool_start_event(update, display_by_name)
     if isinstance(update, ToolCallProgress):
         return _tool_progress_event(update)
     if isinstance(update, UsageUpdate):
@@ -191,15 +195,22 @@ def _delta_or_none(event_type: str, text: str) -> StreamEvent | None:
     return StreamEvent(type=event_type, content=text) if text else None
 
 
-def _tool_start_event(update: ToolCallStart) -> StreamEvent:
+def _tool_start_event(
+    update: ToolCallStart,
+    display_by_name: dict[str, Any] | None = None,
+) -> StreamEvent:
     """Translate a ``tool_call`` notification to ``StreamEvent(type=tool_use)``."""
     raw_input = update.raw_input if isinstance(update.raw_input, dict) else {}
-    return StreamEvent(
+    name = update.kind or update.title or "tool"
+    event = StreamEvent(
         type="tool_use",
-        name=update.kind or update.title or "tool",
+        name=name,
         input=raw_input,
         tool_use_id=update.tool_call_id,
     )
+    if display_by_name is not None and name in display_by_name:
+        event["display"] = display_by_name[name]
+    return event
 
 
 def _tool_progress_event(update: ToolCallProgress) -> StreamEvent | None:

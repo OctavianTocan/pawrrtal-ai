@@ -7,7 +7,7 @@ import logging
 import time
 import uuid
 from collections import Counter
-from collections.abc import AsyncIterator, Callable, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -120,6 +120,9 @@ class ChatTurnInput:
     verbose_level: int | None = None
     # These are the pre-turn hooks that will be run before the turn is started. They come from the plugin registry (for now).
     pre_turn_hooks: list[PreTurnHook] | None = None
+    # Optional callback for pre-turn hooks to stream draft status back to the channel.
+    draft_updater: Callable[[str], Awaitable[None]] | None = None
+    on_pre_turn_finished: Callable[[], Awaitable[None]] | None = None
 
 
 @dataclass
@@ -164,6 +167,7 @@ async def _run_pre_turn_hooks(turn_input: ChatTurnInput) -> str | None:
                         user_id=turn_input.user_id,
                         question=turn_input.question,
                         workspace_root=turn_input.workspace_root or Path(),
+                        draft_updater=turn_input.draft_updater,
                     )
                 )
                 if result is not None:
@@ -223,6 +227,8 @@ async def run_turn(
 
     # --- Pre-turn hooks ---
     pre_turn_added_context: str | None = await _run_pre_turn_hooks(turn_input)
+    if turn_input.on_pre_turn_finished:
+        await turn_input.on_pre_turn_finished()
 
     # --- Main turn ---
     aggregator = ChatTurnAggregator()

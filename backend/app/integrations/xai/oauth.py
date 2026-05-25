@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # device-code shape; the operator deployment can override via
 # ``settings.xai_oauth_*`` once the upstream URL stabilises.
 DEVICE_CODE_URL = "https://api.x.ai/oauth/device/code"
-TOKEN_URL = "https://api.x.ai/oauth/token"
+TOKEN_URL = "https://api.x.ai/oauth/token"  # noqa: S105
 DEFAULT_SCOPE = "chat:read chat:write stt:read"
 
 # Network defaults. Polling intervals come from the device-code
@@ -110,7 +110,7 @@ async def request_device_code(
             logger.warning("XAI_OAUTH_DEVICE_CODE_REQUEST_FAIL error=%s", exc)
             raise OAuthError("xAI OAuth device endpoint unreachable.") from exc
 
-    if response.status_code != 200:
+    if response.status_code != 200:  # noqa: PLR2004
         logger.warning(
             "XAI_OAUTH_DEVICE_CODE_HTTP_ERR status=%s body=%s",
             response.status_code,
@@ -172,7 +172,7 @@ async def poll_for_token(
                 logger.warning("XAI_OAUTH_TOKEN_REQUEST_FAIL error=%s", exc)
                 raise OAuthError("xAI OAuth token endpoint unreachable.") from exc
 
-            if response.status_code == 200:
+            if response.status_code == 200:  # noqa: PLR2004
                 payload = response.json()
                 return DeviceCodeGrant(
                     access_token=str(payload["access_token"]),
@@ -239,7 +239,7 @@ async def refresh_token(
             logger.warning("XAI_OAUTH_REFRESH_FAIL error=%s", exc)
             raise OAuthError("xAI OAuth refresh endpoint unreachable.") from exc
 
-    if response.status_code != 200:
+    if response.status_code != 200:  # noqa: PLR2004
         error_payload = _safe_json(response)
         code = error_payload.get("error") if isinstance(error_payload, dict) else None
         logger.warning(

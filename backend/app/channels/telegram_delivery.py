@@ -164,7 +164,7 @@ def thinking_html(text: str) -> str:
     # ``<``/``&`` from the model into Telegram's HTML parser.
     if rendered is text:
         rendered = html_lib.escape(text)
-    return f"<i>{rendered}</i>"
+    return f"💭 <b>Thinking...</b>\n\n<i>{rendered}</i>"
 
 
 def optional_int(value: object) -> int | None:

@@ -1,3 +1,5 @@
+import contextlib
+import html as html_lib
 import logging
 import time
 import uuid
@@ -67,11 +69,59 @@ def _apply_stream_event(tel: _StreamTelemetry, event: dict[str, Any]) -> None:
 
 async def _collect_stream_telemetry(
     stream: AsyncIterator[Any],
+    draft_updater: Any | None = None,
 ) -> tuple[str, list[str], int, int, float, str | None]:
     """Consume provider stream, aggregate text, and collect wide-event telemetry."""
     tel = _StreamTelemetry()
+    trace_parts: list[str] = []
+
+    async def _update_draft() -> None:
+        if not draft_updater:
+            return
+
+        trace_str = " | ".join(trace_parts)
+        # Truncate so it works in one line
+        max_len = 60
+        if len(trace_str) > max_len:
+            trace_str = "..." + trace_str[-(max_len - 3) :]
+
+        safe_trace = html_lib.escape(trace_str)
+        html = (
+            f"💭 Recalling memory...\n\n<code>{safe_trace}</code>"
+            if safe_trace
+            else "💭 Recalling memory..."
+        )
+
+        reply = "".join(tel.parts).strip()
+        if reply:
+            safe_reply = html_lib.escape(reply)
+            html += f"\n\n<i>{safe_reply}</i>"
+
+        with contextlib.suppress(Exception):
+            await draft_updater(html)
+
+    # Initial draft
+    await _update_draft()
+
     async for event in stream:
+        event_type = event.get("type")
+        if event_type == "tool_use":
+            name = event.get("name") or "unknown"
+            trace_parts.append(f"{name}()")
+            await _update_draft()
+        elif event_type == "thinking":
+            if not trace_parts or trace_parts[-1] != "thinking...":
+                trace_parts.append("thinking...")
+                await _update_draft()
+        elif event_type == "delta":
+            _apply_stream_event(tel, event)
+            await _update_draft()
+            continue
+
         _apply_stream_event(tel, event)
+
+    # Final update to ensure everything is flushed
+    await _update_draft()
 
     return (
         "".join(tel.parts).strip(),
@@ -130,7 +180,7 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
             output_tokens,
             cost_usd,
             error_msg,
-        ) = await _collect_stream_telemetry(stream)
+        ) = await _collect_stream_telemetry(stream, draft_updater=ctx.draft_updater)
 
         duration_ms = (time.perf_counter() - start_time) * 1000.0
         tools_str = ",".join(tools_called) or "none"

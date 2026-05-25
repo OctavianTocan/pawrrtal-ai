@@ -2,16 +2,15 @@
 
 Three thin wrappers around :class:`app.core.scheduler.JobScheduler`:
 
-* ``cron_create`` — register a new recurring job (validates the cron
-  expression up front).
-* ``cron_list``   — list active scheduled jobs for the current user.
-* ``cron_delete`` — soft-delete a job by explicit ID.
+* ``reminder_schedule`` — register a new recurring or one-shot job (validates the cron expression or date up front).
+* ``reminder_list``   — list active scheduled jobs for the current user.
+* ``reminder_cancel`` — soft-delete a job by explicit ID.
 
 Safety:
 
 * All tools are user-scoped via ``user_id`` — a tool call cannot
   reach other users' jobs.
-* ``cron_delete`` requires an explicit job ID (no bulk filters) per
+* ``reminder_cancel`` requires an explicit job ID (no bulk filters) per
   the issue's "Never allow arbitrary bulk deletion" requirement.
 * All tools return ``[scheduler_disabled]`` when
   ``settings.scheduler_enabled`` is False — they don't crash, they
@@ -27,6 +26,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime
 from typing import Any
 
 from app.core.agent_loop.types import AgentTool
@@ -54,28 +54,48 @@ def _format_job_row(row: dict[str, object]) -> str:
     """
     state = "active" if row.get("is_active") else "inactive"
     prompt = str(row.get("prompt") or "")
-    return (
-        f"- {row.get('id')} | {row.get('name')} | "
-        f"cron={row.get('cron_expression')!r} | {state} | "
-        f"prompt={prompt[:60]!r}"
-    )
+    fire_at = row.get("fire_at")
+    if isinstance(fire_at, datetime):
+        fire_str = f"fire_at={fire_at.isoformat()!r}"
+    else:
+        fire_str = f"cron={row.get('cron_expression')!r}"
+    return f"- {row.get('id')} | {row.get('name')} | {fire_str} | {state} | prompt={prompt[:60]!r}"
 
 
-def make_cron_create_tool(*, user_id: uuid.UUID) -> AgentTool:
-    """Return the ``cron_create`` :class:`AgentTool` scoped to ``user_id``."""
+def make_reminder_schedule_tool(*, user_id: uuid.UUID) -> AgentTool:
+    """Return the ``reminder_schedule`` :class:`AgentTool` scoped to ``user_id``."""
 
-    async def execute(tool_call_id: str, **kwargs: Any) -> str:
+    async def execute(tool_call_id: str, **kwargs: Any) -> str:  # noqa: PLR0911
         scheduler = get_active_scheduler()
         if scheduler is None:
             return _DISABLED_MSG
         name = str(kwargs.get("name") or "").strip()
-        cron_expression = str(kwargs.get("cron_expression") or "").strip()
+        cron_expression = str(kwargs.get("cron_expression") or "").strip() or None
+        fire_at_str = str(kwargs.get("fire_at") or "").strip() or None
         prompt = str(kwargs.get("prompt") or "").strip()
-        if not name or not cron_expression or not prompt:
+
+        if not name or not prompt:
             return ToolError(
                 ToolErrorCode.INVALID_PATH,
-                "cron_create requires 'name', 'cron_expression', and 'prompt'.",
+                "reminder_schedule requires 'name' and 'prompt'.",
             ).render()
+
+        if bool(cron_expression) == bool(fire_at_str):
+            return ToolError(
+                ToolErrorCode.INVALID_PATH,
+                "reminder_schedule requires EXACTLY ONE of 'cron_expression' or 'fire_at'. "
+                "Providing both or neither is invalid.",
+            ).render()
+
+        fire_at = None
+        if fire_at_str:
+            try:
+                fire_at = datetime.fromisoformat(fire_at_str.replace("Z", "+00:00"))
+            except ValueError:
+                return ToolError(
+                    ToolErrorCode.INVALID_PATH,
+                    "Invalid 'fire_at' format. Must be a valid ISO 8601 datetime string.",
+                ).render()
         skill_name = kwargs.get("skill_name")
         target_chat_ids = kwargs.get("target_chat_ids")
         if target_chat_ids is not None and not isinstance(target_chat_ids, list):
@@ -89,27 +109,34 @@ def make_cron_create_tool(*, user_id: uuid.UUID) -> AgentTool:
                     session=session,
                     user_id=user_id,
                     name=name,
-                    cron_expression=cron_expression,
                     prompt=prompt,
+                    cron_expression=cron_expression,
+                    fire_at=fire_at,
                     skill_name=str(skill_name) if skill_name else None,
                     target_chat_ids=[str(c) for c in target_chat_ids] if target_chat_ids else None,
                 )
         except ValueError as exc:
-            return f"[invalid_cron] {exc}"
+            return f"[invalid_schedule] {exc}"
         except Exception as exc:
-            log.exception("CRON_CREATE_FAILED user_id=%s name=%s", user_id, name)
-            return f"[error] Could not register cron job: {exc}"
-        return (
-            f"Created cron job {row.id} ({row.name!r}) — next fire follows {row.cron_expression!r}."
+            log.exception("REMINDER_SCHEDULE_FAILED user_id=%s name=%s", user_id, name)
+            return f"[error] Could not register reminder: {exc}"
+
+        schedule_desc = (
+            f"cron {row.cron_expression!r}"
+            if row.cron_expression
+            else f"date {row.fire_at.isoformat()!r}"
+            if isinstance(row.fire_at, datetime)
+            else "date <unknown>"
         )
+        return f"Created reminder {row.id} ({row.name!r}) — next fire follows {schedule_desc}."
 
     return AgentTool(
-        name="cron_create",
+        name="reminder_schedule",
         description=(
-            "Schedule a recurring agent turn. Use when the user asks to "
+            "Schedule a recurring agent turn or a one-shot reminder. Use when the user asks to "
             "'remind me every morning', 'run this weekly', or otherwise "
-            "wants a job to repeat on a cron schedule. The prompt becomes "
-            "the agent input the next time the cron fires."
+            "wants a job to repeat on a schedule or fire once at a specific date. The prompt becomes "
+            "the agent input the next time the reminder fires."
         ),
         parameters={
             "type": "object",
@@ -123,7 +150,15 @@ def make_cron_create_tool(*, user_id: uuid.UUID) -> AgentTool:
                     "description": (
                         "Standard 5-field cron expression "
                         "(``minute hour day-of-month month day-of-week``). "
-                        "Example: ``0 9 * * 1-5`` for 9am on weekdays UTC."
+                        "Example: ``0 9 * * 1-5`` for 9am on weekdays UTC. "
+                        "Mutually exclusive with fire_at."
+                    ),
+                },
+                "fire_at": {
+                    "type": "string",
+                    "description": (
+                        "Specific ISO 8601 datetime string to fire this reminder once. "
+                        "Mutually exclusive with cron_expression."
                     ),
                 },
                 "prompt": {
@@ -146,23 +181,20 @@ def make_cron_create_tool(*, user_id: uuid.UUID) -> AgentTool:
                     ),
                 },
             },
-            "required": ["name", "cron_expression", "prompt"],
+            "required": ["name", "prompt"],
         },
         execute=execute,
         display=make_tool_display(
             icon="⏰",
-            label="Schedule Cron Job",
-            present=lambda args: (
-                f"⏰ Scheduling Cron Job '{str(args.get('name') or '')[:60]}'"
-                f" ({args.get('cron_expression') or ''!s})"
-            ),
-            compact=lambda args: f"Scheduled Cron Job '{str(args.get('name') or '')[:40]}'",
+            label="Schedule Reminder",
+            present=lambda args: f"⏰ Scheduling Reminder '{str(args.get('name') or '')[:60]}'",
+            compact=lambda args: f"Scheduled Reminder '{str(args.get('name') or '')[:40]}'",
         ),
     )
 
 
-def make_cron_list_tool(*, user_id: uuid.UUID) -> AgentTool:
-    """Return the ``cron_list`` :class:`AgentTool` scoped to ``user_id``."""
+def make_reminder_list_tool(*, user_id: uuid.UUID) -> AgentTool:
+    """Return the ``reminder_list`` :class:`AgentTool` scoped to ``user_id``."""
 
     async def execute(tool_call_id: str, **kwargs: Any) -> str:
         scheduler = get_active_scheduler()
@@ -180,11 +212,11 @@ def make_cron_list_tool(*, user_id: uuid.UUID) -> AgentTool:
         return "\n".join(_format_job_row(row) for row in rows)
 
     return AgentTool(
-        name="cron_list",
+        name="reminder_list",
         description=(
-            "List the calling user's scheduled cron jobs. Use when the "
+            "List the calling user's scheduled reminders and cron jobs. Use when the "
             "user asks 'what reminders do I have?' or before scheduling a "
-            "new job that might duplicate an existing one."
+            "new reminder that might duplicate an existing one."
         ),
         parameters={
             "type": "object",
@@ -199,19 +231,19 @@ def make_cron_list_tool(*, user_id: uuid.UUID) -> AgentTool:
         execute=execute,
         display=make_tool_display(
             icon="📅",
-            label="List Cron Jobs",
+            label="List Reminders",
             present=lambda args: (
-                "📅 Listing All Cron Jobs"
+                "📅 Listing All Reminders"
                 if args.get("include_inactive")
-                else "📅 Listing Active Cron Jobs"
+                else "📅 Listing Active Reminders"
             ),
-            compact=lambda args: "Listed Cron Jobs",
+            compact=lambda args: "Listed Reminders",
         ),
     )
 
 
-def make_cron_delete_tool(*, user_id: uuid.UUID) -> AgentTool:
-    """Return the ``cron_delete`` :class:`AgentTool` scoped to ``user_id``."""
+def make_reminder_cancel_tool(*, user_id: uuid.UUID) -> AgentTool:
+    """Return the ``reminder_cancel`` :class:`AgentTool` scoped to ``user_id``."""
 
     async def execute(tool_call_id: str, **kwargs: Any) -> str:
         scheduler = get_active_scheduler()
@@ -221,7 +253,7 @@ def make_cron_delete_tool(*, user_id: uuid.UUID) -> AgentTool:
         if not job_id_raw:
             return ToolError(
                 ToolErrorCode.INVALID_PATH,
-                "cron_delete requires an explicit 'job_id' — bulk deletion is not supported.",
+                "reminder_cancel requires an explicit 'job_id' — bulk deletion is not supported.",
             ).render()
         try:
             job_id = uuid.UUID(job_id_raw)
@@ -240,11 +272,11 @@ def make_cron_delete_tool(*, user_id: uuid.UUID) -> AgentTool:
         return f"[not_found] Could not remove job {job_id_raw}."
 
     return AgentTool(
-        name="cron_delete",
+        name="reminder_cancel",
         description=(
-            "Delete a scheduled cron job by its explicit ID. Bulk filters "
+            "Cancel a scheduled reminder or cron job by its explicit ID. Bulk filters "
             "are NOT supported — the model must pass a single UUID, "
-            "typically obtained from cron_list first."
+            "typically obtained from reminder_list first."
         ),
         parameters={
             "type": "object",
@@ -259,8 +291,8 @@ def make_cron_delete_tool(*, user_id: uuid.UUID) -> AgentTool:
         execute=execute,
         display=make_tool_display(
             icon="🗑",
-            label="Cancel Cron Job",
-            present=lambda args: f"🗑 Canceling Cron Job {str(args.get('job_id') or '')[:36]}",
-            compact=lambda args: f"Canceled Cron Job {str(args.get('job_id') or '')[:8]}…",
+            label="Cancel Reminder",
+            present=lambda args: f"🗑 Canceling Reminder {str(args.get('job_id') or '')[:36]}",
+            compact=lambda args: f"Canceled Reminder {str(args.get('job_id') or '')[:8]}…",
         ),
     )

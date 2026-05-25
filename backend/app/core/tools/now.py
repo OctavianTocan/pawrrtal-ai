@@ -24,18 +24,20 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.core.agent_loop.types import AgentTool
+from app.core.tools.cron_tools import (
+    make_reminder_cancel_tool as make_reminder_cancel_tool,  # noqa: PLC0414
+)
+from app.core.tools.cron_tools import (
+    make_reminder_list_tool as make_reminder_list_tool,  # noqa: PLC0414
+)
 
 # Re-export the TASKS.md tools (#311 v1) through this module so
 # ``agent_tools.py`` can import them off ``now`` and stay under
 # sentrux's ``no_god_files`` fan-out ceiling. The aggregation is
 # purely organisational; the implementations live in ``tasks_md.py``.
 from app.core.tools.cron_tools import (
-    make_cron_create_tool as make_cron_create_tool,  # noqa: PLC0414
+    make_reminder_schedule_tool as make_reminder_schedule_tool,  # noqa: PLC0414
 )
-from app.core.tools.cron_tools import (
-    make_cron_delete_tool as make_cron_delete_tool,  # noqa: PLC0414
-)
-from app.core.tools.cron_tools import make_cron_list_tool as make_cron_list_tool  # noqa: PLC0414
 from app.core.tools.display import make_tool_display
 
 # Re-exports below keep agent_tools fan-out under sentrux's no_god_files budget.

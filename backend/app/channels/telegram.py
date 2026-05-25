@@ -207,6 +207,7 @@ class TelegramChannel:
                     last_edit_at=last_edit_at,
                     reply_to_message_id=reply_to_message_id,
                     message_thread_id=message_thread_id,
+                    tool_states=tool_states,
                 )
                 previous_block_kind = "tools"
                 tool_trace, chars_since_edit, last_edit_at = await handle_tool_use(

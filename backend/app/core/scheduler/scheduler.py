@@ -28,6 +28,7 @@ from pathlib import Path
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler  # type: ignore[import-untyped]
 from apscheduler.triggers.cron import CronTrigger  # type: ignore[import-untyped]
+from apscheduler.triggers.date import DateTrigger  # type: ignore[import-untyped]
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -51,6 +52,7 @@ def _row_to_dict(row: ScheduledJob) -> dict[str, object]:
         "user_id": row.user_id,
         "name": row.name,
         "cron_expression": row.cron_expression,
+        "fire_at": row.fire_at,
         "prompt": row.prompt,
         "skill_name": row.skill_name,
         "target_chat_ids": list(row.target_chat_ids or []),
@@ -92,25 +94,29 @@ class JobScheduler:
         session: AsyncSession,
         user_id: uuid.UUID,
         name: str,
-        cron_expression: str,
         prompt: str,
+        cron_expression: str | None = None,
+        fire_at: datetime | None = None,
         skill_name: str | None = None,
         target_chat_ids: list[str] | None = None,
         target_conversation_id: uuid.UUID | None = None,
         working_directory: str | None = None,
     ) -> ScheduledJob:
-        """Persist a job + register the cron trigger atomically.
+        """Persist a job + register the cron or date trigger atomically.
 
-        Validates the cron expression up front (``CronTrigger.from_crontab``
-        raises on malformed input) so a 422 surfaces at creation time
-        instead of fire time.
+        Validates the cron expression or fire_at date up front.
 
         ``target_conversation_id`` is optional; when set, every fire
         persists the agent response into that conversation in addition
         to Telegram fan-out via ``target_chat_ids``.
         """
         # Validate first; we don't want a row that the scheduler can't load.
-        trigger = CronTrigger.from_crontab(cron_expression)
+        if cron_expression:
+            trigger = CronTrigger.from_crontab(cron_expression)
+        elif fire_at:
+            trigger = DateTrigger(run_date=fire_at)
+        else:
+            raise ValueError("Must provide either cron_expression or fire_at")
 
         now = datetime.now(UTC)
         row = ScheduledJob(
@@ -118,6 +124,7 @@ class JobScheduler:
             user_id=user_id,
             name=name,
             cron_expression=cron_expression,
+            fire_at=fire_at,
             prompt=prompt,
             skill_name=skill_name,
             target_chat_ids=target_chat_ids or [],
@@ -132,10 +139,11 @@ class JobScheduler:
         await session.refresh(row)
         self._register_with_aps(row, trigger=trigger)
         logger.info(
-            "SCHEDULER_JOB_ADDED job_id=%s name=%s cron=%s",
+            "SCHEDULER_JOB_ADDED job_id=%s name=%s cron=%s fire_at=%s",
             row.id,
             name,
             cron_expression,
+            fire_at,
         )
         return row
 
@@ -206,18 +214,24 @@ class JobScheduler:
             rows = list(result.scalars().all())
         for row in rows:
             try:
-                trigger = CronTrigger.from_crontab(row.cron_expression)
+                if row.cron_expression:
+                    trigger = CronTrigger.from_crontab(row.cron_expression)
+                elif row.fire_at:
+                    trigger = DateTrigger(run_date=row.fire_at)
+                else:
+                    raise ValueError("Job has neither cron_expression nor fire_at")
                 self._register_with_aps(row, trigger=trigger)
             except Exception:
                 logger.exception(
-                    "SCHEDULER_HYDRATE_FAILED job_id=%s name=%s cron=%s",
+                    "SCHEDULER_HYDRATE_FAILED job_id=%s name=%s cron=%s fire_at=%s",
                     row.id,
                     row.name,
                     row.cron_expression,
+                    row.fire_at,
                 )
         logger.info("SCHEDULER_HYDRATE count=%d", len(rows))
 
-    def _register_with_aps(self, row: ScheduledJob, *, trigger: CronTrigger) -> None:
+    def _register_with_aps(self, row: ScheduledJob, *, trigger: CronTrigger | DateTrigger) -> None:
         """Register one job with APScheduler — id matches the DB row's UUID."""
         target_conversation = row.target_conversation_id
         self._scheduler.add_job(

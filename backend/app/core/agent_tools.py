@@ -54,14 +54,14 @@ from app.core.tools.now import (
     build_external_mcp_tools,
     make_add_task_tool,
     make_complete_task_tool,
-    make_cron_create_tool,
-    make_cron_delete_tool,
-    make_cron_list_tool,
     make_invoke_skill_tool,
     make_list_skills_tool,
     make_list_tasks_tool,
     make_now_tool,
     make_read_skill_tool,
+    make_reminder_cancel_tool,
+    make_reminder_list_tool,
+    make_reminder_schedule_tool,
     make_report_issue_tool,
 )
 from app.core.tools.python_exec import make_virtual_python_tool
@@ -220,9 +220,9 @@ def build_agent_tools(
     # Tools handle the ``scheduler_enabled = False`` case themselves
     # via ``get_active_scheduler() is None``.
     if user_id is not None:
-        tools.append(make_cron_create_tool(user_id=user_id))
-        tools.append(make_cron_list_tool(user_id=user_id))
-        tools.append(make_cron_delete_tool(user_id=user_id))
+        tools.append(make_reminder_schedule_tool(user_id=user_id))
+        tools.append(make_reminder_list_tool(user_id=user_id))
+        tools.append(make_reminder_cancel_tool(user_id=user_id))
 
     # In-process Python execution.  Opt-in via
     # ``settings.virtual_python_enabled`` because the tool is *not*

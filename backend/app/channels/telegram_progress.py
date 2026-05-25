@@ -94,8 +94,8 @@ def render_tools_in_flight(tool_names: list[str]) -> str:
     """
     if not tool_names:
         return "🔧 <b>Using tools...</b>"
-    esc_names = ", ".join(html.escape(n) for n in tool_names)
-    return f"🔧 <b>Using tools:</b> {esc_names}"
+    esc_names = "\n".join(f"  {html.escape(n)}" for n in tool_names)
+    return f"🔧 <b>Using tools:</b>\n{esc_names}"
 
 
 def render_tool_success(tool_display: str, elapsed_ms: int) -> str:

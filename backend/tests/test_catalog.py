@@ -175,5 +175,3 @@ def test_every_catalog_entry_has_non_empty_display_metadata() -> None:
         assert entry.display_name.strip(), f"{entry.id} has empty display_name"
         assert entry.short_name.strip(), f"{entry.id} has empty short_name"
         assert entry.description.strip(), f"{entry.id} has empty description"
-
-

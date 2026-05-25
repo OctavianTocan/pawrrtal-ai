@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING, NoReturn
 import anyio
 from acp import connect_to_agent
 
+from app.core.agent_loop.display import tool_display_map
 from app.core.agent_loop.types import AgentTool, PermissionCheckFn
 from app.core.providers.base import ReasoningEffort, StreamEvent
 from app.core.providers.gemini_cli.acp import (
@@ -175,6 +176,7 @@ class GeminiCliLLM:
                 history=history,
                 system_prompt=system_prompt,
                 permission_check=permission_check,
+                tools=tools,
             ):
                 yield event
         finally:
@@ -188,6 +190,7 @@ class GeminiCliLLM:
         history: list[dict[str, str]] | None,
         system_prompt: str | None,
         permission_check: PermissionCheckFn | None,
+        tools: list[AgentTool] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Run one ACP initialize → new_session → prompt cycle on ``proc``.
 
@@ -196,10 +199,14 @@ class GeminiCliLLM:
         which inner stage (handshake, session, prompt) failed.
         """
         event_queue: asyncio.Queue[StreamEvent | None] = asyncio.Queue()
+
+        display_by_name = tool_display_map(tools) if tools else {}
+
         client_impl = PawrrtalAcpClient(
             event_queue=event_queue,
             workspace_root=self._workspace_root,
             permission_check=permission_check,
+            display_by_name=display_by_name,
         )
         # ``proc.stdin`` / ``proc.stdout`` are typed Optional because
         # ``create_subprocess_exec`` permits PIPE / DEVNULL / FD; we

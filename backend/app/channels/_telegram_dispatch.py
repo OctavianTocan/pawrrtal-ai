@@ -119,10 +119,10 @@ def _render_tools_block(
     unescaped ``display`` text into Telegram's HTML parser.
     """
     lines = [s.result_line for s in tool_states.values() if s.result_line is not None]
-    if in_flight_names:
-        header = render_tools_in_flight(in_flight_names)
-        lines = [header, *lines]
-    return "\n".join(lines)
+    header = render_tools_in_flight(in_flight_names)
+    if lines:
+        return f"{header}\n\n" + "\n".join(lines)
+    return header
 
 
 async def prepare_tools_block(
@@ -136,6 +136,7 @@ async def prepare_tools_block(
     last_edit_at: float,
     reply_to_message_id: int | None,
     message_thread_id: int | None,
+    tool_states: dict[str, ToolLineState] | None = None,
 ) -> tuple[str, int, int, float]:
     """Open a fresh tools message on a ``thinking → tools`` transition (#288).
 
@@ -144,6 +145,9 @@ async def prepare_tools_block(
     No-op when this is the first block of either kind, or when the
     previous block was already ``tools``.
     """
+    if previous_block_kind not in (None, "tools") and tool_states is not None:
+        tool_states.clear()
+
     if previous_block_kind in (None, "tools"):
         return tool_trace, tool_message_id, chars_since_edit, last_edit_at
     new_id = await safe_send_html(

@@ -9,8 +9,8 @@ it took — enough to grep operator logs, replay a failed pass, and
 trace any memory row back to the pass that created it via
 ``memories.provenance_job_id``.
 
-Revision ID: 022_add_dreaming_jobs_table
-Revises: 021_add_memories_table
+Revision ID: 025_add_dreaming_jobs_table
+Revises: 024_add_memories_table
 """
 
 from __future__ import annotations
@@ -18,8 +18,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "022_add_dreaming_jobs_table"
-down_revision = "021_add_memories_table"
+revision = "025_add_dreaming_jobs_table"
+down_revision = "024_add_memories_table"
 branch_labels = None
 depends_on = None
 

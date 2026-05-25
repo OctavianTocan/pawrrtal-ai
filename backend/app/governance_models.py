@@ -166,7 +166,9 @@ class ScheduledJob(Base):
         Uuid, ForeignKey("user.id", ondelete="CASCADE"), index=True
     )
     name: Mapped[str] = mapped_column(String(_SCHEDULED_JOB_NAME_LEN))
-    cron_expression: Mapped[str] = mapped_column(String(_CRON_EXPRESSION_LEN))
+    cron_expression: Mapped[str | None] = mapped_column(String(_CRON_EXPRESSION_LEN), nullable=True)
+    # Specific time to fire the job, for one-shot reminders. Mutually exclusive with cron_expression.
+    fire_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # Prompt the agent runs when the job fires.
     prompt: Mapped[str] = mapped_column(Text)
     # Optional skill to invoke (`/triage`, etc.) — prepended to the prompt.

@@ -103,6 +103,13 @@ class AgentHandler:
             # CCT convention: surface the skill name as a slash-prefix
             # so the model picks it up the way users type a skill.
             prompt = f"/{event.skill_name}\n\n{prompt}" if prompt else f"/{event.skill_name}"
+
+        notification_header = (
+            f"[System Notification: Reminder Fired - {event.job_name}]"
+            if event.job_name
+            else "[System Notification: Reminder Fired]"
+        )
+        prompt = f"{notification_header}\n\n{prompt}"
         await self._run_and_publish(
             prompt=prompt,
             user_id=event.user_id or self._default_user_id,

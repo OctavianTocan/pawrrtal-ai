@@ -79,11 +79,17 @@ async def test_text_after_thinking_renders_as_new_message() -> None:
     async for _ in channel.deliver(_stream(*events), msg):
         pass
 
-    sends = [call.kwargs.get("text", "") for call in bot.send_message.await_args_list]
-    # First send is the thinking message (italic); second is the
-    # interleaved text block opened by the delta.
-    assert any("<i>let me check</i>" in s for s in sends)
-    assert any(s == "the answer" for s in sends)
+    # The first thinking block edits the placeholder in-place:
+    bot.edit_message_text.assert_any_call(
+        chat_id=1,
+        message_id=2,
+        text="💭 <b>Thinking...</b>\n\n<i>let me check</i>",
+    )
+    # The final answer is sent as a new message:
+    bot.send_message.assert_awaited_once_with(
+        chat_id=1,
+        text="the answer",
+    )
 
 
 async def test_text_after_tools_renders_as_new_message() -> None:

@@ -135,6 +135,7 @@ class PawrrtalAcpClient:
         event_queue: asyncio.Queue[StreamEvent | None],
         workspace_root: Path | None,
         permission_check: PermissionCheckFn | None,
+        display_by_name: dict[str, Any] | None = None,
     ) -> None:
         """Construct the client.
 
@@ -152,10 +153,12 @@ class PawrrtalAcpClient:
                 approving any tool. When ``None``, every permission is
                 auto-approved (the user opted into a local CLI agent —
                 the trust model is "you trust your local agent").
+            display_by_name: Optional display mapping for tools.
         """
         self._event_queue = event_queue
         self._workspace_root = workspace_root
         self._permission_check = permission_check
+        self._display_by_name = display_by_name
 
     async def session_update(
         self,
@@ -175,7 +178,7 @@ class PawrrtalAcpClient:
     ) -> None:
         """Translate an ACP session update into a Pawrrtal StreamEvent."""
         _log_session_update(session_id, update)
-        event = _stream_event_for_update(update)
+        event = _stream_event_for_update(update, self._display_by_name)
         if event is not None:
             await self._event_queue.put(event)
 

@@ -273,7 +273,7 @@ class TestTelegramChannelDeliver:
         bot.edit_message_text.assert_any_call(
             chat_id=123,
             message_id=456,
-            text="<i>checking the workspace</i>",
+            text="💭 <b>Thinking...</b>\n\n<i>checking the workspace</i>",
         )
         # The final answer is sent as a new message
         bot.send_message.assert_awaited_once_with(
@@ -310,7 +310,7 @@ class TestTelegramChannelDeliver:
         bot.edit_message_text.assert_any_call(
             chat_id=88,
             message_id=11,
-            text="<i>let me check the workspace</i>",
+            text="💭 <b>Thinking...</b>\n\n<i>let me check the workspace</i>",
         )
 
         # The second thinking block and final answer call send_message:
@@ -321,7 +321,7 @@ class TestTelegramChannelDeliver:
         sent_texts = [call.kwargs.get("text", "") for call in bot.send_message.await_args_list]
 
         # The second thinking message should be sent as a separate message
-        thinking_sends = [text for text in sent_texts if text.startswith("<i>")]
+        thinking_sends = [text for text in sent_texts if text.startswith("💭 <b>Thinking...</b>")]
         assert len(thinking_sends) == 1
         assert "now I understand" in thinking_sends[0]
         assert "let me check the workspace" not in thinking_sends[0]
@@ -517,7 +517,7 @@ class TestTelegramChannelDeliver:
         bot.edit_message_text.assert_any_call(
             chat_id=42,
             message_id=99,
-            text="<i>thinking content</i>",
+            text="💭 <b>Thinking...</b>\n\n<i>thinking content</i>",
         )
         # And the placeholder MUST NOT be deleted:
         bot.delete_message.assert_not_called()
@@ -551,7 +551,7 @@ class TestTelegramChannelDeliver:
         bot.edit_message_text.assert_any_call(
             chat_id=42,
             message_id=99,
-            text="<i>The user said\nhello.</i>",
+            text="💭 <b>Thinking...</b>\n\n<i>The user said\nhello.</i>",
         )
 
 
