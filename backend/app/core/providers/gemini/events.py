@@ -32,7 +32,16 @@ def agent_event_to_stream_event(event: Any) -> StreamEvent | None:
     if event_type == "text_delta":
         return StreamEvent(type="delta", content=event["text"])
     if event_type == "thinking_delta":
-        return StreamEvent(type="thinking", content=event["text"])
+        thinking_event = StreamEvent(type="thinking", content=event["text"])
+        # Carry ``block_index`` through to the channel renderer when
+        # the provider supplied one (#353). Telegram dispatch uses it
+        # to insert paragraph breaks between distinct thinking blocks;
+        # the chat aggregator uses it to coalesce a single timeline
+        # entry per block.
+        block_index = event.get("block_index")
+        if block_index is not None:
+            thinking_event["block_index"] = block_index
+        return thinking_event
     if event_type == "tool_call_end":
         return StreamEvent(
             type="tool_use",

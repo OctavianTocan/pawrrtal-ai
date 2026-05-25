@@ -160,6 +160,20 @@ def _resolve_opencode_api_key(workspace_root: Path | None) -> str:
     return settings.opencode_api_key
 
 
+# User-facing notice surfaced when neither the workspace nor the gateway
+# has an OpenCode API key configured. The provider used to silently push
+# ``api_key="missing"`` at the gateway, take a 401, and rely on the
+# legacy Telegram text path to render the resulting error — which can
+# drop everything after the first chunk (#346) so the user sees no
+# reply at all. Surfacing the cause as an explicit ``error`` event
+# bypasses that path entirely. See #350.
+_OPENCODE_MISSING_KEY_NOTICE = (
+    "OpenCode API key not configured. Set OPENCODE_API_KEY in your "
+    "workspace .env file or configure OPENCODE_API_KEY on the gateway "
+    "to use Kimi K2.6 / GLM-5.1 via OpenCode Go."
+)
+
+
 def _drain_text_and_thinking(delta: Any) -> tuple[list[LLMEvent], str]:
     """Translate one streaming delta into ``(events_to_yield, response_text)``.
 
@@ -173,7 +187,17 @@ def _drain_text_and_thinking(delta: Any) -> tuple[list[LLMEvent], str]:
     out: list[LLMEvent] = []
     thinking_text = read_reasoning(delta)
     if thinking_text:
-        out.append(LLMThinkingDeltaEvent(type="thinking_delta", text=thinking_text))
+        # OpenCode Go streams reasoning per-token via ``reasoning_content``
+        # — one continuous logical block per stream attempt. Emit a
+        # constant ``block_index=0`` so the channel renderer doesn't
+        # insert paragraph breaks between consecutive tokens (#353).
+        out.append(
+            LLMThinkingDeltaEvent(
+                type="thinking_delta",
+                text=thinking_text,
+                block_index=0,
+            )
+        )
     response_text = getattr(delta, "content", None) or ""
     if response_text:
         out.append(LLMTextDeltaEvent(type="text_delta", text=response_text))
@@ -399,6 +423,25 @@ class OpencodeGoLLM:
                 conversation_id,
                 len(images),
             )
+
+        # Fail fast on missing API key with a user-readable notice. The
+        # alternative — letting the request hit the gateway with
+        # ``api_key="missing"`` — produces a 401 whose text is rendered
+        # by the legacy Telegram path as a single-chunk delta and
+        # frequently appears as no reply at all (#350). The check runs
+        # before ``agent_loop`` so the loop's retry budget doesn't burn
+        # three 401s before giving up.
+        api_key = _resolve_opencode_api_key(self._workspace_root)
+        if not api_key:
+            logger.warning(
+                "OPENCODE_GO_MISSING_API_KEY conversation_id=%s user_id=%s model=%s",
+                conversation_id,
+                user_id,
+                self._model_id,
+            )
+            yield StreamEvent(type="error", content=_OPENCODE_MISSING_KEY_NOTICE)
+            return
+
         prior: list[AgentMessage] = []
         for m in history or []:
             role = m.get("role")

@@ -131,8 +131,8 @@ def resolve_gemini_api_key(workspace_root: Path | None) -> str:
     return settings.google_api_key
 
 
-def split_chunk_text(chunk: Any) -> tuple[str, str]:
-    """Return ``(thinking_text, response_text)`` for a streaming chunk.
+def split_chunk_text(chunk: Any) -> tuple[list[str], str]:
+    """Return ``(thinking_parts, response_text)`` for a streaming chunk.
 
     Gemini's thinking-capable models emit ``Part`` objects with a
     ``thought=True`` flag for chain-of-thought content; regular response
@@ -141,8 +141,17 @@ def split_chunk_text(chunk: Any) -> tuple[str, str]:
     flag, so consumers that need to render the two streams separately
     must walk parts explicitly.
 
+    Each distinct ``Part(thought=True)`` is returned as its own list
+    entry so the caller can assign a separate ``block_index`` per
+    block (#353). The caller pairs each part with an incrementing
+    counter and emits one :class:`LLMThinkingDeltaEvent` per part with
+    that index — the channel renderer then knows where Gemini intended
+    a paragraph break without relying on whitespace heuristics (#351).
+    Response parts are concatenated verbatim; they carry their own
+    model-owned whitespace.
+
     Non-thinking models simply never set ``thought=True``, so the
-    thinking string stays empty and the response string is identical to
+    thinking list stays empty and the response string is identical to
     ``chunk.text``.
     """
     thinking_parts: list[str] = []
@@ -158,7 +167,7 @@ def split_chunk_text(chunk: Any) -> tuple[str, str]:
                 thinking_parts.append(text)
             else:
                 response_parts.append(text)
-    return "".join(thinking_parts), "".join(response_parts)
+    return thinking_parts, "".join(response_parts)
 
 
 def tool_calls_from_chunk(chunk: Any, start_index: int) -> list[dict[str, Any]]:
