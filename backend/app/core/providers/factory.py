@@ -18,17 +18,19 @@ from pathlib import Path
 
 from app.core.config import settings as settings  # noqa: PLC0414
 
+from .agy_cli import AgyCliLLM
 from .base import AILLM
-from .claude_provider import ClaudeLLM, ClaudeLLMConfig
+from .claude import ClaudeLLM, ClaudeLLMConfig
+from .gemini import GeminiLLM
 from .gemini_cli import GeminiCliLLM
-from .gemini_provider import GeminiLLM
 from .litellm_provider import LiteLLMLLM
 from .model_id import Host, ParsedModelId, parse_model_id
-from .opencode_go_provider import OpencodeGoLLM, OpencodeGoLLMConfig
-from .xai_provider import XaiLLM
+from .opencode_go import OpencodeGoLLM, OpencodeGoLLMConfig
+from .xai import XaiLLM
 
 HOST_TO_PROVIDER: dict[Host, type[AILLM]] = {
     Host.agent_sdk: ClaudeLLM,
+    Host.agy_cli: AgyCliLLM,
     Host.gemini_cli: GeminiCliLLM,
     Host.google_ai: GeminiLLM,
     Host.litellm: LiteLLMLLM,
@@ -173,16 +175,12 @@ def resolve_llm(
             cwd=str(workspace_root) if workspace_root is not None else None,
         )
         return ClaudeLLM(parsed.model, config=config, workspace_root=workspace_root)
-    if provider_cls is GeminiLLM:
-        return GeminiLLM(parsed.model, workspace_root=workspace_root)
-    if provider_cls is GeminiCliLLM:
-        return GeminiCliLLM(parsed.model, workspace_root=workspace_root)
-    if provider_cls is XaiLLM:
-        return XaiLLM(parsed.model, workspace_root=workspace_root)
     if provider_cls is LiteLLMLLM:
         return LiteLLMLLM(parsed.model, parsed.vendor, workspace_root=workspace_root)
     if provider_cls is OpencodeGoLLM:
         return _build_opencode_go(parsed, workspace_root)
+    if provider_cls in {AgyCliLLM, GeminiLLM, GeminiCliLLM, XaiLLM}:
+        return provider_cls(parsed.model, workspace_root=workspace_root)  # type: ignore[call-arg]
     raise KeyError(f"no provider class registered for host {parsed.host!r}")
 
 
