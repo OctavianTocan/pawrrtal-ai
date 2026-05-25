@@ -82,6 +82,15 @@ from app.integrations.telegram.model_picker_runtime import (
 # notice formatter.
 from app.integrations.telegram.reasoning_notify import normalize_reasoning_and_notify
 
+# Regenerate-keyboard runtime (#368) — re-exports the callback prefix
+# so bot.py imports both the registration prefix + handler from one
+# module, keeping the fan-out under the sentrux ``no_god_files``
+# budget. Same trick as the model / thinking / verbose pickers.
+from app.integrations.telegram.regenerate_runtime import (
+    REGEN_CALLBACK_PREFIX,
+    handle_regenerate_callback,
+)
+
 # ``compact_command`` is re-exported via :mod:`status` to keep bot.py
 # under sentrux's ``no_god_files`` fan-out budget (same trick as
 # ``handle_lcm_command``).
@@ -690,6 +699,10 @@ def _register_telegram_callback_handlers(dispatcher: Dispatcher) -> None:
     )
     async def _on_thinking_picker(callback: CallbackQuery) -> None:
         await handle_thinking_picker_callback(callback=callback)
+
+    @dispatcher.callback_query(lambda query: (query.data or "").startswith(REGEN_CALLBACK_PREFIX))
+    async def _on_regenerate(callback: CallbackQuery) -> None:
+        await handle_regenerate_callback(callback=callback)
 
 
 def _register_telegram_message_handler(dispatcher: Dispatcher) -> None:

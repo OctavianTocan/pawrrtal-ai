@@ -63,9 +63,7 @@ _EDIT_DEBOUNCE_CHARS = 40
 # sees *something* change even when the model emits many tiny tokens.
 _MAX_EDIT_INTERVAL_S = 3.0
 
-# Prefix glyphs for non-text outcomes so the user can spot terminations and
-# errors at a glance in their chat.  These are deliberately short so they
-# don't crowd out the actual message body.
+# Prefix glyphs for non-text outcomes (short to avoid crowding the message).
 _AGENT_TERMINATED_PREFIX = "⚠️ "
 _ERROR_PREFIX = "❌ "
 
@@ -75,6 +73,15 @@ _ERROR_PREFIX = "❌ "
 # paths here — this string is rendered directly into the user's Telegram chat
 # and shouldn't leak internal infrastructure.
 _EMPTY_RESPONSE_FALLBACK = "⚠️ The agent finished without producing a reply. Please try again."
+
+
+def _build_regenerate_markup(conversation_id: Any) -> Any | None:
+    """Build the regenerate inline keyboard when the feature flag is on (#368)."""
+    if not settings.telegram_regenerate_button_enabled:
+        return None
+    from app.integrations.telegram.regenerate_keyboard import regenerate_markup_for  # noqa: PLC0415
+
+    return regenerate_markup_for(conversation_id)
 
 
 class TelegramChannel:
@@ -113,6 +120,8 @@ class TelegramChannel:
         message_id: int = meta["message_id"]
         reply_to_message_id = optional_int(meta.get("reply_to_message_id"))
         message_thread_id = optional_int(meta.get("message_thread_id"))
+        # #368: regenerate button built once per turn (off by default).
+        reply_markup = _build_regenerate_markup(message["conversation_id"])
 
         tool_trace = ""
         # Per-tool state dict for Workstream 4 success/failure timing.
@@ -370,6 +379,7 @@ class TelegramChannel:
             reply_to_message_id=reply_to_message_id,
             message_thread_id=message_thread_id,
             draft_state=draft_state,
+            reply_markup=reply_markup,
         )
 
         # No bytes to yield — delivery is a side-effect only.
