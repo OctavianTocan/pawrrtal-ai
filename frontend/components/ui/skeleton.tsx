@@ -1,9 +1,13 @@
-/**
- * Skeleton loading primitive — re-exports boneyard-js.
- *
- * Boneyard wraps real content: `<Skeleton loading={true}>` shows bones,
- * `<Skeleton loading={false}>` renders children.
- */
+import { cn } from '@/lib/utils';
 
-export { Skeleton } from 'boneyard-js/react';
-export type { SkeletonProps } from 'boneyard-js/react';
+function Skeleton({ className, ...props }: React.ComponentProps<'div'>): React.JSX.Element {
+	return (
+		<div
+			data-slot="skeleton"
+			className={cn('bg-muted rounded-xl animate-pulse', className)}
+			{...props}
+		/>
+	);
+}
+
+export { Skeleton };
