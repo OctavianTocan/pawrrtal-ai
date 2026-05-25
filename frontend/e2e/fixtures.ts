@@ -1,27 +1,27 @@
 /**
  * Shared Playwright fixtures.
  *
- * Every browser context created by this fixture file gets two
- * localStorage entries injected via `addInitScript` (runs before any
- * page script on every new document):
+ * The suite needs two distinct authenticated states — onboarding tests
+ * exercise the personalization wizard (which only opens when the user
+ * has no workspace yet), while home-shell / sidebar tests expect a
+ * fully provisioned workspace. Splitting the state setup into two
+ * fixtures keeps each test self-contained and prevents cross-test
+ * state leakage.
  *
- *   1. `pawrrtal:e2e-skip-onboarding` — suppresses the v2 onboarding
- *      wizard so specs land directly on the chat shell. Tests that
- *      exercise onboarding itself opt out via `skipOnboarding: false`.
+ * `devLogin` does just the auth half: hits `/auth/dev-login`, confirms
+ * the response is 2xx, and returns. The session cookie lands in the
+ * context's cookie jar automatically.
  *
- *   2. `pawrrtal:backend-config` — provides a stored backend URL so
- *      `hasBackendConfig()` returns true. Without it `AppShell`
- *      dispatches `OPEN_ONBOARDING_SERVER_STEP_EVENT` on mount, forcing
- *      the wizard to the "Where is your Pawrrtal?" step even when the
- *      skip flag is absent.
+ * `ensureProvisionedWorkspace` adds the workspace seed via the
+ * personalization upsert endpoint (which calls
+ * `ensure_default_workspace` server-side). Tests that need the
+ * sidebar visible call this before navigating.
  *
- * `authenticatedPage` runs the dev-admin login via the backend (no UI
- * clicks) and forwards the resulting session cookie into the browser
- * context, so every spec starts already signed in. Per the project's
- * api-setup-not-ui rule.
+ * Per the api-setup-not-ui rule, both helpers drive state through
+ * the backend, not through UI clicks.
  */
 
-import { type BrowserContext, test as base } from '@playwright/test';
+import { type APIRequestContext, type BrowserContext, test as base } from '@playwright/test';
 import { E2E_SKIP_ONBOARDING_STORAGE_KEY } from '../features/onboarding/v2/OnboardingFlow';
 
 const BACKEND_URL = process.env.E2E_API_URL ?? 'http://localhost:8000';
@@ -31,10 +31,9 @@ const BACKEND_CONFIG_STORAGE_KEY = 'pawrrtal:backend-config';
 /**
  * Authenticate the supplied browser context with the dev-admin user.
  *
- * Hits the backend `/auth/dev-login` endpoint directly — the response
- * body is the session payload, and the Set-Cookie header is what the
- * regular browser flow would normally land. We replay that cookie into
- * the context's cookie jar so the next page navigation is signed in.
+ * Hits the backend `/auth/dev-login` endpoint directly. The Set-Cookie
+ * header is captured into the context's cookie jar so subsequent
+ * `page.goto()` calls share the auth session.
  */
 async function devLogin(context: BrowserContext): Promise<void> {
 	const response = await context.request.post(`${BACKEND_URL}/auth/dev-login`);
@@ -45,8 +44,54 @@ async function devLogin(context: BrowserContext): Promise<void> {
 	}
 }
 
+/**
+ * Provision a default workspace for the authenticated user.
+ *
+ * Posts a minimal personalization profile, which triggers
+ * `ensure_default_workspace` server-side. Idempotent — calling it
+ * twice in the same test is safe. Tests that need the home shell
+ * fully rendered (sidebar, chat composer, settings) call this after
+ * `devLogin`.
+ */
+async function ensureProvisionedWorkspace(request: APIRequestContext): Promise<void> {
+	const response = await request.put(`${BACKEND_URL}/api/v1/personalization`, {
+		data: {
+			name: 'E2E Admin',
+		},
+	});
+	if (!response.ok()) {
+		throw new Error(
+			`Provisioning the dev workspace failed (${response.status()}). The PUT /api/v1/personalization endpoint is required for sidebar / home-shell tests to land on a populated app shell.`
+		);
+	}
+}
+
+/**
+ * Seed one conversation so the sidebar renders the Projects section.
+ *
+ * ``NavChatsView`` hides the Projects header while the chat list is
+ * empty (see the inline comment near the ``<ProjectsList />`` mount).
+ * Tests that assert on Projects-related UI need at least one
+ * conversation to exist. We generate a UUID client-side and POST it
+ * to ``/api/v1/conversations/{id}`` — matching the FE's
+ * ``createConversationFirst`` pattern.
+ */
+async function seedConversation(request: APIRequestContext): Promise<void> {
+	const conversationId = crypto.randomUUID();
+	const response = await request.post(`${BACKEND_URL}/api/v1/conversations/${conversationId}`, {
+		data: { title: 'E2E Seed Conversation' },
+	});
+	if (!response.ok()) {
+		throw new Error(
+			`Seeding the dev conversation failed (${response.status()}). The sidebar Projects header only renders when at least one chat row exists.`
+		);
+	}
+}
+
 interface E2EFixtures {
 	authenticatedPage: void;
+	authenticatedPageWithWorkspace: void;
+	authenticatedPageWithWorkspaceAndChat: void;
 	/**
 	 * When false, the onboarding skip flag is NOT injected so the wizard
 	 * opens normally. Defaults to true for all specs except onboarding.
@@ -97,6 +142,25 @@ export const test = base.extend<E2EFixtures>({
 	authenticatedPage: [
 		async ({ context }, use) => {
 			await devLogin(context);
+			await use();
+		},
+		{ auto: false },
+	],
+
+	authenticatedPageWithWorkspace: [
+		async ({ context }, use) => {
+			await devLogin(context);
+			await ensureProvisionedWorkspace(context.request);
+			await use();
+		},
+		{ auto: false },
+	],
+
+	authenticatedPageWithWorkspaceAndChat: [
+		async ({ context }, use) => {
+			await devLogin(context);
+			await ensureProvisionedWorkspace(context.request);
+			await seedConversation(context.request);
 			await use();
 		},
 		{ auto: false },

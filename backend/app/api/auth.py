@@ -1,16 +1,9 @@
-import logging
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
 from fastapi.security import OAuth2PasswordRequestForm
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.crud.workspace import ensure_dev_admin_workspace
-from app.db import get_async_session
 from app.users import UserManager, auth_backend, get_jwt_strategy, get_user_manager
-
-logger = logging.getLogger(__name__)
 
 
 def get_auth_router() -> APIRouter:
@@ -20,21 +13,17 @@ def get_auth_router() -> APIRouter:
     @router.post("/auth/dev-login")
     async def dev_login(
         user_manager: UserManager = Depends(get_user_manager),
-        session: AsyncSession = Depends(get_async_session),
     ) -> Response:
         """Log in with the seeded admin account without exposing its password to the client.
 
-        Auto-provisions a default workspace for the admin user when none
-        exists yet. The web app refuses to render the sidebar until the
-        active user has a default workspace (`onboarding-status`); without
-        this step, Playwright suites that drive the seeded admin land on
-        the onboarding wizard instead of the home shell. Personalization
-        upsert still creates one for real users via
-        :func:`app.crud.workspace.ensure_default_workspace` — this call
-        hits the dev-admin-specific seed path so the workspace folder is
-        pinned to a stable location on disk (``{workspace_base_dir}/dev-admin``).
-        That keeps a developer's working files in the same directory across
-        DB resets, so wiping Postgres doesn't force a file copy.
+        The dev-login endpoint is intentionally minimal: it authenticates
+        the seeded admin and returns the session cookie. It does **not**
+        seed a workspace — that's left to the personalization flow so
+        Playwright suites can drive both pre-onboarding and post-onboarding
+        states independently. The workspace seed lives in the
+        ``authenticatedPageWithWorkspace`` fixture in
+        ``frontend/e2e/fixtures.ts`` for tests that need a fully-rendered
+        home shell.
         """
         if settings.is_production:
             raise HTTPException(
@@ -67,20 +56,6 @@ def get_auth_router() -> APIRouter:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="The dev admin account is inactive.",
             )
-
-        # Idempotent — returns the existing workspace if one is already
-        # present, otherwise creates one pinned to the stable dev-admin
-        # folder. ``create_workspace`` (called inside) does not commit,
-        # so we commit the outer transaction ourselves before returning
-        # the login response. Errors are logged + swallowed: a failed
-        # seed must never block dev-login (the user can still personalise
-        # via the UI to get a workspace).
-        try:
-            await ensure_dev_admin_workspace(user.id, session)
-            await session.commit()
-        except Exception:
-            logger.exception("DEV_LOGIN_WORKSPACE_SEED_FAILED user_id=%s", user.id)
-            await session.rollback()
 
         return await auth_backend.login(get_jwt_strategy(), user)
 

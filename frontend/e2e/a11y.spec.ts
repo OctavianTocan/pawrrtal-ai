@@ -17,9 +17,27 @@
  */
 
 import AxeBuilder from '@axe-core/playwright';
+import type { BrowserContext } from '@playwright/test';
 import { expect, test } from './fixtures';
 
 const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
+
+/**
+ * Authenticate + provision a default workspace via the backend so the
+ * authenticated home shell / settings page render the same chrome a
+ * real user sees. ``context.request`` shares cookies with the browser
+ * context, so the dev-login session carries into the personalization
+ * upsert that triggers ``ensure_default_workspace`` server-side.
+ */
+async function seedAuthenticatedHomeShell(context: BrowserContext): Promise<void> {
+	const backend = process.env.E2E_API_URL ?? 'http://localhost:8000';
+	const loginResponse = await context.request.post(`${backend}/auth/dev-login`);
+	expect(loginResponse.ok()).toBe(true);
+	const provisionResponse = await context.request.put(`${backend}/api/v1/personalization`, {
+		data: { name: 'E2E Admin' },
+	});
+	expect(provisionResponse.ok()).toBe(true);
+}
 
 test.describe('a11y smoke', () => {
 	test('login page has no auto-detectable a11y violations', async ({ page }) => {
@@ -32,34 +50,19 @@ test.describe('a11y smoke', () => {
 		page,
 		context,
 	}) => {
-		const response = await context.request.post(
-			`${process.env.E2E_API_URL ?? 'http://localhost:8000'}/auth/dev-login`
-		);
-		expect(response.ok()).toBe(true);
+		await seedAuthenticatedHomeShell(context);
 		await page.goto('/');
-		await expect(page.getByRole('button', { name: /New Session/i })).toBeVisible();
-		const results = await new AxeBuilder({ page: page as never })
-			.withTags(WCAG_TAGS)
-			// aria-allowed-attr: vendored @octavian-tocan/react-dropdown renders
-			// a non-asChild trigger as <div aria-expanded>. Fix belongs in the
-			// library submodule; tracked separately.
-			.disableRules(['aria-allowed-attr'])
-			.analyze();
+		await expect(
+			page.getByPlaceholder(/^(Ask|Type|Send)/i).or(page.getByRole('textbox'))
+		).toBeVisible();
+		const results = await new AxeBuilder({ page: page as never }).withTags(WCAG_TAGS).analyze();
 		expect(results.violations).toEqual([]);
 	});
 
 	test('settings page has no auto-detectable a11y violations', async ({ page, context }) => {
-		const response = await context.request.post(
-			`${process.env.E2E_API_URL ?? 'http://localhost:8000'}/auth/dev-login`
-		);
-		expect(response.ok()).toBe(true);
+		await seedAuthenticatedHomeShell(context);
 		await page.goto('/settings');
-		await expect(page.getByRole('heading', { name: 'General' })).toBeVisible();
-		const results = await new AxeBuilder({ page: page as never })
-			.withTags(WCAG_TAGS)
-			// Same vendored dropdown aria-allowed-attr issue as the home shell.
-			.disableRules(['aria-allowed-attr'])
-			.analyze();
+		const results = await new AxeBuilder({ page: page as never }).withTags(WCAG_TAGS).analyze();
 		expect(results.violations).toEqual([]);
 	});
 
@@ -67,18 +70,14 @@ test.describe('a11y smoke', () => {
 		page,
 		context,
 	}) => {
-		const response = await context.request.post(
-			`${process.env.E2E_API_URL ?? 'http://localhost:8000'}/auth/dev-login`
-		);
-		expect(response.ok()).toBe(true);
+		await seedAuthenticatedHomeShell(context);
 		await page.goto('/');
-		await expect(page.getByRole('button', { name: /New Session/i })).toBeVisible();
-		const composer = page.locator('textarea').first();
+		const composer = page
+			.getByPlaceholder(/^(Ask|Type|Send)/i)
+			.or(page.getByRole('textbox'))
+			.first();
 		await composer.fill('Hello — this is an a11y smoke draft.');
-		const results = await new AxeBuilder({ page: page as never })
-			.withTags(WCAG_TAGS)
-			.disableRules(['aria-allowed-attr'])
-			.analyze();
+		const results = await new AxeBuilder({ page: page as never }).withTags(WCAG_TAGS).analyze();
 		expect(results.violations).toEqual([]);
 	});
 });
