@@ -35,13 +35,16 @@ test.describe('sidebar', () => {
 		await page.goto('/');
 		// The "New chat" button is always visible in the sidebar header.
 		await expect(page.getByRole('button', { name: /New chat/i })).toBeVisible();
-		// The seeded conversation appears in the conversation list.
-		await expect(page.getByText('E2E Seed Conversation')).toBeVisible();
+		// The seeded conversation appears in the conversation list once React
+		// Query fetches it from the backend. Allow extra time in CI where the
+		// SQLite backend can be slow to respond on first cold query.
+		await expect(page.getByText('E2E Seed Conversation')).toBeVisible({ timeout: 15_000 });
 	});
 
 	test('renders the user profile section in the sidebar footer', async ({ page }) => {
 		await page.goto('/');
-		// The sidebar footer shows the provisioned user name.
-		await expect(page.getByText('E2E Admin')).toBeVisible();
+		// The sidebar footer shows the provisioned user name once the
+		// personalization query resolves. Allow extra time for cold CI.
+		await expect(page.getByText('E2E Admin')).toBeVisible({ timeout: 15_000 });
 	});
 });
