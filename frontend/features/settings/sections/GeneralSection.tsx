@@ -109,6 +109,7 @@ export function GeneralSection(): React.JSX.Element {
 				</SettingsRow>
 				<SettingsRow label="Full name">
 					<Input
+						aria-label="Full name"
 						className="w-56"
 						value={name}
 						onChange={(e) => {
@@ -118,10 +119,11 @@ export function GeneralSection(): React.JSX.Element {
 					/>
 				</SettingsRow>
 				<SettingsRow label="What should we call you?">
-					<Input className="w-56" value={nickname} readOnly />
+					<Input aria-label="Nickname" className="w-56" value={nickname} readOnly />
 				</SettingsRow>
 				<SettingsRow label="What best describes your work?">
 					<Input
+						aria-label="Work description"
 						className="w-56"
 						value={role}
 						onChange={(e) => {

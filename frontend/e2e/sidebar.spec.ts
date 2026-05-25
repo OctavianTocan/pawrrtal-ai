@@ -1,10 +1,9 @@
 /**
- * Sidebar smoke: open, close, and project header visibility.
+ * Sidebar smoke: authenticated sidebar renders conversation list and controls.
  *
- * The sidebar's Projects section is only rendered when the chat list
- * is non-empty (see ``NavChatsView`` for the gate). Tests seed the
- * required state via the same ``context.request`` so cookies from
- * dev-login carry into every subsequent setup call.
+ * Tests seed a conversation via the backend API so the sidebar has
+ * content to render. ``context.request`` shares cookies with the
+ * browser context so dev-login auth carries into every setup call.
  *
  * Multi-select + drag-and-drop need a richer fixture (a real
  * conversation list seeded via the backend) — split into a follow-up
@@ -32,17 +31,17 @@ test.describe('sidebar', () => {
 		expect(conversationResponse.ok()).toBe(true);
 	});
 
-	test('renders the Projects header + create-project button', async ({ page }) => {
+	test('renders the New chat button and seeded conversation in the sidebar', async ({ page }) => {
 		await page.goto('/');
-		await expect(page.getByText('Projects')).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Create new project' })).toBeVisible();
+		// The "New chat" button is always visible in the sidebar header.
+		await expect(page.getByRole('button', { name: /New chat/i })).toBeVisible();
+		// The seeded conversation appears in the conversation list.
+		await expect(page.getByText('E2E Seed Conversation')).toBeVisible();
 	});
 
-	test('opens the Create project modal with a name input', async ({ page }) => {
+	test('renders the user profile section in the sidebar footer', async ({ page }) => {
 		await page.goto('/');
-		await page.getByRole('button', { name: 'Create new project' }).click();
-		await expect(page.getByRole('heading', { name: 'Create project' })).toBeVisible();
-		await expect(page.getByLabel('Project name')).toBeVisible();
-		await expect(page.getByRole('button', { name: 'Create project' })).toBeDisabled();
+		// The sidebar footer shows the provisioned user name.
+		await expect(page.getByText('E2E Admin')).toBeVisible();
 	});
 });

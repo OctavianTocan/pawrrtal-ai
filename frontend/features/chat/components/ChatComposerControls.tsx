@@ -187,6 +187,7 @@ export function AutoReviewSelector(): React.JSX.Element {
 				<TooltipTrigger asChild>
 					<span className="inline-flex">
 						<DropdownMenu
+							asChild
 							align="start"
 							closeOnSelect
 							usePortal
