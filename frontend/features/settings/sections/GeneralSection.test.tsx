@@ -1,28 +1,72 @@
-import { render } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { render, waitFor } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
 import { GeneralSection } from './GeneralSection';
+
+const { mockCurrentUser, mockPersonalization, mockUpsert } = vi.hoisted(() => ({
+	mockCurrentUser: {
+		data: {
+			id: '1',
+			email: 'user@example.com',
+			is_active: true,
+			is_superuser: false,
+			is_verified: false,
+		},
+		isLoading: false,
+		isError: false,
+	},
+	mockPersonalization: {
+		data: { name: 'Test User', role: 'Design', customInstructions: '' },
+		isLoading: false,
+		isError: false,
+	},
+	mockUpsert: { mutate: vi.fn(), isPending: false },
+}));
+
+vi.mock('@/hooks/use-current-user', () => ({
+	useCurrentUser: () => mockCurrentUser,
+}));
+
+vi.mock('@/lib/personalization/use-personalization', () => ({
+	useGetPersonalization: () => mockPersonalization,
+	useUpsertPersonalization: () => mockUpsert,
+}));
+
+function createWrapper(): React.ComponentType<{ children: React.ReactNode }> {
+	const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+	return function Wrapper({ children }: { children: React.ReactNode }): React.JSX.Element {
+		return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+	};
+}
 
 describe('GeneralSection', () => {
 	it('renders the General page heading + every section heading', () => {
-		const { getByRole, getByText } = render(<GeneralSection />);
-		// Page-level title is the only `<h1>` — section headers below
-		// are intentionally rendered as `<span>` inside SettingsCard
-		// so the document outline isn't littered with low-importance
-		// h2/h3s, but they're still visible text.
+		const { getByRole, getByText } = render(<GeneralSection />, { wrapper: createWrapper() });
 		expect(getByRole('heading', { name: 'General' })).toBeTruthy();
 		expect(getByText('Profile')).toBeTruthy();
 		expect(getByText('Notifications')).toBeTruthy();
-		// "Preferences" was previously a third card here. It was deleted
-		// when the Appearance rail item became the single source of truth
-		// for theme + chat font + voice; the duplicate was drifting out
-		// of sync with the live settings.
 	});
 
-	it('renders the profile inputs with default values', () => {
-		const { getByDisplayValue } = render(<GeneralSection />);
-		expect(getByDisplayValue('Octavian Tocan')).toBeTruthy();
-		expect(getByDisplayValue('Tavi')).toBeTruthy();
-		expect(getByDisplayValue('Engineering')).toBeTruthy();
+	it('hydrates profile data after mount', async () => {
+		const { getByDisplayValue } = render(<GeneralSection />, { wrapper: createWrapper() });
+		await waitFor(() => {
+			expect(getByDisplayValue('Test User')).toBeTruthy();
+		});
+		expect(getByDisplayValue('Test')).toBeTruthy();
+		expect(getByDisplayValue('Design')).toBeTruthy();
+	});
+
+	it('renders empty inputs when personalization has no name or role', async () => {
+		const prevData = mockPersonalization.data;
+		mockPersonalization.data = {} as never;
+		const { container } = render(<GeneralSection />, { wrapper: createWrapper() });
+		await waitFor(() => {
+			const inputs = container.querySelectorAll('input');
+			const nameInput = inputs[0];
+			expect(nameInput).toBeTruthy();
+			expect((nameInput as HTMLInputElement).value).toBe('');
+		});
+		mockPersonalization.data = prevData;
 	});
 
 	// The "appearance segmented control" assertion that previously lived

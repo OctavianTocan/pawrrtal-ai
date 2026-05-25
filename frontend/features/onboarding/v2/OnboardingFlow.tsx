@@ -220,6 +220,7 @@ export function OnboardingFlow({
 	}, [step]);
 
 	const finish = useCallback(() => {
+		const wasAlreadyComplete = hasCompletedOnboarding();
 		try {
 			window.localStorage.setItem(ONBOARDING_COMPLETE_STORAGE_KEY, '1');
 		} catch {
@@ -230,6 +231,14 @@ export function OnboardingFlow({
 		// fresh — without this the user would land on whatever step they
 		// last left off, which is jarring for a "new workspace" intent.
 		dispatchFlowState({ type: 'set-step', step: 'identity' });
+		if (!wasAlreadyComplete) {
+			// Full-page navigation on first completion resets the app shell
+			// with the session cookie fully committed — prevents the blank-page
+			// race where authed queries fire before Set-Cookie flushes.
+			// Re-opens from the workspace selector skip this to avoid discarding
+			// in-progress UI state (active conversations, etc.).
+			window.location.replace('/');
+		}
 	}, []);
 
 	const handleOpenChange = useCallback((nextOpen: boolean) => {

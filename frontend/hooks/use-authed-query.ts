@@ -12,6 +12,8 @@ export interface UseAuthedQueryOptions {
 	enabled?: boolean;
 	/** Stale time in milliseconds passed through to React Query. */
 	staleTime?: number;
+	/** Poll interval in ms. When set, the query refetches automatically. */
+	refetchInterval?: number;
 }
 
 /**
@@ -36,5 +38,6 @@ export function useAuthedQuery<T>(
 		},
 		enabled: options?.enabled,
 		staleTime: options?.staleTime,
+		refetchInterval: options?.refetchInterval,
 	});
 }
