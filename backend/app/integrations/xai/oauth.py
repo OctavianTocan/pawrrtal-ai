@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 
@@ -26,7 +27,7 @@ logger = logging.getLogger(__name__)
 # device-code shape; the operator deployment can override via
 # ``settings.xai_oauth_*`` once the upstream URL stabilises.
 DEVICE_CODE_URL = "https://api.x.ai/oauth/device/code"
-TOKEN_ENDPOINT = "https://api.x.ai/oauth/token"  # noqa: S105 — URL, not a credential
+TOKEN_ENDPOINT = "https://api.x.ai/oauth/token"  # noqa: S105  # nosec B105
 DEFAULT_SCOPE = "chat:read chat:write stt:read"
 
 # HTTP status codes used in response comparisons.
@@ -264,10 +265,10 @@ async def refresh_token(
     )
 
 
-def _clamp_interval(value: object) -> int:
+def _clamp_interval(value: Any) -> int:
     """Coerce + clamp the poll-interval value to the safe range."""
     try:
-        interval = int(value)  # type: ignore[arg-type]
+        interval = int(value)
     except (TypeError, ValueError):
         interval = int(_MIN_POLL_INTERVAL_SECONDS)
     return max(int(_MIN_POLL_INTERVAL_SECONDS), min(int(_MAX_POLL_INTERVAL_SECONDS), interval))

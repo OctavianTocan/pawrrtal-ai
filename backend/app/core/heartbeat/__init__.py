@@ -8,10 +8,8 @@ from .heartbeat import (
     load_heartbeat_md,
     parse_heartbeat_md,
 )
-from .template import HEARTBEAT_MD
 
 __all__ = [
-    "HEARTBEAT_MD",
     "HeartbeatCheck",
     "HeartbeatConfig",
     "load_heartbeat_md",

@@ -51,7 +51,7 @@ def _make_turn_input(provider: _ScriptedProvider, *, verbose_level: int) -> Chat
         conversation_id=MagicMock(),
         user_id=MagicMock(),
         question="hi",
-        provider=provider,  # type: ignore[arg-type]
+        provider=provider,
         channel=MagicMock(),
         channel_message=MagicMock(),
         workspace_root=None,

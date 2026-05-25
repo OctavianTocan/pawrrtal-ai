@@ -56,9 +56,9 @@ def _make_personalization(**kwargs: Any) -> UserPersonalization:
 
 def _patch_workspace_base(tmp_path: Path) -> Any:
     """Patch ``workspace_base_dir`` only; leave template paths real."""
-    from app.core import workspace as workspace_module
+    from app.core.config import settings
 
-    return patch.object(workspace_module.settings, "workspace_base_dir", str(tmp_path))
+    return patch.object(settings, "workspace_base_dir", str(tmp_path))
 
 
 # ---------------------------------------------------------------------------
@@ -285,12 +285,7 @@ class TestWorkspaceService:
     async def test_ensure_dev_admin_workspace_uses_stable_path(
         self, db_session: AsyncSession, test_user: User, tmp_path: Path
     ) -> None:
-        from app.crud import workspace as crud_workspace
-
-        with (
-            _patch_workspace_base(tmp_path),
-            patch.object(crud_workspace.settings, "workspace_base_dir", str(tmp_path)),
-        ):
+        with _patch_workspace_base(tmp_path):
             ws = await ensure_dev_admin_workspace(test_user.id, db_session)
             await db_session.commit()
 
@@ -303,7 +298,6 @@ class TestWorkspaceService:
     ) -> None:
         """DB-reset run: dev-admin folder already has user files; helper
         must reuse the folder without overwriting them."""
-        from app.crud import workspace as crud_workspace
 
         stable_root = tmp_path / DEV_ADMIN_WORKSPACE_DIRNAME
         stable_root.mkdir(parents=True)
@@ -314,10 +308,7 @@ class TestWorkspaceService:
         edited_agents = stable_root / "AGENTS.md"
         edited_agents.write_text("hand-edited", encoding="utf-8")
 
-        with (
-            _patch_workspace_base(tmp_path),
-            patch.object(crud_workspace.settings, "workspace_base_dir", str(tmp_path)),
-        ):
+        with _patch_workspace_base(tmp_path):
             ws = await ensure_dev_admin_workspace(test_user.id, db_session)
             await db_session.commit()
 
@@ -329,12 +320,7 @@ class TestWorkspaceService:
     async def test_ensure_dev_admin_workspace_is_idempotent(
         self, db_session: AsyncSession, test_user: User, tmp_path: Path
     ) -> None:
-        from app.crud import workspace as crud_workspace
-
-        with (
-            _patch_workspace_base(tmp_path),
-            patch.object(crud_workspace.settings, "workspace_base_dir", str(tmp_path)),
-        ):
+        with _patch_workspace_base(tmp_path):
             ws1 = await ensure_dev_admin_workspace(test_user.id, db_session)
             await db_session.commit()
             ws2 = await ensure_dev_admin_workspace(test_user.id, db_session)

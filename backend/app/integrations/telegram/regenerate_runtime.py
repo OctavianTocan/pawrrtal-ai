@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -179,7 +179,7 @@ def _callback_message(callback: CallbackQuery) -> Message | None:
     message = callback.message
     if message is None or not hasattr(message, "answer"):
         return None
-    return message
+    return cast("Message", message)
 
 
 class _RegenerateMessageView:
