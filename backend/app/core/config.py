@@ -51,6 +51,11 @@ class Settings(BaseSettings):
     # (the endpoint returns 503 with a clear "not configured" message).
     # Also consumed by the LiteLLM provider for Grok chat models.
     xai_api_key: str = ""
+    # OAuth 2.0 client id for the xAI device-code flow (#372). Set
+    # to the value xAI hands back from registering Pawrrtal as an
+    # OAuth client. When empty the device-code path is disabled
+    # and users must keep using the legacy long-lived ``xai_api_key``.
+    xai_oauth_client_id: str = ""
     # API key for OpenAI (https://platform.openai.com).  Consumed by the
     # LiteLLM provider for GPT-4o / o-series chat models.  Leave empty
     # to disable those models; chat requests resolved to an OpenAI model
