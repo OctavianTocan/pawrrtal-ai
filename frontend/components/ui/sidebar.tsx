@@ -676,23 +676,21 @@ function SidebarMenuSkeleton({
 	});
 
 	return (
-		<Skeleton loading name="sidebar-menu" animate="pulse">
-			<div
-				data-slot="sidebar-menu-skeleton"
-				data-sidebar="menu-skeleton"
-				className={cn('h-8 gap-2 rounded-md px-2 flex items-center', className)}
-				{...props}
-			>
-				{showIcon && (
-					<div className="size-4 rounded-md" data-sidebar="menu-skeleton-icon" />
-				)}
-				<div
-					className="h-4 flex-1"
-					data-sidebar="menu-skeleton-text"
-					style={{ maxWidth: width }}
-				/>
-			</div>
-		</Skeleton>
+		<div
+			data-slot="sidebar-menu-skeleton"
+			data-sidebar="menu-skeleton"
+			className={cn('h-8 gap-2 rounded-md px-2 flex animate-pulse items-center', className)}
+			{...props}
+		>
+			{showIcon && (
+				<Skeleton className="size-4 rounded-md" data-sidebar="menu-skeleton-icon" />
+			)}
+			<Skeleton
+				className="h-4 flex-1 rounded-md"
+				data-sidebar="menu-skeleton-text"
+				style={{ maxWidth: width }}
+			/>
+		</div>
 	);
 }
 

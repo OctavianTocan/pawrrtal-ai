@@ -268,9 +268,9 @@ def _parse_prefixed_callback(parts: list[str]) -> ModelCallback | None:
     if len(parts) == _CALLBACK_LIST_PARTS and tag == "l":
         return _parse_list_callback(parts)
     if len(parts) == _CALLBACK_SELECT_PARTS and tag == "s":
-        return _parse_select_callback(parts)
+        return _parse_indexed_callback(parts, "select")
     if len(parts) == _CALLBACK_DEFAULT_PARTS and tag == "d":
-        return _parse_set_default_callback(parts)
+        return _parse_indexed_callback(parts, "set_default")
     return None
 
 
@@ -401,28 +401,15 @@ def _parse_list_callback(parts: list[str]) -> ModelCallback | None:
     )
 
 
-def _parse_select_callback(parts: list[str]) -> ModelCallback | None:
+def _parse_indexed_callback(
+    parts: list[str],
+    action: ModelCallbackAction,
+) -> ModelCallback | None:
     try:
         index = int(parts[3])
     except ValueError:
         return None
-    return ModelCallback(
-        action="select",
-        index=index,
-        catalog_token=parts[2],
-    )
-
-
-def _parse_set_default_callback(parts: list[str]) -> ModelCallback | None:
-    try:
-        index = int(parts[3])
-    except ValueError:
-        return None
-    return ModelCallback(
-        action="set_default",
-        index=index,
-        catalog_token=parts[2],
-    )
+    return ModelCallback(action=action, index=index, catalog_token=parts[2])
 
 
 def _page_count(entries: list[ModelEntry]) -> int:

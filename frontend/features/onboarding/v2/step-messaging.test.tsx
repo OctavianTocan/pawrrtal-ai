@@ -17,6 +17,20 @@ vi.mock('next/navigation', () => ({
 	useSearchParams: () => new URLSearchParams(),
 }));
 
+// Mock useAuthedFetch to prevent the transitive useRouter() call chain
+// (TelegramConnectDialog -> useTelegramBinding -> useAuthedQuery -> useAuthedFetch -> useRouter).
+const { mockAuthedFetch } = vi.hoisted(() => ({
+	mockAuthedFetch: vi.fn().mockResolvedValue({
+		ok: true,
+		status: 200,
+		json: async () => [],
+		text: async () => '[]',
+	}),
+}));
+vi.mock('@/hooks/use-authed-fetch', () => ({
+	useAuthedFetch: () => mockAuthedFetch,
+}));
+
 vi.mock('@/lib/channels', () => ({
 	listChannels: vi.fn().mockResolvedValue([]),
 }));
