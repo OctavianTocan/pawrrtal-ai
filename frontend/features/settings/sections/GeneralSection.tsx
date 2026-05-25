@@ -31,7 +31,7 @@ const SAVE_DEBOUNCE_MS = 1200;
  */
 export function GeneralSection(): React.JSX.Element {
 	const { data: currentUser } = useCurrentUser();
-	const { data: personalization, isLoading } = useGetPersonalization();
+	const { data: personalization } = useGetPersonalization();
 	const upsert = useUpsertPersonalization();
 
 	const [name, setName] = useState('');

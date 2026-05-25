@@ -4,6 +4,19 @@ import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { StepMessaging } from './step-messaging';
 
+vi.mock('next/navigation', () => ({
+	useRouter: () => ({
+		push: vi.fn(),
+		replace: vi.fn(),
+		back: vi.fn(),
+		forward: vi.fn(),
+		refresh: vi.fn(),
+		prefetch: vi.fn(),
+	}),
+	usePathname: () => '/',
+	useSearchParams: () => new URLSearchParams(),
+}));
+
 vi.mock('@/lib/channels', () => ({
 	listChannels: vi.fn().mockResolvedValue([]),
 }));
@@ -23,7 +36,7 @@ describe('StepMessaging', () => {
 				onPatch={vi.fn()}
 				profile={{ connectedChannels: [] }}
 			/>,
-			{ wrapper: createWrapper() },
+			{ wrapper: createWrapper() }
 		);
 		expect(getByText('Connect Slack')).toBeTruthy();
 		expect(getByText('Connect Telegram')).toBeTruthy();
@@ -39,7 +52,7 @@ describe('StepMessaging', () => {
 				onPatch={vi.fn()}
 				profile={{ connectedChannels: [] }}
 			/>,
-			{ wrapper: Wrapper },
+			{ wrapper: Wrapper }
 		);
 		const continueButton = getByRole('button', {
 			name: 'Finish messaging setup',
@@ -67,7 +80,7 @@ describe('StepMessaging', () => {
 				onPatch={onPatch}
 				profile={{ connectedChannels: [] }}
 			/>,
-			{ wrapper: createWrapper() },
+			{ wrapper: createWrapper() }
 		);
 		const buttons = getAllByRole('button', { name: 'Connect' });
 		const first = buttons[0];
@@ -85,7 +98,7 @@ describe('StepMessaging', () => {
 				onPatch={vi.fn()}
 				profile={{ connectedChannels: ['slack'] }}
 			/>,
-			{ wrapper: createWrapper() },
+			{ wrapper: createWrapper() }
 		);
 		await user.click(getByRole('button', { name: 'Finish messaging setup' }));
 		expect(onFinish).toHaveBeenCalled();
