@@ -26,8 +26,11 @@ logger = logging.getLogger(__name__)
 # device-code shape; the operator deployment can override via
 # ``settings.xai_oauth_*`` once the upstream URL stabilises.
 DEVICE_CODE_URL = "https://api.x.ai/oauth/device/code"
-TOKEN_URL = "https://api.x.ai/oauth/token"  # noqa: S105
+TOKEN_ENDPOINT = "https://api.x.ai/oauth/token"  # noqa: S105 — URL, not a credential
 DEFAULT_SCOPE = "chat:read chat:write stt:read"
+
+# HTTP status codes used in response comparisons.
+_HTTP_OK = 200
 
 # Network defaults. Polling intervals come from the device-code
 # response (RFC 8628 ``interval`` field); these caps protect against
@@ -110,7 +113,7 @@ async def request_device_code(
             logger.warning("XAI_OAUTH_DEVICE_CODE_REQUEST_FAIL error=%s", exc)
             raise OAuthError("xAI OAuth device endpoint unreachable.") from exc
 
-    if response.status_code != 200:  # noqa: PLR2004
+    if response.status_code != _HTTP_OK:
         logger.warning(
             "XAI_OAUTH_DEVICE_CODE_HTTP_ERR status=%s body=%s",
             response.status_code,
@@ -144,7 +147,7 @@ async def poll_for_token(
     device_code: str,
     interval: int,
     deadline_seconds: float = _MAX_POLL_DEADLINE_SECONDS,
-    url: str = TOKEN_URL,
+    url: str = TOKEN_ENDPOINT,
 ) -> DeviceCodeGrant:
     """Poll the token endpoint until the user authorises (or the code expires).
 
@@ -172,7 +175,7 @@ async def poll_for_token(
                 logger.warning("XAI_OAUTH_TOKEN_REQUEST_FAIL error=%s", exc)
                 raise OAuthError("xAI OAuth token endpoint unreachable.") from exc
 
-            if response.status_code == 200:  # noqa: PLR2004
+            if response.status_code == _HTTP_OK:
                 payload = response.json()
                 return DeviceCodeGrant(
                     access_token=str(payload["access_token"]),
@@ -217,7 +220,7 @@ async def refresh_token(
     *,
     client_id: str,
     refresh_token_value: str,
-    url: str = TOKEN_URL,
+    url: str = TOKEN_ENDPOINT,
 ) -> DeviceCodeGrant:
     """Trade a refresh token for a fresh access token.
 
@@ -239,7 +242,7 @@ async def refresh_token(
             logger.warning("XAI_OAUTH_REFRESH_FAIL error=%s", exc)
             raise OAuthError("xAI OAuth refresh endpoint unreachable.") from exc
 
-    if response.status_code != 200:  # noqa: PLR2004
+    if response.status_code != _HTTP_OK:
         error_payload = _safe_json(response)
         code = error_payload.get("error") if isinstance(error_payload, dict) else None
         logger.warning(
@@ -264,10 +267,10 @@ async def refresh_token(
 def _clamp_interval(value: object) -> int:
     """Coerce + clamp the poll-interval value to the safe range."""
     try:
-        interval = int(value)  # type: ignore[call-overload]
+        interval = int(value)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         interval = int(_MIN_POLL_INTERVAL_SECONDS)
-    return int(max(int(_MIN_POLL_INTERVAL_SECONDS), min(int(_MAX_POLL_INTERVAL_SECONDS), interval)))
+    return max(int(_MIN_POLL_INTERVAL_SECONDS), min(int(_MAX_POLL_INTERVAL_SECONDS), interval))
 
 
 def _safe_json(response: httpx.Response) -> object:

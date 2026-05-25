@@ -132,17 +132,25 @@ def _copy_tree_skip_existing(src: Path, dst: Path) -> None:
     dst.mkdir(parents=True, exist_ok=True)
     for entry in src.iterdir():
         target = dst / entry.name
+
         if entry.is_dir():
-            if _path_exists(target) and not target.is_dir():
-                raise FileExistsError(
-                    f"Cannot seed directory {entry} over existing non-directory {target}"
-                )
-            _copy_tree_skip_existing(entry, target)
-        elif _path_exists(target):
-            if target.is_dir():
-                raise FileExistsError(f"Cannot seed file {entry} over existing directory {target}")
-        else:
+            _seed_directory_entry(entry, target)
+            continue
+
+        # File entry — skip if target already exists (preserve agent edits).
+        if not _path_exists(target):
             shutil.copy2(entry, target)
+            continue
+
+        if target.is_dir():
+            raise FileExistsError(f"Cannot seed file {entry} over existing directory {target}")
+
+
+def _seed_directory_entry(entry: Path, target: Path) -> None:
+    """Validate and recurse into a directory entry during workspace seeding."""
+    if _path_exists(target) and not target.is_dir():
+        raise FileExistsError(f"Cannot seed directory {entry} over existing non-directory {target}")
+    _copy_tree_skip_existing(entry, target)
 
 
 def _path_exists(path: Path) -> bool:
