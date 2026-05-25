@@ -138,10 +138,12 @@ async def _collect_stream_telemetry(
 
 async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
     """Search LCM for context relevant to the user's question before the main agent turn."""
-    if settings.lcm_enabled is False:
+    if settings.active_recall_enabled is False or settings.lcm_enabled is False:
         logger.info(
-            "ACTIVE_RECALL_SKIP conversation_id=%s reason=disabled",
+            "ACTIVE_RECALL_SKIP conversation_id=%s reason=disabled enabled=%s lcm_enabled=%s",
             ctx.conversation_id,
+            settings.active_recall_enabled,
+            settings.lcm_enabled,
         )
         return None
 
@@ -157,15 +159,17 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
             ctx.conversation_id,
             ctx.user_id,
         )
-        # We're using a very fast, very cheap Google AI model to do the heavy lifting of the search.
-        provider = resolve_llm("google-ai:google/gemini-3.1-flash-lite")
+        provider = resolve_llm(settings.active_recall_model)
         # We give the agent its tools.
         lcm_tools: list[AgentTool] = [
             make_lcm_grep_tool(conversation_id=ctx.conversation_id),
             make_lcm_search_tool(conversation_id=ctx.conversation_id),
-            make_read_file_tool(ctx.workspace_root),
-            make_list_dir_tool(ctx.workspace_root),
         ]
+        if settings.active_recall_search_workspace:
+            lcm_tools.extend([
+                make_read_file_tool(ctx.workspace_root),
+                make_list_dir_tool(ctx.workspace_root),
+            ])
 
         stream = provider.stream(
             question=ctx.question,
@@ -173,7 +177,7 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
             user_id=ctx.user_id,
             history=None,
             tools=lcm_tools,
-            system_prompt=SYSTEM_PROMPT,
+            system_prompt=settings.active_recall_system_prompt or SYSTEM_PROMPT,
         )
 
         (

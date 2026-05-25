@@ -376,6 +376,22 @@ class Settings(BaseSettings):
     # The timeout in seconds for each pre-turn hook.
     pre_turn_hook_timeout_seconds: int = 10
 
+    # ── Active Recall ───────────────────────────────────────────────────
+    # Master switch for the Active Recall pre-turn hook. If False, the recall
+    # agent is skipped entirely. Note that Active Recall also requires
+    # ``lcm_enabled`` to be True to search conversation history.
+    active_recall_enabled: bool = True
+    # Fast, cost-efficient model used by the Active Recall search agent.
+    # Defaults to the stable Gemini Flash Lite.
+    active_recall_model: str = "google-ai:google/gemini-3.1-flash-lite"
+    # If True, the Active Recall agent is allowed to search and read local
+    # files inside the workspace root (e.g. TASKS.md). If False, it only
+    # searches conversation history via LCM.
+    active_recall_search_workspace: bool = True
+    # Optional system prompt override for the Active Recall agent. If empty,
+    # falls back to the default agent prompt defined in the plugin.
+    active_recall_system_prompt: str = ""
+
     @property
     def claude_sandbox_excluded_commands_list(self) -> list[str]:
         """Parsed view of ``claude_sandbox_excluded_commands``."""
