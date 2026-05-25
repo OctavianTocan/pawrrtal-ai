@@ -138,6 +138,34 @@ function shouldInitiallyOpenFlow(initialOpen: boolean): boolean {
 	return true;
 }
 
+/**
+ * Close the wizard, mark onboarding complete, and (on first completion)
+ * force a full-page navigation so the app shell boots with a committed
+ * session cookie. Extracted to keep {@link OnboardingFlow} under the
+ * Biome `noExcessiveLinesPerFunction` budget.
+ */
+function finishOnboarding(dispatch: React.Dispatch<OnboardingFlowAction>): void {
+	const wasAlreadyComplete = hasCompletedOnboarding();
+	try {
+		window.localStorage.setItem(ONBOARDING_COMPLETE_STORAGE_KEY, '1');
+	} catch {
+		/* quota / private browsing — ignore */
+	}
+	dispatch({ type: 'set-open', open: false });
+	// Reset to step 1 so re-opening from the workspace selector starts
+	// fresh — without this the user would land on whatever step they
+	// last left off, which is jarring for a "new workspace" intent.
+	dispatch({ type: 'set-step', step: 'identity' });
+	if (!wasAlreadyComplete) {
+		// Full-page navigation on first completion resets the app shell
+		// with the session cookie fully committed — prevents the blank-page
+		// race where authed queries fire before Set-Cookie flushes.
+		// Re-opens from the workspace selector skip this to avoid discarding
+		// in-progress UI state (active conversations, etc.).
+		window.location.replace('/');
+	}
+}
+
 /** Props for {@link OnboardingFlow}. */
 export interface OnboardingFlowProps {
 	/** Open on first mount. Defaults to false (event-driven). */
@@ -220,25 +248,7 @@ export function OnboardingFlow({
 	}, [step]);
 
 	const finish = useCallback(() => {
-		const wasAlreadyComplete = hasCompletedOnboarding();
-		try {
-			window.localStorage.setItem(ONBOARDING_COMPLETE_STORAGE_KEY, '1');
-		} catch {
-			/* quota / private browsing — ignore */
-		}
-		dispatchFlowState({ type: 'set-open', open: false });
-		// Reset to step 1 so re-opening from the workspace selector starts
-		// fresh — without this the user would land on whatever step they
-		// last left off, which is jarring for a "new workspace" intent.
-		dispatchFlowState({ type: 'set-step', step: 'identity' });
-		if (!wasAlreadyComplete) {
-			// Full-page navigation on first completion resets the app shell
-			// with the session cookie fully committed — prevents the blank-page
-			// race where authed queries fire before Set-Cookie flushes.
-			// Re-opens from the workspace selector skip this to avoid discarding
-			// in-progress UI state (active conversations, etc.).
-			window.location.replace('/');
-		}
+		finishOnboarding(dispatchFlowState);
 	}, []);
 
 	const handleOpenChange = useCallback((nextOpen: boolean) => {
