@@ -14,10 +14,9 @@ through to the existing executor.
 What's checked (in order)
 -------------------------
 1. **Workspace tool allowlist** — when the workspace's
-   ``.claude/settings.json`` lists ``permissions.allow`` /
-   ``permissions.deny`` (PR 06 wires this in), respect it.
-   For PR 03 the placeholder accepts everything; the real check
-   plugs into :class:`WorkspaceContext` once PR 06 lands.
+   ``.agent/protocols/permissions.md`` defines an explicit
+   allowlist, respect it. Today the loader returns "no opinion"
+   (permissive default); a Markdown→allowlist parser is future work.
 2. **File-path boundary** — for tools whose arguments name a
    workspace file (``Read``, ``Write``, ``Edit``, ``MultiEdit``,
    ``workspace_read``, ``workspace_write``, ``workspace_list``,
@@ -136,8 +135,9 @@ async def check_workspace_allowlist(
     """Reject tools not in the workspace's enabled-tools allowlist.
 
     No-op when ``context.enabled_tools is None`` so workspaces without
-    a ``.claude/settings.json`` accept every registered tool (matches
-    PR 03's "permissive by default; PR 06 tightens" plan).
+    an explicit allowlist accept every registered tool — the permissive
+    default while a Markdown→allowlist parser for
+    ``.agent/protocols/permissions.md`` is still future work.
     """
     _ = arguments  # not needed for an allowlist check
     if context.enabled_tools is None:
@@ -147,7 +147,7 @@ async def check_workspace_allowlist(
     return PermissionDecision.deny(
         reason=(
             f"Tool '{tool_name}' is not enabled by this workspace's "
-            "`.claude/settings.json` permissions.allow list."
+            "`.agent/protocols/permissions.md` allow list."
         ),
         violation_type="tool_disabled_by_workspace",
     )

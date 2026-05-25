@@ -2,29 +2,29 @@
 
 Single source of truth for "what does this workspace tell the agent
 it can do" — every provider (Claude, Gemini, future) consumes the
-same :class:`WorkspaceContext` so a Claude-Code-native workspace
-dropped into the SaaS just works for non-Claude models too.
+same :class:`WorkspaceContext` so a Pawrrtal workspace works the same
+across all backends.
 
 What we read
 ------------
-1. **System prompt** — concatenation of (in order):
-   * ``SOUL.md`` — agent identity (the existing
-     :func:`app.core.tools.agents_md.assemble_workspace_prompt` covers
-     this and AGENTS.md; we add CLAUDE.md compatibility on top).
-   * ``AGENTS.md`` — operating rules.
-   * ``BOOTSTRAP.md`` — first-run Paw persona setup, only until completed.
-   * ``CLAUDE.md`` — Claude Code-native operating manual.  Loaded so
-     a workspace authored against the Claude Code CLI works the same
-     against our Gemini path.
-2. **Skills** — one ``SkillDef`` per ``.claude/skills/<name>/SKILL.md``.
+1. **System prompt** — concatenation of (in order), via
+   :func:`app.core.tools.agents_md.assemble_workspace_prompt`:
+   * ``SOUL.md`` — durable Paw identity.
+   * ``AGENTS.md`` — operating contract.
+   * ``USER.md`` — user profile.
+   * ``PREFERENCES.md`` — standing preferences and bootstrap state.
+   * ``.agent/skills/paw-bootstrap/SKILL.md`` — first-run Paw persona
+     setup, only until the identity block in PREFERENCES.md flips
+     ``bootstrap_completed: true``.
+   * ``.agent/skills/_index.md`` — the always-in-context skill map.
+2. **Skills** — one ``SkillDef`` per ``.agent/skills/<name>/SKILL.md``.
    The body of each SKILL.md is appended to the system prompt under
    a "## Available Skills" section so providers without native skill
    loading (Gemini, future) still surface the skill catalogue.
-3. **Permissions** — parsed from ``.claude/settings.json`` (Claude
-   Code's permissions schema: ``permissions.allow``, ``permissions.deny``,
-   ``permissions.defaultMode``).  Mapped onto an
-   ``enabled_tools: frozenset[str] | None`` the cross-provider
-   permission gate (PR 03) consults.
+3. **Permissions** — ``.agent/protocols/permissions.md`` is appended
+   to the prompt for conversational guidance. The mechanical allow/deny
+   gate currently returns "no opinion" (permissive default); a
+   Markdown→allowlist parser is future work.
 
 Writes
 ------
@@ -43,7 +43,6 @@ decide whether to short-circuit.
 
 from __future__ import annotations
 
-import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -61,29 +60,24 @@ logger = logging.getLogger(__name__)
 # so a workspace can't blow the context window with a 10MB SKILL.md.
 _MAX_BYTES = 64_000
 
-# Workspace-relative path to the canonical Claude Code-native operating
-# manual.  Read in addition to SOUL.md / AGENTS.md so a workspace
-# authored against the Claude Code CLI keeps working.
-_CLAUDE_MD = "CLAUDE.md"
-
-# Per-skill manifest filename.  Each ``.claude/skills/<name>/SKILL.md``
+# Per-skill manifest filename. Each ``.agent/skills/<name>/SKILL.md``
 # contributes one :class:`SkillDef` to the catalogue.
 _SKILL_MANIFEST = "SKILL.md"
 
 # Section heading injected into the system prompt when the workspace
-# has at least one skill.  Kept short so it doesn't fight with the
-# operating-rules text from AGENTS.md / CLAUDE.md.
+# has at least one skill. Kept short so it doesn't fight with the
+# operating-rules text from AGENTS.md.
 _SKILLS_HEADING = "## Available Skills"
 
 
 @dataclass(frozen=True)
 class SkillDef:
-    """One skill the workspace exposes via ``.claude/skills/<name>/SKILL.md``.
+    """One skill the workspace exposes via ``.agent/skills/<name>/SKILL.md``.
 
     Skills are surfaced into the system prompt as a catalogue so
     providers without native skill auto-invocation (Gemini, future)
     can still let the model decide when to "call" a skill (i.e. ask
-    the user to follow its instructions).  Auto-invocation lives in
+    the user to follow its instructions). Auto-invocation lives in
     a future PR with a classifier.
     """
 
@@ -95,14 +89,13 @@ class SkillDef:
 
 @dataclass(frozen=True)
 class SettingsPermissions:
-    """Parsed ``permissions`` block from ``.claude/settings.json``.
+    """Permission allow/deny lists pulled from the workspace.
 
-    Mirrors Claude Code's published schema:
-    https://docs.anthropic.com/en/docs/claude-code/settings#permissions
-
-    ``allow`` and ``deny`` are *tool name patterns* — the cross-provider
-    gate currently treats them as exact tool names; pattern semantics
-    (``Bash(npm test)``, etc.) are a future PR.
+    The current loader reads ``.agent/protocols/permissions.md`` for
+    context only and returns an empty :class:`SettingsPermissions`
+    (no mechanical opinion). A Markdown→tool-allowlist parser is
+    future work; until then the agent honours permissions
+    conversationally via AGENTS.md's reference to the file.
     """
 
     allow: frozenset[str] = field(default_factory=frozenset)
@@ -148,7 +141,7 @@ def load_workspace_context(root: Path) -> WorkspaceContext:
 
     No-op when ``settings.workspace_context_enabled`` is False — the
     caller can keep the call site unchanged and just see an empty
-    context.  Logs at DEBUG for every path actually loaded so the
+    context. Logs at DEBUG for every path actually loaded so the
     operator can verify a deploy reads what they expect.
     """
     if not settings.workspace_context_enabled:
@@ -157,25 +150,28 @@ def load_workspace_context(root: Path) -> WorkspaceContext:
     loaded: list[Path] = []
     base_prompt = assemble_workspace_prompt(root)
     if base_prompt is not None:
-        # ``assemble_workspace_prompt`` already concatenates SOUL.md,
-        # AGENTS.md, pending BOOTSTRAP.md, and skills/_index.md; we
-        # record the source paths if they exist.
-        loaded.extend(root / name for name in ("SOUL.md", "AGENTS.md") if (root / name).exists())
-        if is_persona_bootstrap_pending(root):
-            loaded.append(root / "BOOTSTRAP.md")
-        if (root / "skills/_index.md").exists():
-            loaded.append(root / "skills/_index.md")
-
-    claude_md = read_capped_utf8(root / _CLAUDE_MD, max_bytes=_MAX_BYTES)
-    if claude_md is not None:
-        loaded.append(root / _CLAUDE_MD)
+        # ``assemble_workspace_prompt`` concatenates root context files,
+        # the paw-bootstrap skill body (while pending), and skills/_index.md.
+        for filename in ("SOUL.md", "AGENTS.md", "USER.md", "PREFERENCES.md"):
+            path = root / filename
+            if read_capped_utf8(path, max_bytes=_MAX_BYTES) is not None:
+                loaded.append(path)
+        bootstrap_path = root / ".agent/skills/paw-bootstrap/SKILL.md"
+        if (
+            is_persona_bootstrap_pending(root)
+            and read_capped_utf8(bootstrap_path, max_bytes=_MAX_BYTES) is not None
+        ):
+            loaded.append(bootstrap_path)
+        skills_index_path = root / ".agent/skills/_index.md"
+        if read_capped_utf8(skills_index_path, max_bytes=_MAX_BYTES) is not None:
+            loaded.append(skills_index_path)
 
     skills = _load_skills(root, loaded)
-    permissions = _load_permissions(root, loaded)
+    permissions, permissions_text = _load_permissions(root, loaded)
 
     system_prompt = _assemble_system_prompt(
         base_prompt=base_prompt,
-        claude_md=claude_md,
+        permissions_text=permissions_text,
         skills=skills,
     )
     enabled_tools = _resolve_enabled_tools(permissions)
@@ -211,7 +207,7 @@ def _empty_context() -> WorkspaceContext:
 
 
 def _load_skills(root: Path, loaded: list[Path]) -> list[SkillDef]:
-    """Walk ``.claude/skills/*/SKILL.md`` and parse each into a SkillDef."""
+    """Walk ``.agent/skills/*/SKILL.md`` and parse each into a SkillDef."""
     skills_dir = root / settings.workspace_skills_dir_name
     if not skills_dir.exists() or not skills_dir.is_dir():
         return []
@@ -257,69 +253,41 @@ def _extract_description(body: str) -> str | None:
     return None
 
 
-def _load_permissions(root: Path, loaded: list[Path]) -> SettingsPermissions:
-    """Parse ``.claude/settings.json`` permissions block.
+def _load_permissions(root: Path, loaded: list[Path]) -> tuple[SettingsPermissions, str | None]:
+    """Read ``.agent/protocols/permissions.md`` for context.
 
-    Returns the default-shaped :class:`SettingsPermissions` when the
-    file is missing or malformed — workspaces without an explicit
-    settings file accept every registered tool (matches PR 03's
-    "permissive by default" plan).
+    Returns the default-shaped :class:`SettingsPermissions` (empty
+    allow/deny) when the file is missing. When present and readable,
+    the file is recorded in ``loaded`` and appended to the prompt, but
+    no Markdown→tool-allowlist parser is implemented yet — the
+    mechanical gate stays permissive.
     """
     settings_path = root / settings.workspace_settings_filename
-    if not settings_path.exists():
-        return SettingsPermissions()
-    try:
-        raw = read_capped_utf8(settings_path, max_bytes=_MAX_BYTES)
-        if raw is None:
-            return SettingsPermissions()
-        payload = json.loads(raw)
-    except (OSError, json.JSONDecodeError) as exc:
-        logger.warning(
-            "WORKSPACE_SETTINGS_PARSE_FAILED path=%s error=%s",
-            settings_path,
-            exc,
-        )
-        return SettingsPermissions()
-    perms = payload.get("permissions") if isinstance(payload, dict) else None
-    if not isinstance(perms, dict):
-        return SettingsPermissions()
+    text = read_capped_utf8(settings_path, max_bytes=_MAX_BYTES)
+    if text is None:
+        return SettingsPermissions(), None
     loaded.append(settings_path)
-    return SettingsPermissions(
-        allow=frozenset(_as_str_iter(perms.get("allow"))),
-        deny=frozenset(_as_str_iter(perms.get("deny"))),
-        default_mode=_as_optional_str(perms.get("defaultMode")),
-    )
-
-
-def _as_str_iter(value: object) -> list[str]:
-    """Coerce a JSON value into a list of strings (filters out non-strings)."""
-    if not isinstance(value, list):
-        return []
-    return [item for item in value if isinstance(item, str)]
-
-
-def _as_optional_str(value: object) -> str | None:
-    return value if isinstance(value, str) else None
+    return SettingsPermissions(), f"## Workspace Permissions\n\n{text}"
 
 
 def _assemble_system_prompt(
     *,
     base_prompt: str | None,
-    claude_md: str | None,
+    permissions_text: str | None,
     skills: list[SkillDef],
 ) -> str | None:
-    """Concatenate the base prompt + CLAUDE.md + skills catalogue.
+    """Concatenate the base prompt + skills catalogue.
 
-    Order matches the load priority: SOUL.md + AGENTS.md (already
-    concatenated by ``assemble_workspace_prompt``) → CLAUDE.md →
-    skills catalogue.  Returns ``None`` when none of the three
-    sources contributed text.
+    Order matches the load priority: AGENTS.md + bootstrap +
+    skills/_index.md (already concatenated by
+    ``assemble_workspace_prompt``) -> skills catalogue. Returns
+    ``None`` when neither contributed text.
     """
     parts: list[str] = []
     if base_prompt is not None:
         parts.append(base_prompt)
-    if claude_md is not None:
-        parts.append(claude_md)
+    if permissions_text is not None:
+        parts.append(permissions_text)
     if skills:
         parts.append(_format_skills_catalogue(skills))
     if not parts:
@@ -331,8 +299,8 @@ def _format_skills_catalogue(skills: list[SkillDef]) -> str:
     """Render a skill list as a Markdown section the model can read.
 
     Includes the description (when present) and the full body of each
-    skill so the model can decide when to follow it.  For long skills
-    this can grow the prompt — operators can drop the ``.claude/skills/``
+    skill so the model can decide when to follow it. For long skills
+    this can grow the prompt — operators can drop the ``.agent/skills/``
     directory or set ``WORKSPACE_CONTEXT_ENABLED=false`` to disable.
     """
     lines: list[str] = [_SKILLS_HEADING, ""]

@@ -283,16 +283,23 @@ class Settings(BaseSettings):
     # ── Governance: workspace context (PR 06) ────────────────────────────
     # When True, the chat router calls
     # ``governance.workspace_context.load_workspace_context`` to read
-    # CLAUDE.md/AGENTS.md/SOUL.md + skills/ + settings.json and assemble
-    # the unified system prompt + tool allowlist.
+    # root prompt files plus the internal ``.agent/`` skills/protocols
+    # tree and assemble the unified system prompt.
     workspace_context_enabled: bool = True
     # Workspace-relative path to the skills directory. Each subdirectory
     # is expected to contain a ``SKILL.md`` file.
-    workspace_skills_dir_name: str = ".claude/skills"
-    # Workspace-relative path to the Claude Code-compatible settings
-    # file. When present, ``permissions.allow``/``deny`` shape the
-    # ``can_use_tool`` gate.
-    workspace_settings_filename: str = ".claude/settings.json"
+    workspace_skills_dir_name: str = ".agent/skills"
+    # Workspace-relative path to the permissions file. Today the loader
+    # only treats it as documentation for the agent; a Markdown →
+    # allowlist parser is future work.
+    workspace_settings_filename: str = ".agent/protocols/permissions.md"
+
+    # ── Workspace seeding: template sources ──────────────────────────────
+    # The seeder copies this Pawrrtal-owned template into each new
+    # workspace without overwriting existing files.
+    workspace_template_dir: str = str(
+        Path(__file__).resolve().parents[3] / "backend" / "templates" / "workspace"
+    )
 
     # ── Ops platform: webhooks (PR 11) ───────────────────────────────────
     # When False the POST /webhooks routes return 503 with a clear

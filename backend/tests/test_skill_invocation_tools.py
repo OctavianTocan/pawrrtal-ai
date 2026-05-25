@@ -18,7 +18,7 @@ pytestmark = pytest.mark.anyio
 
 
 def _make_skill(workspace: Path, name: str, body: str = "# Demo\n\nUse this skill.\n") -> Path:
-    skills_dir = workspace / "skills" / name
+    skills_dir = workspace / ".agent" / "skills" / name
     skills_dir.mkdir(parents=True, exist_ok=True)
     skill_md = skills_dir / "SKILL.md"
     skill_md.write_text(body, encoding="utf-8")
@@ -26,8 +26,8 @@ def _make_skill(workspace: Path, name: str, body: str = "# Demo\n\nUse this skil
 
 
 def _write_manifest(workspace: Path, entries: list[dict[str, Any]]) -> None:
-    (workspace / "skills").mkdir(exist_ok=True)
-    (workspace / "skills" / "_manifest.jsonl").write_text(
+    (workspace / ".agent" / "skills").mkdir(parents=True, exist_ok=True)
+    (workspace / ".agent" / "skills" / "_manifest.jsonl").write_text(
         "\n".join(json.dumps(e) for e in entries),
         encoding="utf-8",
     )

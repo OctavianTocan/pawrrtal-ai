@@ -60,12 +60,13 @@ async def _get_owned_workspace(
     return ws
 
 
-def _safe_child(root: Path, relative: str) -> Path:
+def _safe_child(root: Path, relative: str, *, follow_final_symlink: bool = True) -> Path:
     """Resolve a workspace-relative path and verify it stays inside the root.
 
     Raises 400 if the path escapes the workspace root (directory traversal).
     """
-    resolved = (root / relative).resolve()
+    candidate = root / relative
+    resolved = candidate.resolve() if follow_final_symlink else candidate.parent.resolve()
     try:
         resolved.relative_to(root.resolve())
     except ValueError as exc:
@@ -73,7 +74,18 @@ def _safe_child(root: Path, relative: str) -> Path:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Path must be inside the workspace",
         ) from exc
-    return resolved
+    return resolved if follow_final_symlink else candidate
+
+
+def _has_symlink_parent(root: Path, relative: str) -> bool:
+    """Return True when any parent component in ``relative`` is a symlink."""
+    current = root
+    parts = Path(relative).parts[:-1]
+    for part in parts:
+        current = current / part
+        if current.is_symlink():
+            return True
+    return False
 
 
 def _build_tree(root: Path, relative_root: Path | None = None) -> list[WorkspaceFileNode]:
@@ -218,8 +230,13 @@ def _register_file_routes(router: APIRouter) -> None:
     ) -> WorkspaceFileContent:
         """Create or replace a text file inside the workspace."""
         ws = await _get_owned_workspace(workspace_id, user, session)
-        target = _safe_child(Path(ws.path), file_path)
+        target = _safe_child(Path(ws.path), file_path, follow_final_symlink=False)
 
+        if _has_symlink_parent(Path(ws.path), file_path) or target.is_symlink():
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot write through a workspace symlink",
+            )
         if target.is_dir():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -243,11 +260,16 @@ def _register_file_routes(router: APIRouter) -> None:
     ) -> None:
         """Delete a file from the workspace.  Does not delete directories."""
         ws = await _get_owned_workspace(workspace_id, user, session)
-        target = _safe_child(Path(ws.path), file_path)
+        target = _safe_child(Path(ws.path), file_path, follow_final_symlink=False)
 
-        if not target.exists():
+        if _has_symlink_parent(Path(ws.path), file_path):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete through a workspace symlink",
+            )
+        if not target.exists() and not target.is_symlink():
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
-        if target.is_dir():
+        if target.is_dir() and not target.is_symlink():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Use a dedicated endpoint to delete directories",
@@ -267,8 +289,9 @@ def _register_skills_route(router: APIRouter) -> None:
     ) -> list[SkillRead]:
         """Return the skill list for a workspace.
 
-        Reads ``skills/_manifest.jsonl`` and falls back to directory discovery.
-        Returns an empty list (not 404) when the workspace has no skills yet.
+        Reads ``.agent/skills/_manifest.jsonl`` and falls back to
+        directory discovery. Returns an empty list (not 404) when the
+        workspace has no skills yet.
         """
         ws = await _get_owned_workspace(workspace_id, user, session)
         root = Path(ws.path)

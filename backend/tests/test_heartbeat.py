@@ -275,6 +275,7 @@ async def test_sync_workspace_heartbeats_handles_missing_file(
 
 def _write_heartbeat_md(workspace_path: Path, content: str) -> None:
     """Drop a HEARTBEAT.md into a fake workspace dir for sync tests."""
+    workspace_path.mkdir(parents=True, exist_ok=True)
     (workspace_path / "HEARTBEAT.md").write_text(content, encoding="utf-8")
 
 

@@ -10,6 +10,7 @@ from app.core.agent_loop import (
     PAW_CORE_SYSTEM_PROMPT,
     compose_agent_system_prompt,
 )
+from app.core.persona_bootstrap import IDENTITY_BEGIN, IDENTITY_END
 
 
 def test_default_prompt_identifies_the_agent_as_a_paw() -> None:
@@ -26,19 +27,27 @@ def test_compose_agent_system_prompt_prepends_paw_identity() -> None:
     assert "workspace identity" in prompt
 
 
-def test_workspace_system_prompt_backfills_bootstrap_for_placeholder_identity(
+def test_workspace_system_prompt_includes_bootstrap_when_identity_pending(
     tmp_path: Path,
 ) -> None:
-    """Untouched existing workspaces get first-run bootstrap instructions."""
-    (tmp_path / "IDENTITY.md").write_text("_(set a name for your agent)_", encoding="utf-8")
+    """Workspaces with bootstrap_completed=false get the bootstrap skill body."""
     (tmp_path / "AGENTS.md").write_text("operating rules", encoding="utf-8")
+    prefs = tmp_path / "PREFERENCES.md"
+    prefs.write_text(
+        f"# Prefs\n\n{IDENTITY_BEGIN}\n"
+        '{"name": null, "vibe": null, "emoji": null, "bootstrap_completed": false}'
+        f"\n{IDENTITY_END}\n",
+        encoding="utf-8",
+    )
+    bootstrap = tmp_path / ".agent" / "skills" / "paw-bootstrap" / "SKILL.md"
+    bootstrap.parent.mkdir(parents=True)
+    bootstrap.write_text("FIRST_RUN_SETUP_BODY", encoding="utf-8")
 
     prompt = _workspace_system_prompt(tmp_path)
 
     assert prompt is not None
     assert "user's Paw" in prompt
-    assert "First-Run Paw Setup" in prompt
-    assert (tmp_path / "BOOTSTRAP.md").exists()
+    assert "FIRST_RUN_SETUP_BODY" in prompt
 
 
 def test_workspace_system_prompt_uses_default_without_workspace() -> None:

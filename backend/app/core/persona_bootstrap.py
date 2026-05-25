@@ -1,117 +1,84 @@
-"""First-run persona bootstrap helpers for Paw workspaces."""
+"""First-run persona bootstrap helpers for Paw workspaces.
+
+The Paw's identity (name, vibe, emoji, bootstrap-completion flag) lives
+as a single-line JSON block inside the workspace root ``PREFERENCES.md``
+file, between the marker comments:
+
+    <!-- pawrrtal:identity:begin -->
+    {"name": null, "vibe": null, "emoji": null, "bootstrap_completed": false}
+    <!-- pawrrtal:identity:end -->
+
+When ``bootstrap_completed`` is false, the system prompt assembler
+includes the body of ``.agent/skills/paw-bootstrap/SKILL.md`` so the
+agent runs the first-run conversation. Once the agent flips the flag
+to true the bootstrap skill stops being injected.
+"""
 
 from __future__ import annotations
 
 import json
 import logging
+import re
 from pathlib import Path
 
 from app.core.fs import read_capped_utf8
 
 log = logging.getLogger(__name__)
 
-BOOTSTRAP_FILENAME = "BOOTSTRAP.md"
-BOOTSTRAP_STATE_PATH = ".pawrrtal/persona_bootstrap.json"
-BOOTSTRAP_VERSION = 1
+PREFERENCES_PATH = "PREFERENCES.md"
+BOOTSTRAP_SKILL_PATH = ".agent/skills/paw-bootstrap/SKILL.md"
+IDENTITY_BEGIN = "<!-- pawrrtal:identity:begin -->"
+IDENTITY_END = "<!-- pawrrtal:identity:end -->"
 
 _MAX_BYTES = 32_000
-_IDENTITY_PLACEHOLDER = "_(set a name for your agent)_"
-
-BOOTSTRAP_TEMPLATE = """\
-# BOOTSTRAP.md - First-Run Paw Setup
-
-You are in persona bootstrap mode because this workspace does not yet have a
-completed Paw identity.
-
-Your underlying role is fixed: you are the user's Paw, their personal agent
-inside Pawrrtal. "Paw" is the conceptual role. The user can choose your name,
-voice, style, emoji, boundaries, and working preferences, and those can evolve
-over time.
-
-## What to do first
-
-Ask one short first question, in your own words:
-
-"I'm your Paw. What would you like to call me, and what kind of working style
-should I have?"
-
-Keep the setup conversational. Do not interrogate the user. If they give enough
-information in one message, proceed. If they only give a name, ask one follow-up
-about working style or boundaries.
-
-## When enough information is available
-
-Use the workspace file tools to update these files:
-
-1. `IDENTITY.md` - name, vibe, optional emoji, and a short identity summary.
-2. `SOUL.md` - durable operating identity and style. Keep the fixed Paw concept,
-   but reflect the user's chosen name and personality.
-3. `USER.md` - any durable user preferences or working conventions the user
-   revealed during setup.
-4. `.pawrrtal/persona_bootstrap.json` - write exactly:
-   `{"version": 1, "completed": true}`
-
-Do not say bootstrap is complete until those writes succeed. After completion,
-answer normally on future turns.
-"""
-
-
-def seed_persona_bootstrap(root: Path) -> None:
-    """Seed bootstrap files for a newly-created workspace."""
-    (root / ".pawrrtal").mkdir(parents=True, exist_ok=True)
-    if is_persona_bootstrap_completed(root):
-        return
-    bootstrap_path = root / BOOTSTRAP_FILENAME
-    if not bootstrap_path.exists():
-        bootstrap_path.write_text(BOOTSTRAP_TEMPLATE, encoding="utf-8")
-
-
-def ensure_persona_bootstrap_seeded(root: Path) -> None:
-    """Backfill bootstrap for existing untouched workspaces.
-
-    Existing users may already have custom identity files. We only create
-    ``BOOTSTRAP.md`` when the identity file is missing or still contains the
-    original placeholder, which avoids re-running setup for a shaped Paw.
-    """
-    if is_persona_bootstrap_completed(root):
-        return
-    if (root / BOOTSTRAP_FILENAME).exists():
-        return
-    if _identity_needs_bootstrap(root):
-        seed_persona_bootstrap(root)
+_IDENTITY_BLOCK_PATTERN = re.compile(
+    re.escape(IDENTITY_BEGIN) + r"\s*(.+?)\s*" + re.escape(IDENTITY_END),
+    re.DOTALL,
+)
 
 
 def read_persona_bootstrap(root: Path) -> str | None:
-    """Return bootstrap instructions when setup is pending."""
+    """Return the paw-bootstrap skill body when first-run setup is pending."""
     if not is_persona_bootstrap_pending(root):
         return None
-    return read_capped_utf8(root / BOOTSTRAP_FILENAME, max_bytes=_MAX_BYTES)
+    return read_capped_utf8(root / BOOTSTRAP_SKILL_PATH, max_bytes=_MAX_BYTES)
 
 
 def is_persona_bootstrap_pending(root: Path) -> bool:
-    """Return whether the workspace should include bootstrap instructions."""
-    return (root / BOOTSTRAP_FILENAME).exists() and not is_persona_bootstrap_completed(root)
+    """Return True when the bootstrap skill should be injected this turn."""
+    if not (root / BOOTSTRAP_SKILL_PATH).exists():
+        return False
+    return not is_persona_bootstrap_completed(root)
 
 
 def is_persona_bootstrap_completed(root: Path) -> bool:
-    """Return whether the bootstrap marker says setup is complete."""
-    state_path = root / BOOTSTRAP_STATE_PATH
-    if not state_path.exists():
-        return False
-    try:
-        payload = json.loads(state_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        log.warning("PERSONA_BOOTSTRAP_STATE_INVALID path=%s error=%s", state_path, exc)
-        return False
-    return (
-        isinstance(payload, dict)
-        and payload.get("version") == BOOTSTRAP_VERSION
-        and payload.get("completed") is True
-    )
+    """Return True when the identity block has ``bootstrap_completed: true``.
 
-
-def _identity_needs_bootstrap(root: Path) -> bool:
-    identity = read_capped_utf8(root / "IDENTITY.md", max_bytes=_MAX_BYTES)
+    Returns False (i.e. "still pending") when the file is missing or the
+    JSON block is malformed — failure modes route the user back through
+    setup rather than skipping it silently.
+    """
+    identity = _read_identity_block(root)
     if identity is None:
-        return True
-    return _IDENTITY_PLACEHOLDER in identity
+        return False
+    return identity.get("bootstrap_completed") is True
+
+
+def _read_identity_block(root: Path) -> dict[str, object] | None:
+    """Extract the JSON identity block from PREFERENCES.md."""
+    text = read_capped_utf8(root / PREFERENCES_PATH, max_bytes=_MAX_BYTES)
+    if text is None:
+        return None
+    match = _IDENTITY_BLOCK_PATTERN.search(text)
+    if match is None:
+        log.warning("IDENTITY_BLOCK_MISSING path=%s", root / PREFERENCES_PATH)
+        return None
+    try:
+        payload = json.loads(match.group(1))
+    except json.JSONDecodeError as exc:
+        log.warning("IDENTITY_BLOCK_INVALID path=%s error=%s", root / PREFERENCES_PATH, exc)
+        return None
+    if not isinstance(payload, dict):
+        log.warning("IDENTITY_BLOCK_NOT_OBJECT path=%s", root / PREFERENCES_PATH)
+        return None
+    return payload

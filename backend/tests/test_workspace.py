@@ -1,18 +1,15 @@
 """Tests for the workspace service and API.
 
 Covers:
-- seed_workspace: directory structure and file contents
-- ensure_default_workspace: idempotency and DB row creation
-- GET /api/v1/workspaces: list workspaces
-- GET /api/v1/workspaces/{id}/tree: file tree
-- GET /api/v1/workspaces/{id}/files/{path}: read file
-- PUT /api/v1/workspaces/{id}/files/{path}: write file
-- DELETE /api/v1/workspaces/{id}/files/{path}: delete file
-- Path traversal guard
+
+- ``seed_workspace``: Pawrrtal-owned root context files plus internal ``.agent`` shape.
+- ``ensure_default_workspace`` / ``ensure_dev_admin_workspace``: idempotency, DB rows, orphan cleanup.
+- Workspace API: list / tree / file read & write / skill discovery / path-traversal guard.
 """
 
 from __future__ import annotations
 
+import json
 import uuid
 from datetime import UTC, datetime
 from pathlib import Path
@@ -24,12 +21,9 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.persona_bootstrap import BOOTSTRAP_STATE_PATH
-from app.core.workspace import (
-    _build_soul_md,
-    _build_user_md,
-    seed_workspace,
-)
+from app.core.keys import load_workspace_env
+from app.core.persona_bootstrap import IDENTITY_BEGIN, IDENTITY_END
+from app.core.workspace import _build_preferences_md, seed_workspace
 from app.crud.workspace import (
     DEV_ADMIN_WORKSPACE_DIRNAME,
     create_workspace,
@@ -41,19 +35,9 @@ from app.crud.workspace import (
 from app.db import User
 from app.models import UserPersonalization, Workspace
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
 
 def _make_personalization(**kwargs: Any) -> UserPersonalization:
-    """Build an unpersisted UserPersonalization for the workspace seeders.
-
-    The seeders only read attributes — they never call session methods —
-    so we can instantiate the ORM model directly without a session and
-    feed it to ``seed_workspace`` / ``_build_*_md`` with full type
-    fidelity.
-    """
+    """Build an unpersisted UserPersonalization for the workspace seeder."""
     defaults: dict[str, Any] = {
         "user_id": uuid.uuid4(),
         "name": "Tavi",
@@ -70,267 +54,169 @@ def _make_personalization(**kwargs: Any) -> UserPersonalization:
     return UserPersonalization(**{**defaults, **kwargs})
 
 
+def _patch_workspace_base(tmp_path: Path) -> Any:
+    """Patch ``workspace_base_dir`` only; leave template paths real."""
+    from app.core import workspace as workspace_module
+
+    return patch.object(workspace_module.settings, "workspace_base_dir", str(tmp_path))
+
+
 # ---------------------------------------------------------------------------
 # seed_workspace
 # ---------------------------------------------------------------------------
 
 
 class TestSeedWorkspace:
-    def test_creates_standard_subdirectories(self, tmp_path: Path) -> None:
+    def test_creates_required_root_files_and_symlinks(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id)
+        for filename in (
+            "AGENTS.md",
+            "HEARTBEAT.md",
+            "SOUL.md",
+            "PREFERENCES.md",
+            "USER.md",
+        ):
+            assert (root / filename).is_file(), f"missing {filename}"
+        assert (root / ".env").is_file()
+        assert load_workspace_env(root) == {}
+        assert (root / "CLAUDE.md").is_symlink()
+        assert (root / "CLAUDE.md").readlink() == Path("AGENTS.md")
+        assert (root / ".agents" / "skills").is_symlink()
+        assert (root / ".agents" / "skills").readlink() == Path("../.agent/skills")
+        assert (root / ".claude" / "skills").is_symlink()
+        assert (root / ".claude" / "skills").readlink() == Path("../.agent/skills")
 
-        assert (root / "memory").is_dir()
-        assert (root / "skills").is_dir()
-        assert (root / "artifacts").is_dir()
-
-    def test_creates_memory_sublayers(self, tmp_path: Path) -> None:
+    def test_agent_directory_contains_only_internal_roots(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id)
+        agent_children = {entry.name for entry in (root / ".agent").iterdir()}
+        assert agent_children == {"memory", "protocols", "harness", "tools", "skills"}
 
-        for layer in ("personal", "working", "episodic", "semantic"):
-            assert (root / "memory" / layer).is_dir()
-
-    def test_creates_protocols_dir(self, tmp_path: Path) -> None:
+    def test_creates_internal_directories(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id)
+        for directory in ("memory", "protocols", "harness", "tools", "skills"):
+            assert (root / ".agent" / directory).is_dir(), f"missing {directory}/"
 
-        assert (root / "protocols").is_dir()
-
-    def test_creates_gitkeep_in_episodic_and_artifacts(self, tmp_path: Path) -> None:
+    def test_copies_protocols(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id)
+        protocols = root / ".agent" / "protocols"
+        assert (protocols / "permissions.md").exists()
+        assert (protocols / "delegation.md").exists()
+        assert (protocols / "hook_patterns.json").exists()
 
-        assert (root / "memory" / "episodic" / ".gitkeep").exists()
-        assert (root / "artifacts" / ".gitkeep").exists()
-
-    def test_seeds_skills_index_md(self, tmp_path: Path) -> None:
+    def test_copies_paw_skills(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id)
+        for name in ("paw-persona", "paw-bootstrap"):
+            assert (root / ".agent" / "skills" / name / "SKILL.md").exists()
+        assert (root / ".agent" / "skills" / "_index.md").exists()
 
-        index = (root / "skills" / "_index.md").read_text()
-        assert "Skill Map" in index
-        assert "read_file" in index
-
-    def test_seeds_manifest_as_empty_file(self, tmp_path: Path) -> None:
+    def test_seeds_root_heartbeat(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id)
+        heartbeat = root / "HEARTBEAT.md"
+        assert heartbeat.exists()
+        assert "checks:" in heartbeat.read_text(encoding="utf-8")
 
-        manifest = root / "skills" / "_manifest.jsonl"
-        assert manifest.exists()
-        assert manifest.read_text() == ""
-
-    def test_seeds_memory_personal_preferences(self, tmp_path: Path) -> None:
+    def test_preferences_md_seeded_with_identity_block(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id)
+        prefs = (root / "PREFERENCES.md").read_text(encoding="utf-8")
+        assert IDENTITY_BEGIN in prefs
+        assert IDENTITY_END in prefs
+        # The block is parseable JSON with bootstrap_completed false on first seed.
+        block = prefs.split(IDENTITY_BEGIN, 1)[1].split(IDENTITY_END, 1)[0].strip()
+        payload = json.loads(block)
+        assert payload["bootstrap_completed"] is False
 
-        assert (root / "memory" / "personal" / "PREFERENCES.md").exists()
-
-    def test_seeds_memory_working_workspace(self, tmp_path: Path) -> None:
-        ws_id = uuid.uuid4()
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
-            root = seed_workspace(ws_id)
-
-        assert (root / "memory" / "working" / "WORKSPACE.md").exists()
-        assert (root / "memory" / "working" / "REVIEW_QUEUE.md").exists()
-
-    def test_seeds_semantic_memory_files(self, tmp_path: Path) -> None:
-        ws_id = uuid.uuid4()
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
-            root = seed_workspace(ws_id)
-
-        assert (root / "memory" / "semantic" / "LESSONS.md").exists()
-        assert (root / "memory" / "semantic" / "DECISIONS.md").exists()
-
-    def test_seeds_protocols_files(self, tmp_path: Path) -> None:
-        ws_id = uuid.uuid4()
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
-            root = seed_workspace(ws_id)
-
-        assert (root / "protocols" / "permissions.md").exists()
-        assert (root / "protocols" / "delegation.md").exists()
-
-    def test_does_not_overwrite_existing_skills_index(self, tmp_path: Path) -> None:
-        ws_id = uuid.uuid4()
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
-            root = seed_workspace(ws_id)
-
-        custom = "# My custom skill index\n"
-        (root / "skills" / "_index.md").write_text(custom)
-
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
-            seed_workspace(ws_id)
-
-        assert (root / "skills" / "_index.md").read_text() == custom
-
-    def test_writes_agents_md(self, tmp_path: Path) -> None:
-        ws_id = uuid.uuid4()
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
-            root = seed_workspace(ws_id)
-
-        agents = (root / "AGENTS.md").read_text()
-        assert "AGENTS.md" in agents
-        assert "Session Continuity" in agents
-
-    def test_writes_identity_and_tools_md(self, tmp_path: Path) -> None:
-        ws_id = uuid.uuid4()
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
-            root = seed_workspace(ws_id)
-
-        assert (root / "IDENTITY.md").exists()
-        assert (root / "TOOLS.md").exists()
-
-    def test_seeds_persona_bootstrap_files(self, tmp_path: Path) -> None:
-        ws_id = uuid.uuid4()
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
-            root = seed_workspace(ws_id)
-
-        bootstrap = (root / "BOOTSTRAP.md").read_text()
-        assert "First-Run Paw Setup" in bootstrap
-        assert (root / ".pawrrtal").is_dir()
-
-    def test_completed_bootstrap_state_prevents_reseed(self, tmp_path: Path) -> None:
-        ws_id = uuid.uuid4()
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
-            root = seed_workspace(ws_id)
-
-        (root / "BOOTSTRAP.md").unlink()
-        state_path = root / BOOTSTRAP_STATE_PATH
-        state_path.write_text('{"version": 1, "completed": true}', encoding="utf-8")
-
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
-            seed_workspace(ws_id)
-
-        assert not (root / "BOOTSTRAP.md").exists()
-
-    def test_does_not_overwrite_existing_files(self, tmp_path: Path) -> None:
-        ws_id = uuid.uuid4()
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
-            root = seed_workspace(ws_id)
-
-        # Manually write custom content.
-        custom = "# My custom AGENTS.md\n"
-        (root / "AGENTS.md").write_text(custom)
-
-        # Re-seed — existing file must survive.
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
-            seed_workspace(ws_id)
-
-        assert (root / "AGENTS.md").read_text() == custom
-
-    def test_populates_user_md_from_personalization(self, tmp_path: Path) -> None:
+    def test_preferences_md_includes_personalization(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()
         p = _make_personalization(name="Alice", role="PM")
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id, personalization=p)
+        prefs = (root / "PREFERENCES.md").read_text(encoding="utf-8")
+        assert "Alice" in prefs
+        assert "PM" in prefs
 
-        user_md = (root / "USER.md").read_text()
-        assert "Alice" in user_md
-        assert "PM" in user_md
-
-    def test_uses_personality_for_soul_md(self, tmp_path: Path) -> None:
+    def test_preferences_md_renders_placeholder_without_personalization(
+        self, tmp_path: Path
+    ) -> None:
         ws_id = uuid.uuid4()
-        p = _make_personalization(personality="analytical")
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
-            root = seed_workspace(ws_id, personalization=p)
-
-        soul = (root / "SOUL.md").read_text()
-        assert "analytical" in soul.lower()
-
-    def test_falls_back_to_balanced_soul_for_unknown_personality(self, tmp_path: Path) -> None:
-        ws_id = uuid.uuid4()
-        p = _make_personalization(personality="goblin")
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
-            root = seed_workspace(ws_id, personalization=p)
-
-        soul = (root / "SOUL.md").read_text()
-        # Balanced soul is the fallback.
-        assert "SOUL.md" in soul
-
-    def test_seed_without_personalization_writes_placeholder_user_md(self, tmp_path: Path) -> None:
-        ws_id = uuid.uuid4()
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             root = seed_workspace(ws_id, personalization=None)
+        prefs = (root / "PREFERENCES.md").read_text(encoding="utf-8")
+        assert "first-run setup" in prefs
 
-        user_md = (root / "USER.md").read_text()
-        assert "Fill in" in user_md
+    def test_reseed_does_not_overwrite_edited_files(self, tmp_path: Path) -> None:
+        ws_id = uuid.uuid4()
+        with _patch_workspace_base(tmp_path):
+            root = seed_workspace(ws_id)
+            edited = root / "AGENTS.md"
+            edited.write_text("hand-edited", encoding="utf-8")
+            seed_workspace(ws_id)
+        assert edited.read_text(encoding="utf-8") == "hand-edited"
+
+    def test_reseed_does_not_overwrite_edited_preferences(self, tmp_path: Path) -> None:
+        ws_id = uuid.uuid4()
+        with _patch_workspace_base(tmp_path):
+            root = seed_workspace(ws_id)
+            prefs = root / "PREFERENCES.md"
+            prefs.write_text("user has typed in here", encoding="utf-8")
+            seed_workspace(ws_id, personalization=_make_personalization(name="Bob"))
+        assert prefs.read_text(encoding="utf-8") == "user has typed in here"
+
+    def test_conflicting_real_symlink_path_raises(self, tmp_path: Path) -> None:
+        ws_id = uuid.uuid4()
+        root = tmp_path / str(ws_id)
+        (root / ".agents" / "skills").mkdir(parents=True)
+        with _patch_workspace_base(tmp_path), pytest.raises(FileExistsError):
+            seed_workspace(ws_id)
 
 
 # ---------------------------------------------------------------------------
-# Template builders
+# _build_preferences_md
 # ---------------------------------------------------------------------------
 
 
-class TestBuildUserMd:
+class TestBuildPreferencesMd:
+    def test_includes_identity_block_with_bootstrap_pending(self) -> None:
+        md = _build_preferences_md(None)
+        assert IDENTITY_BEGIN in md
+        assert IDENTITY_END in md
+        block = md.split(IDENTITY_BEGIN, 1)[1].split(IDENTITY_END, 1)[0].strip()
+        assert json.loads(block)["bootstrap_completed"] is False
+
     def test_includes_name_role_company(self) -> None:
         p = _make_personalization(name="Bob", role="CTO", company_website="https://acme.com")
-        md = _build_user_md(p)
+        md = _build_preferences_md(p)
         assert "Bob" in md
         assert "CTO" in md
         assert "https://acme.com" in md
 
     def test_includes_goals_list(self) -> None:
         p = _make_personalization(goals=["Ship fast", "Sleep well"])
-        md = _build_user_md(p)
+        md = _build_preferences_md(p)
         assert "Ship fast" in md
         assert "Sleep well" in md
 
     def test_includes_custom_instructions(self) -> None:
         p = _make_personalization(custom_instructions="Always use British English.")
-        md = _build_user_md(p)
+        md = _build_preferences_md(p)
         assert "British English" in md
 
-    def test_none_personalization_returns_placeholder(self) -> None:
-        md = _build_user_md(None)
-        assert "Fill in" in md
-
-
-class TestBuildSoulMd:
-    @pytest.mark.parametrize("personality", ["analytical", "creative", "direct", "balanced"])
-    def test_known_personalities_return_content(self, personality: str) -> None:
-        p = _make_personalization(personality=personality)
-        md = _build_soul_md(p)
-        assert len(md) > 50
-
-    def test_unknown_personality_returns_balanced(self) -> None:
-        p = _make_personalization(personality="wizard")
-        md = _build_soul_md(p)
-        # Balanced soul contains "well-rounded".
-        assert "well-rounded" in md
-
-    def test_none_personalization_returns_balanced(self) -> None:
-        md = _build_soul_md(None)
-        assert "well-rounded" in md
+    def test_none_personalization_renders_placeholder(self) -> None:
+        md = _build_preferences_md(None)
+        assert "first-run setup" in md
 
 
 # ---------------------------------------------------------------------------
@@ -343,8 +229,7 @@ class TestWorkspaceService:
     async def test_create_workspace_adds_db_row(
         self, db_session: AsyncSession, test_user: User, tmp_path: Path
     ) -> None:
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             ws = await create_workspace(test_user.id, db_session)
             await db_session.commit()
 
@@ -357,14 +242,13 @@ class TestWorkspaceService:
     async def test_create_workspace_seeds_filesystem(
         self, db_session: AsyncSession, test_user: User, tmp_path: Path
     ) -> None:
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             ws = await create_workspace(test_user.id, db_session)
             await db_session.commit()
 
         root = Path(ws.path)
         assert (root / "AGENTS.md").exists()
-        assert (root / "memory").is_dir()
+        assert (root / ".agent" / "memory").is_dir()
 
     @pytest.mark.anyio
     async def test_get_default_workspace_returns_none_when_absent(
@@ -377,8 +261,7 @@ class TestWorkspaceService:
     async def test_get_default_workspace_returns_existing(
         self, db_session: AsyncSession, test_user: User, tmp_path: Path
     ) -> None:
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             created = await create_workspace(test_user.id, db_session)
             await db_session.commit()
 
@@ -390,8 +273,7 @@ class TestWorkspaceService:
     async def test_ensure_default_workspace_is_idempotent(
         self, db_session: AsyncSession, test_user: User, tmp_path: Path
     ) -> None:
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             ws1 = await ensure_default_workspace(test_user.id, db_session)
             await db_session.commit()
             ws2 = await ensure_default_workspace(test_user.id, db_session)
@@ -403,12 +285,12 @@ class TestWorkspaceService:
     async def test_ensure_dev_admin_workspace_uses_stable_path(
         self, db_session: AsyncSession, test_user: User, tmp_path: Path
     ) -> None:
+        from app.crud import workspace as crud_workspace
+
         with (
-            patch("app.core.workspace.settings") as mock_core_settings,
-            patch("app.crud.workspace.settings") as mock_crud_settings,
+            _patch_workspace_base(tmp_path),
+            patch.object(crud_workspace.settings, "workspace_base_dir", str(tmp_path)),
         ):
-            mock_core_settings.workspace_base_dir = str(tmp_path)
-            mock_crud_settings.workspace_base_dir = str(tmp_path)
             ws = await ensure_dev_admin_workspace(test_user.id, db_session)
             await db_session.commit()
 
@@ -419,23 +301,23 @@ class TestWorkspaceService:
     async def test_ensure_dev_admin_workspace_preserves_existing_files(
         self, db_session: AsyncSession, test_user: User, tmp_path: Path
     ) -> None:
-        """Simulates a DB-reset run: the dev-admin folder already has user
-        files; the helper must reuse the folder without overwriting them.
-        """
+        """DB-reset run: dev-admin folder already has user files; helper
+        must reuse the folder without overwriting them."""
+        from app.crud import workspace as crud_workspace
+
         stable_root = tmp_path / DEV_ADMIN_WORKSPACE_DIRNAME
-        (stable_root / "artifacts").mkdir(parents=True)
-        user_file = stable_root / "artifacts" / "my-notes.md"
+        stable_root.mkdir(parents=True)
+        user_file = stable_root / ".agent" / "memory" / "personal" / "my-notes.md"
+        user_file.parent.mkdir(parents=True)
         user_file.write_text("important user content", encoding="utf-8")
         # Pre-existing seed file with edited content must not be clobbered.
         edited_agents = stable_root / "AGENTS.md"
         edited_agents.write_text("hand-edited", encoding="utf-8")
 
         with (
-            patch("app.core.workspace.settings") as mock_core_settings,
-            patch("app.crud.workspace.settings") as mock_crud_settings,
+            _patch_workspace_base(tmp_path),
+            patch.object(crud_workspace.settings, "workspace_base_dir", str(tmp_path)),
         ):
-            mock_core_settings.workspace_base_dir = str(tmp_path)
-            mock_crud_settings.workspace_base_dir = str(tmp_path)
             ws = await ensure_dev_admin_workspace(test_user.id, db_session)
             await db_session.commit()
 
@@ -447,12 +329,12 @@ class TestWorkspaceService:
     async def test_ensure_dev_admin_workspace_is_idempotent(
         self, db_session: AsyncSession, test_user: User, tmp_path: Path
     ) -> None:
+        from app.crud import workspace as crud_workspace
+
         with (
-            patch("app.core.workspace.settings") as mock_core_settings,
-            patch("app.crud.workspace.settings") as mock_crud_settings,
+            _patch_workspace_base(tmp_path),
+            patch.object(crud_workspace.settings, "workspace_base_dir", str(tmp_path)),
         ):
-            mock_core_settings.workspace_base_dir = str(tmp_path)
-            mock_crud_settings.workspace_base_dir = str(tmp_path)
             ws1 = await ensure_dev_admin_workspace(test_user.id, db_session)
             await db_session.commit()
             ws2 = await ensure_dev_admin_workspace(test_user.id, db_session)
@@ -472,8 +354,7 @@ class TestWorkspaceService:
     async def test_list_workspaces_returns_all(
         self, db_session: AsyncSession, test_user: User, tmp_path: Path
     ) -> None:
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             await create_workspace(test_user.id, db_session, name="Main", slug="main")
             await create_workspace(
                 test_user.id, db_session, name="Work", slug="work", is_default=False
@@ -487,19 +368,10 @@ class TestWorkspaceService:
     async def test_unique_index_blocks_duplicate_default_insert(
         self, db_session: AsyncSession, test_user: User, tmp_path: Path
     ) -> None:
-        """Regression test for pawrrtal-pq4r.
-
-        Applies the partial unique index from migration 009 directly to the
-        in-memory test DB and verifies that a second direct INSERT of a default
-        workspace raises IntegrityError — proving the constraint actually fires
-        before the application-level recovery path is even needed.
-        """
+        """Regression for pawrrtal-pq4r: partial unique index actually fires."""
         from sqlalchemy import text
         from sqlalchemy.exc import IntegrityError as SAIntegrityError
 
-        # Manually apply migration 009's partial unique index to the test DB.
-        # (conftest uses Base.metadata.create_all, not Alembic, so this
-        # would not exist otherwise.)
         await db_session.execute(
             text(
                 "CREATE UNIQUE INDEX IF NOT EXISTS "
@@ -510,26 +382,20 @@ class TestWorkspaceService:
         )
         await db_session.commit()
 
-        # Create the first default workspace — must succeed.
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             ws1 = await create_workspace(test_user.id, db_session)
             await db_session.commit()
 
-        # Attempt a second default workspace via a savepoint so the session
-        # stays alive after the expected constraint violation.
         caught = False
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             try:
                 async with db_session.begin_nested():
                     await create_workspace(test_user.id, db_session)
             except SAIntegrityError:
                 caught = True
 
-        assert caught, "Expected IntegrityError from unique index — constraint is not applied"
+        assert caught, "Expected IntegrityError from unique index"
 
-        # Only the first workspace must remain.
         from sqlalchemy import func
         from sqlalchemy import select as sa_select
 
@@ -544,40 +410,29 @@ class TestWorkspaceService:
             )
         )
         assert count_result.scalar_one() == 1
-        assert (await get_default_workspace(test_user.id, db_session)).id == ws1.id  # type: ignore[union-attr]
+        result = await get_default_workspace(test_user.id, db_session)
+        assert result is not None
+        assert result.id == ws1.id
 
     @pytest.mark.anyio
     async def test_ensure_default_workspace_handles_integrity_error(
         self, db_session: AsyncSession, test_user: User, tmp_path: Path
     ) -> None:
-        """ensure_default_workspace must recover cleanly when a concurrent
-        request already committed the workspace (simulated via IntegrityError).
-
-        We mock ``create_workspace`` to raise ``IntegrityError`` after first
-        seeding the DB row directly, so the subsequent re-fetch in the except
-        branch has a real row to return.
-        """
+        """ensure_default_workspace recovers cleanly when a concurrent
+        request already committed the workspace."""
         from sqlalchemy.exc import IntegrityError as SAIntegrityError
 
-        # First, create the workspace directly so it already exists in the DB.
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             real_ws = await create_workspace(test_user.id, db_session)
             await db_session.commit()
 
-        # Now patch create_workspace to raise IntegrityError, simulating the
-        # race where two requests both passed the "no existing workspace" check
-        # before either committed.
         with (
-            patch("app.core.workspace.settings") as mock_settings,
+            _patch_workspace_base(tmp_path),
             patch(
                 "app.crud.workspace.create_workspace",
                 side_effect=SAIntegrityError("mock", {}, Exception()),
             ),
         ):
-            mock_settings.workspace_base_dir = str(tmp_path)
-            # ensure_default_workspace should catch the IntegrityError,
-            # re-fetch, and return the already-committed row.
             recovered_ws = await ensure_default_workspace(test_user.id, db_session)
 
         assert recovered_ws.id == real_ws.id
@@ -647,8 +502,7 @@ class TestWorkspaceAPI:
         test_user: User,
         tmp_path: Path,
     ) -> None:
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             await create_workspace(test_user.id, db_session)
             await db_session.commit()
 
@@ -659,24 +513,21 @@ class TestWorkspaceAPI:
         assert data[0]["name"] == "Main"
 
     @pytest.mark.anyio
-    async def test_tree_returns_seeded_files(
+    async def test_tree_returns_agent_dir(
         self,
         client: AsyncClient,
         db_session: AsyncSession,
         test_user: User,
         tmp_path: Path,
     ) -> None:
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             ws = await create_workspace(test_user.id, db_session)
             await db_session.commit()
 
         resp = await client.get(f"/api/v1/workspaces/{ws.id}/tree")
         assert resp.status_code == 200
         names = {node["name"] for node in resp.json()["nodes"]}
-        assert "AGENTS.md" in names
-        assert "USER.md" in names
-        assert "memory" in names
+        assert ".agent" in names
 
     @pytest.mark.anyio
     async def test_tree_returns_404_for_unknown_workspace(self, client: AsyncClient) -> None:
@@ -691,14 +542,13 @@ class TestWorkspaceAPI:
         test_user: User,
         tmp_path: Path,
     ) -> None:
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             ws = await create_workspace(test_user.id, db_session)
             await db_session.commit()
 
         resp = await client.get(f"/api/v1/workspaces/{ws.id}/files/AGENTS.md")
         assert resp.status_code == 200
-        assert "AGENTS.md" in resp.json()["content"]
+        assert "Pawrrtal workspace" in resp.json()["content"]
 
     @pytest.mark.anyio
     async def test_read_file_404_for_missing(
@@ -708,8 +558,7 @@ class TestWorkspaceAPI:
         test_user: User,
         tmp_path: Path,
     ) -> None:
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             ws = await create_workspace(test_user.id, db_session)
             await db_session.commit()
 
@@ -724,21 +573,63 @@ class TestWorkspaceAPI:
         test_user: User,
         tmp_path: Path,
     ) -> None:
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             ws = await create_workspace(test_user.id, db_session)
             await db_session.commit()
 
         content = "# My Note\n\nHello from the test.\n"
         put_resp = await client.put(
-            f"/api/v1/workspaces/{ws.id}/files/memory/2026-05-06.md",
+            f"/api/v1/workspaces/{ws.id}/files/.agent/memory/working/2026-05-06.md",
             json={"content": content},
         )
         assert put_resp.status_code == 200
 
-        get_resp = await client.get(f"/api/v1/workspaces/{ws.id}/files/memory/2026-05-06.md")
+        get_resp = await client.get(
+            f"/api/v1/workspaces/{ws.id}/files/.agent/memory/working/2026-05-06.md"
+        )
         assert get_resp.status_code == 200
         assert get_resp.json()["content"] == content
+
+    @pytest.mark.anyio
+    async def test_write_symlink_path_is_rejected(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        test_user: User,
+        tmp_path: Path,
+    ) -> None:
+        with _patch_workspace_base(tmp_path):
+            ws = await create_workspace(test_user.id, db_session)
+            await db_session.commit()
+
+        resp = await client.put(
+            f"/api/v1/workspaces/{ws.id}/files/CLAUDE.md",
+            json={"content": "do not alias"},
+        )
+
+        assert resp.status_code == 400
+        assert (Path(ws.path) / "CLAUDE.md").is_symlink()
+        assert "do not alias" not in (Path(ws.path) / "AGENTS.md").read_text(encoding="utf-8")
+
+    @pytest.mark.anyio
+    async def test_write_through_symlink_directory_is_rejected(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        test_user: User,
+        tmp_path: Path,
+    ) -> None:
+        with _patch_workspace_base(tmp_path):
+            ws = await create_workspace(test_user.id, db_session)
+            await db_session.commit()
+
+        resp = await client.put(
+            f"/api/v1/workspaces/{ws.id}/files/.claude/skills/new/SKILL.md",
+            json={"content": "do not alias"},
+        )
+
+        assert resp.status_code == 400
+        assert not (Path(ws.path) / ".agent" / "skills" / "new" / "SKILL.md").exists()
 
     @pytest.mark.anyio
     async def test_delete_file(
@@ -748,21 +639,62 @@ class TestWorkspaceAPI:
         test_user: User,
         tmp_path: Path,
     ) -> None:
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             ws = await create_workspace(test_user.id, db_session)
             await db_session.commit()
 
-        # Write a file first.
         await client.put(
-            f"/api/v1/workspaces/{ws.id}/files/artifacts/output.txt",
+            f"/api/v1/workspaces/{ws.id}/files/.agent/memory/working/output.txt",
             json={"content": "some output"},
         )
-        del_resp = await client.delete(f"/api/v1/workspaces/{ws.id}/files/artifacts/output.txt")
+        del_resp = await client.delete(
+            f"/api/v1/workspaces/{ws.id}/files/.agent/memory/working/output.txt"
+        )
         assert del_resp.status_code == 204
 
-        get_resp = await client.get(f"/api/v1/workspaces/{ws.id}/files/artifacts/output.txt")
+        get_resp = await client.get(
+            f"/api/v1/workspaces/{ws.id}/files/.agent/memory/working/output.txt"
+        )
         assert get_resp.status_code == 404
+
+    @pytest.mark.anyio
+    async def test_delete_symlink_removes_link_not_target(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        test_user: User,
+        tmp_path: Path,
+    ) -> None:
+        with _patch_workspace_base(tmp_path):
+            ws = await create_workspace(test_user.id, db_session)
+            await db_session.commit()
+
+        root = Path(ws.path)
+        del_resp = await client.delete(f"/api/v1/workspaces/{ws.id}/files/CLAUDE.md")
+
+        assert del_resp.status_code == 204
+        assert not (root / "CLAUDE.md").exists()
+        assert (root / "AGENTS.md").exists()
+
+    @pytest.mark.anyio
+    async def test_delete_through_symlink_directory_is_rejected(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        test_user: User,
+        tmp_path: Path,
+    ) -> None:
+        with _patch_workspace_base(tmp_path):
+            ws = await create_workspace(test_user.id, db_session)
+            await db_session.commit()
+
+        target = Path(ws.path) / ".agent" / "skills" / "paw-bootstrap" / "SKILL.md"
+        del_resp = await client.delete(
+            f"/api/v1/workspaces/{ws.id}/files/.claude/skills/paw-bootstrap/SKILL.md"
+        )
+
+        assert del_resp.status_code == 400
+        assert target.exists()
 
     @pytest.mark.anyio
     async def test_path_traversal_is_rejected(
@@ -772,58 +704,26 @@ class TestWorkspaceAPI:
         test_user: User,
         tmp_path: Path,
     ) -> None:
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             ws = await create_workspace(test_user.id, db_session)
             await db_session.commit()
 
         resp = await client.get(f"/api/v1/workspaces/{ws.id}/files/../../../etc/passwd")
-        # Either 400 (traversal blocked) or 404 (path normalised to inside workspace).
         assert resp.status_code in (400, 404)
 
     @pytest.mark.anyio
-    async def test_skills_endpoint_returns_empty_for_fresh_workspace(
+    async def test_skills_endpoint_returns_seeded_skills(
         self,
         client: AsyncClient,
         db_session: AsyncSession,
         test_user: User,
         tmp_path: Path,
     ) -> None:
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
+        with _patch_workspace_base(tmp_path):
             ws = await create_workspace(test_user.id, db_session)
             await db_session.commit()
 
         resp = await client.get(f"/api/v1/workspaces/{ws.id}/skills")
         assert resp.status_code == 200
-        assert resp.json() == []
-
-    @pytest.mark.anyio
-    async def test_skills_endpoint_discovers_skill_after_write(
-        self,
-        client: AsyncClient,
-        db_session: AsyncSession,
-        test_user: User,
-        tmp_path: Path,
-    ) -> None:
-        with patch("app.core.workspace.settings") as mock_settings:
-            mock_settings.workspace_base_dir = str(tmp_path)
-            ws = await create_workspace(test_user.id, db_session)
-            await db_session.commit()
-
-        # Write a skill via the existing file endpoint.
-        skill_content = (
-            "---\nname: my-skill\ntrigger: when testing\nsummary: run tests\n---\n\n# My Skill\n"
-        )
-        put_resp = await client.put(
-            f"/api/v1/workspaces/{ws.id}/files/skills/my-skill/SKILL.md",
-            json={"content": skill_content},
-        )
-        assert put_resp.status_code == 200
-
-        resp = await client.get(f"/api/v1/workspaces/{ws.id}/skills")
-        assert resp.status_code == 200
-        skills = resp.json()
-        assert len(skills) == 1
-        assert skills[0]["name"] == "my-skill"
-        assert skills[0]["has_skill_md"] is True
+        names = {row["name"] for row in resp.json()}
+        assert names == {"paw-persona", "paw-bootstrap"}
