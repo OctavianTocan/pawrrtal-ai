@@ -19,7 +19,6 @@
 import React from 'react';
 import { NavUser, type NavUserIdentity } from '@/components/nav-user';
 import { NewSessionButton } from '@/components/new-session-button';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
 	Sidebar,
 	SidebarContent,
@@ -28,6 +27,7 @@ import {
 	SidebarProvider,
 	useSidebar,
 } from '@/components/ui/sidebar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ChatActivityProvider } from '@/features/nav-chats/context/chat-activity-context';
 import { SidebarFocusProvider, useFocusZone } from '@/features/nav-chats/context/sidebar-focus';
 import { NavChats } from '@/features/nav-chats/NavChats';
