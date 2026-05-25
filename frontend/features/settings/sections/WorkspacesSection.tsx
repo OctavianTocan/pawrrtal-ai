@@ -88,6 +88,34 @@ const KEY_METAS: readonly WorkspaceEnvKeyMeta[] = [
 		placeholder: 'Your OpenCode API key',
 		url: 'https://opencode.ai/docs/zen',
 	},
+	{
+		key: 'ACTIVE_RECALL_ENABLED',
+		label: 'Active Recall Enabled',
+		description:
+			'Master switch for the pre-turn memory lookup agent. If false, the recall agent is skipped entirely.',
+		placeholder: 'true',
+	},
+	{
+		key: 'ACTIVE_RECALL_MODEL',
+		label: 'Active Recall Model',
+		description:
+			'Cheap, fast model used to query conversation history (LCM) and workspace files for context.',
+		placeholder: 'google-ai:google/gemini-3.1-flash-lite',
+	},
+	{
+		key: 'ACTIVE_RECALL_SEARCH_WORKSPACE',
+		label: 'Active Recall Search Workspace',
+		description:
+			'Allow Active Recall to read local workspace files (e.g. TASKS.md) to gather context.',
+		placeholder: 'true',
+	},
+	{
+		key: 'ACTIVE_RECALL_SYSTEM_PROMPT',
+		label: 'Active Recall System Prompt',
+		description:
+			'Optional system prompt override for the Active Recall agent. If empty, falls back to the default prompt.',
+		placeholder: 'Enter custom system prompt',
+	},
 ];
 
 /** Empty record with every overridable key seeded to the empty string. */

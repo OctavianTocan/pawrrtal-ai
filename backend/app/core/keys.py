@@ -67,6 +67,11 @@ OVERRIDABLE_KEYS: frozenset[str] = frozenset(
         "NOTION_API_KEY",
         "OPENCODE_API_KEY",
         "GITHUB_TOKEN",
+        # Active Recall plugin (see backend/app/plugins/active_recall/)
+        "ACTIVE_RECALL_ENABLED",
+        "ACTIVE_RECALL_MODEL",
+        "ACTIVE_RECALL_SEARCH_WORKSPACE",
+        "ACTIVE_RECALL_SYSTEM_PROMPT",
     }
 )
 

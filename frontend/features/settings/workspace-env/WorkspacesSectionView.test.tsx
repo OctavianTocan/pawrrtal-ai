@@ -38,6 +38,10 @@ const EMPTY_VALUES = {
 	OPENAI_API_KEY: '',
 	NOTION_API_KEY: '',
 	OPENCODE_API_KEY: '',
+	ACTIVE_RECALL_ENABLED: '',
+	ACTIVE_RECALL_MODEL: '',
+	ACTIVE_RECALL_SEARCH_WORKSPACE: '',
+	ACTIVE_RECALL_SYSTEM_PROMPT: '',
 } as const;
 
 describe('WorkspacesSectionView', () => {

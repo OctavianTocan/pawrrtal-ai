@@ -27,6 +27,10 @@ export const WORKSPACE_ENV_KEY_IDS = [
 	'OPENAI_API_KEY',
 	'NOTION_API_KEY',
 	'OPENCODE_API_KEY',
+	'ACTIVE_RECALL_ENABLED',
+	'ACTIVE_RECALL_MODEL',
+	'ACTIVE_RECALL_SEARCH_WORKSPACE',
+	'ACTIVE_RECALL_SYSTEM_PROMPT',
 ] as const satisfies readonly string[];
 
 /** Union of valid workspace env key names. Derived from `WORKSPACE_ENV_KEY_IDS`. */

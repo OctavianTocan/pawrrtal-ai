@@ -1,6 +1,7 @@
 import contextlib
 import html as html_lib
 import logging
+import os
 import time
 import uuid
 from collections.abc import AsyncIterator
@@ -10,6 +11,7 @@ from typing import Any
 from app.channels.telegram_html import md_to_telegram_html
 from app.core.agent_loop.types import AgentTool
 from app.core.config import settings
+from app.core.keys import resolve_api_key
 from app.core.plugins.types import PreTurnHookContext
 from app.core.providers.factory import resolve_llm
 from app.core.tools.lcm_grep_agent import make_lcm_grep_tool
@@ -17,6 +19,16 @@ from app.core.tools.lcm_search_agent import make_lcm_search_tool
 from app.core.tools.workspace_files import make_list_dir_tool, make_read_file_tool
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_bool(val: Any, default: bool) -> bool:
+    """Parse a boolean value from a string, boolean, or None/empty value."""
+    if val is None or val == "":
+        return default
+    if isinstance(val, bool):
+        return val
+    return str(val).lower() in ("true", "1", "yes", "on")
+
 
 SYSTEM_PROMPT = """
 You are the Active Recall Agent running as a pre-turn hook for a personal AI assistant.
@@ -138,14 +150,38 @@ async def _collect_stream_telemetry(
 
 async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
     """Search LCM for context relevant to the user's question before the main agent turn."""
-    if settings.active_recall_enabled is False or settings.lcm_enabled is False:
+    # Resolve ACTIVE_RECALL_ENABLED
+    val_enabled = resolve_api_key(ctx.workspace_root, "ACTIVE_RECALL_ENABLED")
+    if val_enabled is None:
+        val_enabled = os.environ.get("ACTIVE_RECALL_ENABLED")
+    active_recall_enabled = _parse_bool(val_enabled, default=True)
+
+    if active_recall_enabled is False or settings.lcm_enabled is False:
         logger.info(
             "ACTIVE_RECALL_SKIP conversation_id=%s reason=disabled enabled=%s lcm_enabled=%s",
             ctx.conversation_id,
-            settings.active_recall_enabled,
+            active_recall_enabled,
             settings.lcm_enabled,
         )
         return None
+
+    # Resolve ACTIVE_RECALL_MODEL
+    active_recall_model = resolve_api_key(ctx.workspace_root, "ACTIVE_RECALL_MODEL")
+    if not active_recall_model:
+        active_recall_model = (
+            os.environ.get("ACTIVE_RECALL_MODEL") or "google-ai:google/gemini-3.1-flash-lite"
+        )
+
+    # Resolve ACTIVE_RECALL_SEARCH_WORKSPACE
+    val_search_ws = resolve_api_key(ctx.workspace_root, "ACTIVE_RECALL_SEARCH_WORKSPACE")
+    if val_search_ws is None:
+        val_search_ws = os.environ.get("ACTIVE_RECALL_SEARCH_WORKSPACE")
+    active_recall_search_workspace = _parse_bool(val_search_ws, default=True)
+
+    # Resolve ACTIVE_RECALL_SYSTEM_PROMPT
+    active_recall_system_prompt = resolve_api_key(ctx.workspace_root, "ACTIVE_RECALL_SYSTEM_PROMPT")
+    if not active_recall_system_prompt:
+        active_recall_system_prompt = os.environ.get("ACTIVE_RECALL_SYSTEM_PROMPT") or ""
 
     start_time = time.perf_counter()
     tools_called: list[str] = []
@@ -159,17 +195,19 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
             ctx.conversation_id,
             ctx.user_id,
         )
-        provider = resolve_llm(settings.active_recall_model)
+        provider = resolve_llm(active_recall_model)
         # We give the agent its tools.
         lcm_tools: list[AgentTool] = [
             make_lcm_grep_tool(conversation_id=ctx.conversation_id),
             make_lcm_search_tool(conversation_id=ctx.conversation_id),
         ]
-        if settings.active_recall_search_workspace:
-            lcm_tools.extend([
-                make_read_file_tool(ctx.workspace_root),
-                make_list_dir_tool(ctx.workspace_root),
-            ])
+        if active_recall_search_workspace:
+            lcm_tools.extend(
+                [
+                    make_read_file_tool(ctx.workspace_root),
+                    make_list_dir_tool(ctx.workspace_root),
+                ]
+            )
 
         stream = provider.stream(
             question=ctx.question,
@@ -177,7 +215,7 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
             user_id=ctx.user_id,
             history=None,
             tools=lcm_tools,
-            system_prompt=settings.active_recall_system_prompt or SYSTEM_PROMPT,
+            system_prompt=active_recall_system_prompt or SYSTEM_PROMPT,
         )
 
         (

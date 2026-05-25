@@ -31,7 +31,7 @@ export interface WorkspaceEnvKeyMeta {
 	/** Placeholder text for the input. */
 	placeholder: string;
 	/** External docs/console link where the user can obtain the key. */
-	url: string;
+	url?: string;
 }
 
 /** Props for the pure-presentation Workspaces section. */
@@ -111,14 +111,16 @@ export function WorkspacesSectionView({
 								>
 									{label}
 								</label>
-								<a
-									className="text-muted-foreground text-xs underline"
-									href={url}
-									rel="noopener noreferrer"
-									target="_blank"
-								>
-									Get key
-								</a>
+								{url && (
+									<a
+										className="text-muted-foreground text-xs underline"
+										href={url}
+										rel="noopener noreferrer"
+										target="_blank"
+									>
+										Get key
+									</a>
+								)}
 							</div>
 							<div className="relative flex items-center">
 								<input
