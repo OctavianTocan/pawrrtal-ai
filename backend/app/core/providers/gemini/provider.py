@@ -107,6 +107,13 @@ class _GeminiStreamState:
     # the terminal chunk; we just keep overwriting and absorb the
     # last value into ``usage_sink`` at end-of-stream.
     last_usage_metadata: Any | None = None
+    # Monotonic counter for Gemini's per-Part thinking blocks (#353).
+    # Each ``Part(thought=True)`` is its own block on the wire, and
+    # downstream renderers need that boundary information to insert
+    # paragraph breaks between blocks without guessing from
+    # whitespace heuristics. Starts at 0 and increments once per
+    # emitted thinking part.
+    thinking_block_index: int = 0
 
 
 def _events_from_chunk(chunk: Any, state: _GeminiStreamState) -> Iterator[LLMEvent]:
@@ -127,9 +134,16 @@ def _events_from_chunk(chunk: Any, state: _GeminiStreamState) -> Iterator[LLMEve
     # text. ``chunk.text`` is a convenience accessor that concatenates
     # all text parts regardless of the thought flag, so we walk parts
     # explicitly to keep the two streams separate downstream.
-    thinking_text, response_text = split_chunk_text(chunk)
-    if thinking_text:
-        yield LLMThinkingDeltaEvent(type="thinking_delta", text=thinking_text)
+    # ``split_chunk_text`` returns thinking parts as a list so we can
+    # stamp each block with its own ``block_index`` (#353).
+    thinking_parts, response_text = split_chunk_text(chunk)
+    for thinking_text in thinking_parts:
+        yield LLMThinkingDeltaEvent(
+            type="thinking_delta",
+            text=thinking_text,
+            block_index=state.thinking_block_index,
+        )
+        state.thinking_block_index += 1
     if response_text:
         yield LLMTextDeltaEvent(type="text_delta", text=response_text)
         state.full_text += response_text

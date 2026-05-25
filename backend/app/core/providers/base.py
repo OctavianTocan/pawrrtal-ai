@@ -32,6 +32,14 @@ class StreamEvent(TypedDict, total=False):
 
     type: str  # "delta" | "thinking" | "tool_use" | "tool_result" | "error" | "artifact" | "message" | "usage"
     content: str  # for delta and thinking
+    # Block-boundary metadata for ``thinking`` events: same value = same
+    # thinking block, different value = paragraph boundary between
+    # blocks. Providers that stream per-token (xAI) emit a constant
+    # value; providers that stream per-block (Gemini, Claude) increment
+    # per block. Renderers MUST treat the field's absence as "same block
+    # as the previous thinking event" for backward compatibility with
+    # older stream functions. See #353.
+    block_index: int
     name: str  # for tool_use
     input: dict[str, Any]  # for tool_use
     display: ToolDisplayPayload  # for tool_use

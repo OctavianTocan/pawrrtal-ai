@@ -698,7 +698,14 @@ def _consume_llm_event(
         events.append(TextDeltaEvent(type="text_delta", text=llm_event["text"]))
         return None
     if llm_event["type"] == "thinking_delta":
-        events.append(ThinkingDeltaEvent(type="thinking_delta", text=llm_event["text"]))
+        thinking_event = ThinkingDeltaEvent(type="thinking_delta", text=llm_event["text"])
+        # Forward ``block_index`` when the provider supplied one (#353).
+        # Older provider stream functions omit the field; downstream
+        # renderers treat absence as "same block as previous".
+        block_index = llm_event.get("block_index")
+        if block_index is not None:
+            thinking_event["block_index"] = block_index
+        events.append(thinking_event)
         return None
     if llm_event["type"] == "tool_call":
         display = render_display_from_map(

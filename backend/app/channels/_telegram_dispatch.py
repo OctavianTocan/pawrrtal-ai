@@ -269,6 +269,14 @@ async def handle_tool_result(
     return tool_trace, 0, now
 
 
+# Inserted between thinking deltas whose ``block_index`` differs (#353).
+# Same-block deltas (xAI per-token, all ``block_index=0``) concatenate
+# verbatim with no separator; different-block deltas (Gemini per-Part,
+# Claude per ThinkingBlock) get a paragraph break so the rendered
+# italic reads as distinct thoughts rather than one run-on stream.
+_THINKING_BLOCK_SEPARATOR = "\n\n"
+
+
 async def handle_thinking(
     *,
     event: StreamEvent,
@@ -276,15 +284,46 @@ async def handle_thinking(
     chat_id: int | str,
     thinking_text: str,
     thinking_message_id: int | None,
+    previous_thinking_block_index: int | None,
     reply_to_message_id: int | None,
     message_thread_id: int | None,
-) -> tuple[str, int | None]:
-    """Send or edit the separate italic thinking message."""
+) -> tuple[str, int | None, int | None]:
+    """Send or edit the separate italic thinking message.
+
+    The model owns its whitespace and paragraph breaks within a block;
+    between blocks we insert :data:`_THINKING_BLOCK_SEPARATOR` so
+    per-block providers (Gemini, Claude) get visible boundaries while
+    per-token providers (xAI) — which emit a constant ``block_index`` —
+    stay tightly concatenated. Covers #345 + #351 + #353.
+
+    ``previous_thinking_block_index`` is the index from the previous
+    thinking event on this turn, or ``None`` for the first thinking
+    event (in which case no separator is prepended). Returns the
+    updated ``(thinking_text, thinking_message_id, next_block_index)``
+    triple so the caller can thread the next block index forward. When
+    the provider omits ``block_index`` (older stream functions, tests
+    that script raw events without setting the field) the returned
+    index stays at the previous value and no separator is ever inserted.
+    """
     chunk = str(event.get("content") or "")
+    block_index = event.get("block_index")
     if not chunk:
-        return thinking_text, thinking_message_id
-    thinking_text = f"{thinking_text}{chunk}"
+        # Preserve the previous baseline so the next chunk's separator
+        # decision still sees the correct anchor.
+        next_index = block_index if block_index is not None else previous_thinking_block_index
+        return thinking_text, thinking_message_id, next_index
+    needs_break = (
+        bool(thinking_text)
+        and block_index is not None
+        and previous_thinking_block_index is not None
+        and block_index != previous_thinking_block_index
+    )
+    if needs_break:
+        thinking_text = thinking_text + _THINKING_BLOCK_SEPARATOR + chunk
+    else:
+        thinking_text = thinking_text + chunk
     rendered = thinking_html(thinking_text)
+    next_index = block_index if block_index is not None else previous_thinking_block_index
     if thinking_message_id is None:
         message_id = await safe_send_html(
             bot,
@@ -293,9 +332,9 @@ async def handle_thinking(
             reply_to_message_id=reply_to_message_id,
             message_thread_id=message_thread_id,
         )
-        return thinking_text, message_id
+        return thinking_text, message_id, next_index
     await safe_edit_html(bot, chat_id, thinking_message_id, rendered)
-    return thinking_text, thinking_message_id
+    return thinking_text, thinking_message_id, next_index
 
 
 def capture_terminal_event(

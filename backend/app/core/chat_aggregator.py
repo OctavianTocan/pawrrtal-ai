@@ -115,12 +115,25 @@ class ChatTurnAggregator:
         if self.started_at_monotonic is None:
             self.started_at_monotonic = time.monotonic()
 
-    def _push_thinking_entry(self, text: str) -> None:
-        """Coalesce consecutive thinking chunks into a single timeline entry."""
+    def _push_thinking_entry(self, text: str, block_index: int | None) -> None:
+        """Coalesce thinking chunks into a single timeline entry per block.
+
+        When ``block_index`` is supplied, consecutive chunks with the
+        same index merge; a change in index opens a new timeline entry
+        so per-block providers (Gemini, Claude) render with visible
+        boundaries. When the provider omits ``block_index`` we fall
+        back to the legacy "consecutive thinking events coalesce"
+        behaviour so older callers and tests stay green. See #353.
+        """
         if self.timeline and self.timeline[-1].get("kind") == "thinking":
-            self.timeline[-1]["text"] = self.timeline[-1].get("text", "") + text
-            return
-        self.timeline.append({"kind": "thinking", "text": text})
+            previous_index = self.timeline[-1].get("block_index")
+            if block_index is None or previous_index is None or previous_index == block_index:
+                self.timeline[-1]["text"] = self.timeline[-1].get("text", "") + text
+                return
+        entry: dict[str, Any] = {"kind": "thinking", "text": text}
+        if block_index is not None:
+            entry["block_index"] = block_index
+        self.timeline.append(entry)
 
     def apply(self, event: StreamEvent) -> None:
         """Fold one provider event into the running snapshot."""
@@ -133,7 +146,7 @@ class ChatTurnAggregator:
             self._mark_started()
             chunk = event.get("content", "") or ""
             self.thinking += chunk
-            self._push_thinking_entry(chunk)
+            self._push_thinking_entry(chunk, event.get("block_index"))
             return
         if event_type == "tool_use":
             self._mark_started()

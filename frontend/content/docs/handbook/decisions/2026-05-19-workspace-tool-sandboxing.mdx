@@ -1,0 +1,106 @@
+---
+title: Workspace filesystem tools rely on soft path escaping; defer to a sandbox boundary
+description: ADR — keep ``read_file`` / ``write_file`` / ``list_dir`` path resolution + ``O_NOFOLLOW`` as defence in depth, but treat the Python and Shell sandboxes as the real isolation surface for workspace boundaries.
+---
+
+# ADR: Workspace filesystem tools rely on soft path escaping; defer to a sandbox boundary
+
+- **Date:** 2026-05-19
+- **Owners:** OctavianTocan
+- **Tracking:** Issue [#358](https://github.com/OctavianTocan/Pawrrtal-AI/issues/358)
+
+<Callout type="info" title="Status: Accepted">
+The ``read_file`` / ``write_file`` / ``list_dir`` workspace tools keep
+their per-call path normalisation + ``O_NOFOLLOW`` guard as
+defence-in-depth, but those checks are not load-bearing for security.
+The agent has a Python sandbox with full ``os`` / ``subprocess`` access
+that trivially bypasses them. Real isolation lives at the
+sandbox-execution boundary (the future containerised runtime for the
+agent's workspace); the file tools are convenience APIs above that
+boundary, not a security perimeter on their own.
+</Callout>
+
+## Context
+
+Issue [#358](https://github.com/OctavianTocan/Pawrrtal-AI/issues/358)
+flags an inconsistency that's been latent in the codebase:
+
+- ``backend/app/core/tools/workspace_files`` validates every path
+  against the workspace root, refuses to follow symlinks, and rejects
+  ``..`` segments. The tests cover the basic escape vectors.
+- The same agent has a Python sandbox tool (issued via ``litellm``
+  reasoning models, the future inline runtime, etc.) with the full
+  ``os``, ``subprocess``, and ``pathlib`` surface. A model that wants
+  to read ``../../etc/passwd`` writes three lines of Python and the
+  workspace guard is irrelevant.
+
+If the file tools are pretending to be a security boundary, the
+mismatch is the worst kind: it gives reviewers and operators false
+confidence that ``read_file`` is "safe" because of those checks, when
+in practice any model with sandbox access has already crossed the
+line. The right question to answer is whether the soft checks are
+worth their complexity at all, or whether we should explicitly stop
+treating them as security and move the isolation primitive somewhere
+that can actually enforce it.
+
+The codebase already hints at this tension:
+
+- ``.claude/rules/architecture/no-tools-in-providers.md`` keeps tool
+  composition centralised so policy gates live above the providers.
+- The Claude SDK's ``can_use_tool`` and Gemini/xAI's
+  ``permission_check`` plumbing exists precisely so policy lives in
+  ``backend/app/api/chat.py``, not on each provider's stream loop.
+- A containerised runtime for the agent's workspace tools is on the
+  longer-term roadmap (out of scope for this issue) and would supply
+  the real boundary.
+
+## Decision
+
+The workspace file tools keep their existing checks for three reasons,
+even though they're not a security perimeter:
+
+1. **Operator UX.** A model that hallucinates an absolute path like
+   ``/etc/passwd`` should fail closed with a clean error, not silently
+   read a file. The check distinguishes a buggy tool call from an
+   adversarial one. Logs and the chat transcript stay readable.
+2. **Defence in depth.** A bug in the future sandbox runtime that
+   accidentally widens the agent's filesystem reach should still be
+   caught by the per-call path resolution. Stacking cheap guards is a
+   cost-effective design — they're already written.
+3. **No regressions on existing flows.** Removing the checks now
+   would weaken the surface today (no sandbox is shipped yet) for the
+   sake of removing complexity that nobody has complained about.
+
+What we explicitly **don't** do:
+
+- We don't represent the path-escape guards as a security boundary in
+  any code comment, log message, or doc. The next agent reading
+  ``workspace_files`` should not infer that the guard is the line of
+  defence.
+- We don't add new "soft" sandboxing primitives that try to compete
+  with the future containerised runtime. New isolation work goes into
+  that runtime, not into the file tools.
+- We don't expand the tool surface (e.g. ``chmod``, ``stat`` on
+  arbitrary paths) past what an agent can already do via the Python
+  sandbox. Adding new surface here only matters once the runtime
+  boundary is real.
+
+## Consequences
+
+- The workspace tool tests stay green; no code change is required to
+  land this decision.
+- Future work on the containerised runtime ("agent workspace sandbox")
+  must surface as its own ADR with the full threat model. That ADR
+  will deprecate the path-escape comments in ``workspace_files`` if
+  the runtime makes them strictly redundant, but until then the
+  current code stays.
+- Reviewers should treat any PR that adds a new path-escape check
+  with the question: "is this actually the perimeter, or is it
+  paperwork above a real perimeter that doesn't exist yet?" If the
+  latter, the answer is usually "skip it; ship the runtime instead."
+
+## References
+
+- Issue [#358](https://github.com/OctavianTocan/Pawrrtal-AI/issues/358)
+- ``.claude/rules/architecture/no-tools-in-providers.md``
+- ``backend/app/core/tools/workspace_files``
