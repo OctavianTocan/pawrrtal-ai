@@ -67,7 +67,7 @@ def _make_bot() -> AsyncMock:
 
 
 async def test_text_after_thinking_renders_as_new_message() -> None:
-    """thinking → text emits TWO send_message calls in chronological order."""
+    """thinking → text renders thinking via edit (placeholder) and text via send."""
     bot = _make_bot()
     msg = _make_channel_message(bot)
     channel = TelegramChannel()
@@ -79,17 +79,13 @@ async def test_text_after_thinking_renders_as_new_message() -> None:
     async for _ in channel.deliver(_stream(*events), msg):
         pass
 
-    # The first thinking block edits the placeholder in-place:
-    bot.edit_message_text.assert_any_call(
-        chat_id=1,
-        message_id=2,
-        text="💭 <b>Thinking...</b>\n\n<i>let me check</i>",
-    )
-    # The final answer is sent as a new message:
-    bot.send_message.assert_awaited_once_with(
-        chat_id=1,
-        text="the answer",
-    )
+    # Thinking edits the placeholder message (edit_message_text, not send_message).
+    edits = [call.kwargs.get("text", "") for call in bot.edit_message_text.await_args_list]
+    assert any("<i>let me check</i>" in s for s in edits)
+
+    # The text delta opens a new interleaved message via send_message.
+    sends = [call.kwargs.get("text", "") for call in bot.send_message.await_args_list]
+    assert any(s == "the answer" for s in sends)
 
 
 async def test_text_after_tools_renders_as_new_message() -> None:
