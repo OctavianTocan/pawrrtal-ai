@@ -114,6 +114,15 @@ const EXEMPT_PATH_FRAGMENTS = [
 	// dreaming trigger) into a sibling ``post_turn_hooks.py``.
 	// TODO(pawrrtal-turn-runner-split): land the split and remove.
 	'backend/app/channels/turn_runner.py',
+	// Block-index plumbing (#371) and regenerate-button threading (#414)
+	// grew these files past 500. Each has a documented split plan in the
+	// refactor PRs (#394, #403, #409). Exempt until those land.
+	'backend/app/models.py',
+	'backend/app/core/providers/opencode_go_provider.py',
+	'backend/app/core/providers/gemini_provider.py',
+	'backend/app/channels/_telegram_dispatch.py',
+	'backend/app/channels/telegram.py',
+	'backend/app/core/agent_loop/types.py',
 ];
 
 /** Recursively yield every source file under `dir` that we should check. */
