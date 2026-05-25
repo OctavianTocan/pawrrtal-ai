@@ -1,7 +1,7 @@
 'use client';
 
 import type * as React from 'react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -22,6 +22,15 @@ import {
 
 const SAVE_DEBOUNCE_MS = 1200;
 
+/** Local form state for the profile editor fields. */
+interface ProfileFormState {
+	name: string;
+	role: string;
+	customInstructions: string;
+}
+
+const INITIAL_FORM: ProfileFormState = { name: '', role: '', customInstructions: '' };
+
 /**
  * General settings section — profile, preferences, and notifications.
  *
@@ -34,26 +43,34 @@ export function GeneralSection(): React.JSX.Element {
 	const { data: personalization } = useGetPersonalization();
 	const upsert = useUpsertPersonalization();
 
-	const [name, setName] = useState('');
-	const [role, setRole] = useState('');
-	const [customInstructions, setCustomInstructions] = useState('');
-
 	const hydrated = useRef(false);
+	const [form, updateForm] = useReducer(
+		(prev: ProfileFormState, patch: Partial<ProfileFormState>): ProfileFormState => ({
+			...prev,
+			...patch,
+		}),
+		INITIAL_FORM
+	);
 	useEffect(() => {
 		if (!personalization || hydrated.current) return;
 		hydrated.current = true;
-		setName(personalization.name ?? '');
-		setRole(personalization.role ?? '');
-		setCustomInstructions(personalization.customInstructions ?? '');
+		updateForm({
+			name: personalization.name ?? '',
+			role: personalization.role ?? '',
+			customInstructions: personalization.customInstructions ?? '',
+		});
 	}, [personalization]);
+
+	const { name, role, customInstructions } = form;
 
 	const nickname = name.split(' ')[0] ?? '';
 	const initials = getInitials(name || currentUser?.email || '');
 
 	const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 	useEffect(() => {
+		const ref = saveTimerRef;
 		return () => {
-			if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+			if (ref.current) clearTimeout(ref.current);
 		};
 	}, []);
 
@@ -72,10 +89,7 @@ export function GeneralSection(): React.JSX.Element {
 		[personalization, upsert]
 	);
 
-	const profileKey = useMemo(
-		(): string => `profile-${currentUser?.id ?? 'anon'}`,
-		[currentUser?.id]
-	);
+	const profileKey = `profile-${currentUser?.id ?? 'anon'}`;
 
 	return (
 		<SettingsPage
@@ -98,7 +112,7 @@ export function GeneralSection(): React.JSX.Element {
 						className="w-56"
 						value={name}
 						onChange={(e) => {
-							setName(e.target.value);
+							updateForm({ name: e.target.value });
 							save({ name: e.target.value });
 						}}
 					/>
@@ -111,7 +125,7 @@ export function GeneralSection(): React.JSX.Element {
 						className="w-56"
 						value={role}
 						onChange={(e) => {
-							setRole(e.target.value);
+							updateForm({ role: e.target.value });
 							save({ role: e.target.value });
 						}}
 					/>
@@ -125,7 +139,7 @@ export function GeneralSection(): React.JSX.Element {
 						className="min-h-24 w-72 resize-none"
 						value={customInstructions}
 						onChange={(e) => {
-							setCustomInstructions(e.target.value);
+							updateForm({ customInstructions: e.target.value });
 							save({ customInstructions: e.target.value });
 						}}
 						placeholder="e.g. keep explanations brief and to the point"
