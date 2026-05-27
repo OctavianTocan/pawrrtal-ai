@@ -11,6 +11,7 @@ refuses to load `openai_codex` and its submodules. A meta_path finder
 survives `sys.modules.pop(...)` and module reloads — unlike
 `monkeypatch.setattr` on an inner symbol, which races with re-imports.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -26,17 +27,7 @@ class _OpenAICodexBlocker:
 
     def find_spec(self, name: str, path: Any = None, target: Any = None) -> Any:
         if name == "openai_codex" or name.startswith("openai_codex."):
-            raise ImportError(
-                f"openai_codex blocked by isolation test ({name})"
-            )
-        return None
-
-    # Legacy API kept for older finders that look it up.
-    def find_module(self, name: str, path: Any = None) -> Any:
-        if name == "openai_codex" or name.startswith("openai_codex."):
-            raise ImportError(
-                f"openai_codex blocked by isolation test ({name})"
-            )
+            raise ImportError(f"openai_codex blocked by isolation test ({name})")
         return None
 
 
@@ -95,5 +86,5 @@ def test_factory_codex_resolution_raises_when_runtime_unavailable(
 
     # Use a canonical wire string for a Codex model. The lazy resolver
     # in factory.resolve_llm should attempt the import and fail.
-    with pytest.raises((ImportError, RuntimeError)):
+    with pytest.raises(ImportError):
         factory.resolve_llm("openai-codex:openai/gpt-5.5")

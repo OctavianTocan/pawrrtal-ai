@@ -83,7 +83,7 @@ _HOST_AUTH_KEYS: dict[Host, tuple[str, str]] = {
 }
 
 
-def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> bool:  # noqa: PLR0911
+def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> bool:
     """Return whether ``host`` has credentials reachable for this request.
 
     Drives the "only show authenticated providers" filter on the
@@ -133,20 +133,9 @@ def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> boo
         # Codex auth is primarily file-based (~/.codex/auth.json or $CODEX_HOME
         # written by `codex login`). The SDK binary discovers it automatically.
         # We also support an explicit OPENAI_CODEX_OAUTH_TOKEN override.
-        # For the picker filter we are permissive (return True) so users who
-        # did a normal `codex login` see the models; the provider itself will
-        # surface clear errors at stream time if no usable auth exists.
-        try:
-            from .openai_codex.auth import resolve_openai_codex_auth  # noqa: PLC0415
-
-            tok, _ = resolve_openai_codex_auth(workspace_root=workspace_root)
-            if tok:
-                return True
-            # No explicit override — still allow the host. The native SDK path
-            # (the whole point of this provider) will use the standard auth.json.
-            return True
-        except Exception:
-            return False
+        # The picker is permissive (always True) — the provider surfaces a
+        # clear error at stream time if no usable auth exists.
+        return True
 
     if workspace_root is not None:
         # ``resolve_api_key`` already does workspace → settings fallback,
