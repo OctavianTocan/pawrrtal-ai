@@ -171,13 +171,46 @@ def get_chat_router() -> APIRouter:
     ) -> StreamingResponse:
         """Stream an AI response as Server-Sent Events.
 
-        SSE event shapes:
-          {"type": "delta", "content": "..."}      — text chunk
-          {"type": "thinking", "content": "..."}   — reasoning (when available)
-          {"type": "tool_use", "name": "...", "input": {...}}
-          {"type": "tool_result", "content": "..."}
-          {"type": "error", "content": "..."}      — stream-level error
+        SSE event shapes (emitted by providers, the agent loop, and this
+        router):
+
+          {"type": "delta", "content": "..."}
+              Provider-emitted text chunk (every provider).
+          {"type": "thinking", "content": "...", "block_index": N?}
+              Provider-emitted reasoning chunk; ``block_index`` marks
+              paragraph boundaries for renderers that group blocks.
+          {"type": "tool_use", "name": "...", "input": {...},
+           "tool_use_id": "...", "display": {...}?}
+              Provider-emitted tool call.
+          {"type": "tool_result", "content": "...", "tool_use_id": "...",
+           "is_error": bool?}
+              Provider-emitted tool result.
+          {"type": "usage", "input_tokens": N, "output_tokens": N,
+           "cost_usd": F}
+              Provider-emitted per-turn token/cost accounting. Powers the
+              cost ledger; consumers can ignore.
+          {"type": "artifact",
+           "artifact": {"id": "...", "title": "...", "spec": {...},
+                        "tool_use_id": "..."}}
+              Emitted by ``_maybe_artifact_event`` in this router when the
+              agent calls ``render_artifact``. Renderers render this as a
+              first-class artifact card.
+          {"type": "message", "content": "...", "attachment": "path"?,
+           "mime": "..."?}
+              Emitted by this router's ``send_fn`` for the agent's
+              mid-turn ``send_message`` tool (text + optional file).
+          {"type": "agent_terminated", "content": "..."}
+              Emitted by the agent loop when a safety cap fires
+              (iteration cap, wall-clock budget, consecutive-error
+              threshold). The loop already wrote ``[DONE]`` after this
+              event; renderers should treat it as a controlled stop with
+              an explanation, not as a stream error.
+          {"type": "error", "content": "...", "error_code": "..."?}
+              Stream-level error (provider failure, exception during the
+              agent loop). The transport raises after this; no further
+              frames follow.
           [DONE]
+              Terminal sentinel — the stream ends after this line.
 
         While streaming, the endpoint also persists the turn to the
         ``chat_messages`` table — the user prompt as a row, the assistant
@@ -366,6 +399,11 @@ def get_chat_router() -> APIRouter:
             if request.images
             else None
         )
+
+        # Load Codex thread id (if any) before constructing the frozen ChatTurnInput.
+        from app.channels.turn_runner import _load_codex_thread_id  # noqa: PLC0415
+        codex_thread_id = await _load_codex_thread_id(request.conversation_id)
+
         turn_input = ChatTurnInput(
             conversation_id=request.conversation_id,
             user_id=user.id,
@@ -390,6 +428,7 @@ def get_chat_router() -> APIRouter:
                 "surface": surface,
             },
             pre_turn_hooks=build_pre_turn_hooks(),
+            codex_thread_id=codex_thread_id,
         )
         hooks: list[EventHook] = [_artifact_hook, _drain_send_queue]
 

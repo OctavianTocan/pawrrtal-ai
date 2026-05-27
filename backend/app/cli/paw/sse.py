@@ -46,6 +46,11 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset(
         "usage",
         "error",
         "message",
+        # Controlled stop from the agent loop's safety layer
+        # (iteration cap, wall-clock budget, consecutive-error
+        # threshold). Distinct from "error" so renderers can show a
+        # neutral "stopped" affordance instead of a failure banner.
+        "agent_terminated",
         "done",
     }
 )
