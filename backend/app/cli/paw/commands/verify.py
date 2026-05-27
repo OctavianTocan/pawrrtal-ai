@@ -19,6 +19,7 @@ per check.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 
 import typer
 
@@ -26,8 +27,17 @@ from app.cli.paw.config import PersonaState
 from app.cli.paw.errors import LocalError, VerificationFailed
 from app.cli.paw.http import PawClient
 from app.cli.paw.output import emit_human, emit_json
+from app.cli.paw.verify.chat_roundtrip import run_chat_roundtrip_scenario
 from app.cli.paw.verify.codex import SCENARIO_HTTP_TIMEOUT_SECONDS, run_codex_scenario
+from app.cli.paw.verify.model_switch import run_model_switch_scenario
 from app.cli.paw.verify.scenarios import ScenarioResult
+
+# Canonical order all-dispatcher walks when no --include flag narrows it.
+# Order matters: codex first because its credentials are most likely to be
+# unconfigured (early skip-or-fail surfaces the diagnosis); chat-roundtrip
+# next so the stream-vs-DB invariant is asserted before the multi-turn
+# switch scenario muddies the row.
+DEFAULT_SUITES = ("codex", "chat-roundtrip", "model-switch")
 
 app = typer.Typer(
     help="End-to-end provider verification scenarios.",
@@ -56,14 +66,173 @@ def verify_codex(
       paw verify codex --keep-conversation
     """
     state = _load_state(profile)
-    result = asyncio.run(_run_scenario(state, keep_conversation=keep_conversation))
+    result = asyncio.run(
+        _run_one(
+            state,
+            lambda client: run_codex_scenario(state, client, keep_conversation=keep_conversation),
+        )
+    )
+    _emit_and_exit(result, json_out=json_out, label="codex")
+
+
+@app.command("chat-roundtrip")
+def verify_chat_roundtrip(
+    profile: str = typer.Option("default", "--profile"),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Override the model id (defaults to catalog `is_default`).",
+    ),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Compare one streamed turn's SSE events against the persisted DB row.
+
+    Catches the "stream looked right but the DB row is wrong" bug class —
+    content drift, dropped tool_use rows, thinking-render regressions.
+
+    Examples:
+      paw verify chat-roundtrip
+      paw verify chat-roundtrip --model openai-codex:openai/gpt-5.5 --json
+    """
+    state = _load_state(profile)
+    result = asyncio.run(
+        _run_one(
+            state,
+            lambda client: run_chat_roundtrip_scenario(state, client, model_override=model),
+        )
+    )
+    _emit_and_exit(result, json_out=json_out, label="chat-roundtrip")
+
+
+@app.command("model-switch")
+def verify_model_switch(
+    profile: str = typer.Option("default", "--profile"),
+    from_model: str | None = typer.Option(
+        None,
+        "--from",
+        help="Starting model id (defaults to catalog `is_default`).",
+    ),
+    to_model: str | None = typer.Option(
+        None,
+        "--to",
+        help="Model id to switch to (defaults to first non-default catalog entry).",
+    ),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Switch models mid-conversation and assert row + state-machine integrity.
+
+    Verifies migration 012's model_id canonicalisation and migration 020's
+    ``reasoning_effort`` CHECK constraint via the PATCH path.
+
+    Examples:
+      paw verify model-switch
+      paw verify model-switch --from openai-codex:openai/gpt-5.5 --to agent-sdk:anthropic/claude-opus-4-7
+    """
+    state = _load_state(profile)
+    result = asyncio.run(
+        _run_one(
+            state,
+            lambda client: run_model_switch_scenario(
+                state,
+                client,
+                from_override=from_model,
+                to_override=to_model,
+            ),
+        )
+    )
+    _emit_and_exit(result, json_out=json_out, label="model-switch")
+
+
+@app.command("all")
+def verify_all(
+    profile: str = typer.Option("default", "--profile"),
+    include: str | None = typer.Option(
+        None,
+        "--include",
+        help="Comma-separated suites to run (default: all). Names: codex,chat-roundtrip,model-switch.",
+    ),
+    exclude: str | None = typer.Option(
+        None,
+        "--exclude",
+        help="Comma-separated suites to skip.",
+    ),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Run every configured verify suite and aggregate results.
+
+    Exits 0 if all selected suites pass, 6 if any suite has a failed check.
+
+    Examples:
+      paw verify all
+      paw verify all --json | jq '.[] | {scenario, passed}'
+      paw verify all --include chat-roundtrip,model-switch
+      paw verify all --exclude codex --json
+    """
+    state = _load_state(profile)
+    selected = _select_suites(include=include, exclude=exclude)
+    results = asyncio.run(_run_many(state, selected))
+
     if json_out:
-        emit_json(result.to_dict())
+        emit_json([r.to_dict() for r in results])
     else:
-        emit_human(_render(result))
-    if not result.passed:
-        failed_names = ", ".join(c.name for c in result.checks if not c.passed)
-        raise VerificationFailed(f"codex scenario failed ({failed_names})")
+        emit_human(_render_aggregate(results))
+
+    if any(not r.passed for r in results):
+        failed = ",".join(r.name for r in results if not r.passed)
+        raise VerificationFailed(f"verify all failed for suites: {failed}")
+
+
+def _select_suites(*, include: str | None, exclude: str | None) -> tuple[str, ...]:
+    """Apply ``--include`` / ``--exclude`` filters in canonical order."""
+    if include is not None:
+        requested = tuple(s.strip() for s in include.split(",") if s.strip())
+        unknown = [s for s in requested if s not in DEFAULT_SUITES]
+        if unknown:
+            raise LocalError(
+                f"Unknown suite(s): {unknown}",
+                hint=f"Valid suites: {', '.join(DEFAULT_SUITES)}",
+            )
+        chosen: tuple[str, ...] = requested
+    else:
+        chosen = DEFAULT_SUITES
+
+    if exclude is not None:
+        skipped = {s.strip() for s in exclude.split(",") if s.strip()}
+        chosen = tuple(s for s in chosen if s not in skipped)
+
+    if not chosen:
+        raise LocalError(
+            "No suites selected after applying --include/--exclude.",
+            hint=f"Valid suites: {', '.join(DEFAULT_SUITES)}",
+        )
+    return chosen
+
+
+SuiteRunner = Callable[[PawClient], Awaitable[ScenarioResult]]
+
+
+def _suite_runner(state: PersonaState, name: str) -> SuiteRunner:
+    """Return the async runner for a named suite. Raises on unknown names."""
+    if name == "codex":
+        return lambda client: run_codex_scenario(state, client)
+    if name == "chat-roundtrip":
+        return lambda client: run_chat_roundtrip_scenario(state, client)
+    if name == "model-switch":
+        return lambda client: run_model_switch_scenario(state, client)
+    raise LocalError(
+        f"Unknown suite: {name}",
+        hint=f"Valid suites: {', '.join(DEFAULT_SUITES)}",
+    )
+
+
+async def _run_many(state: PersonaState, suites: tuple[str, ...]) -> list[ScenarioResult]:
+    """Run each suite sequentially under one shared ``PawClient``."""
+    results: list[ScenarioResult] = []
+    async with PawClient(state, timeout=SCENARIO_HTTP_TIMEOUT_SECONDS) as client:
+        for name in suites:
+            runner = _suite_runner(state, name)
+            results.append(await runner(client))
+    return results
 
 
 def _load_state(profile: str) -> PersonaState:
@@ -77,10 +246,21 @@ def _load_state(profile: str) -> PersonaState:
         ) from e
 
 
-async def _run_scenario(state: PersonaState, *, keep_conversation: bool) -> ScenarioResult:
-    """Open one ``PawClient`` for the whole scenario and dispatch."""
+async def _run_one(state: PersonaState, runner: SuiteRunner) -> ScenarioResult:
+    """Open one ``PawClient`` and dispatch a single scenario runner."""
     async with PawClient(state, timeout=SCENARIO_HTTP_TIMEOUT_SECONDS) as client:
-        return await run_codex_scenario(state, client, keep_conversation=keep_conversation)
+        return await runner(client)
+
+
+def _emit_and_exit(result: ScenarioResult, *, json_out: bool, label: str) -> None:
+    """Shared output + exit handling for single-scenario commands."""
+    if json_out:
+        emit_json(result.to_dict())
+    else:
+        emit_human(_render(result))
+    if not result.passed:
+        failed_names = ", ".join(c.name for c in result.checks if not c.passed)
+        raise VerificationFailed(f"{label} scenario failed ({failed_names})")
 
 
 def _render(r: ScenarioResult) -> str:
@@ -93,3 +273,10 @@ def _render(r: ScenarioResult) -> str:
             line += f"   ({c.detail})"
         lines.append(line)
     return "\n".join(lines) + "\n"
+
+
+def _render_aggregate(results: list[ScenarioResult]) -> str:
+    """Render the aggregate ``paw verify all`` output."""
+    sections = [_render(r) for r in results]
+    summary_line = f"\n{sum(r.passed for r in results)}/{len(results)} suites passed.\n"
+    return "".join(sections) + summary_line
