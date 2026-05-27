@@ -28,7 +28,27 @@ from .model_id import Host, ParsedModelId, parse_model_id
 from .opencode_go import OpencodeGoLLM, OpencodeGoLLMConfig
 from .xai import XaiLLM
 
-HOST_TO_PROVIDER: dict[Host, type[AILLM]] = {
+
+def _load_openai_codex_provider_cls() -> type[AILLM]:
+    """Resolve the OpenAICodexProvider class lazily.
+
+    Imported through the package surface (which exposes the symbol
+    lazily via ``__getattr__``) so the SDK bootstrap only runs when
+    this function is actually called for a Codex model. Eagerly
+    importing it at module scope previously poisoned every chat
+    turn — including non-Codex hosts — when the codex binary or
+    vendored submodule was unavailable (regression: bean
+    pawrrtal-t5j8).
+    """
+    from .openai_codex import OpenAICodexProvider  # noqa: PLC0415
+
+    # __getattr__ on the openai_codex package returns Any; mypy can't
+    # see the concrete class. The Protocol-conformance check happens
+    # structurally at call time when resolve_llm constructs it.
+    return OpenAICodexProvider  # type: ignore[no-any-return]
+
+
+HOST_TO_PROVIDER: dict[Host, type[AILLM] | None] = {
     Host.agent_sdk: ClaudeLLM,
     Host.agy_cli: AgyCliLLM,
     Host.gemini_cli: GeminiCliLLM,
@@ -36,6 +56,7 @@ HOST_TO_PROVIDER: dict[Host, type[AILLM]] = {
     Host.litellm: LiteLLMLLM,
     Host.opencode_go: OpencodeGoLLM,
     Host.xai: XaiLLM,
+    Host.openai_codex: None,  # resolved lazily in resolve_llm
 }
 """Map of host enum to the concrete provider class that serves it.
 
@@ -58,10 +79,11 @@ _HOST_AUTH_KEYS: dict[Host, tuple[str, str]] = {
     Host.litellm: ("OPENAI_API_KEY", "openai_api_key"),
     Host.opencode_go: ("OPENCODE_API_KEY", "opencode_api_key"),
     Host.xai: ("XAI_API_KEY", "xai_api_key"),
+    Host.openai_codex: ("OPENAI_CODEX_OAUTH_TOKEN", "openai_codex_oauth_token"),
 }
 
 
-def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> bool:
+def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> bool:  # noqa: PLR0911
     """Return whether ``host`` has credentials reachable for this request.
 
     Drives the "only show authenticated providers" filter on the
@@ -91,6 +113,7 @@ def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> boo
       single credential we need.
     * ``opencode_go``: non-empty ``OPENCODE_API_KEY``.
     * ``xai``: non-empty ``XAI_API_KEY``.
+    * ``openai_codex``: non-empty ``OPENAI_CODEX_OAUTH_TOKEN`` (or valid ~/.codex/auth.json).
 
     Add a new entry to :data:`_HOST_ENV_KEY` when introducing a new
     :class:`Host`.
@@ -105,6 +128,26 @@ def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> boo
     if keys is None:
         return False
     env_key, settings_attr = keys
+
+    if host is Host.openai_codex:
+        # Codex auth is primarily file-based (~/.codex/auth.json or $CODEX_HOME
+        # written by `codex login`). The SDK binary discovers it automatically.
+        # We also support an explicit OPENAI_CODEX_OAUTH_TOKEN override.
+        # For the picker filter we are permissive (return True) so users who
+        # did a normal `codex login` see the models; the provider itself will
+        # surface clear errors at stream time if no usable auth exists.
+        try:
+            from .openai_codex.auth import resolve_openai_codex_auth  # noqa: PLC0415
+
+            tok, _ = resolve_openai_codex_auth(workspace_root=workspace_root)
+            if tok:
+                return True
+            # No explicit override — still allow the host. The native SDK path
+            # (the whole point of this provider) will use the standard auth.json.
+            return True
+        except Exception:
+            return False
+
     if workspace_root is not None:
         # ``resolve_api_key`` already does workspace → settings fallback,
         # so this single call covers both the per-workspace and the
@@ -165,6 +208,10 @@ def resolve_llm(
         parsed = parse_model_id(raw)
 
     provider_cls = HOST_TO_PROVIDER[parsed.host]
+    if parsed.host is Host.openai_codex and provider_cls is None:
+        provider_cls = _load_openai_codex_provider_cls()
+    if provider_cls is None:
+        raise KeyError(f"no provider class registered for host {parsed.host!r}")
     # The table values are typed ``type[AILLM]`` (the streaming protocol),
     # which has no ``__init__`` contract. Construction is concrete: we
     # narrow back to the real classes here so each gets the args its
@@ -179,7 +226,9 @@ def resolve_llm(
         return LiteLLMLLM(parsed.model, parsed.vendor, workspace_root=workspace_root)
     if provider_cls is OpencodeGoLLM:
         return _build_opencode_go(parsed, workspace_root)
-    if provider_cls in {AgyCliLLM, GeminiLLM, GeminiCliLLM, XaiLLM}:
+    if provider_cls in {AgyCliLLM, GeminiLLM, GeminiCliLLM, XaiLLM} or (
+        parsed.host is Host.openai_codex
+    ):
         return provider_cls(parsed.model, workspace_root=workspace_root)  # type: ignore[call-arg]
     raise KeyError(f"no provider class registered for host {parsed.host!r}")
 
