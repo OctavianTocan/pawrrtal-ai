@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import base64
 import http.cookiejar
+import json
+import os
 import sys
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import IO, Any
 
 import httpx
 
@@ -18,6 +22,10 @@ DEFAULT_TIMEOUT_SECONDS = 60.0
 RESPONSE_BODY_PREVIEW_BYTES = 500
 ERROR_BODY_PREVIEW_CHARS = 200
 HTTP_UNAUTHORIZED = 401
+
+# Env var that, when set, triggers fixture recording inside PawClient.
+# Set by `paw record` and inherited by the spawned/in-process command.
+RECORD_ENV_VAR = "PAW_RECORD"
 
 
 def load_cookies(path: Path) -> http.cookiejar.MozillaCookieJar:
@@ -65,6 +73,7 @@ class PawClient:
         *,
         timeout: float = DEFAULT_TIMEOUT_SECONDS,
         verbose: bool = False,
+        record_path: str | os.PathLike[str] | None = None,
     ) -> None:
         self._state = state
         self._verbose = verbose
@@ -75,11 +84,25 @@ class PawClient:
             timeout=timeout,
             follow_redirects=False,
         )
+        # Recording: env var is the canonical trigger so `paw record` can
+        # capture fixtures from any subcommand without threading the path
+        # through every callsite.
+        if record_path is None:
+            record_path = os.environ.get(RECORD_ENV_VAR)
+        self._record_path: Path | None = Path(record_path) if record_path else None
+        self._record_file: IO[str] | None = None
+        self._request_started: dict[int, float] = {}
+        hooks: dict[str, list[Any]] = {"request": [], "response": []}
         if verbose:
-            self._client.event_hooks = {
-                "request": [self._log_request],
-                "response": [self._log_response],
-            }
+            hooks["request"].append(self._log_request)
+            hooks["response"].append(self._log_response)
+        if self._record_path is not None:
+            self._record_path.parent.mkdir(parents=True, exist_ok=True)
+            self._record_file = self._record_path.open("a", encoding="utf-8")
+            hooks["request"].append(self._record_request_start)
+            hooks["response"].append(self._record_response)
+        if hooks["request"] or hooks["response"]:
+            self._client.event_hooks = hooks
 
     @property
     def jar(self) -> http.cookiejar.CookieJar:
@@ -96,6 +119,9 @@ class PawClient:
             save_cookies(self._jar, cookies_path(self._state.profile))
         finally:
             await self._client.aclose()
+            if self._record_file is not None:
+                self._record_file.close()
+                self._record_file = None
 
     async def _log_request(self, request: httpx.Request) -> None:
         """Stream a curl-like trace of the outgoing request to stderr."""
@@ -115,6 +141,51 @@ class PawClient:
         if response.content:
             body = response.content.decode("utf-8", errors="replace")
             sys.stderr.write(f"< \n< {body[:RESPONSE_BODY_PREVIEW_BYTES]}\n")
+
+    async def _record_request_start(self, request: httpx.Request) -> None:
+        """Stamp request start time so the matching response hook can compute duration."""
+        self._request_started[id(request)] = time.perf_counter()
+
+    async def _record_response(self, response: httpx.Response) -> None:
+        """Append one JSONL row capturing the request + response pair.
+
+        Streaming responses (``text/event-stream``) are tagged with
+        ``is_stream=True`` and the response body is left empty — capturing
+        the live stream while preserving the consumer's iterator is a v2
+        follow-up (see the fixture replay bean).
+        """
+        if self._record_file is None:
+            return
+        request = response.request
+        started = self._request_started.pop(id(request), None)
+        duration_ms = int((time.perf_counter() - started) * 1000) if started else 0
+        content_type = response.headers.get("content-type", "")
+        is_stream = "text/event-stream" in content_type
+        body_text: str | None = None
+        body_b64: str | None = None
+        if not is_stream:
+            await response.aread()
+            try:
+                body_text = response.content.decode("utf-8")
+            except UnicodeDecodeError:
+                body_b64 = base64.b64encode(response.content).decode("ascii")
+        row = {
+            "method": request.method,
+            "url": str(request.url),
+            "request_headers": dict(request.headers),
+            "request_body": (
+                request.content.decode("utf-8", errors="replace") if request.content else None
+            ),
+            "status": response.status_code,
+            "response_headers": dict(response.headers),
+            "response_body": body_text,
+            "response_body_bytes_b64": body_b64,
+            "is_stream": is_stream,
+            "duration_ms": duration_ms,
+        }
+        self._record_file.write(json.dumps(row, ensure_ascii=False))
+        self._record_file.write("\n")
+        self._record_file.flush()
 
     async def request(
         self,
