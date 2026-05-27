@@ -44,7 +44,7 @@ def mock_backend() -> Iterator[str]:
                 },
             )
         )
-        r.get("/users/me").mock(
+        r.get("/api/v1/users/me").mock(
             return_value=httpx.Response(200, json={"id": "u1", "email": "admin@example.com"})
         )
         # First /api/v1/workspaces call returns empty; the login flow seeds via
@@ -56,6 +56,7 @@ def mock_backend() -> Iterator[str]:
         ]
         r.get("/api/v1/workspaces").mock(side_effect=workspaces_responses)
         r.put("/api/v1/personalization").mock(return_value=httpx.Response(200, json={}))
+        r.post("/auth/jwt/logout").mock(return_value=httpx.Response(204))
         yield MOCK_BACKEND
 
 
@@ -77,7 +78,7 @@ def test_login_is_idempotent_when_workspace_already_exists(runner):
                 headers={"set-cookie": "session_token=tok456; Path=/; HttpOnly"},
             )
         )
-        r.get("/users/me").mock(
+        r.get("/api/v1/users/me").mock(
             return_value=httpx.Response(200, json={"id": "u1", "email": "admin@example.com"})
         )
         existing_ws = {
