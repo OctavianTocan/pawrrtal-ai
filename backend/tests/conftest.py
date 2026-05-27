@@ -1,9 +1,19 @@
 """Shared backend test fixtures."""
 
+import os
 import sys
 from collections.abc import AsyncGenerator, Generator
 from pathlib import Path
 from uuid import uuid4
+
+# Exclude live-backend E2E tests from default collection. They boot a real
+# uvicorn subprocess and only make sense behind the ``PAW_E2E=1`` gate;
+# without the gate, pytest would try to import their conftest and skip at
+# module level, which still adds load time and noise. Skipping the whole
+# directory here keeps the default ``uv run pytest`` run fast and offline.
+collect_ignore_glob: list[str] = []
+if os.environ.get("PAW_E2E") != "1":
+    collect_ignore_glob.append("e2e_paw/*")
 
 import pytest
 from fastapi import FastAPI
@@ -13,6 +23,10 @@ from sqlalchemy.pool import StaticPool
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
+
+from app.logger_setup import configure_logging
+
+configure_logging()
 
 from app import models  # noqa: F401  # Registers ORM models on Base metadata.
 from app.db import User, get_async_session

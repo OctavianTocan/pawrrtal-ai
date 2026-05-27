@@ -195,6 +195,11 @@ ignore = [
     "S603",  # subprocess calls in CLI are operator-driven, not user-input
     "S607",  # `git` and similar trusted binaries on PATH are intentional
 ]
+"tests/e2e_paw/**" = [
+    "S603",  # live E2E fixture spawns uvicorn + paw via subprocess by design
+    "S607",  # `uv` resolved from PATH is intentional; the whole point is to
+             # exercise the same entry the developer would type by hand
+]
 
 [tool.ruff.lint.mccabe]
 # Cap cyclomatic complexity. Functions above this should be split.
