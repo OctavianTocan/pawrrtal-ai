@@ -1,9 +1,14 @@
 """API tests for conversation routes."""
 
+from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db import User
+from app.models import Conversation
 
 
 @pytest.mark.anyio
@@ -142,3 +147,36 @@ async def test_generate_conversation_title_persists_usable_title(
     assert response.status_code == 200
     assert response.json() == "Better Title"
     assert get_response.json()["title"] == "Better Title"
+
+
+@pytest.mark.anyio
+async def test_conversation_response_includes_codex_thread_id(
+    client: AsyncClient, db_session: AsyncSession, test_user: User
+) -> None:
+    """ConversationRead must include codex_thread_id so paw verify can assert it.
+
+    The column already exists on the ORM (models.py: Conversation.codex_thread_id)
+    but was being dropped from the API response. Without exposing it, an HTTP
+    client has no way to observe that the codex provider persisted a stable
+    thread id across turns.
+    """
+    conversation_id = uuid4()
+    now = datetime.now(UTC)
+    conversation = Conversation(
+        id=conversation_id,
+        user_id=test_user.id,
+        title="codex thread persistence",
+        created_at=now,
+        updated_at=now,
+        model_id="openai-codex:openai/gpt-5.5",
+        codex_thread_id="thr_test_abc",
+    )
+    db_session.add(conversation)
+    await db_session.commit()
+
+    response = await client.get(f"/api/v1/conversations/{conversation_id}")
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert "codex_thread_id" in body, f"missing field; got keys={list(body.keys())}"
+    assert body["codex_thread_id"] == "thr_test_abc"
