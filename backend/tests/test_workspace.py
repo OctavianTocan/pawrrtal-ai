@@ -712,4 +712,130 @@ class TestWorkspaceAPI:
         resp = await client.get(f"/api/v1/workspaces/{ws.id}/skills")
         assert resp.status_code == 200
         names = {row["name"] for row in resp.json()}
-        assert names == {"paw-persona", "paw-bootstrap"}
+        assert names == {"paw-persona", "paw-bootstrap", "heartbeat"}
+
+
+class TestWorkspaceCrudAPI:
+    """POST/PATCH/DELETE /api/v1/workspaces — exposed so external clients
+    (paw, future SDKs) can manage workspaces without piggybacking on the
+    personalization side-effect.
+    """
+
+    @pytest.mark.anyio
+    async def test_create_workspace_returns_201(
+        self, client: AsyncClient, tmp_path: Path
+    ) -> None:
+        with _patch_workspace_base(tmp_path):
+            resp = await client.post(
+                "/api/v1/workspaces",
+                json={"name": "Project Alpha"},
+            )
+        assert resp.status_code == 201
+        body = resp.json()
+        assert body["name"] == "Project Alpha"
+        assert body["is_default"] is True  # first workspace becomes default
+        assert body["path"].startswith(str(tmp_path))
+
+    @pytest.mark.anyio
+    async def test_create_workspace_duplicate_name_is_409(
+        self, client: AsyncClient, tmp_path: Path
+    ) -> None:
+        with _patch_workspace_base(tmp_path):
+            first = await client.post("/api/v1/workspaces", json={"name": "Main"})
+            assert first.status_code == 201
+            second = await client.post("/api/v1/workspaces", json={"name": "Main"})
+        assert second.status_code == 409
+
+    @pytest.mark.anyio
+    async def test_create_workspace_rejects_path_outside_base(
+        self, client: AsyncClient, tmp_path: Path
+    ) -> None:
+        with _patch_workspace_base(tmp_path):
+            resp = await client.post(
+                "/api/v1/workspaces",
+                json={"name": "Outside", "path": "/etc"},
+            )
+        assert resp.status_code == 400
+
+    @pytest.mark.anyio
+    async def test_patch_workspace_renames(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        test_user: User,
+        tmp_path: Path,
+    ) -> None:
+        with _patch_workspace_base(tmp_path):
+            ws = await create_workspace(test_user.id, db_session)
+            await db_session.commit()
+
+            resp = await client.patch(
+                f"/api/v1/workspaces/{ws.id}",
+                json={"name": "Renamed"},
+            )
+        assert resp.status_code == 200
+        assert resp.json()["name"] == "Renamed"
+
+    @pytest.mark.anyio
+    async def test_delete_workspace_removes_row(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        test_user: User,
+        tmp_path: Path,
+    ) -> None:
+        with _patch_workspace_base(tmp_path):
+            # Two workspaces so deleting the non-default one is allowed.
+            await create_workspace(
+                test_user.id, db_session, name="Default", is_default=True
+            )
+            secondary = await create_workspace(
+                test_user.id, db_session, name="Side", slug="side", is_default=False
+            )
+            await db_session.commit()
+
+            resp = await client.delete(f"/api/v1/workspaces/{secondary.id}")
+            assert resp.status_code == 204
+
+            follow_up = await client.get(f"/api/v1/workspaces/{secondary.id}/tree")
+            assert follow_up.status_code == 404
+
+    @pytest.mark.anyio
+    async def test_delete_default_workspace_returns_409(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        test_user: User,
+        tmp_path: Path,
+    ) -> None:
+        with _patch_workspace_base(tmp_path):
+            await create_workspace(
+                test_user.id, db_session, name="Default", is_default=True
+            )
+            secondary = await create_workspace(
+                test_user.id, db_session, name="Side", slug="side", is_default=False
+            )
+            await db_session.commit()
+            # Try to delete the default workspace; should fail.
+            default_ws = await get_default_workspace(test_user.id, db_session)
+            assert default_ws is not None
+
+            resp = await client.delete(f"/api/v1/workspaces/{default_ws.id}")
+        assert resp.status_code == 409
+        # Sanity: secondary still exists.
+        assert secondary.id != default_ws.id
+
+    @pytest.mark.anyio
+    async def test_delete_last_workspace_returns_409(
+        self,
+        client: AsyncClient,
+        db_session: AsyncSession,
+        test_user: User,
+        tmp_path: Path,
+    ) -> None:
+        with _patch_workspace_base(tmp_path):
+            ws = await create_workspace(test_user.id, db_session, is_default=False)
+            await db_session.commit()
+
+            resp = await client.delete(f"/api/v1/workspaces/{ws.id}")
+        assert resp.status_code == 409

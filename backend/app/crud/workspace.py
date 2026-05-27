@@ -213,6 +213,59 @@ async def ensure_dev_admin_workspace(
         return result
 
 
+async def update_workspace(
+    session: AsyncSession,
+    workspace: Workspace,
+    *,
+    name: str | None = None,
+    slug: str | None = None,
+    path: str | None = None,
+    is_default: bool | None = None,
+) -> Workspace:
+    """Patch a workspace row.
+
+    Only keys with a non-None value are applied — callers pass the resolved
+    subset of ``WorkspaceUpdate`` they want to write.  When ``is_default``
+    flips to ``True`` we first demote the user's existing default in the
+    same session so the partial unique index
+    ``uq_workspaces_one_default_per_user`` stays satisfied.
+
+    Does NOT commit — the caller participates in the outer transaction.
+    """
+    from app.models import Workspace  # noqa: PLC0415
+
+    if name is not None:
+        workspace.name = name
+    if slug is not None:
+        workspace.slug = slug
+    if path is not None:
+        workspace.path = path
+    if is_default is True and not workspace.is_default:
+        # Demote any existing default workspace for this user before promoting
+        # the new one — the partial unique index only permits a single
+        # is_default=True row per user.
+        existing_default = await get_default_workspace(workspace.user_id, session)
+        if existing_default is not None and existing_default.id != workspace.id:
+            existing_default.is_default = False
+            await session.flush()
+        workspace.is_default = True
+
+    return workspace
+
+
+async def delete_workspace(
+    session: AsyncSession,
+    workspace: Workspace,
+) -> None:
+    """Delete a workspace row from the database.
+
+    Filesystem cleanup is intentionally out of scope here — workspaces own
+    user files that we don't want to silently wipe on a stray DELETE.
+    Operators reclaim disk space manually.
+    """
+    await session.delete(workspace)
+
+
 async def _remove_orphan_workspace_dir(path: Path) -> None:
     """Remove a just-seeded workspace directory after its DB row rolled back."""
     resolved = _validated_orphan_workspace_dir(path)

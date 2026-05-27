@@ -391,6 +391,37 @@ class WorkspaceRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class WorkspaceCreate(BaseModel):
+    """Request body for ``POST /api/v1/workspaces``.
+
+    ``path`` is optional — when omitted the server picks a directory under
+    ``settings.workspace_base_dir`` (the same layout as
+    ``ensure_default_workspace``). When provided, the path must be absolute
+    and live inside ``workspace_base_dir`` so a misbehaving client can't
+    point the workspace at an arbitrary filesystem location.
+    """
+
+    name: str = Field(..., min_length=1, max_length=120)
+    slug: str | None = Field(default=None, max_length=120)
+    path: str | None = None
+    is_default: bool = False
+
+
+class WorkspaceUpdate(BaseModel):
+    """Request body for ``PATCH /api/v1/workspaces/{id}``.
+
+    All fields are optional — only the keys present in the request body
+    are applied. Promoting a workspace to ``is_default=True`` will demote
+    the user's previous default in the same transaction so the partial
+    unique index ``uq_workspaces_one_default_per_user`` stays satisfied.
+    """
+
+    name: str | None = Field(default=None, min_length=1, max_length=120)
+    slug: str | None = Field(default=None, max_length=120)
+    path: str | None = None
+    is_default: bool | None = None
+
+
 class OnboardingStatus(BaseModel):
     """Onboarding readiness response for authenticated users."""
 

@@ -22,18 +22,27 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.tools.skills import read_skill_manifest
-from app.crud.workspace import get_default_workspace, list_workspaces
+from app.crud.workspace import (
+    create_workspace,
+    delete_workspace,
+    get_default_workspace,
+    list_workspaces,
+    update_workspace,
+)
 from app.db import User, get_async_session
 from app.models import Workspace
 from app.schemas import (
     OnboardingStatus,
     SkillRead,
+    WorkspaceCreate,
     WorkspaceFileContent,
     WorkspaceFileNode,
     WorkspaceFileWrite,
     WorkspaceRead,
     WorkspaceTreeResponse,
+    WorkspaceUpdate,
 )
 from app.users import get_allowed_user
 
@@ -129,11 +138,147 @@ def get_workspace_router() -> APIRouter:
     """Build the workspace router (mounted at /api/v1/workspaces)."""
     router = APIRouter(prefix="/api/v1/workspaces", tags=["workspaces"])
     _register_listing_routes(router)
+    _register_crud_routes(router)
     _register_tree_route(router)
     _register_file_routes(router)
     _register_skills_route(router)
     _register_serve_route(router)
     return router
+
+
+def _validate_workspace_path(raw_path: str) -> str:
+    """Return a normalised workspace path or raise 400 if it's unsafe.
+
+    Workspace paths must (a) be absolute and (b) live inside the configured
+    ``workspace_base_dir`` — otherwise a client could point a workspace at
+    arbitrary filesystem locations and trick later file-tree / read / write
+    endpoints into operating outside the sandbox.
+    """
+    candidate = Path(raw_path)
+    if not candidate.is_absolute():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Workspace path must be absolute",
+        )
+    base = Path(settings.workspace_base_dir).resolve()
+    try:
+        candidate.resolve().relative_to(base)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Workspace path must live under {base}",
+        ) from exc
+    return str(candidate)
+
+
+def _register_crud_routes(router: APIRouter) -> None:
+    """Register POST / PATCH / DELETE workspace endpoints.
+
+    Workspaces were historically created only as a side-effect of
+    ``PUT /api/v1/personalization`` (via ``ensure_default_workspace``).
+    These routes expose the same machinery directly so external clients —
+    paw, future SDKs, scripts — can manage workspaces without going
+    through onboarding.
+    """
+
+    @router.post(
+        "",
+        response_model=WorkspaceRead,
+        status_code=status.HTTP_201_CREATED,
+    )
+    async def create_user_workspace(
+        payload: WorkspaceCreate,
+        user: User = Depends(get_allowed_user),
+        session: AsyncSession = Depends(get_async_session),
+    ) -> WorkspaceRead:
+        """Create a new workspace for the authenticated user.
+
+        When ``payload.is_default`` is True any existing default workspace
+        is demoted first so the partial unique index stays satisfied.
+        Duplicate names return 409 (we surface a clear error rather than
+        creating two visually identical entries the user can't distinguish).
+        """
+        existing = await list_workspaces(user.id, session)
+        if any(ws.name == payload.name for ws in existing):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail=f"Workspace named {payload.name!r} already exists",
+            )
+
+        seed_path = (
+            Path(_validate_workspace_path(payload.path)) if payload.path else None
+        )
+        slug = payload.slug or "main"
+        is_default = payload.is_default or len(existing) == 0
+        if is_default:
+            current_default = await get_default_workspace(user.id, session)
+            if current_default is not None:
+                current_default.is_default = False
+                await session.flush()
+
+        workspace = await create_workspace(
+            user_id=user.id,
+            session=session,
+            name=payload.name,
+            slug=slug,
+            is_default=is_default,
+            path=seed_path,
+        )
+        await session.commit()
+        await session.refresh(workspace)
+        return WorkspaceRead.model_validate(workspace)
+
+    @router.patch("/{workspace_id}", response_model=WorkspaceRead)
+    async def patch_user_workspace(
+        workspace_id: uuid.UUID,
+        payload: WorkspaceUpdate,
+        user: User = Depends(get_allowed_user),
+        session: AsyncSession = Depends(get_async_session),
+    ) -> WorkspaceRead:
+        """Update a workspace's name, slug, path, or default flag."""
+        workspace = await _get_owned_workspace(workspace_id, user, session)
+        validated_path = (
+            _validate_workspace_path(payload.path) if payload.path is not None else None
+        )
+        await update_workspace(
+            session,
+            workspace,
+            name=payload.name,
+            slug=payload.slug,
+            path=validated_path,
+            is_default=payload.is_default,
+        )
+        await session.commit()
+        await session.refresh(workspace)
+        return WorkspaceRead.model_validate(workspace)
+
+    @router.delete("/{workspace_id}", status_code=status.HTTP_204_NO_CONTENT)
+    async def delete_user_workspace(
+        workspace_id: uuid.UUID,
+        user: User = Depends(get_allowed_user),
+        session: AsyncSession = Depends(get_async_session),
+    ) -> None:
+        """Delete a workspace.
+
+        Refuses with 409 when the workspace is the user's last one or is
+        currently marked default — the chat router requires a default
+        workspace to run, so silently deleting it would break the user's
+        ability to chat without a clear failure mode.
+        """
+        workspace = await _get_owned_workspace(workspace_id, user, session)
+        existing = await list_workspaces(user.id, session)
+        if len(existing) <= 1:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot delete the user's only workspace",
+            )
+        if workspace.is_default:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot delete the default workspace. Promote another workspace first.",
+            )
+        await delete_workspace(session, workspace)
+        await session.commit()
 
 
 def _register_listing_routes(router: APIRouter) -> None:
