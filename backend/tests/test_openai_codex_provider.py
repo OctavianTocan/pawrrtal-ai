@@ -78,6 +78,46 @@ pytestmark = pytest.mark.xfail(
 )
 
 
+@pytest.mark.anyio
+async def test_provider_installs_deny_all_approval_handler(monkeypatch):
+    """
+    REGRESSION: The SDK's default approval handler accepts all
+    shell-exec and file-change requests. The provider MUST install a
+    deny-all handler before the codex app-server starts.
+    See client.py:_default_approval_handler — accepts by default.
+    """
+    if OpenAICodexProvider is None:
+        pytest.skip("provider not importable")
+
+    provider = OpenAICodexProvider("gpt-5.5", workspace_root=None)
+
+    class _FakeSyncClient:
+        def __init__(self):
+            self._approval_handler = None
+    class _FakeClient:
+        def __init__(self):
+            self._sync = _FakeSyncClient()
+    class _FakeCodex:
+        def __init__(self):
+            self._client = _FakeClient()
+        async def _ensure_initialized(self):
+            return None
+
+    fake = _FakeCodex()
+    monkeypatch.setattr(provider, "_codex", fake)
+
+    provider._install_deny_all_approval_handler()
+
+    handler = fake._client._sync._approval_handler
+    assert handler is not None
+    assert handler(
+        "item/commandExecution/requestApproval", {"command": "rm -rf /"}
+    ) == {"decision": "deny"}
+    assert handler(
+        "item/fileChange/requestApproval", {"path": "/etc/passwd"}
+    ) == {"decision": "deny"}
+
+
 # =============================================================================
 # AUTH LAYER TESTS
 # =============================================================================

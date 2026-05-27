@@ -50,6 +50,28 @@ from . import (
 logger = logging.getLogger(__name__)
 
 
+_DENY_ALL_DECISION: dict[str, str] = {"decision": "deny"}
+
+
+def _deny_all_approval_handler(method: str, params: dict | None) -> dict:
+    """Reject every escalation request.
+
+    The SDK's default (vendor/codex/sdk/python/src/openai_codex/client.py:597)
+    accepts shell exec and file writes. Pawrrtal turns must not let the
+    spawned codex app-server modify the workspace silently. Per-tool
+    approvals are handled by the chat router's tool composition (see
+    .claude/rules/architecture/no-tools-in-providers.md). Once the tool
+    bridge lands (bean pawrrtal-roi0), this handler should be replaced
+    with one that consults the agent loop.
+    """
+    if method in (
+        "item/commandExecution/requestApproval",
+        "item/fileChange/requestApproval",
+    ):
+        return _DENY_ALL_DECISION
+    return {}
+
+
 def _map_pawrrtal_reasoning_to_codex(
     effort: PawReasoningEffort | None,
 ) -> CodexReasoningEffort | None:
@@ -111,7 +133,28 @@ class OpenAICodexProvider:
             )
 
         self._codex = AsyncCodex(config=config)
+        self._install_deny_all_approval_handler()
         return self._codex
+
+    def _install_deny_all_approval_handler(self) -> None:
+        """Install the deny-all approval handler on the underlying sync client.
+
+        AsyncCodex / AsyncAppServerClient (vendored 0.131.0a4) do not accept
+        an approval_handler kwarg, so we reach into the wrapped sync client
+        to override its default. Tracked in bean pawrrtal-roi0 (tool bridge)
+        which will replace this with an agent-loop-aware handler.
+        """
+        if self._codex is None:
+            return
+        client = getattr(self._codex, "_client", None)
+        sync = getattr(client, "_sync", None)
+        if sync is None:
+            logger.warning(
+                "openai_codex: could not reach sync client to install approval handler "
+                "— falling back to SDK default which AUTO-ACCEPTS shell + file changes."
+            )
+            return
+        sync._approval_handler = _deny_all_approval_handler
 
     async def stream(
         self,
