@@ -5,45 +5,95 @@ If this test fails, it means a cold-import problem in openai_codex/
 will surface as an exception during *every* chat turn — even for chats
 using Claude / Gemini / xAI / LiteLLM — which is the bug behind bean
 pawrrtal-t5j8.
-"""
 
+We force the failure mode by installing a `sys.meta_path` finder that
+refuses to load `openai_codex` and its submodules. A meta_path finder
+survives `sys.modules.pop(...)` and module reloads — unlike
+`monkeypatch.setattr` on an inner symbol, which races with re-imports.
+"""
 from __future__ import annotations
 
 import importlib
 import sys
+from collections.abc import Iterator
+from typing import Any
+
+import pytest
 
 
-def test_factory_imports_without_codex_runtime(monkeypatch):
-    """
-    Re-import `app.core.providers.factory` after removing the openai_codex
-    package and forcing the vendor bootstrap to fail. The factory must still
-    import successfully and expose HOST_TO_PROVIDER for non-Codex hosts.
-    """
-    # Force any later "import openai_codex" to fail.
+class _OpenAICodexBlocker:
+    """meta_path finder that makes `import openai_codex` raise ImportError."""
+
+    def find_spec(self, name: str, path: Any = None, target: Any = None) -> Any:
+        if name == "openai_codex" or name.startswith("openai_codex."):
+            raise ImportError(
+                f"openai_codex blocked by isolation test ({name})"
+            )
+        return None
+
+    # Legacy API kept for older finders that look it up.
+    def find_module(self, name: str, path: Any = None) -> Any:
+        if name == "openai_codex" or name.startswith("openai_codex."):
+            raise ImportError(
+                f"openai_codex blocked by isolation test ({name})"
+            )
+        return None
+
+
+@pytest.fixture
+def _block_openai_codex() -> Iterator[None]:
+    """Force `import openai_codex` to fail for the duration of the test."""
+    # Evict cached modules so future imports actually hit the blocker.
     for mod in list(sys.modules):
         if (
-            mod.startswith("openai_codex")
-            or mod.startswith("app.core.providers.openai_codex")
+            mod == "openai_codex"
+            or mod.startswith("openai_codex.")
             or mod == "app.core.providers.factory"
+            or mod == "app.core.providers.openai_codex"
+            or mod.startswith("app.core.providers.openai_codex.")
         ):
             sys.modules.pop(mod, None)
 
-    def _raise(*_a, **_kw):
-        raise RuntimeError("openai_codex SDK forced unavailable for this test")
+    blocker = _OpenAICodexBlocker()
+    sys.meta_path.insert(0, blocker)
+    try:
+        yield
+    finally:
+        sys.meta_path.remove(blocker)
+        # Clean up cached modules again so other tests in the same
+        # session re-import lazily and pick up the real SDK.
+        for mod in list(sys.modules):
+            if (
+                mod == "openai_codex"
+                or mod.startswith("openai_codex.")
+                or mod == "app.core.providers.factory"
+                or mod == "app.core.providers.openai_codex"
+                or mod.startswith("app.core.providers.openai_codex.")
+            ):
+                sys.modules.pop(mod, None)
 
-    # Patch the vendor bootstrap so the import would blow up if eagerly used.
-    monkeypatch.setattr(
-        "app.core.providers.openai_codex._vendor.ensure_openai_codex_available",
-        _raise,
-    )
 
+def test_factory_imports_without_codex_runtime(_block_openai_codex: None) -> None:
+    """Importing the factory must succeed even when openai_codex cannot be imported."""
     factory = importlib.import_module("app.core.providers.factory")
 
-    # Non-Codex hosts must still be registered and resolvable.
     from app.core.providers.model_id import Host
 
+    # All hosts are still registered…
     assert Host.agent_sdk in factory.HOST_TO_PROVIDER
     assert Host.litellm in factory.HOST_TO_PROVIDER
-    # Codex registration is OK as long as merely importing factory.py
-    # does not eagerly construct or call into the SDK.
     assert Host.openai_codex in factory.HOST_TO_PROVIDER
+    # …and the codex slot is sentinel-None (lazy resolution happens on demand).
+    assert factory.HOST_TO_PROVIDER[Host.openai_codex] is None
+
+
+def test_factory_codex_resolution_raises_when_runtime_unavailable(
+    _block_openai_codex: None,
+) -> None:
+    """When a Codex model is actually requested with no runtime, raise — never silently fall back."""
+    factory = importlib.import_module("app.core.providers.factory")
+
+    # Use a canonical wire string for a Codex model. The lazy resolver
+    # in factory.resolve_llm should attempt the import and fail.
+    with pytest.raises((ImportError, RuntimeError)):
+        factory.resolve_llm("openai-codex:openai/gpt-5.5")
