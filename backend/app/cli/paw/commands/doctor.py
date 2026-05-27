@@ -8,8 +8,10 @@ from dataclasses import dataclass
 import httpx
 import typer
 
-from ..config import PersonaState, profile_dir, state_path
-from ..output import emit_human, emit_json
+from app.cli.paw.config import PersonaState, cookies_path, profile_dir, state_path
+from app.cli.paw.errors import AuthError, BackendUnreachable
+from app.cli.paw.http import PawClient
+from app.cli.paw.output import emit_human, emit_json
 
 app = typer.Typer()
 
@@ -86,17 +88,37 @@ async def _run(profile: str) -> list[Check]:
         checks.append(Check("state_file_parseable", False, detail=str(e)))
         return checks
 
+    backend_reachable = False
     try:
         async with httpx.AsyncClient(base_url=state.api_base_url, timeout=5.0) as client:
             resp = await client.get("/api/v1/health")
+            backend_reachable = resp.status_code == 200
             checks.append(
                 Check(
                     "backend_reachable",
-                    resp.status_code == 200,
+                    backend_reachable,
                     detail=f"{state.api_base_url} -> {resp.status_code}",
                 )
             )
     except httpx.ConnectError as e:
         checks.append(Check("backend_reachable", False, detail=str(e)))
 
+    # Only verify the session token when we actually have one to check. A
+    # fresh install (no state.json or no cookies on disk) skips this check —
+    # paw login is the user's job to run first.
+    if backend_reachable and cookies_path(profile).exists():
+        await _append_token_valid_check(checks, state)
+
     return checks
+
+
+async def _append_token_valid_check(checks: list[Check], state: PersonaState) -> None:
+    """Probe /users/me to confirm the persisted cookie still authenticates."""
+    try:
+        async with PawClient(state, timeout=5.0) as client:
+            await client.request("GET", "/users/me")
+        checks.append(Check("token_valid", True))
+    except AuthError:
+        checks.append(Check("token_valid", False, detail="session expired; run paw login --force"))
+    except BackendUnreachable as e:
+        checks.append(Check("token_valid", False, detail=str(e.message)))
