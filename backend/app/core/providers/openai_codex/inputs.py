@@ -35,6 +35,19 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+# Ensure the openai_codex SDK is on sys.path before we import from it.
+# This module is only loaded when the provider needs to build a Codex
+# turn input, which is well after any cold-import concern. We translate
+# the vendor bootstrap's RuntimeError into ImportError so that callers
+# (and import-isolation tests) see the same exception type they'd see
+# from a missing package.
+from ._vendor import ensure_openai_codex_available
+
+try:
+    ensure_openai_codex_available()
+except RuntimeError as exc:
+    raise ImportError(str(exc)) from exc
+
 from openai_codex import (
     ImageInput,
     InputItem,
@@ -102,9 +115,7 @@ def _message_to_input_items(msg: dict[str, Any]) -> list[InputItem]:
         for tc in tool_calls:
             name = tc.get("name", "unknown_tool")
             args = tc.get("arguments", {})
-            items.append(
-                TextInput(text=f"[Previous assistant tool call] {name}({args})")
-            )
+            items.append(TextInput(text=f"[Previous assistant tool call] {name}({args})"))
 
         return items
 
