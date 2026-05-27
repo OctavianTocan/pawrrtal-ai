@@ -242,13 +242,24 @@ async def _do_login(
 def logout(
     profile: str = typer.Option("default", "--profile"),
     yes: bool = typer.Option(False, "--yes", "-y"),
+    server: bool = typer.Option(
+        True,
+        "--server/--no-server",
+        help="Also call POST /auth/jwt/logout to revoke the server-side cookie.",
+    ),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Forget the persona's session + cookies. Local-only; does not call /auth/logout.
+    """Forget the persona's session + cookies.
+
+    By default also issues ``POST /auth/jwt/logout`` so the server can
+    revoke the session cookie before paw deletes the local state.
+    Server logout is best-effort — network or auth failures are
+    swallowed and the local cleanup still runs.
 
     Examples:
       paw logout --yes
       paw logout --profile staging --yes
+      paw logout --yes --no-server   # local-only, skip the server call
     """
     sp = state_path(profile)
     cp = cookies_path(profile)
@@ -260,11 +271,46 @@ def logout(
         return
     if not yes:
         raise typer.BadParameter("Pass --yes to confirm logout (deletes local state + cookies).")
+
+    server_logout_status: str = "skipped"
+    if server and sp.exists() and cp.exists():
+        server_logout_status = asyncio.run(_call_server_logout(profile))
+
     if sp.exists():
         sp.unlink()
     if cp.exists():
         cp.unlink()
     if json_out:
-        emit_json({"deleted": True, "profile": profile})
+        emit_json(
+            {"deleted": True, "profile": profile, "server_logout": server_logout_status}
+        )
     else:
-        emit_human(f"Logged out (profile={profile}).")
+        emit_human(
+            f"Logged out (profile={profile}, server_logout={server_logout_status})."
+        )
+
+
+async def _call_server_logout(profile: str) -> str:
+    """Best-effort POST /auth/jwt/logout using the persisted cookies.
+
+    Returns a short status token (``ok``, ``http_<code>``, ``unreachable``,
+    ``no_state``) so the caller can surface what happened without raising.
+    """
+    try:
+        state = PersonaState.load(profile)
+    except (LocalError, FileNotFoundError):
+        return "no_state"
+    jar = load_cookies(cookies_path(profile))
+    try:
+        async with httpx.AsyncClient(
+            base_url=state.api_base_url,
+            cookies=jar,
+            timeout=LOGIN_TIMEOUT_SECONDS,
+            follow_redirects=False,
+        ) as client:
+            resp = await client.post("/auth/jwt/logout")
+    except httpx.HTTPError:
+        return "unreachable"
+    if resp.status_code in SUCCESS_STATUS_CODES:
+        return "ok"
+    return f"http_{resp.status_code}"
