@@ -25,6 +25,8 @@ from __future__ import annotations
 
 import importlib
 import logging
+import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Any
@@ -58,11 +60,33 @@ def _vendored_sdk_src_path() -> Path:
     return vendored
 
 
-def discover_vendored_codex_bin() -> Path | None:
-    """Try to find a built Codex binary in the vendored submodule.
+def _shutil_which(name: str) -> str | None:
+    """Indirection seam so tests can monkeypatch the PATH lookup."""
+    return shutil.which(name)
 
-    This is intended for development when using `backend/vendor/codex`.
-    It looks in common cargo target locations.
+
+def _path_fallback_enabled() -> bool:
+    """Read the OPENAI_CODEX_ALLOW_PATH_FALLBACK env var directly.
+
+    _vendor.py is a bootstrap path with no app-config dependency, so we
+    can't import app.core.config.settings here. Acceptable truthy values:
+    '1', 'true', 'yes', 'on' (case-insensitive). Default False.
+    """
+    raw = os.environ.get("OPENAI_CODEX_ALLOW_PATH_FALLBACK", "").strip().lower()
+    return raw in ("1", "true", "yes", "on")
+
+
+def discover_vendored_codex_bin() -> Path | None:
+    """Locate a Codex binary for local development.
+
+    Resolution order (most pinned first):
+        1. Vendored Cargo target dirs (backend/vendor/codex/codex-rs/target/{release,debug})
+        2. (Dev only, opt-in) shutil.which("codex") — gated by
+           OPENAI_CODEX_ALLOW_PATH_FALLBACK to prevent silent version skew
+           with a system codex differing from the pinned cli-bin wheel.
+
+    Returns None if neither path yields a binary; in production the SDK
+    will then resolve via `codex_cli_bin.bundled_codex_path()`.
     """
     try:
         backend_dir = _vendored_sdk_src_path().parents[3]  # go up from sdk/python/src
@@ -81,6 +105,18 @@ def discover_vendored_codex_bin() -> Path | None:
                 return p
     except Exception as exc:
         logger.debug("openai_codex: vendored binary discovery failed: %s", exc)
+
+    if _path_fallback_enabled():
+        path_match = _shutil_which("codex")
+        if path_match:
+            logger.warning(
+                "openai_codex: using PATH-resolved codex at %s "
+                "(OPENAI_CODEX_ALLOW_PATH_FALLBACK enabled). "
+                "Production deployments should rely on the pinned "
+                "openai-codex-cli-bin wheel instead.",
+                path_match,
+            )
+            return Path(path_match)
 
     return None
 

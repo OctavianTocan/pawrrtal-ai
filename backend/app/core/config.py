@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Literal
 from urllib.parse import urlparse
 
-from pydantic import PositiveInt, field_validator, model_validator
+from pydantic import Field, PositiveInt, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -61,6 +61,22 @@ class Settings(BaseSettings):
     # to disable those models; chat requests resolved to an OpenAI model
     # surface a clear "not configured" error.
     openai_api_key: str = ""
+    # Dev-only fallback for the vendored Codex Rust binary discovery in
+    # ``app.core.providers.openai_codex._vendor``. Off by default so production
+    # always resolves through the pinned ``openai-codex-cli-bin`` wheel — a
+    # system ``codex`` differing in version could silently introduce JSON-RPC
+    # schema drift against the pinned SDK. Enable locally only when you have
+    # Homebrew or npm ``@openai/codex`` on PATH but no built submodule and no
+    # cli-bin wheel installed.
+    openai_codex_allow_path_fallback: bool = Field(
+        default=False,
+        description=(
+            "Dev-only fallback: if the openai-codex-cli-bin wheel is not "
+            "installed and the vendored codex Rust binary is not built, "
+            "fall back to PATH-resolved `codex`. Risks silent SDK/binary "
+            "version skew; never enable in production."
+        ),
+    )
     # API key for the OpenCode Go gateway (https://opencode.ai/docs/zen),
     # SST's hosted OpenAI-compatible endpoint serving open-weight coding
     # models (GLM-5.1, Kimi K2.6). Leave empty to disable; resolving a

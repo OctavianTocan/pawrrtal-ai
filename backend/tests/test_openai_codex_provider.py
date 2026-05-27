@@ -814,6 +814,44 @@ def test_mapper_covers_all_documented_notification_types():
 
 
 # -----------------------------------------------------------------------------
+# Vendored binary discovery — opt-in PATH fallback gate
+# -----------------------------------------------------------------------------
+
+
+def test_discover_vendored_codex_bin_returns_none_without_fallback_flag(
+    monkeypatch, tmp_path
+):
+    """Without the dev-fallback flag, discovery must NOT return a PATH match."""
+    from app.core.providers.openai_codex import _vendor
+
+    monkeypatch.setattr(_vendor, "_vendored_sdk_src_path", lambda: tmp_path / "nope")
+    monkeypatch.delenv("OPENAI_CODEX_ALLOW_PATH_FALLBACK", raising=False)
+
+    # PATH has codex available locally on most dev machines via Homebrew.
+    # If the flag is off, discovery returns None even if PATH would resolve.
+    result = _vendor.discover_vendored_codex_bin()
+    assert result is None
+
+
+def test_discover_vendored_codex_bin_uses_path_when_flag_enabled(
+    monkeypatch, tmp_path
+):
+    """With the flag on, fall back to PATH-resolved codex if no vendored binary."""
+    from app.core.providers.openai_codex import _vendor
+
+    fake_bin = tmp_path / "fake-codex"
+    fake_bin.write_text("#!/bin/sh\necho 0.0.0\n")
+    fake_bin.chmod(0o755)
+
+    monkeypatch.setattr(_vendor, "_vendored_sdk_src_path", lambda: tmp_path / "nope")
+    monkeypatch.setenv("OPENAI_CODEX_ALLOW_PATH_FALLBACK", "true")
+    monkeypatch.setattr(_vendor, "_shutil_which", lambda name: str(fake_bin))
+
+    result = _vendor.discover_vendored_codex_bin()
+    assert result == Path(str(fake_bin))
+
+
+# -----------------------------------------------------------------------------
 # Image plugin coverage tied to provider
 # -----------------------------------------------------------------------------
 
