@@ -655,3 +655,15 @@ The first-class native provider is live for text models. Key landing artefacts:
 - Bump pair to a newer upstream version when the Python SDK source moves past 0.131.0a4 — track in the deferred bean.
 
 The previous "commented implementation only" rule from bean `pawrrtal-ujo8` no longer applies; the provider is now live in `main`-bound commits.
+
+## Verification
+
+The canonical end-to-end proof for the Codex provider is the `paw verify codex` suite:
+
+```bash
+just paw verify codex --json
+```
+
+8 sequenced HTTP calls + 17 named assertions. Exits 0 if Codex works end-to-end (catalog → conversation creation → first turn streamed → conversation row + `codex_thread_id` persisted → messages stored → second turn → thread resumed → cleanup). Exits 6 on any failed assertion, with full event log + DB rows in the JSON payload for diagnosis.
+
+See `backend/app/cli/paw/verify/codex.py` for the scenario and `.claude/skills/paw/SKILL.md` for the full CLI surface.

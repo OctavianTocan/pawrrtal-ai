@@ -5,7 +5,7 @@ status: completed
 type: feature
 priority: high
 created_at: 2026-05-27T13:23:58Z
-updated_at: 2026-05-27T16:25:46Z
+updated_at: 2026-05-27T20:07:51Z
 blocked_by:
     - pawrrtal-t5j8
 ---
@@ -61,3 +61,10 @@ Follow-up beans:
 
 Resolved sibling:
 - pawrrtal-t5j8 (cross-provider codex bleed — fixed by Task 0 lazy imports)
+
+
+
+## Verification artefact (added 2026-05-27)
+
+End-to-end proof now lives as a runnable script: `just paw verify codex --json`.
+See backend/app/cli/paw/verify/codex.py + docs/superpowers/plans/2026-05-27-agent-cli-user.md.
