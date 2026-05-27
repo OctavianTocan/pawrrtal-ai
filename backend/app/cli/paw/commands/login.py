@@ -6,8 +6,9 @@ Auth flow notes (verified against backend/app/api/auth.py and backend/main.py):
   admin user. Returns 204 with a ``session_token`` cookie via fastapi-users.
 - ``POST /auth/jwt/login`` — standard fastapi-users JWT login; form body
   ``username`` + ``password`` (OAuth2PasswordRequestForm).
-- ``GET /users/me`` — fastapi-users user info; mounted at ``/users`` (no
-  ``/api/v1`` prefix on that router).
+- ``GET /api/v1/users/me`` — fastapi-users user info; canonical v1 mount.
+  The legacy ``/users/me`` alias is kept on the server for frontend compat
+  but new clients (paw) standardize on ``/api/v1/users``.
 - Workspaces are seeded as a side-effect of ``PUT /api/v1/personalization``;
   there is no public POST endpoint for workspace creation. We call
   personalization with an empty profile (idempotent — workspace creation is
@@ -210,7 +211,7 @@ async def _do_login(
                 f"Login succeeded but no {SESSION_COOKIE_NAME} cookie was set.",
             )
 
-        me = (await client.get("/users/me")).json()
+        me = (await client.get("/api/v1/users/me")).json()
         workspace = await _ensure_default_workspace(client)
 
     save_cookies(jar, cookies_path(profile))

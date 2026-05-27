@@ -113,10 +113,10 @@ async def _run(profile: str) -> list[Check]:
 
 
 async def _append_token_valid_check(checks: list[Check], state: PersonaState) -> None:
-    """Probe /users/me to confirm the persisted cookie still authenticates."""
+    """Probe /api/v1/users/me to confirm the persisted cookie still authenticates."""
     try:
         async with PawClient(state, timeout=5.0) as client:
-            await client.request("GET", "/users/me")
+            await client.request("GET", "/api/v1/users/me")
         checks.append(Check("token_valid", True))
     except AuthError:
         checks.append(Check("token_valid", False, detail="session expired; run paw login --force"))

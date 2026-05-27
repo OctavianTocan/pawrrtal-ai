@@ -3,6 +3,11 @@
 Defines all API routes, configures middleware, and wires up authentication.
 """
 
+from app.logger_setup import configure_logging
+
+# Configure logging at the very start of the application. This ensures that all loggers in the app will use this configuration.
+configure_logging()
+
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
@@ -49,18 +54,12 @@ from app.core.telemetry import setup_tracing, shutdown_tracing
 from app.db import create_db_and_tables
 from app.integrations.telegram import telegram_lifespan
 from app.integrations.webhooks import get_webhooks_router
-from app.logger_setup import (
-    configure_logging,  # Set up logging configuration (this should be done before any loggers are used)
-)
 from app.schemas import (
     UserCreate,
     UserRead,
     UserUpdate,
 )
 from app.users import auth_backend, fastapi_users
-
-# Configure logging at the very start of the application. This ensures that all loggers in the app will use this configuration.
-configure_logging()
 
 
 def _log_gemini_cli_status() -> None:
@@ -194,10 +193,19 @@ def create_app() -> FastAPI:
         prefix="/auth",
         tags=["auth"],
     )
+    # Canonical v1 mount — every other API surface lives under /api/v1/* and
+    # paw / future SDK clients standardize on this prefix.
+    fastapi_app.include_router(
+        fastapi_users.get_users_router(UserRead, UserUpdate),
+        prefix="/api/v1/users",
+        tags=["users"],
+    )
+    # Compat alias for the existing frontend (still calls /users/me). Safe
+    # to drop once the frontend migrates to /api/v1/users.
     fastapi_app.include_router(
         fastapi_users.get_users_router(UserRead, UserUpdate),
         prefix="/users",
-        tags=["users"],
+        tags=["users-compat"],
     )
 
     # Custom API routes for conversations and chat.

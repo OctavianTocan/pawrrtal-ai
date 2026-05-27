@@ -20,7 +20,7 @@ def status(
     profile: str = typer.Option("default", "--profile"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Show whether paw thinks it's authenticated. Validates by calling /users/me.
+    """Show whether paw thinks it's authenticated. Validates by calling /api/v1/users/me.
 
     Exit codes: 0 authenticated, 3 not.
 
@@ -80,9 +80,9 @@ def status(
 
 
 async def _verify(state: PersonaState) -> dict[str, Any]:
-    """Hit /users/me with the persona's cookie jar; raises AuthError on 401."""
+    """Hit /api/v1/users/me with the persona's cookie jar; raises AuthError on 401."""
     async with PawClient(state) as client:
-        me = (await client.request("GET", "/users/me")).json()
+        me = (await client.request("GET", "/api/v1/users/me")).json()
     return {
         "user_email": me["email"],
         "user_id": me["id"],
