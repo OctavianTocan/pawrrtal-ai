@@ -40,7 +40,6 @@ from app.core.providers.openai_codex.inputs import build_codex_run_input
 from . import (
     AppServerConfig,
     AsyncCodex,
-    ReasoningSummary,
     TextInput,
 )
 from . import (
@@ -70,6 +69,29 @@ def _deny_all_approval_handler(method: str, params: dict | None) -> dict:
     ):
         return _DENY_ALL_DECISION
     return {}
+
+
+_DEFAULT_REASONING_SUMMARY: Any | None = None
+
+
+def _get_default_reasoning_summary() -> Any:
+    """Lazily build a validated ReasoningSummary('auto') on first use.
+
+    ReasoningSummary is a Pydantic RootModel (see
+    vendor/codex/sdk/python/src/openai_codex/generated/v2_all.py:2685).
+    Canonical SDK usage is ReasoningSummary.model_validate('auto')
+    (see vendor/codex/sdk/python/examples/12_turn_params_kitchen_sink/async.py).
+
+    Lazy so an SDK drift in a future cli-bin bump surfaces as a clear
+    runtime error on a Codex turn — not as a backend startup crash that
+    takes down every other provider.
+    """
+    global _DEFAULT_REASONING_SUMMARY
+    if _DEFAULT_REASONING_SUMMARY is None:
+        from . import ReasoningSummary  # noqa: PLC0415 — lazy by design
+
+        _DEFAULT_REASONING_SUMMARY = ReasoningSummary.model_validate("auto")
+    return _DEFAULT_REASONING_SUMMARY
 
 
 def _map_pawrrtal_reasoning_to_codex(
@@ -225,7 +247,7 @@ class OpenAICodexProvider:
             handle = await thread.turn(
                 run_input,
                 effort=effort,
-                summary=ReasoningSummary.auto,
+                summary=_get_default_reasoning_summary(),
             )
 
             # The high-level async handle exposes a stream of Notification objects.

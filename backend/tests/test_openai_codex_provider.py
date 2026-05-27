@@ -118,6 +118,28 @@ async def test_provider_installs_deny_all_approval_handler(monkeypatch):
     ) == {"decision": "deny"}
 
 
+@pytest.mark.anyio
+async def test_provider_passes_validated_reasoning_summary(monkeypatch):
+    """
+    REGRESSION: provider used `ReasoningSummary.auto` which is invalid
+    because ReasoningSummary is a Pydantic RootModel, not an Enum.
+    Confirm the provider now passes a model-validated instance whose
+    `.root` is the `auto` value.
+    """
+    if OpenAICodexProvider is None:
+        pytest.skip("provider not importable")
+
+    from app.core.providers.openai_codex import ReasoningSummary
+    from app.core.providers.openai_codex.provider import (
+        _get_default_reasoning_summary,
+    )
+
+    summary = _get_default_reasoning_summary()
+    assert isinstance(summary, ReasoningSummary)
+    # RootModel exposes the inner value as .root
+    assert getattr(summary.root, "value", summary.root) == "auto"
+
+
 # =============================================================================
 # AUTH LAYER TESTS
 # =============================================================================
