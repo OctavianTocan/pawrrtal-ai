@@ -1,0 +1,129 @@
+"""SSE stream consumer for paw.
+
+Mirrors the frontend's technique (``fetch`` + ``ReadableStream.getReader()`` +
+``TextDecoderStream`` + manual ``\\n\\n`` framing) — see
+``frontend/features/chat/hooks/use-chat.ts:165`` for the canonical implementation.
+The chat endpoint emits a custom SSE shape: one JSON dict per ``data:`` line,
+terminated by the literal ``data: [DONE]\\n\\n`` sentinel. A byte-level framer
+(rather than ``httpx-sse``) keeps the CLI's parser reproducing the same
+frame-boundary semantics the frontend exercises, so frame-boundary bugs are
+visible in both surfaces.
+
+Event taxonomy (as of 2026-05-27, mined from
+``backend/app/api/chat.py`` and ``backend/app/core/providers/*/events.py``):
+
+* ``delta``           — provider-native text chunk
+* ``thinking``        — provider-native reasoning content
+* ``tool_use``        — provider-native tool invocation
+* ``tool_result``     — provider-native tool result
+* ``artifact``        — router-injected (``chat.py:105``) + ``openai_codex/events.py:132``
+* ``usage``           — provider-native token usage (e.g. ``openai_codex/events.py:154``)
+* ``error``           — stream-level error
+* ``message``         — router-injected at ``backend/app/api/chat.py:309`` (``send_message`` tool)
+* ``done``            — synthesized here from the ``[DONE]`` sentinel
+"""
+
+from __future__ import annotations
+
+import json
+from collections.abc import AsyncIterator
+from typing import Any
+
+import httpx
+
+FRAME_DELIMITER = b"\n\n"
+DONE_SENTINEL = "[DONE]"
+DATA_PREFIX = "data:"
+COMMENT_PREFIX = ":"
+
+KNOWN_EVENT_TYPES: frozenset[str] = frozenset(
+    {
+        "delta",
+        "thinking",
+        "tool_use",
+        "tool_result",
+        "artifact",
+        "usage",
+        "error",
+        "message",
+        "done",
+    }
+)
+
+
+def parse_frame(frame: bytes) -> dict[str, Any] | None:
+    """Decode one SSE frame (the bytes between two ``\\n\\n`` delimiters).
+
+    Returns ``None`` for empty frames, comment-only frames, and frames whose
+    ``data:`` payload is not valid JSON (incomplete or malformed chunks).
+    Returns ``{"type": "done"}`` for the ``[DONE]`` sentinel so callers can
+    treat completion as just another event in the iterator.
+    """
+    text = frame.decode("utf-8", errors="replace").strip()
+    if not text:
+        return None
+
+    payload_lines: list[str] = []
+    for line in text.splitlines():
+        if line.startswith(DATA_PREFIX):
+            payload_lines.append(line[len(DATA_PREFIX) :].lstrip())
+            continue
+        if line.startswith(COMMENT_PREFIX):
+            # SSE comment ("`:keepalive`"); intentionally ignored.
+            continue
+        # Other SSE field lines (``event:``, ``id:``, ``retry:``) are not
+        # used by the chat endpoint, so we drop them rather than silently
+        # treating them as data.
+
+    if not payload_lines:
+        return None
+
+    payload = "\n".join(payload_lines)
+    if payload == DONE_SENTINEL:
+        return {"type": "done"}
+
+    try:
+        decoded = json.loads(payload)
+    except json.JSONDecodeError:
+        return None
+
+    if not isinstance(decoded, dict):
+        return None
+    return decoded
+
+
+async def stream_chat_events(
+    client: httpx.AsyncClient,
+    method: str,
+    path: str,
+    *,
+    json_body: Any | None = None,
+) -> AsyncIterator[dict[str, Any]]:
+    """Yield decoded chat events from an SSE endpoint (``POST /api/v1/chat/``).
+
+    Buffers raw bytes and splits on the ``\\n\\n`` frame delimiter so frames
+    that arrive split across chunks are reassembled before decoding. Stops
+    yielding after a ``{"type": "done"}`` event is produced — callers that
+    want to drive the stream further should not rely on the iterator
+    resuming past completion.
+    """
+    async with client.stream(method, path, json=json_body) as resp:
+        resp.raise_for_status()
+        buffer = b""
+        async for chunk in resp.aiter_bytes():
+            buffer += chunk
+            while FRAME_DELIMITER in buffer:
+                frame, buffer = buffer.split(FRAME_DELIMITER, 1)
+                event = parse_frame(frame)
+                if event is None:
+                    continue
+                yield event
+                if event.get("type") == "done":
+                    return
+        # Trailing frame without a ``\n\n`` terminator: still attempt a decode
+        # so a server that closes the connection cleanly without the final
+        # delimiter doesn't silently drop its last event.
+        if buffer.strip():
+            event = parse_frame(buffer)
+            if event is not None:
+                yield event
