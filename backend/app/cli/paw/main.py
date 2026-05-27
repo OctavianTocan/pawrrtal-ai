@@ -8,6 +8,9 @@ from app.cli.paw.commands import auth as auth_cmd
 from app.cli.paw.commands import conversations as conversations_cmd
 from app.cli.paw.commands import doctor as doctor_cmd
 from app.cli.paw.commands import login as login_cmd
+from app.cli.paw.commands import messages as messages_cmd
+from app.cli.paw.commands import models as models_cmd
+from app.cli.paw.commands import workspaces as workspaces_cmd
 
 app = typer.Typer(
     name="paw",
@@ -45,6 +48,30 @@ app.add_typer(
     conversations_cmd.app,
     name="conversations",
     help="Manage conversations and send chat turns.",
+)
+
+app.add_typer(
+    workspaces_cmd.workspaces_app,
+    name="workspaces",
+    help="Manage workspaces (ls/show/use/create/rename/delete).",
+)
+
+app.add_typer(
+    workspaces_cmd.workspace_app,
+    name="workspace",
+    help="Per-workspace env vars and files.",
+)
+
+app.add_typer(
+    models_cmd.app,
+    name="models",
+    help="List available models.",
+)
+
+app.add_typer(
+    messages_cmd.app,
+    name="messages",
+    help="Inspect persisted chat messages.",
 )
 
 
