@@ -1,6 +1,6 @@
 # Design: OpenAI Codex OAuth provider for GPT text models
 
-**Status:** Proposed — research complete, ready for implementation
+**Status:** Live for text models via the vendored `openai_codex` SDK 0.131.0a4 + matching `openai-codex-cli-bin==0.131.0a4` wheel (upstream's Python SDK has not been re-versioned past 0.131.0a4 even though the Rust/CLI side has reached 0.134.0 — pin both together; tracked in a follow-up bean). Approvals deny-all (see bean `pawrrtal-roi0` for the tool bridge that will replace it). Per-workspace OAuth override not yet wired (bean `pawrrtal-nf6y`).
 **Author:** Tavi + Wretch
 **Last updated:** 2026-05-12
 
@@ -527,3 +527,131 @@ Replay-style, mirroring `test_claude_provider.py`:
   - `openai/codex#14743` — wrong request body shape
   - `openai/codex#15502` — refresh-token rotation
   - `openclaw/openclaw#64133` — wrong endpoint sub-path
+
+---
+
+## 2026-05 Codex SDK Path (First-Class Provider + Image Plugin)
+
+**Status (plan phase):** All implementation artifacts produced in **commented form only**.
+No live code has been mutated. A later mechanical activation PR will remove the markers.
+
+This section records the decision (per user direction) that the official
+`openai_codex` Python SDK (https://github.com/openai/codex/tree/main/sdk/python)
+is the desired, first-class integration path — not the reverse-engineered
+Responses HTTP path documented above.
+
+### Key Outcomes of This Plan
+- New first-class provider package: `backend/app/core/providers/openai_codex/`
+  - `auth.py` — unified, refresh-safe Codex OAuth resolution (lifted from image_gen + this doc)
+  - `provider.py` — `OpenAICodexProvider` implementing the full native streaming contract
+- Image generation via Codex agent delivered as a plugin:
+  - `backend/app/plugins/openai_codex_image_gen/` (exact layout of `active_recall`)
+  - Not hook-driven; invoked as a regular tool / explicit action.
+- All artifacts follow the strict "commented implementation only" discipline
+  (see the approved plan for the exact marker format).
+- LiteLLM OpenAI routing is left 100% untouched.
+- The provider must feel "butter smooth" and follow the SDK surface exactly
+  ("whatever they say we should do" + "latest all the way").
+- Codex "threads" are understood as persistent stateful agent sessions
+  (the plan author researched the actual SDK source before writing the provider).
+
+### Implementation Note (2026)
+The Codex SDK path (first-class `openai_codex` provider + image plugin) was
+implemented in phases after this document was written. The original
+"commented blocks + later mechanical activation" approach was followed
+initially, then activated incrementally with compatibility work against the
+vendored SDK tree. The Responses-based text provider path documented above
+remains as historical/secondary context.
+
+### References Added During This Work
+- Official SDK Python package and surface (primary source of truth)
+- Existing image generation code + this design doc (auth reuse)
+- `plugins/active_recall/` (exact structural template for the image plugin)
+
+This completes the 2026-05 Codex SDK implementation plan.
+
+---
+
+## Vendored Codex Repository (as Git Submodule)
+
+As of the integration work, the upstream `openai/codex` repository is included as a git submodule at:
+
+```
+backend/vendor/codex/
+```
+
+This gives us direct access to the official Python SDK source at:
+
+```
+backend/vendor/codex/sdk/python/
+```
+
+### Why a submodule?
+
+- The official Python SDK (`openai_codex` package) is not (yet) a simple standalone PyPI package. It is developed inside the main Codex monorepo and expects to be installed from source (`pip install -e .` from `sdk/python`).
+- Including it as a submodule makes the dependency "real" and reproducible inside the pawrrtal-ai tree, rather than requiring every developer to manually `git clone` the Codex repo.
+- It allows the provider implementation and tests to reference concrete code and types from the official SDK.
+
+### Setup for developers
+
+After cloning pawrrtal-ai:
+
+```bash
+git submodule update --init --recursive
+# Then (from backend/):
+cd vendor/codex/sdk/python
+uv pip install -e .
+```
+
+The test suite in `backend/tests/test_openai_codex_provider.py` automatically adds the vendored `src` directory to `sys.path` when present, enabling more realistic imports during test development.
+
+### Pinning
+
+The submodule is pinned to a specific commit for reproducibility. Update the pointer deliberately when we want to move to a newer Codex revision.
+
+---
+
+## Final Pass Status (2026-05-26)
+
+**All major implementation artifacts have been produced in strict commented form** following the approved plan's "Implementation Discipline".
+
+### Artifacts Delivered (All Commented)
+- Full `openai_codex` provider package (`provider.py`, `auth.py`, `events.py`, `__init__.py`)
+- Complete Codex-driven image generation plugin (`openai_codex_image_gen/`) modeled exactly on `active_recall`
+- Expanded test skeleton
+- Commented registration blocks in `model_id.py`, `factory.py`, and catalog
+- Documentation updates (package README, new `docs/codex-sdk-provider.md`, root `README.md`, and this design doc)
+
+### Verification Performed
+- All Python files compile cleanly (`py_compile` passed on every new/modified file)
+- New source files pass the project's 500-line hard limit
+- Plugin directory structure exactly mirrors `active_recall` (non-hook-driven)
+- All work remains 100% non-mutating (no live code changed)
+
+### Remaining Manual Step
+A single future PR will mechanically remove the `# === CODEX-SDK-PLAN` comment blocks and activate the feature. Because the code was written to be directly usable, that step will be low-risk and reviewable.
+
+**Plan execution status: Complete in commented form.**
+
+## Implementation Notes (2026-05-27)
+
+The first-class native provider is live for text models. Key landing artefacts:
+
+- **Provider package:** `backend/app/core/providers/openai_codex/`
+  - `provider.py` — `OpenAICodexProvider` (`stream` translates SDK notifications → Pawrrtal `StreamEvent`s; installs a deny-all approval handler on the wrapped sync client before initialize)
+  - `_vendor.py` — SDK import shim with opt-in `OPENAI_CODEX_ALLOW_PATH_FALLBACK` for local dev
+  - `auth.py` — `OPENAI_CODEX_OAUTH_TOKEN` override resolver (per-workspace injection deferred — bean `pawrrtal-nf6y`)
+  - `events.py` — `Notification` → `StreamEvent` mapper
+  - `inputs.py` — history + question → `RunInput`
+- **Wiring:** `backend/app/core/providers/factory.py` (lazy via `_load_openai_codex_provider_cls`), `backend/app/core/providers/model_id.py` (`Host.openai_codex`), `backend/app/core/providers/catalog/openai.py` (single row `openai-codex:openai/gpt-5.5`).
+- **Persistence:** `Conversation.codex_thread_id` column + migration `027_add_codex_thread_id_to_conversations.py`; `backend/app/channels/turn_runner.py` loads/persists the thread id and listens for the provider's `codex_thread_created` internal event.
+- **Submodule:** `backend/vendor/codex` pinned at upstream `rust-v0.134.0` (whose `sdk/python/pyproject.toml` reports `version = "0.131.0a4"`).
+- **Tests:** `backend/tests/test_openai_codex_provider.py` (strict — auth, discovery, event mapper, provider-contract via SDK-seam mocks; image-plugin tests stay `xfail` until bean `pawrrtal-roi0`) and `backend/tests/test_openai_codex_import_isolation.py` (regression: package imports must not break other providers).
+
+**Known follow-ups:**
+
+- `pawrrtal-roi0` — wire `AgentTool` bridge; replace the deny-all approval handler with an agent-loop-aware one.
+- `pawrrtal-nf6y` — per-workspace `OPENAI_CODEX_OAUTH_TOKEN` injection (today the token is detected but only logged).
+- Bump pair to a newer upstream version when the Python SDK source moves past 0.131.0a4 — track in the deferred bean.
+
+The previous "commented implementation only" rule from bean `pawrrtal-ujo8` no longer applies; the provider is now live in `main`-bound commits.
