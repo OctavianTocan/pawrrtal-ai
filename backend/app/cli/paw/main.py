@@ -5,6 +5,7 @@ from __future__ import annotations
 import typer
 
 from app.cli.paw.commands import auth as auth_cmd
+from app.cli.paw.commands import conversations as conversations_cmd
 from app.cli.paw.commands import doctor as doctor_cmd
 from app.cli.paw.commands import login as login_cmd
 
@@ -37,6 +38,13 @@ app.add_typer(
     auth_cmd.app,
     name="auth",
     help="Auth status.",
+)
+
+# `conv` alias is a v2 follow-up; for now the canonical verb is `conversations`.
+app.add_typer(
+    conversations_cmd.app,
+    name="conversations",
+    help="Manage conversations and send chat turns.",
 )
 
 
