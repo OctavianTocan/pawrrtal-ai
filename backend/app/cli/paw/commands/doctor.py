@@ -16,8 +16,13 @@ from app.cli.paw.output import emit_human, emit_json
 app = typer.Typer()
 
 
+HTTP_OK = 200
+
+
 @dataclass
 class Check:
+    """One row in the doctor checklist: name, pass/fail boolean, and detail."""
+
     name: str
     passed: bool
     detail: str = ""
@@ -92,7 +97,7 @@ async def _run(profile: str) -> list[Check]:
     try:
         async with httpx.AsyncClient(base_url=state.api_base_url, timeout=5.0) as client:
             resp = await client.get("/api/v1/health")
-            backend_reachable = resp.status_code == 200
+            backend_reachable = resp.status_code == HTTP_OK
             checks.append(
                 Check(
                     "backend_reachable",
@@ -108,6 +113,7 @@ async def _run(profile: str) -> list[Check]:
     # paw login is the user's job to run first.
     if backend_reachable and cookies_path(profile).exists():
         await _append_token_valid_check(checks, state)
+        await _append_models_endpoint_check(checks, state)
 
     return checks
 
@@ -122,3 +128,36 @@ async def _append_token_valid_check(checks: list[Check], state: PersonaState) ->
         checks.append(Check("token_valid", False, detail="session expired; run paw login --force"))
     except BackendUnreachable as e:
         checks.append(Check("token_valid", False, detail=str(e.message)))
+
+
+async def _append_models_endpoint_check(checks: list[Check], state: PersonaState) -> None:
+    """Probe /api/v1/models to confirm at least one model is selectable.
+
+    The catalog is filtered to hosts the user has credentials for, so an
+    empty list means no provider keys are configured — paw send + chat
+    will fail to dispatch until at least one key is set. Surfaces that
+    state early under a single explicit check name.
+    """
+    try:
+        async with PawClient(state, timeout=5.0) as client:
+            resp = await client.request("GET", "/api/v1/models")
+        body = resp.json()
+        models = body.get("models") if isinstance(body, dict) else None
+        count = len(models) if isinstance(models, list) else 0
+        checks.append(
+            Check(
+                "models_endpoint_returns_nonempty",
+                count > 0,
+                detail=f"{count} model(s) available"
+                if count > 0
+                else "no models — configure a provider key",
+            )
+        )
+    except AuthError:
+        checks.append(
+            Check("models_endpoint_returns_nonempty", False, detail="auth required"),
+        )
+    except BackendUnreachable as e:
+        checks.append(
+            Check("models_endpoint_returns_nonempty", False, detail=str(e.message)),
+        )
