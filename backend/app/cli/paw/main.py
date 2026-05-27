@@ -1,7 +1,4 @@
-"""paw — top-level typer app. Subcommands register here.
-
-Sentinel touch (verifying post-mypy-sweep pre-commit). Safe to revert.
-"""
+"""paw — top-level typer app. Subcommands register here."""
 
 from __future__ import annotations
 
