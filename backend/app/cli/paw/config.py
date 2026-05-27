@@ -1,0 +1,94 @@
+"""XDG config paths + profile resolution + persona state file IO."""
+
+from __future__ import annotations
+
+import json
+import os
+import tempfile
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
+from pathlib import Path
+
+DEFAULT_PROFILE = "default"
+SCHEMA_VERSION = 1
+
+
+def config_root() -> Path:
+    """Return ~/.config/pawrrtal (or PAW_CONFIG_DIR if set)."""
+    if "PAW_CONFIG_DIR" in os.environ:
+        return Path(os.environ["PAW_CONFIG_DIR"])
+    xdg = os.environ.get("XDG_CONFIG_HOME")
+    base = Path(xdg) if xdg else Path.home() / ".config"
+    return base / "pawrrtal"
+
+
+def profile_dir(profile: str = DEFAULT_PROFILE) -> Path:
+    return config_root() / profile
+
+
+def state_path(profile: str = DEFAULT_PROFILE) -> Path:
+    return profile_dir(profile) / "state.json"
+
+
+def cookies_path(profile: str = DEFAULT_PROFILE) -> Path:
+    return profile_dir(profile) / "cookies.txt"
+
+
+ENV_BASE_URLS = {
+    "local": "http://127.0.0.1:8000",
+    "dev": "https://dev.pawrrtal.dev",
+    "stg": "https://staging.pawrrtal.dev",
+    "prod": "https://pawrrtal.com",
+}
+
+
+@dataclass
+class PersonaState:
+    schema_version: int = SCHEMA_VERSION
+    profile: str = DEFAULT_PROFILE
+    env: str = "local"
+    api_base_url: str = ENV_BASE_URLS["local"]
+    user_id: str | None = None
+    user_email: str | None = None
+    default_workspace_id: str | None = None
+    default_workspace_path: str | None = None
+    default_model_id: str | None = None
+    current_conversation_id: str | None = None
+    created_at: str = field(
+        default_factory=lambda: datetime.now(UTC).isoformat(),
+    )
+    last_used_at: str = field(
+        default_factory=lambda: datetime.now(UTC).isoformat(),
+    )
+
+    @classmethod
+    def load(cls, profile: str = DEFAULT_PROFILE) -> PersonaState:
+        p = state_path(profile)
+        if not p.exists():
+            return cls(profile=profile)
+        raw = json.loads(p.read_text())
+        if raw.get("schema_version") != SCHEMA_VERSION:
+            raise RuntimeError(
+                f"State schema mismatch at {p}. Run `paw login --force` to recreate.",
+            )
+        return cls(**{k: v for k, v in raw.items() if k in cls.__dataclass_fields__})
+
+    def save(self) -> None:
+        """Atomically write the state JSON, chmod 0600."""
+        self.last_used_at = datetime.now(UTC).isoformat()
+        p = state_path(self.profile)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=p.parent, prefix=".state.", suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(asdict(self), f, indent=2, sort_keys=True)
+                f.flush()
+                os.fsync(f.fileno())
+            os.chmod(tmp, 0o600)
+            os.replace(tmp, p)
+        except Exception:
+            try:
+                os.unlink(tmp)
+            except OSError:
+                pass
+            raise

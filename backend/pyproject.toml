@@ -47,7 +47,29 @@ dependencies = [
     # SDK's own pin (sdk/python/pyproject.toml). Bump together when
     # upstream re-versions the Python SDK.
     "openai-codex-cli-bin==0.131.0a4",
+    "httpx[http2]>=0.28",
+    "typer>=0.13",
 ]
+
+[project.scripts]
+paw = "app.cli.paw.main:app"
+
+# uv must package the project for `[project.scripts]` entry points to be
+# installed. Without this, `uv run paw` fails with "No such file or
+# directory" because the console script wrapper is never written into
+# the venv bin/.
+[tool.uv]
+package = true
+
+# Hatchling is the default build backend uv picks when packaging is on.
+# Restrict the wheel to the `app` package so it doesn't try to vendor
+# alembic/tests/etc.
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
 
 # Optional voice transcription backends (PR 14). The ``api/stt.py``
 # xAI proxy is in the core dependencies; ``mistralai`` is the only
@@ -68,6 +90,7 @@ dev = [
     "pre-commit>=4.0.0",
     "types-pyyaml>=6.0.12",
     "import-linter>=2.11",
+    "respx>=0.21",
 ]
 
 # --- ruff: linter + formatter ----------------------------------------------

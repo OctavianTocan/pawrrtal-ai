@@ -14,6 +14,14 @@ dev:
 dev-telegram:
     TELEGRAM_MODE=polling bun run dev.ts
 
+# Run the Pawrrtal Agent CLI (paw) against the local backend.
+# Examples:
+#   just paw doctor
+#   just paw doctor --json
+#   just paw doctor --profile staging
+paw *ARGS:
+    cd backend && uv run paw {{ARGS}}
+
 # Auto-generate conventional commit via Gemini
 commit *ARGS:
     cd backend && uv run python -m app.cli.commit {{ARGS}}
