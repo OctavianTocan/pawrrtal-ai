@@ -13,6 +13,7 @@ from app.cli.paw.commands import messages as messages_cmd
 from app.cli.paw.commands import models as models_cmd
 from app.cli.paw.commands import record as record_cmd
 from app.cli.paw.commands import replay as replay_cmd
+from app.cli.paw.commands import verify as verify_cmd
 from app.cli.paw.commands import workspaces as workspaces_cmd
 
 app = typer.Typer(
@@ -81,6 +82,12 @@ app.add_typer(
     api_cmd.app,
     name="api",
     help="Generic HTTP passthrough + OpenAPI discovery.",
+)
+
+app.add_typer(
+    verify_cmd.app,
+    name="verify",
+    help="End-to-end provider verification scenarios.",
 )
 
 # `record` and `replay` accept arbitrary trailing args (the wrapped paw
