@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.channels._turn_cost import record_turn_cost_if_enabled
@@ -40,6 +41,7 @@ from app.crud.chat_message import (
     get_messages_for_conversation,
 )
 from app.db import async_session_maker
+from app.models import Conversation
 
 if TYPE_CHECKING:
     from app.channels.base import Channel, ChannelMessage
@@ -67,6 +69,13 @@ _MS_PER_SECOND_FOR_LOG = 1000
 # any token).  Cheaper than a conditional format string and keeps the
 # field-position contract stable for log parsers.
 _TTFT_LOG_MISSING = "-"
+
+# Strong references for fire-and-forget Codex thread-id persistence
+# tasks. ``asyncio.create_task`` only holds a weak reference to the
+# returned ``Task``; without an external strong reference the task can
+# be garbage-collected mid-flight (Python docs `asyncio.create_task`).
+# The done-callback prunes finished tasks so the set doesn't grow.
+_codex_persist_tasks: set[asyncio.Task[None]] = set()
 
 
 @dataclass(frozen=True)
@@ -118,6 +127,9 @@ class ChatTurnInput:
     log_tag: str = "TURN"
     log_extras: dict[str, Any] = field(default_factory=dict)
     verbose_level: int | None = None
+    # For the native openai_codex provider: the Codex thread id to resume
+    # if one was previously persisted for this conversation.
+    codex_thread_id: str | None = None
     # These are the pre-turn hooks that will be run before the turn is started. They come from the plugin registry (for now).
     pre_turn_hooks: list[PreTurnHook] | None = None
     # Optional callback for pre-turn hooks to stream draft status back to the channel.
@@ -354,6 +366,14 @@ async def _guarded_stream(
     ``error`` ``StreamEvent``, and the generator exits cleanly so the
     channel deliverer can finish its turn-level chrome.
     """
+    # ``codex_thread_id`` is an openai_codex-specific extension kwarg
+    # (multi-turn thread resume). Other providers' ``stream()`` signatures
+    # don't accept it, so we only forward it when it's actually set —
+    # which only happens for conversations bound to the openai_codex
+    # provider. The Protocol stays clean.
+    extra_kwargs: dict[str, Any] = {}
+    if turn_input.codex_thread_id is not None:
+        extra_kwargs["codex_thread_id"] = turn_input.codex_thread_id
     try:
         async for event in turn_input.provider.stream(
             turn_input.question,
@@ -365,6 +385,7 @@ async def _guarded_stream(
             reasoning_effort=turn_input.reasoning_effort,
             permission_check=turn_input.permission_check,
             images=turn_input.images,
+            **extra_kwargs,
         ):
             # Hooks fire BEFORE the verbose filter so observability sees
             # every provider event — including thinking-deltas at
@@ -377,6 +398,24 @@ async def _guarded_stream(
             extras = list(_expand_hook_events(event, hooks))
             if not _should_deliver_event(event, turn_input.verbose_level):
                 continue
+            # Handle Codex native provider internal signals (e.g. new thread created
+            # so we can persist the thread_id for resume on future turns).
+            if event.get("type") == "internal" and event.get("kind") == "codex_thread_created":
+                thread_id = event.get("thread_id")
+                if isinstance(thread_id, str) and thread_id:
+                    # Persist asynchronously without blocking the stream.
+                    # The reference is kept in the function-local
+                    # ``_codex_persist_tasks`` set so the event loop holds a
+                    # strong reference (RUF006); the discard callback prunes
+                    # it once the persistence task finishes.
+                    persist_task = asyncio.create_task(
+                        _persist_codex_thread_id(turn_input.conversation_id, thread_id)
+                    )
+                    _codex_persist_tasks.add(persist_task)
+                    persist_task.add_done_callback(_codex_persist_tasks.discard)
+                # Do not forward this internal event to the UI.
+                continue
+
             counter.record(event)
             aggregator.apply(event)
             yield event
@@ -594,5 +633,42 @@ async def _finalize_turn(
     schedule_lcm_compaction(
         conversation_id=turn_input.conversation_id,
         user_id=turn_input.user_id,
-        model_id=model_id or "",
+        model_id=model_id,
     )
+
+
+async def _persist_codex_thread_id(conversation_id: uuid.UUID, thread_id: str) -> None:
+    """Persist a newly created Codex thread id against the conversation.
+
+    Called via fire-and-forget from the streaming wrapper when the
+    openai_codex provider emits a "codex_thread_created" internal signal.
+    """
+    try:
+        async with async_session_maker() as session:
+            await session.execute(
+                update(Conversation)
+                .where(Conversation.id == conversation_id)
+                .values(codex_thread_id=thread_id)
+            )
+            await session.commit()
+            logger.debug(
+                "codex: persisted thread_id=%s for conversation=%s",
+                thread_id,
+                conversation_id,
+            )
+    except Exception:
+        logger.exception("codex: failed to persist thread_id for conversation %s", conversation_id)
+
+
+async def _load_codex_thread_id(conversation_id: uuid.UUID) -> str | None:
+    """Load the persisted Codex thread id for resume support (if any)."""
+    try:
+        async with async_session_maker() as session:
+            result = await session.execute(
+                select(Conversation.codex_thread_id).where(Conversation.id == conversation_id)
+            )
+            row = result.first()
+            return row[0] if row else None
+    except Exception:
+        logger.exception("codex: failed to load thread_id for conversation %s", conversation_id)
+        return None

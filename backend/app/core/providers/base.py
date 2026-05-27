@@ -67,6 +67,29 @@ class StreamEvent(TypedDict, total=False):
     input_tokens: int
     output_tokens: int
     cost_usd: float
+    # ``thinking`` events: ``True`` when the delta is a "summary" thinking
+    # block (renderers may collapse / style differently). Currently only
+    # emitted by the openai_codex provider, which separates summary vs raw
+    # reasoning text deltas. Other providers treat the absence as "raw".
+    summary: bool
+    # ``internal`` + ``artifact`` events: free-form subtype tag used by
+    # the openai_codex provider to mark out-of-band signals
+    # (``kind="codex_thread_created"``) and artifact subtypes
+    # (``kind="image"``). Consumers route on ``type`` first and only
+    # inspect ``kind`` when the type calls for it.
+    kind: str
+    # ``artifact`` events: opaque provider-supplied payload (the artifact
+    # bytes / metadata). Renderers know how to interpret it based on
+    # ``kind`` + ``provider``.
+    data: Any
+    # ``artifact`` / ``internal`` events: identifies the provider that
+    # produced the artifact (``"openai_codex"``, etc.) so downstream
+    # plugins can dispatch without inspecting the message envelope.
+    provider: str
+    # ``internal`` events: thread/session identifier the provider wants
+    # the caller to persist for resume on the next turn (codex stores
+    # this on the Conversation row).
+    thread_id: str
 
 
 class AILLM(Protocol):
@@ -128,5 +151,13 @@ class AILLM(Protocol):
                      content blocks (Claude messages content blocks, Gemini
                      ``Part.from_bytes``).  Providers without multimodal
                      ignore the kwarg.
+
+        Provider-specific extensions live on the concrete provider's
+        ``stream()`` signature, not on this Protocol. The openai_codex
+        provider, for example, accepts ``codex_thread_id: str | None`` for
+        SDK multi-turn continuity. Cross-provider callers pass these
+        through ``**extra_kwargs`` and only forward them when actually set
+        (see ``app.channels.turn_runner._guarded_stream``) so unrelated
+        providers don't see unknown keys.
         """
         ...

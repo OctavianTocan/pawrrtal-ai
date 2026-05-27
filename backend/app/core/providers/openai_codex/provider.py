@@ -34,17 +34,25 @@ from app.core.providers.openai_codex.events import (
 )
 from app.core.providers.openai_codex.inputs import build_codex_run_input
 
-# Pull SDK symbols through our own re-export layer (which owns the vendored
-# snapshot compatibility logic in __init__.py + _vendor.py). This is the
-# correct architectural pattern.
-from . import (
-    AppServerConfig,
-    AsyncCodex,
-    TextInput,
-)
-from . import (
-    ReasoningEffort as CodexReasoningEffort,
-)
+# Make sure the vendored SDK is on sys.path before we statically import from
+# it. ``_vendor.ensure_openai_codex_available`` injects the vendored source
+# path when the published wheels aren't installed; calling it at import time
+# keeps the symbols below resolvable at runtime. (mypy sees them via
+# ``mypy_path`` in pyproject.toml, which points at the same source tree.)
+from ._vendor import ensure_openai_codex_available
+
+try:
+    ensure_openai_codex_available()
+except RuntimeError as exc:
+    raise ImportError(str(exc)) from exc
+
+# Import the SDK symbols directly from the vendored / installed package.
+# We deliberately bypass the local ``__init__.__getattr__`` shim here: that
+# shim returns ``Any`` to keep the package import cheap, which defeats type
+# checking inside this module. The shim still serves the public Pawrrtal
+# surface (``from app.core.providers.openai_codex import OpenAICodexProvider``).
+from openai_codex import AppServerConfig, AsyncCodex, TextInput
+from openai_codex.generated.v2_all import ReasoningEffort as CodexReasoningEffort
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +60,7 @@ logger = logging.getLogger(__name__)
 _DENY_ALL_DECISION: dict[str, str] = {"decision": "deny"}
 
 
-def _deny_all_approval_handler(method: str, params: dict | None) -> dict:
+def _deny_all_approval_handler(method: str, params: dict[str, Any] | None) -> dict[str, Any]:
     """Reject every escalation request.
 
     The SDK's default (vendor/codex/sdk/python/src/openai_codex/client.py:597)
@@ -86,7 +94,11 @@ def _get_default_reasoning_summary() -> Any:
     runtime error on a Codex turn — not as a backend startup crash that
     takes down every other provider.
     """
-    global _DEFAULT_REASONING_SUMMARY
+    # Module-scope cache for the singleton ``ReasoningSummary("auto")`` so
+    # we only validate it once per process. A plain global is the simplest
+    # fit for "lazy import + cache"; refactoring to a closure or class
+    # singleton would not change behaviour.
+    global _DEFAULT_REASONING_SUMMARY  # noqa: PLW0603
     if _DEFAULT_REASONING_SUMMARY is None:
         from . import ReasoningSummary  # noqa: PLC0415 — lazy by design
 
@@ -188,6 +200,8 @@ class OpenAICodexProvider:
         tools: list[AgentTool] | None = None,
         system_prompt: str | None = None,
         reasoning_effort: PawReasoningEffort | None = None,
+        codex_thread_id: str | None = None,
+        images: list[dict[str, str]] | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamEvent]:
         """Drive a Codex turn and emit native Pawrrtal StreamEvents."""
@@ -205,10 +219,9 @@ class OpenAICodexProvider:
         # persisted for this conversation. Falls back to fresh thread_start.
         # The actual persistence (storing codex_thread_id on the Conversation row)
         # is handled by the turn runner / caller when we emit a thread creation signal.
-        existing_thread_id = kwargs.get("codex_thread_id")
         try:
-            if existing_thread_id:
-                thread = await codex.thread_resume(existing_thread_id)
+            if codex_thread_id:
+                thread = await codex.thread_resume(codex_thread_id)
             else:
                 thread = await codex.thread_start(
                     model=self._model_id,
@@ -216,12 +229,16 @@ class OpenAICodexProvider:
                     base_instructions=system_prompt,
                 )
                 # Signal to the caller that a new thread was created so it can be
-                # persisted against the conversation for future resume.
-                yield {
-                    "type": "internal",
-                    "kind": "codex_thread_created",
-                    "thread_id": getattr(thread, "id", None),
-                }
+                # persisted against the conversation for future resume. The
+                # turn runner narrows on ``isinstance(thread_id, str)`` so a
+                # missing/empty id is silently dropped rather than persisted.
+                new_thread_id = getattr(thread, "id", None)
+                if isinstance(new_thread_id, str) and new_thread_id:
+                    yield {
+                        "type": "internal",
+                        "kind": "codex_thread_created",
+                        "thread_id": new_thread_id,
+                    }
         except Exception as exc:
             logger.exception("openai_codex: thread_start/resume failed")
             yield {"type": "error", "content": f"Failed to start/resume Codex thread: {exc}"}
@@ -230,7 +247,6 @@ class OpenAICodexProvider:
         # Build rich input using the dedicated translation layer.
         # This gives us proper history replay, previous thinking, tool results,
         # and attached images — the main missing piece from the v1 implementation.
-        images = kwargs.get("images")
         try:
             run_input = build_codex_run_input(
                 question=question,
@@ -252,7 +268,7 @@ class OpenAICodexProvider:
 
             # The high-level async handle exposes a stream of Notification objects.
             # We consume it directly.
-            async for notification in handle.stream():  # type: ignore[attr-defined]
+            async for notification in handle.stream():
                 for event in map_codex_notification_to_stream_events(notification):
                     if event:
                         yield event

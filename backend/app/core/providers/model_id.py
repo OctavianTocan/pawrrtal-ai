@@ -52,6 +52,15 @@ class Host(StrEnum):
     litellm = "litellm"
     opencode_go = "opencode-go"
     xai = "xai"
+    openai_codex = "openai-codex"
+    """First-class native provider using the official `openai_codex`
+    Python SDK (https://github.com/openai/codex/tree/main/sdk/python).
+
+    Distinct from `litellm` (which remains the path for users who
+    want standard OpenAI models via LiteLLM). This host gives
+    full access to Codex threads, native streaming, app-server
+    features, and the ability to drive Codex as a powerful agent.
+    """
 
 
 CANONICAL_HOST: dict[Vendor, Host] = {

@@ -99,6 +99,9 @@ class Conversation(Base):
     origin_channel: Mapped[str | None] = mapped_column(String(32), nullable=True)
     # Telegram Bot API 9.3+ topic thread ID.  NULL for non-topic DMs.
     telegram_thread_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Codex SDK thread ID for native openai_codex provider resume support.
+    # Stored when the provider emits a "codex_thread_created" internal event.
+    codex_thread_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     # Lifecycle marker for the auto-title feature:
     # NULL = not yet titled, "auto" = generated, "user" = user-edited.
     title_set_by: Mapped[str | None] = mapped_column(String(16), nullable=True)
