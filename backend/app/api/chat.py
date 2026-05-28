@@ -402,8 +402,19 @@ def get_chat_router() -> APIRouter:
 
         # Load Codex thread id (if any) before constructing the frozen ChatTurnInput.
         from app.channels.turn_runner import _load_codex_thread_id  # noqa: PLC0415
+
         codex_thread_id = await _load_codex_thread_id(request.conversation_id)
 
+        # ``db_session`` is intentionally left at its ``None`` default so the
+        # turn runner opens its own ``async_session_maker()`` session inside
+        # the streaming generator. Passing the request-scoped session from
+        # ``Depends(get_async_session)`` breaks under SQLite/aiosqlite because
+        # ``StreamingResponse`` keeps the response body iterating long after
+        # the route handler returns — by the time ``_finalize_turn`` runs,
+        # aiosqlite's underlying connection has been torn down and any
+        # ``session.execute`` raises ``OperationalError: no active connection``.
+        # Postgres masks this because pool checkout + ``pool_pre_ping`` can
+        # transparently reconnect; aiosqlite does not. Issue: pawrrtal-0dgj.
         turn_input = ChatTurnInput(
             conversation_id=request.conversation_id,
             user_id=user.id,
@@ -411,7 +422,6 @@ def get_chat_router() -> APIRouter:
             provider=provider,
             channel=channel,
             channel_message=channel_message,
-            db_session=session,
             workspace_root=root,
             tools=agent_tools,
             # ``effective_reasoning_effort`` is the resolved value
