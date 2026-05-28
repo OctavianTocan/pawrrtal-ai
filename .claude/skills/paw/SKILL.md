@@ -193,7 +193,6 @@ v1 shipped (Tasks 0–11) on the `development` branch.
 
 **Open follow-up beans:**
 
-- CI workflow wiring (`PAW_E2E=1` gate in GitHub Actions)
 - SQLite chat-path bug (live E2E currently green only against Postgres)
 - Streaming capture in `record`/`replay` (HTTP capture works; SSE stream bytes need a dedicated writer)
 - Frontend migration off the `/users/me` compat alias to canonical `/api/v1/users/me`

@@ -15,3 +15,4 @@
 .github/workflows/stagehand-e2e.yml:generic-api-key:103
 .github/workflows/playwright-e2e.yml:generic-api-key:99
 .github/workflows/playwright-e2e.yml:generic-api-key:100
+.github/workflows/paw-verify.yml:generic-api-key:90

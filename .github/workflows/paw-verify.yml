@@ -1,0 +1,157 @@
+name: paw verify (live E2E)
+
+# Runs the live ``paw`` E2E suite under ``backend/tests/e2e_paw/`` with
+# ``PAW_E2E=1``. The suite boots a real uvicorn subprocess against a
+# tmpdir-backed SQLite DB via the ``live_backend`` fixture in
+# ``backend/tests/e2e_paw/conftest.py``, seeds a dev-admin persona with
+# ``paw login --dev-admin``, then runs ``paw verify`` end-to-end.
+#
+# Two live tests are wired in today:
+#   - ``test_chat_roundtrip_live`` (LiteLLM -> OpenAI; needs OPENAI_API_KEY)
+#   - ``test_verify_codex_live``   (needs ~/.codex/auth.json on the runner)
+#
+# Each test self-skips when its credential is missing. The job stays
+# green when credentials are absent so the gate doesn't block PRs that
+# don't touch the live surface, but a failed assertion against real
+# infrastructure fails the run.
+#
+# Reproduce locally with:
+#   cd backend && PAW_E2E=1 uv run pytest tests/e2e_paw/ -v
+
+on:
+  pull_request:
+    branches: [development, main]
+    paths:
+      - 'backend/**'
+      - '.claude/skills/paw/**'
+      - 'docs/superpowers/plans/*paw*'
+      - '.github/workflows/paw-verify.yml'
+  push:
+    branches: [development, main]
+    paths:
+      - 'backend/**'
+      - '.claude/skills/paw/**'
+      - 'docs/superpowers/plans/*paw*'
+      - '.github/workflows/paw-verify.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: paw-verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  paw-verify:
+    name: paw verify (PAW_E2E=1)
+    # OctavianTocan-only gate (see .claude/rules/github-actions/
+    # octaviantocan-only-and-self-hosted-runner.md). Push events have no
+    # pull_request payload, so the second clause is vacuously true.
+    if: >-
+      (github.actor == 'OctavianTocan' || github.actor == 'octagent') &&
+      (github.event_name != 'pull_request' ||
+        github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: [self-hosted, openclaw-mini, pawrrtal]
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.2
+        with:
+          submodules: recursive
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: uv sync --frozen
+
+      - name: Run paw live E2E suite
+        id: paw_e2e
+        working-directory: backend
+        # Settings (pydantic-settings) requires these at import time. The
+        # live_backend fixture sets DATABASE_URL to a tmpdir-backed SQLite
+        # path itself; the value below is the import-time placeholder and
+        # is overridden by the fixture before the FastAPI app boots.
+        # LiteLLM (chat-roundtrip) needs OPENAI_API_KEY; the codex test
+        # checks for ~/.codex/auth.json on the runner. Both tests skip
+        # cleanly when their credential is missing.
+        env:
+          PAW_E2E: '1'
+          AUTH_SECRET: paw-e2e-not-a-secret
+          GOOGLE_API_KEY: paw-e2e-not-a-key
+          # Required by Settings.workspace_encryption_key (no default).
+          WORKSPACE_ENCRYPTION_KEY: 'zG9KQK6sH0xLm4LJ4n8C9aD2vF3gN5pT7rE1yU8xKqM='
+          CORS_ORIGINS: '["http://localhost:53001"]'
+          DATABASE_URL: 'sqlite+aiosqlite:///:memory:'
+          ADMIN_EMAIL: paw-e2e-admin@example.com
+          ADMIN_PASSWORD: paw-e2e-admin-password
+          # workspace_base_dir defaults to /data/workspaces which the
+          # runner can't write to; redirect to /tmp so the dev-login
+          # workspace seed can succeed.
+          WORKSPACE_BASE_DIR: /tmp/pawrrtal-paw-e2e-workspaces
+          COOKIE_SAMESITE: lax
+          COOKIE_SECURE: 'false'
+          # Provider credentials for the chat-roundtrip live test.
+          # Absent secrets resolve to '' and the test skips itself.
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -o pipefail
+          uv run pytest tests/e2e_paw/ -v --tb=short 2>&1 | tee ../paw-verify-output.txt
+          status=${PIPESTATUS[0]}
+          {
+            echo 'output<<EOF'
+            cat ../paw-verify-output.txt
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+          exit "$status"
+
+      - name: Upload paw verify log
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: paw-verify-output
+          path: paw-verify-output.txt
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Comment PR on failure
+        if: failure() && github.event_name == 'pull_request'
+        uses: actions/github-script@v9
+        env:
+          TEST_OUTPUT: ${{ steps.paw_e2e.outputs.output }}
+        with:
+          script: |
+            const output = process.env.TEST_OUTPUT || '';
+            const body = [
+              '### paw live E2E failed',
+              '',
+              'One or more live ``paw`` E2E assertions failed.',
+              'Reproduce locally with:',
+              '',
+              '```',
+              'cd backend && PAW_E2E=1 uv run pytest tests/e2e_paw/ -v',
+              '```',
+              '',
+              'See `.claude/skills/paw/SKILL.md` for the suite contract.',
+              '',
+              '<details><summary>output (last 6000 chars)</summary>',
+              '',
+              '```',
+              output.slice(-6000),
+              '```',
+              '',
+              '</details>',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body,
+            });
