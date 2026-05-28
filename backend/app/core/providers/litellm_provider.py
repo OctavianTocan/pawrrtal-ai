@@ -25,7 +25,23 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import litellm
-from litellm.exceptions import APIError as LiteLLMAPIError
+from litellm.exceptions import (
+    APIError as LiteLLMAPIError,
+)
+from litellm.exceptions import (
+    AuthenticationError as LiteLLMAuthenticationError,
+)
+from litellm.exceptions import (
+    RateLimitError as LiteLLMRateLimitError,
+)
+from litellm.exceptions import (
+    Timeout as LiteLLMTimeout,
+)
+from litellm.exceptions import (
+    UnsupportedParamsError as LiteLLMUnsupportedParamsError,
+)
+from returns.future import FutureResult
+from returns.result import Failure, Result, Success
 
 from app.core.agent_loop import (
     DEFAULT_AGENT_SYSTEM_PROMPT as _FALLBACK_SYSTEM_PROMPT,
@@ -48,6 +64,14 @@ from app.core.agent_loop.types import PermissionCheckFn, TextContent
 from app.core.config import settings
 from app.core.keys import resolve_api_key
 
+from ._errors import (
+    ProviderAuthError,
+    ProviderError,
+    ProviderRateLimitError,
+    ProviderTimeoutError,
+    ProviderUnknownError,
+    ProviderUnsupportedParamError,
+)
 from ._stream_logging import log_provider_stream_event
 from .base import ReasoningEffort, StreamEvent
 from .gemini.events import agent_event_to_stream_event, identity_convert
@@ -174,6 +198,142 @@ _LITELLM_REASONING_EFFORT: dict[str, str] = {
     "high": "high",
     "extra-high": "xhigh",
 }
+
+
+# ---------------------------------------------------------------------------
+# Returns pilot — Phase 3 (provider seam).
+#
+# ``open_litellm_stream`` exposes the *connection* phase of a LiteLLM
+# completion as ``FutureResult[AsyncIterator[Any], ProviderError]``. The
+# caller awaits the future to discover whether the call was rejected
+# (auth / rate-limit / unsupported-param / timeout) before draining any
+# chunks. Mid-stream exceptions still surface as the SDK raises them
+# inside the iterator — wrapping them in the container is not
+# ergonomic, and the chat router already classifies mid-stream errors
+# into ``StreamEvent(type="error")`` frames.
+#
+# Crucially this is *additive*. Production today routes through
+# :class:`LiteLLMLLM` → :func:`make_litellm_stream_fn` and is
+# unchanged; nothing currently calls ``open_litellm_stream``. Once the
+# chat router or a sibling provider migrates, this is the surface they
+# import. See ``docs/superpowers/specs/2026-05-28-returns-adoption-grilling.md``
+# and ``.claude/skills/returns-for-pawrrtal/SKILL.md``.
+# ---------------------------------------------------------------------------
+
+
+def _classify_litellm_exception(exc: BaseException, *, model: str) -> ProviderError:
+    """Map a LiteLLM SDK exception onto our closed ``ProviderError`` set.
+
+    The mapping order matters — ``UnsupportedParamsError`` is a
+    subclass of ``BadRequestError`` which is itself a subclass of the
+    generic ``APIError``, so the narrowest variants are matched first.
+    Unrecognised exceptions fall into :class:`ProviderUnknownError`
+    carrying the original message verbatim so on-call still has
+    something to grep for.
+    """
+    if isinstance(exc, LiteLLMAuthenticationError):
+        return ProviderAuthError(message=str(exc))
+    if isinstance(exc, LiteLLMRateLimitError):
+        retry_after_raw = getattr(exc, "retry_after", None)
+        retry_after: float | None
+        try:
+            retry_after = float(retry_after_raw) if retry_after_raw is not None else None
+        except (TypeError, ValueError):
+            retry_after = None
+        return ProviderRateLimitError(message=str(exc), retry_after=retry_after)
+    if isinstance(exc, LiteLLMUnsupportedParamsError):
+        param = str(getattr(exc, "param", "") or "")
+        return ProviderUnsupportedParamError(
+            message=str(exc),
+            param=param,
+            model=model,
+        )
+    if isinstance(exc, LiteLLMTimeout):
+        return ProviderTimeoutError(message=str(exc))
+    return ProviderUnknownError(message=str(exc))
+
+
+def open_litellm_stream(
+    vendor: Vendor,
+    model: str,
+    workspace_root: Path | None = None,
+    *,
+    messages: list[dict[str, Any]],
+    reasoning_effort: ReasoningEffort | None = None,
+) -> FutureResult[AsyncIterator[Any], ProviderError]:
+    """Open a LiteLLM streaming completion as a ``FutureResult``.
+
+    Returns a future that resolves to ``IOSuccess(<async iterator of
+    chunks>)`` when LiteLLM accepts the request, or ``IOFailure(<typed
+    ProviderError>)`` when the connection / setup phase fails. Errors
+    raised *inside* the iterator after a successful open remain
+    exceptions — see the module-level comment for why.
+
+    Args:
+        vendor: The model's vendor enum.
+        model: Bare model name (no provider prefix).
+        workspace_root: Optional workspace path for per-workspace key
+            overrides; mirrors the rest of the LiteLLM seam.
+        messages: Pre-assembled OpenAI-shape message list. The caller
+            (or :func:`_build_litellm_messages`) is responsible for
+            multimodal flattening.
+        reasoning_effort: Optional reasoning knob mapped through
+            :data:`_LITELLM_REASONING_EFFORT`.
+
+    Returns:
+        ``FutureResult[AsyncIterator[Any], ProviderError]`` — the inner
+        iterator yields raw LiteLLM chunks (use :func:`_delta_text` to
+        extract text fragments).
+    """
+    model_string = _litellm_model_string(vendor, model)
+
+    async def _open() -> AsyncIterator[Any]:
+        """Resolve the API key, build kwargs, and call ``acompletion``."""
+        api_key = _resolve_litellm_api_key(vendor, workspace_root)
+        if not api_key:
+            # Translate "missing key" into an auth error so the caller
+            # can match a single ProviderAuthError variant regardless
+            # of whether the upstream or our key resolution rejected.
+            raise LiteLLMAuthenticationError(
+                message=(
+                    f"missing {_VENDOR_API_KEY_NAME[vendor]} — set it in the "
+                    "workspace env or as a gateway env var."
+                ),
+                llm_provider=vendor.value,
+                model=model_string,
+            )
+
+        completion_kwargs: dict[str, object] = {
+            "model": model_string,
+            "messages": messages,
+            "api_key": api_key,
+            "stream": True,
+        }
+        if reasoning_effort is not None:
+            mapped = _LITELLM_REASONING_EFFORT.get(reasoning_effort)
+            if mapped is not None:
+                completion_kwargs["reasoning_effort"] = mapped
+
+        response = await litellm.acompletion(**completion_kwargs)
+        # ``litellm.acompletion(stream=True)`` returns an
+        # ``AsyncIterator`` over chunks. Cast away the SDK's loose typing
+        # at the seam — this is the documented streaming contract.
+        return response  # type: ignore[no-any-return]
+
+    async def _open_with_classify() -> Result[AsyncIterator[Any], ProviderError]:
+        try:
+            iterator = await _open()
+        except (
+            LiteLLMAuthenticationError,
+            LiteLLMRateLimitError,
+            LiteLLMUnsupportedParamsError,
+            LiteLLMTimeout,
+            LiteLLMAPIError,
+        ) as exc:
+            return Failure(_classify_litellm_exception(exc, model=model_string))
+        return Success(iterator)
+
+    return FutureResult(_open_with_classify())
 
 
 def make_litellm_stream_fn(
