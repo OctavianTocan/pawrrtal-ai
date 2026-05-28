@@ -272,7 +272,7 @@ def _build_fake_codex(
     notifs = list(turn_notifications or [])
 
     class _FakeHandle:
-        async def stream(self_inner):
+        async def stream(self):
             if turn_stream_raises is not None:
                 raise turn_stream_raises
             for n in notifs:
@@ -281,7 +281,7 @@ def _build_fake_codex(
     class _FakeThread:
         id = "thr_test_123"
 
-        async def turn(self_inner, run_input, **kw):
+        async def turn(self, run_input, **kw):
             return _FakeHandle()
 
     class _FakeSyncClient:
@@ -293,20 +293,20 @@ def _build_fake_codex(
     class _FakeCodex:
         _client = _FakeInnerClient()
 
-        async def _ensure_initialized(self_inner):
+        async def _ensure_initialized(self):
             return None
 
-        async def thread_start(self_inner, **kw):
+        async def thread_start(self, **kw):
             if thread_start_raises is not None:
                 raise thread_start_raises
             return _FakeThread()
 
-        async def thread_resume(self_inner, tid, **kw):
+        async def thread_resume(self, tid, **kw):
             t = _FakeThread()
             t.id = tid
             return t
 
-        async def close(self_inner):
+        async def close(self):
             return None
 
     return _FakeCodex()
@@ -330,9 +330,7 @@ async def test_provider_stream_emits_codex_thread_created_event(monkeypatch):
     monkeypatch.setattr(provider_mod.OpenAICodexProvider, "_ensure_codex", _fake_ensure_codex)
 
     provider = provider_mod.OpenAICodexProvider("gpt-5.5")
-    events = []
-    async for ev in provider.stream("hi", uuid.uuid4(), uuid.uuid4()):
-        events.append(ev)
+    events = [ev async for ev in provider.stream("hi", uuid.uuid4(), uuid.uuid4())]
 
     kinds = [(e.get("type"), e.get("kind")) for e in events]
     assert ("internal", "codex_thread_created") in kinds
@@ -355,9 +353,7 @@ async def test_stream_yields_error_event_on_thread_start_exception(monkeypatch):
     monkeypatch.setattr(provider_mod.OpenAICodexProvider, "_ensure_codex", _fake_ensure_codex)
 
     provider = provider_mod.OpenAICodexProvider("gpt-5.5")
-    events = []
-    async for e in provider.stream("test", uuid.uuid4(), uuid.uuid4()):
-        events.append(e)
+    events = [e async for e in provider.stream("test", uuid.uuid4(), uuid.uuid4())]
 
     assert len(events) == 1
     assert events[0]["type"] == "error"
@@ -381,9 +377,7 @@ async def test_stream_yields_error_event_on_turn_stream_exception(monkeypatch):
     monkeypatch.setattr(provider_mod.OpenAICodexProvider, "_ensure_codex", _fake_ensure_codex)
 
     provider = provider_mod.OpenAICodexProvider("gpt-5.5")
-    events = []
-    async for e in provider.stream("test", uuid.uuid4(), uuid.uuid4()):
-        events.append(e)
+    events = [e async for e in provider.stream("test", uuid.uuid4(), uuid.uuid4())]
 
     assert any(e.get("type") == "error" and "Codex turn failed" in e["content"] for e in events)
 
@@ -407,14 +401,15 @@ async def test_stream_resumes_existing_thread_when_thread_id_provided(monkeypatc
     monkeypatch.setattr(provider_mod.OpenAICodexProvider, "_ensure_codex", _fake_ensure_codex)
 
     provider = provider_mod.OpenAICodexProvider("gpt-5.5")
-    events = []
-    async for ev in provider.stream(
-        "follow up",
-        uuid.uuid4(),
-        uuid.uuid4(),
-        codex_thread_id="thr_existing_abc",
-    ):
-        events.append(ev)
+    events = [
+        ev
+        async for ev in provider.stream(
+            "follow up",
+            uuid.uuid4(),
+            uuid.uuid4(),
+            codex_thread_id="thr_existing_abc",
+        )
+    ]
 
     kinds = [(e.get("type"), e.get("kind")) for e in events]
     assert ("internal", "codex_thread_created") not in kinds

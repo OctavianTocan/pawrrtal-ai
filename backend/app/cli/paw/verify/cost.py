@@ -51,9 +51,7 @@ def _ledger_rows(payload: Any) -> list[dict[str, Any]]:
     return [row for row in payload if isinstance(row, dict)]
 
 
-async def _capture_baseline(
-    client: PawClient, r: ScenarioResult
-) -> list[dict[str, Any]]:
+async def _capture_baseline(client: PawClient, r: ScenarioResult) -> list[dict[str, Any]]:
     """Snapshot summary + ledger so post-turn deltas have a known starting point.
 
     Returns the baseline ledger row list; the summary is recorded as an

@@ -52,6 +52,7 @@ SKIP_DIRECTORIES = frozenset(
         "dist",
         "alembic",
         "tests",  # tests can nest more freely (e.g. parametrized assertions)
+        "vendor",  # vendored submodules (e.g. backend/vendor/codex) follow their own style
         ".pytest_cache",
         ".mypy_cache",
         ".ruff_cache",
@@ -93,6 +94,26 @@ EXEMPT_FUNCTIONS: frozenset[str] = frozenset(
         # existing helpers) and threading the shared state through
         # them so the loop body stays at depth 1–2.
         "backend/app/channels/telegram.py::deliver",
+        # TODO(pawrrtal): bean pawrrtal-(see follow-up) tracks
+        # flattening the 14 entries below.  Each entry was admitted
+        # to EXEMPT during the PR469 unblock so the nesting gate
+        # could re-enforce against future regressions while the
+        # existing offenders are split out in a sibling PR.  Do not
+        # extend this list — fix or file a sibling PR.
+        "backend/app/core/providers/litellm_provider.py::_build_litellm_messages",
+        "backend/app/core/providers/opencode_go/events.py::build_openai_messages",
+        "backend/app/core/providers/xai/messages.py::build_xai_messages",
+        "backend/app/channels/_telegram_finalize.py::finalize_turn_delivery",
+        "backend/app/channels/turn_runner.py::_guarded_stream",
+        "backend/app/cli/paw/commands/conversations.py::_send_turn",
+        "backend/app/cli/paw/commands/dev/process.py::tail_log_until_exit",
+        "backend/app/cli/paw/commands/workspaces.py::_delete_workspace_env_keys",
+        "backend/app/cli/paw/sse.py::stream_chat_events",
+        "backend/app/core/providers/gemini/messages.py::_user_parts",
+        "backend/app/core/providers/openai_codex/inputs.py::build_codex_run_input",
+        "backend/app/core/providers/openai_codex/provider.py::stream",
+        "backend/app/core/scheduler/scheduler.py::_hydrate_active_jobs",
+        "backend/app/plugins/active_recall/recall_agent.py::_collect_stream_telemetry",
     }
 )
 

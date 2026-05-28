@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import tempfile
@@ -25,14 +26,17 @@ def config_root() -> Path:
 
 
 def profile_dir(profile: str = DEFAULT_PROFILE) -> Path:
+    """Return the per-profile config directory under ``config_root()``."""
     return config_root() / profile
 
 
 def state_path(profile: str = DEFAULT_PROFILE) -> Path:
+    """Return the path to ``state.json`` for ``profile``."""
     return profile_dir(profile) / "state.json"
 
 
 def cookies_path(profile: str = DEFAULT_PROFILE) -> Path:
+    """Return the path to ``cookies.txt`` for ``profile``."""
     return profile_dir(profile) / "cookies.txt"
 
 
@@ -46,6 +50,14 @@ ENV_BASE_URLS = {
 
 @dataclass
 class PersonaState:
+    """Persistent per-profile persona state written to ``state.json``.
+
+    Carries the persona's API base URL, identity, workspace defaults,
+    and timestamps. Versioned by :data:`SCHEMA_VERSION`; mismatches
+    surface as a "run ``paw login --force``" error rather than silent
+    decoding.
+    """
+
     schema_version: int = SCHEMA_VERSION
     profile: str = DEFAULT_PROFILE
     env: str = "local"
@@ -65,6 +77,7 @@ class PersonaState:
 
     @classmethod
     def load(cls, profile: str = DEFAULT_PROFILE) -> PersonaState:
+        """Load the persona state JSON for ``profile`` or return a fresh default."""
         p = state_path(profile)
         if not p.exists():
             return cls(profile=profile)
@@ -86,13 +99,11 @@ class PersonaState:
                 json.dump(asdict(self), f, indent=2, sort_keys=True)
                 f.flush()
                 os.fsync(f.fileno())
-            os.chmod(tmp, 0o600)
-            os.replace(tmp, p)
+            Path(tmp).chmod(0o600)
+            Path(tmp).replace(p)
         except Exception:
-            try:
-                os.unlink(tmp)
-            except OSError:
-                pass
+            with contextlib.suppress(OSError):
+                Path(tmp).unlink()
             raise
 
 

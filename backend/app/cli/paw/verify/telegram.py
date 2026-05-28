@@ -198,9 +198,7 @@ async def _check_post_unlink_list(
             True,
             detail=SKIPPED_NO_REDEMPTION_DETAIL,
         )
-        r.artifacts.setdefault("skipped_checks", []).append(
-            "telegram_binding_absent_after_unlink"
-        )
+        r.artifacts.setdefault("skipped_checks", []).append("telegram_binding_absent_after_unlink")
         return
     bindings = await _list_channels(client)
     r.artifacts["post_unlink_bindings"] = bindings

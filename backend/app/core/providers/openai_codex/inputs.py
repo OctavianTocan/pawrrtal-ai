@@ -138,8 +138,9 @@ def build_codex_run_input(
     system_prompt: str | None = None,
     images: list[dict[str, str]] | None = None,
 ) -> RunInput:
-    """Convert a full Pawrrtal turn (history + current question + images) into
-    a Codex `RunInput` (either a plain string or a list of `InputItem`).
+    """Convert a Pawrrtal turn (history + question + images) into a Codex ``RunInput``.
+
+    Returns either a plain string or a list of ``InputItem``.
 
     This is the main entry point used by `OpenAICodexProvider`.
 

@@ -121,6 +121,9 @@ extend-exclude = [
     ".venv",
     "alembic/versions",  # auto-generated migrations
     "workspaces",        # ephemeral runtime data
+    # Vendored submodule — owned by openai/codex, lints under their rules
+    # not ours. The submodule's own CI gates its style.
+    "vendor",
     # Agentic tooling / editor metadata directories — never lint these.
     ".agents",
     ".claude",

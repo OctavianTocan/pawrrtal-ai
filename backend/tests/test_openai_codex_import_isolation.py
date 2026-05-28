@@ -36,13 +36,11 @@ def _block_openai_codex() -> Iterator[None]:
     """Force `import openai_codex` to fail for the duration of the test."""
     # Evict cached modules so future imports actually hit the blocker.
     for mod in list(sys.modules):
-        if (
-            mod == "openai_codex"
-            or mod.startswith("openai_codex.")
-            or mod == "app.core.providers.factory"
-            or mod == "app.core.providers.openai_codex"
-            or mod.startswith("app.core.providers.openai_codex.")
-        ):
+        if mod in {
+            "openai_codex",
+            "app.core.providers.factory",
+            "app.core.providers.openai_codex",
+        } or mod.startswith(("openai_codex.", "app.core.providers.openai_codex.")):
             sys.modules.pop(mod, None)
 
     blocker = _OpenAICodexBlocker()
@@ -54,17 +52,16 @@ def _block_openai_codex() -> Iterator[None]:
         # Clean up cached modules again so other tests in the same
         # session re-import lazily and pick up the real SDK.
         for mod in list(sys.modules):
-            if (
-                mod == "openai_codex"
-                or mod.startswith("openai_codex.")
-                or mod == "app.core.providers.factory"
-                or mod == "app.core.providers.openai_codex"
-                or mod.startswith("app.core.providers.openai_codex.")
-            ):
+            if mod in {
+                "openai_codex",
+                "app.core.providers.factory",
+                "app.core.providers.openai_codex",
+            } or mod.startswith(("openai_codex.", "app.core.providers.openai_codex.")):
                 sys.modules.pop(mod, None)
 
 
-def test_factory_imports_without_codex_runtime(_block_openai_codex: None) -> None:
+@pytest.mark.usefixtures("_block_openai_codex")
+def test_factory_imports_without_codex_runtime() -> None:
     """Importing the factory must succeed even when openai_codex cannot be imported."""
     factory = importlib.import_module("app.core.providers.factory")
 
@@ -78,9 +75,8 @@ def test_factory_imports_without_codex_runtime(_block_openai_codex: None) -> Non
     assert factory.HOST_TO_PROVIDER[Host.openai_codex] is None
 
 
-def test_factory_codex_resolution_raises_when_runtime_unavailable(
-    _block_openai_codex: None,
-) -> None:
+@pytest.mark.usefixtures("_block_openai_codex")
+def test_factory_codex_resolution_raises_when_runtime_unavailable() -> None:
     """When a Codex model is actually requested with no runtime, raise — never silently fall back."""
     factory = importlib.import_module("app.core.providers.factory")
 
