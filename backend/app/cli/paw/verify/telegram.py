@@ -85,7 +85,8 @@ async def _issue_link_code(client: PawClient, r: ScenarioResult) -> dict[str, An
         f"/api/v1/channels/{TELEGRAM_PROVIDER}/link",
         expect=(200, 201),
     )
-    payload = resp.json() if isinstance(resp.json(), dict) else {}
+    parsed = resp.json()
+    payload = parsed if isinstance(parsed, dict) else {}
     r.artifacts["link_code_response"] = payload
 
     code = payload.get("code") if isinstance(payload, dict) else None
