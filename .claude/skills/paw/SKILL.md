@@ -35,6 +35,7 @@ Every row reflects a shipped subcommand. Source: `backend/app/cli/paw/commands/`
 | workspaces       | `ls`, `show`, `use`, `create`, `rename`, `delete`              | `/api/v1/workspaces`                     |
 | workspace env    | `get`, `set`, `unset`                                          | `/api/v1/workspaces/{id}/env`            |
 | workspace files  | `ls`, `cat`, `write`, `rm`                                     | `/api/v1/workspaces/{id}/files`          |
+| channels         | `list`/`ls`, `link telegram`, `unlink telegram`                | `/api/v1/channels` + `/{provider}/link`  |
 | models           | `ls` (envelope: `{"models": [...], "etag": "..."}`)            | `/api/v1/models`                         |
 | conversations    | `ls`, `show`, `create`, `send`, `rename`, `delete`, `export`   | `/api/v1/conversations`                  |
 | messages         | `ls`, `get` (by `(conv_id, index)`; no `/messages/{id}` route) | `/api/v1/conversations/{id}/messages`    |
@@ -178,7 +179,6 @@ v1 shipped (Tasks 0–11) on the `development` branch.
 
 **Deferred to v2** (file as separate beans before implementing):
 
-- `paw channels` — Telegram link/unlink, simulate-update
 - `paw mcp` — MCP server CRUD
 - `paw cost` — cost summary + ledger
 - `paw audit` — audit events
