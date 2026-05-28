@@ -15,7 +15,6 @@ from typing import Any
 
 from app.cli.paw import ids
 from app.cli.paw.http import PawClient
-from app.cli.paw.sse import stream_chat_events
 from app.cli.paw.verify.scenarios import ScenarioResult
 
 
@@ -128,10 +127,9 @@ async def stream_turn(
         body["reasoning_effort"] = reasoning_effort
     return [
         ev
-        async for ev in stream_chat_events(
-            client._client,
-            "POST",
-            "/api/v1/chat/",
+        async for ev in client.stream_events(
+            method="POST",
+            url="/api/v1/chat/",
             json_body=body,
         )
     ]

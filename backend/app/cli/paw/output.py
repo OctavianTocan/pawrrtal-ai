@@ -7,6 +7,17 @@ import sys
 from collections.abc import Iterable
 from typing import Any
 
+from app.cli.paw.errors import LocalError
+
+
+def require_one_output_mode(*, json_out: bool, plain: bool) -> None:
+    """Reject simultaneous --json + --plain. Mutually exclusive by design."""
+    if json_out and plain:
+        raise LocalError(
+            "Pass --json or --plain, not both.",
+            hint="--json for machine output, --plain for TSV.",
+        )
+
 
 def emit_json(payload: Any) -> None:
     """Emit a single-line JSON dump terminated by newline."""

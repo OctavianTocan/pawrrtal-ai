@@ -33,10 +33,10 @@ from typing import Any
 
 import typer
 
-from app.cli.paw.config import PersonaState
+from app.cli.paw.config import PersonaState, load_state
 from app.cli.paw.errors import ApiError, LocalError
 from app.cli.paw.http import PawClient
-from app.cli.paw.output import emit_human, emit_json, emit_plain_rows
+from app.cli.paw.output import emit_human, emit_json, emit_plain_rows, require_one_output_mode
 
 # Column widths for `paw mcp list` on an 80-col terminal: 36-char UUID,
 # 24-char name, 10-char status, remainder reserved for a short
@@ -50,6 +50,9 @@ LS_STATUS_WIDTH = 10
 # error before the HTTP round-trip.
 ALLOWED_STATUS = ("enabled", "disabled")
 
+# Sole HTTP status code interpreted at this layer (delete-noop semantics).
+HTTP_NOT_FOUND = 404
+
 app = typer.Typer(
     help="Manage MCP server registry (list / show / create / update / delete).",
     no_args_is_help=True,
@@ -59,26 +62,6 @@ app = typer.Typer(
 # --------------------------------------------------------------------------- #
 # Shared helpers
 # --------------------------------------------------------------------------- #
-
-
-def _require_one_output_mode(*, json_out: bool, plain: bool) -> None:
-    """Reject simultaneous --json + --plain. Mutually exclusive by design."""
-    if json_out and plain:
-        raise LocalError(
-            "Pass --json or --plain, not both.",
-            hint="--json for machine output, --plain for TSV.",
-        )
-
-
-def _load_state(profile: str) -> PersonaState:
-    """Load persona state for ``profile``; surface a friendly hint when absent."""
-    try:
-        return PersonaState.load(profile)
-    except FileNotFoundError as e:
-        raise LocalError(
-            f"No persona state for profile {profile!r}.",
-            hint="Run `paw login` first.",
-        ) from e
 
 
 def _parse_config(raw: str | None) -> dict[str, Any]:
@@ -138,8 +121,8 @@ def mcp_list(
       paw mcp list --json
       paw mcp list --plain
     """
-    _require_one_output_mode(json_out=json_out, plain=plain)
-    state = _load_state(profile)
+    require_one_output_mode(json_out=json_out, plain=plain)
+    state = load_state(profile)
     servers = asyncio.run(_list_mcp_servers(state))
 
     if json_out:
@@ -198,7 +181,7 @@ def mcp_show(
       paw mcp show 6c87...
       paw mcp show 6c87... --json
     """
-    state = _load_state(profile)
+    state = load_state(profile)
     servers = asyncio.run(_list_mcp_servers(state))
     match = next((s for s in servers if str(s.get("id")) == server_id), None)
     if match is None:
@@ -246,7 +229,7 @@ def mcp_create(
     """
     _validate_status(status)
     config_dict = _parse_config(config)
-    state = _load_state(profile)
+    state = load_state(profile)
     server = asyncio.run(_create_mcp_server(state, name=name, config=config_dict, status=status))
     if json_out:
         emit_json(server)
@@ -293,7 +276,7 @@ def mcp_update(
             hint="paw mcp update <id> --status disabled",
         )
 
-    state = _load_state(profile)
+    state = load_state(profile)
     current = asyncio.run(_get_mcp_server(state, server_id))
     body: dict[str, Any] = {
         "name": name if name is not None else current.get("name"),
@@ -332,7 +315,7 @@ def mcp_delete(
             "Pass --yes to confirm deletion.",
             hint="paw mcp delete <id> --yes",
         )
-    state = _load_state(profile)
+    state = load_state(profile)
     result = asyncio.run(_delete_mcp_server(state, server_id))
     if json_out:
         emit_json(result)
@@ -418,7 +401,7 @@ async def _delete_mcp_server(state: PersonaState, server_id: str) -> dict[str, A
                 expect=(204,),
             )
         except ApiError as e:
-            if "404" in e.message:
+            if e.status_code == HTTP_NOT_FOUND:
                 return {"deleted": False, "reason": "not_found", "id": server_id}
             raise
     return {"deleted": True, "id": server_id}

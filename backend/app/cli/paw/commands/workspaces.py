@@ -22,10 +22,10 @@ from typing import Any
 
 import typer
 
-from app.cli.paw.config import PersonaState
+from app.cli.paw.config import PersonaState, load_state
 from app.cli.paw.errors import ApiError, LocalError
 from app.cli.paw.http import PawClient
-from app.cli.paw.output import emit_human, emit_json, emit_plain_rows
+from app.cli.paw.output import emit_human, emit_json, emit_plain_rows, require_one_output_mode
 
 # Column widths for the workspace ls table on an 80-col terminal: 36 char UUID,
 # 30 char name, the remaining ~14 char fall to the IS_DEFAULT marker; path
@@ -38,6 +38,10 @@ LS_DEFAULT_WIDTH = 10
 MODELS_ID_WIDTH = 36
 MODELS_NAME_WIDTH = 28
 MODELS_HOST_WIDTH = 14
+
+# Mirrors HTTPStatus.NOT_FOUND. Local constant so the few "is this a 404
+# we should swallow?" sites read self-evidently without importing http.
+HTTP_NOT_FOUND = 404
 
 workspaces_app = typer.Typer(
     help="Manage workspaces (ls / show / use / create / rename / delete).",
@@ -66,26 +70,6 @@ workspace_app.add_typer(files_app, name="files")
 # --------------------------------------------------------------------------- #
 # Shared helpers
 # --------------------------------------------------------------------------- #
-
-
-def _require_one_output_mode(*, json_out: bool, plain: bool) -> None:
-    """Reject simultaneous --json + --plain. Mutually exclusive by design."""
-    if json_out and plain:
-        raise LocalError(
-            "Pass --json or --plain, not both.",
-            hint="--json for machine output, --plain for TSV.",
-        )
-
-
-def _load_state(profile: str) -> PersonaState:
-    """Load persona state for ``profile``; surface a friendly hint when absent."""
-    try:
-        return PersonaState.load(profile)
-    except FileNotFoundError as e:
-        raise LocalError(
-            f"No persona state for profile {profile!r}.",
-            hint="Run `paw login` first.",
-        ) from e
 
 
 def _resolve_workspace_id(state: PersonaState, override: str | None) -> str:
@@ -125,8 +109,8 @@ def workspaces_ls(
       paw workspaces ls --json
       paw workspaces ls --plain
     """
-    _require_one_output_mode(json_out=json_out, plain=plain)
-    state = _load_state(profile)
+    require_one_output_mode(json_out=json_out, plain=plain)
+    state = load_state(profile)
     workspaces = asyncio.run(_list_workspaces(state))
 
     if json_out:
@@ -168,7 +152,7 @@ def workspaces_show(
       paw workspaces show
       paw workspaces show --workspace ws-1 --json
     """
-    state = _load_state(profile)
+    state = load_state(profile)
     workspace_id = _resolve_workspace_id(state, workspace)
     workspaces = asyncio.run(_list_workspaces(state))
     match = next((w for w in workspaces if str(w.get("id")) == workspace_id), None)
@@ -207,7 +191,7 @@ def workspaces_use(
       paw workspaces use ws-1
       paw workspaces use 6c87... --json
     """
-    state = _load_state(profile)
+    state = load_state(profile)
     workspaces = asyncio.run(_list_workspaces(state))
     match = next((w for w in workspaces if str(w.get("id")) == workspace_id), None)
     if match is None:
@@ -249,7 +233,7 @@ def workspaces_create(
       paw workspaces create "ops" --default --json
       paw workspaces create "exploration" --path /workspaces/exploration
     """
-    state = _load_state(profile)
+    state = load_state(profile)
     workspace = asyncio.run(_create_workspace(state, name=name, path=path, is_default=is_default))
     if json_out:
         emit_json(workspace)
@@ -275,7 +259,7 @@ def workspaces_rename(
       paw workspaces rename ws-1 "Q2 planning"
       paw workspaces rename 6c87... "research" --json
     """
-    state = _load_state(profile)
+    state = load_state(profile)
     workspace = asyncio.run(_patch_workspace(state, workspace_id, body={"name": new_name}))
     if json_out:
         emit_json(workspace)
@@ -305,7 +289,7 @@ def workspaces_delete(
             "Pass --yes to confirm deletion.",
             hint="paw workspaces delete <id> --yes",
         )
-    state = _load_state(profile)
+    state = load_state(profile)
     result = asyncio.run(_delete_workspace(state, workspace_id))
     if json_out:
         emit_json(result)
@@ -374,7 +358,7 @@ async def _delete_workspace(state: PersonaState, workspace_id: str) -> dict[str,
                 expect=(204,),
             )
         except ApiError as e:
-            if "404" in e.message:
+            if e.status_code == HTTP_NOT_FOUND:
                 return {"deleted": False, "reason": "not_found", "id": workspace_id}
             raise
     return {"deleted": True, "id": workspace_id}
@@ -400,8 +384,8 @@ def env_get(
       paw workspace env get GEMINI_API_KEY
       paw workspace env get --json
     """
-    _require_one_output_mode(json_out=json_out, plain=plain)
-    state = _load_state(profile)
+    require_one_output_mode(json_out=json_out, plain=plain)
+    state = load_state(profile)
     workspace_id = _resolve_workspace_id(state, workspace)
     envelope = asyncio.run(_get_workspace_env(state, workspace_id))
     vars_dict = envelope.get("vars", {}) if isinstance(envelope, dict) else {}
@@ -440,7 +424,7 @@ def env_set(
       paw workspace env set GEMINI_API_KEY=sk-...
       paw workspace env set EXA_API_KEY=... OPENAI_API_KEY=... --json
     """
-    state = _load_state(profile)
+    state = load_state(profile)
     workspace_id = _resolve_workspace_id(state, workspace)
     deltas = _parse_kv_pairs(pairs)
     envelope = asyncio.run(_put_workspace_env(state, workspace_id, vars_dict=deltas))
@@ -473,7 +457,7 @@ def env_unset(
             "Pass --yes to confirm.",
             hint="paw workspace env unset KEY --yes",
         )
-    state = _load_state(profile)
+    state = load_state(profile)
     workspace_id = _resolve_workspace_id(state, workspace)
     results = asyncio.run(_delete_workspace_env_keys(state, workspace_id, keys))
     if json_out:
@@ -547,7 +531,7 @@ async def _delete_workspace_env_keys(
                 )
                 results.append({"key": key, "deleted": True})
             except ApiError as e:
-                if "404" in e.message:
+                if e.status_code == HTTP_NOT_FOUND:
                     results.append({"key": key, "deleted": False, "reason": "not_found"})
                 else:
                     raise
@@ -581,8 +565,8 @@ def files_ls(
       paw workspace files ls memory --json
       paw workspace files ls notes --plain
     """
-    _require_one_output_mode(json_out=json_out, plain=plain)
-    state = _load_state(profile)
+    require_one_output_mode(json_out=json_out, plain=plain)
+    state = load_state(profile)
     workspace_id = _resolve_workspace_id(state, workspace)
     envelope = asyncio.run(_get_workspace_tree(state, workspace_id))
     nodes = envelope.get("nodes", []) if isinstance(envelope, dict) else []
@@ -623,7 +607,7 @@ def files_cat(
       paw workspace files cat memory/2026-05-06.md
       paw workspace files cat notes/todo.md --json
     """
-    state = _load_state(profile)
+    state = load_state(profile)
     workspace_id = _resolve_workspace_id(state, workspace)
     envelope = asyncio.run(_read_workspace_file(state, workspace_id, path))
     if json_out:
@@ -665,7 +649,7 @@ def files_write(
         )
     payload_body = sys.stdin.read() if use_stdin else (content or "")
 
-    state = _load_state(profile)
+    state = load_state(profile)
     workspace_id = _resolve_workspace_id(state, workspace)
     envelope = asyncio.run(_write_workspace_file(state, workspace_id, path, payload_body))
     if json_out:
@@ -693,7 +677,7 @@ def files_rm(
             "Pass --yes to confirm deletion.",
             hint="paw workspace files rm <path> --yes",
         )
-    state = _load_state(profile)
+    state = load_state(profile)
     workspace_id = _resolve_workspace_id(state, workspace)
     result = asyncio.run(_delete_workspace_file(state, workspace_id, path))
     if json_out:
@@ -765,7 +749,7 @@ async def _delete_workspace_file(
                 expect=(204,),
             )
         except ApiError as e:
-            if "404" in e.message:
+            if e.status_code == HTTP_NOT_FOUND:
                 return {"deleted": False, "reason": "not_found", "path": file_path}
             raise
     return {"deleted": True, "path": file_path}

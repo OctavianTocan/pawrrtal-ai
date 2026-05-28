@@ -35,10 +35,10 @@ from typing import Any
 
 import typer
 
-from app.cli.paw.config import PersonaState
+from app.cli.paw.config import PersonaState, load_state
 from app.cli.paw.errors import LocalError
 from app.cli.paw.http import PawClient
-from app.cli.paw.output import emit_human, emit_json, emit_plain_rows
+from app.cli.paw.output import emit_human, emit_json, emit_plain_rows, require_one_output_mode
 
 # Backend constraint from ``app/api/lcm.py``: fresh_tail_count is
 # ``Query(ge=0, le=1024)``. Reject out-of-range inputs client-side so
@@ -55,26 +55,6 @@ app = typer.Typer(
     help="LCM observability — inspect the pre-turn assembled context (read-only).",
     no_args_is_help=True,
 )
-
-
-def _require_one_output_mode(*, json_out: bool, plain: bool) -> None:
-    """Reject simultaneous --json + --plain. Mutually exclusive by design."""
-    if json_out and plain:
-        raise LocalError(
-            "Pass --json or --plain, not both.",
-            hint="--json for machine output, --plain for TSV.",
-        )
-
-
-def _load_state(profile: str) -> PersonaState:
-    """Load persona state for ``profile``; surface a friendly hint when absent."""
-    try:
-        return PersonaState.load(profile)
-    except FileNotFoundError as e:
-        raise LocalError(
-            f"No persona state for profile {profile!r}.",
-            hint="Run `paw login` first.",
-        ) from e
 
 
 def _validate_fresh_tail_count(value: int | None) -> None:
@@ -127,9 +107,9 @@ def lcm_context(
       paw lcm context 6c87... --fresh-tail-count 32 --json
       paw lcm context 6c87... --plain
     """
-    _require_one_output_mode(json_out=json_out, plain=plain)
+    require_one_output_mode(json_out=json_out, plain=plain)
     _validate_fresh_tail_count(fresh_tail_count)
-    state = _load_state(profile)
+    state = load_state(profile)
     response = asyncio.run(
         _fetch_context(state, conversation_id, fresh_tail_count=fresh_tail_count)
     )

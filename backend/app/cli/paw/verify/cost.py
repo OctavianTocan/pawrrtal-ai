@@ -53,8 +53,14 @@ def _ledger_rows(payload: Any) -> list[dict[str, Any]]:
 
 async def _capture_baseline(
     client: PawClient, r: ScenarioResult
-) -> tuple[float | None, list[dict[str, Any]]]:
-    """Snapshot summary + ledger so post-turn deltas have a known starting point."""
+) -> list[dict[str, Any]]:
+    """Snapshot summary + ledger so post-turn deltas have a known starting point.
+
+    Returns the baseline ledger row list; the summary is recorded as an
+    artifact for debugging but not compared post-turn — see
+    :func:`_assert_ledger_delta` for why the conversation-scoped ledger
+    check is the only authoritative delta.
+    """
     summary = (await client.request("GET", "/api/v1/cost/")).json()
     r.artifacts["baseline_summary"] = summary
     current = _summary_current_usd(summary)
@@ -67,7 +73,7 @@ async def _capture_baseline(
     ledger = _ledger_rows((await client.request("GET", "/api/v1/cost/ledger")).json())
     r.artifacts["baseline_ledger_count"] = len(ledger)
     r.add("baseline_ledger_size", True, detail=f"rows={len(ledger)}")
-    return current, ledger
+    return ledger
 
 
 async def _drive_chat_turn(
@@ -103,29 +109,6 @@ async def _drive_chat_turn(
     if not final_text.strip():
         return None
     return conv_id
-
-
-async def _assert_summary_delta(
-    client: PawClient,
-    r: ScenarioResult,
-    baseline_current: float | None,
-) -> None:
-    """Post-turn summary must show ``current_usd`` strictly greater than baseline."""
-    summary = (await client.request("GET", "/api/v1/cost/")).json()
-    r.artifacts["post_turn_summary"] = summary
-    post = _summary_current_usd(summary)
-    if baseline_current is None or post is None:
-        r.add(
-            "summary_current_usd_increased",
-            False,
-            detail=f"baseline={baseline_current} post={post}",
-        )
-        return
-    r.add(
-        "summary_current_usd_increased",
-        post > baseline_current,
-        detail=f"baseline={baseline_current} post={post}",
-    )
 
 
 async def _assert_ledger_delta(
@@ -206,14 +189,17 @@ async def run_cost_scenario(
     if model_id is None:
         return r
 
-    baseline_current, baseline_ledger = await _capture_baseline(client, r)
+    baseline_ledger = await _capture_baseline(client, r)
 
     conv_id = await _drive_chat_turn(client, r, model_id=model_id)
     if conv_id is None:
         _record_budget_gap(r)
         return r
 
-    await _assert_summary_delta(client, r, baseline_current)
+    # The summary endpoint reports the whole user's accumulated cost,
+    # so its post-turn delta is racy under fanout (sibling slots can
+    # advance ``current_usd`` independently). The ledger delta below
+    # filters by ``conversation_id`` and is the authoritative check.
     await _assert_ledger_delta(client, r, len(baseline_ledger), conv_id)
     _record_budget_gap(r)
     await helpers.cleanup_conversation(client, r, conv_id)

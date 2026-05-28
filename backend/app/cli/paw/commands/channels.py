@@ -36,10 +36,10 @@ from typing import Any
 
 import typer
 
-from app.cli.paw.config import PersonaState
+from app.cli.paw.config import PersonaState, load_state
 from app.cli.paw.errors import LocalError
 from app.cli.paw.http import PawClient
-from app.cli.paw.output import emit_human, emit_json, emit_plain_rows
+from app.cli.paw.output import emit_human, emit_json, emit_plain_rows, require_one_output_mode
 
 # Column widths for `paw channels list` on an 80-col terminal: 12-char
 # provider, 30-char external user id (Telegram numeric IDs fit easily),
@@ -77,26 +77,6 @@ app.add_typer(unlink_app, name="unlink")
 # --------------------------------------------------------------------------- #
 
 
-def _require_one_output_mode(*, json_out: bool, plain: bool) -> None:
-    """Reject simultaneous --json + --plain. Mutually exclusive by design."""
-    if json_out and plain:
-        raise LocalError(
-            "Pass --json or --plain, not both.",
-            hint="--json for machine output, --plain for TSV.",
-        )
-
-
-def _load_state(profile: str) -> PersonaState:
-    """Load persona state for ``profile``; surface a friendly hint when absent."""
-    try:
-        return PersonaState.load(profile)
-    except FileNotFoundError as e:
-        raise LocalError(
-            f"No persona state for profile {profile!r}.",
-            hint="Run `paw login` first.",
-        ) from e
-
-
 # --------------------------------------------------------------------------- #
 # paw channels list / ls
 # --------------------------------------------------------------------------- #
@@ -119,8 +99,8 @@ def channels_list(
       paw channels list --json
       paw channels list --plain
     """
-    _require_one_output_mode(json_out=json_out, plain=plain)
-    state = _load_state(profile)
+    require_one_output_mode(json_out=json_out, plain=plain)
+    state = load_state(profile)
     bindings = asyncio.run(_list_channels(state))
 
     if json_out:
@@ -188,7 +168,7 @@ def link_telegram(
       paw channels link telegram
       paw channels link telegram --json
     """
-    state = _load_state(profile)
+    state = load_state(profile)
     code = asyncio.run(_issue_telegram_link_code(state))
 
     if json_out:
@@ -231,7 +211,7 @@ def unlink_telegram(
             "Pass --yes to confirm unlink.",
             hint="paw channels unlink telegram --yes",
         )
-    state = _load_state(profile)
+    state = load_state(profile)
     result = asyncio.run(_unlink_provider(state, TELEGRAM_PROVIDER))
     if json_out:
         emit_json(result)

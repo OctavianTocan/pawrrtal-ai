@@ -44,10 +44,10 @@ from typing import Any
 
 import typer
 
-from app.cli.paw.config import PersonaState
+from app.cli.paw.config import PersonaState, load_state
 from app.cli.paw.errors import ApiError, LocalError
 from app.cli.paw.http import PawClient
-from app.cli.paw.output import emit_human, emit_json, emit_plain_rows
+from app.cli.paw.output import emit_human, emit_json, emit_plain_rows, require_one_output_mode
 
 # Column widths for ``paw jobs ls`` on an 80-col terminal: 36-char
 # UUID, 24-char name, schedule expression (cron or ISO datetime),
@@ -62,6 +62,9 @@ LS_ACTIVE_WIDTH = 6
 # inputs client-side so we surface a friendly hint instead of a 422.
 NAME_MIN_LEN = 1
 NAME_MAX_LEN = 128
+
+# Sole HTTP status code interpreted at this layer (delete-noop semantics).
+HTTP_NOT_FOUND = 404
 CRON_MIN_LEN = 1
 CRON_MAX_LEN = 128
 
@@ -74,26 +77,6 @@ app = typer.Typer(
 # --------------------------------------------------------------------------- #
 # Shared helpers
 # --------------------------------------------------------------------------- #
-
-
-def _require_one_output_mode(*, json_out: bool, plain: bool) -> None:
-    """Reject simultaneous --json + --plain. Mutually exclusive by design."""
-    if json_out and plain:
-        raise LocalError(
-            "Pass --json or --plain, not both.",
-            hint="--json for machine output, --plain for TSV.",
-        )
-
-
-def _load_state(profile: str) -> PersonaState:
-    """Load persona state for ``profile``; surface a friendly hint when absent."""
-    try:
-        return PersonaState.load(profile)
-    except FileNotFoundError as e:
-        raise LocalError(
-            f"No persona state for profile {profile!r}.",
-            hint="Run `paw login` first.",
-        ) from e
 
 
 def _validate_name(name: str) -> None:
@@ -174,8 +157,8 @@ def jobs_list(
       paw jobs list --json
       paw jobs list --active-only --plain
     """
-    _require_one_output_mode(json_out=json_out, plain=plain)
-    state = _load_state(profile)
+    require_one_output_mode(json_out=json_out, plain=plain)
+    state = load_state(profile)
     jobs = asyncio.run(_list_jobs(state))
     if active_only:
         jobs = [j for j in jobs if j.get("is_active")]
@@ -249,7 +232,7 @@ def jobs_show(
       paw jobs show 6c87...
       paw jobs show 6c87... --json
     """
-    state = _load_state(profile)
+    state = load_state(profile)
     match = asyncio.run(_get_job(state, job_id))
 
     if json_out:
@@ -341,7 +324,7 @@ def jobs_create(
         _validate_cron(cron)
     fire_at = _parse_fire_at(at) if at is not None else None
 
-    state = _load_state(profile)
+    state = load_state(profile)
     job = asyncio.run(
         _create_job(
             state,
@@ -391,7 +374,7 @@ def jobs_delete(
             "Pass --yes to confirm deletion.",
             hint="paw jobs delete <id> --yes",
         )
-    state = _load_state(profile)
+    state = load_state(profile)
     result = asyncio.run(_delete_job(state, job_id))
     if json_out:
         emit_json(result)
@@ -483,7 +466,7 @@ async def _delete_job(state: PersonaState, job_id: str) -> dict[str, Any]:
                 expect=(204,),
             )
         except ApiError as e:
-            if "404" in e.message:
+            if e.status_code == HTTP_NOT_FOUND:
                 return {"deleted": False, "reason": "not_found", "id": job_id}
             raise
     return {"deleted": True, "id": job_id}

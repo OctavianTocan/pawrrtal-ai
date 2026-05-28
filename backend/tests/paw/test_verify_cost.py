@@ -34,7 +34,6 @@ SSE_OK = (
 
 # Baseline summary: $1.23 used out of $100 cap.
 BASELINE_CURRENT_USD = 1.23
-POST_TURN_CURRENT_USD = 1.45
 
 # Per-turn cost reported on the new ledger row.
 TURN_COST_USD = 0.22
@@ -118,28 +117,22 @@ def _mock_happy_path(
     baseline_ledger: list[dict[str, Any]] | None = None,
     post_turn_ledger: list[dict[str, Any]] | None = None,
     baseline_summary: dict[str, Any] | None = None,
-    post_turn_summary: dict[str, Any] | None = None,
 ) -> None:
     """Wire every endpoint the scenario touches to a healthy response.
 
-    The cost endpoints are called twice in sequence (baseline then
-    post-turn); we use ``side_effect`` so the second call returns the
-    updated payload.
+    The summary endpoint is hit once (baseline only) — the scenario no
+    longer compares ``current_usd`` across the turn because that summary
+    is racy under fanout. The conversation-scoped ledger delta is the
+    authoritative check.
     """
     base_ledger = baseline_ledger if baseline_ledger is not None else []
     post_ledger = (
         post_turn_ledger if post_turn_ledger is not None else [_ledger_row(conversation_id=conv_id)]
     )
     base_summary = baseline_summary or _summary(BASELINE_CURRENT_USD)
-    post_summary = post_turn_summary or _summary(POST_TURN_CURRENT_USD)
 
     r.get("/api/v1/models").mock(return_value=httpx.Response(200, json=_models_payload()))
-    r.get("/api/v1/cost/").mock(
-        side_effect=[
-            httpx.Response(200, json=base_summary),
-            httpx.Response(200, json=post_summary),
-        ]
-    )
+    r.get("/api/v1/cost/").mock(return_value=httpx.Response(200, json=base_summary))
     r.get("/api/v1/cost/ledger").mock(
         side_effect=[
             httpx.Response(200, json=base_ledger),
@@ -186,13 +179,16 @@ def test_happy_path_passes_every_check(
         "conversation_created",
         "chat_turn_no_errors",
         "chat_turn_final_text_nonempty",
-        "summary_current_usd_increased",
         "ledger_row_added",
         "ledger_row_references_conversation",
         "ledger_row_cost_nonzero",
         "budget_endpoint_unavailable",
         "conversation_cleanup",
     } <= names
+    # ``summary_current_usd_increased`` was retired: the summary endpoint
+    # reports the whole user, which races under fanout. The
+    # conversation-scoped ledger checks are the authoritative delta.
+    assert "summary_current_usd_increased" not in names
 
 
 def test_baseline_401_exits_3(runner: CliRunner, seeded: PersonaState, stable_uuid: str) -> None:
@@ -204,20 +200,6 @@ def test_baseline_401_exits_3(runner: CliRunner, seeded: PersonaState, stable_uu
         )
         result = runner.invoke(app, ["verify", "cost", "--json"])
     assert result.exit_code == 3, result.stdout
-
-
-def test_summary_no_delta_fails_increase_check(
-    runner: CliRunner, seeded: PersonaState, stable_uuid: str
-) -> None:
-    """``current_usd`` unchanged after the turn trips the increase check."""
-    flat = _summary(BASELINE_CURRENT_USD)
-    with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
-        _mock_happy_path(r, stable_uuid, baseline_summary=flat, post_turn_summary=flat)
-        result = runner.invoke(app, ["verify", "cost", "--json"])
-
-    assert result.exit_code == 6, result.stdout
-    payload = json.loads(result.stdout)
-    assert "summary_current_usd_increased" in _failed_check_names(payload)
 
 
 def test_no_new_ledger_row_fails_added_check(
@@ -313,7 +295,6 @@ def test_json_shape_matches_scenario_result(
     # Every artifact key we promise to emit on the happy path.
     assert "baseline_summary" in payload["artifacts"]
     assert "baseline_ledger_count" in payload["artifacts"]
-    assert "post_turn_summary" in payload["artifacts"]
     assert "post_turn_ledger_count" in payload["artifacts"]
     assert "chat_events" in payload["artifacts"]
 

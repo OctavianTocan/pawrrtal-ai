@@ -9,6 +9,8 @@ from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 
+from app.cli.paw.errors import LocalError
+
 DEFAULT_PROFILE = "default"
 SCHEMA_VERSION = 1
 
@@ -92,3 +94,20 @@ class PersonaState:
             except OSError:
                 pass
             raise
+
+
+def load_state(profile: str) -> PersonaState:
+    """Load persona state for ``profile``; surface a friendly hint when absent.
+
+    Shared wrapper around :meth:`PersonaState.load` that maps a missing
+    state file to a ``LocalError`` with a ``paw login`` hint, so every
+    command surfaces the same message instead of duplicating the
+    try/except boilerplate locally.
+    """
+    try:
+        return PersonaState.load(profile)
+    except FileNotFoundError as e:
+        raise LocalError(
+            f"No persona state for profile {profile!r}.",
+            hint="Run `paw login` first.",
+        ) from e

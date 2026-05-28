@@ -18,6 +18,7 @@ import httpx
 
 from app.cli.paw.config import PersonaState, cookies_path
 from app.cli.paw.errors import ApiError, AuthError, BackendUnreachable
+from app.cli.paw.sse import stream_chat_events
 
 DEFAULT_TIMEOUT_SECONDS = 60.0
 RESPONSE_BODY_PREVIEW_BYTES = 500
@@ -264,8 +265,33 @@ class PawClient:
         if expect and resp.status_code not in expect:
             raise ApiError(
                 f"{method} {path} -> {resp.status_code}: {resp.text[:ERROR_BODY_PREVIEW_CHARS]}",
+                status_code=resp.status_code,
             )
         return resp
+
+    def stream_events(
+        self,
+        *,
+        method: str,
+        url: str,
+        json_body: Any | None = None,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Yield decoded SSE events for a chat endpoint, with recording wired in.
+
+        Lets callers consume the chat stream without reaching into the
+        private ``_client`` attribute. The recording tap is attached
+        automatically when ``PAW_RECORD`` is active, so the call site
+        only needs the URL + body. The returned async iterator delegates
+        to :func:`app.cli.paw.sse.stream_chat_events`.
+        """
+        full_url = str(self._client.base_url.join(url))
+        return stream_chat_events(
+            self._client,
+            method,
+            url,
+            json_body=json_body,
+            on_raw_frame=self.make_sse_tap(full_url),
+        )
 
 
 @asynccontextmanager

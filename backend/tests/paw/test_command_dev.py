@@ -17,13 +17,16 @@ import httpx
 import pytest
 
 from app.cli.paw import config as paw_config
-from app.cli.paw.commands import dev as dev_module
+from app.cli.paw.commands.dev import commands as dev_commands_module
+from app.cli.paw.commands.dev import process as process_module
+from app.cli.paw.commands.dev import state as state_module
+from app.cli.paw.errors import EXIT_DEV_DEAD
 from app.cli.paw.main import app
 
 
 @dataclass
 class _FakeResponse:
-    """Stand-in for ``httpx.Response`` accepted by ``_probe_health``."""
+    """Stand-in for ``httpx.Response`` accepted by ``probe_health``."""
 
     status_code: int
 
@@ -48,7 +51,7 @@ def fake_popen(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
         calls.append(kwargs)
         return _FakePopen(pid=12345)
 
-    monkeypatch.setattr(dev_module, "_spawn_uvicorn", fake_spawn)
+    monkeypatch.setattr(process_module, "spawn_uvicorn", fake_spawn)
     return calls
 
 
@@ -74,13 +77,13 @@ def unhealthy_backend(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def alive_pids(monkeypatch: pytest.MonkeyPatch) -> set[int]:
-    """Track which PIDs ``_pid_alive`` should report as alive."""
+    """Track which PIDs ``pid_alive`` should report as alive."""
     alive: set[int] = set()
 
     def fake_pid_alive(pid: int) -> bool:
         return pid in alive
 
-    monkeypatch.setattr(dev_module, "_pid_alive", fake_pid_alive)
+    monkeypatch.setattr(process_module, "pid_alive", fake_pid_alive)
     return alive
 
 
@@ -101,8 +104,8 @@ def killed_pids(monkeypatch: pytest.MonkeyPatch) -> list[tuple[int, int]]:
 @pytest.fixture
 def fast_polls(monkeypatch: pytest.MonkeyPatch) -> None:
     """Shrink the poll cadences so ``--no-detach``-less tests don't hang on edge cases."""
-    monkeypatch.setattr(dev_module, "HEALTH_PROBE_INTERVAL_S", 0.0)
-    monkeypatch.setattr(dev_module, "LIVENESS_POLL_INTERVAL_S", 0.0)
+    monkeypatch.setattr(process_module, "HEALTH_PROBE_INTERVAL_S", 0.0)
+    monkeypatch.setattr(process_module, "LIVENESS_POLL_INTERVAL_S", 0.0)
 
 
 def test_up_writes_state_file_and_reports_success(
@@ -124,7 +127,7 @@ def test_up_writes_state_file_and_reports_success(
     assert state["pid"] == 12345
     assert state["port"] == 8000
     assert state["host"] == "127.0.0.1"
-    assert state["schema_version"] == dev_module.DEV_STATE_SCHEMA_VERSION
+    assert state["schema_version"] == state_module.DEV_STATE_SCHEMA_VERSION
     assert "started_at" in state
     assert state["log_path"].endswith("dev.log")
 
@@ -165,7 +168,7 @@ def test_up_restart_stops_old_and_starts_new(
     def fake_spawn_2(**_: Any) -> _FakePopen:
         return _FakePopen(pid=67890)
 
-    monkeypatch.setattr(dev_module, "_spawn_uvicorn", fake_spawn_2)
+    monkeypatch.setattr(process_module, "spawn_uvicorn", fake_spawn_2)
 
     sent: list[tuple[int, int]] = []
 
@@ -195,7 +198,7 @@ def test_up_boot_timeout_when_health_never_responds(
     monkeypatch,
 ):
     """`paw dev up` fails with exit 1 if /api/v1/health never responds."""
-    monkeypatch.setattr(dev_module, "DEFAULT_BOOT_TIMEOUT_S", 1)
+    monkeypatch.setattr(process_module, "DEFAULT_BOOT_TIMEOUT_S", 1)
     result = runner.invoke(app, ["dev", "up", "--boot-timeout", "1"])
     assert result.exit_code == 1
     # The child should be torn down so we don't leak a half-booted process.
@@ -289,12 +292,15 @@ def test_status_when_tracked_but_pid_dead(
     alive_pids,
     fast_polls,
 ):
-    """`paw dev status` exits 4 when the recorded PID is no longer alive."""
+    """`paw dev status` exits EXIT_DEV_DEAD (7) when the recorded PID is no longer alive."""
     runner.invoke(app, ["dev", "up"])
     # alive_pids is empty -> PID is dead.
 
     result = runner.invoke(app, ["dev", "status"])
-    assert result.exit_code == dev_module.EXIT_TRACKED_BUT_DEAD
+    assert result.exit_code == EXIT_DEV_DEAD
+    # Exit 7 must remain distinct from 4 (BackendUnreachable) so callers
+    # can tell "tracked process died" from "couldn't reach backend".
+    assert EXIT_DEV_DEAD == 7
     assert "stopped" in result.stdout
 
 
@@ -319,6 +325,7 @@ def test_status_json_schema(
         "port",
         "started_at",
         "uptime",
+        "uptime_s",
         "log_path",
         "pid_alive",
         "healthy",
@@ -328,11 +335,66 @@ def test_status_json_schema(
     assert payload["tracked"] is True
     assert payload["pid"] == 12345
     assert payload["status"] == "running"
+    assert isinstance(payload["uptime_s"], int)
+
+
+def test_status_plain_emits_single_tsv_row(
+    runner,
+    fake_popen,
+    healthy_backend,
+    alive_pids,
+    fast_polls,
+):
+    """`paw dev status --plain` emits a single TSV row: pid\tport\tuptime_s\thealth."""
+    runner.invoke(app, ["dev", "up"])
+    alive_pids.add(12345)
+
+    result = runner.invoke(app, ["dev", "status", "--plain"])
+    assert result.exit_code == 0
+    line = result.stdout.strip().splitlines()[-1]
+    columns = line.split("\t")
+    assert len(columns) == 4
+    pid_col, port_col, uptime_col, health_col = columns
+    assert pid_col == "12345"
+    assert port_col == "8000"
+    # uptime_s must be a stringified integer.
+    assert uptime_col.isdigit()
+    assert health_col == "ok"
+
+
+def test_status_plain_untracked_row(runner, monkeypatch):
+    """`paw dev status --plain` with no state emits an ``untracked`` health row."""
+    monkeypatch.setattr(process_module, "port_in_use", lambda host, port: False)
+    result = runner.invoke(app, ["dev", "status", "--plain"])
+    assert result.exit_code == 0
+    # Avoid ``.strip()`` — the leading-empty pid column is significant.
+    line = result.stdout.rstrip("\n").splitlines()[-1]
+    columns = line.split("\t")
+    assert len(columns) == 4
+    assert columns[0] == ""  # pid
+    assert columns[1] == "8000"  # port
+    assert columns[2] == ""  # uptime_s
+    assert columns[3] == "untracked"
+
+
+def test_status_rejects_json_and_plain_together(
+    runner,
+    fake_popen,
+    healthy_backend,
+    alive_pids,
+    fast_polls,
+):
+    """`paw dev status --json --plain` exits 1 — mutually exclusive."""
+    runner.invoke(app, ["dev", "up"])
+    alive_pids.add(12345)
+
+    result = runner.invoke(app, ["dev", "status", "--json", "--plain"])
+    assert result.exit_code == 1
 
 
 def test_status_untracked_probes_port(runner, monkeypatch):
     """`paw dev status` with no state file probes the canonical port."""
-    monkeypatch.setattr(dev_module, "_port_in_use", lambda host, port: False)
+    monkeypatch.setattr(process_module, "port_in_use", lambda host, port: False)
     result = runner.invoke(app, ["dev", "status"])
     assert result.exit_code == 0
     assert "untracked" in result.stdout
@@ -340,7 +402,7 @@ def test_status_untracked_probes_port(runner, monkeypatch):
 
 def test_status_untracked_json_flags_port_in_use(runner, monkeypatch):
     """The untracked JSON payload includes ``port_in_use`` for diagnosis."""
-    monkeypatch.setattr(dev_module, "_port_in_use", lambda host, port: True)
+    monkeypatch.setattr(process_module, "port_in_use", lambda host, port: True)
     result = runner.invoke(app, ["dev", "status", "--json"])
     assert result.exit_code == 0
     payload = json.loads(result.stdout.strip().splitlines()[-1])
@@ -349,9 +411,58 @@ def test_status_untracked_json_flags_port_in_use(runner, monkeypatch):
     assert payload["status"] == "untracked"
 
 
+def test_spawn_uvicorn_reload_excludes_log_and_state_files(monkeypatch):
+    """The real spawn_uvicorn command line includes --reload-exclude (review M2).
+
+    Bypasses the ``fake_popen`` fixture so the actual command builder runs.
+    Intercepts ``subprocess.Popen`` to capture argv without launching uvicorn.
+    """
+    import subprocess
+
+    captured: dict[str, Any] = {}
+
+    class _PopenStub:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            captured["argv"] = args[0]
+            self.pid = 99999
+
+    monkeypatch.setattr(subprocess, "Popen", _PopenStub)
+    proc = process_module.spawn_uvicorn(host="127.0.0.1", port=8000, reload=True, log_handle=0)
+    assert proc.pid == 99999
+    argv = captured["argv"]
+    # Defensive: log files + state JSON must not retrigger the watcher.
+    assert "--reload-exclude" in argv
+    assert "*.log" in argv
+    assert "dev.json" in argv
+
+
+def test_graceful_shutdown_timeout_raised_for_sse_drain():
+    """Graceful timeout is 30s, not 10s (review M9 — SSE drain headroom)."""
+    assert process_module.GRACEFUL_SHUTDOWN_TIMEOUT_S == 30
+
+
 def test_dev_help_renders(runner):
     """`paw dev --help` exits 0 and lists the three verbs."""
     result = runner.invoke(app, ["dev", "--help"])
     assert result.exit_code == 0
     for verb in ("up", "down", "status"):
         assert verb in result.stdout
+
+
+def test_status_help_renders(runner):
+    """`paw dev status --help` exits 0 and documents --plain."""
+    result = runner.invoke(app, ["dev", "status", "--help"])
+    assert result.exit_code == 0
+    assert "--plain" in result.stdout
+
+
+def test_dev_commands_module_re_exported_app_matches(runner):
+    """``app.cli.paw.commands.dev.app`` matches the Typer app on the commands module.
+
+    Verifies the package ``__init__`` re-exports the Typer instance so
+    ``main.py``'s existing ``app.add_typer(dev_cmd.app, ...)`` call keeps
+    working without changes to the registration site.
+    """
+    from app.cli.paw.commands import dev as dev_pkg
+
+    assert dev_pkg.app is dev_commands_module.app

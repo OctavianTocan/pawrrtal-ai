@@ -32,11 +32,10 @@ from typing import Any
 import typer
 
 from app.cli.paw import ids
-from app.cli.paw.config import PersonaState
+from app.cli.paw.config import PersonaState, load_state
 from app.cli.paw.errors import ApiError, LocalError
 from app.cli.paw.http import PawClient
-from app.cli.paw.output import emit_human, emit_json, emit_plain_rows
-from app.cli.paw.sse import stream_chat_events
+from app.cli.paw.output import emit_human, emit_json, emit_plain_rows, require_one_output_mode
 
 # Default cap on conversations returned by `paw conversations ls`. Mirrors
 # the chat sidebar's "first page" without paging UI complexity for v1.
@@ -54,6 +53,9 @@ LS_ID_WIDTH = 36
 LS_TITLE_WIDTH = 40
 LS_MODEL_WIDTH = 25
 
+# Sole HTTP status code interpreted at this layer (delete-noop semantics).
+HTTP_NOT_FOUND = 404
+
 app = typer.Typer(
     help="Manage conversations and send chat turns. Drives the UUID-first flow.",
     no_args_is_help=True,
@@ -63,26 +65,6 @@ app = typer.Typer(
 # --------------------------------------------------------------------------- #
 # Shared helpers
 # --------------------------------------------------------------------------- #
-
-
-def _require_one_output_mode(*, json_out: bool, plain: bool) -> None:
-    """Reject simultaneous --json + --plain. Mutually exclusive by design."""
-    if json_out and plain:
-        raise LocalError(
-            "Pass --json or --plain, not both.",
-            hint="--json for machine output, --plain for TSV.",
-        )
-
-
-def _load_state(profile: str) -> PersonaState:
-    """Load the persona state for the active profile, or raise a LocalError."""
-    try:
-        return PersonaState.load(profile)
-    except FileNotFoundError as e:
-        raise LocalError(
-            f"No persona state for profile {profile!r}.",
-            hint="Run `paw login` first.",
-        ) from e
 
 
 def _stderr(message: str) -> None:
@@ -122,7 +104,7 @@ def create(
       paw conversations create --title "Q2 planning" --json
       paw conversations create --model gpt-4o --workspace ws-1
     """
-    state = _load_state(profile)
+    state = load_state(profile)
     new_id = ids.new_conversation_id()
     conversation = asyncio.run(
         _create_conversation(state, new_id, title=title, model=model, workspace=workspace)
@@ -219,7 +201,7 @@ def send(
             "Pass --conversation or --new, not both.",
         )
 
-    state = _load_state(profile)
+    state = load_state(profile)
     result = asyncio.run(
         _send_turn(
             state,
@@ -299,13 +281,10 @@ async def _send_turn(
         error_payload: dict[str, Any] | None = None
 
         chat_path = "/api/v1/chat/"
-        chat_url = str(client._client.base_url.join(chat_path))
-        async for event in stream_chat_events(
-            client._client,
-            "POST",
-            chat_path,
+        async for event in client.stream_events(
+            method="POST",
+            url=chat_path,
             json_body=chat_body,
-            on_raw_frame=client.make_sse_tap(chat_url),
         ):
             event_type = event.get("type", "unknown")
             event_counts[event_type] = event_counts.get(event_type, 0) + 1
@@ -365,8 +344,8 @@ def ls(
       paw conversations ls --json --limit 10
       paw conversations ls --plain
     """
-    _require_one_output_mode(json_out=json_out, plain=plain)
-    state = _load_state(profile)
+    require_one_output_mode(json_out=json_out, plain=plain)
+    state = load_state(profile)
     conversations = asyncio.run(_list_conversations(state, limit))
 
     if json_out:
@@ -428,7 +407,7 @@ def show(
       paw conversations show 6c87... --json
       paw conversations show 6c87... --with-messages --json
     """
-    state = _load_state(profile)
+    state = load_state(profile)
     result = asyncio.run(_show_conversation(state, conversation_id, with_messages=with_messages))
 
     if json_out:
@@ -493,7 +472,7 @@ def rename(
     Examples:
       paw conversations rename 6c87... "Q2 planning"
     """
-    state = _load_state(profile)
+    state = load_state(profile)
     result = asyncio.run(_rename_conversation(state, conversation_id, new_title))
     if json_out:
         emit_json(result)
@@ -543,7 +522,7 @@ def delete(
             "Pass --yes to confirm deletion.",
             hint="paw conversations delete <id> --yes",
         )
-    state = _load_state(profile)
+    state = load_state(profile)
     result = asyncio.run(_delete_conversation(state, conversation_id))
     if json_out:
         emit_json(result)
@@ -565,9 +544,8 @@ async def _delete_conversation(state: PersonaState, conversation_id: str) -> dic
             )
         except ApiError as e:
             # Idempotency: a 404 means the row was already gone — same end
-            # state from the caller's perspective. ApiError carries the raw
-            # status code preview in its message, so detect by substring.
-            if "404" in e.message:
+            # state from the caller's perspective.
+            if e.status_code == HTTP_NOT_FOUND:
                 return {"deleted": False, "reason": "not_found", "id": conversation_id}
             raise
     return {"deleted": True, "id": conversation_id}
@@ -595,7 +573,7 @@ def export(
             f"Unknown --format {export_format!r}.",
             hint="--format md  |  --format json",
         )
-    state = _load_state(profile)
+    state = load_state(profile)
     messages = asyncio.run(_fetch_messages(state, conversation_id))
     if export_format == "json":
         emit_json({"id": conversation_id, "messages": messages})

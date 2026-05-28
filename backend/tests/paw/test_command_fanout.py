@@ -220,3 +220,60 @@ def test_fanout_child_env_inherits_paw_config_dir_unique_per_slot(
         child_dir = Path(call["env"]["PAW_CONFIG_DIR"])
         assert child_dir.parent == root
         assert child_dir.name.startswith(".fanout-paw-fanout-")
+
+
+def test_fanout_strips_paw_record_from_child_env(
+    runner, captured_spawns, monkeypatch
+):
+    """``PAW_RECORD`` in the parent env must not leak into spawned children.
+
+    Otherwise N slots overwrite each other's rows in the same recorder
+    file and the parent's recorded fixture is corrupted with interleaved
+    request rows from every child. Children that need to record should
+    be invoked under their own ``paw record`` wrapper.
+    """
+    monkeypatch.setenv("PAW_RECORD", "/tmp/paw-record-parent.jsonl")
+    result = runner.invoke(app, ["fanout", "2", "auth", "status"])
+    assert result.exit_code == 0, result.stdout
+    assert len(captured_spawns) == 2
+    for call in captured_spawns:
+        assert "PAW_RECORD" not in call["env"], (
+            "child inherited PAW_RECORD; would corrupt the parent fixture"
+        )
+
+
+def test_fanout_plain_output_emits_tsv_rows(runner, monkeypatch):
+    """--plain emits one TSV row per slot: slot, exit_code, duration_ms, stdout_size."""
+
+    async def fake_create(*args, env=None, **_):
+        slot = int(env["PAW_PROFILE"].rsplit("-", 1)[1])
+        return _FakeProc(
+            returncode=0,
+            stdout=f"hello-{slot}\n".encode(),
+            stderr=b"",
+        )
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create)
+    result = runner.invoke(app, ["fanout", "2", "--plain", "auth", "status"])
+    assert result.exit_code == 0, result.stdout
+    rows = [
+        line.split("\t")
+        for line in result.stdout.strip().splitlines()
+        if line and "\t" in line
+    ]
+    assert len(rows) == 2
+    for row in rows:
+        assert len(row) == 4  # slot, exit_code, duration_ms, stdout_size_bytes
+        int(row[0])
+        int(row[1])
+        int(row[2])
+        int(row[3])
+
+
+def test_fanout_rejects_json_plus_plain(runner):
+    """--json and --plain are mutually exclusive (fail with exit=1)."""
+    result = runner.invoke(
+        app,
+        ["fanout", "2", "--json", "--plain", "auth", "status"],
+    )
+    assert result.exit_code == 1

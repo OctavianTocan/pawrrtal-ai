@@ -27,7 +27,8 @@ import typer
 
 from app.cli.paw.config import config_root
 from app.cli.paw.errors import LocalError
-from app.cli.paw.output import emit_human, emit_json
+from app.cli.paw.http import RECORD_ENV_VAR
+from app.cli.paw.output import emit_human, emit_json, emit_plain_rows, require_one_output_mode
 
 logger = logging.getLogger(__name__)
 
@@ -67,10 +68,15 @@ def fanout(
         help="Cap simultaneous children. 0 (default) = no cap, run all at once.",
         min=0,
     ),
-    json_output: bool = typer.Option(
+    json_out: bool = typer.Option(
         False,
         "--json",
         help="Emit a JSON array of per-slot results instead of the human table.",
+    ),
+    plain: bool = typer.Option(
+        False,
+        "--plain",
+        help="Emit one TSV row per slot (slot, exit_code, duration_ms, stdout_size_bytes).",
     ),
     persona_prefix: str = typer.Option(
         DEFAULT_PERSONA_PREFIX,
@@ -90,6 +96,7 @@ def fanout(
       paw fanout 3 --json auth status
       paw fanout 10 --max-concurrent 3 verify chat-roundtrip --json
     """
+    require_one_output_mode(json_out=json_out, plain=plain)
     extra = list(ctx.args)
     if not extra:
         raise LocalError(
@@ -118,8 +125,18 @@ def fanout(
         if not keep_personas:
             _cleanup_slot_dirs(slot_dirs)
 
-    if json_output:
+    if json_out:
         emit_json([_serialise_result(r) for r in results])
+    elif plain:
+        emit_plain_rows(
+            (
+                r.slot,
+                r.exit_code,
+                r.duration_ms,
+                len(r.stdout.encode("utf-8", errors="replace")),
+            )
+            for r in results
+        )
     else:
         _emit_human_summary(results)
 
@@ -229,6 +246,11 @@ def _build_child_env(profile: str, slot_dir: Path) -> dict[str, str]:
     env = dict(os.environ)
     env["PAW_CONFIG_DIR"] = str(slot_dir)
     env["PAW_PROFILE"] = profile
+    # Drop ``PAW_RECORD`` so children never inherit the parent's recorder
+    # fixture path. Otherwise N slots clobber each other in the same file
+    # and the parent's recorded session is corrupted with interleaved
+    # request rows from each child.
+    env.pop(RECORD_ENV_VAR, None)
     return env
 
 

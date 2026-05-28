@@ -7,8 +7,8 @@ The headline scenario for ``paw verify``. Drives the real chat surface
 observable property a Codex turn touches.
 
 The scenario itself uses paw's own building blocks — ``PawClient``,
-``stream_chat_events``, ``new_conversation_id`` — so frame-boundary bugs
-in the SSE framer are caught the same way they would be by the
+``PawClient.stream_events``, ``new_conversation_id`` — so frame-boundary
+bugs in the SSE framer are caught the same way they would be by the
 frontend.
 """
 
@@ -20,7 +20,6 @@ from typing import Any
 from app.cli.paw import ids
 from app.cli.paw.config import PersonaState
 from app.cli.paw.http import PawClient
-from app.cli.paw.sse import stream_chat_events
 from app.cli.paw.verify.scenarios import ScenarioResult
 
 CODEX_MODEL = "openai-codex:openai/gpt-5.5"
@@ -112,10 +111,9 @@ async def _stream_turn(client: PawClient, conv_id: str, text: str) -> list[dict[
     """Drive one chat turn end-to-end; return the full event list."""
     return [
         ev
-        async for ev in stream_chat_events(
-            client._client,
-            "POST",
-            "/api/v1/chat/",
+        async for ev in client.stream_events(
+            method="POST",
+            url="/api/v1/chat/",
             json_body={
                 "question": text,
                 "model_id": CODEX_MODEL,

@@ -8,11 +8,19 @@ Exit codes (documented in --help footer):
     4  backend unreachable
     5  provider/API error (HTTP 4xx/5xx other than 401)
     6  verification failed
+    7  tracked dev backend PID is dead (paw dev status; distinct from 4)
 """
 
 from __future__ import annotations
 
 import typer
+
+# ``paw dev status`` returns this when the persisted dev-backend PID
+# exists in state but no longer responds to signal 0 (the process was
+# killed externally or crashed). Distinct from exit 4 (BackendUnreachable),
+# which means "I tried to reach the backend over HTTP and could not" —
+# a transient network/health condition rather than a dead-process one.
+EXIT_DEV_DEAD = 7
 
 
 class PawError(typer.Exit):
@@ -25,11 +33,15 @@ class PawError(typer.Exit):
 
 
 class LocalError(PawError):
+    """Generic local-side failure: bad args, missing file, config drift (exit 1)."""
+
     def __init__(self, msg: str, hint: str | None = None) -> None:
         super().__init__(msg, exit_code=1, hint=hint)
 
 
 class AuthError(PawError):
+    """Authentication missing or rejected by the backend (exit 3)."""
+
     def __init__(
         self,
         msg: str = "Not authenticated.",
@@ -38,7 +50,13 @@ class AuthError(PawError):
         super().__init__(msg, exit_code=3, hint=hint)
 
 
-class BackendUnreachable(PawError):
+class BackendUnreachableError(PawError):
+    """Network-level failure reaching the backend (exit 4).
+
+    Distinct from ``EXIT_DEV_DEAD`` (exit 7), which signals that ``paw dev``
+    has a tracked PID in state but the process itself is gone.
+    """
+
     def __init__(
         self,
         msg: str,
@@ -47,11 +65,33 @@ class BackendUnreachable(PawError):
         super().__init__(msg, exit_code=4, hint=hint)
 
 
+# Backwards-compatible alias for the historical un-suffixed name. Kept so
+# the rename can land without churning unrelated consumers in flight
+# (mirror.py, http.py, doctor.py, etc.). New code should reference
+# ``BackendUnreachableError`` directly.
+BackendUnreachable = BackendUnreachableError
+
+
 class ApiError(PawError):
-    def __init__(self, msg: str, hint: str | None = None) -> None:
+    """Backend returned an HTTP error other than 401 auth (exit 5)."""
+
+    def __init__(
+        self,
+        msg: str,
+        hint: str | None = None,
+        *,
+        status_code: int | None = None,
+    ) -> None:
         super().__init__(msg, exit_code=5, hint=hint)
+        self.status_code = status_code
 
 
-class VerificationFailed(PawError):
+class VerificationFailedError(PawError):
+    """A ``paw verify`` scenario completed but its assertions failed (exit 6)."""
+
     def __init__(self, msg: str, hint: str | None = None) -> None:
         super().__init__(msg, exit_code=6, hint=hint)
+
+
+# Backwards-compatible alias (see ``BackendUnreachable`` note above).
+VerificationFailed = VerificationFailedError
