@@ -6,7 +6,7 @@ import { useAuthedQuery } from './use-authed-query';
 /** Cache key for the current user endpoint. */
 const CURRENT_USER_QUERY_KEY = ['current-user'] as const;
 
-/** Shape returned by FastAPI-Users' GET /users/me (UserRead). */
+/** Shape returned by FastAPI-Users' GET /api/v1/users/me (UserRead). */
 export interface CurrentUser {
 	/** Stable UUID for the authenticated user. */
 	id: string;
@@ -21,7 +21,7 @@ export interface CurrentUser {
 }
 
 /**
- * Fetch the authenticated user's account data from GET /users/me.
+ * Fetch the authenticated user's account data from GET /api/v1/users/me.
  *
  * Returns id, email, and account flags. For display name and role,
  * compose with `useGetPersonalization()`.

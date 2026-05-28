@@ -34,7 +34,7 @@ const INITIAL_FORM: ProfileFormState = { name: '', role: '', customInstructions:
 /**
  * General settings section — profile, preferences, and notifications.
  *
- * Pulls the authenticated user's email from `GET /users/me` and display
+ * Pulls the authenticated user's email from `GET /api/v1/users/me` and display
  * name / role from the personalization profile. Edits are auto-saved to
  * the backend via PUT after a debounce.
  */

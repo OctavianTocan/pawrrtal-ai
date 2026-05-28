@@ -46,7 +46,7 @@ import { AppShellHeader } from './AppShellHeader';
 
 /**
  * Sidebar footer profile row — resolves the authenticated user's identity
- * from `GET /users/me` + the personalization profile and renders `NavUser`.
+ * from `GET /api/v1/users/me` + the personalization profile and renders `NavUser`.
  * Shows a skeleton placeholder while the user query is loading.
  */
 function SidebarFooterUser(): React.JSX.Element {
