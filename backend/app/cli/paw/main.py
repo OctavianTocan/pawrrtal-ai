@@ -17,6 +17,7 @@ from app.cli.paw.commands import lcm as lcm_cmd
 from app.cli.paw.commands import login as login_cmd
 from app.cli.paw.commands import mcp as mcp_cmd
 from app.cli.paw.commands import messages as messages_cmd
+from app.cli.paw.commands import mirror as mirror_cmd
 from app.cli.paw.commands import models as models_cmd
 from app.cli.paw.commands import record as record_cmd
 from app.cli.paw.commands import replay as replay_cmd
@@ -152,6 +153,14 @@ app.command(
     "fanout",
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
 )(fanout_cmd.fanout)
+
+# `mirror` spawns the wrapped paw command against local + an upstream URL
+# in parallel and diffs the SSE event streams to surface provider drift.
+# Trailing args carry the wrapped subcommand verbatim, same as fanout.
+app.command(
+    "mirror",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)(mirror_cmd.mirror)
 
 
 @app.callback()

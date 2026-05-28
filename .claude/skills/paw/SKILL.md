@@ -47,6 +47,7 @@ Every row reflects a shipped subcommand. Source: `backend/app/cli/paw/commands/`
 | api (raw)        | `METHOD PATH`, `openapi`, `ls`                                 | any                                      |
 | record / replay  | `record COMMAND…`, `replay --from FILE`                        | local (respx-backed)                     |
 | fanout           | `<N> COMMAND…`                                                 | local orchestrator over N parallel personas |
+| mirror           | `--upstream URL COMMAND…`                                      | local vs remote SSE diff                  |
 | verify           | `codex`, `chat-roundtrip`, `model-switch`, `all`               | end-to-end                               |
 | doctor           | (no verb)                                                      | local + ping `/api/v1/health` + models   |
 
@@ -186,7 +187,6 @@ v1 shipped (Tasks 0–11) on the `development` branch.
 **Deferred to v2** (file as separate beans before implementing):
 
 - `paw lcm memories / lineages / dream` — blocked on backend HTTP surface (`pawrrtal-x9u4`). `paw lcm context` ships today.
-- `paw mirror --upstream URL COMMAND...` — local vs remote SSE diff
 - `paw verify telegram-link-and-bot` — full channel E2E
 - `paw verify cost-and-budget` — ledger + budget enforcement
 - `paw verify lcm-active-recall` — Active Recall pre-turn agent integration
