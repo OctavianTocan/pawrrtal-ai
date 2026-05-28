@@ -48,7 +48,7 @@ Every row reflects a shipped subcommand. Source: `backend/app/cli/paw/commands/`
 | record / replay  | `record COMMAND…`, `replay --from FILE`                        | local (respx-backed)                     |
 | fanout           | `<N> COMMAND…`                                                 | local orchestrator over N parallel personas |
 | mirror           | `--upstream URL COMMAND…`                                      | local vs remote SSE diff                  |
-| verify           | `codex`, `chat-roundtrip`, `model-switch`, `telegram`, `cost`, `all` | end-to-end                          |
+| verify           | `codex`, `chat-roundtrip`, `model-switch`, `telegram`, `cost`, `lcm`, `all` | end-to-end                   |
 | doctor           | (no verb)                                                      | local + ping `/api/v1/health` + models   |
 | dev              | `up`, `down`, `status`                                         | local backend lifecycle (pid file at `<PAW_CONFIG_DIR>/<profile>/dev.json`) |
 
@@ -117,13 +117,31 @@ the scenario emits a stable `budget_endpoint_unavailable` marker
 check until a `POST /api/v1/cost/limit` route lands; the existing 402
 enforcement path is exercised by `tests/api/test_chat_cost_budget.py`.
 
+### Verify LCM observability after a chat
+
+```bash
+just paw verify lcm --json | jq '.checks[] | select(.passed == false)'
+```
+
+Resolves the default model -> creates a conversation -> streams two
+chat turns -> asserts `GET /api/v1/lcm/conversations/{id}/context`
+returns 200 with the expected envelope (`lcm_enabled`, `fresh_tail_count`,
+`items`, `estimated_tokens`). When `lcm_enabled` is false in the env,
+structural item-shape checks are skipped and a
+`lcm_disabled_in_this_env` marker is emitted instead. The *full*
+active-recall E2E (seed memories -> dream -> recall on a later turn) is
+still blocked on `pawrrtal-x9u4`; the scenario emits stable
+`memory_seeding_endpoint_unavailable` and
+`dreaming_trigger_endpoint_unavailable` marker checks so the gap is
+greppable until those endpoints land.
+
 ### Verify everything shippable
 
 ```bash
 just paw verify all --json
 ```
 
-Runs `codex` + `chat-roundtrip` + `model-switch` + `telegram` + `cost` in sequence; aggregate exit code is 6 if any single suite fails.
+Runs `codex` + `chat-roundtrip` + `model-switch` + `telegram` + `cost` + `lcm` in sequence; aggregate exit code is 6 if any single suite fails.
 
 ### Capture a fixture for unit tests, then replay offline
 
@@ -216,7 +234,7 @@ v1 shipped on `development`. v2 surface (`channels`, `mcp`, `cost`, `audit`, `jo
 **Still blocked on backend work:**
 
 - `paw lcm memories / lineages / dream` — blocked on backend HTTP surface (`pawrrtal-x9u4`). `paw lcm context` ships today.
-- `paw verify lcm-active-recall` — depends on `pawrrtal-x9u4` so memories can be seeded and dreaming triggered programmatically.
+- Full active-recall E2E (seeded memories surfacing after a dreaming pass) — depends on `pawrrtal-x9u4` so memories can be seeded and dreaming triggered programmatically. The observability slice (`paw verify lcm`) ships today and emits stable marker checks for both gaps.
 
 **Known protocol drift to fix elsewhere:**
 

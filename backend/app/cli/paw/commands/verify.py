@@ -30,6 +30,7 @@ from app.cli.paw.output import emit_human, emit_json
 from app.cli.paw.verify.chat_roundtrip import run_chat_roundtrip_scenario
 from app.cli.paw.verify.codex import SCENARIO_HTTP_TIMEOUT_SECONDS, run_codex_scenario
 from app.cli.paw.verify.cost import run_cost_scenario
+from app.cli.paw.verify.lcm import run_lcm_scenario
 from app.cli.paw.verify.model_switch import run_model_switch_scenario
 from app.cli.paw.verify.scenarios import ScenarioResult
 from app.cli.paw.verify.telegram import run_telegram_scenario
@@ -42,8 +43,11 @@ from app.cli.paw.verify.telegram import run_telegram_scenario
 # they touch a different resource family (channels / cost ledger) and
 # never depend on a chat completing — so a Codex/chat outage doesn't
 # mask a channels regression, and cost runs after the others have already
-# accumulated some ledger rows on the same backend.
-DEFAULT_SUITES = ("codex", "chat-roundtrip", "model-switch", "telegram", "cost")
+# accumulated some ledger rows on the same backend. ``lcm`` slots after
+# ``cost`` because it depends on chat completing (same as ``cost``) but
+# only asserts on the read-only LCM debug endpoint — running last keeps
+# the chat-dependent suites grouped together.
+DEFAULT_SUITES = ("codex", "chat-roundtrip", "model-switch", "telegram", "cost", "lcm")
 
 app = typer.Typer(
     help="End-to-end provider verification scenarios.",
@@ -206,13 +210,46 @@ def verify_cost(
     _emit_and_exit(result, json_out=json_out, label="cost")
 
 
+@app.command("lcm")
+def verify_lcm(
+    profile: str = typer.Option("default", "--profile"),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Override the model id (defaults to catalog `is_default`).",
+    ),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Drive two chat turns and assert LCM observability for the conversation.
+
+    Sends two turns through the real chat surface, then asserts the LCM
+    debug endpoint (``GET /api/v1/lcm/conversations/{id}/context``)
+    returns a 200 with the expected envelope. Does NOT assert active
+    recall (memory seed -> dream -> recall) — see the
+    ``memory_seeding_endpoint_unavailable`` and
+    ``dreaming_trigger_endpoint_unavailable`` marker checks.
+
+    Examples:
+      paw verify lcm
+      paw verify lcm --json | jq '.checks[] | select(.passed == false)'
+    """
+    state = _load_state(profile)
+    result = asyncio.run(
+        _run_one(
+            state,
+            lambda client: run_lcm_scenario(state, client, model=model),
+        )
+    )
+    _emit_and_exit(result, json_out=json_out, label="lcm")
+
+
 @app.command("all")
 def verify_all(
     profile: str = typer.Option("default", "--profile"),
     include: str | None = typer.Option(
         None,
         "--include",
-        help="Comma-separated suites to run (default: all). Names: codex,chat-roundtrip,model-switch,telegram,cost.",
+        help="Comma-separated suites to run (default: all). Names: codex,chat-roundtrip,model-switch,telegram,cost,lcm.",
     ),
     exclude: str | None = typer.Option(
         None,
@@ -286,6 +323,8 @@ def _suite_runner(state: PersonaState, name: str) -> SuiteRunner:
         return lambda client: run_telegram_scenario(state, client)
     if name == "cost":
         return lambda client: run_cost_scenario(state, client)
+    if name == "lcm":
+        return lambda client: run_lcm_scenario(state, client)
     raise LocalError(
         f"Unknown suite: {name}",
         hint=f"Valid suites: {', '.join(DEFAULT_SUITES)}",
