@@ -48,7 +48,7 @@ Every row reflects a shipped subcommand. Source: `backend/app/cli/paw/commands/`
 | record / replay  | `record COMMAND…`, `replay --from FILE`                        | local (respx-backed)                     |
 | fanout           | `<N> COMMAND…`                                                 | local orchestrator over N parallel personas |
 | mirror           | `--upstream URL COMMAND…`                                      | local vs remote SSE diff                  |
-| verify           | `codex`, `chat-roundtrip`, `model-switch`, `telegram`, `all`   | end-to-end                               |
+| verify           | `codex`, `chat-roundtrip`, `model-switch`, `telegram`, `cost`, `all` | end-to-end                          |
 | doctor           | (no verb)                                                      | local + ping `/api/v1/health` + models   |
 | dev              | `up`, `down`, `status`                                         | local backend lifecycle (pid file at `<PAW_CONFIG_DIR>/<profile>/dev.json`) |
 
@@ -102,13 +102,28 @@ covered today because no simulate endpoint exists; the scenario emits a
 stable `simulate_redemption_endpoint_unavailable` check so the gap is
 greppable.
 
+### Verify cost ledger + budget enforcement
+
+```bash
+just paw verify cost --json | jq '.checks[] | select(.passed == false)'
+```
+
+Baselines `/api/v1/cost/` + `/api/v1/cost/ledger` → drives one chat
+turn → asserts `current_usd` strictly increased and a new ledger row
+references the new conversation with a non-zero `cost_usd`. The
+per-user budget *limit* is configured via the
+`cost_max_per_user_daily_usd` env setting (not a setter endpoint), so
+the scenario emits a stable `budget_endpoint_unavailable` marker
+check until a `POST /api/v1/cost/limit` route lands; the existing 402
+enforcement path is exercised by `tests/api/test_chat_cost_budget.py`.
+
 ### Verify everything shippable
 
 ```bash
 just paw verify all --json
 ```
 
-Runs `codex` + `chat-roundtrip` + `model-switch` + `telegram` in sequence; aggregate exit code is 6 if any single suite fails.
+Runs `codex` + `chat-roundtrip` + `model-switch` + `telegram` + `cost` in sequence; aggregate exit code is 6 if any single suite fails.
 
 ### Capture a fixture for unit tests, then replay offline
 
@@ -201,7 +216,6 @@ v1 shipped (Tasks 0–11) on the `development` branch.
 **Deferred to v2** (file as separate beans before implementing):
 
 - `paw lcm memories / lineages / dream` — blocked on backend HTTP surface (`pawrrtal-x9u4`). `paw lcm context` ships today.
-- `paw verify cost-and-budget` — ledger + budget enforcement
 - `paw verify lcm-active-recall` — Active Recall pre-turn agent integration
 
 **Open follow-up beans:**

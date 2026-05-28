@@ -76,6 +76,10 @@ def _stub_all_passing(monkeypatch: pytest.MonkeyPatch) -> None:
         "app.cli.paw.commands.verify.run_telegram_scenario",
         lambda *a, **kw: _ok("telegram"),
     )
+    monkeypatch.setattr(
+        "app.cli.paw.commands.verify.run_cost_scenario",
+        lambda *a, **kw: _ok("cost"),
+    )
 
 
 def _stub_one_failing(monkeypatch: pytest.MonkeyPatch, failing_suite: str) -> None:
@@ -107,6 +111,10 @@ def _stub_one_failing(monkeypatch: pytest.MonkeyPatch, failing_suite: str) -> No
     monkeypatch.setattr(
         "app.cli.paw.commands.verify.run_telegram_scenario",
         _runner_for("telegram"),
+    )
+    monkeypatch.setattr(
+        "app.cli.paw.commands.verify.run_cost_scenario",
+        _runner_for("cost"),
     )
 
 
@@ -144,6 +152,7 @@ def test_verify_all_runs_default_suites_and_returns_aggregated_json(
         "chat-roundtrip",
         "model-switch",
         "telegram",
+        "cost",
     ]
     assert all(r["passed"] is True for r in payload)
 
@@ -166,6 +175,7 @@ def test_verify_all_exit_6_when_any_suite_fails(
         "chat-roundtrip": False,
         "model-switch": True,
         "telegram": True,
+        "cost": True,
     }
 
 
@@ -199,7 +209,12 @@ def test_exclude_drops_named_suites(
 
     assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)
-    assert [r["scenario"] for r in payload] == ["chat-roundtrip", "model-switch", "telegram"]
+    assert [r["scenario"] for r in payload] == [
+        "chat-roundtrip",
+        "model-switch",
+        "telegram",
+        "cost",
+    ]
 
 
 def test_unknown_include_is_local_error(
@@ -255,7 +270,7 @@ def test_all_filtered_out_is_local_error(
             "verify",
             "all",
             "--exclude",
-            "codex,chat-roundtrip,model-switch,telegram",
+            "codex,chat-roundtrip,model-switch,telegram,cost",
             "--json",
         ],
     )

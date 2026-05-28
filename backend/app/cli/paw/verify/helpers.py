@@ -52,6 +52,36 @@ def find_model(models: list[dict[str, Any]], model_id: str) -> dict[str, Any] | 
     return None
 
 
+async def resolve_default_model(
+    client: PawClient,
+    r: ScenarioResult,
+    override: str | None,
+    *,
+    check_name: str = "model_resolved",
+) -> str | None:
+    """Resolve a model id from ``--model`` override or the catalog default.
+
+    Returns ``None`` and adds a failing ``check_name`` row when neither
+    is available so the caller can short-circuit cleanly.
+    """
+    if override is not None:
+        r.add(check_name, True, detail=f"override={override}")
+        return override
+    catalog = (await client.request("GET", "/api/v1/models")).json()
+    models = extract_models(catalog)
+    default = find_default_model(models)
+    if default is None:
+        r.add(
+            check_name,
+            False,
+            detail="no catalog entry has is_default=true; pass --model to override",
+        )
+        return None
+    model_id = default.get("model_id") or default.get("id")
+    r.add(check_name, bool(model_id), detail=f"default={model_id}")
+    return model_id if isinstance(model_id, str) else None
+
+
 async def create_conversation(
     client: PawClient,
     r: ScenarioResult,

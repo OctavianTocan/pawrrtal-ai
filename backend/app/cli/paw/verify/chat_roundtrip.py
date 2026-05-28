@@ -72,26 +72,6 @@ def _content_matches(stream_text: str, stored: str) -> bool:
     return a in b or b in a
 
 
-async def _resolve_model(client: PawClient, r: ScenarioResult, override: str | None) -> str | None:
-    """Resolve the model id from ``--model`` or the catalog default."""
-    if override is not None:
-        r.add("model_resolved", True, detail=f"override={override}")
-        return override
-    catalog = (await client.request("GET", "/api/v1/models")).json()
-    models = helpers.extract_models(catalog)
-    default = helpers.find_default_model(models)
-    if default is None:
-        r.add(
-            "model_resolved",
-            False,
-            detail="no catalog entry has is_default=true; pass --model to override",
-        )
-        return None
-    model_id = default.get("model_id") or default.get("id")
-    r.add("model_resolved", bool(model_id), detail=f"default={model_id}")
-    return model_id if isinstance(model_id, str) else None
-
-
 def _assert_stream_shape(r: ScenarioResult, events: list[dict[str, Any]]) -> None:
     """Stream-side assertions before comparing to DB."""
     errors = [e for e in events if e.get("type") == "error"]
@@ -174,7 +154,7 @@ async def run_chat_roundtrip_scenario(
     """
     r = ScenarioResult(name="chat-roundtrip")
 
-    model_id = await _resolve_model(client, r, model_override)
+    model_id = await helpers.resolve_default_model(client, r, model_override)
     if model_id is None:
         return r
 

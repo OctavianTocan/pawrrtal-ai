@@ -29,6 +29,7 @@ from app.cli.paw.http import PawClient
 from app.cli.paw.output import emit_human, emit_json
 from app.cli.paw.verify.chat_roundtrip import run_chat_roundtrip_scenario
 from app.cli.paw.verify.codex import SCENARIO_HTTP_TIMEOUT_SECONDS, run_codex_scenario
+from app.cli.paw.verify.cost import run_cost_scenario
 from app.cli.paw.verify.model_switch import run_model_switch_scenario
 from app.cli.paw.verify.scenarios import ScenarioResult
 from app.cli.paw.verify.telegram import run_telegram_scenario
@@ -37,11 +38,12 @@ from app.cli.paw.verify.telegram import run_telegram_scenario
 # Order matters: codex first because its credentials are most likely to be
 # unconfigured (early skip-or-fail surfaces the diagnosis); chat-roundtrip
 # next so the stream-vs-DB invariant is asserted before the multi-turn
-# switch scenario muddies the row. ``telegram`` runs last because it
-# touches a different resource family (channels) and never depends on a
-# chat completing — so a Codex/chat outage doesn't mask a channels
-# regression.
-DEFAULT_SUITES = ("codex", "chat-roundtrip", "model-switch", "telegram")
+# switch scenario muddies the row. ``telegram`` and ``cost`` run last:
+# they touch a different resource family (channels / cost ledger) and
+# never depend on a chat completing — so a Codex/chat outage doesn't
+# mask a channels regression, and cost runs after the others have already
+# accumulated some ledger rows on the same backend.
+DEFAULT_SUITES = ("codex", "chat-roundtrip", "model-switch", "telegram", "cost")
 
 app = typer.Typer(
     help="End-to-end provider verification scenarios.",
@@ -171,13 +173,46 @@ def verify_telegram(
     _emit_and_exit(result, json_out=json_out, label="telegram")
 
 
+@app.command("cost")
+def verify_cost(
+    profile: str = typer.Option("default", "--profile"),
+    model: str | None = typer.Option(
+        None,
+        "--model",
+        help="Override the model id (defaults to catalog `is_default`).",
+    ),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Send one chat turn and assert the cost summary + ledger accumulated.
+
+    Baselines the cost surface, drives one chat turn, then asserts the
+    summary ``current_usd`` strictly increased and a new ledger row
+    references the new conversation with a non-zero ``cost_usd``. The
+    per-user budget *limit* is configured via env, not a setter
+    endpoint; the scenario records that gap as the passing
+    ``budget_endpoint_unavailable`` check.
+
+    Examples:
+      paw verify cost
+      paw verify cost --json | jq '.checks[] | select(.passed == false)'
+    """
+    state = _load_state(profile)
+    result = asyncio.run(
+        _run_one(
+            state,
+            lambda client: run_cost_scenario(state, client, model_override=model),
+        )
+    )
+    _emit_and_exit(result, json_out=json_out, label="cost")
+
+
 @app.command("all")
 def verify_all(
     profile: str = typer.Option("default", "--profile"),
     include: str | None = typer.Option(
         None,
         "--include",
-        help="Comma-separated suites to run (default: all). Names: codex,chat-roundtrip,model-switch,telegram.",
+        help="Comma-separated suites to run (default: all). Names: codex,chat-roundtrip,model-switch,telegram,cost.",
     ),
     exclude: str | None = typer.Option(
         None,
@@ -249,6 +284,8 @@ def _suite_runner(state: PersonaState, name: str) -> SuiteRunner:
         return lambda client: run_model_switch_scenario(state, client)
     if name == "telegram":
         return lambda client: run_telegram_scenario(state, client)
+    if name == "cost":
+        return lambda client: run_cost_scenario(state, client)
     raise LocalError(
         f"Unknown suite: {name}",
         hint=f"Valid suites: {', '.join(DEFAULT_SUITES)}",
