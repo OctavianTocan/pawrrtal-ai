@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import os
 import shutil
 import sys
 import time
@@ -25,9 +24,13 @@ from pathlib import Path
 
 import typer
 
+from app.cli.paw.commands.child_env import (
+    add_provider_credentials,
+    build_base_child_env,
+    warn_on_dropped_paw_record,
+)
 from app.cli.paw.config import config_root
 from app.cli.paw.errors import LocalError
-from app.cli.paw.http import RECORD_ENV_VAR
 from app.cli.paw.output import emit_human, emit_json, emit_plain_rows, require_one_output_mode
 
 logger = logging.getLogger(__name__)
@@ -45,6 +48,15 @@ MAX_SLOTS = 256
 # child does not flood the terminal. The JSON output preserves the full
 # capture.
 HUMAN_OUTPUT_PREVIEW_BYTES = 256
+
+# Default wall-clock cap per slot. Fanout children hit the same backend as
+# the parent so they share the parent's typical-turn budget; 600s is the
+# "something is wrong" backstop, not a normal upper bound.
+DEFAULT_PER_SLOT_TIMEOUT_S = 600.0
+
+# Graceful-shutdown window after SIGTERM before escalating to SIGKILL when
+# tearing down a child on cancel or timeout.
+CHILD_TERMINATE_GRACE_S = 5.0
 
 
 @dataclass(slots=True)
@@ -88,6 +100,15 @@ def fanout(
         "--keep-personas",
         help="Do not delete per-slot persona config dirs after the run.",
     ),
+    per_slot_timeout: float = typer.Option(
+        DEFAULT_PER_SLOT_TIMEOUT_S,
+        "--per-slot-timeout",
+        help=(
+            "Wall-clock cap (seconds) per child. The child is SIGTERM/SIGKILL'd "
+            "if it exceeds this; the slot surfaces exit_code=-1."
+        ),
+        min=1.0,
+    ),
 ) -> None:
     """Spawn ``n`` parallel personas and run the wrapped paw command in each.
 
@@ -117,9 +138,10 @@ def fanout(
     parent_config_root = config_root()
     slot_dirs = _allocate_slot_dirs(parent_config_root, persona_prefix, n)
     concurrency = n if max_concurrent == 0 else max_concurrent
+    warn_on_dropped_paw_record()
     try:
         results = asyncio.run(
-            _run_all(extra, slot_dirs, persona_prefix, concurrency),
+            _run_all(extra, slot_dirs, persona_prefix, concurrency, per_slot_timeout),
         )
     finally:
         if not keep_personas:
@@ -185,6 +207,7 @@ async def _run_all(
     slot_dirs: list[tuple[int, str, Path]],
     prefix: str,
     concurrency: int,
+    per_slot_timeout_s: float,
 ) -> list[SlotResult]:
     """Spawn every slot subject to a concurrency semaphore.
 
@@ -194,7 +217,9 @@ async def _run_all(
     sem = asyncio.Semaphore(max(1, concurrency))
     _ = prefix
     tasks = [
-        asyncio.create_task(_run_slot(slot, profile, slot_dir, wrapped_args, sem))
+        asyncio.create_task(
+            _run_slot(slot, profile, slot_dir, wrapped_args, sem, per_slot_timeout_s)
+        )
         for slot, profile, slot_dir in slot_dirs
     ]
     return await asyncio.gather(*tasks)
@@ -206,8 +231,14 @@ async def _run_slot(
     slot_dir: Path,
     wrapped_args: list[str],
     sem: asyncio.Semaphore,
+    per_slot_timeout_s: float,
 ) -> SlotResult:
-    """Execute the wrapped paw command in one child subprocess."""
+    """Execute the wrapped paw command in one child subprocess.
+
+    Cancellation (^C → ``KeyboardInterrupt`` → ``asyncio.CancelledError``)
+    and timeout both reap the child via SIGTERM → SIGKILL so we never
+    leave orphan subprocesses behind.
+    """
     async with sem:
         env = _build_child_env(profile, slot_dir)
         started = time.monotonic()
@@ -220,20 +251,62 @@ async def _run_slot(
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         )
-        stdout_bytes, stderr_bytes = await proc.communicate()
+        try:
+            stdout_bytes, stderr_bytes = await asyncio.wait_for(
+                proc.communicate(),
+                timeout=per_slot_timeout_s,
+            )
+            timed_out = False
+        except (asyncio.CancelledError, KeyboardInterrupt):
+            await _terminate_child(proc)
+            raise
+        except TimeoutError:
+            logger.warning(
+                "Fanout slot timed out; terminating child",
+                extra={"slot": slot, "profile": profile, "timeout_s": per_slot_timeout_s},
+            )
+            await _terminate_child(proc)
+            stdout_bytes = b""
+            stderr_bytes = f"fanout: slot timed out after {per_slot_timeout_s}s\n".encode()
+            timed_out = True
         duration_ms = int((time.monotonic() - started) * 1000)
+        exit_code = -1 if timed_out else (proc.returncode if proc.returncode is not None else -1)
         return SlotResult(
             slot=slot,
             profile=profile,
-            exit_code=proc.returncode if proc.returncode is not None else -1,
+            exit_code=exit_code,
             stdout=stdout_bytes.decode("utf-8", errors="replace"),
             stderr=stderr_bytes.decode("utf-8", errors="replace"),
             duration_ms=duration_ms,
         )
 
 
+async def _terminate_child(proc: asyncio.subprocess.Process) -> None:
+    """SIGTERM → SIGKILL escalation for a child being torn down on cancel/timeout."""
+    if proc.returncode is not None:
+        return
+    try:
+        proc.terminate()
+    except ProcessLookupError:
+        return
+    try:
+        await asyncio.wait_for(proc.wait(), timeout=CHILD_TERMINATE_GRACE_S)
+        return
+    except TimeoutError:
+        pass
+    try:
+        proc.kill()
+    except ProcessLookupError:
+        return
+    await proc.wait()
+
+
 def _build_child_env(profile: str, slot_dir: Path) -> dict[str, str]:
     """Compose the env passed to one child subprocess.
+
+    Built from an explicit allowlist rather than ``dict(os.environ)`` so
+    secrets the child does not need (``AUTH_*``, ``STRIPE_*``, anything
+    not on the credentials list) stay in the parent.
 
     - ``PAW_CONFIG_DIR`` points at this slot's isolated config directory so
       cookies + persona state never collide with sibling slots or the
@@ -242,15 +315,15 @@ def _build_child_env(profile: str, slot_dir: Path) -> dict[str, str]:
       consumes ``--profile`` per-command, but ``PAW_PROFILE`` is set for
       tools that read it directly and for future env-driven profile
       resolution.
+    - Provider credentials *are* forwarded: fanout children hit the same
+      backend the parent is configured to call, so they need the same
+      provider keys. ``PAW_RECORD`` is excluded by :func:`build_base_child_env`
+      so children never share the parent's recorder fixture file.
     """
-    env = dict(os.environ)
+    env = build_base_child_env()
     env["PAW_CONFIG_DIR"] = str(slot_dir)
     env["PAW_PROFILE"] = profile
-    # Drop ``PAW_RECORD`` so children never inherit the parent's recorder
-    # fixture path. Otherwise N slots clobber each other in the same file
-    # and the parent's recorded session is corrupted with interleaved
-    # request rows from each child.
-    env.pop(RECORD_ENV_VAR, None)
+    add_provider_credentials(env)
     return env
 
 

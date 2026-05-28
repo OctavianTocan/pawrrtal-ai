@@ -138,12 +138,15 @@ def up(
 
         if not process_module.wait_for_health(host, port, boot_timeout):
             # Tear the dead child down so we don't leak a half-booted process.
-            process_module.kill_failed_boot(proc.pid)
+            process_module.kill_failed_boot(proc)
             raise LocalError(
                 f"Backend did not become healthy on http://{host}:{port} within {boot_timeout}s.",
                 hint=f"Inspect {log_path} for boot errors.",
             )
 
+        # OS-reported start time so ``paw dev down`` can verify the PID
+        # is still ours before signalling — see ``is_pid_recycled``.
+        start_time = process_module.process_create_time(proc.pid)
         state = DevState(
             schema_version=DEV_STATE_SCHEMA_VERSION,
             pid=proc.pid,
@@ -151,6 +154,7 @@ def up(
             port=port,
             started_at=datetime.now(UTC).isoformat(),
             log_path=str(log_path),
+            start_time=start_time,
         )
         state_module.save_state(profile, state)
     finally:

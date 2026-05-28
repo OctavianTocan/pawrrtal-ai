@@ -17,8 +17,10 @@ from app.cli.paw.config import profile_dir
 logger = logging.getLogger(__name__)
 
 # State file schema version. Bump when the persisted shape changes
-# in a non-backwards-compatible way.
-DEV_STATE_SCHEMA_VERSION = 1
+# in a non-backwards-compatible way. v2 added ``start_time`` so
+# ``paw dev down`` can verify the tracked PID hasn't been recycled by
+# the kernel for an unrelated process before signalling.
+DEV_STATE_SCHEMA_VERSION = 2
 
 
 @dataclass(slots=True)
@@ -26,6 +28,17 @@ class DevState:
     """Persisted record of the running dev backend.
 
     Stored as JSON at ``<PAW_CONFIG_DIR>/<profile>/dev.json``.
+
+    ``start_time`` is the OS-reported process creation time (seconds
+    since epoch), captured at spawn. It exists for one reason: PID
+    recycling. The kernel reuses PIDs aggressively, so between the
+    ``paw dev up`` write and a later ``paw dev down`` read, the original
+    process may have died and an unrelated process picked up the same
+    PID. ``stop_tracked_backend`` re-reads the live process's creation
+    time and refuses to signal if it doesn't match what we persisted.
+    Stored as ``float | None`` for backwards compatibility with v1 state
+    files: a missing value forces the conservative refuse-to-signal
+    path, matching the new safety contract.
     """
 
     schema_version: int
@@ -34,6 +47,7 @@ class DevState:
     port: int
     started_at: str
     log_path: str
+    start_time: float | None = None
 
 
 def dev_state_path(profile: str) -> Path:
@@ -59,6 +73,8 @@ def load_state(profile: str) -> DevState | None:
             extra={"path": str(path), "error": str(exc)},
         )
         return None
+    raw_start_time = raw.get("start_time")
+    start_time = float(raw_start_time) if raw_start_time is not None else None
     return DevState(
         schema_version=int(raw.get("schema_version", DEV_STATE_SCHEMA_VERSION)),
         pid=int(raw["pid"]),
@@ -66,6 +82,7 @@ def load_state(profile: str) -> DevState | None:
         port=int(raw["port"]),
         started_at=str(raw["started_at"]),
         log_path=str(raw["log_path"]),
+        start_time=start_time,
     )
 
 

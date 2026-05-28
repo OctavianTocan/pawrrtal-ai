@@ -66,6 +66,50 @@ LIVENESS_POLL_INTERVAL_S = 0.1
 # so the comparison in ``probe_health`` reads as intent, not magic number.
 HEALTH_OK_STATUS = 200
 
+# Slop allowed when comparing the persisted ``start_time`` with the live
+# process's reported create-time. Keeps us robust to clock granularity
+# differences between the spawning thread's wall clock and the OS-reported
+# create-time (``ps -o lstart`` rounds to whole seconds on macOS).
+PID_RECYCLE_TOLERANCE_S = 1.0
+
+# Wait for a child to exit after SIGTERM during the failed-boot teardown
+# before escalating to SIGKILL. Short because a child that never reached
+# health has nothing to drain.
+FAILED_BOOT_TERMINATE_GRACE_S = 10.0
+
+
+def process_create_time(pid: int) -> float | None:
+    """Return the OS-reported creation time of ``pid`` in seconds since epoch.
+
+    Uses ``ps -o lstart= -p <pid>`` so we don't need a hard dependency
+    on ``psutil``. ``lstart`` is supported on both macOS and Linux and
+    parses with ``%a %b %d %H:%M:%S %Y``. Returns ``None`` when ``ps``
+    is unavailable, the process is gone, or the output doesn't parse —
+    callers must treat ``None`` as "cannot verify ownership" and bail.
+    """
+    try:
+        result = subprocess.run(
+            ["ps", "-o", "lstart=", "-p", str(pid)],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=2.0,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if result.returncode != 0:
+        return None
+    raw = result.stdout.strip()
+    if not raw:
+        return None
+    try:
+        # ``lstart`` example: ``Thu May 28 13:08:15 2026``. Parse as local
+        # time to match the wall-clock stamp recorded at spawn.
+        parsed = time.strptime(raw, "%a %b %d %H:%M:%S %Y")
+    except ValueError:
+        return None
+    return time.mktime(parsed)
+
 
 def pid_alive(pid: int) -> bool:
     """Return ``True`` if a process with ``pid`` exists and accepts signals.
@@ -188,6 +232,28 @@ def spawn_uvicorn(
     )
 
 
+def is_pid_recycled(state: DevState) -> bool:
+    """Return True if the live process at ``state.pid`` is not our spawned child.
+
+    Compares the live process's OS-reported creation time against the
+    value we persisted at spawn. A divergence beyond
+    ``PID_RECYCLE_TOLERANCE_S`` means the kernel recycled the PID for an
+    unrelated process (we spawned X, X died, the kernel reused X's PID
+    for some other program). Signalling such a PID would attack an
+    innocent third-party process, so the caller must refuse to signal.
+
+    If we have no recorded ``start_time`` (v1 state file, or psutil-less
+    environment where ``process_create_time`` returned ``None``) we
+    treat the PID as recycled — the safer default.
+    """
+    if state.start_time is None:
+        return True
+    live_start = process_create_time(state.pid)
+    if live_start is None:
+        return True
+    return abs(live_start - state.start_time) > PID_RECYCLE_TOLERANCE_S
+
+
 def stop_tracked_backend(state: DevState, *, force: bool) -> None:
     """Send the appropriate signal(s) to terminate the tracked backend.
 
@@ -195,8 +261,22 @@ def stop_tracked_backend(state: DevState, *, force: bool) -> None:
     so we signal the group rather than the lead PID — uvicorn's
     ``--reload`` mode forks a reloader supervisor and a worker, and
     signalling only the supervisor leaves the worker orphaned.
+
+    Before signalling, checks the live process's creation time against
+    the value persisted at spawn. If the times diverge, the PID has been
+    recycled — we refuse to signal and log a warning so the operator
+    can clean up the stale state file by hand.
     """
     if not pid_alive(state.pid):
+        return
+
+    if is_pid_recycled(state):
+        logger.warning(
+            "Refusing to signal pid %s — start time does not match persisted state. "
+            "The PID was likely recycled. Delete the state file by hand if you're "
+            "sure the original process is gone.",
+            state.pid,
+        )
         return
 
     signal_to_send = signal.SIGKILL if force else signal.SIGTERM
@@ -248,7 +328,29 @@ def tail_log_until_exit(proc: subprocess.Popen[bytes], log_path: Path) -> None:
         return
 
 
-def kill_failed_boot(pid: int) -> None:
-    """Best-effort tear-down of a child that never became healthy."""
+def kill_failed_boot(proc: subprocess.Popen[bytes]) -> None:
+    """Tear down a child that never became healthy.
+
+    SIGTERMs the process group, waits up to ``FAILED_BOOT_TERMINATE_GRACE_S``
+    for the child to exit, then escalates to SIGKILL. Critically: we
+    block on ``proc.wait()`` so the Python process never accumulates a
+    zombie entry for the failed boot — the previous fire-and-forget
+    ``os.killpg(SIGTERM)`` left the child to be reaped lazily, which
+    could leak file descriptors on systems where many failed boots
+    pile up before the parent exits.
+    """
+    if proc.poll() is not None:
+        return
     with contextlib.suppress(ProcessLookupError):
-        os.killpg(pid, signal.SIGTERM)
+        os.killpg(proc.pid, signal.SIGTERM)
+    deadline = time.monotonic() + FAILED_BOOT_TERMINATE_GRACE_S
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            return
+        time.sleep(LIVENESS_POLL_INTERVAL_S)
+    with contextlib.suppress(ProcessLookupError):
+        os.killpg(proc.pid, signal.SIGKILL)
+    try:
+        proc.wait(timeout=FAILED_BOOT_TERMINATE_GRACE_S)
+    except subprocess.TimeoutExpired:
+        logger.warning("Failed-boot child did not exit after SIGKILL", extra={"pid": proc.pid})

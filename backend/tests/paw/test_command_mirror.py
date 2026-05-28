@@ -253,8 +253,8 @@ def test_mirror_strict_timing_flags_duration_delta(runner, monkeypatch):
     # (also in runner) calls run_side via the local name binding.
     real_run_side = mirror_runner.run_side
 
-    async def fake_run_side(label, profile, backend_url, side_dir, wrapped_args):
-        result = await real_run_side(label, profile, backend_url, side_dir, wrapped_args)
+    async def fake_run_side(label, profile, backend_url, side_dir, wrapped_args, **kwargs):
+        result = await real_run_side(label, profile, backend_url, side_dir, wrapped_args, **kwargs)
         if label == "upstream":
             result.duration_ms = 5000
         else:
@@ -340,6 +340,116 @@ def test_mirror_strips_paw_record_from_child_env(runner, monkeypatch):
     assert len(calls) == 2
     for call in calls:
         assert "PAW_RECORD" not in call["env"], call["env"]
+
+
+def test_mirror_strips_provider_secrets_from_upstream_child(runner, monkeypatch):
+    """Provider keys never flow to a remote upstream child.
+
+    Mirror's threat model treats ``--upstream`` as potentially attacker-
+    controlled (the operator may point it at a staging URL they don't
+    fully trust to inspect the diff). Forwarding the parent's
+    ``ANTHROPIC_API_KEY`` / ``OPENAI_API_KEY`` / etc. to a remote
+    upstream is a credential leak — they must stay in the parent.
+
+    The local side (loopback) is allowed to inherit them because the
+    operator already owns that backend.
+    """
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-secret")
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-secret")
+    monkeypatch.setenv("XAI_API_KEY", "xai-secret")
+    monkeypatch.setenv("GH_TOKEN", "gh-secret")
+    payload = _make_send_payload(final_text="x", events={"delta": 1})
+    procs = {
+        "http://127.0.0.1:8000": _FakeProc(returncode=0, stdout=payload, stderr=b""),
+        "https://dev.example.com": _FakeProc(returncode=0, stdout=payload, stderr=b""),
+    }
+    calls = _install_fake_spawns(monkeypatch, procs)
+    runner.invoke(
+        app,
+        [
+            "mirror",
+            "--upstream",
+            "https://dev.example.com",
+            "--json",
+            "conversations",
+            "send",
+            "hi",
+            "--new",
+        ],
+    )
+    assert len(calls) == 2
+    by_backend = {call["env"]["PAW_BACKEND_URL"]: call["env"] for call in calls}
+    upstream_env = by_backend["https://dev.example.com"]
+    # Upstream side: NO provider creds, NO unrelated tokens.
+    for forbidden in ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "XAI_API_KEY", "GH_TOKEN"):
+        assert forbidden not in upstream_env, (
+            f"{forbidden} leaked to remote upstream child env: {upstream_env}"
+        )
+    # Local side: provider creds passed through (operator already owns this backend).
+    local_env = by_backend["http://127.0.0.1:8000"]
+    assert local_env.get("ANTHROPIC_API_KEY") == "anthropic-secret"
+    assert local_env.get("OPENAI_API_KEY") == "openai-secret"
+    # ``GH_TOKEN`` is not on the provider-credential allowlist — neither
+    # side should ever see it.
+    assert "GH_TOKEN" not in local_env
+
+
+def test_mirror_terminates_child_on_per_side_timeout(runner, monkeypatch):
+    """``--per-side-timeout`` triggers a SIGTERM-then-SIGKILL teardown
+    of the hung child and surfaces a non-zero aggregate exit.
+
+    Asserts the ``proc.terminate()`` path runs by counting calls on a
+    fake process that never returns from ``communicate()`` — so without
+    the ``asyncio.wait_for`` guard, the test would hang.
+    """
+    terminate_calls: list[int] = []
+
+    class _HangingProc:
+        returncode: int | None = None
+
+        def __init__(self, label: str) -> None:
+            self._label = label
+
+        async def communicate(self) -> tuple[bytes, bytes]:
+            if self._label == "local":
+                return _make_send_payload(final_text="x", events={"delta": 1}), b""
+            await asyncio.sleep(60)
+            return b"", b""
+
+        def terminate(self) -> None:
+            terminate_calls.append(id(self))
+            self.returncode = -15
+
+        def kill(self) -> None:
+            self.returncode = -9
+
+        async def wait(self) -> int:
+            return self.returncode if self.returncode is not None else 0
+
+    async def fake_create(*args, env=None, **_):
+        backend_url = (env or {}).get("PAW_BACKEND_URL", "")
+        label = "local" if "127.0.0.1" in backend_url else "upstream"
+        return _HangingProc(label)
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create)
+
+    result = runner.invoke(
+        app,
+        [
+            "mirror",
+            "--upstream",
+            "https://dev.example.com",
+            "--per-side-timeout",
+            "1",
+            "--json",
+            "conversations",
+            "send",
+            "hi",
+            "--new",
+        ],
+    )
+    assert result.exit_code != 0, result.stdout
+    assert terminate_calls, "expected at least one proc.terminate() call"
 
 
 def test_mirror_json_output_schema(runner, monkeypatch):

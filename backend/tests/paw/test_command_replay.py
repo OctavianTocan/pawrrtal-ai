@@ -70,3 +70,33 @@ def test_replay_missing_fixture_exits_local_error(runner, tmp_path):
         app, ["replay", "--from", str(tmp_path / "nope.jsonl"), "auth", "status"]
     )
     assert result.exit_code == LOCAL_ERROR_EXIT_CODE
+
+
+def test_replay_skips_malformed_jsonl_rows(runner, tmp_path):
+    """A fixture with a truncated/malformed row replays the good rows.
+
+    Simulates a SIGKILL mid-write that leaves one row half-flushed: the
+    decoder must skip the bad line with a warning rather than crashing
+    the replay run.
+    """
+    _seed_persona()
+    fixture = tmp_path / "replay-with-garbage.jsonl"
+    good_row = {
+        "method": "GET",
+        "url": f"{MOCK_BACKEND}/api/v1/users/me",
+        "request_headers": {},
+        "request_body": None,
+        "status": 200,
+        "response_headers": {"content-type": "application/json"},
+        "response_body": json.dumps({"id": "u1", "email": "replayed@example.com"}),
+        "response_body_bytes_b64": None,
+        "is_stream": False,
+        "duration_ms": 5,
+    }
+    with fixture.open("w", encoding="utf-8") as f:
+        f.write(json.dumps(good_row) + "\n")
+        # Truncated row — looks like SIGKILL interrupted the write
+        # between the JSON payload and the trailing newline.
+        f.write('{"method": "GET", "url": "trunc')
+    result = runner.invoke(app, ["replay", "--from", str(fixture), "auth", "status", "--json"])
+    assert result.exit_code == 0, result.stdout

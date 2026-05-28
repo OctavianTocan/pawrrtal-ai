@@ -186,8 +186,11 @@ class PawClient:
             "is_stream": is_stream,
             "duration_ms": duration_ms,
         }
-        self._record_file.write(json.dumps(row, ensure_ascii=False))
-        self._record_file.write("\n")
+        # Single write keeps the line atomic relative to SIGKILL between
+        # the JSON payload and the trailing newline — otherwise a crash
+        # mid-row leaves a half-line that crashes `paw replay`'s JSON
+        # decoder.
+        self._record_file.write(json.dumps(row, ensure_ascii=False) + "\n")
         self._record_file.flush()
 
     @property
@@ -196,42 +199,52 @@ class PawClient:
         return self._record_file is not None
 
     def _write_record_row(self, row: dict[str, Any]) -> None:
-        """Append a single JSONL row to the recording file (no-op if not recording)."""
+        """Append a single JSONL row to the recording file (no-op if not recording).
+
+        Concatenates the JSON payload with the trailing newline before
+        the single ``write()`` so SIGKILL between the two cannot leave
+        a truncated row that crashes downstream decoders.
+        """
         if self._record_file is None:
             return
-        self._record_file.write(json.dumps(row, ensure_ascii=False))
-        self._record_file.write("\n")
+        self._record_file.write(json.dumps(row, ensure_ascii=False) + "\n")
         self._record_file.flush()
 
-    def record_sse_frame(self, url: str, frame: bytes) -> None:
+    def record_sse_frame(self, method: str, url: str, frame: bytes) -> None:
         r"""Persist one raw SSE frame so `paw replay` can reconstruct the stream.
 
         ``frame`` is the bytes between two ``\n\n`` delimiters as observed
         by :func:`stream_chat_events`. The frame is base64-encoded to keep
-        the row safe across any future non-UTF-8 producer.
+        the row safe across any future non-UTF-8 producer. ``method`` is
+        recorded so the replay layer can mount the response under the
+        same (method, url) key the live consumer used — otherwise replay
+        defaulted to POST and ignored GET-based streams.
         """
         self._write_record_row(
             {
                 "type": "sse",
                 "ts": dt.datetime.now(dt.UTC).isoformat(),
+                "method": method,
                 "url": url,
                 "frame_b64": base64.b64encode(frame).decode("ascii"),
             }
         )
 
-    def make_sse_tap(self, url: str) -> Callable[[bytes], None] | None:
+    def make_sse_tap(self, method: str, url: str) -> Callable[[bytes], None] | None:
         """Return a raw-frame tap for `stream_chat_events`, or None when off.
 
         Wires the SSE consumer to the recording file without leaking the
         recording mechanism into call sites: the consumer just passes the
-        returned callable as ``on_raw_frame``.
+        returned callable as ``on_raw_frame``. ``method`` is captured
+        here so each recorded frame carries the verb the live consumer
+        used.
         """
         if self._record_file is None:
             return None
         record_frame = self.record_sse_frame
 
         def tap(frame: bytes) -> None:
-            record_frame(url, frame)
+            record_frame(method, url, frame)
 
         return tap
 
@@ -290,7 +303,7 @@ class PawClient:
             method,
             url,
             json_body=json_body,
-            on_raw_frame=self.make_sse_tap(full_url),
+            on_raw_frame=self.make_sse_tap(method, full_url),
         )
 
 

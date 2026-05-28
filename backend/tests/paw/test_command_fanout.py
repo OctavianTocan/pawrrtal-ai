@@ -222,9 +222,7 @@ def test_fanout_child_env_inherits_paw_config_dir_unique_per_slot(
         assert child_dir.name.startswith(".fanout-paw-fanout-")
 
 
-def test_fanout_strips_paw_record_from_child_env(
-    runner, captured_spawns, monkeypatch
-):
+def test_fanout_strips_paw_record_from_child_env(runner, captured_spawns, monkeypatch):
     """``PAW_RECORD`` in the parent env must not leak into spawned children.
 
     Otherwise N slots overwrite each other's rows in the same recorder
@@ -257,9 +255,7 @@ def test_fanout_plain_output_emits_tsv_rows(runner, monkeypatch):
     result = runner.invoke(app, ["fanout", "2", "--plain", "auth", "status"])
     assert result.exit_code == 0, result.stdout
     rows = [
-        line.split("\t")
-        for line in result.stdout.strip().splitlines()
-        if line and "\t" in line
+        line.split("\t") for line in result.stdout.strip().splitlines() if line and "\t" in line
     ]
     assert len(rows) == 2
     for row in rows:
@@ -277,3 +273,75 @@ def test_fanout_rejects_json_plus_plain(runner):
         ["fanout", "2", "--json", "--plain", "auth", "status"],
     )
     assert result.exit_code == 1
+
+
+def test_fanout_preserves_provider_secrets_for_same_backend_children(
+    runner, captured_spawns, monkeypatch
+):
+    """Provider credentials reach every fanout child.
+
+    Fanout children hit the same backend the parent is configured for —
+    they need the same provider keys to drive turns through the LLM. The
+    env-allowlist must therefore explicitly forward ``ANTHROPIC_API_KEY``
+    / ``OPENAI_API_KEY`` / etc.
+
+    Unrelated tokens (``GH_TOKEN``, ``AUTH_SECRET``) must NOT flow even
+    when the backend is local — they're not on the allowlist and the
+    children don't need them.
+    """
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-secret")
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-secret")
+    monkeypatch.setenv("XAI_API_KEY", "xai-secret")
+    monkeypatch.setenv("GOOGLE_API_KEY", "google-secret")
+    monkeypatch.setenv("GH_TOKEN", "should-not-leak")
+    monkeypatch.setenv("AUTH_SECRET", "should-not-leak")
+    result = runner.invoke(app, ["fanout", "2", "auth", "status"])
+    assert result.exit_code == 0, result.stdout
+    assert len(captured_spawns) == 2
+    for call in captured_spawns:
+        assert call["env"].get("ANTHROPIC_API_KEY") == "anthropic-secret"
+        assert call["env"].get("OPENAI_API_KEY") == "openai-secret"
+        assert call["env"].get("XAI_API_KEY") == "xai-secret"
+        assert call["env"].get("GOOGLE_API_KEY") == "google-secret"
+        # Off-allowlist secrets must not flow into children.
+        assert "GH_TOKEN" not in call["env"]
+        assert "AUTH_SECRET" not in call["env"]
+
+
+def test_fanout_terminates_child_on_per_slot_timeout(runner, monkeypatch):
+    """``--per-slot-timeout`` reaps a hung child via terminate()→kill().
+
+    Uses a fake process that never returns from ``communicate()``; the
+    test hangs without the ``asyncio.wait_for`` guard. Counts
+    ``terminate()`` calls to verify the cleanup path runs.
+    """
+    terminate_calls: list[int] = []
+
+    class _HangingProc:
+        returncode: int | None = None
+
+        async def communicate(self) -> tuple[bytes, bytes]:
+            await asyncio.sleep(60)
+            return b"", b""
+
+        def terminate(self) -> None:
+            terminate_calls.append(id(self))
+            self.returncode = -15
+
+        def kill(self) -> None:
+            self.returncode = -9
+
+        async def wait(self) -> int:
+            return self.returncode if self.returncode is not None else 0
+
+    async def fake_create(*args, env=None, **_):
+        return _HangingProc()
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_create)
+    result = runner.invoke(
+        app,
+        ["fanout", "2", "--per-slot-timeout", "1", "auth", "status"],
+    )
+    # Both slots time out → aggregate exit non-zero.
+    assert result.exit_code != 0, result.stdout
+    assert len(terminate_calls) == 2, terminate_calls

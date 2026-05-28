@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 from collections import defaultdict
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,8 @@ import respx
 import typer
 
 from app.cli.paw.errors import LocalError
+
+logger = logging.getLogger(__name__)
 
 # SSE frames are joined with this delimiter to reconstruct the wire stream
 # the consumer originally saw. Mirrors ``FRAME_DELIMITER`` in
@@ -81,14 +84,26 @@ def replay(
 
 
 def _load_rows(path: Path) -> list[dict[str, Any]]:
-    """Parse a JSONL fixture into a list of recorded rows."""
+    """Parse a JSONL fixture into a list of recorded rows.
+
+    Malformed lines (truncated by SIGKILL, hand-edited, etc.) are
+    skipped with a warning rather than crashing the entire replay so
+    one bad row doesn't make an otherwise-useful fixture unusable.
+    """
     rows: list[dict[str, Any]] = []
     with path.open(encoding="utf-8") as f:
-        for raw in f:
+        for lineno, raw in enumerate(f, start=1):
             stripped = raw.strip()
             if not stripped:
                 continue
-            row = json.loads(stripped)
+            try:
+                row = json.loads(stripped)
+            except json.JSONDecodeError as exc:
+                logger.warning(
+                    "Skipping malformed JSONL row",
+                    extra={"path": str(path), "line": lineno, "error": str(exc)},
+                )
+                continue
             if isinstance(row, dict):
                 rows.append(row)
     return rows

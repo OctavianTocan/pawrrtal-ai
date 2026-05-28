@@ -79,6 +79,37 @@ def stable_uuid(monkeypatch: pytest.MonkeyPatch) -> str:
     return NEW_UUID
 
 
+@pytest.mark.anyio
+async def test_record_sse_frame_writes_method_field(tmp_path: Path) -> None:
+    """Recorded SSE rows must carry the HTTP method that produced them.
+
+    Without ``method`` on the row, ``paw replay`` defaulted every SSE
+    body to POST and silently ignored GET-based streams. The recorder
+    now stamps each frame with its verb so replay's ``(method, url)``
+    keying matches what the live consumer saw.
+    """
+    _seed_persona("test-method")
+    state = PersonaState(
+        profile="test-method",
+        env="local",
+        api_base_url=MOCK_BACKEND,
+        user_id="u1",
+        user_email="x@x.com",
+    )
+    state.save()
+    fixture = tmp_path / "frame.jsonl"
+    from app.cli.paw.http import PawClient
+
+    async with PawClient(state, record_path=fixture) as client:
+        client.record_sse_frame("POST", "http://test-backend/api/v1/chat/", b"data: hi\n")
+    rows = [json.loads(line) for line in fixture.read_text().splitlines() if line]
+    assert len(rows) == 1
+    assert rows[0]["method"] == "POST"
+    assert rows[0]["url"] == "http://test-backend/api/v1/chat/"
+    assert rows[0]["type"] == "sse"
+    assert "frame_b64" in rows[0]
+
+
 def test_record_captures_one_jsonl_row_per_sse_frame(
     runner: CliRunner,
     tmp_path: Path,

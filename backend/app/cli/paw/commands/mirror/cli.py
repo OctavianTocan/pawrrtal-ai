@@ -52,6 +52,7 @@ from app.cli.paw.commands.mirror.output import (
     emit_plain_summary,
 )
 from app.cli.paw.commands.mirror.runner import (
+    DEFAULT_PER_SIDE_TIMEOUT_S,
     DEFAULT_PERSONA_PREFIX,
     allocate_side_dirs,
     cleanup_side_dirs,
@@ -134,6 +135,15 @@ def mirror(
         "--keep-personas",
         help="Do not delete per-side persona config dirs after the run.",
     ),
+    per_side_timeout: float = typer.Option(
+        DEFAULT_PER_SIDE_TIMEOUT_S,
+        "--per-side-timeout",
+        help=(
+            "Wall-clock cap (seconds) per child. The child is SIGTERM/SIGKILL'd "
+            "if it exceeds this; the side surfaces exit_code=-1."
+        ),
+        min=1.0,
+    ),
 ) -> None:
     r"""Run the wrapped paw command against local + upstream, diff the result.
 
@@ -162,7 +172,9 @@ def mirror(
     parent_config_root = config_root()
     sides = allocate_side_dirs(parent_config_root, persona_prefix, local_url, upstream)
     try:
-        results = asyncio.run(run_both_sides(wrapped_args, sides))
+        results = asyncio.run(
+            run_both_sides(wrapped_args, sides, per_side_timeout_s=per_side_timeout)
+        )
     finally:
         if not keep_personas:
             cleanup_side_dirs(sides)

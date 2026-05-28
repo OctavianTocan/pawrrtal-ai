@@ -108,6 +108,28 @@ def fast_polls(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(process_module, "LIVENESS_POLL_INTERVAL_S", 0.0)
 
 
+@pytest.fixture
+def stable_process_create_time(monkeypatch: pytest.MonkeyPatch) -> dict[int, float]:
+    """Fake ``process_create_time`` so PID-recycle checks pass for tracked PIDs.
+
+    Returns a dict keyed by PID; tests can pre-populate it to control what
+    the recycle check sees. By default, any PID we spawn returns a fixed
+    epoch so the persisted state's ``start_time`` matches on read.
+    """
+    times: dict[int, float] = {}
+
+    def fake_create_time(pid: int) -> float | None:
+        return times.get(pid)
+
+    monkeypatch.setattr(process_module, "process_create_time", fake_create_time)
+    # Seed the canonical fake PID used by ``_FakePopen`` so ``paw dev up``
+    # writes a non-None start_time and subsequent ``paw dev down`` calls
+    # see a matching live value.
+    times[12345] = 1_000_000.0
+    times[67890] = 2_000_000.0
+    return times
+
+
 def test_up_writes_state_file_and_reports_success(
     runner,
     fake_popen,
@@ -156,6 +178,7 @@ def test_up_restart_stops_old_and_starts_new(
     healthy_backend,
     alive_pids,
     fast_polls,
+    stable_process_create_time,
     monkeypatch,
 ):
     """`paw dev up --restart` SIGTERMs the old PID before launching."""
@@ -214,6 +237,7 @@ def test_down_sigterms_and_removes_state(
     healthy_backend,
     alive_pids,
     fast_polls,
+    stable_process_create_time,
     monkeypatch,
 ):
     """`paw dev down` sends SIGTERM and deletes the state file."""
@@ -255,6 +279,7 @@ def test_down_force_sends_sigkill_immediately(
     alive_pids,
     killed_pids,
     fast_polls,
+    stable_process_create_time,
 ):
     """`paw dev down --force` skips SIGTERM and sends SIGKILL right away."""
     runner.invoke(app, ["dev", "up"])
@@ -454,6 +479,104 @@ def test_status_help_renders(runner):
     result = runner.invoke(app, ["dev", "status", "--help"])
     assert result.exit_code == 0
     assert "--plain" in result.stdout
+
+
+def test_dev_down_refuses_when_pid_recycled(
+    runner,
+    fake_popen,
+    healthy_backend,
+    alive_pids,
+    killed_pids,
+    fast_polls,
+    stable_process_create_time,
+    monkeypatch,
+):
+    """``paw dev down`` must NOT signal a PID whose live create-time
+    diverges from the persisted ``start_time``.
+
+    Simulates PID recycling: we ``paw dev up`` to write a state file with
+    ``start_time=1_000_000``, then mutate the fake create-time table so
+    the live process reports a different (much later) value. The
+    subsequent ``paw dev down`` must:
+
+    1. See the PID is alive (``alive_pids`` still contains it).
+    2. Detect the start-time mismatch and refuse to signal.
+    3. NOT call ``os.killpg`` for that PID.
+    """
+    runner.invoke(app, ["dev", "up"])
+    alive_pids.add(12345)
+
+    # Recycle the PID: the live process now reports a creation time
+    # one hour later than what we persisted.
+    stable_process_create_time[12345] = 1_000_000.0 + 3600.0
+
+    result = runner.invoke(app, ["dev", "down"])
+    # The command completes (state file is still removed) but the
+    # signal is suppressed and a warning is logged.
+    assert result.exit_code == 0
+    assert all(pid != 12345 for pid, _sig in killed_pids), killed_pids
+
+
+def test_dev_down_refuses_when_start_time_missing(
+    runner,
+    fake_popen,
+    healthy_backend,
+    alive_pids,
+    killed_pids,
+    fast_polls,
+    monkeypatch,
+):
+    """v1 state files (no ``start_time``) trigger the safe refusal too.
+
+    Without a persisted creation time we can't verify the PID is still
+    ours, so the conservative default is to leave the live process
+    alone and let the operator clean up the stale state file by hand.
+    """
+    # No ``stable_process_create_time`` fixture — paw dev up persists
+    # ``start_time=None`` because ``process_create_time`` is unmocked
+    # and ``ps`` does not find PID 12345 in the test process tree.
+    runner.invoke(app, ["dev", "up"])
+    alive_pids.add(12345)
+
+    result = runner.invoke(app, ["dev", "down"])
+    assert result.exit_code == 0
+    assert all(pid != 12345 for pid, _sig in killed_pids), killed_pids
+
+
+def test_kill_failed_boot_terminates_then_kills_child(monkeypatch):
+    """``kill_failed_boot`` SIGTERMs, then SIGKILLs, then awaits proc.wait.
+
+    Earlier the function fired-and-forgot SIGTERM, leaving the child's
+    zombie unreaped. Now it waits ``FAILED_BOOT_TERMINATE_GRACE_S`` and
+    escalates to SIGKILL if the child doesn't exit cleanly.
+    """
+    import os as os_module
+
+    sent_signals: list[int] = []
+
+    def fake_killpg(pid: int, sig: int) -> None:
+        sent_signals.append(sig)
+
+    monkeypatch.setattr(os_module, "killpg", fake_killpg)
+    monkeypatch.setattr(process_module, "LIVENESS_POLL_INTERVAL_S", 0.0)
+    monkeypatch.setattr(process_module, "FAILED_BOOT_TERMINATE_GRACE_S", 0.05)
+
+    class _NeverDiesPopen:
+        pid = 54321
+        returncode: int | None = None
+
+        def poll(self) -> int | None:
+            return self.returncode
+
+        def wait(self, timeout: float | None = None) -> int:
+            return 0
+
+    # ``kill_failed_boot`` only touches the poll/pid/wait surface; we
+    # type-erase the stub through ``object`` so mypy doesn't require a
+    # full ``subprocess.Popen[bytes]`` shape that this test doesn't need.
+    process_module.kill_failed_boot(_NeverDiesPopen())  # type: ignore[arg-type]
+    assert signal.SIGTERM in sent_signals
+    assert signal.SIGKILL in sent_signals
 
 
 def test_dev_commands_module_re_exported_app_matches(runner):
