@@ -25,9 +25,9 @@ from app.core.keys import (
     load_workspace_env,
     save_workspace_env,
 )
-from app.db import User, get_async_session
+from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.database.legacy import User, get_async_session
 from app.models import Workspace
-from app.users import get_allowed_user
 
 # NOTE: Numeric limits on key count (was MAX_KEYS=10) and per-value length
 # (was MAX_VALUE_LENGTH=512) were removed. The per-workspace .env is

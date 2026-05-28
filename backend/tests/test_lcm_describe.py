@@ -19,7 +19,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.tools.lcm_describe import lcm_describe, lcm_list_summaries
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import Conversation, LCMSummary, LCMSummarySource
 
 # Helpers

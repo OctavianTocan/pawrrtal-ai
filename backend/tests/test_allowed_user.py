@@ -9,8 +9,8 @@ from unittest.mock import patch
 import pytest
 from fastapi import HTTPException
 
-from app.db import User
-from app.users import get_allowed_user
+from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.database.legacy import User
 
 
 def _user(email: str) -> User:

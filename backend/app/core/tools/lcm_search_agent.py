@@ -18,7 +18,7 @@ from app.core.tools.lcm_search import (
     format_results,
     lcm_search,
 )
-from app.db import async_session_maker
+from app.infrastructure.database.legacy import async_session_maker
 
 _TOOL_NAME = "lcm_search"
 

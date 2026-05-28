@@ -39,7 +39,7 @@ from app.core.tools.lcm_search import (
     lcm_search,
 )
 from app.core.tools.lcm_search_agent import make_lcm_search_tool
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import ChatMessage, Conversation, LCMSummary
 
 

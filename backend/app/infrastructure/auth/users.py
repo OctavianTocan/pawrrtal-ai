@@ -17,7 +17,7 @@ from fastapi_users.authentication import (
 from fastapi_users.db import SQLAlchemyUserDatabase
 
 from app.core.config import settings
-from app.db import User, get_user_db
+from app.infrastructure.database.legacy import User, get_user_db
 from app.schemas import UserCreate
 
 MIN_PASSWORD_LENGTH = 8

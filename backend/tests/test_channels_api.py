@@ -21,7 +21,7 @@ from app.crud.channel import (
     issue_link_code,
     list_bindings,
 )
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.integrations.telegram.handlers import (
     PROVIDER,
     handle_plain_message,

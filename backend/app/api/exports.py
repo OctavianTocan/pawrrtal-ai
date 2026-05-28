@@ -19,8 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exporters import render_html, render_json, render_markdown
 from app.crud.chat_message import get_messages_for_conversation
 from app.crud.conversation import get_conversation
-from app.db import User, get_async_session
-from app.users import get_allowed_user
+from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.database.legacy import User, get_async_session
 
 logger = logging.getLogger(__name__)
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from app.db import async_session_maker
+from app.infrastructure.database.legacy import async_session_maker
 from app.integrations.telegram.model_command import (
     handle_model_command,
     set_user_default_model_from_callback,

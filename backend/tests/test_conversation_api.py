@@ -7,7 +7,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import Conversation
 
 

@@ -30,9 +30,9 @@ from app.crud.audit import (
     get_user_activity_summary,
     list_audit_events_for_user,
 )
-from app.db import User, get_async_session
+from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.database.legacy import User, get_async_session
 from app.schemas import AuditEventRead
-from app.users import get_allowed_user
 
 # Upper bound on the dashboard window so the aggregation query can't
 # scan the whole table. 90 days matches the default retention.

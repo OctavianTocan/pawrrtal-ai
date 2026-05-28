@@ -33,7 +33,7 @@ from app.core.agent_loop.types import AgentTool
 from app.core.scheduler import get_active_scheduler
 from app.core.tools.display import make_tool_display
 from app.core.tools.errors import ToolError, ToolErrorCode
-from app.db import async_session_maker
+from app.infrastructure.database.legacy import async_session_maker
 
 log = logging.getLogger(__name__)
 

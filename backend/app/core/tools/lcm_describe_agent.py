@@ -27,7 +27,7 @@ from typing import Any
 from app.core.agent_loop.types import AgentTool
 from app.core.tools.display import make_tool_display
 from app.core.tools.lcm_describe import lcm_describe, lcm_list_summaries
-from app.db import async_session_maker
+from app.infrastructure.database.legacy import async_session_maker
 
 # ---------------------------------------------------------------------------
 # lcm_list_summaries

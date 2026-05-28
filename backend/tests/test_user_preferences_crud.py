@@ -9,7 +9,7 @@ from app.crud.user_preferences import (
     get_user_default_model_id,
     set_user_default_model_id,
 )
-from app.db import User
+from app.infrastructure.database.legacy import User
 
 
 @pytest.mark.anyio

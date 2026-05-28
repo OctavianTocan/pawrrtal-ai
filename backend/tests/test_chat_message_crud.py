@@ -19,7 +19,7 @@ from app.crud.chat_message import (
     append_user_message,
     finalize_assistant_message,
 )
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import Conversation
 
 

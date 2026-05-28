@@ -25,7 +25,7 @@ from typing import TYPE_CHECKING
 
 from app.core.providers.reasoning import format_adaptation_notice
 from app.crud.channel import normalize_conversation_reasoning_effort
-from app.db import async_session_maker
+from app.infrastructure.database.legacy import async_session_maker
 
 if TYPE_CHECKING:
     from aiogram.types import Message

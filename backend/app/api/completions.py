@@ -23,8 +23,8 @@ from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
 from app.core.providers import resolve_llm
-from app.db import User
-from app.users import get_allowed_user
+from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.database.legacy import User
 
 logger = logging.getLogger(__name__)
 

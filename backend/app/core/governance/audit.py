@@ -46,7 +46,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.governance.secret_redaction import redact_mapping
-from app.core.request_logging import get_request_id
+from app.infrastructure.middleware.logging import get_request_id
 from app.models import AuditEvent
 
 logger = logging.getLogger(__name__)

@@ -19,7 +19,7 @@ from app.core.providers.base import AILLM
 from app.core.providers.catalog import default_model, require_known
 from app.core.providers.model_id import InvalidModelId, UnknownModelId
 from app.crud.channel import update_conversation_model
-from app.db import async_session_maker
+from app.infrastructure.database.legacy import async_session_maker
 from app.integrations.telegram.handlers import TelegramTurnContext
 
 logger = logging.getLogger(__name__)

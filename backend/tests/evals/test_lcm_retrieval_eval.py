@@ -23,7 +23,7 @@ from app.core.lcm.evals import (
     run_eval_matrix,
     seed_scenario,
 )
-from app.db import User
+from app.infrastructure.database.legacy import User
 from tests.evals.scenarios import all_scenarios
 
 

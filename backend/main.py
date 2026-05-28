@@ -3,7 +3,7 @@
 Defines all API routes, configures middleware, and wires up authentication.
 """
 
-from app.logger_setup import configure_logging
+from app.infrastructure.logging.setup import configure_logging
 
 # Configure logging at the very start of the application. This ensures that all loggers in the app will use this configuration.
 configure_logging()
@@ -42,23 +42,23 @@ from app.cli.migrate_workspace_env import migrate_user_keyed_env_files_for_all_u
 from app.core.config import settings
 from app.core.event_bus import AgentHandler, EventBus, NotificationService
 from app.core.event_bus.global_bus import set_event_bus
-from app.core.middleware import BackendApiKeyMiddleware
 from app.core.providers.gemini_cli import (
     GEMINI_BINARY_NAME,
     is_gemini_cli_available,
 )
-from app.core.rate_limit import ChatRateLimitMiddleware
-from app.core.request_logging import RequestLoggingMiddleware
 from app.core.scheduler import JobScheduler, set_active_scheduler
 from app.core.telemetry import setup_tracing, shutdown_tracing
-from app.db import create_db_and_tables
+from app.infrastructure.auth.users import auth_backend, fastapi_users
+from app.infrastructure.database.legacy import create_db_and_tables
+from app.infrastructure.middleware.backend_api_key import BackendApiKeyMiddleware
+from app.infrastructure.middleware.logging import RequestLoggingMiddleware
+from app.infrastructure.middleware.rate_limit import ChatRateLimitMiddleware
 from app.integrations.telegram import telegram_lifespan
 from app.schemas import (
     UserCreate,
     UserRead,
     UserUpdate,
 )
-from app.users import auth_backend, fastapi_users
 
 
 def _log_gemini_cli_status() -> None:

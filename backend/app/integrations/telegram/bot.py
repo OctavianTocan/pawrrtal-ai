@@ -43,7 +43,7 @@ from app.channels.turn_runner import ChatTurnInput, run_turn
 from app.core.agent_loop.hooks import build_pre_turn_hooks
 from app.core.agent_loop.tools import build_agent_tools
 from app.core.config import settings
-from app.db import async_session_maker
+from app.infrastructure.database.legacy import async_session_maker
 from app.integrations.telegram.bot_provider_resolution import (
     resolve_provider_with_auto_clear,
 )

@@ -23,9 +23,9 @@ from app.crud.channel import (
     issue_link_code,
     list_bindings,
 )
-from app.db import User, get_async_session
+from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.database.legacy import User, get_async_session
 from app.schemas import ChannelBindingRead, TelegramLinkCodeRead
-from app.users import get_allowed_user
 
 _TELEGRAM = "telegram"
 

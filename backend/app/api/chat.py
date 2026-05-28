@@ -30,7 +30,6 @@ from app.channels.turn_runner import ChatTurnInput, EventHook, run_turn
 from app.core.agent_loop.hooks import build_pre_turn_hooks
 from app.core.agent_loop.tools import build_agent_tools
 from app.core.providers import StreamEvent, default_model, resolve_llm
-from app.core.request_logging import get_request_id
 from app.core.tools.artifact_agent import (
     ARTIFACT_TOOL_NAME,
     ArtifactValidationError,
@@ -41,9 +40,10 @@ from app.crud.conversation import (
     get_conversation,
 )
 from app.crud.workspace import get_default_workspace
-from app.db import User, get_async_session
+from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.database.legacy import User, get_async_session
+from app.infrastructure.middleware.logging import get_request_id
 from app.schemas import ChatRequest
-from app.users import get_allowed_user
 
 logger = logging.getLogger(__name__)
 

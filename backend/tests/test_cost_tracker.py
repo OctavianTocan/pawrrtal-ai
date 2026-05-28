@@ -23,7 +23,7 @@ from app.core.governance.cost_tracker import (
 )
 from app.core.providers.catalog import ModelEntry
 from app.core.providers.model_id import Host, Vendor
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import CostLedger
 
 pytestmark = pytest.mark.anyio

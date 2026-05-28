@@ -34,7 +34,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.event_bus import ScheduledEvent
 from app.core.event_bus.global_bus import publish_if_available
-from app.db import async_session_maker
+from app.infrastructure.database.legacy import async_session_maker
 from app.models import ScheduledJob
 
 logger = logging.getLogger(__name__)

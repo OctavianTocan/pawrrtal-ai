@@ -4,9 +4,9 @@ from fastapi_users.db import SQLAlchemyUserDatabase
 from fastapi_users.exceptions import UserNotExists
 
 from app.core.config import settings
-from app.db import User, async_session_maker
+from app.infrastructure.auth.users import UserManager
+from app.infrastructure.database.legacy import User, async_session_maker
 from app.schemas import UserCreate
-from app.users import UserManager
 
 
 async def seed_admin_user() -> None:

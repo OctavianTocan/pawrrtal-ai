@@ -24,7 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.crud.channel import get_user_id_for_external, issue_link_code
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.integrations.telegram.dev_admin import (
     TELEGRAM_PROVIDER,
     resolve_or_autolink_telegram_user,

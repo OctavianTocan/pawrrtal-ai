@@ -30,7 +30,7 @@ from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud.channel import get_user_id_for_external
-from app.db import async_session_maker
+from app.infrastructure.database.legacy import async_session_maker
 from app.integrations.telegram.regenerate_keyboard import (
     REGEN_CALLBACK_PREFIX,  # re-exported for bot.py one-stop import
     parse_regenerate_callback_data,

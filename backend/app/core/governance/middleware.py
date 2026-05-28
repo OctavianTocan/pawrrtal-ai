@@ -46,8 +46,8 @@ from app.core.governance.cost_tracker import (
     PostgresCostLedger,
     per_request_reservation_usd,
 )
-from app.core.rate_limit import CHAT_PATH_PREFIX
-from app.db import async_session_maker
+from app.infrastructure.database.legacy import async_session_maker
+from app.infrastructure.middleware.rate_limit import CHAT_PATH_PREFIX
 
 logger = logging.getLogger(__name__)
 

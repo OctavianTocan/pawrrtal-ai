@@ -10,7 +10,7 @@ from app.crud.appearance import (
     reset_appearance,
     upsert_appearance,
 )
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.schemas import (
     AppearanceFonts,
     AppearanceOptions,

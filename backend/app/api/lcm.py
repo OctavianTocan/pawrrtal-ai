@@ -25,8 +25,8 @@ from app.core.lcm.observe import (
     describe_assembled_context,
 )
 from app.crud import conversation as crud
-from app.db import User, get_async_session
-from app.users import get_allowed_user
+from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.database.legacy import User, get_async_session
 
 logger = logging.getLogger(__name__)
 

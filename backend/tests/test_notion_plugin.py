@@ -27,7 +27,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.plugins import ToolContext, all_plugins
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import NotionOperationLog, Workspace
 from app.plugins.notion import notion_plugin
 from app.plugins.notion.audit import STATUS_ERROR, STATUS_OK

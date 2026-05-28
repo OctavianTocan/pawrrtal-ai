@@ -13,7 +13,7 @@ from app.crud.memory import (
     list_memories_for_user,
     mark_memory_referenced,
 )
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import Memory
 
 

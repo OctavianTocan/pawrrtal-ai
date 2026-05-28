@@ -23,7 +23,7 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.tools.lcm_grep import _excerpt, lcm_grep
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import (
     ChatMessage,
     Conversation,

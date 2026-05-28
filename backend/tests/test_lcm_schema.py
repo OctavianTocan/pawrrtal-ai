@@ -25,7 +25,7 @@ from sqlalchemy import Table, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import (
     Conversation,
     LCMContextItem,

@@ -31,7 +31,8 @@ from app.crud.workspace import (
     list_workspaces,
     update_workspace,
 )
-from app.db import User, get_async_session
+from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.database.legacy import User, get_async_session
 from app.models import Workspace
 from app.schemas import (
     OnboardingStatus,
@@ -44,7 +45,6 @@ from app.schemas import (
     WorkspaceTreeResponse,
     WorkspaceUpdate,
 )
-from app.users import get_allowed_user
 
 # ---------------------------------------------------------------------------
 # Helpers

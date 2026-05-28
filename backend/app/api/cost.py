@@ -22,9 +22,9 @@ from app.crud.cost import (
     list_cost_rows_for_user,
     per_model_breakdown,
 )
-from app.db import User, get_async_session
+from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.database.legacy import User, get_async_session
 from app.schemas import CostLedgerRead, CostSummaryRead
-from app.users import get_allowed_user
 
 # Upper bound on the configurable window so the SQL aggregate stays
 # bounded.  90 days mirrors the default audit retention.

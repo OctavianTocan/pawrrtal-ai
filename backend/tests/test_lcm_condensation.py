@@ -26,7 +26,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.lcm import assemble_context, compact_leaf_if_needed
 from app.core.lcm.condense import _condense_at_depth
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import (
     ChatMessage,
     Conversation,

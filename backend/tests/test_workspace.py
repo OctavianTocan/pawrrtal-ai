@@ -32,7 +32,7 @@ from app.crud.workspace import (
     get_default_workspace,
     list_workspaces,
 )
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import UserPersonalization, Workspace
 
 

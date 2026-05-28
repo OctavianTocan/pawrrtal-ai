@@ -21,7 +21,7 @@ from app.crud.conversation import (
     update_conversation_model,
     update_conversation_title,
 )
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import Conversation
 from app.schemas import ConversationCreate, ConversationUpdate
 

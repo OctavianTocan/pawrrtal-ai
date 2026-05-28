@@ -44,7 +44,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import settings as settings  # noqa: PLC0414
 from app.core.lcm import compact_leaf_if_needed
-from app.db import async_session_maker
+from app.infrastructure.database.legacy import async_session_maker
 
 logger = logging.getLogger(__name__)
 

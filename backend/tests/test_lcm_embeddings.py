@@ -47,7 +47,7 @@ from app.core.lcm.evals import (
     seed_scenario,
 )
 from app.core.tools.lcm_search import LCMSearchResult
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import (
     ChatMessage,
     Conversation,

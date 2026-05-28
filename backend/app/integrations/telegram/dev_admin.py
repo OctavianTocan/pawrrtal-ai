@@ -29,7 +29,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.crud.channel import get_user_id_for_external
 from app.crud.workspace import ensure_dev_admin_workspace
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.integrations.telegram.sender import TelegramSender
 from app.models import ChannelBinding
 

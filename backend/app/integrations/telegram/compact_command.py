@@ -36,7 +36,7 @@ from app.crud.channel import (
     get_or_create_telegram_conversation_full,
     get_user_id_for_external,
 )
-from app.db import async_session_maker
+from app.infrastructure.database.legacy import async_session_maker
 from app.integrations.telegram.model_defaults import resolve_effective_model_id
 
 

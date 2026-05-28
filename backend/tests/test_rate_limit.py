@@ -10,7 +10,7 @@ from starlette.responses import JSONResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from app.core.rate_limit import (
+from app.infrastructure.middleware.rate_limit import (
     CHAT_PATH_PREFIX,
     ChatRateLimitMiddleware,
     InMemoryWindow,

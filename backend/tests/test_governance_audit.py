@@ -26,7 +26,7 @@ from app.core.governance.audit import (
     assess_command_risk,
     assess_file_access_risk,
 )
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import AuditEvent
 
 pytestmark = pytest.mark.anyio

@@ -17,7 +17,7 @@ from app.crud.project import (
     list_projects,
     update_project,
 )
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.schemas import (
     ConversationCreate,
     ConversationUpdate,

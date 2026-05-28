@@ -16,9 +16,9 @@ from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.crud import mcp_servers as crud
-from app.db import User, get_async_session
+from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.database.legacy import User, get_async_session
 from app.models import McpServer
-from app.users import get_allowed_user
 
 log = logging.getLogger(__name__)
 

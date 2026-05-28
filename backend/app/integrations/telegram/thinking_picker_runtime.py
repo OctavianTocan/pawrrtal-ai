@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from app.crud.channel import update_conversation_reasoning_effort
-from app.db import async_session_maker
+from app.infrastructure.database.legacy import async_session_maker
 from app.integrations.telegram.handlers import TelegramSender
 
 # Re-exported so bot.py imports both via one module.

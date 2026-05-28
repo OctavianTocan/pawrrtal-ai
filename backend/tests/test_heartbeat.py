@@ -24,7 +24,7 @@ from app.crud.conversation import (
     get_or_create_heartbeat_conversation,
 )
 from app.crud.heartbeat import JOB_NAME_PREFIX, sync_workspace_heartbeats
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import Conversation, Workspace
 
 # ── Parser ───────────────────────────────────────────────────────────────

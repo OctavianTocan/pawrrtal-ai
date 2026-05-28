@@ -28,7 +28,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.lcm.observe import describe_assembled_context
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import (
     ChatMessage,
     Conversation,

@@ -46,7 +46,7 @@ from app.crud.chat_message import (
     finalize_assistant_message,
     get_messages_for_conversation,
 )
-from app.db import async_session_maker
+from app.infrastructure.database.legacy import async_session_maker
 from app.models import Conversation
 
 # Strong references to in-flight codex_thread_id persist tasks so they

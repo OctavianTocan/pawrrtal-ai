@@ -33,7 +33,7 @@ from app.core.event_bus.types import (
     WebhookEvent,
 )
 from app.core.providers import default_model, resolve_llm
-from app.db import async_session_maker
+from app.infrastructure.database.legacy import async_session_maker
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +153,7 @@ class AgentHandler:
             # try:
             #     job_id = uuid.UUID(originating_event_id)
             #     from app.models import ScheduledJob
-            #     from app.db import async_session_maker
+            #     from app.infrastructure.database.legacy import async_session_maker
             #     from app.core.event_bus import AgentResponseEvent
             #     from app.core.event_bus.global_bus import publish_if_available
             #     from app.core.event_bus.handlers import _persist_assistant_response

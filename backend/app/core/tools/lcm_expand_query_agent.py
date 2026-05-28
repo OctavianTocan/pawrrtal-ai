@@ -25,7 +25,7 @@ from typing import Any
 from app.core.agent_loop.types import AgentTool
 from app.core.tools.display import make_tool_display, summarize_query
 from app.core.tools.lcm_expand_query import lcm_expand_query
-from app.db import async_session_maker
+from app.infrastructure.database.legacy import async_session_maker
 
 _TOOL_NAME = "lcm_expand_query"
 

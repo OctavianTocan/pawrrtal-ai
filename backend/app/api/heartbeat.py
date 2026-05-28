@@ -28,8 +28,8 @@ from app.core.scheduler import JobScheduler
 from app.crud import channel as channel_crud
 from app.crud.heartbeat import sync_workspace_heartbeats
 from app.crud.workspace import get_default_workspace
-from app.db import User, get_async_session
-from app.users import get_allowed_user
+from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.database.legacy import User, get_async_session
 
 logger = logging.getLogger(__name__)
 

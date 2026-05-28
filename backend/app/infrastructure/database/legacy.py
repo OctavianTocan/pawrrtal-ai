@@ -16,7 +16,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
-from app.db_base import Base
+from app.infrastructure.models.base import Base
 
 logger = logging.getLogger(__name__)
 

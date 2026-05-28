@@ -14,7 +14,7 @@ from datetime import datetime
 from sqlalchemy import DateTime, ForeignKey, String, Text, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db_base import Base
+from app.infrastructure.models.base import Base
 
 
 def _utcnow() -> datetime:
