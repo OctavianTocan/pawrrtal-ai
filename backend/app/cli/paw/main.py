@@ -12,6 +12,7 @@ from app.cli.paw.commands import conversations as conversations_cmd
 from app.cli.paw.commands import cost as cost_cmd
 from app.cli.paw.commands import doctor as doctor_cmd
 from app.cli.paw.commands import jobs as jobs_cmd
+from app.cli.paw.commands import lcm as lcm_cmd
 from app.cli.paw.commands import login as login_cmd
 from app.cli.paw.commands import mcp as mcp_cmd
 from app.cli.paw.commands import messages as messages_cmd
@@ -111,6 +112,12 @@ app.add_typer(
     audit_cmd.app,
     name="audit",
     help="Inspect audit events.",
+)
+
+app.add_typer(
+    lcm_cmd.app,
+    name="lcm",
+    help="LCM observability — pre-turn context inspection.",
 )
 
 app.add_typer(

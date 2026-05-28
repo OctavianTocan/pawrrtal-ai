@@ -43,6 +43,7 @@ Every row reflects a shipped subcommand. Source: `backend/app/cli/paw/commands/`
 | messages         | `ls`, `get` (by `(conv_id, index)`; no `/messages/{id}` route) | `/api/v1/conversations/{id}/messages`    |
 | cost             | `summary`, `ledger`                                            | `/api/v1/cost`, `/api/v1/cost/ledger`    |
 | audit            | `ls`/`list`, `show`                                            | `/api/v1/audit`                          |
+| lcm              | `context <conv-id>`                                            | `/api/v1/lcm/conversations/{id}/context` |
 | api (raw)        | `METHOD PATH`, `openapi`, `ls`                                 | any                                      |
 | record / replay  | `record COMMAND…`, `replay --from FILE`                        | local (respx-backed)                     |
 | verify           | `codex`, `chat-roundtrip`, `model-switch`, `all`               | end-to-end                               |
@@ -183,7 +184,7 @@ v1 shipped (Tasks 0–11) on the `development` branch.
 
 **Deferred to v2** (file as separate beans before implementing):
 
-- `paw lcm` — LCM list/get + memories + dreaming
+- `paw lcm memories / lineages / dream` — blocked on backend HTTP surface (`pawrrtal-x9u4`). `paw lcm context` ships today.
 - `paw fanout N COMMAND...` — N parallel personas hitting the same backend
 - `paw mirror --upstream URL COMMAND...` — local vs remote SSE diff
 - `paw verify telegram-link-and-bot` — full channel E2E
