@@ -48,7 +48,7 @@ Every row reflects a shipped subcommand. Source: `backend/app/cli/paw/commands/`
 | record / replay  | `record COMMAND…`, `replay --from FILE`                        | local (respx-backed)                     |
 | fanout           | `<N> COMMAND…`                                                 | local orchestrator over N parallel personas |
 | mirror           | `--upstream URL COMMAND…`                                      | local vs remote SSE diff                  |
-| verify           | `codex`, `chat-roundtrip`, `model-switch`, `all`               | end-to-end                               |
+| verify           | `codex`, `chat-roundtrip`, `model-switch`, `telegram`, `all`   | end-to-end                               |
 | doctor           | (no verb)                                                      | local + ping `/api/v1/health` + models   |
 | dev              | `up`, `down`, `status`                                         | local backend lifecycle (pid file at `<PAW_CONFIG_DIR>/<profile>/dev.json`) |
 
@@ -89,13 +89,26 @@ just paw verify model-switch --from litellm:openai/gpt-4o-mini --to litellm:anth
 
 Create with model M1 → turn 1 → switch conversation to M2 → turn 2 → assert each turn ran against its assigned model.
 
+### Verify the Telegram link-and-bot flow end-to-end
+
+```bash
+just paw verify telegram --json | jq '.checks[] | select(.passed == false)'
+```
+
+Lists channels → issues a one-time link code (asserts shape + future
+expiry) → re-lists → unlinks → asserts the Telegram binding is gone.
+The bot-side redemption (user pasting the code into the bot) is **not**
+covered today because no simulate endpoint exists; the scenario emits a
+stable `simulate_redemption_endpoint_unavailable` check so the gap is
+greppable.
+
 ### Verify everything shippable
 
 ```bash
 just paw verify all --json
 ```
 
-Runs `codex` + `chat-roundtrip` + `model-switch` in sequence; aggregate exit code is 6 if any single suite fails.
+Runs `codex` + `chat-roundtrip` + `model-switch` + `telegram` in sequence; aggregate exit code is 6 if any single suite fails.
 
 ### Capture a fixture for unit tests, then replay offline
 
@@ -188,7 +201,6 @@ v1 shipped (Tasks 0–11) on the `development` branch.
 **Deferred to v2** (file as separate beans before implementing):
 
 - `paw lcm memories / lineages / dream` — blocked on backend HTTP surface (`pawrrtal-x9u4`). `paw lcm context` ships today.
-- `paw verify telegram-link-and-bot` — full channel E2E
 - `paw verify cost-and-budget` — ledger + budget enforcement
 - `paw verify lcm-active-recall` — Active Recall pre-turn agent integration
 
