@@ -58,8 +58,8 @@ def test_module_level_decorator_uses_default_registry() -> None:
     assert any(h.fn is example_hook for h in hooks)
 
 
-@pytest.mark.asyncio
-async def test_hook_fn_is_called_with_app(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.anyio
+async def test_hook_fn_is_called_with_app() -> None:
     """Registered hooks receive the FastAPI app instance when invoked."""
     registry = LifecycleRegistry()
     called_with: list[object] = []

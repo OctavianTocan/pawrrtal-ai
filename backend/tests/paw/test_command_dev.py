@@ -476,9 +476,15 @@ def test_dev_help_renders(runner):
 
 def test_status_help_renders(runner):
     """`paw dev status --help` exits 0 and documents --plain."""
+    import re
+
     result = runner.invoke(app, ["dev", "status", "--help"])
     assert result.exit_code == 0
-    assert "--plain" in result.stdout
+    # Rich Click colorises help output, so ``--plain`` is rendered as
+    # interleaved ANSI escape codes that defeat a literal substring match.
+    # Strip the codes before asserting.
+    plain_stdout = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
+    assert "--plain" in plain_stdout
 
 
 def test_dev_down_refuses_when_pid_recycled(
