@@ -211,14 +211,13 @@ Every command supports:
 
 ## Status
 
-v1 shipped (Tasks 0–11) on the `development` branch.
+v1 shipped on `development`. v2 surface (`channels`, `mcp`, `cost`, `audit`, `jobs`, `lcm context`, `fanout`, `mirror`, `dev`, `verify telegram`, `verify cost`) shipped May 2026.
 
-**Deferred to v2** (file as separate beans before implementing):
+**Still blocked on backend work:**
 
 - `paw lcm memories / lineages / dream` — blocked on backend HTTP surface (`pawrrtal-x9u4`). `paw lcm context` ships today.
-- `paw verify lcm-active-recall` — Active Recall pre-turn agent integration
+- `paw verify lcm-active-recall` — depends on `pawrrtal-x9u4` so memories can be seeded and dreaming triggered programmatically.
 
-**Open follow-up beans:**
+**Known protocol drift to fix elsewhere:**
 
-- SQLite chat-path bug (live E2E currently green only against Postgres)
-- Frontend migration off the `/users/me` compat alias to canonical `/api/v1/users/me`
+- `pawrrtal-95xr` — chat router doesn't catalog-validate `reasoning_effort` against the selected model before forwarding; surfaces as `UnsupportedParamsError` in `paw verify chat-roundtrip` when an incompatible (model, effort) pair is exercised.
