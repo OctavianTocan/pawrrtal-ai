@@ -10,6 +10,7 @@ from app.cli.paw.commands import auth as auth_cmd
 from app.cli.paw.commands import channels as channels_cmd
 from app.cli.paw.commands import conversations as conversations_cmd
 from app.cli.paw.commands import cost as cost_cmd
+from app.cli.paw.commands import dev as dev_cmd
 from app.cli.paw.commands import doctor as doctor_cmd
 from app.cli.paw.commands import fanout as fanout_cmd
 from app.cli.paw.commands import jobs as jobs_cmd
@@ -40,6 +41,12 @@ app.add_typer(
     doctor_cmd.app,
     name="doctor",
     help="Health-check the persona + backend.",
+)
+
+app.add_typer(
+    dev_cmd.app,
+    name="dev",
+    help="Dev backend process lifecycle (up/down/status).",
 )
 
 # login + logout sit at the top level (not under `paw auth`) so muscle memory

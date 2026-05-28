@@ -1,11 +1,11 @@
 ---
 # pawrrtal-54y0
 title: 'feat(paw): paw dev up/down/status'
-status: todo
+status: completed
 type: feature
 priority: low
 created_at: 2026-05-27T20:08:18Z
-updated_at: 2026-05-27T20:08:18Z
+updated_at: 2026-05-28T01:22:54Z
 parent: pawrrtal-6cnv
 ---
 

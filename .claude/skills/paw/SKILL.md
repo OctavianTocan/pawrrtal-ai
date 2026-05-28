@@ -50,6 +50,7 @@ Every row reflects a shipped subcommand. Source: `backend/app/cli/paw/commands/`
 | mirror           | `--upstream URL COMMAND…`                                      | local vs remote SSE diff                  |
 | verify           | `codex`, `chat-roundtrip`, `model-switch`, `all`               | end-to-end                               |
 | doctor           | (no verb)                                                      | local + ping `/api/v1/health` + models   |
+| dev              | `up`, `down`, `status`                                         | local backend lifecycle (pid file at `<PAW_CONFIG_DIR>/<profile>/dev.json`) |
 
 ## Conversation flow (important)
 
@@ -190,7 +191,6 @@ v1 shipped (Tasks 0–11) on the `development` branch.
 - `paw verify telegram-link-and-bot` — full channel E2E
 - `paw verify cost-and-budget` — ledger + budget enforcement
 - `paw verify lcm-active-recall` — Active Recall pre-turn agent integration
-- `paw dev up/down/status` — process lifecycle for the dev launcher
 
 **Open follow-up beans:**
 
