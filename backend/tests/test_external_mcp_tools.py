@@ -15,15 +15,8 @@ from unittest.mock import patch
 
 import httpx
 import pytest
-from returns.io import IOResult
-from returns.result import Failure, Success
 
 from app.core.tools.external_mcp import (
-    McpAuthError,
-    McpError,
-    McpProtocolError,
-    McpServerError,
-    McpTimeoutError,
     _bounded,
     _sanitize,
     build_external_mcp_tools,
@@ -158,62 +151,44 @@ async def test_execute_returns_io_error_on_http_failure() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Phase-1 returns pilot: ``call_external_mcp_tool`` returns
-# ``IOResult[str, McpError]``.  These tests assert the typed surface
-# directly; the caller-level test below asserts that the legacy ``str``
-# unwrap path is unchanged for the agent loop.
+# call_external_mcp_tool: returns the rendered tool-output string directly
+# (on success the payload, on failure the legacy ``[io_error] …`` envelope).
+# These tests assert the rendered surface end-to-end.
 # ---------------------------------------------------------------------------
 
 
-def _unwrap_failure(result: IOResult[str, McpError]) -> McpError:
-    """Extract the :class:`McpError` from an ``IOFailure`` for assertions."""
-    inner = result._inner_value
-    assert isinstance(inner, Failure), f"expected IOFailure, got {inner!r}"
-    err: McpError = inner.failure()
-    return err
-
-
-def _unwrap_success(result: IOResult[str, McpError]) -> str:
-    """Extract the payload from an ``IOSuccess`` for assertions."""
-    inner = result._inner_value
-    assert isinstance(inner, Success), f"expected IOSuccess, got {inner!r}"
-    payload: str = inner.unwrap()
-    return payload
-
-
-async def test_phase1_call_external_mcp_tool_returns_success() -> None:
+async def test_call_external_mcp_tool_returns_success_payload() -> None:
     async def fake_call(**_kwargs: Any) -> str:
         return "result-payload"
 
     with patch("app.core.tools.external_mcp._call_remote_tool", side_effect=fake_call):
-        result = await call_external_mcp_tool(
-            server_name="notion",
-            url="https://x",
-            headers={},
-            tool_name="search",
-            arguments={"query": "hi"},
-        )
-    assert _unwrap_success(result) == "result-payload"
-
-
-async def test_phase1_call_external_mcp_tool_maps_timeout() -> None:
-    async def boom(**_kwargs: Any) -> str:
-        raise httpx.ReadTimeout("read timed out")
-
-    with patch("app.core.tools.external_mcp._call_remote_tool", side_effect=boom):
-        result = await call_external_mcp_tool(
+        out = await call_external_mcp_tool(
             server_name="notion",
             url="https://x",
             headers={},
             tool_name="search",
             arguments={},
         )
-    err = _unwrap_failure(result)
-    assert isinstance(err, McpTimeoutError)
-    assert err.kind == "timeout"
+    assert out == "result-payload"
 
 
-async def test_phase1_call_external_mcp_tool_maps_auth_401() -> None:
+async def test_call_external_mcp_tool_renders_timeout_as_io_error() -> None:
+    async def boom(**_kwargs: Any) -> str:
+        raise httpx.ReadTimeout("read timed out")
+
+    with patch("app.core.tools.external_mcp._call_remote_tool", side_effect=boom):
+        out = await call_external_mcp_tool(
+            server_name="notion",
+            url="https://x",
+            headers={},
+            tool_name="search",
+            arguments={},
+        )
+    assert out.startswith("[io_error] ")
+    assert "read timed out" in out
+
+
+async def test_call_external_mcp_tool_renders_auth_401_as_io_error() -> None:
     request = httpx.Request("POST", "https://x/call_tool")
     response = httpx.Response(401, request=request, text="unauthorized")
 
@@ -221,19 +196,18 @@ async def test_phase1_call_external_mcp_tool_maps_auth_401() -> None:
         raise httpx.HTTPStatusError("401", request=request, response=response)
 
     with patch("app.core.tools.external_mcp._call_remote_tool", side_effect=boom):
-        result = await call_external_mcp_tool(
+        out = await call_external_mcp_tool(
             server_name="notion",
             url="https://x",
             headers={},
             tool_name="search",
             arguments={},
         )
-    err = _unwrap_failure(result)
-    assert isinstance(err, McpAuthError)
-    assert err.status_code == 401
+    assert out.startswith("[io_error] ")
+    assert "401" in out
 
 
-async def test_phase1_call_external_mcp_tool_maps_auth_403() -> None:
+async def test_call_external_mcp_tool_renders_auth_403_as_io_error() -> None:
     request = httpx.Request("POST", "https://x/call_tool")
     response = httpx.Response(403, request=request, text="forbidden")
 
@@ -241,19 +215,18 @@ async def test_phase1_call_external_mcp_tool_maps_auth_403() -> None:
         raise httpx.HTTPStatusError("403", request=request, response=response)
 
     with patch("app.core.tools.external_mcp._call_remote_tool", side_effect=boom):
-        result = await call_external_mcp_tool(
+        out = await call_external_mcp_tool(
             server_name="notion",
             url="https://x",
             headers={},
             tool_name="search",
             arguments={},
         )
-    err = _unwrap_failure(result)
-    assert isinstance(err, McpAuthError)
-    assert err.status_code == 403
+    assert out.startswith("[io_error] ")
+    assert "403" in out
 
 
-async def test_phase1_call_external_mcp_tool_maps_server_5xx() -> None:
+async def test_call_external_mcp_tool_renders_server_5xx_as_io_error() -> None:
     request = httpx.Request("POST", "https://x/call_tool")
     response = httpx.Response(503, request=request, text="unavailable")
 
@@ -261,51 +234,49 @@ async def test_phase1_call_external_mcp_tool_maps_server_5xx() -> None:
         raise httpx.HTTPStatusError("503", request=request, response=response)
 
     with patch("app.core.tools.external_mcp._call_remote_tool", side_effect=boom):
-        result = await call_external_mcp_tool(
+        out = await call_external_mcp_tool(
             server_name="notion",
             url="https://x",
             headers={},
             tool_name="search",
             arguments={},
         )
-    err = _unwrap_failure(result)
-    assert isinstance(err, McpServerError)
-    assert err.status_code == 503
+    assert out.startswith("[io_error] ")
+    assert "503" in out
 
 
-async def test_phase1_call_external_mcp_tool_maps_protocol_error_on_connect() -> None:
+async def test_call_external_mcp_tool_renders_connect_error_as_io_error() -> None:
     async def boom(**_kwargs: Any) -> str:
         raise httpx.ConnectError("connection refused")
 
     with patch("app.core.tools.external_mcp._call_remote_tool", side_effect=boom):
-        result = await call_external_mcp_tool(
+        out = await call_external_mcp_tool(
             server_name="notion",
             url="https://x",
             headers={},
             tool_name="search",
             arguments={},
         )
-    err = _unwrap_failure(result)
-    assert isinstance(err, McpProtocolError)
+    assert out.startswith("[io_error] ")
+    assert "connection refused" in out
 
 
-async def test_phase1_call_external_mcp_tool_maps_protocol_error_on_bad_json() -> None:
-    import json as _json  # local import keeps the top of the file lean
+async def test_call_external_mcp_tool_renders_bad_json_as_io_error() -> None:
+    import json as _json
 
     async def boom(**_kwargs: Any) -> str:
         raise _json.JSONDecodeError("expecting value", "garbage", 0)
 
     with patch("app.core.tools.external_mcp._call_remote_tool", side_effect=boom):
-        result = await call_external_mcp_tool(
+        out = await call_external_mcp_tool(
             server_name="notion",
             url="https://x",
             headers={},
             tool_name="search",
             arguments={},
         )
-    err = _unwrap_failure(result)
-    assert isinstance(err, McpProtocolError)
-    assert "malformed JSON" in err.message
+    assert out.startswith("[io_error] ")
+    assert "malformed JSON" in out
 
 
 async def test_phase1_unwrap_preserves_legacy_string_contract_on_auth() -> None:

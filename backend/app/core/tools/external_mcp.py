@@ -52,8 +52,6 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 import httpx
-from returns.io import IOFailure, IOResult, IOSuccess
-from returns.result import Failure, Success
 
 from app.core.agent_loop.types import AgentTool
 from app.core.tools.display import make_tool_display
@@ -266,19 +264,13 @@ def _wrap_remote_tool(
 
     async def execute(tool_call_id: str, **kwargs: Any) -> str:
         del tool_call_id  # unused — remote server doesn't need it
-        # Phase-1 returns pilot: the outermost tool-call hop returns a
-        # typed ``IOResult[str, McpError]`` so the failure shape is in
-        # the signature.  We unwrap back to the legacy
-        # ``ToolError.render()`` string contract here so the agent-loop
-        # caller is unchanged.  See SKILL `returns-for-pawrrtal`.
-        result = await call_external_mcp_tool(
+        return await call_external_mcp_tool(
             server_name=server_name,
             url=url,
             headers=headers,
             tool_name=tool_name,
             arguments=kwargs,
         )
-        return _unwrap_mcp_result(result=result, server_name=server_name, tool_name=tool_name)
 
     return AgentTool(
         name=qualified,
@@ -317,17 +309,13 @@ async def call_external_mcp_tool(
     headers: dict[str, Any],
     tool_name: str,
     arguments: dict[str, Any],
-) -> IOResult[str, McpError]:
-    """Invoke one remote MCP tool, returning a typed ``IOResult``.
+) -> str:
+    """Invoke one remote MCP tool, returning the rendered tool-output string.
 
-    Phase-1 of the ``dry-python/returns`` adoption pilot — see
-    ``docs/superpowers/specs/2026-05-28-returns-adoption-grilling.md``.
-    The agent-loop bridge keeps consuming this as a plain ``str`` by
-    unwrapping in the closure built by :func:`_wrap_remote_tool`; the
-    typed signature makes the closed set of failure modes legible at
-    the call site and stops the previous broad
-    ``except (TimeoutError, json.JSONDecodeError)`` catch from
-    swallowing unrelated bugs.
+    On success returns the JSON-decoded body the agent loop expects. On
+    any of the closed-set MCP failure modes (timeout, auth, server,
+    protocol) renders the corresponding ``[io_error] …`` string via
+    :class:`ToolError` so the agent-loop caller sees a uniform contract.
 
     Args:
         server_name: User-friendly server identifier (used only in logs
@@ -339,65 +327,28 @@ async def call_external_mcp_tool(
         tool_name: Name of the remote tool to call.
         arguments: JSON-serialisable arguments forwarded to the remote
             server.
-
-    Returns:
-        ``IOSuccess(content)`` on a successful call, ``IOFailure(error)``
-        with one of the :class:`McpError` variants for any other outcome.
     """
     try:
-        content = await _call_remote_tool(
+        return await _call_remote_tool(
             url=url,
             headers=headers,
             tool_name=tool_name,
             arguments=arguments,
         )
     except httpx.HTTPStatusError as exc:
-        return IOFailure(_status_error_to_mcp_error(exc, server_name, tool_name))
+        err = _status_error_to_mcp_error(exc, server_name, tool_name)
     except httpx.TimeoutException as exc:
         log.warning("MCP_CALL_TIMEOUT server=%s tool=%s", server_name, tool_name)
-        return IOFailure(McpTimeoutError(message=str(exc)))
+        err = McpTimeoutError(message=str(exc))
     except httpx.HTTPError as exc:
-        log.warning(
-            "MCP_CALL_FAILED server=%s tool=%s error=%s",
-            server_name,
-            tool_name,
-            exc,
-        )
-        return IOFailure(McpProtocolError(message=str(exc)))
+        log.warning("MCP_CALL_FAILED server=%s tool=%s error=%s", server_name, tool_name, exc)
+        err = McpProtocolError(message=str(exc))
     except TimeoutError as exc:
         log.warning("MCP_CALL_TIMEOUT server=%s tool=%s", server_name, tool_name)
-        return IOFailure(McpTimeoutError(message=str(exc)))
+        err = McpTimeoutError(message=str(exc))
     except json.JSONDecodeError as exc:
-        return IOFailure(McpProtocolError(message=f"malformed JSON response: {exc}"))
-    return IOSuccess(content)
-
-
-def _unwrap_mcp_result(
-    *,
-    result: IOResult[str, McpError],
-    server_name: str,
-    tool_name: str,
-) -> str:
-    """Unwrap an :class:`IOResult` back to the legacy ``str`` tool contract.
-
-    The agent loop consumes tool output as a plain string today; this
-    helper is the single bridge between the typed Phase-1 surface and
-    that contract so the call-site closure in :func:`_wrap_remote_tool`
-    stays a one-liner.
-    """
-    inner = result._inner_value
-    if isinstance(inner, Success):
-        # ``Success._inner_value`` is ``str`` by construction (we only
-        # build ``IOSuccess(content)`` in :func:`call_external_mcp_tool`).
-        payload: str = inner.unwrap()
-        return payload
-    if isinstance(inner, Failure):
-        err: McpError = inner.failure()
-        return _render_mcp_error(server_name=server_name, tool_name=tool_name, err=err)
-    # Unreachable: ``IOResult`` is built only out of ``Success`` /
-    # ``Failure``; this branch keeps mypy's exhaustiveness happy without
-    # depending on structural ``match`` against private generics.
-    raise AssertionError("unreachable IOResult unwrap")
+        err = McpProtocolError(message=f"malformed JSON response: {exc}")
+    return _render_mcp_error(server_name=server_name, tool_name=tool_name, err=err)
 
 
 def _render_mcp_error(*, server_name: str, tool_name: str, err: McpError) -> str:
