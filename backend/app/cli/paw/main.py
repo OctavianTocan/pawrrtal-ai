@@ -10,6 +10,7 @@ from app.cli.paw.commands import channels as channels_cmd
 from app.cli.paw.commands import conversations as conversations_cmd
 from app.cli.paw.commands import doctor as doctor_cmd
 from app.cli.paw.commands import login as login_cmd
+from app.cli.paw.commands import mcp as mcp_cmd
 from app.cli.paw.commands import messages as messages_cmd
 from app.cli.paw.commands import models as models_cmd
 from app.cli.paw.commands import record as record_cmd
@@ -71,6 +72,12 @@ app.add_typer(
     channels_cmd.app,
     name="channels",
     help="Telegram channel link/unlink.",
+)
+
+app.add_typer(
+    mcp_cmd.app,
+    name="mcp",
+    help="MCP server registry CRUD.",
 )
 
 app.add_typer(
