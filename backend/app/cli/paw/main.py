@@ -5,6 +5,7 @@ from __future__ import annotations
 import typer
 
 from app.cli.paw.commands import api as api_cmd
+from app.cli.paw.commands import audit as audit_cmd
 from app.cli.paw.commands import auth as auth_cmd
 from app.cli.paw.commands import channels as channels_cmd
 from app.cli.paw.commands import conversations as conversations_cmd
@@ -97,6 +98,12 @@ app.add_typer(
     cost_cmd.app,
     name="cost",
     help="Cost summary + ledger.",
+)
+
+app.add_typer(
+    audit_cmd.app,
+    name="audit",
+    help="Inspect audit events.",
 )
 
 app.add_typer(
