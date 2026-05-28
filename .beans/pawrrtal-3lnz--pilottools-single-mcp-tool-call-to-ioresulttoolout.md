@@ -1,11 +1,11 @@
 ---
 # pawrrtal-3lnz
 title: 'pilot(tools): single MCP tool call to IOResult[ToolOutput, McpError]'
-status: in-progress
+status: completed
 type: task
 priority: deferred
 created_at: 2026-05-28T09:54:10Z
-updated_at: 2026-05-28T10:31:11Z
+updated_at: 2026-05-28T10:32:06Z
 blocked_by:
     - pawrrtal-67rg
 ---
