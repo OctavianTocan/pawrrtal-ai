@@ -118,7 +118,7 @@ async def test_interleaved_text_segments_render_separately() -> None:
 
 
 async def test_pure_text_turn_keeps_legacy_single_message_behavior() -> None:
-    """No thinking/tool blocks → text still arrives as one final message."""
+    """No thinking/tool blocks → text still arrives as one final message edited in-place."""
     bot = _make_bot()
     msg = _make_channel_message(bot, chat_id=42, message_id=99)
     channel = TelegramChannel()
@@ -130,6 +130,12 @@ async def test_pure_text_turn_keeps_legacy_single_message_behavior() -> None:
     async for _ in channel.deliver(_stream(*events), msg):
         pass
 
-    # One send_message with the full reply; placeholder is deleted.
-    bot.delete_message.assert_awaited_once_with(chat_id=42, message_id=99)
-    bot.send_message.assert_awaited_once_with(chat_id=42, text="Hello, world")
+    # No new message sent or placeholder deleted; edited in-place instead.
+    bot.delete_message.assert_not_called()
+    bot.send_message.assert_not_called()
+    bot.edit_message_text.assert_any_call(
+        chat_id=42,
+        message_id=99,
+        text="Hello, world",
+        reply_markup=None,
+    )

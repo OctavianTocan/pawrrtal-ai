@@ -36,11 +36,14 @@ def run_migrations_offline() -> None:
     even need a DBAPI to be available.
     """
     url = config.get_main_option("sqlalchemy.url")
+    # render_as_batch helps when generating migration scripts for SQLite.
+    render_as_batch = "sqlite" in (url or "")
     context.configure(
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        render_as_batch=render_as_batch,
     )
 
     with context.begin_transaction():
@@ -67,7 +70,15 @@ def run_migrations_online() -> None:
                 {"lock_id": ALEMBIC_MIGRATION_LOCK_ID},
             )
         try:
-            context.configure(connection=connection, target_metadata=target_metadata)
+            # render_as_batch=True is required for safe ALTER TABLE operations on SQLite.
+            # Without it, adding columns (common during development) can fail or corrupt
+            # the schema on existing dev databases.
+            render_as_batch = connection.dialect.name == "sqlite"
+            context.configure(
+                connection=connection,
+                target_metadata=target_metadata,
+                render_as_batch=render_as_batch,
+            )
 
             with context.begin_transaction():
                 context.run_migrations()

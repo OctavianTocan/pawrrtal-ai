@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import AsyncIterator, Iterator
-from dataclasses import dataclass, field
+from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, cast
 
@@ -24,8 +23,6 @@ from app.core.agent_loop import (
     LLMDoneEvent,
     LLMEvent,
     LLMTextDeltaEvent,
-    LLMThinkingDeltaEvent,
-    LLMToolCallEvent,
     StreamFn,
     UserMessage,
     agent_loop,
@@ -34,7 +31,6 @@ from app.core.agent_loop.safety_factory import safety_from_settings
 from app.core.agent_loop.types import (
     PermissionCheckFn,
     TextContent,
-    ToolCallContent,
 )
 from app.core.config import settings
 from app.core.governance.cost_tracker import compute_cost_usd
@@ -43,13 +39,15 @@ from app.core.providers.base import ReasoningEffort, StreamEvent
 
 from .events import agent_event_to_stream_event, identity_convert
 from .messages import (
+    _build_done_event,
+    _events_from_chunk,
+    _GeminiStreamState,
     build_gemini_contents,
     build_gemini_tool_declarations,
     resolve_gemini_api_key,
     split_chunk_text,
     tool_calls_from_chunk,
 )
-from .replay import function_call_content_for
 from .thinking import compose_thinking_config
 from .usage import (
     GeminiUsageAccumulator,
@@ -86,120 +84,6 @@ logger = logging.getLogger(__name__)
 # ``_gemini_thinking`` so this module fits the 500-line file budget.
 
 
-@dataclass
-class _GeminiStreamState:
-    """Mutable per-request scratch space for the Gemini StreamFn.
-
-    Lives at module scope so the chunk-level helper can mutate it in
-    place without inheriting the streaming for-loop's nesting depth.
-    """
-
-    full_text: str = ""
-    tool_calls: list[dict[str, Any]] = field(default_factory=list)
-    # Native ``ModelContent`` from whichever chunk produced the
-    # function_call parts (Gemini delivers function calls in a single
-    # chunk). Forwarded as ``LLMDoneEvent.provider_state["gemini"]
-    # ["model_content"]`` so the next turn's request can replay
-    # ``thought_signature`` bytes.
-    function_call_content: gtypes.Content | None = None
-    # Latest ``usage_metadata`` snapshot from this request. Gemini
-    # emits cumulative counts on each chunk and a final snapshot on
-    # the terminal chunk; we just keep overwriting and absorb the
-    # last value into ``usage_sink`` at end-of-stream.
-    last_usage_metadata: Any | None = None
-    # Monotonic counter for Gemini's per-Part thinking blocks (#353).
-    # Each ``Part(thought=True)`` is its own block on the wire, and
-    # downstream renderers need that boundary information to insert
-    # paragraph breaks between blocks without guessing from
-    # whitespace heuristics. Starts at 0 and increments once per
-    # emitted thinking part.
-    thinking_block_index: int = 0
-
-
-def _events_from_chunk(chunk: Any, state: _GeminiStreamState) -> Iterator[LLMEvent]:
-    """Yield events for one Gemini chunk and mutate ``state`` in place.
-
-    Returns a generator so the caller can ``for event in _events_from_chunk(...)``
-    one level shallower than inlining the body would force. Kept as a
-    sync generator to stay flat — the outer ``async for chunk`` already
-    awaits the SDK iterator.
-    """
-    # Track the latest ``usage_metadata`` — Gemini reports it
-    # cumulatively per chunk, so the final non-None value is the
-    # per-request total we want to bill.
-    chunk_usage = getattr(chunk, "usage_metadata", None)
-    if chunk_usage is not None:
-        state.last_usage_metadata = chunk_usage
-    # Split parts into thoughts (``part.thought is True``) and regular
-    # text. ``chunk.text`` is a convenience accessor that concatenates
-    # all text parts regardless of the thought flag, so we walk parts
-    # explicitly to keep the two streams separate downstream.
-    # ``split_chunk_text`` returns thinking parts as a list so we can
-    # stamp each block with its own ``block_index`` (#353).
-    thinking_parts, response_text = split_chunk_text(chunk)
-    for thinking_text in thinking_parts:
-        yield LLMThinkingDeltaEvent(
-            type="thinking_delta",
-            text=thinking_text,
-            block_index=state.thinking_block_index,
-        )
-        state.thinking_block_index += 1
-    if response_text:
-        yield LLMTextDeltaEvent(type="text_delta", text=response_text)
-        state.full_text += response_text
-
-    chunk_tool_calls = tool_calls_from_chunk(chunk, len(state.tool_calls))
-    if not chunk_tool_calls:
-        return
-    # Capture the original Gemini ``ModelContent`` so follow-up turns
-    # can replay ``thought_signature`` bytes verbatim. Only the first
-    # function-call chunk is preserved — Gemini emits function calls
-    # in a single chunk so this is sufficient.
-    if state.function_call_content is None:
-        state.function_call_content = function_call_content_for(chunk)
-    for tool_call in chunk_tool_calls:
-        yield LLMToolCallEvent(
-            type="tool_call",
-            tool_call_id=tool_call["tool_call_id"],
-            name=tool_call["name"],
-            arguments=tool_call["arguments"],
-        )
-        state.tool_calls.append(tool_call)
-
-
-def _build_done_event(state: _GeminiStreamState) -> LLMDoneEvent:
-    """Build the terminal ``LLMDoneEvent`` from accumulated stream state.
-
-    When the turn made any tool calls, forward the original Gemini
-    ``ModelContent`` as opaque ``provider_state`` so the next iteration's
-    request body replays the exact function_call parts (preserving
-    ``thought_signature`` bytes that Gemini-3 / Vertex require).
-    Pure-text turns omit the field — there is nothing for the next turn
-    to replay.
-    """
-    stop_reason = "tool_use" if state.tool_calls else "stop"
-    content: list[TextContent | ToolCallContent] = []
-    if state.full_text:
-        content.append(TextContent(type="text", text=state.full_text))
-    content.extend(
-        ToolCallContent(
-            type="toolCall",
-            tool_call_id=tc["tool_call_id"],
-            name=tc["name"],
-            arguments=tc["arguments"],
-        )
-        for tc in state.tool_calls
-    )
-    done_event: LLMDoneEvent = LLMDoneEvent(
-        type="done",
-        stop_reason=stop_reason,
-        content=content,
-    )
-    if state.function_call_content is not None:
-        done_event["provider_state"] = {"gemini": {"model_content": state.function_call_content}}
-    return done_event
-
-
 def make_gemini_stream_fn(
     model_id: str,
     workspace_root: Path | None = None,
@@ -207,6 +91,7 @@ def make_gemini_stream_fn(
     system_prompt: str,
     reasoning_effort: ReasoningEffort | None = None,
     usage_sink: GeminiUsageAccumulator | None = None,
+    images: list[dict[str, str]] | None = None,
 ) -> StreamFn:
     """Build a StreamFn backed by the google-genai SDK.
 
@@ -240,6 +125,7 @@ def make_gemini_stream_fn(
             ledger. Thinking tokens are billed as output by Gemini (per
             https://ai.google.dev/gemini-api/docs/thinking), so we
             include them in ``output_tokens`` rather than dropping them.
+        images: Optional list of base64 multimodal image inputs.
 
     Returns:
         An async generator factory that yields ``LLMEvent``s. The generator
@@ -251,7 +137,7 @@ def make_gemini_stream_fn(
         tools: list[AgentTool],
     ) -> AsyncIterator[LLMEvent]:
         client = genai.Client(api_key=resolve_gemini_api_key(workspace_root))
-        contents = build_gemini_contents(messages)
+        contents = build_gemini_contents(messages, images=images)
         # ``GenerateContentConfig.tools`` is typed as the wider union
         # ``list[Tool | Callable | mcp.Tool | ClientSession] | None``;
         # ``list`` is invariant, so we widen the local list at this seam
@@ -390,12 +276,6 @@ class GeminiLLM:
                 logged and ignored so callers can switch on it
                 conditionally without a runtime error.
         """
-        if images:
-            logger.debug(
-                "GEMINI_IMAGES_IGNORED conversation_id=%s count=%d",
-                conversation_id,
-                len(images),
-            )
         # AgentMessage is a union alias (not callable); construct the correct TypedDict by role.
         prior: list[AgentMessage] = []
         for m in history or []:
@@ -446,6 +326,7 @@ class GeminiLLM:
             system_prompt=context.system_prompt,
             reasoning_effort=reasoning_effort,
             usage_sink=usage,
+            images=images,
         )
 
         try:

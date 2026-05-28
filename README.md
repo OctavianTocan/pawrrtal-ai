@@ -36,6 +36,8 @@ Key-gated: Claude (`CLAUDE_CODE_OAUTH_TOKEN`), Gemini (`GEMINI_API_KEY`), xAI Gr
 
 Feature-flagged or off by default: LCM (`LCM_ENABLED=false`), scheduler (`SCHEDULER_ENABLED=false`), webhook receiver (`WEBHOOK_API_ENABLED=false`), chat rate limiting (`CHAT_RATE_LIMIT_PER_MINUTE=0`), Claude sandboxing (`CLAUDE_SANDBOX_ENABLED=false`), and in-process Python (`VIRTUAL_PYTHON_ENABLED=false`).
 
+Native OpenAI Codex integration is available via the first-class `openai-codex` host (powered by the official `openai_codex` Python SDK + local Codex app-server). Models appear as `openai-codex:gpt-5.5` etc. once the vendored submodule is initialized (`git submodule update --init --recursive` in `backend/vendor/codex`). See `backend/app/core/providers/openai_codex/` for details.
+
 Known caveats: Apple OAuth callback is currently stubbed and returns 501. The event-bus `AgentHandler` path for webhook/scheduled agent turns is present, but should be verified before relying on it in production. The in-process Python tool is explicitly unsandboxed and should stay single-tenant/operator-only.
 
 ---
@@ -44,7 +46,7 @@ Known caveats: Apple OAuth callback is currently stubbed and returns 501. The ev
 
 ### Agent runtime
 
-- **Multi-provider model catalog**: Anthropic Claude through `claude-agent-sdk`, Google Gemini through `google-genai`, xAI Grok through the official `xai-sdk` (gRPC), OpenAI chat models routed through the in-process LiteLLM SDK, and SST's OpenCode Go gateway (OpenAI-compatible) fronting open-weight coding models — all behind one `AILLM` protocol.
+- **Multi-provider model catalog**: Anthropic Claude through `claude-agent-sdk`, Google Gemini through `google-genai`, xAI Grok through the official `xai-sdk` (gRPC), OpenAI chat models routed through the in-process LiteLLM SDK, OpenAI via the official Codex SDK (first-class `openai_codex` host), and SST's OpenCode Go gateway (OpenAI-compatible) fronting open-weight coding models — all behind one `AILLM` protocol.
 - **Current catalog entries**: Claude Opus 4.7, Claude Sonnet 4.6, Claude Haiku 4.5, Gemini 3 Flash Preview (default), Gemini 3.1 Flash Lite Preview, Grok 4.3, GPT-4o, GPT-4o mini, OpenAI o1, o1 mini, o3 mini, GLM-5.1 (z.ai, via OpenCode Go), and Kimi K2.6 (Moonshot, via OpenCode Go).
 - **Canonical model IDs**: `host:vendor/model` IDs are used across the API, DB, logs, frontend, and Telegram picker.
 - **Per-conversation model override**: Web and Telegram conversations can persist their own model choice.

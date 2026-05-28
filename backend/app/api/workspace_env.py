@@ -29,15 +29,13 @@ from app.db import User, get_async_session
 from app.models import Workspace
 from app.users import get_allowed_user
 
-# Maximum number of distinct keys a single PUT may set/update. Each user can
-# set at most this many overrides regardless of MAX_VALUE_LENGTH; this is a
-# safety bound, not a quota — workspace .env files should stay tiny.
-MAX_KEYS = 10
-
-# Maximum length of a single overridden value, in characters. Generous enough
-# for OAuth tokens and signed JWTs; hard cap so a misbehaving client can't
-# silently push megabytes through this endpoint.
-MAX_VALUE_LENGTH = 512
+# NOTE: Numeric limits on key count (was MAX_KEYS=10) and per-value length
+# (was MAX_VALUE_LENGTH=512) were removed. The per-workspace .env is
+# encrypted user-controlled data living inside the user's own workspace
+# directory (0600 perms). The only hard security boundary that remains is
+# the newline-rejection validator below (prevents key-injection on the
+# line-based serializer). The allowlist (OVERRIDABLE_KEYS) still gates
+# unknown keys with 400.
 
 
 class WorkspaceEnvVars(BaseModel):
@@ -164,12 +162,7 @@ def get_workspace_env_router() -> APIRouter:
         """
         ws = await _get_owned_workspace(workspace_id, user, session)
         workspace_root = Path(ws.path)
-        if len(payload.vars) > MAX_KEYS:
-            raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail=f"Too many keys: maximum is {MAX_KEYS}.",
-            )
-        for k, v in payload.vars.items():
+        for k in payload.vars:
             if k not in OVERRIDABLE_KEYS:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -177,11 +170,6 @@ def get_workspace_env_router() -> APIRouter:
                         f"Unknown workspace env key: '{k}'. "
                         f"Allowed keys: {sorted(OVERRIDABLE_KEYS)}."
                     ),
-                )
-            if len(v) > MAX_VALUE_LENGTH:
-                raise HTTPException(
-                    status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail=f"Value for '{k}' exceeds {MAX_VALUE_LENGTH} characters.",
                 )
         existing = load_workspace_env(workspace_root)
         existing.update(payload.vars)

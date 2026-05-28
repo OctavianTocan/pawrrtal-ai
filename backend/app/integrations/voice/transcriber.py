@@ -335,6 +335,10 @@ class XaiSttTranscriber:
         data: dict[str, str] = {}
         if self._language:
             data["language"] = self._language
+        elif self._format:
+            # xAI requires a language when format is True. If none is
+            # specified, default to English ("en").
+            data["language"] = "en"
         if self._format:
             data["format"] = "true"
         files = {

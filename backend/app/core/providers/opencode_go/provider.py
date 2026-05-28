@@ -33,7 +33,6 @@ import uuid
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from openai import AsyncOpenAI
 
@@ -49,8 +48,6 @@ from app.core.agent_loop import (
     LLMDoneEvent,
     LLMEvent,
     LLMTextDeltaEvent,
-    LLMThinkingDeltaEvent,
-    LLMToolCallEvent,
     StreamFn,
     UserMessage,
     agent_loop,
@@ -59,30 +56,27 @@ from app.core.agent_loop.safety_factory import safety_from_settings
 from app.core.agent_loop.types import (
     PermissionCheckFn,
     TextContent,
-    ToolCallContent,
 )
 from app.core.config import settings
-from app.core.keys import resolve_api_key
 from app.core.providers._stream_logging import log_provider_stream_event
 from app.core.providers.base import ReasoningEffort, StreamEvent
 from app.core.providers.gemini.events import agent_event_to_stream_event, identity_convert
 
 from .events import (
+    _OPENCODE_MISSING_KEY_NOTICE,
     ToolCallBuffer,
+    _absorb_usage,
+    _done_event,
+    _drain_text_and_thinking,
+    _flush_tool_calls,
+    _resolve_opencode_api_key,
+    _UsageAccumulator,
     build_openai_messages,
     build_openai_tools,
     compute_cost_usd,
-    read_reasoning,
 )
 
 logger = logging.getLogger(__name__)
-
-
-# Workspace-facing env-var name resolved per request via
-# ``resolve_api_key`` — registered in :mod:`app.core.keys` so end users
-# can override the gateway-global key in their encrypted workspace
-# .env file.
-_OPENCODE_API_KEY_NAME = "OPENCODE_API_KEY"
 
 
 @dataclass(frozen=True)
@@ -99,157 +93,6 @@ class OpencodeGoLLMConfig:
     base_url: str = "https://opencode.ai/zen/go/v1"
 
 
-@dataclass
-class _UsageAccumulator:
-    """Mutable holder so the closure-captured StreamFn can report usage back.
-
-    OpenAI streams ``usage`` only on the terminal chunk when the
-    request opts in with ``stream_options={"include_usage": True}``. The
-    StreamFn writes the counts here; :meth:`OpencodeGoLLM.stream` reads
-    the totals once the agent loop finishes and emits a single
-    ``StreamEvent(type="usage")`` so the cost ledger aggregates per
-    request, not per loop iteration.
-    """
-
-    input_tokens: int = 0
-    output_tokens: int = 0
-
-    def add(self, *, prompt_tokens: int | None, completion_tokens: int | None) -> None:
-        """Fold one chunk's reported usage into the running totals.
-
-        Args:
-            prompt_tokens: Value off ``chunk.usage.prompt_tokens`` (or
-                ``None`` when the SDK exposes no usage payload).
-            completion_tokens: Value off ``chunk.usage.completion_tokens``
-                (or ``None``).
-        """
-        if prompt_tokens:
-            self.input_tokens += int(prompt_tokens)
-        if completion_tokens:
-            self.output_tokens += int(completion_tokens)
-
-
-def _absorb_usage(chunk: Any, usage_acc: _UsageAccumulator) -> None:
-    """Fold one chunk's optional ``usage`` payload into the accumulator.
-
-    OpenAI sends the ``usage`` block only on the terminal chunk when
-    the request opts in with ``stream_options={"include_usage": True}``;
-    every other chunk has ``usage is None``. Pulled out so the streaming
-    body can stay flat enough to satisfy the project nesting budget.
-    """
-    usage_blob = getattr(chunk, "usage", None)
-    if usage_blob is None:
-        return
-    usage_acc.add(
-        prompt_tokens=getattr(usage_blob, "prompt_tokens", None),
-        completion_tokens=getattr(usage_blob, "completion_tokens", None),
-    )
-
-
-def _resolve_opencode_api_key(workspace_root: Path | None) -> str:
-    """Resolve the OpenCode API key for this request.
-
-    Mirrors the ``_resolve_gemini_api_key`` /
-    ``_resolve_xai_api_key`` pattern — per-workspace override first,
-    gateway-global ``settings.opencode_api_key`` second.  Falls
-    through to the global when no workspace is in scope (background
-    utility agents) or the workspace has not set an override.
-    """
-    if workspace_root is not None:
-        return resolve_api_key(workspace_root, _OPENCODE_API_KEY_NAME) or ""
-    return settings.opencode_api_key
-
-
-# User-facing notice surfaced when neither the workspace nor the gateway
-# has an OpenCode API key configured. The provider used to silently push
-# ``api_key="missing"`` at the gateway, take a 401, and rely on the
-# legacy Telegram text path to render the resulting error — which can
-# drop everything after the first chunk (#346) so the user sees no
-# reply at all. Surfacing the cause as an explicit ``error`` event
-# bypasses that path entirely. See #350.
-_OPENCODE_MISSING_KEY_NOTICE = (
-    "OpenCode API key not configured. Set OPENCODE_API_KEY in your "
-    "workspace .env file or configure OPENCODE_API_KEY on the gateway "
-    "to use Kimi K2.6 / GLM-5.1 via OpenCode Go."
-)
-
-
-def _drain_text_and_thinking(delta: Any) -> tuple[list[LLMEvent], str]:
-    """Translate one streaming delta into ``(events_to_yield, response_text)``.
-
-    Returning the response text alongside the event list lets the
-    caller accumulate the full assistant string without opening an
-    ``if`` inside its own ``for event in …: yield event`` loop — which
-    would push the surrounding ``try / async for`` body past the
-    project nesting budget (depth 3, enforced by
-    ``scripts/check-nesting.py``).
-    """
-    out: list[LLMEvent] = []
-    thinking_text = read_reasoning(delta)
-    if thinking_text:
-        # OpenCode Go streams reasoning per-token via ``reasoning_content``
-        # — one continuous logical block per stream attempt. Emit a
-        # constant ``block_index=0`` so the channel renderer doesn't
-        # insert paragraph breaks between consecutive tokens (#353).
-        out.append(
-            LLMThinkingDeltaEvent(
-                type="thinking_delta",
-                text=thinking_text,
-                block_index=0,
-            )
-        )
-    response_text = getattr(delta, "content", None) or ""
-    if response_text:
-        out.append(LLMTextDeltaEvent(type="text_delta", text=response_text))
-    return out, response_text
-
-
-def _flush_tool_calls(
-    buffer: ToolCallBuffer,
-) -> tuple[list[LLMToolCallEvent], list[dict[str, Any]]]:
-    """Materialise buffered tool-call deltas into LLM events + content blocks.
-
-    Returns:
-        ``(events, calls)`` where ``events`` is the list ready to yield
-        from the StreamFn and ``calls`` carries the same data in the
-        accumulator's dict form so the caller can use it to build the
-        terminal ``LLMDoneEvent.content``.
-    """
-    calls = buffer.finalize()
-    events = [
-        LLMToolCallEvent(
-            type="tool_call",
-            tool_call_id=call["tool_call_id"],
-            name=call["name"],
-            arguments=call["arguments"],
-        )
-        for call in calls
-    ]
-    return events, calls
-
-
-def _done_event(full_text: str, tool_calls: list[dict[str, Any]]) -> LLMDoneEvent:
-    """Build the terminal ``LLMDoneEvent`` for one StreamFn invocation.
-
-    Mirrors the assistant content shape Gemini emits so both providers
-    feed the agent loop's accumulator the same dict union.
-    """
-    stop_reason = "tool_use" if tool_calls else "stop"
-    content: list[TextContent | ToolCallContent] = []
-    if full_text:
-        content.append(TextContent(type="text", text=full_text))
-    content.extend(
-        ToolCallContent(
-            type="toolCall",
-            tool_call_id=tc["tool_call_id"],
-            name=tc["name"],
-            arguments=tc["arguments"],
-        )
-        for tc in tool_calls
-    )
-    return LLMDoneEvent(type="done", stop_reason=stop_reason, content=content)
-
-
 def make_opencode_go_stream_fn(
     model_id: str,
     workspace_root: Path | None,
@@ -257,6 +100,7 @@ def make_opencode_go_stream_fn(
     config: OpencodeGoLLMConfig,
     system_prompt: str,
     usage_acc: _UsageAccumulator,
+    images: list[dict[str, str]] | None = None,
 ) -> StreamFn:
     """Build a StreamFn backed by the OpenAI SDK pointed at OpenCode Go.
 
@@ -276,6 +120,7 @@ def make_opencode_go_stream_fn(
         usage_acc: Mutable usage holder; the closure writes totals into
             it so the surrounding :class:`OpencodeGoLLM` can emit a
             cumulative ``usage`` event after the loop ends.
+        images: Optional list of base64 multimodal image inputs.
 
     Returns:
         An async-generator factory the agent loop drives one turn at a
@@ -288,7 +133,11 @@ def make_opencode_go_stream_fn(
     ) -> AsyncIterator[LLMEvent]:
         api_key = _resolve_opencode_api_key(workspace_root)
         client = AsyncOpenAI(base_url=config.base_url, api_key=api_key or "missing")
-        openai_messages = build_openai_messages(system_prompt=system_prompt, messages=messages)
+        openai_messages = build_openai_messages(
+            system_prompt=system_prompt,
+            messages=messages,
+            images=images,
+        )
         openai_tools = build_openai_tools(tools)
 
         tool_buffer = ToolCallBuffer()
@@ -417,13 +266,6 @@ class OpencodeGoLLM:
                 router's image plumbing lands separately. A non-empty
                 list is logged and ignored for now.
         """
-        if images:
-            logger.debug(
-                "OPENCODE_GO_IMAGES_IGNORED conversation_id=%s count=%d",
-                conversation_id,
-                len(images),
-            )
-
         # Fail fast on missing API key with a user-readable notice. The
         # alternative — letting the request hit the gateway with
         # ``api_key="missing"`` — produces a 401 whose text is rendered
@@ -476,6 +318,7 @@ class OpencodeGoLLM:
             config=self._config,
             system_prompt=context.system_prompt,
             usage_acc=usage_acc,
+            images=images,
         )
 
         try:

@@ -26,6 +26,7 @@ from app.core.providers.factory import resolve_llm
 from app.core.providers.model_id import Host, Vendor, parse_model_id
 from app.core.providers.opencode_go.events import (
     ToolCallBuffer,
+    _UsageAccumulator,
     build_openai_messages,
     build_openai_tools,
     compute_cost_usd,
@@ -34,7 +35,6 @@ from app.core.providers.opencode_go.events import (
 from app.core.providers.opencode_go.provider import (
     OpencodeGoLLM,
     OpencodeGoLLMConfig,
-    _UsageAccumulator,
 )
 from tests.agent_harness import (
     ScriptedStreamFn,

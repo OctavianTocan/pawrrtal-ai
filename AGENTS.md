@@ -37,6 +37,7 @@ We rely on `just` as our primary task runner for the repository.
 - **Design system lint**: `bun run design:lint` (validates `DESIGN.md` against the spec; CI runs the same gate).
 - **Design system diff**: `bun run design:diff -- DESIGN.md DESIGN-v2.md` (compare two design system snapshots).
 - **Install All Dependencies**: `just install` (runs `bun install` for frontend and `uv sync` for backend).
+- **Run DB migrations after schema changes**: `cd backend && uv run alembic upgrade head` (required after touching models.py; especially important with SQLite dev DBs).
 - **Auto-commit**: `just commit` (auto-generates conventional commit).
 - **Push**: `just push` (runs push with auth switching).
 - **Terminology**:

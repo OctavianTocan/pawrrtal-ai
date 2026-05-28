@@ -98,19 +98,33 @@ def _resolve_litellm_api_key(vendor: Vendor, workspace_root: Path | None) -> str
 def _build_litellm_messages(
     messages: list[AgentMessage],
     system_prompt: str,
-) -> list[dict[str, str]]:
+    images: list[dict[str, str]] | None = None,
+) -> list[dict[str, Any]]:
     """Convert agent-loop messages to LiteLLM's OpenAI-shaped messages.
 
-    Text-only v1: ``ToolCallContent`` / ``ToolResultMessage`` are
-    dropped on purpose.  When the tool bridge lands, this helper grows
-    a per-role branch that emits the OpenAI ``tool_calls`` / ``tool``
-    message shapes.
+    PR 09: when ``images`` is supplied, the last user message becomes a
+    multimodal content list (images first, then the text question)
+    matching OpenAI's shape.
     """
-    out: list[dict[str, str]] = [{"role": "system", "content": system_prompt}]
-    for msg in messages:
+    out: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
+
+    last_user_idx = -1
+    for idx, msg in enumerate(messages):
+        if msg["role"] == "user":
+            last_user_idx = idx
+
+    for idx, msg in enumerate(messages):
         if msg["role"] == "user":
             text = msg["content"]
-            if text.strip():
+            if idx == last_user_idx and images:
+                content_list: list[dict[str, Any]] = [{"type": "text", "text": text}]
+                for img in images:
+                    if "data" in img:
+                        media_type = img.get("media_type", "image/png")
+                        data_uri = f"data:{media_type};base64,{img['data']}"
+                        content_list.append({"type": "image_url", "image_url": {"url": data_uri}})
+                out.append({"role": "user", "content": content_list})
+            elif text.strip():
                 out.append({"role": "user", "content": text})
             continue
         if msg["role"] == "assistant":
@@ -169,6 +183,7 @@ def make_litellm_stream_fn(
     *,
     system_prompt: str,
     reasoning_effort: ReasoningEffort | None = None,
+    images: list[dict[str, str]] | None = None,
 ) -> StreamFn:
     """Build a StreamFn backed by ``litellm.acompletion``.
 
@@ -192,6 +207,7 @@ def make_litellm_stream_fn(
             ``reasoning_effort`` value (per
             :data:`_LITELLM_REASONING_EFFORT`) rides on the
             ``litellm.acompletion`` kwargs.
+        images: Optional list of base64 multimodal image inputs.
 
     Returns:
         An async generator factory the agent loop can call.  When a
@@ -226,7 +242,7 @@ def make_litellm_stream_fn(
             )
             return
 
-        litellm_messages = _build_litellm_messages(messages, system_prompt)
+        litellm_messages = _build_litellm_messages(messages, system_prompt, images=images)
 
         # Forward Pawrrtal's reasoning knob to OpenAI's
         # ``reasoning_effort`` parameter via LiteLLM. Set only when the
@@ -350,13 +366,6 @@ class LiteLLMLLM:
                 and ignored; the LiteLLM image flow lands with the tool
                 bridge.
         """
-        if images:
-            logger.debug(
-                "LITELLM_IMAGES_IGNORED conversation_id=%s count=%d",
-                conversation_id,
-                len(images),
-            )
-
         prior: list[AgentMessage] = []
         for m in history or []:
             role = m.get("role")
@@ -390,6 +399,7 @@ class LiteLLMLLM:
             self._workspace_root,
             system_prompt=context.system_prompt,
             reasoning_effort=reasoning_effort,
+            images=images,
         )
 
         try:

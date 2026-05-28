@@ -232,8 +232,6 @@ async def update_workspace(
 
     Does NOT commit — the caller participates in the outer transaction.
     """
-    from app.models import Workspace  # noqa: PLC0415
-
     if name is not None:
         workspace.name = name
     if slug is not None:

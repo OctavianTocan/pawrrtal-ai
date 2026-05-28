@@ -62,7 +62,11 @@ def _format_job_row(row: dict[str, object]) -> str:
     return f"- {row.get('id')} | {row.get('name')} | {fire_str} | {state} | prompt={prompt[:60]!r}"
 
 
-def make_reminder_schedule_tool(*, user_id: uuid.UUID) -> AgentTool:
+def make_reminder_schedule_tool(
+    *,
+    user_id: uuid.UUID,
+    conversation_id: uuid.UUID | None = None,
+) -> AgentTool:
     """Return the ``reminder_schedule`` :class:`AgentTool` scoped to ``user_id``."""
 
     async def execute(tool_call_id: str, **kwargs: Any) -> str:  # noqa: PLR0911
@@ -114,6 +118,7 @@ def make_reminder_schedule_tool(*, user_id: uuid.UUID) -> AgentTool:
                     fire_at=fire_at,
                     skill_name=str(skill_name) if skill_name else None,
                     target_chat_ids=[str(c) for c in target_chat_ids] if target_chat_ids else None,
+                    target_conversation_id=conversation_id,
                 )
         except ValueError as exc:
             return f"[invalid_schedule] {exc}"

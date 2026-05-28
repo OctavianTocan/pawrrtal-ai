@@ -32,6 +32,7 @@ def test_host_label_returns_expected_strings() -> None:
     assert host_label(Host.google_ai) == "Gemini API"
     assert host_label(Host.litellm) == "LiteLLM"
     assert host_label(Host.opencode_go) == "OpenCode Go"
+    assert host_label(Host.openai_codex) == "Codex SDK"
     assert host_label(Host.xai) == "xAI"
 
 

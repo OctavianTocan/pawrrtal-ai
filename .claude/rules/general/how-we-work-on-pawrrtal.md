@@ -120,9 +120,26 @@ add a dependency that wasn't on the menu — pause and ask. Auto mode
 accelerates routine work; it doesn't license unrequested architecture
 shifts.
 
+## Rule 10 — Prioritize simple user-facing loops & respect instructions
+
+Before proposing any design or making code edits, explicitly ensure:
+1. The direct user-facing loop is clear (how the user/agent is notified of failure/success).
+2. The simplest path using existing APIs is taken (KISS - no new classes/abstractions unless absolutely necessary).
+3. Any explicit formatting/modification constraints (e.g. "comments only") are strictly followed.
+
+## Rule 11 — Guarded command execution & narrow filter scopes
+
+Before running any CLI query or terminal command, verify sandbox environment restrictions (e.g. check BypassSandbox permissions) and ensure list or search commands contain explicit filter arguments matching the target scope (e.g. narrow PR listings to active ones).
+
+## Rule 12 — Precise search-and-replace target boundaries
+
+When replacing code blocks, use precise boundaries (such as function headers or unique indentation blocks) in the search query. Immediately check the output diff to verify no adjacent lines were deleted or modified.
+
 ## Verify
 
 "Did I read the implementation first? Trace cause before fixing?
 Update DESIGN.md if I touched a token? Use established patterns? Add
 cursor-pointer to interactive elements? Run the toolchain after every
-file? Add tests in the same commit? Commit one concern at a time?"
+file? Add tests in the same commit? Commit one concern at a time?
+Prioritize simple user loops and respect constraints? Filter CLI commands
+narrowly? Verify diffs of replacements immediately?"

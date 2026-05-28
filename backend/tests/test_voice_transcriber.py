@@ -108,7 +108,9 @@ class TestXaiSttTranscriber:
         # ``file`` is the documented last multipart field.
         assert "file" in captured["files"]
 
-    async def test_omits_language_field_when_unset(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    async def test_defaults_language_field_to_english_when_unset(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         captured: dict[str, Any] = {}
         _install_stub_post(
             monkeypatch,
@@ -117,7 +119,7 @@ class TestXaiSttTranscriber:
         )
         transcriber = XaiSttTranscriber(api_key="sk-test")
         await transcriber.transcribe(b"voice")
-        assert "language" not in captured["data"]
+        assert captured["data"]["language"] == "en"
         assert captured["data"]["format"] == "true"
 
     async def test_raises_on_non_2xx(self, monkeypatch: pytest.MonkeyPatch) -> None:

@@ -39,6 +39,8 @@ _NOISY_THIRD_PARTY_LOGGERS: dict[str, int] = {
     "asyncio": logging.INFO,
     "watchfiles": logging.INFO,
     "urllib3": logging.INFO,
+    "LiteLLM": logging.ERROR,
+    "litellm": logging.ERROR,
 }
 
 

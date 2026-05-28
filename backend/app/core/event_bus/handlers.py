@@ -150,6 +150,41 @@ class AgentHandler:
                 originating_event_id,
                 user_id,
             )
+            # try:
+            #     job_id = uuid.UUID(originating_event_id)
+            #     from app.models import ScheduledJob
+            #     from app.db import async_session_maker
+            #     from app.core.event_bus import AgentResponseEvent
+            #     from app.core.event_bus.global_bus import publish_if_available
+            #     from app.core.event_bus.handlers import _persist_assistant_response
+            #     import sys
+            #     err_msg = str(sys.exc_info()[1] or "Unknown error")
+            #     async with async_session_maker() as session:
+            #         row = await session.get(ScheduledJob, job_id)
+            #         if row:
+            #             row.last_status = "failed"
+            #             row.last_error = err_msg
+            #             if row.fire_at:
+            #                 row.is_active = False
+            #             await session.commit()
+            #             if row.target_conversation_id:
+            #                 await _persist_assistant_response(
+            #                     conversation_id=row.target_conversation_id,
+            #                     user_id=user_id,
+            #                     text=f"❌ **System Notification**: The scheduled job '{row.name}' failed to execute: {err_msg}.",
+            #                     originating_event_id=originating_event_id,
+            #                 )
+            #             for chat_id in row.target_chat_ids:
+            #                 await publish_if_available(
+            #                     AgentResponseEvent(
+            #                         user_id=user_id,
+            #                         chat_id=chat_id,
+            #                         text=f"❌ [System Notification]: The scheduled job '{row.name}' failed to execute: {err_msg}.",
+            #                         originating_event_id=originating_event_id,
+            #                     )
+            #                 )
+            # except Exception:
+            #     logger.exception("Failed to handle job execution error notification")
             return
         if not text:
             logger.info(

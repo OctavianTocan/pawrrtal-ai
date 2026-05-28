@@ -18,11 +18,10 @@ Auth flow notes (verified against backend/app/api/auth.py and backend/main.py):
 from __future__ import annotations
 
 import asyncio
+from typing import Any
 
 import httpx
 import typer
-
-from typing import Any
 
 from app.cli.paw.config import (
     ENV_BASE_URLS,
@@ -149,9 +148,7 @@ async def _ensure_default_workspace(client: httpx.AsyncClient) -> dict[str, Any]
     ws_list_resp = await client.get("/api/v1/workspaces")
     ws_list = ws_list_resp.json()
 
-    default: dict[str, Any] | None = next(
-        (w for w in ws_list if w.get("is_default")), None
-    )
+    default: dict[str, Any] | None = next((w for w in ws_list if w.get("is_default")), None)
     if default is not None:
         return default
 
@@ -281,13 +278,9 @@ def logout(
     if cp.exists():
         cp.unlink()
     if json_out:
-        emit_json(
-            {"deleted": True, "profile": profile, "server_logout": server_logout_status}
-        )
+        emit_json({"deleted": True, "profile": profile, "server_logout": server_logout_status})
     else:
-        emit_human(
-            f"Logged out (profile={profile}, server_logout={server_logout_status})."
-        )
+        emit_human(f"Logged out (profile={profile}, server_logout={server_logout_status}).")
 
 
 async def _call_server_logout(profile: str) -> str:

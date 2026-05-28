@@ -187,6 +187,8 @@ async def safe_edit_html(
     chat_id: int | str,
     message_id: int,
     html: str,
+    *,
+    reply_markup: Any | None = None,
 ) -> None:
     """Call ``edit_message_text`` with pre-rendered Telegram HTML."""
     if len(html) > MAX_MESSAGE_LEN:
@@ -196,6 +198,7 @@ async def safe_edit_html(
             chat_id=chat_id,
             message_id=message_id,
             text=html,
+            reply_markup=reply_markup,
         )
     except _aiogram_errors() as exc:
         err_str = str(exc).lower()

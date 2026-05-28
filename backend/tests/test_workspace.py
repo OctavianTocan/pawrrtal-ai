@@ -722,9 +722,7 @@ class TestWorkspaceCrudAPI:
     """
 
     @pytest.mark.anyio
-    async def test_create_workspace_returns_201(
-        self, client: AsyncClient, tmp_path: Path
-    ) -> None:
+    async def test_create_workspace_returns_201(self, client: AsyncClient, tmp_path: Path) -> None:
         with _patch_workspace_base(tmp_path):
             resp = await client.post(
                 "/api/v1/workspaces",
@@ -786,9 +784,7 @@ class TestWorkspaceCrudAPI:
     ) -> None:
         with _patch_workspace_base(tmp_path):
             # Two workspaces so deleting the non-default one is allowed.
-            await create_workspace(
-                test_user.id, db_session, name="Default", is_default=True
-            )
+            await create_workspace(test_user.id, db_session, name="Default", is_default=True)
             secondary = await create_workspace(
                 test_user.id, db_session, name="Side", slug="side", is_default=False
             )
@@ -809,9 +805,7 @@ class TestWorkspaceCrudAPI:
         tmp_path: Path,
     ) -> None:
         with _patch_workspace_base(tmp_path):
-            await create_workspace(
-                test_user.id, db_session, name="Default", is_default=True
-            )
+            await create_workspace(test_user.id, db_session, name="Default", is_default=True)
             secondary = await create_workspace(
                 test_user.id, db_session, name="Side", slug="side", is_default=False
             )

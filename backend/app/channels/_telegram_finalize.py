@@ -17,6 +17,7 @@ from .telegram_delivery import (
     safe_send_text,
     thinking_html,
 )
+from .telegram_html import md_to_telegram_html
 
 if TYPE_CHECKING:
     from aiogram import Bot
@@ -59,8 +60,19 @@ async def finalize_turn_delivery(
         await safe_edit_html(bot, chat_id, placeholder_message_id, tool_trace)
     elif first_block_kind == "thinking":
         await safe_edit_html(bot, chat_id, placeholder_message_id, thinking_html(thinking_text))
-    elif first_block_kind == "text" or final_text:
+    elif first_block_kind == "text":
         await safe_delete(bot, chat_id, placeholder_message_id)
+    elif final_text:
+        # Pure text turn: edit the placeholder in-place with the final answer HTML
+        # and attach the reply markup (regenerate button) directly.
+        await safe_edit_html(
+            bot,
+            chat_id,
+            placeholder_message_id,
+            md_to_telegram_html(final_text),
+            reply_markup=reply_markup,
+        )
+        return
     else:
         await safe_edit(bot, chat_id, placeholder_message_id, _EMPTY_RESPONSE_FALLBACK)
         logger.warning(
@@ -68,6 +80,7 @@ async def finalize_turn_delivery(
             chat_id,
             placeholder_message_id,
         )
+        return
 
     # Prefer ``final_text`` (the caller's authoritative ``answer_text``)
     # over ``text_buffer`` when both diverge — defence in depth against

@@ -263,10 +263,10 @@ def md_to_telegram_html(text: str) -> str:
 
     Returns:
         HTML string safe to pass to Telegram with ``ParseMode.HTML``.
-        Falls back to the original *text* if conversion yields nothing.
+        Falls back to the escaped *text* if conversion yields nothing.
     """
     raw_html = _md.render(text)
     renderer = _TelegramRenderer()
     renderer.feed(raw_html)
     converted = renderer.result()
-    return converted if converted else text
+    return converted if converted else _html.escape(text)

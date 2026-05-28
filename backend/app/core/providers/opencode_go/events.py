@@ -19,16 +19,24 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from app.core.agent_loop.types import (
     AgentMessage,
     AgentTool,
     AssistantMessage,
+    LLMDoneEvent,
+    LLMEvent,
+    LLMTextDeltaEvent,
+    LLMThinkingDeltaEvent,
+    LLMToolCallEvent,
     TextContent,
     ToolCallContent,
     ToolResultMessage,
 )
+from app.core.config import settings
+from app.core.keys import resolve_api_key
 
 logger = logging.getLogger(__name__)
 
@@ -252,6 +260,7 @@ def build_openai_messages(
     *,
     system_prompt: str,
     messages: list[AgentMessage],
+    images: list[dict[str, str]] | None = None,
 ) -> list[dict[str, Any]]:
     """Convert ``AgentMessage`` history into OpenAI chat messages.
 
@@ -265,21 +274,188 @@ def build_openai_messages(
             closure at request build time.
         messages: The LLM-visible slice produced by
             ``AgentLoopConfig.convert_to_llm``.
+        images: Optional list of base64 multimodal image inputs.
+            Appended to the last user message in the list.
 
     Returns:
         A list of dicts ready to pass straight to
         ``client.chat.completions.create(messages=...)``.
     """
     out: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
-    for msg in messages:
+
+    # Find the last user message's index so we attach the current turn's images to it
+    last_user_idx = -1
+    for idx, msg in enumerate(messages):
         if msg["role"] == "user":
-            out.append({"role": "user", "content": msg["content"]})
+            last_user_idx = idx
+
+    for idx, msg in enumerate(messages):
+        if msg["role"] == "user":
+            user_content = msg["content"]
+            if idx == last_user_idx and images:
+                content_list: list[dict[str, Any]] = [{"type": "text", "text": user_content}]
+                for img in images:
+                    if "data" in img:
+                        media_type = img.get("media_type", "image/png")
+                        data_uri = f"data:{media_type};base64,{img['data']}"
+                        content_list.append({"type": "image_url", "image_url": {"url": data_uri}})
+                out.append({"role": "user", "content": content_list})
+            else:
+                out.append({"role": "user", "content": user_content})
             continue
         if msg["role"] == "assistant":
             out.append(_assistant_to_openai(msg))
             continue
         out.append(_tool_result_to_openai(msg))
     return out
+
+
+_OPENCODE_API_KEY_NAME = "OPENCODE_API_KEY"
+
+# User-facing notice surfaced when neither the workspace nor the gateway
+# has an OpenCode API key configured.
+_OPENCODE_MISSING_KEY_NOTICE = (
+    "OpenCode API key not configured. Set OPENCODE_API_KEY in your "
+    "workspace .env file or configure OPENCODE_API_KEY on the gateway "
+    "to use Kimi K2.6 / GLM-5.1 via OpenCode Go."
+)
+
+
+@dataclass
+class _UsageAccumulator:
+    """Mutable holder so the closure-captured StreamFn can report usage back.
+
+    OpenAI streams ``usage`` only on the terminal chunk when the
+    request opts in with ``stream_options={"include_usage": True}``. The
+    StreamFn writes the counts here; :meth:`OpencodeGoLLM.stream` reads
+    the totals once the agent loop finishes and emits a single
+    ``StreamEvent(type="usage")`` so the cost ledger aggregates per
+    request, not per loop iteration.
+    """
+
+    input_tokens: int = 0
+    output_tokens: int = 0
+
+    def add(self, *, prompt_tokens: int | None, completion_tokens: int | None) -> None:
+        """Fold one chunk's reported usage into the running totals.
+
+        Args:
+            prompt_tokens: Value off ``chunk.usage.prompt_tokens`` (or
+                ``None`` when the SDK exposes no usage payload).
+            completion_tokens: Value off ``chunk.usage.completion_tokens``
+                (or ``None``).
+        """
+        if prompt_tokens:
+            self.input_tokens += int(prompt_tokens)
+        if completion_tokens:
+            self.output_tokens += int(completion_tokens)
+
+
+def _absorb_usage(chunk: Any, usage_acc: _UsageAccumulator) -> None:
+    """Fold one chunk's optional ``usage`` payload into the accumulator.
+
+    OpenAI sends the ``usage`` block only on the terminal chunk when
+    the request opts in with ``stream_options={"include_usage": True}``;
+    every other chunk has ``usage is None``. Pulled out so the streaming
+    body can stay flat enough to satisfy the project nesting budget.
+    """
+    usage_blob = getattr(chunk, "usage", None)
+    if usage_blob is None:
+        return
+    usage_acc.add(
+        prompt_tokens=getattr(usage_blob, "prompt_tokens", None),
+        completion_tokens=getattr(usage_blob, "completion_tokens", None),
+    )
+
+
+def _resolve_opencode_api_key(workspace_root: Path | None) -> str:
+    """Resolve the OpenCode API key for this request.
+
+    Mirrors the ``_resolve_gemini_api_key`` /
+    ``_resolve_xai_api_key`` pattern — per-workspace override first,
+    gateway-global ``settings.opencode_api_key`` second.  Falls
+    through to the global when no workspace is in scope (background
+    utility agents) or the workspace has not set an override.
+    """
+    if workspace_root is not None:
+        return resolve_api_key(workspace_root, _OPENCODE_API_KEY_NAME) or ""
+    return settings.opencode_api_key
+
+
+def _drain_text_and_thinking(delta: Any) -> tuple[list[LLMEvent], str]:
+    """Translate one streaming delta into ``(events_to_yield, response_text)``.
+
+    Returning the response text alongside the event list lets the
+    caller accumulate the full assistant string without opening an
+    ``if`` inside its own ``for event in …: yield event`` loop — which
+    would push the surrounding ``try / async for`` body past the
+    project nesting budget (depth 3, enforced by
+    ``scripts/check-nesting.py``).
+    """
+    out: list[LLMEvent] = []
+    thinking_text = read_reasoning(delta)
+    if thinking_text:
+        # OpenCode Go streams reasoning per-token via ``reasoning_content``
+        # — one continuous logical block per stream attempt. Emit a
+        # constant ``block_index=0`` so the channel renderer doesn't
+        # insert paragraph breaks between consecutive tokens (#353).
+        out.append(
+            LLMThinkingDeltaEvent(
+                type="thinking_delta",
+                text=thinking_text,
+                block_index=0,
+            )
+        )
+    response_text = getattr(delta, "content", None) or ""
+    if response_text:
+        out.append(LLMTextDeltaEvent(type="text_delta", text=response_text))
+    return out, response_text
+
+
+def _flush_tool_calls(
+    buffer: ToolCallBuffer,
+) -> tuple[list[LLMToolCallEvent], list[dict[str, Any]]]:
+    """Materialise buffered tool-call deltas into LLM events + content blocks.
+
+    Returns:
+        ``(events, calls)`` where ``events`` is the list ready to yield
+        from the StreamFn and ``calls`` carries the same data in the
+        accumulator's dict form so the caller can use it to build the
+        terminal ``LLMDoneEvent.content``.
+    """
+    calls = buffer.finalize()
+    events = [
+        LLMToolCallEvent(
+            type="tool_call",
+            tool_call_id=call["tool_call_id"],
+            name=call["name"],
+            arguments=call["arguments"],
+        )
+        for call in calls
+    ]
+    return events, calls
+
+
+def _done_event(full_text: str, tool_calls: list[dict[str, Any]]) -> LLMDoneEvent:
+    """Build the terminal ``LLMDoneEvent`` for one StreamFn invocation.
+
+    Mirrors the assistant content shape Gemini emits so both providers
+    feed the agent loop's accumulator the same dict union.
+    """
+    stop_reason = "tool_use" if tool_calls else "stop"
+    content: list[TextContent | ToolCallContent] = []
+    if full_text:
+        content.append(TextContent(type="text", text=full_text))
+    content.extend(
+        ToolCallContent(
+            type="toolCall",
+            tool_call_id=tc["tool_call_id"],
+            name=tc["name"],
+            arguments=tc["arguments"],
+        )
+        for tc in tool_calls
+    )
+    return LLMDoneEvent(type="done", stop_reason=stop_reason, content=content)
 
 
 # Token-count denominator for the catalogue's per-million-token rates.

@@ -28,7 +28,7 @@ Heavy manual refresh logic, JWT parsing, and single-use refresh token locking
 have been removed from this layer. If a future path genuinely needs direct
 token manipulation, it should live in the legacy image-gen plugin, not here.
 
-See also:
+See Also:
 - The official SDK docs (sdk/python/docs/)
 - `codex login` and the standard auth.json format.
 """
@@ -85,7 +85,9 @@ def resolve_openai_codex_auth(
     if workspace_root:
         ws_auth = workspace_root / ".codex" / "auth.json"
         if ws_auth.exists():
-            logger.debug("openai_codex.auth: workspace auth file exists at %s (not yet wired)", ws_auth)
+            logger.debug(
+                "openai_codex.auth: workspace auth file exists at %s (not yet wired)", ws_auth
+            )
             # Placeholder for future per-workspace auth support.
             # For now we fall through and let the normal SDK path win.
 
@@ -136,8 +138,10 @@ def build_app_server_config(
         # Development convenience: try to auto-discover a built binary from the
         # vendored Codex submodule (backend/vendor/codex). This lets developers
         # use the provider without having the published `openai-codex-cli-bin`
-        # wheel installed.
-        from . import _vendor as _codex_vendor
+        # wheel installed. Lazy import: `_vendor` mutates sys.path on first
+        # call, and we only want that side-effect on the auth path that
+        # actually needs a discovered binary.
+        from . import _vendor as _codex_vendor  # noqa: PLC0415
 
         discovered = _codex_vendor.discover_vendored_codex_bin()
         if discovered:

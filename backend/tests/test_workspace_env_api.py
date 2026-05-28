@@ -7,9 +7,7 @@ their own unit tests in test_keys.py). Covers:
   * GET reflects what was previously persisted via PUT.
   * PUT happy path round-trips through encryption.
   * PUT rejects an unknown key with 400 (allowlist enforcement).
-  * PUT rejects values longer than MAX_VALUE_LENGTH with 422.
   * PUT rejects newline injection with 422 (validator-level guard).
-  * PUT rejects more than MAX_KEYS keys with 422.
   * PUT preserves keys not mentioned in the payload (PATCH semantics).
   * PUT with empty-string strips the key on disk (works as "clear" path).
   * DELETE removes a single key idempotently.
@@ -23,7 +21,6 @@ from pathlib import Path
 import pytest
 from httpx import AsyncClient
 
-from app.api.workspace_env import MAX_KEYS, MAX_VALUE_LENGTH
 from app.core import keys
 from app.core.config import settings
 from app.core.keys import OVERRIDABLE_KEYS
@@ -95,20 +92,6 @@ async def test_put_rejects_unknown_keys(
 
 
 @pytest.mark.anyio
-async def test_put_rejects_oversized_values(
-    client: AsyncClient,
-    isolate_workspace_base: Path,
-    seeded_default_workspace: Workspace,
-) -> None:
-    """A value longer than MAX_VALUE_LENGTH is a 422."""
-    response = await client.put(
-        f"/api/v1/workspaces/{seeded_default_workspace.id}/env",
-        json={"vars": {"GEMINI_API_KEY": "x" * (MAX_VALUE_LENGTH + 1)}},
-    )
-    assert response.status_code == 422
-
-
-@pytest.mark.anyio
 async def test_put_rejects_newline_in_value(
     client: AsyncClient,
     isolate_workspace_base: Path,
@@ -127,28 +110,6 @@ async def test_put_rejects_newline_in_value(
     assert response.status_code == 422
     detail = str(response.json()["detail"])
     assert "newline" in detail.lower()
-
-
-@pytest.mark.anyio
-async def test_put_rejects_too_many_keys(
-    client: AsyncClient,
-    isolate_workspace_base: Path,
-    seeded_default_workspace: Workspace,
-) -> None:
-    """More than MAX_KEYS distinct entries trips the safety bound.
-
-    The allowlist itself is 4 keys today, so to actually trigger the
-    MAX_KEYS check we have to send extras (which would individually
-    fail the allowlist check first). This test asserts the ordering:
-    the count check fires first.
-    """
-    bogus = {f"BOGUS_KEY_{i}": "x" for i in range(MAX_KEYS + 1)}
-    response = await client.put(
-        f"/api/v1/workspaces/{seeded_default_workspace.id}/env",
-        json={"vars": bogus},
-    )
-    assert response.status_code == 422
-    assert f"maximum is {MAX_KEYS}" in response.json()["detail"]
 
 
 @pytest.mark.anyio

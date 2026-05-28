@@ -55,7 +55,8 @@ async def test_cron_create_invokes_scheduler_add_job(
     row.cron_expression = "0 9 * * 1-5"
     scheduler.add_job.return_value = row
     monkeypatch.setattr(cron_tools, "get_active_scheduler", lambda: scheduler)
-    tool = cron_tools.make_reminder_schedule_tool(user_id=_USER_ID)
+    conv_id = uuid.uuid4()
+    tool = cron_tools.make_reminder_schedule_tool(user_id=_USER_ID, conversation_id=conv_id)
     result = await tool.execute(
         "call-1",
         name="daily standup",
@@ -69,6 +70,7 @@ async def test_cron_create_invokes_scheduler_add_job(
     assert kwargs["name"] == "daily standup"
     assert kwargs["cron_expression"] == "0 9 * * 1-5"
     assert kwargs["prompt"] == "Remind me"
+    assert kwargs["target_conversation_id"] == conv_id
 
 
 async def test_cron_create_surfaces_invalid_cron_expression(

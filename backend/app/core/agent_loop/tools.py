@@ -220,7 +220,12 @@ def build_agent_tools(
     # Tools handle the ``scheduler_enabled = False`` case themselves
     # via ``get_active_scheduler() is None``.
     if user_id is not None:
-        tools.append(make_reminder_schedule_tool(user_id=user_id))
+        tools.append(
+            make_reminder_schedule_tool(
+                user_id=user_id,
+                conversation_id=conversation_id,
+            )
+        )
         tools.append(make_reminder_list_tool(user_id=user_id))
         tools.append(make_reminder_cancel_tool(user_id=user_id))
 

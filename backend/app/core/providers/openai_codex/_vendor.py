@@ -166,8 +166,8 @@ def _try_vendored_fallback() -> Any | None:
             getattr(mod, "__file__", "unknown"),
         )
         return mod
-    except Exception as exc:
-        logger.exception("openai_codex: failed to import from vendored path: %s", exc)
+    except Exception:
+        logger.exception("openai_codex: failed to import from vendored path")
         return None
 
 
@@ -179,7 +179,10 @@ def ensure_openai_codex_available() -> None:
 
     This function is idempotent.
     """
-    global _VENDOR_IMPORT_ATTEMPTED, _OPENAI_CODEX_MODULE
+    # Module-level cache: repeat callers (lifespan + first provider
+    # instantiation) must not re-run the sys.path mutation in
+    # `_attempt_vendored_import`.
+    global _VENDOR_IMPORT_ATTEMPTED, _OPENAI_CODEX_MODULE  # noqa: PLW0603
 
     if _OPENAI_CODEX_MODULE is not None:
         return

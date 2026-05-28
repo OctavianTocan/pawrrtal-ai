@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 from collections.abc import Sequence
 
+from xai_sdk.chat import image as xai_image
 from xai_sdk.chat import text, tool, tool_result, user
 from xai_sdk.proto import chat_pb2
 
@@ -45,6 +46,7 @@ def build_xai_tools(tools: list[AgentTool]) -> Sequence[chat_pb2.Tool] | None:
 def build_xai_messages(
     messages: list[AgentMessage],
     system_prompt: str,
+    images: list[dict[str, str]] | None = None,
 ) -> list[chat_pb2.Message]:
     """Convert AgentMessages to xAI proto ``Message`` instances, oldest-first.
 
@@ -55,7 +57,7 @@ def build_xai_messages(
 
     Per-message conversions:
 
-    * ``user`` → :func:`xai_sdk.chat.user` (text-only; empty turns are
+    * ``user`` → :func:`xai_sdk.chat.user` (text/multimodal; empty turns are
       dropped to match the historical behaviour).
     * ``assistant`` → either :func:`xai_sdk.chat.text` for pure-text
       replies or a direct ``chat_pb2.Message`` carrying ``tool_calls``
@@ -71,10 +73,27 @@ def build_xai_messages(
             content=[text(system_prompt)],
         )
     ]
-    for msg in messages:
+
+    last_user_idx = -1
+    for idx, msg in enumerate(messages):
+        if msg["role"] == "user":
+            last_user_idx = idx
+
+    for idx, msg in enumerate(messages):
         if msg["role"] == "user":
             user_text = msg["content"]
-            if user_text.strip():
+            if idx == last_user_idx and images:
+                content_args = []
+                if user_text.strip():
+                    content_args.append(user_text)
+                for img in images:
+                    if "data" in img:
+                        media_type = img.get("media_type", "image/png")
+                        data_uri = f"data:{media_type};base64,{img['data']}"
+                        content_args.append(xai_image(data_uri))
+                if content_args:
+                    out.append(user(*content_args))
+            elif user_text.strip():
                 out.append(user(user_text))
             continue
         if msg["role"] == "assistant":

@@ -76,6 +76,22 @@ _OPENAI_O4_MINI_OUT_USD = 4.40
 
 
 OPENAI_ENTRIES: tuple[ModelEntry, ...] = (
+    # Native Codex SDK models (first-class provider via openai_codex host).
+    # These only appear for users/workspaces that have Codex auth (see
+    # host_authenticated in factory.py). Distinct from the litellm-routed
+    # equivalents so users can choose the native thread/agent experience.
+    ModelEntry(
+        host=Host.openai_codex,
+        vendor=Vendor.openai,
+        model="gpt-5.5",
+        display_name="GPT-5.5 (Codex SDK)",
+        short_name="GPT-5.5 Codex",
+        description="OpenAI GPT-5.5 via the official Codex Python SDK (native threads, local app-server, full agentic capabilities)",
+        is_default=False,
+        cost_per_mtok_in_usd=5.00,
+        cost_per_mtok_out_usd=30.00,
+        supports_reasoning=("minimal", "low", "medium", "high", "extra-high"),
+    ),
     ModelEntry(
         host=Host.litellm,
         vendor=Vendor.openai,

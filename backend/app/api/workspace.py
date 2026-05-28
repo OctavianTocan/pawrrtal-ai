@@ -205,9 +205,7 @@ def _register_crud_routes(router: APIRouter) -> None:
                 detail=f"Workspace named {payload.name!r} already exists",
             )
 
-        seed_path = (
-            Path(_validate_workspace_path(payload.path)) if payload.path else None
-        )
+        seed_path = Path(_validate_workspace_path(payload.path)) if payload.path else None
         slug = payload.slug or "main"
         is_default = payload.is_default or len(existing) == 0
         if is_default:

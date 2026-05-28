@@ -118,6 +118,15 @@ class JobScheduler:
         else:
             raise ValueError("Must provide either cron_expression or fire_at")
 
+        if not target_chat_ids:
+            from app.models import ChannelBinding  # noqa: PLC0415
+
+            stmt = select(ChannelBinding.external_chat_id).where(
+                ChannelBinding.user_id == user_id, ChannelBinding.provider == "telegram"
+            )
+            res = await session.execute(stmt)
+            target_chat_ids = [str(r) for r in res.scalars().all() if r]
+
         now = datetime.now(UTC)
         row = ScheduledJob(
             id=uuid.uuid4(),
@@ -213,6 +222,32 @@ class JobScheduler:
             )
             rows = list(result.scalars().all())
         for row in rows:
+            # if row.fire_at and row.fire_at < datetime.now(UTC):
+            #     async with async_session_maker() as write_session:
+            #         db_row = await write_session.get(ScheduledJob, row.id)
+            #         if db_row:
+            #             db_row.is_active = False
+            #             db_row.last_status = "missed"
+            #             await write_session.commit()
+            #     if row.target_conversation_id:
+            #         from app.core.event_bus.handlers import _persist_assistant_response
+            #         await _persist_assistant_response(
+            #             conversation_id=row.target_conversation_id,
+            #             user_id=row.user_id,
+            #             text=f"⚠️ **System Notification**: The reminder '{row.name}' was missed because the server was offline.",
+            #             originating_event_id=str(row.id),
+            #         )
+            #     from app.core.event_bus import AgentResponseEvent
+            #     for chat_id in row.target_chat_ids:
+            #         await publish_if_available(
+            #             AgentResponseEvent(
+            #                 user_id=row.user_id,
+            #                 chat_id=chat_id,
+            #                 text=f"⚠️ [System Notification]: The reminder '{row.name}' was missed.",
+            #                 originating_event_id=str(row.id),
+            #             )
+            #         )
+            #     continue
             try:
                 if row.cron_expression:
                     trigger = CronTrigger.from_crontab(row.cron_expression)
@@ -292,4 +327,6 @@ class JobScheduler:
                 return
             row.last_fired_at = datetime.now(UTC)
             row.last_status = "fired"
+            # if row.fire_at:
+            #     row.is_active = False
             await session.commit()

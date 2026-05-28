@@ -154,6 +154,7 @@ def make_xai_stream_fn(
     system_prompt: str,
     reasoning_effort: ReasoningEffort | None = None,
     usage_sink: UsageAccumulator | None = None,
+    images: list[dict[str, str]] | None = None,
 ) -> StreamFn:
     """Build a :data:`StreamFn` backed by xai-sdk's gRPC ``AsyncClient``.
 
@@ -180,6 +181,7 @@ def make_xai_stream_fn(
             correctly.  ``None`` skips usage capture entirely — useful
             for unit tests and utility callers that don't talk to the
             cost ledger.
+        images: Optional list of base64 multimodal image inputs.
 
     Returns:
         An async generator factory that yields ``LLMEvent`` instances.
@@ -192,7 +194,7 @@ def make_xai_stream_fn(
         tools: list[AgentTool],
     ) -> AsyncIterator[LLMEvent]:
         api_key = _resolve_xai_api_key(workspace_root)
-        request_messages = build_xai_messages(messages, system_prompt)
+        request_messages = build_xai_messages(messages, system_prompt, images=images)
         xai_tools = build_xai_tools(tools)
         effort = _map_reasoning_effort(reasoning_effort)
 
@@ -357,13 +359,6 @@ class XaiLLM:
                 list is logged and ignored so callers can switch on it
                 without a runtime error).
         """
-        if images:
-            logger.debug(
-                "XAI_IMAGES_IGNORED conversation_id=%s count=%d",
-                conversation_id,
-                len(images),
-            )
-
         prior: list[AgentMessage] = []
         for m in history or []:
             role = m.get("role")
@@ -401,6 +396,7 @@ class XaiLLM:
             system_prompt=context.system_prompt,
             reasoning_effort=reasoning_effort,
             usage_sink=usage_sink,
+            images=images,
         )
 
         try:

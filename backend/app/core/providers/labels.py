@@ -18,6 +18,7 @@ HOST_LABELS: dict[Host, str] = {
     Host.google_ai: "Gemini API",
     Host.litellm: "LiteLLM",
     Host.opencode_go: "OpenCode Go",
+    Host.openai_codex: "Codex SDK",
     Host.xai: "xAI",
 }
 """Map from :class:`Host` enum to user-facing display string."""

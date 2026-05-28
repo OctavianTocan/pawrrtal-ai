@@ -194,14 +194,8 @@ class TestTelegramChannelDeliver:
         assert last_call.kwargs["message_id"] == 456
         assert "agent finished without producing a reply" in last_call.kwargs["text"]
 
-    async def test_final_reply_sent_as_separate_message(self) -> None:
-        """Plain answer text is sent as a final reply, not streamed into the trace.
-
-        The placeholder is updated with progress states (render_initial →
-        render_starting → render_working) before the final delete, so
-        edit_message_text WILL be called — but those are progress updates,
-        not the trace. The key assertions are delete + single send.
-        """
+    async def test_final_reply_edited_in_placeholder(self) -> None:
+        """Plain answer text is edited in-place inside the placeholder message for pure-text turns."""
         bot = _make_bot()
         msg = _make_channel_message(bot, chat_id=7, message_id=99)
         channel = TelegramChannel()
@@ -209,11 +203,14 @@ class TestTelegramChannelDeliver:
         async for _ in channel.deliver(_stream({"type": "delta", "content": "hi"}), msg):
             pass
 
-        bot.delete_message.assert_awaited_once_with(chat_id=7, message_id=99)
-        bot.send_message.assert_awaited_once_with(chat_id=7, text="hi")
+        bot.delete_message.assert_not_called()
+        bot.send_message.assert_not_called()
+        bot.edit_message_text.assert_any_call(
+            chat_id=7, message_id=99, text="hi", reply_markup=None
+        )
 
     async def test_accumulates_deltas_into_final_reply(self) -> None:
-        """Multiple deltas collapse into one final Telegram reply."""
+        """Multiple deltas collapse into one final Telegram reply edited in-place."""
         bot = _make_bot()
         msg = _make_channel_message(bot, chat_id=1, message_id=2)
         channel = TelegramChannel()
@@ -226,8 +223,11 @@ class TestTelegramChannelDeliver:
         async for _ in channel.deliver(_stream(*events), msg):
             pass
 
-        bot.delete_message.assert_awaited_once_with(chat_id=1, message_id=2)
-        bot.send_message.assert_awaited_once_with(chat_id=1, text="Hello, world")
+        bot.delete_message.assert_not_called()
+        bot.send_message.assert_not_called()
+        bot.edit_message_text.assert_any_call(
+            chat_id=1, message_id=2, text="Hello, world", reply_markup=None
+        )
 
     async def test_tool_use_edits_detailed_trace_message(self) -> None:
         """``tool_use`` edits the trace with friendly display metadata."""
@@ -274,6 +274,7 @@ class TestTelegramChannelDeliver:
             chat_id=123,
             message_id=456,
             text="💭 <b>Thinking...</b>\n\n<i>checking the workspace</i>",
+            reply_markup=None,
         )
         # The final answer is sent as a new message
         bot.send_message.assert_awaited_once_with(
@@ -311,6 +312,7 @@ class TestTelegramChannelDeliver:
             chat_id=88,
             message_id=11,
             text="💭 <b>Thinking...</b>\n\n<i>let me check the workspace</i>",
+            reply_markup=None,
         )
 
         # The second thinking block and final answer call send_message:
@@ -330,7 +332,7 @@ class TestTelegramChannelDeliver:
         assert "Answer." in sent_texts
 
     async def test_agent_terminated_replaces_placeholder(self) -> None:
-        """``agent_terminated`` without text must send a final warning reply."""
+        """``agent_terminated`` without text edits placeholder in-place."""
         bot = _make_bot()
         msg = _make_channel_message(bot, chat_id=11, message_id=22)
         channel = TelegramChannel()
@@ -344,11 +346,11 @@ class TestTelegramChannelDeliver:
         async for _ in channel.deliver(_stream(*events), msg):
             pass
 
-        bot.delete_message.assert_awaited_once_with(chat_id=11, message_id=22)
-        bot.send_message.assert_awaited_once()
-        text = bot.send_message.await_args.kwargs["text"]
-        assert "max_iterations" in text
-        assert bot.send_message.await_args.kwargs["chat_id"] == 11
+        bot.delete_message.assert_not_called()
+        bot.send_message.assert_not_called()
+        # Get all text sent in edit_message_text calls
+        edit_texts = [call.kwargs.get("text", "") for call in bot.edit_message_text.call_args_list]
+        assert any("max_iterations" in text for text in edit_texts)
 
     async def test_agent_terminated_appended_after_partial_text(self) -> None:
         """If the agent produced text before termination, final reply includes both."""
@@ -363,9 +365,11 @@ class TestTelegramChannelDeliver:
         async for _ in channel.deliver(_stream(*events), msg):
             pass
 
-        last_text = bot.send_message.await_args.kwargs["text"]
-        assert "Partial answer." in last_text
-        assert "max_iterations" in last_text
+        bot.delete_message.assert_not_called()
+        bot.send_message.assert_not_called()
+        edit_texts = [call.kwargs.get("text", "") for call in bot.edit_message_text.call_args_list]
+        assert any("Partial answer." in text for text in edit_texts)
+        assert any("max_iterations" in text for text in edit_texts)
 
     async def test_thinking_event_renders_markdown_bold_inside_italic(self) -> None:
         """Thinking deltas with Markdown emphasis render formatted, not literal (#287)."""
@@ -433,7 +437,7 @@ class TestTelegramChannelDeliver:
         assert "agent finished without producing a reply" in text
 
     async def test_error_event_replaces_placeholder(self) -> None:
-        """A bare ``error`` event must surface the error text as final reply."""
+        """A bare ``error`` event must surface the error text in-place."""
         bot = _make_bot()
         msg = _make_channel_message(bot)
         channel = TelegramChannel()
@@ -444,23 +448,29 @@ class TestTelegramChannelDeliver:
         async for _ in channel.deliver(_stream(*events), msg):
             pass
 
-        bot.delete_message.assert_awaited_once()
-        assert "rate limited" in bot.send_message.await_args.kwargs["text"]
+        bot.delete_message.assert_not_called()
+        bot.send_message.assert_not_called()
+        edit_texts = [call.kwargs.get("text", "") for call in bot.edit_message_text.call_args_list]
+        assert any("rate limited" in text for text in edit_texts)
 
     async def test_final_reply_uses_reply_parameters_when_available(self) -> None:
-        """Telegram final replies thread under the original user message."""
+        """Telegram final replies thread under the original user message when a new message is sent."""
         bot = _make_bot()
         msg = _make_channel_message(bot, chat_id=1, message_id=2, reply_to_message_id=44)
         channel = TelegramChannel()
 
-        async for _ in channel.deliver(_stream({"type": "delta", "content": "answer"}), msg):
+        events: list[StreamEvent] = [
+            {"type": "thinking", "content": "thought"},
+            {"type": "delta", "content": "answer"},
+        ]
+        async for _ in channel.deliver(_stream(*events), msg):
             pass
 
         kwargs = bot.send_message.await_args.kwargs
         assert kwargs["reply_parameters"].message_id == 44
 
     async def test_regenerate_button_attached_to_final_reply_when_flag_on(self) -> None:
-        """When the regenerate flag is on, the closing send carries the rgn:<uuid> markup (#368)."""
+        """When the regenerate flag is on, the closing edit carries the rgn:<uuid> markup (#368)."""
         from aiogram.types import InlineKeyboardMarkup
 
         from app.integrations.telegram.regenerate_keyboard import REGEN_CALLBACK_PREFIX
@@ -480,8 +490,10 @@ class TestTelegramChannelDeliver:
             async for _ in channel.deliver(_stream({"type": "delta", "content": "answer"}), msg):
                 pass
 
-        kwargs = bot.send_message.await_args.kwargs
-        markup = kwargs.get("reply_markup")
+        bot.delete_message.assert_not_called()
+        bot.send_message.assert_not_called()
+        last_edit_call = bot.edit_message_text.call_args_list[-1]
+        markup = last_edit_call.kwargs.get("reply_markup")
         assert isinstance(markup, InlineKeyboardMarkup)
         # The lone button row encodes the conversation_id behind the rgn prefix
         # so the callback handler can replay the last user message.
@@ -497,8 +509,13 @@ class TestTelegramChannelDeliver:
             async for _ in channel.deliver(_stream({"type": "delta", "content": "answer"}), msg):
                 pass
 
-        kwargs = bot.send_message.await_args.kwargs
-        assert "reply_markup" not in kwargs
+        bot.delete_message.assert_not_called()
+        bot.send_message.assert_not_called()
+        last_edit_call = bot.edit_message_text.call_args_list[-1]
+        assert (
+            "reply_markup" not in last_edit_call.kwargs
+            or last_edit_call.kwargs["reply_markup"] is None
+        )
 
     async def test_not_modified_error_swallowed(self) -> None:
         """TelegramBadRequest: message is not modified must not propagate."""
@@ -559,6 +576,7 @@ class TestTelegramChannelDeliver:
             chat_id=42,
             message_id=99,
             text="💭 <b>Thinking...</b>\n\n<i>thinking content</i>",
+            reply_markup=None,
         )
         # And the placeholder MUST NOT be deleted:
         bot.delete_message.assert_not_called()
@@ -593,6 +611,7 @@ class TestTelegramChannelDeliver:
             chat_id=42,
             message_id=99,
             text="💭 <b>Thinking...</b>\n\n<i>The user said\nhello.</i>",
+            reply_markup=None,
         )
 
 
