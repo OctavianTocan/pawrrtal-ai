@@ -11,6 +11,7 @@ from app.cli.paw.commands import channels as channels_cmd
 from app.cli.paw.commands import conversations as conversations_cmd
 from app.cli.paw.commands import cost as cost_cmd
 from app.cli.paw.commands import doctor as doctor_cmd
+from app.cli.paw.commands import fanout as fanout_cmd
 from app.cli.paw.commands import jobs as jobs_cmd
 from app.cli.paw.commands import lcm as lcm_cmd
 from app.cli.paw.commands import login as login_cmd
@@ -143,6 +144,14 @@ app.command(
     "replay",
     context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
 )(replay_cmd.replay)
+
+# `fanout` re-invokes paw N times in parallel as subprocesses; the wrapped
+# subcommand follows the slot count, so trailing args must pass through
+# untouched (same pattern as record/replay above).
+app.command(
+    "fanout",
+    context_settings={"allow_extra_args": True, "ignore_unknown_options": True},
+)(fanout_cmd.fanout)
 
 
 @app.callback()
