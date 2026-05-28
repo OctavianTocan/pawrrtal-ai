@@ -140,3 +140,68 @@ async def test_chat_finalizes_assistant_status_on_sqlite(
         f"got {final.get('assistant_status')!r}. The streaming generator's "
         "persistence path must not depend on the request session."
     )
+
+
+@pytest.mark.anyio
+async def test_finalize_turn_leaves_message_complete_on_cost_write_failure(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    seeded_default_workspace: Workspace,
+) -> None:
+    """Cost-ledger failure must NOT strand the assistant row at ``status="streaming"``.
+
+    ``_finalize_turn`` splits its writes into two transactions: the
+    assistant-row finalize (hard requirement) and the cost-ledger insert
+    (best-effort observability). A failure in the cost write must be
+    swallowed at the broad ``SQLAlchemyError`` boundary — narrower
+    ``OperationalError`` / ``IntegrityError`` excepts would let
+    ``PendingRollbackError`` / ``InvalidRequestError`` propagate into the
+    streaming generator after the SSE body has yielded, breaking the
+    response *and* leaving the assistant row stuck mid-stream.
+
+    Inject a synthetic ``IntegrityError`` into the cost-write path and
+    assert the assistant row still reaches ``status="complete"``.
+    """
+    from sqlalchemy.exc import IntegrityError
+
+    conversation_id = uuid4()
+    await client.post(
+        f"/api/v1/conversations/{conversation_id}",
+        json={"title": "Cost Failure"},
+    )
+    monkeypatch.setattr(
+        "app.api.chat.resolve_llm",
+        lambda _model_id, **kwargs: _FakeProvider(),
+    )
+
+    async def _explode(**_kwargs: Any) -> None:
+        """Synthetic cost-write failure that should be swallowed."""
+        raise IntegrityError("synthetic", params=None, orig=Exception("boom"))
+
+    # Patch where the symbol is looked up — ``turn_runner`` imported it
+    # at module load, so patching ``app.channels._turn_cost`` would miss
+    # the in-scope reference.
+    monkeypatch.setattr(
+        "app.channels.turn_runner.record_turn_cost_if_enabled",
+        _explode,
+    )
+
+    response = await client.post(
+        "/api/v1/chat/",
+        json={"question": "hi", "conversation_id": str(conversation_id)},
+    )
+    assert response.status_code == 200
+    assert "data: [DONE]" in response.text
+
+    messages_resp = await client.get(f"/api/v1/conversations/{conversation_id}/messages")
+    assert messages_resp.status_code == 200
+    messages = messages_resp.json()
+    assistant_rows = [m for m in messages if m["role"] == "assistant"]
+    assert assistant_rows, "expected at least one assistant message row"
+    final = assistant_rows[-1]
+    assert final.get("assistant_status") == "complete", (
+        f"assistant row must reach status=complete even when the cost-ledger "
+        f"write raises; got {final.get('assistant_status')!r}. The broadened "
+        "SQLAlchemyError catch in _finalize_turn is the headline guarantee of "
+        "the split-transaction design."
+    )

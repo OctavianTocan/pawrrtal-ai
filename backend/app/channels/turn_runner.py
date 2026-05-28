@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select, update
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.channels._turn_cost import record_turn_cost_if_enabled
@@ -70,6 +70,7 @@ _MS_PER_SECOND_FOR_LOG = 1000
 # any token).  Cheaper than a conditional format string and keeps the
 # field-position contract stable for log parsers.
 _TTFT_LOG_MISSING = "-"
+
 
 @dataclass(frozen=True)
 class ChatTurnInput:
@@ -560,7 +561,17 @@ async def _finalize_turn(
                 **snapshot,
             )
             await session.commit()
-    except (OperationalError, IntegrityError):
+    except SQLAlchemyError:
+        # Broad ``SQLAlchemyError`` (not bare ``Exception``) covers the full
+        # set of SQLAlchemy failure modes that can reach this finalize path:
+        # ``OperationalError``/``IntegrityError`` (the original narrow set)
+        # plus ``PendingRollbackError`` / ``InvalidRequestError`` /
+        # ``DataError`` raised when a prior statement inside the session
+        # left the transaction in an unrecoverable state. Narrowing to just
+        # the original two let those leak out of ``_finalize_turn`` (called
+        # from ``run_turn``'s ``finally``) into the ``StreamingResponse``
+        # generator after the body had already yielded, truncating the SSE
+        # stream and stranding the assistant row at ``status="streaming"``.
         logger.exception(
             "%s_PERSIST_ERR conversation_id=%s message_id=%s",
             turn_input.log_tag,
@@ -586,7 +597,11 @@ async def _finalize_turn(
                 log_tag=turn_input.log_tag,
             )
             await session.commit()
-    except (OperationalError, IntegrityError):
+    except SQLAlchemyError:
+        # See the matching except above: narrow ``OperationalError`` /
+        # ``IntegrityError`` skips ``PendingRollbackError`` and friends,
+        # which would propagate into the streaming generator and break
+        # the SSE response after the body has yielded.
         logger.exception(
             "%s_COST_PERSIST_ERR conversation_id=%s message_id=%s",
             turn_input.log_tag,
