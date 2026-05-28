@@ -1,11 +1,11 @@
 ---
 # pawrrtal-ca8v
 title: 'pilot(crud): Maybe[Row] migration for crud/conversation + crud/message'
-status: in-progress
+status: completed
 type: task
 priority: deferred
 created_at: 2026-05-28T09:53:48Z
-updated_at: 2026-05-28T10:26:03Z
+updated_at: 2026-05-28T10:26:43Z
 blocked_by:
     - pawrrtal-3lnz
 ---
@@ -26,4 +26,3 @@ Migrated `crud/conversation.get_conversation` and `crud/conversation.get_convers
 - Tests: `tests/test_conversation_crud.py` asserts `Some` / `Nothing` directly + adds two new tests for `get_conversation_status`; `tests/test_project_crud.py` unwraps via `.value_or(None)`; `tests/test_telegram_channel.py` wraps the mock return in `Some`.
 
 `get_message_by_id` was *not* part of this slice — keeping the change surgical to one CRUD file matches the spec's "two call sites" wording for Phase 2. The message-read migration can land separately if Phase 3 expands the pilot.
-

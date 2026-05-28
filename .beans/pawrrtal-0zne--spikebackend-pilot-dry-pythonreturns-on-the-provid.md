@@ -1,11 +1,11 @@
 ---
 # pawrrtal-0zne
 title: 'spike(backend): pilot dry-python/returns on the provider seam'
-status: in-progress
+status: completed
 type: task
 priority: deferred
 created_at: 2026-05-28T09:14:50Z
-updated_at: 2026-05-28T10:22:58Z
+updated_at: 2026-05-28T10:25:36Z
 blocked_by:
     - pawrrtal-ca8v
 ---
