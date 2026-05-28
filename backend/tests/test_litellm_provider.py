@@ -14,10 +14,15 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from uuid import uuid4
 
+import httpx
 import litellm
+import openai
 import pytest
 from litellm.exceptions import (
     AuthenticationError as LiteLLMAuthenticationError,
+)
+from litellm.exceptions import (
+    BadRequestError as LiteLLMBadRequestError,
 )
 from litellm.exceptions import (
     RateLimitError as LiteLLMRateLimitError,
@@ -376,3 +381,125 @@ async def test_open_litellm_stream_missing_key_is_auth_failure(
     io_result = await future
     inner = io_result.failure()._inner_value
     assert isinstance(inner, ProviderAuthError)
+
+
+# ---------------------------------------------------------------------------
+# Regression coverage — the LiteLLM exception hierarchy puts every HTTP error
+# subclass under ``openai.APIError`` (NOT ``litellm.exceptions.APIError``),
+# so the safety-net catch tuple must include ``openai.APIError`` for those
+# subclasses to be classified rather than propagate raw. Without these tests
+# the bug returned silently the moment anyone "tidied up" the import block.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_open_litellm_stream_with_litellm_bad_request_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``BadRequestError`` (a subclass of ``openai.APIError``) routes to ``ProviderUnknownError``.
+
+    Before the catch-tuple fix this raised raw out of ``FutureResult`` because
+    ``litellm.BadRequestError`` does not inherit from ``litellm.APIError``.
+    """
+    import app.core.providers.litellm_provider as mod
+
+    async def _raise_bad_request(**_kwargs: object) -> AsyncIterator[object]:
+        raise LiteLLMBadRequestError(
+            message="bad request body",
+            llm_provider="openai",
+            model="gpt-4o-mini",
+        )
+
+    monkeypatch.setattr(mod, "_resolve_litellm_api_key", lambda *_a, **_kw: "sk-test")
+    monkeypatch.setattr(litellm, "acompletion", _raise_bad_request)
+
+    future = open_litellm_stream(
+        Vendor.openai,
+        "gpt-4o-mini",
+        messages=[{"role": "user", "content": "hi"}],
+    )
+    io_result = await future
+    inner = io_result.failure()._inner_value
+    assert isinstance(inner, ProviderUnknownError)
+    assert "bad request body" in inner.message
+
+
+def test_classify_litellm_exception_with_openai_apiconnection_error() -> None:
+    """``openai.APIConnectionError`` (LiteLLM's transient network parent) → ``ProviderUnknownError``.
+
+    Confirms the upstream ``openai.APIError`` base catches everything LiteLLM
+    inherits from it. Without the broadened catch tuple this would have
+    escaped the classifier entirely.
+    """
+    request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+    exc = openai.APIConnectionError(message="connection reset", request=request)
+    err = _classify_litellm_exception(exc, model="openai/gpt-4o")
+    assert isinstance(err, ProviderUnknownError)
+    assert "connection reset" in err.message
+
+
+def test_classify_litellm_exception_rate_limit_parses_retry_after_from_header() -> None:
+    """``Retry-After`` on the upstream response surfaces on ``ProviderRateLimitError``.
+
+    LiteLLM's ``RateLimitError.__init__`` does not set a ``retry_after``
+    attribute — the actual hint lives on ``exc.response.headers``. This test
+    pins the header-parsing path that replaced the previously dead
+    ``getattr(exc, "retry_after", None)`` lookup.
+    """
+    response = httpx.Response(
+        status_code=429,
+        headers={"Retry-After": "42"},
+    )
+    exc = LiteLLMRateLimitError(
+        message="slow down",
+        llm_provider="openai",
+        model="gpt-4o",
+        response=response,
+    )
+    err = _classify_litellm_exception(exc, model="openai/gpt-4o")
+    assert isinstance(err, ProviderRateLimitError)
+    assert err.retry_after == 42.0
+
+
+def test_classify_litellm_exception_rate_limit_ignores_non_numeric_retry_after() -> None:
+    """Non-numeric ``Retry-After`` values (HTTP date format) degrade to ``None``."""
+    response = httpx.Response(
+        status_code=429,
+        headers={"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"},
+    )
+    exc = LiteLLMRateLimitError(
+        message="slow down",
+        llm_provider="openai",
+        model="gpt-4o",
+        response=response,
+    )
+    err = _classify_litellm_exception(exc, model="openai/gpt-4o")
+    assert isinstance(err, ProviderRateLimitError)
+    assert err.retry_after is None
+
+
+@pytest.mark.anyio
+async def test_open_litellm_stream_unmapped_vendor_returns_provider_auth_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Vendors not in ``_VENDOR_API_KEY_NAME`` degrade gracefully instead of raising ``KeyError``.
+
+    ``Vendor.deepseek`` (and friends) have no entry in the env-var map yet,
+    so the missing-key branch used to crash on ``_VENDOR_API_KEY_NAME[vendor]``
+    while constructing the user-facing error. The fallback to ``vendor.value``
+    keeps the message readable; the broadened catch tuple also catches the
+    raw ``KeyError`` as a belt-and-braces safety net.
+    """
+    import app.core.providers.litellm_provider as mod
+
+    monkeypatch.setattr(mod, "_resolve_litellm_api_key", lambda *_a, **_kw: None)
+
+    future = open_litellm_stream(
+        Vendor.deepseek,
+        "deepseek-chat",
+        messages=[{"role": "user", "content": "hi"}],
+    )
+    io_result = await future
+    inner = io_result.failure()._inner_value
+    assert isinstance(inner, ProviderAuthError)
+    assert "deepseek" in inner.message

@@ -25,6 +25,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import litellm
+import openai
 from litellm.exceptions import (
     APIError as LiteLLMAPIError,
 )
@@ -221,6 +222,30 @@ _LITELLM_REASONING_EFFORT: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 
+def _extract_retry_after(exc: BaseException) -> float | None:
+    """Pull a ``Retry-After`` hint off a LiteLLM exception's HTTP response.
+
+    LiteLLM does not promote the header onto the exception itself —
+    callers have to read ``exc.response.headers`` (see
+    ``vendor/litellm/.../exceptions.py``). The header may be missing,
+    non-numeric (HTTP date), or absent entirely; in any of those
+    cases we return ``None`` so the caller can apply its own backoff.
+    """
+    response = getattr(exc, "response", None)
+    if response is None:
+        return None
+    headers = getattr(response, "headers", None)
+    if headers is None:
+        return None
+    raw = headers.get("Retry-After") or headers.get("retry-after")
+    if raw is None:
+        return None
+    try:
+        return float(raw)
+    except (TypeError, ValueError):
+        return None
+
+
 def _classify_litellm_exception(exc: BaseException, *, model: str) -> ProviderError:
     """Map a LiteLLM SDK exception onto our closed ``ProviderError`` set.
 
@@ -234,12 +259,13 @@ def _classify_litellm_exception(exc: BaseException, *, model: str) -> ProviderEr
     if isinstance(exc, LiteLLMAuthenticationError):
         return ProviderAuthError(message=str(exc))
     if isinstance(exc, LiteLLMRateLimitError):
-        retry_after_raw = getattr(exc, "retry_after", None)
-        retry_after: float | None
-        try:
-            retry_after = float(retry_after_raw) if retry_after_raw is not None else None
-        except (TypeError, ValueError):
-            retry_after = None
+        # LiteLLM's ``RateLimitError.__init__`` does not set a
+        # ``retry_after`` attribute; the actual hint is on the upstream
+        # HTTP response's ``Retry-After`` header (see
+        # ``litellm/exceptions.py``). Parse from there, falling back
+        # gracefully when the response / header is missing or the
+        # value is malformed.
+        retry_after = _extract_retry_after(exc)
         return ProviderRateLimitError(message=str(exc), retry_after=retry_after)
     if isinstance(exc, LiteLLMUnsupportedParamsError):
         param = str(getattr(exc, "param", "") or "")
@@ -294,10 +320,13 @@ def open_litellm_stream(
             # Translate "missing key" into an auth error so the caller
             # can match a single ProviderAuthError variant regardless
             # of whether the upstream or our key resolution rejected.
+            # Vendors that aren't in ``_VENDOR_API_KEY_NAME`` still need
+            # a readable hint — fall back to the vendor's enum value
+            # so we never blow up with a raw ``KeyError`` here.
+            key_label = _VENDOR_API_KEY_NAME.get(vendor, vendor.value)
             raise LiteLLMAuthenticationError(
                 message=(
-                    f"missing {_VENDOR_API_KEY_NAME[vendor]} — set it in the "
-                    "workspace env or as a gateway env var."
+                    f"missing {key_label} — set it in the workspace env or as a gateway env var."
                 ),
                 llm_provider=vendor.value,
                 model=model_string,
@@ -329,6 +358,21 @@ def open_litellm_stream(
             LiteLLMUnsupportedParamsError,
             LiteLLMTimeout,
             LiteLLMAPIError,
+            # LiteLLM's HTTP-error subclasses (``BadRequestError``,
+            # ``APIConnectionError``, ``InternalServerError``,
+            # ``ServiceUnavailableError``, ``NotFoundError``,
+            # ``PermissionDeniedError``, ``ContextWindowExceededError``)
+            # inherit from ``openai.APIError`` — NOT
+            # ``litellm.exceptions.APIError`` — so without this branch
+            # they would escape the classifier and propagate raw out
+            # of the ``FutureResult``. ``openai.APIError`` is the
+            # upstream common base.
+            openai.APIError,
+            # Defensive: a missing entry in ``_VENDOR_API_KEY_NAME`` or
+            # any other dict-keyed lookup inside ``_open`` should
+            # never crash out of the future — collapse to
+            # ``ProviderUnknownError`` instead.
+            KeyError,
         ) as exc:
             return Failure(_classify_litellm_exception(exc, model=model_string))
         return Success(iterator)
@@ -390,8 +434,13 @@ def make_litellm_stream_fn(
 
         api_key = _resolve_litellm_api_key(vendor, workspace_root)
         if not api_key:
+            # ``_VENDOR_API_KEY_NAME`` is keyed by the providers we
+            # actively support — fall back to the vendor enum value so
+            # the user-facing error never trips on a ``KeyError`` for
+            # a not-yet-mapped vendor.
+            key_label = _VENDOR_API_KEY_NAME.get(vendor, vendor.value)
             error_text = (
-                f"LiteLLM error: missing {_VENDOR_API_KEY_NAME[vendor]} — "
+                f"LiteLLM error: missing {key_label} — "
                 "set it in the workspace env or as a gateway env var."
             )
             yield LLMTextDeltaEvent(type="text_delta", text=error_text)
