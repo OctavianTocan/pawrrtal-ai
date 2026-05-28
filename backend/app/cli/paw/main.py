@@ -11,6 +11,7 @@ from app.cli.paw.commands import channels as channels_cmd
 from app.cli.paw.commands import conversations as conversations_cmd
 from app.cli.paw.commands import cost as cost_cmd
 from app.cli.paw.commands import doctor as doctor_cmd
+from app.cli.paw.commands import jobs as jobs_cmd
 from app.cli.paw.commands import login as login_cmd
 from app.cli.paw.commands import mcp as mcp_cmd
 from app.cli.paw.commands import messages as messages_cmd
@@ -80,6 +81,12 @@ app.add_typer(
     mcp_cmd.app,
     name="mcp",
     help="MCP server registry CRUD.",
+)
+
+app.add_typer(
+    jobs_cmd.app,
+    name="jobs",
+    help="Scheduled jobs CRUD.",
 )
 
 app.add_typer(

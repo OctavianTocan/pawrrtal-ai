@@ -37,6 +37,7 @@ Every row reflects a shipped subcommand. Source: `backend/app/cli/paw/commands/`
 | workspace files  | `ls`, `cat`, `write`, `rm`                                     | `/api/v1/workspaces/{id}/files`          |
 | channels         | `list`/`ls`, `link telegram`, `unlink telegram`                | `/api/v1/channels` + `/{provider}/link`  |
 | mcp              | `list`/`ls`, `show`, `create`, `update`, `delete`              | `/api/v1/mcp/servers`                    |
+| jobs             | `list`/`ls`, `show`, `create`, `delete`                        | `/api/v1/scheduled-jobs`                 |
 | models           | `ls` (envelope: `{"models": [...], "etag": "..."}`)            | `/api/v1/models`                         |
 | conversations    | `ls`, `show`, `create`, `send`, `rename`, `delete`, `export`   | `/api/v1/conversations`                  |
 | messages         | `ls`, `get` (by `(conv_id, index)`; no `/messages/{id}` route) | `/api/v1/conversations/{id}/messages`    |
@@ -182,7 +183,6 @@ v1 shipped (Tasks 0–11) on the `development` branch.
 
 **Deferred to v2** (file as separate beans before implementing):
 
-- `paw jobs` — scheduled jobs
 - `paw lcm` — LCM list/get + memories + dreaming
 - `paw fanout N COMMAND...` — N parallel personas hitting the same backend
 - `paw mirror --upstream URL COMMAND...` — local vs remote SSE diff
