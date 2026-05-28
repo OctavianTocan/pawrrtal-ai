@@ -30,7 +30,7 @@ from pathlib import Path
 
 from app.core.config import settings
 from app.core.keys import load_workspace_env, resolve_api_key, save_workspace_env
-from app.integrations.xai.oauth import (
+from app.core.providers.xai.oauth import (
     OAuthError,
     refresh_token,
 )
