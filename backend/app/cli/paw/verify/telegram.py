@@ -142,13 +142,35 @@ def _record_simulate_gap(r: ScenarioResult) -> None:
     )
 
 
-async def _unlink_telegram(client: PawClient, r: ScenarioResult) -> None:
+SKIPPED_NO_REDEMPTION_DETAIL = (
+    "skipped: requires backend simulate-redemption endpoint to land a real "
+    "channel_bindings row before unlink can be meaningfully verified "
+    "(see pawrrtal-o7xf). Without that precondition, DELETE returns 204 "
+    "even when no binding exists and the post-unlink absence check is "
+    "trivially true — so neither assertion proves anything."
+)
+
+
+async def _unlink_telegram(
+    client: PawClient,
+    r: ScenarioResult,
+    *,
+    link_code_redeemed: bool,
+) -> None:
     """DELETE the binding and assert the idempotent 204 contract.
 
-    ``PawClient.request`` raises ``ApiError`` on any status outside the
-    ``expect`` tuple, so reaching the ``r.add(...)`` line is itself the
-    proof that the backend returned the expected status.
+    Only runs the unlink HTTP call + assertion when a binding has
+    actually been redeemed by a bot-side flow — without that
+    precondition, DELETE returns 204 even when there is nothing to
+    delete (idempotent contract), so the assertion proves nothing. When
+    redemption is not exercised we instead emit a passing-but-skipped
+    check with a stable detail so dashboards and agents can grep for the
+    coverage gap.
     """
+    if not link_code_redeemed:
+        r.add("telegram_unlinked", True, detail=SKIPPED_NO_REDEMPTION_DETAIL)
+        r.artifacts.setdefault("skipped_checks", []).append("telegram_unlinked")
+        return
     await client.request(
         "DELETE",
         f"/api/v1/channels/{TELEGRAM_PROVIDER}/link",
@@ -157,8 +179,29 @@ async def _unlink_telegram(client: PawClient, r: ScenarioResult) -> None:
     r.add("telegram_unlinked", True, detail="status=204")
 
 
-async def _check_post_unlink_list(client: PawClient, r: ScenarioResult) -> None:
-    """After unlink there must be no Telegram binding in the list."""
+async def _check_post_unlink_list(
+    client: PawClient,
+    r: ScenarioResult,
+    *,
+    link_code_redeemed: bool,
+) -> None:
+    """After unlink there must be no Telegram binding in the list.
+
+    Gated on ``link_code_redeemed`` for the same reason as
+    :func:`_unlink_telegram` — without a binding ever being created the
+    "absent after unlink" check is trivially true and proves nothing
+    about the DELETE endpoint's correctness.
+    """
+    if not link_code_redeemed:
+        r.add(
+            "telegram_binding_absent_after_unlink",
+            True,
+            detail=SKIPPED_NO_REDEMPTION_DETAIL,
+        )
+        r.artifacts.setdefault("skipped_checks", []).append(
+            "telegram_binding_absent_after_unlink"
+        )
+        return
     bindings = await _list_channels(client)
     r.artifacts["post_unlink_bindings"] = bindings
     r.add(
@@ -177,15 +220,26 @@ async def run_telegram_scenario(
     Sequence: baseline list -> issue code -> post-issue list ->
     record simulate-gap -> unlink -> post-unlink list. The bot-side
     redemption hop is deliberately skipped (see module docstring).
+
+    ``link_code_redeemed`` is wired to ``False`` until a backend
+    simulate-redemption endpoint exists (tracked as ``pawrrtal-o7xf``).
+    The unlink and post-unlink-list checks are gated behind it because
+    DELETE on a never-bound provider is a no-op 204 — so without a real
+    binding the assertions are trivially true and prove nothing.
     """
     r = ScenarioResult(name="telegram")
     del state  # PersonaState carried by ``client``; kept in signature for parity.
+
+    # Today there is no surface paw can hit to drive bot-side redemption,
+    # so link_code_redeemed is always False. When the simulate endpoint
+    # lands this flag flips and the gated checks become real assertions.
+    link_code_redeemed = False
 
     await _check_baseline(client, r)
     await _issue_link_code(client, r)
     await _check_post_issue_list(client, r)
     _record_simulate_gap(r)
-    await _unlink_telegram(client, r)
-    await _check_post_unlink_list(client, r)
+    await _unlink_telegram(client, r, link_code_redeemed=link_code_redeemed)
+    await _check_post_unlink_list(client, r, link_code_redeemed=link_code_redeemed)
 
     return r

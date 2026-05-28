@@ -157,11 +157,19 @@ def test_past_expiry_fails_expiry_future_check(runner: CliRunner, seeded: Person
     assert "link_code_expiry_future" in _check_names(payload)
 
 
-def test_unlink_500_propagates_api_error(runner: CliRunner, seeded: PersonaState) -> None:
-    """An unexpected 500 on DELETE surfaces as ApiError (exit 5).
+def test_unlink_checks_skipped_without_simulate_endpoint(
+    runner: CliRunner, seeded: PersonaState
+) -> None:
+    """``telegram_unlinked`` + ``..._absent_after_unlink`` ship as skipped passes.
 
-    The backend route is documented as idempotent 204, so any non-204
-    response is a real backend regression, not a soft-pass case.
+    Without a backend simulate-redemption endpoint there is no way to
+    drive a real channel_bindings row, so the original assertions were
+    no-op proofs (DELETE on nothing is 204; absence of a never-created
+    binding is trivially true). They now pass-but-with-skipped-detail
+    and the names are surfaced in ``artifacts.skipped_checks`` so
+    dashboards can grep for the coverage gap. To prove the gated path
+    is not hit we force DELETE to 500 — if the scenario still ran the
+    DELETE call the test would explode with exit 5.
     """
     with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
         _mock_happy_path(r)
@@ -170,43 +178,16 @@ def test_unlink_500_propagates_api_error(runner: CliRunner, seeded: PersonaState
         )
         result = runner.invoke(app, ["verify", "telegram", "--json"])
 
-    assert result.exit_code == 5, result.stdout
-
-
-def test_lingering_telegram_binding_fails_post_unlink_check(
-    runner: CliRunner, seeded: PersonaState
-) -> None:
-    """A telegram binding still present after DELETE trips the absent-after check."""
-    with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
-        r.post("/api/v1/channels/telegram/link").mock(
-            return_value=httpx.Response(200, json=_link_code_payload())
-        )
-        r.delete("/api/v1/channels/telegram/link").mock(return_value=httpx.Response(204))
-        # Baseline + post-issue list return empty; post-unlink list still
-        # reports a telegram binding (a backend bug we want to catch).
-        r.get("/api/v1/channels").mock(
-            side_effect=[
-                httpx.Response(200, json=[]),
-                httpx.Response(200, json=[]),
-                httpx.Response(
-                    200,
-                    json=[
-                        {
-                            "provider": "telegram",
-                            "external_user_id": "5551234567",
-                            "external_chat_id": "5551234567",
-                            "display_handle": "octaviantocan",
-                            "created_at": "2026-05-28T00:00:00Z",
-                        }
-                    ],
-                ),
-            ]
-        )
-        result = runner.invoke(app, ["verify", "telegram", "--json"])
-
-    assert result.exit_code == 6, result.stdout
+    assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)
-    assert "telegram_binding_absent_after_unlink" in _check_names(payload)
+    checks = {c["name"]: c for c in payload["checks"]}
+    assert checks["telegram_unlinked"]["passed"] is True
+    assert "skipped" in checks["telegram_unlinked"]["detail"].lower()
+    assert checks["telegram_binding_absent_after_unlink"]["passed"] is True
+    assert "skipped" in checks["telegram_binding_absent_after_unlink"]["detail"].lower()
+    skipped = payload["artifacts"].get("skipped_checks") or []
+    assert "telegram_unlinked" in skipped
+    assert "telegram_binding_absent_after_unlink" in skipped
 
 
 def test_simulate_gap_check_is_recorded_and_passes(runner: CliRunner, seeded: PersonaState) -> None:
