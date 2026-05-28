@@ -135,12 +135,13 @@ def build_app_server_config(
     if codex_bin:
         cfg["codex_bin"] = str(codex_bin)
     else:
-        # Development convenience: try to auto-discover a built binary from the
-        # vendored Codex submodule (backend/vendor/codex). This lets developers
-        # use the provider without having the published `openai-codex-cli-bin`
-        # wheel installed. Lazy import: `_vendor` mutates sys.path on first
-        # call, and we only want that side-effect on the auth path that
-        # actually needs a discovered binary.
+        # Always discover the codex binary from the submodule build at
+        # backend/vendor/codex/codex-rs/target/release/codex.  We don't
+        # depend on the `openai-codex-cli-bin` PyPI package (no manylinux
+        # wheel), so the SDK's bundled-binary fallback would fail in CI
+        # anyway.  Lazy import: `_vendor` mutates sys.path on first call,
+        # and we only want that side-effect on the auth path that actually
+        # needs a discovered binary.
         from . import _vendor as _codex_vendor  # noqa: PLC0415
 
         discovered = _codex_vendor.discover_vendored_codex_bin()

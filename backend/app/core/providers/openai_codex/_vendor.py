@@ -4,9 +4,14 @@ This module makes `import openai_codex` (and its symbols: Codex, AsyncCodex,
 AppServerConfig, TextInput, ReasoningEffort, etc.) work reliably from inside
 Pawrrtal whether:
 
-- The user has the published wheels installed (`openai-codex` + the
-  platform-specific `openai-codex-cli-bin` that bundles the Rust binary), or
+- The user has the published `openai-codex` wheel installed, or
 - We are developing against the git submodule at backend/vendor/codex.
+
+The Rust `codex` binary is always sourced from the submodule build at
+`backend/vendor/codex/codex-rs/target/release/codex` (built via
+`cargo build --release -p codex-cli --bin codex`).  We deliberately do not
+depend on the `openai-codex-cli-bin` PyPI package because it ships no
+manylinux wheel.
 
 Design:
 - Prefer an already-importable `openai_codex` package (published wheels win).
@@ -83,10 +88,12 @@ def discover_vendored_codex_bin() -> Path | None:
         1. Vendored Cargo target dirs (backend/vendor/codex/codex-rs/target/{release,debug})
         2. (Dev only, opt-in) shutil.which("codex") — gated by
            OPENAI_CODEX_ALLOW_PATH_FALLBACK to prevent silent version skew
-           with a system codex differing from the pinned cli-bin wheel.
+           with a system codex differing from the submodule-built binary.
 
-    Returns None if neither path yields a binary; in production the SDK
-    will then resolve via `codex_cli_bin.bundled_codex_path()`.
+    Returns None if neither path yields a binary; the SDK's
+    `_installed_codex_path()` fallback will then raise a clean
+    FileNotFoundError telling the caller to set `AppServerConfig.codex_bin`
+    explicitly or to build the submodule binary.
     """
     try:
         backend_dir = _vendored_sdk_src_path().parents[3]  # go up from sdk/python/src
@@ -112,8 +119,8 @@ def discover_vendored_codex_bin() -> Path | None:
             logger.warning(
                 "openai_codex: using PATH-resolved codex at %s "
                 "(OPENAI_CODEX_ALLOW_PATH_FALLBACK enabled). "
-                "Production deployments should rely on the pinned "
-                "openai-codex-cli-bin wheel instead.",
+                "Production deployments should rely on the submodule-built "
+                "binary at backend/vendor/codex/codex-rs/target/release/codex.",
                 path_match,
             )
             return Path(path_match)
@@ -191,8 +198,8 @@ def ensure_openai_codex_available() -> None:
         if _OPENAI_CODEX_MODULE is None:
             raise RuntimeError(
                 "openai_codex Python SDK is not available. "
-                "Install the published 'openai-codex' + 'openai-codex-cli-bin' wheels, "
-                "or ensure the backend/vendor/codex submodule is initialized."
+                "Install the published 'openai-codex' wheel, or ensure the "
+                "backend/vendor/codex submodule is initialized."
             )
         return
 
@@ -213,8 +220,9 @@ def ensure_openai_codex_available() -> None:
     # If we reach here, nothing worked.
     raise RuntimeError(
         "openai_codex Python SDK could not be imported. "
-        "Either install the official wheels (openai-codex + platform openai-codex-cli-bin), "
-        "or run `git submodule update --init --recursive` for the vendored copy at backend/vendor/codex."
+        "Either install the official 'openai-codex' wheel, or run "
+        "`git submodule update --init --recursive` for the vendored copy "
+        "at backend/vendor/codex."
     )
 
 

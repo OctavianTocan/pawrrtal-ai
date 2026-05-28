@@ -63,18 +63,18 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     # Dev-only fallback for the vendored Codex Rust binary discovery in
     # ``app.core.providers.openai_codex._vendor``. Off by default so production
-    # always resolves through the pinned ``openai-codex-cli-bin`` wheel — a
-    # system ``codex`` differing in version could silently introduce JSON-RPC
+    # always resolves through the submodule-built binary at
+    # ``backend/vendor/codex/codex-rs/target/release/codex`` — a system
+    # ``codex`` differing in version could silently introduce JSON-RPC
     # schema drift against the pinned SDK. Enable locally only when you have
-    # Homebrew or npm ``@openai/codex`` on PATH but no built submodule and no
-    # cli-bin wheel installed.
+    # Homebrew or npm ``@openai/codex`` on PATH but no built submodule.
     openai_codex_allow_path_fallback: bool = Field(
         default=False,
         description=(
-            "Dev-only fallback: if the openai-codex-cli-bin wheel is not "
-            "installed and the vendored codex Rust binary is not built, "
-            "fall back to PATH-resolved `codex`. Risks silent SDK/binary "
-            "version skew; never enable in production."
+            "Dev-only fallback: if the vendored codex Rust binary at "
+            "backend/vendor/codex/codex-rs/target/release/codex is not "
+            "built, fall back to PATH-resolved `codex`. Risks silent "
+            "SDK/binary version skew; never enable in production."
         ),
     )
     # API key for the OpenCode Go gateway (https://opencode.ai/docs/zen),

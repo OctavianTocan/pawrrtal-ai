@@ -9,11 +9,11 @@ generation — all surfaced through Pawrrtal's standard `AILLM` streaming contra
 
 ## Vendoring & Setup
 
-The SDK is consumed in one of two ways:
-
-- **Production / wheels**: Install `openai-codex` + the platform-specific
-  `openai-codex-cli-bin` package.
-- **Development**: Use the git submodule at `backend/vendor/codex`.
+The SDK Python source is consumed from the git submodule at
+`backend/vendor/codex`. The `codex` Rust binary is built from the same
+submodule — we do **not** depend on the `openai-codex-cli-bin` PyPI
+package because it ships no manylinux wheel (only macOS, Windows, and
+musllinux), which breaks `uv sync` on every glibc x86_64 CI runner.
 
 After cloning:
 
@@ -21,12 +21,17 @@ After cloning:
 git submodule update --init --recursive
 cd backend
 uv sync
+# Build the codex binary (one-time, ~5 min cold; cached afterwards):
+cargo build --release -p codex-cli --bin codex \
+  --manifest-path vendor/codex/codex-rs/Cargo.toml
 # (optional, for richer type information during development)
 cd vendor/codex/sdk/python && uv pip install -e .
 ```
 
-The package automatically prefers installed wheels and falls back to the
-vendored source tree (see `_vendor.py`).
+`_vendor.discover_vendored_codex_bin()` discovers the built binary at
+`backend/vendor/codex/codex-rs/target/release/codex` and threads it
+through `AppServerConfig.codex_bin` so the SDK never needs to call its
+own `codex_cli_bin` fallback.
 
 ## Key Files
 

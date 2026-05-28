@@ -68,6 +68,26 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v7
 
+      - name: Cache codex binary build
+        uses: actions/cache@v4
+        with:
+          path: backend/vendor/codex/codex-rs/target/release/codex
+          key: codex-bin-${{ runner.os }}-${{ hashFiles('.gitmodules', 'backend/vendor/codex/codex-rs/Cargo.lock') }}
+
+      - name: Build codex binary from submodule
+        # Drops the openai-codex-cli-bin PyPI dep (no manylinux wheel) in
+        # favour of the submodule-built binary that ``_vendor.discover_
+        # vendored_codex_bin`` already discovers. Self-hosted runner has
+        # Rust toolchain installed.
+        run: |
+          set -euo pipefail
+          if [ -x backend/vendor/codex/codex-rs/target/release/codex ]; then
+            echo "codex binary already cached; skipping rebuild"
+          else
+            cargo build --release -p codex-cli --bin codex \
+              --manifest-path backend/vendor/codex/codex-rs/Cargo.toml
+          fi
+
       - name: Install backend dependencies
         working-directory: backend
         run: uv sync --frozen

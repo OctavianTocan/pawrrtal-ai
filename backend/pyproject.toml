@@ -41,12 +41,16 @@ dependencies = [
     # path piggybacks on the same install instead of being a separate
     # optional extra.
     "openai>=1.0.0",
-    # OpenAI Codex CLI runtime. Ships the platform-native `codex` binary
-    # required by the openai_codex Python SDK (vendored at
-    # backend/vendor/codex, SDK version 0.131.0a4). Pin must match the
-    # SDK's own pin (sdk/python/pyproject.toml). Bump together when
-    # upstream re-versions the Python SDK.
-    "openai-codex-cli-bin==0.131.0a4",
+    # The Codex CLI binary is built from the submodule at
+    # ``backend/vendor/codex`` (pinned at ``rust-v0.134.0``). The binary
+    # lives at ``backend/vendor/codex/codex-rs/target/release/codex``
+    # and is discovered by ``app.core.providers.openai_codex._vendor``
+    # before the SDK's bundled-binary fallback is consulted. Build with
+    # ``cargo build --release -p codex-cli --bin codex --manifest-path
+    # backend/vendor/codex/codex-rs/Cargo.toml``.  We deliberately don't
+    # depend on the ``openai-codex-cli-bin`` PyPI package because it
+    # ships no manylinux wheel (only macOS, Windows, musllinux), which
+    # breaks ``uv sync`` on every glibc x86_64 CI runner.
     "httpx[http2]>=0.28",
     # ``respx`` is needed at runtime by ``tests/paw`` collection, but pytest
     # collection doesn't activate the dev group. Listing here ensures the
