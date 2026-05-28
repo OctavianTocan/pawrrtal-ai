@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 
 from app.cli.paw import config as paw_config
-from app.cli.paw.commands import mirror as mirror_module
+from app.cli.paw.commands.mirror import runner as mirror_runner
 from app.cli.paw.main import app
 
 
@@ -110,7 +110,7 @@ def test_mirror_no_drift_when_event_counts_match(runner, monkeypatch):
 
 
 def test_mirror_drift_when_final_text_differs(runner, monkeypatch):
-    """Same event counts but divergent final_text -> exit 5."""
+    """Same event counts but divergent final_text -> exit 6 (verification failed)."""
     local_payload = _make_send_payload(final_text="hello", events={"delta": 3, "message": 1})
     upstream_payload = _make_send_payload(
         final_text="hello, world", events={"delta": 3, "message": 1}
@@ -133,14 +133,14 @@ def test_mirror_drift_when_final_text_differs(runner, monkeypatch):
             "--new",
         ],
     )
-    assert result.exit_code == 5, result.stdout
+    assert result.exit_code == 6, result.stdout
     payload_out = json.loads(result.stdout.strip().splitlines()[-1])
     assert payload_out["diff"]["has_drift"] is True
     assert payload_out["diff"]["details"]["final_text_equal"] is False
 
 
 def test_mirror_drift_when_event_counts_differ(runner, monkeypatch):
-    """Diverging per-event-type counts -> exit 5 with per-event delta in details."""
+    """Diverging per-event-type counts -> exit 6 with per-event delta in details."""
     local_payload = _make_send_payload(final_text="same", events={"delta": 5, "tool_call": 1})
     upstream_payload = _make_send_payload(final_text="same", events={"delta": 5, "tool_call": 2})
     procs = {
@@ -161,7 +161,7 @@ def test_mirror_drift_when_event_counts_differ(runner, monkeypatch):
             "--new",
         ],
     )
-    assert result.exit_code == 5, result.stdout
+    assert result.exit_code == 6, result.stdout
     payload_out = json.loads(result.stdout.strip().splitlines()[-1])
     diff_details = payload_out["diff"]["details"]
     assert diff_details["final_text_equal"] is True
@@ -170,8 +170,8 @@ def test_mirror_drift_when_event_counts_differ(runner, monkeypatch):
     }
 
 
-def test_mirror_child_failure_returns_exit_6(runner, monkeypatch):
-    """If either child exits non-zero, mirror exits 6 without diffing."""
+def test_mirror_child_failure_returns_exit_1(runner, monkeypatch):
+    """If either child exits non-zero, mirror exits 1 (local orchestration error)."""
     payload = _make_send_payload(final_text="x", events={"delta": 1})
     procs = {
         "http://127.0.0.1:8000": _FakeProc(returncode=0, stdout=payload, stderr=b""),
@@ -193,7 +193,7 @@ def test_mirror_child_failure_returns_exit_6(runner, monkeypatch):
             "--new",
         ],
     )
-    assert result.exit_code == 6, result.stdout
+    assert result.exit_code == 1, result.stdout
 
 
 def test_mirror_ignore_flag_drops_event_types(runner, monkeypatch):
@@ -247,9 +247,11 @@ def test_mirror_strict_timing_flags_duration_delta(runner, monkeypatch):
     }
     _install_fake_spawns(monkeypatch, procs)
 
-    # Patch _run_side so the upstream child reports a 5s wall-clock and the
-    # local child a 50ms one — well above the 1000ms strict-timing threshold.
-    real_run_side = mirror_module._run_side
+    # Patch runner.run_side so the upstream child reports a 5s wall-clock and
+    # the local child a 50ms one — well above the 1000ms strict-timing
+    # threshold. We must patch on the runner module because run_both_sides
+    # (also in runner) calls run_side via the local name binding.
+    real_run_side = mirror_runner.run_side
 
     async def fake_run_side(label, profile, backend_url, side_dir, wrapped_args):
         result = await real_run_side(label, profile, backend_url, side_dir, wrapped_args)
@@ -259,7 +261,7 @@ def test_mirror_strict_timing_flags_duration_delta(runner, monkeypatch):
             result.duration_ms = 50
         return result
 
-    monkeypatch.setattr(mirror_module, "_run_side", fake_run_side)
+    monkeypatch.setattr(mirror_runner, "run_side", fake_run_side)
 
     result = runner.invoke(
         app,
@@ -275,7 +277,7 @@ def test_mirror_strict_timing_flags_duration_delta(runner, monkeypatch):
             "--new",
         ],
     )
-    assert result.exit_code == 5, result.stdout
+    assert result.exit_code == 6, result.stdout
     payload_out = json.loads(result.stdout.strip().splitlines()[-1])
     assert payload_out["diff"]["details"]["timing_drift"] is True
     assert payload_out["diff"]["details"]["duration_delta_ms"] >= 1000
@@ -309,6 +311,35 @@ def test_mirror_spawns_distinct_backend_urls_and_config_dirs(runner, monkeypatch
     assert len(config_dirs) == 2
     profiles = sorted(c["env"]["PAW_PROFILE"] for c in calls)
     assert profiles == ["paw-mirror-local", "paw-mirror-upstream"]
+
+
+def test_mirror_strips_paw_record_from_child_env(runner, monkeypatch):
+    """``PAW_RECORD`` is removed from every child's env so a mirror nested
+    inside ``paw record`` does not have both sides racing to the same
+    fixture file."""
+    monkeypatch.setenv("PAW_RECORD", "/tmp/some-fixture.jsonl")
+    payload = _make_send_payload(final_text="x", events={"delta": 1})
+    procs = {
+        "http://127.0.0.1:8000": _FakeProc(returncode=0, stdout=payload, stderr=b""),
+        "https://dev.example.com": _FakeProc(returncode=0, stdout=payload, stderr=b""),
+    }
+    calls = _install_fake_spawns(monkeypatch, procs)
+    runner.invoke(
+        app,
+        [
+            "mirror",
+            "--upstream",
+            "https://dev.example.com",
+            "--json",
+            "conversations",
+            "send",
+            "hi",
+            "--new",
+        ],
+    )
+    assert len(calls) == 2
+    for call in calls:
+        assert "PAW_RECORD" not in call["env"], call["env"]
 
 
 def test_mirror_json_output_schema(runner, monkeypatch):
@@ -348,6 +379,55 @@ def test_mirror_json_output_schema(runner, monkeypatch):
     assert set(payload_out["diff"].keys()) == {"mode", "has_drift", "details"}
 
 
+def test_mirror_plain_output_emits_tsv_per_side(runner, monkeypatch):
+    """``--plain`` emits one TSV row per side with label, exit, duration, preview."""
+    payload = _make_send_payload(final_text="hello world", events={"delta": 1})
+    procs = {
+        "http://127.0.0.1:8000": _FakeProc(returncode=0, stdout=payload, stderr=b""),
+        "https://dev.example.com": _FakeProc(returncode=0, stdout=payload, stderr=b""),
+    }
+    _install_fake_spawns(monkeypatch, procs)
+    result = runner.invoke(
+        app,
+        [
+            "mirror",
+            "--upstream",
+            "https://dev.example.com",
+            "--plain",
+            "conversations",
+            "send",
+            "hi",
+            "--new",
+        ],
+    )
+    assert result.exit_code == 0, result.stdout
+    rows = [line.split("\t") for line in result.stdout.strip().splitlines() if line]
+    assert len(rows) == 2
+    labels = sorted(row[0] for row in rows)
+    assert labels == ["local", "upstream"]
+    for row in rows:
+        assert len(row) == 4, row
+        assert row[1] == "0"  # exit_code
+        assert row[3] == "hello world"  # final_text preview
+
+
+def test_mirror_json_and_plain_are_mutually_exclusive(runner):
+    """Passing both --json and --plain is a LocalError (exit 1)."""
+    result = runner.invoke(
+        app,
+        [
+            "mirror",
+            "--upstream",
+            "https://dev.example.com",
+            "--json",
+            "--plain",
+            "auth",
+            "status",
+        ],
+    )
+    assert result.exit_code == 1
+
+
 def test_mirror_falls_back_to_literal_diff_on_non_json_stdout(runner, monkeypatch):
     """Wrapped command without --json -> literal stdout equality diff."""
     procs = {
@@ -361,7 +441,7 @@ def test_mirror_falls_back_to_literal_diff_on_non_json_stdout(runner, monkeypatc
         app,
         ["mirror", "--upstream", "https://dev.example.com", "doctor"],
     )
-    assert result.exit_code == 5, result.stdout
+    assert result.exit_code == 6, result.stdout
     # Human mode: verdict line mentions "literal".
     assert "literal" in result.stdout
 
@@ -508,3 +588,26 @@ def test_mirror_injects_json_flag_into_wrapped_command(runner, monkeypatch):
     for call in calls:
         # argv tail = wrapped command + injected --json.
         assert "--json" in call["args"]
+
+
+def test_mirror_skips_json_injection_for_verbs_without_json(runner, monkeypatch):
+    """Wrapping ``auth login`` must not append ``--json`` — the verb has no
+    such flag and typer would reject the command. The literal-diff path
+    handles non-JSON stdout in that case."""
+    procs = {
+        "http://127.0.0.1:8000": _FakeProc(returncode=0, stdout=b"ok\n", stderr=b""),
+        "https://dev.example.com": _FakeProc(returncode=0, stdout=b"ok\n", stderr=b""),
+    }
+    calls = _install_fake_spawns(monkeypatch, procs)
+    runner.invoke(
+        app,
+        [
+            "mirror",
+            "--upstream",
+            "https://dev.example.com",
+            "auth",
+            "login",
+        ],
+    )
+    for call in calls:
+        assert "--json" not in call["args"], call["args"]
