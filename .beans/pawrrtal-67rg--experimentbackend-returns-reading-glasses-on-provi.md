@@ -1,11 +1,11 @@
 ---
 # pawrrtal-67rg
 title: 'experiment(backend): returns reading-glasses on provider/CRUD/MCP PRs'
-status: in-progress
+status: completed
 type: task
 priority: low
 created_at: 2026-05-28T09:53:47Z
-updated_at: 2026-05-28T10:45:17Z
+updated_at: 2026-05-28T10:45:40Z
 ---
 
 ## Goal

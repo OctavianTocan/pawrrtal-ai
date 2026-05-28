@@ -5,7 +5,7 @@ status: completed
 type: task
 priority: deferred
 created_at: 2026-05-28T09:14:50Z
-updated_at: 2026-05-28T10:25:36Z
+updated_at: 2026-05-28T10:46:23Z
 blocked_by:
     - pawrrtal-ca8v
 ---
@@ -44,3 +44,9 @@ This is now PHASE 3 of a phased experiment. Do NOT start until Phases 0/1/2 (paw
 - `uv run mypy app/core/providers/litellm_provider.py app/core/providers/_errors.py` clean (returns mypy plugin is already enabled globally per `backend/pyproject.toml`).
 - `pytest -k litellm`: 26 passed, 1 skipped (15 new + 11 pre-existing).
 - Full backend suite (excluding Phase 1 sibling-agent in-progress `tests/test_external_mcp_tools.py`): 1923 passed, 1 skipped, 3 xfailed, 7 xpassed.
+
+
+
+## Phase 0 verdict on broader provider expansion (2026-05-28)
+
+The Phase 0 reading-glasses corpus (`docs/superpowers/specs/2026-05-28-returns-phase-0-corpus.md`) walked the 6 un-migrated providers (claude, gemini, gemini_cli, xai, opencode_go, openai_codex). Verdict: **REJECT broader provider expansion.** 6 of 7 use blanket `except Exception` and would only produce the `Result[T, Exception]` anti-pattern the returns-for-pawrrtal skill bans. Only Claude has the multi-branch typed-error shape. Future expansion of returns into providers is gated on those providers first growing typed failure modes — orthogonal to this bean's scope. The litellm pilot shipped here stands as the high-water mark for the provider seam unless that landscape changes.
