@@ -1,11 +1,11 @@
 ---
 # pawrrtal-a3rh
 title: 'feat(paw): paw cost — cost summary + ledger'
-status: todo
+status: completed
 type: feature
 priority: low
 created_at: 2026-05-27T20:08:17Z
-updated_at: 2026-05-27T20:08:17Z
+updated_at: 2026-05-28T00:23:31Z
 parent: pawrrtal-6cnv
 ---
 

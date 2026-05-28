@@ -40,6 +40,7 @@ Every row reflects a shipped subcommand. Source: `backend/app/cli/paw/commands/`
 | models           | `ls` (envelope: `{"models": [...], "etag": "..."}`)            | `/api/v1/models`                         |
 | conversations    | `ls`, `show`, `create`, `send`, `rename`, `delete`, `export`   | `/api/v1/conversations`                  |
 | messages         | `ls`, `get` (by `(conv_id, index)`; no `/messages/{id}` route) | `/api/v1/conversations/{id}/messages`    |
+| cost             | `summary`, `ledger`                                            | `/api/v1/cost`, `/api/v1/cost/ledger`    |
 | api (raw)        | `METHOD PATH`, `openapi`, `ls`                                 | any                                      |
 | record / replay  | `record COMMAND…`, `replay --from FILE`                        | local (respx-backed)                     |
 | verify           | `codex`, `chat-roundtrip`, `model-switch`, `all`               | end-to-end                               |
@@ -180,7 +181,6 @@ v1 shipped (Tasks 0–11) on the `development` branch.
 
 **Deferred to v2** (file as separate beans before implementing):
 
-- `paw cost` — cost summary + ledger
 - `paw audit` — audit events
 - `paw jobs` — scheduled jobs
 - `paw lcm` — LCM list/get + memories + dreaming

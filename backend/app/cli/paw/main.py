@@ -8,6 +8,7 @@ from app.cli.paw.commands import api as api_cmd
 from app.cli.paw.commands import auth as auth_cmd
 from app.cli.paw.commands import channels as channels_cmd
 from app.cli.paw.commands import conversations as conversations_cmd
+from app.cli.paw.commands import cost as cost_cmd
 from app.cli.paw.commands import doctor as doctor_cmd
 from app.cli.paw.commands import login as login_cmd
 from app.cli.paw.commands import mcp as mcp_cmd
@@ -90,6 +91,12 @@ app.add_typer(
     messages_cmd.app,
     name="messages",
     help="Inspect persisted chat messages.",
+)
+
+app.add_typer(
+    cost_cmd.app,
+    name="cost",
+    help="Cost summary + ledger.",
 )
 
 app.add_typer(
