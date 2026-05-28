@@ -53,7 +53,7 @@ jobs:
       (github.event_name != 'pull_request' ||
         github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: [self-hosted, openclaw-mini, pawrrtal]
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6.0.2
@@ -92,14 +92,18 @@ jobs:
       - name: Build codex binary from submodule
         # Drops the openai-codex-cli-bin PyPI dep (no manylinux wheel) in
         # favour of the submodule-built binary that ``_vendor.discover_
-        # vendored_codex_bin`` already discovers.
+        # vendored_codex_bin`` already discovers.  ``--jobs 2`` keeps the
+        # link step under the self-hosted runner's memory budget; the
+        # previous default-parallelism run was killed by OOM during the
+        # codex-tui link.
         run: |
           set -euo pipefail
           if [ -x backend/vendor/codex/codex-rs/target/release/codex ]; then
             echo "codex binary already cached; skipping rebuild"
           else
             cargo build --release -p codex-cli --bin codex \
-              --manifest-path backend/vendor/codex/codex-rs/Cargo.toml
+              --manifest-path backend/vendor/codex/codex-rs/Cargo.toml \
+              --jobs 2
           fi
 
       - name: Install backend dependencies
