@@ -217,3 +217,92 @@ def test_replay_reconstructs_sse_stream_from_fixture(
     assert out["events"]["delta"] == 2
     assert out["events"]["usage"] == 1
     assert out["codex_thread_id"] == "thread-abc"
+
+
+SECOND_SSE_BODY = (
+    b'data: {"type": "delta", "content": "Second"}\n\n'
+    b'data: {"type": "delta", "content": " turn"}\n\n'
+    b'data: {"type": "usage", "input_tokens": 7, "output_tokens": 3}\n\n'
+    b"data: [DONE]\n\n"
+)
+
+
+def test_replay_keeps_per_turn_sse_bodies_distinct(
+    runner: CliRunner,
+    tmp_path: Path,
+    stable_uuid: str,
+) -> None:
+    """Two stream rows against the same URL must replay as two distinct bodies.
+
+    Regression: the original ``_build_sse_bodies`` keyed by URL alone and
+    emitted exactly one body per URL no matter how many ``is_stream=True``
+    HTTP envelopes were captured. The first POST consumed the fused
+    concatenation of every recorded chat turn; subsequent POSTs got an
+    empty body which the framer silently decoded as zero events. This
+    test asserts each invocation now sees its original frames.
+    """
+    del runner, stable_uuid  # not used; helpers don't require them.
+    _seed_persona()
+    fixture = tmp_path / "two_turns.jsonl"
+
+    chat_url = f"{MOCK_BACKEND}/api/v1/chat/"
+    rows: list[dict[str, Any]] = []
+    rows.append(
+        {
+            "type": "http",
+            "method": "POST",
+            "url": chat_url,
+            "status": 200,
+            "response_headers": {"content-type": "text/event-stream"},
+            "response_body": None,
+            "is_stream": True,
+        }
+    )
+    for frame in SSE_BODY.split(b"\n\n"):
+        if not frame.strip():
+            continue
+        rows.append(
+            {
+                "type": "sse",
+                "url": chat_url,
+                "frame_b64": base64.b64encode(frame).decode("ascii"),
+            }
+        )
+    rows.append(
+        {
+            "type": "http",
+            "method": "POST",
+            "url": chat_url,
+            "status": 200,
+            "response_headers": {"content-type": "text/event-stream"},
+            "response_body": None,
+            "is_stream": True,
+        }
+    )
+    for frame in SECOND_SSE_BODY.split(b"\n\n"):
+        if not frame.strip():
+            continue
+        rows.append(
+            {
+                "type": "sse",
+                "url": chat_url,
+                "frame_b64": base64.b64encode(frame).decode("ascii"),
+            }
+        )
+    fixture.write_text("\n".join(json.dumps(row) for row in rows) + "\n")
+
+    from app.cli.paw.commands.replay import _build_sse_bodies, _load_rows
+
+    parsed_rows = _load_rows(fixture)
+    bodies = _build_sse_bodies(parsed_rows)
+    key = ("POST", chat_url)
+    assert len(bodies[key]) == 2, bodies
+    # First body matches turn 1's frames (in particular contains "Hi" not
+    # "Second"); second body matches turn 2's. Without the fix, the
+    # second body would be empty.
+    assert b'"content": "Hi"' in bodies[key][0]
+    assert b'"content": " there"' in bodies[key][0]
+    assert b"Second" not in bodies[key][0]
+    assert b'"content": "Second"' in bodies[key][1]
+    assert b'"content": " turn"' in bodies[key][1]
+    assert b'"content": "Hi"' not in bodies[key][1]

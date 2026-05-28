@@ -100,30 +100,63 @@ def _base_url(url: str) -> str:
     return f"{parsed.scheme}://{parsed.netloc}"
 
 
-def _build_sse_bodies(rows: list[dict[str, Any]]) -> dict[str, list[bytes]]:
-    r"""Collect captured SSE frames into a list of fully-reconstructed bodies per URL.
+def _build_sse_bodies(rows: list[dict[str, Any]]) -> dict[tuple[str, str], list[bytes]]:
+    r"""Collect captured SSE frames into one reconstructed body per stream row.
 
-    When the same streaming endpoint is hit multiple times in a fixture, each
-    HTTP envelope row with ``is_stream=True`` consumes the next body in order
-    — same pattern the non-streaming path already uses for replayed responses.
-    The reconstructed body is the captured frames joined by ``\n\n`` with a
-    trailing delimiter, so the consumer's framer sees identical wire bytes.
+    Keyed by ``(method, url)`` so two methods hitting the same URL don't
+    share bodies. **One body is emitted per ``is_stream=True`` HTTP envelope
+    row** — not one body per URL — so multi-turn fixtures that re-POST the
+    same streaming endpoint (e.g. two ``conversations send`` calls in one
+    recording) replay with distinct per-turn bodies. Without this, every
+    chat turn was keyed by URL alone and the first POST greedily consumed
+    every captured frame while subsequent POSTs got an empty body that the
+    framer silently decoded as zero events.
+
+    The recorder writes the HTTP envelope row first (httpx response hook
+    fires at response start) and then appends one ``type=sse`` row per
+    frame until the stream closes. So the frames that belong to a given
+    envelope are the ``type=sse`` rows between that envelope and the next
+    streaming envelope for the same key (or EOF). The walk below tracks
+    the most-recent stream envelope per ``(method, url)`` and materialises
+    its body when the next envelope for the same key arrives, plus once
+    more at EOF for the final envelope.
     """
-    frames_by_url: dict[str, list[bytes]] = defaultdict(list)
-    bodies: dict[str, list[bytes]] = defaultdict(list)
+    open_body_index: dict[tuple[str, str], int] = {}
+    bodies: dict[tuple[str, str], list[bytes]] = defaultdict(list)
+    frame_buffer: dict[tuple[str, str], list[bytes]] = defaultdict(list)
+
+    def _flush(key: tuple[str, str]) -> None:
+        """Materialize the pending frame buffer into the currently-open body slot."""
+        idx = open_body_index.get(key)
+        if idx is None:
+            return
+        frames = frame_buffer.pop(key, [])
+        body = SSE_FRAME_DELIMITER.join(frames) + SSE_FRAME_DELIMITER if frames else b""
+        bodies[key][idx] = body
+
     for row in rows:
         row_type = row.get("type")
         if row_type == "sse":
+            method = str(row.get("method", "POST")).upper()
             url = str(row["url"])
             frame = base64.b64decode(str(row["frame_b64"]))
-            frames_by_url[url].append(frame)
+            frame_buffer[(method, url)].append(frame)
             continue
         if row_type == "sse_done":
             # Legacy/future terminator marker; reserved for richer replay flows.
             continue
-    for url, frames in frames_by_url.items():
-        body = SSE_FRAME_DELIMITER.join(frames) + SSE_FRAME_DELIMITER if frames else b""
-        bodies[url].append(body)
+        if not row.get("is_stream"):
+            continue
+        method = str(row["method"]).upper()
+        url = str(row["url"])
+        key = (method, url)
+        # The previous open envelope (if any) for this key now collects
+        # no more frames — flush it before reserving a slot for this one.
+        _flush(key)
+        bodies[key].append(b"")
+        open_body_index[key] = len(bodies[key]) - 1
+    for key in list(open_body_index.keys()):
+        _flush(key)
     return bodies
 
 
@@ -140,22 +173,24 @@ def _build_streaming_response(status: int, headers: dict[str, Any], body: bytes)
 def _mount_rows(
     router: respx.MockRouter,
     rows: list[dict[str, Any]],
-    sse_bodies: dict[str, list[bytes]],
+    sse_bodies: dict[tuple[str, str], list[bytes]],
 ) -> None:
     """Group recorded rows by (METHOD, URL) and mount them as respx side effects.
 
     Multiple rows with the same key replay in recorded order so flows that
-    re-poll an endpoint surface different snapshots on each call.
+    re-poll an endpoint surface different snapshots on each call. Streaming
+    rows consume one ``sse_bodies`` entry each — same ``(method, url)`` key
+    used by ``_build_sse_bodies`` — so per-turn bodies stay distinct.
     """
     grouped: dict[tuple[str, str], list[httpx.Response]] = defaultdict(list)
     for row in rows:
-        method = str(row["method"])
+        method = str(row["method"]).upper()
         url = str(row["url"])
         status = int(row["status"])
         headers = row.get("response_headers") or {}
         is_stream = bool(row.get("is_stream"))
         if is_stream:
-            pending = sse_bodies.get(url) or []
+            pending = sse_bodies.get((method, url)) or []
             body = pending.pop(0) if pending else b""
             grouped[(method, url)].append(_build_streaming_response(status, headers, body))
             continue
