@@ -55,11 +55,7 @@ def get_lcm_router() -> APIRouter:
         session: AsyncSession = Depends(get_async_session),
     ) -> LCMContextDebugResponse:
         """Return the assembled LCM context for ``conversation_id``."""
-        # Returns-adoption pilot Phase 2: unwrap the ``Maybe`` at the
-        # route boundary to preserve the 404 contract.
-        conversation = (await crud.get_conversation(user.id, session, conversation_id)).value_or(
-            None
-        )
+        conversation = await crud.get_conversation(user.id, session, conversation_id)
         if conversation is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
 

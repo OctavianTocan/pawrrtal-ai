@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from returns.maybe import Maybe, Nothing, Some
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
@@ -88,14 +87,13 @@ async def create_conversation(
 
 async def get_conversation(
     user_id: uuid.UUID, session: AsyncSession, conversation_id: uuid.UUID
-) -> Maybe[Conversation]:
+) -> Conversation | None:
     """Retrieve a single conversation by ID, scoped to the given user.
 
-    Returns ``Some(Conversation)`` when the row exists and belongs to
-    ``user_id``, otherwise ``Nothing``. Part of the returns-adoption
-    pilot (Phase 2) — the typed container forces callers to handle the
-    "not found / not owned" path explicitly rather than relying on
-    implicit ``None`` truthiness checks.
+    Returns the ``Conversation`` row when it exists and belongs to
+    ``user_id``, otherwise ``None``. Callers handle the ``None`` branch
+    explicitly (a 404 at HTTP boundaries, a friendly fallback in the
+    Telegram surface, etc).
 
     Args:
         user_id: Owner to match against.
@@ -103,7 +101,7 @@ async def get_conversation(
         conversation_id: The conversation to look up.
 
     Returns:
-        ``Some(Conversation)`` if found and owned by ``user_id``, else ``Nothing``.
+        The ``Conversation`` if found and owned by ``user_id``, else ``None``.
     """
     stmt = (
         select(Conversation)
@@ -111,7 +109,7 @@ async def get_conversation(
         .where(Conversation.user_id == user_id)
     )
     result = await session.execute(stmt)
-    return Maybe.from_optional(result.scalar_one_or_none())
+    return result.scalar_one_or_none()
 
 
 async def list_conversations_for_user(
@@ -322,27 +320,24 @@ async def get_conversation_status(
     *,
     conversation_id: uuid.UUID,
     session: AsyncSession,
-) -> Maybe[ConversationStatus]:
+) -> ConversationStatus | None:
     """Return a read-only status snapshot for the given conversation.
 
     Aggregates per-role message counts from ``chat_messages`` and per-turn
-    token totals from ``cost_ledger`` for the conversation. Returns
-    ``Nothing`` when the conversation does not exist; otherwise wraps the
-    snapshot in ``Some``. Returns-adoption pilot Phase 2 — the typed
-    container makes the "row was deleted between resolution and status
-    read" branch explicit at every caller (e.g. the Telegram /status
-    handler renders a gateway-only view in that case).
+    token totals from ``cost_ledger`` for the conversation. Returns ``None``
+    when the conversation does not exist; callers (e.g. the Telegram
+    /status handler) render a gateway-only view in that case.
 
     Args:
         conversation_id: The conversation to snapshot.
         session: Async database session.
 
     Returns:
-        ``Some(ConversationStatus)`` snapshot or ``Nothing`` when not found.
+        ``ConversationStatus`` snapshot or ``None`` when not found.
     """
     conversation = await session.get(Conversation, conversation_id)
     if conversation is None:
-        return Nothing
+        return None
 
     role_counts_stmt = (
         select(ChatMessage.role, func.count(ChatMessage.id))
@@ -362,20 +357,18 @@ async def get_conversation_status(
     ).where(CostLedger.conversation_id == conversation_id)
     total_input, total_output, total_cost = (await session.execute(token_totals_stmt)).one()
 
-    return Some(
-        ConversationStatus(
-            conversation_id=conversation_id,
-            model_id=conversation.model_id,
-            verbose_level=conversation.verbose_level,
-            reasoning_effort=conversation.reasoning_effort,
-            started_at=conversation.created_at,
-            message_count=user_count + assistant_count,
-            user_message_count=user_count,
-            assistant_message_count=assistant_count,
-            total_input_tokens=int(total_input),
-            total_output_tokens=int(total_output),
-            total_cost_usd=float(total_cost),
-        )
+    return ConversationStatus(
+        conversation_id=conversation_id,
+        model_id=conversation.model_id,
+        verbose_level=conversation.verbose_level,
+        reasoning_effort=conversation.reasoning_effort,
+        started_at=conversation.created_at,
+        message_count=user_count + assistant_count,
+        user_message_count=user_count,
+        assistant_message_count=assistant_count,
+        total_input_tokens=int(total_input),
+        total_output_tokens=int(total_output),
+        total_cost_usd=float(total_cost),
     )
 
 
