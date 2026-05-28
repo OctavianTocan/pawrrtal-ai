@@ -82,6 +82,49 @@ def test_every_chunk_respects_max_len() -> None:
     assert all(len(c) <= 200 for c in chunks)
 
 
+def test_chunk_preserves_pre_balance_on_long_block() -> None:
+    """A single ``<pre>`` block longer than ``max_len`` must not leave any
+    chunk with an unbalanced ``<pre>``/``</pre>`` pair.
+
+    Telegram parses each ``sendMessage`` body independently and returns
+    HTTP 400 on an unmatched opening tag — the chunker must close at the
+    boundary and re-open in the next chunk so every chunk renders.
+    """
+    inner = ("line " + ("x" * 30) + "\n") * 200  # ~6.6 KB of code
+    payload = f"<pre>{inner}</pre>"
+    chunks = chunk_html_for_telegram(payload, max_len=1000)
+    assert len(chunks) >= 2
+    for chunk in chunks:
+        assert chunk.count("<pre>") == chunk.count("</pre>"), (
+            "every chunk must have balanced <pre>/</pre> tags"
+        )
+        assert chunk.count("<code>") == chunk.count("</code>"), (
+            "every chunk must have balanced <code>/</code> tags"
+        )
+        assert len(chunk) <= 1000, "rebalance must not exceed max_len"
+
+
+def test_chunk_html_does_not_split_mid_open_tag() -> None:
+    """A long ``<pre>`` near a chunk boundary must not produce a chunk
+    that ends with an unclosed ``<pre>`` opening.
+
+    Constructed so the natural split point lands inside the open ``<pre>``
+    block — the rebalance pass must close+reopen, not pass it through
+    verbatim.
+    """
+    prelude = "prelude\n\n"
+    pre_body = ("code-line-" + ("z" * 20) + "\n") * 60
+    payload = prelude + f"<pre>{pre_body}</pre>" + "\n\ntail"
+    chunks = chunk_html_for_telegram(payload, max_len=600)
+    assert len(chunks) >= 2
+    for chunk in chunks:
+        # Balanced tag count is the load-bearing assertion — Telegram only
+        # cares that every chunk parses as valid HTML.
+        assert chunk.count("<pre>") == chunk.count("</pre>")
+        assert chunk.count("<code>") == chunk.count("</code>")
+        assert len(chunk) <= 600
+
+
 def test_default_max_len_matches_telegram_limit() -> None:
     """Default applies Telegram's documented 4096 ``sendMessage`` cap."""
     # Input below the limit short-circuits; build one just above it to

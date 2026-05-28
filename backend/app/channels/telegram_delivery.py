@@ -25,6 +25,74 @@ logger = logging.getLogger(__name__)
 MAX_MESSAGE_LEN = 4096
 
 
+_BALANCED_TAGS: tuple[str, ...] = ("pre", "code")
+
+# Minimum chunks where boundary rebalancing applies. A single chunk has
+# no boundary so the helper short-circuits.
+_MIN_REBALANCE_CHUNKS = 2
+
+
+def _count_open_tags(chunk: str, tag: str) -> int:
+    """Return the net count of ``<tag>`` openings not closed inside ``chunk``.
+
+    A negative result is clamped to zero: an unmatched ``</tag>`` would
+    mean the chunk's opening lives in a previous chunk, which we already
+    handled by re-opening at the boundary. The simple lowercase scan is
+    sufficient because :func:`md_to_telegram_html` only ever emits
+    lowercase tags without attributes for ``<pre>``/``<code>``.
+    """
+    open_marker = f"<{tag}>"
+    close_marker = f"</{tag}>"
+    return max(0, chunk.count(open_marker) - chunk.count(close_marker))
+
+
+def _rebalance_chunks(chunks: list[str], *, max_len: int) -> list[str]:
+    """Close any open ``<pre>``/``<code>`` tag at a chunk boundary and re-open it.
+
+    Telegram parses each ``sendMessage`` HTML body independently — an
+    unbalanced ``<pre>`` opening in chunk N (closed in chunk N+1) returns
+    HTTP 400. The closing/reopening fix-up preserves rendering: the user
+    sees two adjacent code blocks at the chunk seam, which is visually
+    close to the original single block and *delivers* (the previous
+    behaviour silently dropped 6KB code blocks entirely).
+
+    To keep chunks within ``max_len`` after appending ``</pre>``/``</code>``,
+    we trim the chunk's tail by the number of characters we're about to
+    add. The tail goes back to the next chunk so nothing is lost.
+    """
+    if len(chunks) < _MIN_REBALANCE_CHUNKS:
+        return chunks
+    rebalanced: list[str] = []
+    carry_open: list[str] = []  # tags we re-opened in a previous boundary
+    for index, chunk in enumerate(chunks):
+        prefix = "".join(f"<{tag}>" for tag in carry_open)
+        body = prefix + chunk
+        carry_open = []
+        if index == len(chunks) - 1:
+            rebalanced.append(body)
+            continue
+        # Compute the suffix we need to keep tags balanced.
+        suffix_parts: list[str] = []
+        for tag in _BALANCED_TAGS:
+            if _count_open_tags(body, tag) > 0:
+                suffix_parts.append(f"</{tag}>")
+                carry_open.append(tag)
+        suffix = "".join(suffix_parts)
+        if not suffix:
+            rebalanced.append(body)
+            continue
+        # Trim the body so ``body + suffix`` still fits ``max_len``. The
+        # trimmed tail is prepended to the next chunk (after its carried
+        # opening tags) so no content is lost.
+        budget = max_len - len(suffix)
+        if len(body) > budget:
+            overflow = body[budget:]
+            body = body[:budget]
+            chunks[index + 1] = overflow + chunks[index + 1]
+        rebalanced.append(body + suffix)
+    return rebalanced
+
+
 def chunk_html_for_telegram(html: str, *, max_len: int = MAX_MESSAGE_LEN) -> list[str]:
     """Split a Telegram-HTML string into chunks that each fit the API limit.
 
@@ -38,13 +106,15 @@ def chunk_html_for_telegram(html: str, *, max_len: int = MAX_MESSAGE_LEN) -> lis
 
     Splitting is conservative: we prefer a blank-line boundary, fall
     back to a single newline, and only resort to a hard character
-    boundary when neither exists in the window. We never split inside
-    a ``<pre>`` block — Telegram closes the tag at the message edge
-    and the chunk would render as a broken code block. The simple
-    heuristic for this PR keeps the splitter pure and dependency-free;
-    a smarter tag-balancing pass can land later if a real-world case
-    shows tag corruption (the dominant production traffic is
-    paragraph-separated narrative text).
+    boundary when neither exists in the window.
+
+    A ``<pre>`` or ``<code>`` block longer than ``max_len`` would
+    naturally split mid-tag, which Telegram rejects with HTTP 400. When
+    the splitter ends a chunk while a ``<pre>``/``<code>`` is still
+    open, we close it at the chunk's edge and re-open the same tag at
+    the start of the next chunk (a "close+reopen" boundary). The user
+    sees two adjacent code blocks at the seam — visually close to the
+    original single block, and crucially the message *delivers*.
 
     Args:
         html: Already-rendered Telegram HTML.
@@ -74,15 +144,15 @@ def chunk_html_for_telegram(html: str, *, max_len: int = MAX_MESSAGE_LEN) -> lis
             sep_len = 1
         if cut == -1:
             # No newline in the window — hard-cut at the boundary. The
-            # resulting chunk may end mid-tag in pathological cases;
-            # see the docstring note above.
+            # close+reopen pass below repairs any tag straddling this
+            # cut so Telegram still accepts both chunks.
             cut = max_len
             sep_len = 0
         chunks.append(remaining[:cut])
         remaining = remaining[cut + sep_len :]
     if remaining:
         chunks.append(remaining)
-    return chunks
+    return _rebalance_chunks(chunks, max_len=max_len)
 
 
 def _aiogram_errors() -> tuple[type[BaseException], ...]:
