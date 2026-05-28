@@ -482,3 +482,18 @@ async def compact_leaf_if_needed(
         max_chunk_tokens=max_chunk_tokens,
     )
     return True
+
+
+# Re-export the background scheduler at package level so callers can do
+# ``from app.core.lcm import schedule_lcm_compaction`` without reaching
+# into ``app.core.lcm.background``. The import sits at the bottom of the
+# module so ``background.py``'s own ``from app.core.lcm import
+# compact_leaf_if_needed`` succeeds (that symbol is defined above).
+from app.core.lcm.background import schedule_lcm_compaction  # noqa: E402
+
+__all__ = [
+    "assemble_context",
+    "compact_leaf_if_needed",
+    "ingest_message",
+    "schedule_lcm_compaction",
+]

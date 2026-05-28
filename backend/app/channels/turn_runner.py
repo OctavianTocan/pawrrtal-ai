@@ -13,9 +13,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from sqlalchemy import exc as sa_exc
 from sqlalchemy import select, update
-from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.channels._turn_cost import record_turn_cost_if_enabled
 from app.channels._turn_runtime_context import system_prompt_for_turn
@@ -23,9 +22,15 @@ from app.channels._turn_workspace import workspace_system_prompt
 from app.core.chat_aggregator import ChatTurnAggregator, should_emit_event
 from app.core.config import settings
 from app.core.event_bus import TurnCompletedEvent, publish_if_available
-from app.core.lcm import assemble_context as lcm_assemble_context
-from app.core.lcm import ingest_message as lcm_ingest_message
-from app.core.lcm.background import schedule_lcm_compaction
+from app.core.lcm import (
+    assemble_context as lcm_assemble_context,
+)
+from app.core.lcm import (
+    ingest_message as lcm_ingest_message,
+)
+from app.core.lcm import (
+    schedule_lcm_compaction,
+)
 from app.core.observability import (
     TurnSpanRecorder,
     aggregator_stop_reason,
@@ -98,6 +103,8 @@ async def await_pending_codex_persist_tasks(
 
 
 if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
     from app.channels.base import Channel, ChannelMessage
     from app.core.agent_loop.types import AgentTool, PermissionCheckFn
     from app.core.providers.base import AILLM, ReasoningEffort, StreamEvent
@@ -615,7 +622,7 @@ async def _finalize_turn(
                 **snapshot,
             )
             await session.commit()
-    except SQLAlchemyError:
+    except sa_exc.SQLAlchemyError:
         # Broad ``SQLAlchemyError`` (not bare ``Exception``) covers the full
         # set of SQLAlchemy failure modes that can reach this finalize path:
         # ``OperationalError``/``IntegrityError`` (the original narrow set)
@@ -651,7 +658,7 @@ async def _finalize_turn(
                 log_tag=turn_input.log_tag,
             )
             await session.commit()
-    except SQLAlchemyError:
+    except sa_exc.SQLAlchemyError:
         # See the matching except above: narrow ``OperationalError`` /
         # ``IntegrityError`` skips ``PendingRollbackError`` and friends,
         # which would propagate into the streaming generator and break
@@ -740,7 +747,7 @@ async def persist_codex_thread_id(conversation_id: uuid.UUID, thread_id: str) ->
                 thread_id,
                 conversation_id,
             )
-    except (OperationalError, IntegrityError):
+    except (sa_exc.OperationalError, sa_exc.IntegrityError):
         logger.exception("codex: failed to persist thread_id for conversation %s", conversation_id)
 
 
@@ -753,6 +760,6 @@ async def load_codex_thread_id(conversation_id: uuid.UUID) -> str | None:
             )
             row = result.first()
             return row[0] if row else None
-    except OperationalError:
+    except sa_exc.OperationalError:
         logger.exception("codex: failed to load thread_id for conversation %s", conversation_id)
         return None

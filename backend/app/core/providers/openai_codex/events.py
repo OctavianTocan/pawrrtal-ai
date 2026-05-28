@@ -64,6 +64,26 @@ def _sdk(name: str) -> Any:
     return _sdk_types[name]
 
 
+def _handle_item_completed(item: Any) -> Iterator[StreamEvent]:
+    """Translate an ItemCompletedNotification's inner item into stream events.
+
+    Split out of ``map_codex_notification_to_stream_events`` so the parent
+    mapper stays under sentrux's max cyclomatic complexity budget (30).
+    Image generation is the only branch that currently emits an event;
+    other item kinds (command results, file changes, tool call results)
+    have already had their incremental content carried by the deltas.
+    """
+    inner = getattr(item, "root", item)
+
+    if getattr(inner, "type", None) == "image_generation" or "ImageGeneration" in str(type(inner)):
+        yield {
+            "type": "artifact",
+            "kind": "image",
+            "data": getattr(inner, "result", None) or inner,
+            "provider": "openai_codex",
+        }
+
+
 def map_codex_notification_to_stream_events(  # noqa: C901, PLR0911, PLR0912
     notification: Any,
 ) -> Iterator[StreamEvent]:
@@ -136,30 +156,13 @@ def map_codex_notification_to_stream_events(  # noqa: C901, PLR0911, PLR0912
         yield {"type": "done"}
         return
 
-    # Item completion can carry final artifacts (images, etc.) or tool results
+    # Item completion can carry final artifacts (images, etc.) or tool results.
+    # The inner-branch logic lives in ``_handle_item_completed`` so this
+    # dispatcher stays under sentrux's cyclomatic budget; the helper keeps the
+    # 1:1 SDK-type → StreamEvent mapping that makes this file grep-friendly.
     ItemCompletedT = _sdk("ItemCompletedNotification")  # noqa: N806
     if ItemCompletedT and isinstance(payload, ItemCompletedT):
-        item = payload.item
-        # ThreadItem is a RootModel union — we inspect the inner type
-        inner = getattr(item, "root", item)
-
-        # Image generation (critical for the image-gen plugin path)
-        if getattr(inner, "type", None) == "image_generation" or "ImageGeneration" in str(
-            type(inner)
-        ):
-            # The exact shape of the image result lives inside the item.
-            # For v1 we emit a generic artifact and let downstream code extract.
-            yield {
-                "type": "artifact",
-                "kind": "image",
-                "data": getattr(inner, "result", None) or inner,
-                "provider": "openai_codex",
-            }
-            return
-
-        # Future: command execution results, file changes, tool call results, etc.
-        # For now we ignore non-text, non-image item completions (the deltas
-        # already carried the incremental content).
+        yield from _handle_item_completed(payload.item)
         return
 
     # ------------------------------------------------------------------
