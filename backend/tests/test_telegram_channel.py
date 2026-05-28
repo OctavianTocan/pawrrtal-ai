@@ -19,6 +19,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from returns.maybe import Some
 
 from app.channels import registered_surfaces, resolve_channel
 from app.channels.base import ChannelMessage
@@ -1544,8 +1545,12 @@ class TestHandleStatusCommand:
                 new=AsyncMock(return_value=fake_conv),
             ),
             patch(
+                # Phase 2: ``get_conversation_status`` returns
+                # ``Maybe[ConversationStatus]``; the handler unwraps
+                # via ``.value_or(None)`` so the mock must wrap the
+                # fixture in ``Some``.
                 "app.integrations.telegram.status.get_conversation_status",
-                new=AsyncMock(return_value=fake_status),
+                new=AsyncMock(return_value=Some(fake_status)),
             ),
         ):
             reply = await handle_status_command(

@@ -7,9 +7,9 @@ on the existing ``lcm_context_items`` table.
 
 Access is gated on the same per-user conversation-ownership check the
 rest of the API uses (``crud.conversation.get_conversation`` returns
-``None`` when the conversation belongs to another user), so the panel
-cannot leak history across users even if the caller fabricates a
-conversation UUID.
+``Nothing`` when the conversation belongs to another user), so the
+panel cannot leak history across users even if the caller fabricates
+a conversation UUID.
 """
 
 from __future__ import annotations
@@ -55,7 +55,11 @@ def get_lcm_router() -> APIRouter:
         session: AsyncSession = Depends(get_async_session),
     ) -> LCMContextDebugResponse:
         """Return the assembled LCM context for ``conversation_id``."""
-        conversation = await crud.get_conversation(user.id, session, conversation_id)
+        # Returns-adoption pilot Phase 2: unwrap the ``Maybe`` at the
+        # route boundary to preserve the 404 contract.
+        conversation = (await crud.get_conversation(user.id, session, conversation_id)).value_or(
+            None
+        )
         if conversation is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
 

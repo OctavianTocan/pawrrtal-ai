@@ -319,7 +319,12 @@ async def handle_status_command(
         session=session,
         thread_id=sender.thread_id,
     )
-    status = await get_conversation_status(conversation_id=conversation.id, session=session)
+    # Returns-adoption pilot Phase 2: ``get_conversation_status`` now
+    # returns ``Maybe[ConversationStatus]``. Unwrap at the integration
+    # boundary so the rendering helper still sees a concrete status.
+    status = (
+        await get_conversation_status(conversation_id=conversation.id, session=session)
+    ).value_or(None)
     if status is None:
         # The row was deleted between resolution and status read — extremely
         # unlikely but render the gateway-only view rather than crashing.

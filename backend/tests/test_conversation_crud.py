@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 import pytest
+from returns.maybe import Nothing, Some
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -15,6 +16,7 @@ from app.crud.conversation import (
     create_conversation,
     delete_conversation,
     get_conversation,
+    get_conversation_status,
     list_conversations_for_user,
     update_conversation,
     update_conversation_model,
@@ -117,14 +119,44 @@ async def test_create_conversation_rejects_cross_user_uuid_collision(
 
 @pytest.mark.anyio
 async def test_get_conversation_scopes_to_owner(db_session: AsyncSession, test_user: User) -> None:
-    """Conversation lookup returns None for the wrong owner."""
+    """Conversation lookup returns ``Nothing`` for the wrong owner.
+
+    Returns-adoption pilot Phase 2: ``get_conversation`` returns
+    ``Maybe[Conversation]``. Cross-user access surfaces as ``Nothing``
+    so the route boundary can translate to a 404 without leaking
+    existence.
+    """
     conversation = await create_conversation(
         test_user.id,
         db_session,
         ConversationCreate(title="Owned"),
     )
 
-    assert await get_conversation(uuid4(), db_session, conversation.id) is None
+    assert await get_conversation(uuid4(), db_session, conversation.id) is Nothing
+
+
+@pytest.mark.anyio
+async def test_get_conversation_returns_some_for_owner(
+    db_session: AsyncSession, test_user: User
+) -> None:
+    """``get_conversation`` returns ``Some(row)`` when the owner matches.
+
+    Pairs with ``test_get_conversation_scopes_to_owner`` to cover both
+    branches of the Phase 2 ``Maybe[Conversation]`` migration. The
+    test inspects the container directly (rather than unwrapping)
+    so a regression that flips back to ``Optional[Conversation]``
+    fails loudly here instead of silently at call sites.
+    """
+    conversation = await create_conversation(
+        test_user.id,
+        db_session,
+        ConversationCreate(title="Owned"),
+    )
+
+    result = await get_conversation(test_user.id, db_session, conversation.id)
+
+    assert result == Some(conversation)
+    assert result.unwrap().id == conversation.id
 
 
 @pytest.mark.anyio
@@ -226,7 +258,8 @@ async def test_delete_conversation_removes_owned_row(
     deleted = await delete_conversation(test_user.id, db_session, conversation.id)
 
     assert deleted is True
-    assert await get_conversation(test_user.id, db_session, conversation.id) is None
+    # Phase 2: deleted row → ``Nothing`` instead of ``None``.
+    assert await get_conversation(test_user.id, db_session, conversation.id) is Nothing
 
 
 @pytest.mark.anyio
@@ -420,3 +453,51 @@ async def test_apply_model_switch_persists_after_session_refresh(
     await db_session.refresh(conv)
     assert conv.model_id == new_model
     assert conv.reasoning_effort == "low"  # claude-opus honours low
+
+
+# ---------------------------------------------------------------------------
+# get_conversation_status — Maybe[ConversationStatus] (returns-adoption Phase 2)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_get_conversation_status_returns_nothing_for_unknown_id(
+    db_session: AsyncSession,
+) -> None:
+    """Unknown conversation ID surfaces as ``Nothing``.
+
+    Phase 2 contract: callers (Telegram /status handler) rely on
+    ``Nothing`` to render the gateway-only fallback instead of
+    crashing.
+    """
+    result = await get_conversation_status(
+        conversation_id=uuid4(),
+        session=db_session,
+    )
+
+    assert result is Nothing
+
+
+@pytest.mark.anyio
+async def test_get_conversation_status_returns_some_for_existing_row(
+    db_session: AsyncSession, test_user: User
+) -> None:
+    """An existing conversation yields ``Some(ConversationStatus)``.
+
+    Asserts that the container shape carries through; specific
+    aggregate counts are exercised by the dedicated status tests.
+    """
+    conversation = await create_conversation(
+        test_user.id,
+        db_session,
+        ConversationCreate(title="Status"),
+    )
+
+    result = await get_conversation_status(
+        conversation_id=conversation.id,
+        session=db_session,
+    )
+
+    unwrapped = result.unwrap()
+    assert unwrapped.conversation_id == conversation.id
+    assert unwrapped.message_count == 0

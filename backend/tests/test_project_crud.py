@@ -120,7 +120,9 @@ async def test_delete_project_removes_project_row(
     gone = await get_project(test_user.id, db_session, project.id)
     assert gone is None
 
-    survivor = await get_conversation(test_user.id, db_session, conversation.id)
+    # Phase 2: ``get_conversation`` returns ``Maybe[Conversation]``;
+    # unwrap to assert the surviving row stayed intact.
+    survivor = (await get_conversation(test_user.id, db_session, conversation.id)).value_or(None)
     assert survivor is not None
 
 
@@ -152,7 +154,7 @@ async def test_assign_then_unassign_conversation_to_project(
         conversation.id,
         db_session,
     )
-    attached = await get_conversation(test_user.id, db_session, conversation.id)
+    attached = (await get_conversation(test_user.id, db_session, conversation.id)).value_or(None)
     assert attached is not None
     assert attached.project_id == project.id
 
@@ -163,6 +165,6 @@ async def test_assign_then_unassign_conversation_to_project(
         conversation.id,
         db_session,
     )
-    detached = await get_conversation(test_user.id, db_session, conversation.id)
+    detached = (await get_conversation(test_user.id, db_session, conversation.id)).value_or(None)
     assert detached is not None
     assert detached.project_id is None

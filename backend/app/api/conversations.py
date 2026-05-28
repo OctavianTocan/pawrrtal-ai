@@ -92,8 +92,13 @@ def get_conversations_router() -> APIRouter:  # noqa: C901 — FastAPI router bu
         state (thinking, tool calls, timeline, duration), so a hard reload
         rehydrates the chat exactly as the user last saw it.
         """
-        conversation = await crud.get_conversation(user.id, session, conversation_id)
-        if not conversation:
+        # Returns-adoption pilot Phase 2: ``crud.get_conversation``
+        # returns ``Maybe[Conversation]``. Unwrap at the route
+        # boundary to keep the existing 404 contract intact.
+        conversation = (await crud.get_conversation(user.id, session, conversation_id)).value_or(
+            None
+        )
+        if conversation is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
 
         rows = await get_messages_for_conversation(session, conversation_id)
@@ -106,9 +111,12 @@ def get_conversations_router() -> APIRouter:  # noqa: C901 — FastAPI router bu
         session: AsyncSession = Depends(get_async_session),
     ) -> ConversationRead | None:
         """Return metadata for a single conversation."""
-        conversation: Conversation | None = await crud.get_conversation(
-            user.id, session, conversation_id
-        )
+        # Returns-adoption pilot Phase 2: unwrap the ``Maybe`` at the
+        # route boundary; preserves the existing ``ConversationRead | None``
+        # serializer contract.
+        conversation: Conversation | None = (
+            await crud.get_conversation(user.id, session, conversation_id)
+        ).value_or(None)
         if conversation:
             return ConversationRead(
                 title=conversation.title,

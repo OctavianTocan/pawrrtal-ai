@@ -56,11 +56,15 @@ def get_exports_router() -> APIRouter:
         conversations; anything else returns 404 (not 403, so we
         don't leak existence).
         """
-        conversation = await get_conversation(
-            user_id=user.id,
-            session=session,
-            conversation_id=conversation_id,
-        )
+        # Returns-adoption pilot Phase 2: unwrap the ``Maybe`` at the
+        # route boundary to preserve the 404 contract.
+        conversation = (
+            await get_conversation(
+                user_id=user.id,
+                session=session,
+                conversation_id=conversation_id,
+            )
+        ).value_or(None)
         if conversation is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
 

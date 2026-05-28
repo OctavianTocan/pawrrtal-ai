@@ -251,7 +251,14 @@ def get_chat_router() -> APIRouter:
             len(request.question),
         )
 
-        conversation = await get_conversation(user.id, session, request.conversation_id)
+        # Returns-adoption pilot Phase 2: ``get_conversation`` returns
+        # ``Maybe[Conversation]``. ``.value_or(None)`` unwraps for the
+        # final HTTPException translation — the only acceptable
+        # unwrap site is here at the route boundary (per the
+        # returns-for-pawrrtal skill).
+        conversation = (await get_conversation(user.id, session, request.conversation_id)).value_or(
+            None
+        )
         if conversation is None:
             logger.warning(
                 "CHAT_404 rid=%s user_id=%s conversation_id=%s",
