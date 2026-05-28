@@ -74,11 +74,25 @@ jobs:
           path: backend/vendor/codex/codex-rs/target/release/codex
           key: codex-bin-${{ runner.os }}-${{ hashFiles('.gitmodules', 'backend/vendor/codex/codex-rs/Cargo.lock') }}
 
+      - name: Ensure Rust toolchain on PATH
+        # The self-hosted runner has rustup installed under
+        # ~/.cargo, but PATH isn't always populated for non-login
+        # shells. Add it explicitly so the cargo build step works.
+        run: |
+          if ! command -v cargo >/dev/null 2>&1; then
+            if [ -x "$HOME/.cargo/bin/cargo" ]; then
+              echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            else
+              curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+                sh -s -- -y --default-toolchain stable --profile minimal
+              echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+            fi
+          fi
+
       - name: Build codex binary from submodule
         # Drops the openai-codex-cli-bin PyPI dep (no manylinux wheel) in
         # favour of the submodule-built binary that ``_vendor.discover_
-        # vendored_codex_bin`` already discovers. Self-hosted runner has
-        # Rust toolchain installed.
+        # vendored_codex_bin`` already discovers.
         run: |
           set -euo pipefail
           if [ -x backend/vendor/codex/codex-rs/target/release/codex ]; then
