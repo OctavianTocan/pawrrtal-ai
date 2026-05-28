@@ -61,14 +61,12 @@ log = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
-# Typed failure model (returns Phase 1 — see
-# ``docs/superpowers/specs/2026-05-28-returns-adoption-grilling.md``).
+# Typed failure model.
 #
-# A discriminated union of ``@dataclass`` failures lets the caller match on
-# ``kind`` and react differently per failure mode, while ``returns``'
-# ``IOResult`` keeps the I/O failure in the type signature. We preserve the
-# original exception on every variant via ``__cause__``-style ``cause``
-# attribute so debuggability is not regressed at the unwrap site.
+# A discriminated union of ``@dataclass`` failures lets the renderer match on
+# ``kind`` and produce a tailored error string per failure mode. The
+# original exception is preserved via the ``cause``-style ``message``
+# attribute so debuggability is not regressed at the rendering site.
 # ---------------------------------------------------------------------------
 
 
@@ -328,6 +326,14 @@ async def call_external_mcp_tool(
         arguments: JSON-serialisable arguments forwarded to the remote
             server.
     """
+    # ``err`` carries the typed failure shape across the except-arm
+    # boundary so the final ``_render_mcp_error`` call has something to
+    # render even if a future caller widens the catch tuple. Initialising
+    # to ``None`` + asserting before the render call lets static analysis
+    # see the variable is always bound on the rendering path and
+    # propagates unclassified exceptions (e.g. ``OSError`` outside the
+    # httpx hierarchy) without an ``UnboundLocalError`` masquerade.
+    err: McpError | None = None
     try:
         return await _call_remote_tool(
             url=url,
@@ -348,6 +354,8 @@ async def call_external_mcp_tool(
         err = McpTimeoutError(message=str(exc))
     except json.JSONDecodeError as exc:
         err = McpProtocolError(message=f"malformed JSON response: {exc}")
+    if err is None:  # pragma: no cover — defensive; every except arm above binds err
+        raise AssertionError("call_external_mcp_tool reached render path without binding err")
     return _render_mcp_error(server_name=server_name, tool_name=tool_name, err=err)
 
 

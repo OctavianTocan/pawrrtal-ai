@@ -1,11 +1,10 @@
 """Tests for the external MCP server bridge (#317).
 
-Phase-1 of the ``dry-python/returns`` adoption pilot landed an
-``IOResult[str, McpError]`` typed surface in
-:func:`app.core.tools.external_mcp.call_external_mcp_tool`. The tests
-in :func:`_phase1_*` exercise that surface directly, plus the
-caller-level closure that bridges it back to the legacy ``str``
-contract the agent loop consumes.
+:func:`app.core.tools.external_mcp.call_external_mcp_tool` returns the
+rendered tool-output string directly — on success the payload, on
+failure the legacy ``[io_error] …`` envelope the agent loop already
+expects. These tests assert the rendered surface end-to-end across the
+closed-set MCP failure modes (timeout, auth, server, protocol).
 """
 
 from __future__ import annotations

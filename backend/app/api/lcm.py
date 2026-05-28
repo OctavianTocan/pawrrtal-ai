@@ -7,9 +7,9 @@ on the existing ``lcm_context_items`` table.
 
 Access is gated on the same per-user conversation-ownership check the
 rest of the API uses (``crud.conversation.get_conversation`` returns
-``Nothing`` when the conversation belongs to another user), so the
-panel cannot leak history across users even if the caller fabricates
-a conversation UUID.
+``None`` when the conversation is missing or belongs to another user),
+so the panel cannot leak history across users even if the caller
+fabricates a conversation UUID.
 """
 
 from __future__ import annotations

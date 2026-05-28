@@ -6,10 +6,12 @@ inside :func:`collect_attachments`:
 
 * **photo** → base64 image entry, forwarded multimodally to providers
   that support it via :class:`ChatTurnInput.images`.
-* **voice / audio** → transcribed via the configured backend (Mistral,
-  OpenAI, local whisper.cpp). Failed or unconfigured transcription
-  falls back to a bounded ``[User sent a voice message ...]``
-  annotation so the agent at least knows what happened.
+* **voice / audio** → metadata-only annotation. Transcription was
+  removed during the backend restructure (spec §10), so the agent
+  sees ``[User sent a voice message (Ns).]`` / ``[User sent an audio
+  file: title (Ns).]`` and can ask the user to retype the relevant
+  bits. Re-introduce a single transcription backend later if voice
+  becomes load-bearing.
 * **document** → converted to bounded Markdown via markitdown when the
   payload is under :data:`_MAX_FILE_BYTES`. Oversized or unsupported
   documents fall back to a metadata-only annotation.

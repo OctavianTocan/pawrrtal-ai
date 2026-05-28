@@ -213,7 +213,10 @@ _LITELLM_REASONING_EFFORT: dict[str, str] = {
 #
 # This is *additive*. Production today routes through
 # :class:`LiteLLMLLM` → :func:`make_litellm_stream_fn` and is
-# unchanged; nothing currently calls ``open_litellm_stream``.
+# unchanged; no production caller invokes ``open_litellm_stream`` yet,
+# but the test suite (``tests/test_litellm_provider.py``) pins the
+# closed-set classifier behaviour so a future migration has the seam
+# already covered.
 # ---------------------------------------------------------------------------
 
 

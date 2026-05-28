@@ -19,7 +19,7 @@ from app.core.keys import resolve_api_key
 from app.core.plugins.types import PreTurnHookContext
 from app.core.providers._errors import ProviderError
 from app.core.providers.factory import resolve_llm
-from app.core.tools.exceptions import ToolError
+from app.core.tools.errors import ToolError
 from app.core.tools.lcm_grep_agent import make_lcm_grep_tool
 from app.core.tools.lcm_search_agent import make_lcm_search_tool
 from app.core.tools.workspace_files import make_list_dir_tool, make_read_file_tool

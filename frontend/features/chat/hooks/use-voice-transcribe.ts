@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthedFetch } from '@/hooks/use-authed-fetch';
-import { API_ENDPOINTS } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { attachVoiceAnalyserMeter, detachVoiceAnalyserMeter } from './voice-analyser-meter';
 
@@ -61,44 +60,29 @@ function pickRecorderMimeType(): string {
 	return '';
 }
 
-/**
- * Builds the multipart/form-data body sent to the STT proxy.
- *
- * The xAI endpoint requires `file` to be the LAST field — `FormData.append`
- * preserves insertion order, so the body construction is sequential here.
- */
-function buildSttFormData(audio: Blob, mimeType: string): FormData {
-	const formData = new FormData();
-	formData.append('language', 'en');
-	formData.append('format', 'true');
-	const extension = mimeType.includes('mp4') ? 'mp4' : 'webm';
-	formData.append('file', audio, `voice-note.${extension}`);
-	return formData;
-}
-
 type AuthedFetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 /**
- * POSTs captured audio to the STT proxy and returns trimmed transcript text,
- * or an error message when the network/parse path fails.
+ * Voice transcription is disabled on this deployment.
+ *
+ * The backend STT route + the 4-backend transcriber abstraction
+ * (``backend/app/api/stt.py``, ``backend/app/integrations/voice/``) were
+ * removed during the backend restructure. This helper now returns a clear
+ * "not available" message instead of POSTing to a 404 endpoint and
+ * silently failing. The composer UI and the recorder state machine are
+ * unchanged so re-introducing a single backend later is a one-line flip
+ * back to the network call.
  */
 async function requestVoiceTranscription(
-	fetcher: AuthedFetchLike,
-	audio: Blob,
-	mimeType: string
+	_fetcher: AuthedFetchLike,
+	_audio: Blob,
+	_mimeType: string
 ): Promise<{ transcript: string | null; errorMessage: string | null }> {
-	try {
-		const response = await fetcher(API_ENDPOINTS.stt.transcribe, {
-			method: 'POST',
-			body: buildSttFormData(audio, mimeType),
-		});
-		const payload = (await response.json()) as { text?: string };
-		const transcript = (payload.text ?? '').trim();
-		return { transcript: transcript || null, errorMessage: null };
-	} catch (cause) {
-		const message = cause instanceof Error ? cause.message : 'Transcription failed.';
-		return { transcript: null, errorMessage: message };
-	}
+	return {
+		transcript: null,
+		errorMessage:
+			'Voice transcription is not available on this deployment. Type your message instead.',
+	};
 }
 
 /**

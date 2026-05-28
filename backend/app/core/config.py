@@ -44,12 +44,10 @@ class Settings(BaseSettings):
     # Leave empty to disable web search; the tool returns a clear
     # "not configured" error rather than crashing the turn.
     exa_api_key: str = ""
-    # API key for xAI (https://x.ai). Powers the speech-to-text proxy
-    # endpoint at POST /api/v1/stt — the frontend records audio with the
-    # browser's MediaRecorder, uploads the blob, and the backend forwards
-    # it to https://api.x.ai/v1/stt. Leave empty to disable voice input
-    # (the endpoint returns 503 with a clear "not configured" message).
-    # Also consumed by the LiteLLM provider for Grok chat models.
+    # API key for xAI (https://x.ai). Consumed by the LiteLLM provider
+    # for Grok chat models. The previous speech-to-text proxy that also
+    # consumed this key (the /api/v1/stt route) was removed during the
+    # backend restructure; this key is no longer wired into any voice path.
     xai_api_key: str = ""
     # OAuth 2.0 client id for the xAI device-code flow (#372). Set
     # to the value xAI hands back from registering Pawrrtal as an
@@ -363,19 +361,19 @@ class Settings(BaseSettings):
     # baked in a deployment.
     telegram_chat_queue_enabled: bool = False
 
-    # ── Voice transcription (PR 14) ──────────────────────────────────────
-    # Selects which STT backend the voice handler routes to. The
-    # historical ``xai`` value still works — the existing
-    # ``api/stt.py`` proxy is kept as one option among many.
+    # ── Voice transcription (removed) ────────────────────────────────────
+    # Voice transcription (the 4-backend transcriber, the /api/v1/stt
+    # route, the Telegram voice-attachment transcription) was removed
+    # during the backend restructure. These settings are kept as
+    # no-op placeholders so deployed environments don't fail to boot
+    # on the next pydantic-settings validation pass; they have no
+    # readers in the current codebase. Drop them once the next
+    # config-cleanup PR lands.
     voice_provider: Literal["xai", "mistral", "openai", "local"] = "xai"
     voice_mistral_api_key: str = ""
     voice_openai_api_key: str = ""
-    # When ``voice_provider == "local"``: path to the whisper.cpp binary
-    # and the GGML model file. Both auto-detected from PATH /
-    # ``~/.cache/whisper-cpp/`` when left empty.
     voice_whisper_cpp_binary: str = ""
     voice_whisper_cpp_model: str = "base"
-    # Maximum voice file size accepted, in MB.
     voice_max_size_mb: int = 25
 
     # ── Lossless Context Management (LCM) ────────────────────────────
