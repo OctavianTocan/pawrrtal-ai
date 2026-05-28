@@ -26,10 +26,13 @@ Event taxonomy (as of 2026-05-27, mined from
 from __future__ import annotations
 
 import json
+import logging
 from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger(__name__)
 
 FRAME_DELIMITER = b"\n\n"
 DONE_SENTINEL = "[DONE]"
@@ -121,7 +124,8 @@ async def stream_chat_events(
     non-empty frame *before* decoding — this is how `paw record` captures
     the wire stream (comments, malformed frames, the ``[DONE]`` sentinel,
     everything). It is purely additive: tap failures must not perturb the
-    consumer, so callers are responsible for keeping the tap exception-free.
+    consumer. The tap call is wrapped via ``_safe_invoke_tap`` so a buggy
+    caller-supplied callback can't break the SSE iterator.
     """
     async with client.stream(method, path, json=json_body) as resp:
         resp.raise_for_status()
@@ -131,7 +135,7 @@ async def stream_chat_events(
             while FRAME_DELIMITER in buffer:
                 frame, buffer = buffer.split(FRAME_DELIMITER, 1)
                 if on_raw_frame is not None and frame.strip():
-                    on_raw_frame(frame)
+                    _safe_invoke_tap(on_raw_frame, frame)
                 event = parse_frame(frame)
                 if event is None:
                     continue
@@ -143,7 +147,23 @@ async def stream_chat_events(
         # delimiter doesn't silently drop its last event.
         if buffer.strip():
             if on_raw_frame is not None:
-                on_raw_frame(buffer)
+                _safe_invoke_tap(on_raw_frame, buffer)
             event = parse_frame(buffer)
             if event is not None:
                 yield event
+
+
+def _safe_invoke_tap(tap: RawFrameTap, frame: bytes) -> None:
+    """Invoke ``tap(frame)`` and log-but-swallow any exception it raises.
+
+    The tap is caller-supplied (e.g. paw's record file writer) and the
+    SSE consumer's contract guarantees tap failures must not perturb the
+    stream. A broad ``except Exception`` is intentional here because the
+    callback is user code with unknown failure modes (filesystem errors,
+    serialization bugs, etc.) and the surrounding loop has no recovery
+    path for them beyond "keep iterating."
+    """
+    try:
+        tap(frame)
+    except Exception as exc:
+        logger.warning("SSE raw-frame tap raised: %s", exc, exc_info=True)
