@@ -63,7 +63,7 @@ async def db_session(
 
     Also rebinds ``app.channels.turn_runner.async_session_maker`` to this
     in-memory engine so background helpers in the chat turn runner
-    (``_turn_session``, ``_load_codex_thread_id``, ``_persist_codex_thread_id``)
+    (``_turn_session``, ``load_codex_thread_id``, ``persist_codex_thread_id``)
     see the same tables the request session sees. Required because the chat
     router intentionally does NOT pass the request-scoped session into
     ``ChatTurnInput`` — see ``tests/test_chat_sqlite_session_lifecycle.py``

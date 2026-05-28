@@ -401,9 +401,9 @@ def get_chat_router() -> APIRouter:
         )
 
         # Load Codex thread id (if any) before constructing the frozen ChatTurnInput.
-        from app.channels.turn_runner import _load_codex_thread_id  # noqa: PLC0415
+        from app.channels.turn_runner import load_codex_thread_id  # noqa: PLC0415
 
-        codex_thread_id = await _load_codex_thread_id(request.conversation_id)
+        codex_thread_id = await load_codex_thread_id(request.conversation_id)
 
         # ``db_session`` is intentionally left at its ``None`` default so the
         # turn runner opens its own ``async_session_maker()`` session inside

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.channels._turn_cost import record_turn_cost_if_enabled
@@ -69,14 +70,6 @@ _MS_PER_SECOND_FOR_LOG = 1000
 # any token).  Cheaper than a conditional format string and keeps the
 # field-position contract stable for log parsers.
 _TTFT_LOG_MISSING = "-"
-
-# Strong references for fire-and-forget Codex thread-id persistence
-# tasks. ``asyncio.create_task`` only holds a weak reference to the
-# returned ``Task``; without an external strong reference the task can
-# be garbage-collected mid-flight (Python docs `asyncio.create_task`).
-# The done-callback prunes finished tasks so the set doesn't grow.
-_codex_persist_tasks: set[asyncio.Task[None]] = set()
-
 
 @dataclass(frozen=True)
 class ChatTurnInput:
@@ -403,16 +396,15 @@ async def _guarded_stream(
             if event.get("type") == "internal" and event.get("kind") == "codex_thread_created":
                 thread_id = event.get("thread_id")
                 if isinstance(thread_id, str) and thread_id:
-                    # Persist asynchronously without blocking the stream.
-                    # The reference is kept in the function-local
-                    # ``_codex_persist_tasks`` set so the event loop holds a
-                    # strong reference (RUF006); the discard callback prunes
-                    # it once the persistence task finishes.
-                    persist_task = asyncio.create_task(
-                        _persist_codex_thread_id(turn_input.conversation_id, thread_id)
-                    )
-                    _codex_persist_tasks.add(persist_task)
-                    persist_task.add_done_callback(_codex_persist_tasks.discard)
+                    # Persist inline (one small UPDATE) rather than via
+                    # ``asyncio.create_task`` — a fire-and-forget write can be
+                    # cancelled mid-flight during a graceful shutdown, silently
+                    # losing the thread id and forcing the next request to
+                    # start a fresh Codex thread (multi-turn context drop).
+                    # The signal is emitted at most once per conversation
+                    # (when the Codex thread is first created), so the
+                    # blocking await has negligible cumulative cost.
+                    await persist_codex_thread_id(turn_input.conversation_id, thread_id)
                 # Do not forward this internal event to the UI.
                 continue
 
@@ -548,7 +540,15 @@ async def _finalize_turn(
     event_breakdown: Counter[str],
     ttft_ms: float | None,
 ) -> None:
-    """Patch the assistant placeholder with the final aggregated stream state."""
+    """Patch the assistant placeholder with the final aggregated stream state.
+
+    The two writes (message finalize + cost ledger) are split across
+    separate transactions so a cost-write failure can't leave the
+    assistant row stuck at ``status="streaming"`` forever — which would
+    surface to the user as a "thinking..." placeholder that never
+    resolves. Message finalize is the hard requirement; the cost write
+    is best-effort observability.
+    """
     duration_ms = (time.perf_counter() - started_at) * _MS_PER_SECOND_FOR_LOG
     final_status = "failed" if aggregator.error_text else "complete"
     snapshot = aggregator.to_persisted_shape(status=final_status)
@@ -559,13 +559,23 @@ async def _finalize_turn(
                 message_id=assistant_message_id,
                 **snapshot,
             )
-            # Cost ledger write (PR 04). Same session as the message
-            # persist so a failed commit leaves no orphaned ledger row.
-            # Runs for every surface (web + Telegram) so the per-user
-            # cap applies uniformly.
-            channel_message = turn_input.channel_message
-            cost_model_id = (channel_message.get("model_id") or "") if channel_message else ""
-            cost_surface = (channel_message.get("surface") or "") if channel_message else ""
+            await session.commit()
+    except (OperationalError, IntegrityError):
+        logger.exception(
+            "%s_PERSIST_ERR conversation_id=%s message_id=%s",
+            turn_input.log_tag,
+            turn_input.conversation_id,
+            assistant_message_id,
+        )
+
+    # Cost ledger write runs in its own transaction so a ledger-side
+    # failure can't roll back the assistant-row finalize above. Runs for
+    # every surface (web + Telegram) so the per-user cap applies uniformly.
+    channel_message = turn_input.channel_message
+    cost_model_id = (channel_message.get("model_id") or "") if channel_message else ""
+    cost_surface = (channel_message.get("surface") or "") if channel_message else ""
+    try:
+        async with _turn_session(turn_input) as session:
             await record_turn_cost_if_enabled(
                 session=session,
                 aggregator=aggregator,
@@ -576,9 +586,9 @@ async def _finalize_turn(
                 log_tag=turn_input.log_tag,
             )
             await session.commit()
-    except Exception:
+    except (OperationalError, IntegrityError):
         logger.exception(
-            "%s_PERSIST_ERR conversation_id=%s message_id=%s",
+            "%s_COST_PERSIST_ERR conversation_id=%s message_id=%s",
             turn_input.log_tag,
             turn_input.conversation_id,
             assistant_message_id,
@@ -637,11 +647,16 @@ async def _finalize_turn(
     )
 
 
-async def _persist_codex_thread_id(conversation_id: uuid.UUID, thread_id: str) -> None:
+async def persist_codex_thread_id(conversation_id: uuid.UUID, thread_id: str) -> None:
     """Persist a newly created Codex thread id against the conversation.
 
-    Called via fire-and-forget from the streaming wrapper when the
-    openai_codex provider emits a "codex_thread_created" internal signal.
+    Called inline from the streaming wrapper when the openai_codex
+    provider emits a ``codex_thread_created`` internal signal. The call
+    is awaited (not fire-and-forget) so a graceful shutdown can't cancel
+    the write mid-flight and silently lose multi-turn Codex context.
+    A single small UPDATE is fast enough that the per-event latency
+    impact is negligible, and the signal is emitted at most once per
+    conversation (when the Codex thread is first created).
     """
     try:
         async with async_session_maker() as session:
@@ -656,11 +671,11 @@ async def _persist_codex_thread_id(conversation_id: uuid.UUID, thread_id: str) -
                 thread_id,
                 conversation_id,
             )
-    except Exception:
+    except (OperationalError, IntegrityError):
         logger.exception("codex: failed to persist thread_id for conversation %s", conversation_id)
 
 
-async def _load_codex_thread_id(conversation_id: uuid.UUID) -> str | None:
+async def load_codex_thread_id(conversation_id: uuid.UUID) -> str | None:
     """Load the persisted Codex thread id for resume support (if any)."""
     try:
         async with async_session_maker() as session:
@@ -669,6 +684,6 @@ async def _load_codex_thread_id(conversation_id: uuid.UUID) -> str | None:
             )
             row = result.first()
             return row[0] if row else None
-    except Exception:
+    except OperationalError:
         logger.exception("codex: failed to load thread_id for conversation %s", conversation_id)
         return None
