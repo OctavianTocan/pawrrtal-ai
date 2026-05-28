@@ -1,11 +1,11 @@
 ---
 # pawrrtal-z1n3
 title: 'feat(paw): paw fanout N — parallel personas'
-status: in-progress
+status: completed
 type: feature
 priority: low
 created_at: 2026-05-27T20:08:17Z
-updated_at: 2026-05-28T00:58:09Z
+updated_at: 2026-05-28T00:59:44Z
 parent: pawrrtal-6cnv
 ---
 

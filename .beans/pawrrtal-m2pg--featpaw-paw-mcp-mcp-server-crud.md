@@ -1,11 +1,11 @@
 ---
 # pawrrtal-m2pg
 title: 'feat(paw): paw mcp — MCP server CRUD'
-status: in-progress
+status: completed
 type: feature
 priority: low
 created_at: 2026-05-27T20:08:17Z
-updated_at: 2026-05-28T00:15:42Z
+updated_at: 2026-05-28T00:16:20Z
 parent: pawrrtal-6cnv
 ---
 

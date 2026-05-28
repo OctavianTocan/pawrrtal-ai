@@ -1,11 +1,11 @@
 ---
 # pawrrtal-7uo7
 title: 'feat(paw): paw verify lcm-active-recall'
-status: in-progress
+status: completed
 type: feature
 priority: low
 created_at: 2026-05-27T20:08:17Z
-updated_at: 2026-05-28T09:09:58Z
+updated_at: 2026-05-28T09:23:57Z
 parent: pawrrtal-6cnv
 blocked_by:
     - pawrrtal-x9u4

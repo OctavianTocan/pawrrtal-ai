@@ -1,11 +1,11 @@
 ---
 # pawrrtal-yogx
 title: 'feat(paw): paw channels — Telegram link/unlink + simulate-update'
-status: in-progress
+status: completed
 type: feature
 priority: low
 created_at: 2026-05-27T20:08:17Z
-updated_at: 2026-05-28T00:08:11Z
+updated_at: 2026-05-28T00:09:11Z
 parent: pawrrtal-6cnv
 ---
 

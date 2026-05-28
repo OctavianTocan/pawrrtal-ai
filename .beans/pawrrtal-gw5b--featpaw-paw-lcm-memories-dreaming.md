@@ -1,11 +1,11 @@
 ---
 # pawrrtal-gw5b
 title: 'feat(paw): paw lcm + memories + dreaming'
-status: in-progress
+status: completed
 type: feature
 priority: low
 created_at: 2026-05-27T20:08:17Z
-updated_at: 2026-05-28T00:49:12Z
+updated_at: 2026-05-28T00:50:27Z
 parent: pawrrtal-6cnv
 ---
 
