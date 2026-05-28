@@ -41,8 +41,6 @@ from litellm.exceptions import (
 from litellm.exceptions import (
     UnsupportedParamsError as LiteLLMUnsupportedParamsError,
 )
-from returns.future import FutureResult
-from returns.result import Failure, Result, Success
 
 from app.core.agent_loop import (
     DEFAULT_AGENT_SYSTEM_PROMPT as _FALLBACK_SYSTEM_PROMPT,
@@ -202,23 +200,20 @@ _LITELLM_REASONING_EFFORT: dict[str, str] = {
 
 
 # ---------------------------------------------------------------------------
-# Returns pilot — Phase 3 (provider seam).
+# Provider seam.
 #
 # ``open_litellm_stream`` exposes the *connection* phase of a LiteLLM
-# completion as ``FutureResult[AsyncIterator[Any], ProviderError]``. The
-# caller awaits the future to discover whether the call was rejected
-# (auth / rate-limit / unsupported-param / timeout) before draining any
-# chunks. Mid-stream exceptions still surface as the SDK raises them
-# inside the iterator — wrapping them in the container is not
-# ergonomic, and the chat router already classifies mid-stream errors
-# into ``StreamEvent(type="error")`` frames.
+# completion. It returns the raw chunk async-iterator when LiteLLM
+# accepts the request, or raises one of the closed-set ``ProviderError``
+# variants (auth / rate-limit / unsupported-param / timeout / unknown)
+# when the connection / setup phase fails. Errors raised *inside* the
+# iterator after a successful open continue to surface as the SDK
+# raises them — the chat router classifies those into
+# ``StreamEvent(type="error")`` frames.
 #
-# Crucially this is *additive*. Production today routes through
+# This is *additive*. Production today routes through
 # :class:`LiteLLMLLM` → :func:`make_litellm_stream_fn` and is
-# unchanged; nothing currently calls ``open_litellm_stream``. Once the
-# chat router or a sibling provider migrates, this is the surface they
-# import. See ``docs/superpowers/specs/2026-05-28-returns-adoption-grilling.md``
-# and ``.claude/skills/returns-for-pawrrtal/SKILL.md``.
+# unchanged; nothing currently calls ``open_litellm_stream``.
 # ---------------------------------------------------------------------------
 
 
@@ -279,21 +274,21 @@ def _classify_litellm_exception(exc: BaseException, *, model: str) -> ProviderEr
     return ProviderUnknownError(message=str(exc))
 
 
-def open_litellm_stream(
+async def open_litellm_stream(
     vendor: Vendor,
     model: str,
     workspace_root: Path | None = None,
     *,
     messages: list[dict[str, Any]],
     reasoning_effort: ReasoningEffort | None = None,
-) -> FutureResult[AsyncIterator[Any], ProviderError]:
-    """Open a LiteLLM streaming completion as a ``FutureResult``.
+) -> AsyncIterator[Any]:
+    """Open a LiteLLM streaming completion.
 
-    Returns a future that resolves to ``IOSuccess(<async iterator of
-    chunks>)`` when LiteLLM accepts the request, or ``IOFailure(<typed
-    ProviderError>)`` when the connection / setup phase fails. Errors
-    raised *inside* the iterator after a successful open remain
-    exceptions — see the module-level comment for why.
+    Returns the raw chunk async-iterator when LiteLLM accepts the
+    request. Raises one of the closed-set ``ProviderError`` variants
+    (auth / rate-limit / unsupported-param / timeout / unknown) when
+    the connection / setup phase fails. Mid-stream errors after a
+    successful open continue to surface as the SDK raises them.
 
     Args:
         vendor: The model's vendor enum.
@@ -306,10 +301,13 @@ def open_litellm_stream(
         reasoning_effort: Optional reasoning knob mapped through
             :data:`_LITELLM_REASONING_EFFORT`.
 
+    Raises:
+        ProviderError: One of the closed-set variants on connection /
+            setup failure (see ``_classify_litellm_exception``).
+
     Returns:
-        ``FutureResult[AsyncIterator[Any], ProviderError]`` — the inner
-        iterator yields raw LiteLLM chunks (use :func:`_delta_text` to
-        extract text fragments).
+        ``AsyncIterator[Any]`` yielding raw LiteLLM chunks. Use
+        :func:`_delta_text` to extract text fragments.
     """
     model_string = _litellm_model_string(vendor, model)
 
@@ -349,35 +347,30 @@ def open_litellm_stream(
         # at the seam — this is the documented streaming contract.
         return response  # type: ignore[no-any-return]
 
-    async def _open_with_classify() -> Result[AsyncIterator[Any], ProviderError]:
-        try:
-            iterator = await _open()
-        except (
-            LiteLLMAuthenticationError,
-            LiteLLMRateLimitError,
-            LiteLLMUnsupportedParamsError,
-            LiteLLMTimeout,
-            LiteLLMAPIError,
-            # LiteLLM's HTTP-error subclasses (``BadRequestError``,
-            # ``APIConnectionError``, ``InternalServerError``,
-            # ``ServiceUnavailableError``, ``NotFoundError``,
-            # ``PermissionDeniedError``, ``ContextWindowExceededError``)
-            # inherit from ``openai.APIError`` — NOT
-            # ``litellm.exceptions.APIError`` — so without this branch
-            # they would escape the classifier and propagate raw out
-            # of the ``FutureResult``. ``openai.APIError`` is the
-            # upstream common base.
-            openai.APIError,
-            # Defensive: a missing entry in ``_VENDOR_API_KEY_NAME`` or
-            # any other dict-keyed lookup inside ``_open`` should
-            # never crash out of the future — collapse to
-            # ``ProviderUnknownError`` instead.
-            KeyError,
-        ) as exc:
-            return Failure(_classify_litellm_exception(exc, model=model_string))
-        return Success(iterator)
-
-    return FutureResult(_open_with_classify())
+    try:
+        return await _open()
+    except (
+        LiteLLMAuthenticationError,
+        LiteLLMRateLimitError,
+        LiteLLMUnsupportedParamsError,
+        LiteLLMTimeout,
+        LiteLLMAPIError,
+        # LiteLLM's HTTP-error subclasses (``BadRequestError``,
+        # ``APIConnectionError``, ``InternalServerError``,
+        # ``ServiceUnavailableError``, ``NotFoundError``,
+        # ``PermissionDeniedError``, ``ContextWindowExceededError``)
+        # inherit from ``openai.APIError`` — NOT
+        # ``litellm.exceptions.APIError`` — so without this branch
+        # they would escape the classifier and propagate raw out
+        # of the function. ``openai.APIError`` is the upstream common
+        # base.
+        openai.APIError,
+        # Defensive: a missing entry in ``_VENDOR_API_KEY_NAME`` or
+        # any other dict-keyed lookup inside ``_open`` should never
+        # crash out unclassified — collapse to ``ProviderUnknownError``.
+        KeyError,
+    ) as exc:
+        raise _classify_litellm_exception(exc, model=model_string) from exc
 
 
 def make_litellm_stream_fn(

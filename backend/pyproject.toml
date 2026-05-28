@@ -58,16 +58,6 @@ dependencies = [
     # extra group flags. Tiny pure-python httpx mock.
     "respx>=0.21",
     "typer>=0.13",
-    # ``returns`` containers (Maybe/Result/IOResult/FutureResult) — used
-    # ONLY in the scoped pilot surfaces listed in
-    # ``docs/superpowers/specs/2026-05-28-returns-adoption-grilling.md``:
-    # ``app/core/tools/external_mcp.py`` (Phase 1),
-    # ``app/crud/{conversation,message}.py`` (Phase 2), and
-    # ``app/core/providers/litellm_provider.py`` (Phase 3).  The mypy
-    # plugin is enabled only for those scopes via the per-module overrides
-    # below.  See ``.claude/skills/returns-for-pawrrtal/SKILL.md`` for the
-    # decision rubric before extending to new modules.
-    "returns>=0.25.0,<0.26",
 ]
 
 [project.scripts]
@@ -268,18 +258,15 @@ explicit_package_bases = true
 # to ``mypy_path`` to let static analysis resolve ``import openai_codex``.
 # The SDK ships a ``py.typed`` marker, so this gives mypy real stubs.
 mypy_path = ".:vendor/codex/sdk/python/src"
-# ``returns.contrib.mypy.returns_plugin`` is needed globally (mypy plugins
-# cannot be scoped per-module).  It only adds HKT/narrowing support for
-# code that uses returns containers; it does NOT add lint rules to
-# unrelated modules.  Pilot scopes that use containers live at
-# ``app/core/tools/external_mcp.py``, ``app/crud/conversation.py``, and
-# ``app/core/providers/litellm_provider.py`` — see
-# ``docs/superpowers/specs/2026-05-28-returns-adoption-grilling.md``.
-plugins = ["pydantic.mypy", "returns.contrib.mypy.returns_plugin"]
+plugins = ["pydantic.mypy"]
 exclude = [
     "alembic/versions/",
     "workspaces/",
     ".venv/",
+    # Vendored submodules (e.g. backend/vendor/codex) follow their own
+    # type conventions; mypy treats them as authoritative for the SDK
+    # surface but the SDK's example scripts + ad-hoc tests are noisy.
+    "vendor/",
     # Agentic tooling / editor metadata directories.
     "\\.agents/",
     "\\.claude/",

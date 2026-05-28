@@ -17,7 +17,7 @@ from app.core.governance.permissions import (
 )
 from app.core.keys import resolve_api_key
 from app.core.plugins.types import PreTurnHookContext
-from app.core.providers.exceptions import ProviderError
+from app.core.providers._errors import ProviderError
 from app.core.providers.factory import resolve_llm
 from app.core.tools.exceptions import ToolError
 from app.core.tools.lcm_grep_agent import make_lcm_grep_tool
