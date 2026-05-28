@@ -239,6 +239,14 @@ quote-style = "double"
 indent-style = "space"
 skip-magic-trailing-comma = false
 
+# --- pytest -----------------------------------------------------------------
+# Pinned to ``tests/`` so pytest never wanders into the vendored codex SDK's
+# own test suite (``backend/vendor/codex/sdk/python/tests/``), which depends
+# on the codex binary being available and fails in our CI environment.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["vendor", ".venv", "node_modules", "__pycache__", "*.egg-info"]
+
 # --- mypy: static type checker ---------------------------------------------
 # Strict-ish defaults. Project rule forbids cast(Any, ...), so we want mypy
 # to surface real type holes rather than letting them slip through.

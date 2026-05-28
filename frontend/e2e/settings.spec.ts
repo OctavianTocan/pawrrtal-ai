@@ -33,7 +33,12 @@ test.describe('settings page', () => {
 	test('Archived chats tab renders without crashing', async ({ page }) => {
 		await page.goto('/settings');
 		await page.getByRole('button', { name: 'Archived chats' }).click();
-		await expect(page.getByRole('heading', { name: 'Archived chats' })).toBeVisible();
+		// Two elements match "Archived chats" by accessible name (the sidebar tab
+		// + the section heading). Scope the heading assertion to ``role=main`` so
+		// strict mode is satisfied.
+		await expect(
+			page.getByRole('main').getByRole('heading', { name: 'Archived chats' })
+		).toBeVisible();
 		await expect(page.getByText(/Conversations you've archived/i)).toBeVisible();
 	});
 });
