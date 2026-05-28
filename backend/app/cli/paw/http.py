@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import base64
+import datetime as dt
 import http.cookiejar
 import json
 import os
 import sys
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import IO, Any
@@ -150,9 +151,10 @@ class PawClient:
         """Append one JSONL row capturing the request + response pair.
 
         Streaming responses (``text/event-stream``) are tagged with
-        ``is_stream=True`` and the response body is left empty — capturing
-        the live stream while preserving the consumer's iterator is a v2
-        follow-up (see the fixture replay bean).
+        ``is_stream=True`` and the response body is left empty here — the
+        wire bytes are captured by the SSE consumer via :meth:`make_sse_tap`,
+        which writes one ``type=sse`` row per frame between this envelope
+        row and the consumer-emitted ``type=sse_done`` sentinel.
         """
         if self._record_file is None:
             return
@@ -186,6 +188,51 @@ class PawClient:
         self._record_file.write(json.dumps(row, ensure_ascii=False))
         self._record_file.write("\n")
         self._record_file.flush()
+
+    @property
+    def is_recording(self) -> bool:
+        """True when this client is capturing fixtures (``PAW_RECORD`` active)."""
+        return self._record_file is not None
+
+    def _write_record_row(self, row: dict[str, Any]) -> None:
+        """Append a single JSONL row to the recording file (no-op if not recording)."""
+        if self._record_file is None:
+            return
+        self._record_file.write(json.dumps(row, ensure_ascii=False))
+        self._record_file.write("\n")
+        self._record_file.flush()
+
+    def record_sse_frame(self, url: str, frame: bytes) -> None:
+        r"""Persist one raw SSE frame so `paw replay` can reconstruct the stream.
+
+        ``frame`` is the bytes between two ``\n\n`` delimiters as observed
+        by :func:`stream_chat_events`. The frame is base64-encoded to keep
+        the row safe across any future non-UTF-8 producer.
+        """
+        self._write_record_row(
+            {
+                "type": "sse",
+                "ts": dt.datetime.now(dt.UTC).isoformat(),
+                "url": url,
+                "frame_b64": base64.b64encode(frame).decode("ascii"),
+            }
+        )
+
+    def make_sse_tap(self, url: str) -> Callable[[bytes], None] | None:
+        """Return a raw-frame tap for `stream_chat_events`, or None when off.
+
+        Wires the SSE consumer to the recording file without leaking the
+        recording mechanism into call sites: the consumer just passes the
+        returned callable as ``on_raw_frame``.
+        """
+        if self._record_file is None:
+            return None
+        record_frame = self.record_sse_frame
+
+        def tap(frame: bytes) -> None:
+            record_frame(url, frame)
+
+        return tap
 
     async def request(
         self,

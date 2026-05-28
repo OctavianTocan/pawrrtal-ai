@@ -1,10 +1,10 @@
-"""SSE stream consumer for paw.
+r"""SSE stream consumer for paw.
 
 Mirrors the frontend's technique (``fetch`` + ``ReadableStream.getReader()`` +
-``TextDecoderStream`` + manual ``\\n\\n`` framing) — see
+``TextDecoderStream`` + manual ``\n\n`` framing) — see
 ``frontend/features/chat/hooks/use-chat.ts:165`` for the canonical implementation.
 The chat endpoint emits a custom SSE shape: one JSON dict per ``data:`` line,
-terminated by the literal ``data: [DONE]\\n\\n`` sentinel. A byte-level framer
+terminated by the literal ``data: [DONE]\n\n`` sentinel. A byte-level framer
 (rather than ``httpx-sse``) keeps the CLI's parser reproducing the same
 frame-boundary semantics the frontend exercises, so frame-boundary bugs are
 visible in both surfaces.
@@ -26,7 +26,7 @@ Event taxonomy (as of 2026-05-27, mined from
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import Any
 
 import httpx
@@ -35,6 +35,10 @@ FRAME_DELIMITER = b"\n\n"
 DONE_SENTINEL = "[DONE]"
 DATA_PREFIX = "data:"
 COMMENT_PREFIX = ":"
+
+# Type alias for the optional raw-frame tap used by `paw record` to capture
+# the wire bytes of an SSE stream alongside the structured HTTP record.
+RawFrameTap = Callable[[bytes], None]
 
 KNOWN_EVENT_TYPES: frozenset[str] = frozenset(
     {
@@ -57,7 +61,7 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset(
 
 
 def parse_frame(frame: bytes) -> dict[str, Any] | None:
-    """Decode one SSE frame (the bytes between two ``\\n\\n`` delimiters).
+    r"""Decode one SSE frame (the bytes between two ``\n\n`` delimiters).
 
     Returns ``None`` for empty frames, comment-only frames, and frames whose
     ``data:`` payload is not valid JSON (incomplete or malformed chunks).
@@ -103,14 +107,21 @@ async def stream_chat_events(
     path: str,
     *,
     json_body: Any | None = None,
+    on_raw_frame: RawFrameTap | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
-    """Yield decoded chat events from an SSE endpoint (``POST /api/v1/chat/``).
+    r"""Yield decoded chat events from an SSE endpoint (``POST /api/v1/chat/``).
 
-    Buffers raw bytes and splits on the ``\\n\\n`` frame delimiter so frames
+    Buffers raw bytes and splits on the ``\n\n`` frame delimiter so frames
     that arrive split across chunks are reassembled before decoding. Stops
     yielding after a ``{"type": "done"}`` event is produced — callers that
     want to drive the stream further should not rely on the iterator
     resuming past completion.
+
+    ``on_raw_frame``, when provided, is invoked with the raw bytes of every
+    non-empty frame *before* decoding — this is how `paw record` captures
+    the wire stream (comments, malformed frames, the ``[DONE]`` sentinel,
+    everything). It is purely additive: tap failures must not perturb the
+    consumer, so callers are responsible for keeping the tap exception-free.
     """
     async with client.stream(method, path, json=json_body) as resp:
         resp.raise_for_status()
@@ -119,6 +130,8 @@ async def stream_chat_events(
             buffer += chunk
             while FRAME_DELIMITER in buffer:
                 frame, buffer = buffer.split(FRAME_DELIMITER, 1)
+                if on_raw_frame is not None and frame.strip():
+                    on_raw_frame(frame)
                 event = parse_frame(frame)
                 if event is None:
                     continue
@@ -129,6 +142,8 @@ async def stream_chat_events(
         # so a server that closes the connection cleanly without the final
         # delimiter doesn't silently drop its last event.
         if buffer.strip():
+            if on_raw_frame is not None:
+                on_raw_frame(buffer)
             event = parse_frame(buffer)
             if event is not None:
                 yield event

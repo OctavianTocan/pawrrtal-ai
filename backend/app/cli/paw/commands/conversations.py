@@ -298,11 +298,14 @@ async def _send_turn(
         final_text_parts: list[str] = []
         error_payload: dict[str, Any] | None = None
 
+        chat_path = "/api/v1/chat/"
+        chat_url = str(client._client.base_url.join(chat_path))
         async for event in stream_chat_events(
             client._client,
             "POST",
-            "/api/v1/chat/",
+            chat_path,
             json_body=chat_body,
+            on_raw_frame=client.make_sse_tap(chat_url),
         ):
             event_type = event.get("type", "unknown")
             event_counts[event_type] = event_counts.get(event_type, 0) + 1
