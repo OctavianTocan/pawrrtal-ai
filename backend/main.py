@@ -37,6 +37,7 @@ from app.api.scheduled_jobs import get_scheduled_jobs_router
 from app.api.stt import get_stt_router
 from app.api.workspace import get_workspace_router
 from app.api.workspace_env import get_workspace_env_router
+from app.channels.turn_runner import await_pending_codex_persist_tasks
 from app.cli.admin_seed import seed_admin_user
 from app.cli.migrate_workspace_env import migrate_user_keyed_env_files_for_all_users
 from app.core.config import settings
@@ -155,6 +156,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
             if scheduler is not None:
                 await scheduler.stop()
             set_active_scheduler(None)
+            # Drain any in-flight Codex thread-id persist tasks before
+            # the event loop exits so a SIGTERM that interrupted a stream
+            # mid-``codex_thread_created`` doesn't silently lose the
+            # thread id (which would force the next turn to start a fresh
+            # Codex thread, dropping multi-turn context).
+            await await_pending_codex_persist_tasks()
             set_event_bus(None)
             await event_bus.stop()
             shutdown_tracing()

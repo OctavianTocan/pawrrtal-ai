@@ -44,6 +44,59 @@ from app.crud.chat_message import (
 from app.db import async_session_maker
 from app.models import Conversation
 
+# Strong references to in-flight codex_thread_id persist tasks so they
+# survive (a) GC, and (b) cancellation of the streaming response.  The
+# UPDATE itself is small (~1 ms) but a SIGTERM mid-stream cancels every
+# awaitable in the request task tree; without an independent task here,
+# the multi-turn Codex thread id would be silently lost between turns.
+# Drained at app shutdown via ``await_pending_codex_persist_tasks``
+# (called from ``main.lifespan``'s finally block).
+_PENDING_CODEX_PERSIST_TASKS: set[asyncio.Task[None]] = set()
+
+# Soft cap on the shutdown drain timeout. The UPDATE is small enough
+# that 10 s is generous; tests can override.
+_DEFAULT_PERSIST_DRAIN_TIMEOUT_S: float = 10.0
+
+
+def _register_codex_persist_task(task: asyncio.Task[None]) -> None:
+    """Track an in-flight persist task so shutdown can await it."""
+    _PENDING_CODEX_PERSIST_TASKS.add(task)
+    task.add_done_callback(_PENDING_CODEX_PERSIST_TASKS.discard)
+
+
+async def await_pending_codex_persist_tasks(
+    timeout: float = _DEFAULT_PERSIST_DRAIN_TIMEOUT_S,  # noqa: ASYNC109 — public shutdown drain; bound is the API
+) -> None:
+    """Wait for in-flight Codex thread-id persist tasks to finish.
+
+    Called from the FastAPI lifespan shutdown handler so a graceful
+    SIGTERM can complete the in-flight UPDATEs before the event loop
+    exits. The ``timeout`` parameter caps how long shutdown will block;
+    a soft warning surfaces when the deadline is exceeded so operators
+    can correlate dropped thread ids with the shutdown event.
+
+    ASYNC109 is intentional here — the drain is a public lifespan-
+    shutdown surface where callers want a single bound on how long the
+    cleanup can block. Wrapping with ``asyncio.timeout`` internally
+    keeps the contract caller-friendly.
+    """
+    if not _PENDING_CODEX_PERSIST_TASKS:
+        return
+    pending = list(_PENDING_CODEX_PERSIST_TASKS)
+    try:
+        async with asyncio.timeout(timeout):
+            await asyncio.gather(*pending, return_exceptions=True)
+    except TimeoutError:
+        # Surface the drop loud — operators need to know thread ids
+        # may be lost from this shutdown cycle.
+        outstanding = [t for t in pending if not t.done()]
+        logger.warning(
+            "codex: shutdown drain timed out after %.1fs; %d persist task(s) still running",
+            timeout,
+            len(outstanding),
+        )
+
+
 if TYPE_CHECKING:
     from app.channels.base import Channel, ChannelMessage
     from app.core.agent_loop.types import AgentTool, PermissionCheckFn
@@ -397,15 +450,16 @@ async def _guarded_stream(
             if event.get("type") == "internal" and event.get("kind") == "codex_thread_created":
                 thread_id = event.get("thread_id")
                 if isinstance(thread_id, str) and thread_id:
-                    # Persist inline (one small UPDATE) rather than via
-                    # ``asyncio.create_task`` — a fire-and-forget write can be
-                    # cancelled mid-flight during a graceful shutdown, silently
-                    # losing the thread id and forcing the next request to
-                    # start a fresh Codex thread (multi-turn context drop).
-                    # The signal is emitted at most once per conversation
-                    # (when the Codex thread is first created), so the
-                    # blocking await has negligible cumulative cost.
-                    await persist_codex_thread_id(turn_input.conversation_id, thread_id)
+                    # Detached task so the UPDATE survives cancellation of
+                    # the streaming response (SIGTERM mid-stream, client
+                    # disconnect). We track a strong reference in
+                    # ``_PENDING_CODEX_PERSIST_TASKS`` so the GC can't
+                    # collect it and ``main.lifespan`` awaits the set on
+                    # shutdown before the event loop exits.
+                    persist_task = asyncio.create_task(
+                        persist_codex_thread_id(turn_input.conversation_id, thread_id)
+                    )
+                    _register_codex_persist_task(persist_task)
                 # Do not forward this internal event to the UI.
                 continue
 
