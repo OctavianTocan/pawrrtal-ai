@@ -312,36 +312,19 @@ async def _download_file(bot: Bot, file_id: str, *, label: str) -> bytes | None:
 
 
 async def _transcribe_audio(audio_bytes: bytes) -> str | None:
-    """Transcribe via the configured backend, returning ``None`` on failure.
+    """Voice transcription is disabled on this surface.
 
-    Resolves :func:`app.integrations.voice.resolve_transcriber` once
-    per call.  When the resolver returns ``None`` (operator hasn't
-    configured a voice backend or the corresponding API key is unset)
-    the bot falls back to the metadata-only annotation.  Any backend
-    failure is logged and swallowed; voice ingestion must never break
-    a turn.
+    The four-backend transcriber abstraction (``app.integrations.voice``)
+    was removed in the backend restructure (spec §10). Voice messages
+    still reach the agent as a metadata-only annotation via the callers
+    in this module — the model sees ``[User sent a voice message …]``
+    and can ask the user to retype the relevant bits.
 
-    All four backends — xAI, Mistral, OpenAI, local whisper.cpp — are
-    valid here; the previous behaviour where ``voice_provider == "xai"``
-    silently skipped was the reported Telegram-voice bug.
+    Re-introduce a single transcription backend later if/when the
+    feature becomes load-bearing.
     """
-    from app.integrations.voice import (  # noqa: PLC0415 — optional dep
-        TranscriptionError,
-        resolve_transcriber,
-    )
-
-    transcriber = resolve_transcriber()
-    if transcriber is None:
-        return None
-    try:
-        text = await transcriber.transcribe(audio_bytes)
-    except TranscriptionError as exc:
-        logger.warning("TELEGRAM_VOICE_TRANSCRIBE_FAIL error=%s", exc)
-        return None
-    except Exception:
-        logger.exception("TELEGRAM_VOICE_TRANSCRIBE_UNEXPECTED")
-        return None
-    return text.strip() or None
+    del audio_bytes  # unused — voice transcription is intentionally disabled
+    return None
 
 
 async def _extract_markdown_from_bytes(raw_bytes: bytes, *, file_name: str) -> str | None:

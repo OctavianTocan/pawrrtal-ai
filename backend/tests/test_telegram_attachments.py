@@ -101,50 +101,25 @@ async def test_voice_message_without_file_id_emits_metadata_annotation() -> None
     )
 
 
-async def test_voice_message_transcribes_when_backend_configured(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_voice_message_emits_metadata_annotation_only() -> None:
+    """Voice transcription was removed in the backend restructure.
+
+    Voice messages now reach the agent as a metadata-only annotation;
+    the four-backend transcriber abstraction (``app.integrations.voice``)
+    is gone. The model sees ``[User sent a voice message …]`` and can
+    ask the user to retype the relevant bits.
+    """
     raw = b"OggS\x00fake-voice"
     message = _make_message(
         voice=SimpleNamespace(duration=4, file_id="voice-id", file_size=len(raw)),
     )
-    bot = _make_bot_with_photo(raw)  # reuse the same download mock
-
-    async def fake_transcribe(_audio_bytes: bytes) -> str:
-        return "hello world"
-
-    fake_transcriber = SimpleNamespace(transcribe=fake_transcribe)
-    monkeypatch.setattr(
-        "app.integrations.voice.resolve_transcriber",
-        lambda: fake_transcriber,
-    )
+    bot = _make_bot_with_photo(raw)
 
     attachments = await collect_attachments(message, bot)
     annotation = next(iter(attachments.text_annotations), "")
-    assert "Transcription: hello world" in annotation
-
-
-async def test_voice_message_transcription_failure_falls_back(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from app.integrations.voice import TranscriptionError
-
-    raw = b"OggS\x00fake-voice"
-    message = _make_message(
-        voice=SimpleNamespace(duration=2, file_id="voice-id", file_size=len(raw)),
-    )
-    bot = _make_bot_with_photo(raw)
-
-    async def explode(_audio_bytes: bytes) -> str:
-        raise TranscriptionError("backend down")
-
-    monkeypatch.setattr(
-        "app.integrations.voice.resolve_transcriber",
-        lambda: SimpleNamespace(transcribe=explode),
-    )
-
-    attachments = await collect_attachments(message, bot)
-    assert any("Transcription is not available" in line for line in attachments.text_annotations)
+    assert "voice message" in annotation.lower()
+    assert "4s" in annotation
+    assert "Transcription:" not in annotation
 
 
 async def test_document_message_without_file_id_falls_back_to_metadata() -> None:

@@ -34,7 +34,6 @@ from app.api.oauth import get_oauth_router
 from app.api.personalization import get_personalization_router
 from app.api.projects import get_projects_router
 from app.api.scheduled_jobs import get_scheduled_jobs_router
-from app.api.stt import get_stt_router
 from app.api.workspace import get_workspace_router
 from app.api.workspace_env import get_workspace_env_router
 from app.channels.turn_runner import await_pending_codex_persist_tasks
@@ -54,7 +53,6 @@ from app.core.scheduler import JobScheduler, set_active_scheduler
 from app.core.telemetry import setup_tracing, shutdown_tracing
 from app.db import create_db_and_tables
 from app.integrations.telegram import telegram_lifespan
-from app.integrations.webhooks import get_webhooks_router
 from app.schemas import (
     UserCreate,
     UserRead,
@@ -229,9 +227,6 @@ def create_app() -> FastAPI:
         get_models_router(),
     )
     fastapi_app.include_router(
-        get_stt_router(),
-    )
-    fastapi_app.include_router(
         get_projects_router(),
     )
     fastapi_app.include_router(
@@ -260,9 +255,6 @@ def create_app() -> FastAPI:
     )
     fastapi_app.include_router(
         get_exports_router(),
-    )
-    fastapi_app.include_router(
-        get_webhooks_router(),
     )
     fastapi_app.include_router(
         get_scheduled_jobs_router(),
