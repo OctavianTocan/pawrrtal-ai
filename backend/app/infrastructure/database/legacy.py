@@ -67,14 +67,12 @@ async_session_maker = async_sessionmaker(engine, expire_on_commit=False)
 async def create_db_and_tables() -> None:
     """Create all tables on application startup.
 
-    Every ORM class registers itself with `Base.metadata` the moment its
-    module loads. By the time the FastAPI lifespan reaches this call,
-    `main.py` has already imported every api/* router (which in turn
-    imports `app.models.*`), so the metadata is complete. Alembic and
-    pytest take care of model loading via their own explicit `from app
-    import models` side-effect imports (`alembic/env.py:21`,
-    `backend/tests/conftest.py:18`). Includes retry logic to survive
-    cold-starts from serverless database providers.
+    Every ORM class registers itself with ``Base.metadata`` the moment its
+    module loads. By the time the FastAPI lifespan reaches this call, the
+    app factory has imported every router, and those routers import the
+    compatibility model shims that load ``app.infrastructure.models``.
+    Alembic and pytest also load the model shims explicitly. Includes retry
+    logic to survive cold-starts from serverless database providers.
     """
     for attempt in range(MAX_RETRIES):
         try:

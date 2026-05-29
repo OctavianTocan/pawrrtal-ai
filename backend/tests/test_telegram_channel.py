@@ -827,9 +827,15 @@ class TestHandleModelCommand:
         sender = TelegramSender(user_id=22, chat_id=22, username=None, full_name=None)
         session = AsyncMock()
         update_mock = AsyncMock(return_value=True)
-        with patch(
-            "app.integrations.telegram.model_command.update_conversation_model",
-            new=update_mock,
+        with (
+            patch(
+                "app.integrations.telegram.model_command.resolve_or_autolink_telegram_user",
+                new=AsyncMock(return_value=uuid.uuid4()),
+            ),
+            patch(
+                "app.integrations.telegram.model_command.update_conversation_model",
+                new=update_mock,
+            ),
         ):
             reply = await handle_model_command(
                 sender=sender,

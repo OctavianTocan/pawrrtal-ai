@@ -35,11 +35,11 @@ type = layers
 containers =
     app
 layers =
-    cli
-    api : users : integrations
+    cli : infrastructure.app_factory : infrastructure.router_registry : infrastructure.startup : infrastructure.shutdown
+    api : integrations
     crud
-    models : schemas
-    core : db : logger_setup : db_base
+    models : schemas : governance_models : lcm_models : mcp_models
+    core : infrastructure.auth : infrastructure.database : infrastructure.event_bus : infrastructure.lifecycle : infrastructure.logging : infrastructure.middleware : infrastructure.models : infrastructure.observability
 ; `app.channels` is intentionally NOT in any layer here:
 ; `channels/base.py` + `channels/registry.py` are foundational, but
 ; `channels/turn_runner.py` (added in #204) is orchestration that

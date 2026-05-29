@@ -18,7 +18,6 @@ from fastapi_users.db import SQLAlchemyUserDatabase
 
 from app.core.config import settings
 from app.infrastructure.database.legacy import User, get_user_db
-from app.schemas import UserCreate
 
 MIN_PASSWORD_LENGTH = 8
 
@@ -29,7 +28,7 @@ class UserManager(UUIDIDMixin, BaseUserManager[User, uuid.UUID]):
     reset_password_token_secret = settings.auth_secret
     verification_token_secret = settings.auth_secret
 
-    async def validate_password(self, password: str, user: UserCreate | User) -> None:  # type: ignore[override]
+    async def validate_password(self, password: str, user: object) -> None:
         """Enforce minimum password length."""
         if len(password) < MIN_PASSWORD_LENGTH:
             raise HTTPException(

@@ -53,7 +53,7 @@ def ctx(seeded_default_workspace: Workspace, test_user: User) -> ToolContext:
 def patch_audit_sessionmaker(monkeypatch: pytest.MonkeyPatch, db_session: AsyncSession) -> None:
     """Route audit-log writes through the test's in-memory session.
 
-    Production audit code uses ``app.db.async_session_maker`` directly so
+    Production audit code uses ``app.infrastructure.database.legacy.async_session_maker`` directly so
     a tool call's audit row never participates in the caller's
     transaction (preventing audit failures from rolling back real work).
     In tests we want that row visible to the same ``db_session`` that
