@@ -53,7 +53,7 @@ LEDGER_COST_WIDTH = 10
 # so we surface a friendly local error instead of an opaque 422.
 MAX_SUMMARY_WINDOW_HOURS = 90 * 24
 
-# Mirrors ``app.crud.cost.MAX_LIST_LIMIT`` so we reject out-of-range
+# Mirrors ``app.governance.cost.crud.MAX_LIST_LIMIT`` so we reject out-of-range
 # values before the round-trip. Imported as a literal here so the CLI
 # stays a thin wrapper that doesn't pull in CRUD internals.
 MAX_LEDGER_LIMIT = 1000

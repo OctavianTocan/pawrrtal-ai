@@ -34,7 +34,7 @@ class Conversation(Base):
     __tablename__ = "conversations"
     __table_args__ = (
         # Pin ``reasoning_effort`` to the ``ReasoningEffort`` literal values
-        # (or NULL). The setter in ``app.crud.channel`` accepts ``str | None``,
+        # (or NULL). The setter in ``app.channels.crud`` accepts ``str | None``,
         # so without this constraint a typo or stale enum value could land in
         # the DB and silently break provider resolution. SQL ``CHECK`` allows
         # NULL by default, which is what we want for "let the provider pick".
