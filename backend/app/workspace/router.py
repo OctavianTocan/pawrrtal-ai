@@ -24,13 +24,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.tools.skills import read_skill_manifest
-from app.crud.workspace import (
-    create_workspace,
-    delete_workspace,
-    get_default_workspace,
-    list_workspaces,
-    update_workspace,
-)
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.database.legacy import User, get_async_session
 from app.models import Workspace
@@ -44,6 +37,13 @@ from app.schemas import (
     WorkspaceRead,
     WorkspaceTreeResponse,
     WorkspaceUpdate,
+)
+from app.workspace.crud import (
+    create_workspace,
+    delete_workspace,
+    get_default_workspace,
+    list_workspaces,
+    update_workspace,
 )
 
 # ---------------------------------------------------------------------------

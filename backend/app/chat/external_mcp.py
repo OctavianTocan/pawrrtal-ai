@@ -17,7 +17,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud import mcp_servers as mcp_crud
+import app.integrations.mcp_servers.crud as mcp_crud
 
 logger = logging.getLogger(__name__)
 

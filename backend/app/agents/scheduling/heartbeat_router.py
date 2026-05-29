@@ -23,13 +23,13 @@ from fastapi.routing import APIRouter
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import app.channels.crud as channel_crud
+from app.agents.scheduling.crud import sync_workspace_heartbeats
 from app.core.config import settings
 from app.core.scheduler import JobScheduler
-from app.crud import channel as channel_crud
-from app.crud.heartbeat import sync_workspace_heartbeats
-from app.crud.workspace import get_default_workspace
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.database.legacy import User, get_async_session
+from app.workspace.crud import get_default_workspace
 
 logger = logging.getLogger(__name__)
 

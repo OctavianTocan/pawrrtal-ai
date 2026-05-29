@@ -5,12 +5,12 @@ from datetime import datetime
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.personalization import (
+from app.infrastructure.database.legacy import User
+from app.schemas import PersonalizationProfile
+from app.workspace.personalization.crud import (
     get_personalization,
     upsert_personalization,
 )
-from app.infrastructure.database.legacy import User
-from app.schemas import PersonalizationProfile
 
 
 @pytest.mark.anyio

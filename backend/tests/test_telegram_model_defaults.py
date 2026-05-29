@@ -38,7 +38,7 @@ async def test_resolve_falls_back_to_user_default_when_no_override(
     db_session: AsyncSession, test_user: User
 ) -> None:
     """When conversation has no override, the user's pinned default wins."""
-    from app.crud.user_preferences import set_user_default_model_id
+    from app.workspace.preferences_crud import set_user_default_model_id
 
     user_default = MODEL_CATALOG[2].id
     await set_user_default_model_id(
@@ -74,7 +74,7 @@ async def test_resolve_skips_stale_user_default_and_logs(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """A user default removed from the catalog must fall through + log."""
-    from app.crud.user_preferences import set_user_default_model_id
+    from app.workspace.preferences_crud import set_user_default_model_id
 
     stale = "agent-sdk:anthropic/this-was-removed"
     await set_user_default_model_id(

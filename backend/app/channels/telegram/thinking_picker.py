@@ -21,6 +21,10 @@ from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.channels.crud import (
+    get_or_create_telegram_conversation_full,
+    get_user_id_for_external,
+)
 from app.channels.telegram.model_defaults import resolve_effective_model_id
 from app.core.providers.catalog import (
     CATALOG_ETAG,
@@ -30,10 +34,6 @@ from app.core.providers.catalog import (
     find,
 )
 from app.core.providers.model_id import InvalidModelId, parse_model_id
-from app.crud.channel import (
-    get_or_create_telegram_conversation_full,
-    get_user_id_for_external,
-)
 
 PROVIDER = "telegram"
 THINKING_CALLBACK_PREFIX = "thk:"

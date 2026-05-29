@@ -376,7 +376,7 @@ async def _run_agent_turn(*, prompt: str, user_id: uuid.UUID) -> str:
     from app.core.governance.workspace_context import (  # noqa: PLC0415
         load_workspace_context,
     )
-    from app.crud.workspace import get_default_workspace  # noqa: PLC0415
+    from app.workspace.crud import get_default_workspace  # noqa: PLC0415
 
     async with async_session_maker() as session:
         workspace = await get_default_workspace(user_id, session)
@@ -467,7 +467,7 @@ async def _persist_assistant_response(
     written via the same helpers the web chat router uses, so the
     UI's existing ``GET .../messages`` path picks it up immediately.
     """
-    from app.crud.chat_message import (  # noqa: PLC0415
+    from app.conversations.messages_crud import (  # noqa: PLC0415
         append_assistant_placeholder,
         finalize_assistant_message,
     )

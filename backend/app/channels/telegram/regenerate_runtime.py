@@ -30,11 +30,11 @@ from typing import TYPE_CHECKING, cast
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.channels.crud import get_user_id_for_external
 from app.channels.telegram.regenerate_keyboard import (
     REGEN_CALLBACK_PREFIX,  # re-exported for bot.py one-stop import
     parse_regenerate_callback_data,
 )
-from app.crud.channel import get_user_id_for_external
 from app.infrastructure.database.legacy import async_session_maker
 from app.models import ChatMessage, Conversation
 

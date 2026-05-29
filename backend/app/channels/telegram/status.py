@@ -20,6 +20,11 @@ from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.channels.crud import (
+    get_or_create_telegram_conversation_full,
+    get_user_id_for_external,
+)
+
 # Re-export so callers in ``bot.py`` import all LCM-flavoured handlers
 # from one module path — keeping ``bot.py``'s fan-out under sentrux's
 # ``no_god_files`` budget (issue #303 added the second helper). The
@@ -32,14 +37,10 @@ from app.channels.telegram.lcm_status import (
     handle_lcm_command as handle_lcm_command,  # noqa: PLC0414
 )
 from app.channels.telegram.model_defaults import resolve_effective_model_id
+from app.conversations.crud import ConversationStatus, get_conversation_status
 from app.core.config import settings
 from app.core.providers.catalog import default_model, find
 from app.core.providers.model_id import InvalidModelId, parse_model_id
-from app.crud.channel import (
-    get_or_create_telegram_conversation_full,
-    get_user_id_for_external,
-)
-from app.crud.conversation import ConversationStatus, get_conversation_status
 
 
 class _TelegramSenderLike(Protocol):

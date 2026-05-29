@@ -7,9 +7,9 @@ from typing import Any, Literal, cast
 from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.conversations import crud
+from app.conversations.messages_crud import get_messages_for_conversation
 from app.core.gemini_utils import generate_text_once
-from app.crud import conversation as crud
-from app.crud.chat_message import get_messages_for_conversation
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.database.legacy import User, get_async_session
 from app.models import ChatMessage, Conversation

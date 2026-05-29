@@ -24,7 +24,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.keys import load_workspace_env
 from app.core.persona_bootstrap import IDENTITY_BEGIN, IDENTITY_END
 from app.core.workspace import _build_preferences_md, seed_workspace
-from app.crud.workspace import (
+from app.infrastructure.database.legacy import User
+from app.models import UserPersonalization, Workspace
+from app.workspace.crud import (
     DEV_ADMIN_WORKSPACE_DIRNAME,
     create_workspace,
     ensure_default_workspace,
@@ -32,8 +34,6 @@ from app.crud.workspace import (
     get_default_workspace,
     list_workspaces,
 )
-from app.infrastructure.database.legacy import User
-from app.models import UserPersonalization, Workspace
 
 
 def _make_personalization(**kwargs: Any) -> UserPersonalization:
@@ -415,7 +415,7 @@ class TestWorkspaceService:
         with (
             _patch_workspace_base(tmp_path),
             patch(
-                "app.crud.workspace.create_workspace",
+                "app.workspace.crud.create_workspace",
                 side_effect=SAIntegrityError("mock", {}, Exception()),
             ),
         ):
@@ -449,13 +449,13 @@ class TestWorkspaceService:
         fake_session = SimpleNamespace(begin_nested=begin_nested)
 
         with (
-            patch("app.crud.workspace.settings") as mock_settings,
+            patch("app.workspace.crud.settings") as mock_settings,
             patch(
-                "app.crud.workspace.get_default_workspace",
+                "app.workspace.crud.get_default_workspace",
                 new=AsyncMock(side_effect=[None, winner]),
             ),
             patch(
-                "app.crud.workspace.create_workspace",
+                "app.workspace.crud.create_workspace",
                 new=AsyncMock(return_value=SimpleNamespace(path=str(orphan))),
             ),
         ):

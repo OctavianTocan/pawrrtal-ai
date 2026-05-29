@@ -7,8 +7,8 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
-from app.crud import mcp_servers as crud
 from app.infrastructure.database.legacy import User
+from app.integrations.mcp_servers import crud
 
 pytestmark = pytest.mark.anyio
 

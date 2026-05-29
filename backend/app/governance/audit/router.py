@@ -23,7 +23,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.crud.audit import (
+from app.governance.audit.crud import (
     DEFAULT_DASHBOARD_WINDOW_HOURS,
     DEFAULT_LIST_LIMIT,
     MAX_LIST_LIMIT,

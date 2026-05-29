@@ -19,11 +19,11 @@ from typing import Protocol
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.crud.channel import (
+from app.channels.crud import (
     get_or_create_telegram_conversation_full,
     get_user_id_for_external,
 )
+from app.core.config import settings
 from app.models import LCMContextItem, LCMSummary
 
 

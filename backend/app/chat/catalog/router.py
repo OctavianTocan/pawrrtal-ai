@@ -13,9 +13,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.providers.catalog import CATALOG_ETAG, MODEL_CATALOG, ModelEntry
 from app.core.providers.factory import host_authenticated
 from app.core.providers.model_id import Host
-from app.crud.workspace import get_default_workspace
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.database.legacy import User, get_async_session
+from app.workspace.crud import get_default_workspace
 
 
 def _auth_fingerprint(workspace_root: Path | None) -> str:

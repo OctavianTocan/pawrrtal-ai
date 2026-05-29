@@ -18,8 +18,8 @@ from typing import TYPE_CHECKING
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.conversations.crud import get_or_create_heartbeat_conversation
 from app.core.heartbeat import HeartbeatCheck, load_heartbeat_md
-from app.crud.conversation import get_or_create_heartbeat_conversation
 from app.governance_models import ScheduledJob
 
 if TYPE_CHECKING:

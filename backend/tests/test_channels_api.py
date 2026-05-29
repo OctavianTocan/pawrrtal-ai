@@ -14,6 +14,12 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.channels.crud import (
+    delete_binding,
+    get_user_id_for_external,
+    issue_link_code,
+    list_bindings,
+)
 from app.channels.telegram.handlers import (
     PROVIDER,
     handle_plain_message,
@@ -21,12 +27,6 @@ from app.channels.telegram.handlers import (
 )
 from app.channels.telegram.sender import TelegramSender
 from app.core.config import settings
-from app.crud.channel import (
-    delete_binding,
-    get_user_id_for_external,
-    issue_link_code,
-    list_bindings,
-)
 from app.infrastructure.database.legacy import User
 
 pytestmark = pytest.mark.anyio

@@ -5,10 +5,10 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud import project as crud
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.database.legacy import User, get_async_session
 from app.models import Project
+from app.projects import crud
 from app.schemas import ProjectCreate, ProjectRead, ProjectUpdate
 
 

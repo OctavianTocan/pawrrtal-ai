@@ -12,18 +12,18 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.heartbeat import (
-    HeartbeatCheck,
-    HeartbeatConfig,
-    parse_heartbeat_md,
-)
-from app.crud.conversation import (
+from app.agents.scheduling.crud import JOB_NAME_PREFIX, sync_workspace_heartbeats
+from app.conversations.crud import (
     HEARTBEAT_CONVERSATION_TITLE,
     HEARTBEAT_LABEL,
     delete_conversation,
     get_or_create_heartbeat_conversation,
 )
-from app.crud.heartbeat import JOB_NAME_PREFIX, sync_workspace_heartbeats
+from app.core.heartbeat import (
+    HeartbeatCheck,
+    HeartbeatConfig,
+    parse_heartbeat_md,
+)
 from app.infrastructure.database.legacy import User
 from app.models import Conversation, Workspace
 

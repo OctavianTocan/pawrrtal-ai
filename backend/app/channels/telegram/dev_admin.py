@@ -26,12 +26,12 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.channels.crud import get_user_id_for_external
 from app.channels.telegram.sender import TelegramSender
 from app.core.config import settings
-from app.crud.channel import get_user_id_for_external
-from app.crud.workspace import ensure_dev_admin_workspace
 from app.infrastructure.database.legacy import User
 from app.models import ChannelBinding
+from app.workspace.crud import ensure_dev_admin_workspace
 
 logger = logging.getLogger(__name__)
 

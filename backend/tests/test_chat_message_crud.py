@@ -14,7 +14,7 @@ from datetime import datetime
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.chat_message import (
+from app.conversations.messages_crud import (
     append_assistant_placeholder,
     append_user_message,
     finalize_assistant_message,

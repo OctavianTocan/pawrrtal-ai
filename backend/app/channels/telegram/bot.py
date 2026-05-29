@@ -322,7 +322,7 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
     )
 
     # Keep startup imports lazy and keep fan-out count within limit
-    from app.crud.workspace import get_default_workspace  # noqa: PLC0415
+    from app.workspace.crud import get_default_workspace  # noqa: PLC0415
 
     async with async_session_maker() as ws_session:
         workspace = await get_default_workspace(context.pawrrtal_user_id, ws_session)

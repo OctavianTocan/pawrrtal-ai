@@ -33,6 +33,12 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.channels.crud import (
+    get_or_create_telegram_conversation_full,
+    redeem_link_code,
+    update_conversation_verbose_level,
+)
+
 # Re-export so ``bot.py`` imports both ``handle_plain_message`` and
 # ``collect_attachments`` from the same module — keeps ``bot.py`` under
 # sentrux's ``no_god_files`` fan-out budget without forcing a registry
@@ -46,14 +52,9 @@ from app.channels.telegram.bot_permissions import (
 from app.channels.telegram.dev_admin import resolve_or_autolink_telegram_user
 from app.channels.telegram.model_defaults import resolve_effective_model_id
 from app.channels.telegram.sender import TelegramSender as TelegramSender  # noqa: PLC0414
-from app.crud.channel import (
-    get_or_create_telegram_conversation_full,
-    redeem_link_code,
-    update_conversation_verbose_level,
-)
 
 # Loose match for the link-code shape (8 chars from the look-alike-free
-# alphabet defined in app.crud.channel). Used to distinguish "user pasted
+# alphabet defined in app.channels.crud). Used to distinguish "user pasted
 # a code" from "user is talking to an unbound bot" so we can redeem the
 # former and nudge the latter.
 _CODE_SHAPE = re.compile(r"^[ABCDEFGHJKMNPQRSTUVWXYZ23456789]{8}$")

@@ -19,6 +19,12 @@ from sqlalchemy import select, update
 from app.channels._turn_cost import record_turn_cost_if_enabled
 from app.channels._turn_runtime_context import system_prompt_for_turn
 from app.channels._turn_workspace import workspace_system_prompt
+from app.conversations.messages_crud import (
+    append_assistant_placeholder,
+    append_user_message,
+    finalize_assistant_message,
+    get_messages_for_conversation,
+)
 from app.core.chat_aggregator import ChatTurnAggregator, should_emit_event
 from app.core.config import settings
 from app.core.event_bus import TurnCompletedEvent, publish_if_available
@@ -40,12 +46,6 @@ from app.core.observability import (
     workshop_event_hook,
 )
 from app.core.plugins.types import PreTurnHook, PreTurnHookContext
-from app.crud.chat_message import (
-    append_assistant_placeholder,
-    append_user_message,
-    finalize_assistant_message,
-    get_messages_for_conversation,
-)
 from app.infrastructure.database.legacy import async_session_maker
 from app.models import Conversation
 

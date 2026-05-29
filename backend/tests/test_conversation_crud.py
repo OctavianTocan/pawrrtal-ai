@@ -8,9 +8,7 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.providers.catalog import MODEL_CATALOG
-from app.core.providers.model_id import Host
-from app.crud.conversation import (
+from app.conversations.crud import (
     apply_model_switch_and_normalize_reasoning,
     create_conversation,
     delete_conversation,
@@ -21,6 +19,8 @@ from app.crud.conversation import (
     update_conversation_model,
     update_conversation_title,
 )
+from app.core.providers.catalog import MODEL_CATALOG
+from app.core.providers.model_id import Host
 from app.infrastructure.database.legacy import User
 from app.models import Conversation
 from app.schemas import ConversationCreate, ConversationUpdate

@@ -43,9 +43,9 @@ from app.channels.telegram.status import (
     _render_status_message,
     handle_status_command,
 )
+from app.conversations.crud import ConversationStatus
 from app.core.providers.base import StreamEvent
 from app.core.providers.catalog import default_model
-from app.crud.conversation import ConversationStatus
 
 # ---------------------------------------------------------------------------
 # Helpers

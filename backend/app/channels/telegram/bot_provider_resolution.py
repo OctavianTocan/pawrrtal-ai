@@ -14,12 +14,12 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from app.channels.crud import update_conversation_model
 from app.channels.telegram.handlers import TelegramTurnContext
 from app.core.providers import resolve_llm
 from app.core.providers.base import AILLM
 from app.core.providers.catalog import default_model, require_known
 from app.core.providers.model_id import InvalidModelId, UnknownModelId
-from app.crud.channel import update_conversation_model
 from app.infrastructure.database.legacy import async_session_maker
 
 logger = logging.getLogger(__name__)

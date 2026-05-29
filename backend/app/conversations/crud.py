@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 # ``crud.conversation`` — which it's already importing — instead of
 # pulling in ``crud.channel`` as a separate module. Keeps chat.py
 # under sentrux's ``no_god_files`` fan-out budget.
-from app.crud.channel import (
+from app.channels.crud import (
     normalize_conversation_reasoning_effort as normalize_conversation_reasoning_effort,  # noqa: PLC0414
 )
 from app.governance_models import CostLedger

@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.providers.catalog import default_model, find
 from app.core.providers.model_id import InvalidModelId, parse_model_id
-from app.crud.user_preferences import get_user_default_model_id
+from app.workspace.preferences_crud import get_user_default_model_id
 
 logger = logging.getLogger(__name__)
 

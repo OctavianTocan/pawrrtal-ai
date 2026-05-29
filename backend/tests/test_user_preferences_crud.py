@@ -1,15 +1,15 @@
-"""Tests for the ``app.crud.user_preferences`` module."""
+"""Tests for the ``app.workspace.preferences_crud`` module."""
 
 from __future__ import annotations
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.user_preferences import (
+from app.infrastructure.database.legacy import User
+from app.workspace.preferences_crud import (
     get_user_default_model_id,
     set_user_default_model_id,
 )
-from app.infrastructure.database.legacy import User
 
 
 @pytest.mark.anyio

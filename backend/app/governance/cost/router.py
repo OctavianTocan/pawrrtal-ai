@@ -15,7 +15,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.crud.cost import (
+from app.governance.cost.crud import (
     DEFAULT_LIST_LIMIT,
     MAX_LIST_LIMIT,
     cumulative_window_usd,

@@ -17,12 +17,12 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.crud.channel import (
+from app.channels.crud import (
     delete_binding,
     issue_link_code,
     list_bindings,
 )
+from app.core.config import settings
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.database.legacy import User, get_async_session
 from app.schemas import ChannelBindingRead, TelegramLinkCodeRead

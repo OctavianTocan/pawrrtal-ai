@@ -15,9 +15,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud import mcp_servers as crud
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.database.legacy import User, get_async_session
+from app.integrations.mcp_servers import crud
 from app.models import McpServer
 
 log = logging.getLogger(__name__)

@@ -7,13 +7,13 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.memory import (
+from app.infrastructure.database.legacy import User
+from app.lcm.memory_crud import (
     find_similar_memories,
     insert_memory,
     list_memories_for_user,
     mark_memory_referenced,
 )
-from app.infrastructure.database.legacy import User
 from app.models import Memory
 
 

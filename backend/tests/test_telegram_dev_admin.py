@@ -22,6 +22,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.channels.crud import get_user_id_for_external, issue_link_code
 from app.channels.telegram.dev_admin import (
     TELEGRAM_PROVIDER,
     resolve_or_autolink_telegram_user,
@@ -34,7 +35,6 @@ from app.channels.telegram.handlers import (
 )
 from app.channels.telegram.sender import TelegramSender
 from app.core.config import settings
-from app.crud.channel import get_user_id_for_external, issue_link_code
 from app.infrastructure.database.legacy import User
 from app.models import ChannelBinding, Workspace
 
@@ -297,7 +297,7 @@ async def test_autolink_recovers_from_concurrent_insert_race(
     own commit then trips the unique constraint and falls through to the
     recovery path's re-query, which surfaces the winner.
     """
-    from app.crud import channel as channel_module
+    import app.channels.crud as channel_module
 
     monkeypatch.setattr(settings, "telegram_dev_admin_id", DEV_ADMIN_TELEGRAM_ID)
 

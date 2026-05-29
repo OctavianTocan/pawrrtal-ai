@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
+from app.channels.crud import update_conversation_reasoning_effort
 from app.channels.telegram.handlers import TelegramSender
 
 # Re-exported so bot.py imports both via one module.
@@ -30,7 +31,6 @@ from app.channels.telegram.thinking_picker import (
     picker_stale_message,
     resolve_select,
 )
-from app.crud.channel import update_conversation_reasoning_effort
 from app.infrastructure.database.legacy import async_session_maker
 
 if TYPE_CHECKING:

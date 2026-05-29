@@ -4,7 +4,7 @@ Designed in the ADR at
 ``frontend/content/docs/handbook/decisions/2026-05-20-dreaming-background-reflection.mdx``.
 The pass runs in two modes (session-end + daily cron), both feeding
 the same :class:`DreamingJob` lifecycle and writing through the
-shared dedupe pipeline that :mod:`app.crud.memory` exposes.
+shared dedupe pipeline that :mod:`app.lcm.memory_crud` exposes.
 
 Public surface:
 

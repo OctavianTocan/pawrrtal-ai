@@ -26,6 +26,10 @@ from app.chat.permissions import (
     build_chat_permission_check,
     load_external_mcp_configs,
 )
+from app.conversations.crud import (
+    apply_model_switch_and_normalize_reasoning,
+    get_conversation,
+)
 from app.core.agent_loop.hooks import build_pre_turn_hooks
 from app.core.agent_loop.tools import build_agent_tools
 from app.core.providers import StreamEvent, default_model, resolve_llm
@@ -34,15 +38,11 @@ from app.core.tools.artifact_agent import (
     ArtifactValidationError,
     build_artifact,
 )
-from app.crud.conversation import (
-    apply_model_switch_and_normalize_reasoning,
-    get_conversation,
-)
-from app.crud.workspace import get_default_workspace
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.database.legacy import User, get_async_session
 from app.infrastructure.middleware.logging import get_request_id
 from app.schemas import ChatRequest
+from app.workspace.crud import get_default_workspace
 
 logger = logging.getLogger(__name__)
 

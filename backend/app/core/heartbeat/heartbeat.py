@@ -3,7 +3,7 @@
 Each pawrrtal workspace owns a ``HEARTBEAT.md`` file with YAML front
 matter listing the periodic checks the agent should run. The file is
 seeded by ``app.core.workspace.seed_workspace`` and re-read on demand
-by the sync helper in ``app.crud.heartbeat``.
+by the sync helper in ``app.agents.scheduling.crud``.
 
 Modelled on openclaw's heartbeat (https://docs.openclaw.ai/gateway/heartbeat),
 this module owns the *pure* parsing concerns — schema, validation,

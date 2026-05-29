@@ -37,13 +37,12 @@ containers =
 layers =
     cli : infrastructure.app_factory : infrastructure.router_registry : infrastructure.startup : infrastructure.shutdown
     chat : conversations : agents : workspace : projects : governance : integrations
-    crud
     models : schemas : governance_models : lcm_models : mcp_models
     core : infrastructure.auth : infrastructure.database : infrastructure.event_bus : infrastructure.lifecycle : infrastructure.logging : infrastructure.middleware : infrastructure.models : infrastructure.observability
 ; `app.channels` is intentionally NOT in any layer here:
 ; `channels/base.py` + `channels/registry.py` are foundational, but
 ; `channels/turn_runner.py` (added in #204) is orchestration that
-; pulls `app.crud.*` and `app.db`. The directory mixes layers and
+; pulls domain persistence helpers and database plumbing. The directory mixes layers and
 ; should be split — tracked as a follow-up. Until then it stays
 ; unlayered (sentrux ignores unlayered files).
 ;
@@ -66,13 +65,13 @@ ignore_imports =
     app.core.governance.audit -> app.models
     app.core.governance.cost_tracker -> app.models
     app.core.scheduler.scheduler -> app.models
-    app.core.event_bus.handlers -> app.crud.workspace
+    app.core.event_bus.handlers -> app.workspace.crud
     ; AgentHandler optionally persists scheduled-job responses into a
     ; target conversation (e.g. the heartbeat sink). Lazy-imports the
     ; chat_message CRUD inside the persistence helper so the bus
     ; module stays decoupled at load time; flatten in a follow-up
     ; alongside the workspace one above.
-    app.core.event_bus.handlers -> app.crud.chat_message
+    app.core.event_bus.handlers -> app.conversations.messages_crud
     ; LCM (Stack B / PRs #186–#196) owns three ORM tables
     ; (lcm_summaries, lcm_summary_sources, lcm_context_items) and must
     ; read/write them directly to assemble context, compact leaves, and
@@ -109,7 +108,6 @@ source_modules =
     app.projects
     app.governance
     app.integrations
-    app.crud
     app.core
 forbidden_modules =
     app.main
