@@ -21,7 +21,7 @@ async def test_readiness_returns_200_with_db_and_provider_configured(
     client: AsyncClient,
 ) -> None:
     """Both checks pass → status=ready, 200, every check ok."""
-    with patch("app.api.health.settings") as mock_settings:
+    with patch("app.infrastructure.observability.health.router.settings") as mock_settings:
         mock_settings.google_api_key = "test-google-key"
         mock_settings.claude_code_oauth_token = ""
         response = await client.get("/api/v1/health/ready")
@@ -39,7 +39,7 @@ async def test_readiness_returns_503_when_no_providers_configured(
     client: AsyncClient,
 ) -> None:
     """Empty provider keys → 503 with a clear ``configured: []`` array."""
-    with patch("app.api.health.settings") as mock_settings:
+    with patch("app.infrastructure.observability.health.router.settings") as mock_settings:
         mock_settings.google_api_key = ""
         mock_settings.claude_code_oauth_token = ""
         response = await client.get("/api/v1/health/ready")
@@ -57,7 +57,9 @@ def test_readiness_database_check_handles_unexpected_scalar() -> None:
     # client (FastAPI dep overrides don't reliably reach the inner app
     # when the CORS wrapper is involved), so cover the contract with a
     # focused unit test on the response shape we emit on mismatch.
-    from app.api.health import get_health_router  # noqa: F401  # ensures import side-effects run
+    from app.infrastructure.observability.health.router import (
+        get_health_router,  # noqa: F401  # ensures import side-effects run
+    )
 
     # The check is a tiny inline expression — mirror it here so the
     # contract "scalar != 1 → not-ok with descriptive detail" stays

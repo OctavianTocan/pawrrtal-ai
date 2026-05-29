@@ -114,7 +114,7 @@ async def _autolink_dev_admin(
     # Reach the column via ``__table__.c`` so mypy sees a real
     # ``ColumnElement[bool]`` (the fastapi-users base class declares
     # ``email: str`` which shadows the SQLAlchemy descriptor). Same
-    # workaround used by ``app.api.oauth``'s OAuth login helper.
+    # workaround used by ``app.infrastructure.auth.oauth.router``'s OAuth login helper.
     stmt = select(User).where(User.__table__.c.email == admin_email)
     admin_user = (await session.execute(stmt)).scalar_one_or_none()
     if admin_user is None:

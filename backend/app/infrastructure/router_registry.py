@@ -8,7 +8,7 @@ from typing import Any, cast
 from fastapi import APIRouter, FastAPI
 
 _ROUTER_FACTORIES: tuple[tuple[str, str], ...] = (
-    ("app.api.auth", "get_auth_router"),
+    ("app.infrastructure.auth.dev_login", "get_auth_router"),
     ("app.api.conversations", "get_conversations_router"),
     ("app.api.chat", "get_chat_router"),
     ("app.api.completions", "get_completions_router"),
@@ -16,7 +16,7 @@ _ROUTER_FACTORIES: tuple[tuple[str, str], ...] = (
     ("app.api.projects", "get_projects_router"),
     ("app.api.personalization", "get_personalization_router"),
     ("app.api.appearance", "get_appearance_router"),
-    ("app.api.oauth", "get_oauth_router"),
+    ("app.infrastructure.auth.oauth.router", "get_oauth_router"),
     ("app.api.channels", "get_channels_router"),
     ("app.api.workspace", "get_workspace_router"),
     ("app.api.workspace_env", "get_workspace_env_router"),
@@ -26,8 +26,8 @@ _ROUTER_FACTORIES: tuple[tuple[str, str], ...] = (
     ("app.api.scheduled_jobs", "get_scheduled_jobs_router"),
     ("app.api.heartbeat", "get_heartbeat_router"),
     ("app.api.mcp_servers", "get_mcp_servers_router"),
-    ("app.api.health", "get_health_router"),
-    ("app.api.lcm", "get_lcm_router"),
+    ("app.infrastructure.observability.health.router", "get_health_router"),
+    ("app.infrastructure.observability.lcm.router", "get_lcm_router"),
 )
 
 

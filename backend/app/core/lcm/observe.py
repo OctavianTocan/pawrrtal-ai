@@ -13,7 +13,7 @@ Public API
                                  :class:`LCMContextDebugResponse`.
 
 The schema lives next to the resolver so the API layer (
-``app.api.lcm``) and the eval harness (``backend/tests/evals``) can
+``app.infrastructure.observability.lcm.router``) and the eval harness (``backend/tests/evals``) can
 both consume the same Pydantic types without crossing the
 ``app.schemas`` boundary, which is already at the 500-line cap.
 

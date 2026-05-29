@@ -2,7 +2,7 @@
 
 Covers ``app.core.lcm.observe.describe_assembled_context`` and the
 ``GET /api/v1/lcm/conversations/{id}/context`` route registered in
-``app.api.lcm``.  The behaviours nailed down here:
+``app.infrastructure.observability.lcm.router``.  The behaviours nailed down here:
 
 - Empty conversation produces an empty, well-typed response.
 - Message-only context resolves each row with role + token estimate.

@@ -5,11 +5,9 @@ issue #251.  It does **not** mutate state, does **not** trigger model
 calls, and does **not** alter compaction; it is purely a microscope
 on the existing ``lcm_context_items`` table.
 
-Access is gated on the same per-user conversation-ownership check the
-rest of the API uses (``crud.conversation.get_conversation`` returns
-``None`` when the conversation is missing or belongs to another user),
-so the panel cannot leak history across users even if the caller
-fabricates a conversation UUID.
+Access is gated by a read-only conversation ownership query, so the
+panel cannot leak history across users even if the caller fabricates a
+conversation UUID.
 """
 
 from __future__ import annotations
@@ -18,15 +16,16 @@ import logging
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.lcm.observe import (
     LCMContextDebugResponse,
     describe_assembled_context,
 )
-from app.crud import conversation as crud
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.database.legacy import User, get_async_session
+from app.infrastructure.models.conversation import Conversation
 
 logger = logging.getLogger(__name__)
 
@@ -55,8 +54,12 @@ def get_lcm_router() -> APIRouter:
         session: AsyncSession = Depends(get_async_session),
     ) -> LCMContextDebugResponse:
         """Return the assembled LCM context for ``conversation_id``."""
-        conversation = await crud.get_conversation(user.id, session, conversation_id)
-        if conversation is None:
+        stmt = select(Conversation.id).where(
+            Conversation.id == conversation_id,
+            Conversation.user_id == user.id,
+        )
+        result = await session.execute(stmt)
+        if result.scalar_one_or_none() is None:
             raise HTTPException(status_code=404, detail="Conversation not found")
 
         return await describe_assembled_context(
