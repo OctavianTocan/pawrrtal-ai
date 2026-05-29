@@ -65,7 +65,7 @@ async def test_chat_router_does_not_pass_request_session_into_turn_input(
         json={"title": "SQLite Lifecycle"},
     )
     monkeypatch.setattr(
-        "app.api.chat.resolve_llm",
+        "app.chat.router.resolve_llm",
         lambda _model_id, **kwargs: _FakeProvider(),
     )
 
@@ -81,7 +81,7 @@ async def test_chat_router_does_not_pass_request_session_into_turn_input(
         captured.update(kwargs)
         return _OriginalChatTurnInput(**kwargs)
 
-    monkeypatch.setattr("app.api.chat.ChatTurnInput", _capturing_chat_turn_input)
+    monkeypatch.setattr("app.chat.router.ChatTurnInput", _capturing_chat_turn_input)
 
     response = await client.post(
         "/api/v1/chat/",
@@ -118,7 +118,7 @@ async def test_chat_finalizes_assistant_status_on_sqlite(
         json={"title": "Finalize"},
     )
     monkeypatch.setattr(
-        "app.api.chat.resolve_llm",
+        "app.chat.router.resolve_llm",
         lambda _model_id, **kwargs: _FakeProvider(),
     )
 
@@ -170,7 +170,7 @@ async def test_finalize_turn_leaves_message_complete_on_cost_write_failure(
         json={"title": "Cost Failure"},
     )
     monkeypatch.setattr(
-        "app.api.chat.resolve_llm",
+        "app.chat.router.resolve_llm",
         lambda _model_id, **kwargs: _FakeProvider(),
     )
 

@@ -68,7 +68,7 @@ class ArtifactPayload(TypedDict):
 
     Mirrored verbatim onto the SSE ``artifact`` event consumed by the
     frontend.  Adding fields here is a wire-compat change — bump the
-    schema in :mod:`app.api.chat` and the matching frontend type at the
+    schema in :mod:`app.chat.router` and the matching frontend type at the
     same time.
     """
 

@@ -1,6 +1,6 @@
 """Chat-router event-bus emission helpers.
 
-Extracted from :mod:`app.api.chat` to keep that module's fan-out under
+Extracted from :mod:`app.chat.router` to keep that module's fan-out under
 the sentrux god-file threshold (15). The event-bus module pair adds two
 import edges; concentrating them here lets the chat router stay below
 the cap while still emitting lifecycle events.

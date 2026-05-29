@@ -133,7 +133,7 @@ const EXEMPT_PATH_FRAGMENTS = [
 	'backend/app/cli/paw/commands/workspaces.py',
 	'backend/app/cli/paw/commands/conversations.py',
 	'backend/app/core/providers/litellm_provider.py',
-	'backend/app/api/workspace.py',
+	'backend/app/workspace/router.py',
 	'backend/app/core/config.py',
 	'backend/app/schemas.py',
 ];

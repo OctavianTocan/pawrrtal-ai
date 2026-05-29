@@ -1,6 +1,6 @@
 """Pre-flight cost-budget enforcement for ``/api/v1/chat``.
 
-Extracted from :mod:`app.api.chat` to keep that module's fan-out
+Extracted from :mod:`app.chat.router` to keep that module's fan-out
 under the sentrux god-file threshold. The cost-tracker integration
 adds ``CostBudget``, ``PostgresCostLedger``, and
 ``per_request_reservation_usd`` — three names from one module

@@ -78,7 +78,7 @@ async def test_chat_streams_provider_events(
     conversation_id = uuid4()
     await client.post(f"/api/v1/conversations/{conversation_id}", json={"title": "Chat"})
     monkeypatch.setattr(
-        "app.api.chat.resolve_llm",
+        "app.chat.router.resolve_llm",
         lambda _model_id, **kwargs: FakeProvider([{"type": "delta", "content": "hello"}]),
     )
 
@@ -131,7 +131,7 @@ async def test_chat_forwards_reasoning_effort(
                 yield event
 
     monkeypatch.setattr(
-        "app.api.chat.resolve_llm",
+        "app.chat.router.resolve_llm",
         lambda _model_id, **_kwargs: CapturingProvider([{"type": "delta", "content": "ok"}]),
     )
 
@@ -158,7 +158,7 @@ async def test_chat_persists_requested_model_id(
     conversation_id = uuid4()
     await client.post(f"/api/v1/conversations/{conversation_id}", json={"title": "Model"})
     monkeypatch.setattr(
-        "app.api.chat.resolve_llm",
+        "app.chat.router.resolve_llm",
         lambda _model_id, **kwargs: FakeProvider([{"type": "delta", "content": "ok"}]),
     )
 
@@ -202,7 +202,7 @@ async def test_chat_falls_back_to_catalog_default_when_no_model_id_given(
         captured["model_id"] = model_id
         return FakeProvider([{"type": "delta", "content": "ok"}])
 
-    monkeypatch.setattr("app.api.chat.resolve_llm", _capturing_resolve_llm)
+    monkeypatch.setattr("app.chat.router.resolve_llm", _capturing_resolve_llm)
 
     # No model_id in the body, and the conversation row has none either,
     # so the handler must fall through to the catalog default.
@@ -245,7 +245,7 @@ async def test_chat_stream_converts_provider_exception_to_error_event(
             raise RuntimeError("provider failed")
             yield {"type": "delta", "content": "unreachable"}
 
-    monkeypatch.setattr("app.api.chat.resolve_llm", lambda _model_id, **kwargs: FailingProvider())
+    monkeypatch.setattr("app.chat.router.resolve_llm", lambda _model_id, **kwargs: FailingProvider())
 
     response = await client.post(
         "/api/v1/chat/",
@@ -290,8 +290,8 @@ async def test_chat_multi_turn_tool_call_flows_through_full_http_path(
     monkeypatch.setattr(provider, "_stream_fn", script)
 
     # Inject both the provider and the echo tool into the chat path.
-    monkeypatch.setattr("app.api.chat.resolve_llm", lambda _model_id, **_kw: provider)
-    monkeypatch.setattr("app.api.chat.build_agent_tools", lambda *_args, **_kw: [echo])
+    monkeypatch.setattr("app.chat.router.resolve_llm", lambda _model_id, **_kw: provider)
+    monkeypatch.setattr("app.chat.router.build_agent_tools", lambda *_args, **_kw: [echo])
 
     conversation_id = uuid4()
     await client.post(f"/api/v1/conversations/{conversation_id}", json={"title": "Tool HTTP Test"})
@@ -356,8 +356,8 @@ async def test_chat_safety_layer_fires_and_surfaces_agent_terminated(
         ),
     )
 
-    monkeypatch.setattr("app.api.chat.resolve_llm", lambda _model_id, **_kw: provider)
-    monkeypatch.setattr("app.api.chat.build_agent_tools", lambda *_args, **_kw: [echo_tool("ping")])
+    monkeypatch.setattr("app.chat.router.resolve_llm", lambda _model_id, **_kw: provider)
+    monkeypatch.setattr("app.chat.router.build_agent_tools", lambda *_args, **_kw: [echo_tool("ping")])
 
     conversation_id = uuid4()
     await client.post(f"/api/v1/conversations/{conversation_id}", json={"title": "Safety Test"})

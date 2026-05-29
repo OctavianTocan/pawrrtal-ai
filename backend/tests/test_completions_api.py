@@ -15,7 +15,7 @@ from collections.abc import AsyncIterator
 import pytest
 from httpx import AsyncClient
 
-from app.api.completions import AUTOCOMPLETE_TIMEOUT_SECONDS, MAX_SUGGESTION_CHARS
+from app.chat.completions.router import AUTOCOMPLETE_TIMEOUT_SECONDS, MAX_SUGGESTION_CHARS
 
 
 class FakeProvider:
@@ -59,7 +59,7 @@ class FakeProvider:
 def _install_provider(monkeypatch: pytest.MonkeyPatch, provider: FakeProvider) -> None:
     """Patch ``resolve_llm`` so the router resolves to ``provider``."""
     monkeypatch.setattr(
-        "app.api.completions.resolve_llm",
+        "app.chat.completions.router.resolve_llm",
         lambda _model_id, **_kwargs: provider,
     )
 
@@ -169,7 +169,7 @@ async def test_autocomplete_skips_provider_for_short_prefix(
         called = True
         return FakeProvider([{"type": "delta", "content": "nope"}])
 
-    monkeypatch.setattr("app.api.completions.resolve_llm", _explode)
+    monkeypatch.setattr("app.chat.completions.router.resolve_llm", _explode)
 
     response = await client.post(
         "/api/v1/completions/autocomplete",
@@ -228,11 +228,11 @@ async def test_autocomplete_returns_empty_on_timeout(
             yield {"type": "delta", "content": "too late"}
 
     monkeypatch.setattr(
-        "app.api.completions.resolve_llm",
+        "app.chat.completions.router.resolve_llm",
         lambda _model_id, **_kwargs: HangingProvider(),
     )
     # Shrink the timeout for the test so we don't actually wait 4s.
-    monkeypatch.setattr("app.api.completions.AUTOCOMPLETE_TIMEOUT_SECONDS", 0.05)
+    monkeypatch.setattr("app.chat.completions.router.AUTOCOMPLETE_TIMEOUT_SECONDS", 0.05)
 
     response = await client.post(
         "/api/v1/completions/autocomplete",

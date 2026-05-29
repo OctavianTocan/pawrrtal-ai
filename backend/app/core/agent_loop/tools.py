@@ -5,7 +5,7 @@ agent is exposed to.  Adding a new tool means appending to
 ``build_agent_tools`` here — never reaching into a provider, and
 never scattering tool selection across handlers.
 
-Why a dedicated module instead of inlining in ``app.api.chat``:
+Why a dedicated module instead of inlining in ``app.chat.router``:
 
   * The chat router's job is HTTP plumbing (auth, request body,
     streaming), not deciding which capabilities the agent has.
@@ -160,7 +160,7 @@ def build_agent_tools(
     # structural and the catalog of safe components is enforced on the
     # client, so there's no key/quota to gate on.  The chat router
     # picks up artifact tool-calls and lifts the spec into a sibling
-    # SSE event (see ``app.api.chat`` and ``app.core.tools.artifact``).
+    # SSE event (see ``app.chat.router`` and ``app.core.tools.artifact``).
     # ``surface`` flips the tool description between the read-only and
     # interactive catalogs — Telegram (text-only) sees the read-only one,
     # web/electron sees the interactive widget catalog. Validation is

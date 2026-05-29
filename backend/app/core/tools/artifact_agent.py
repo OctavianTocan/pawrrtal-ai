@@ -21,7 +21,7 @@ from typing import Any
 
 from app.core.agent_loop.types import AgentTool
 
-# Re-export artifact helpers so callers (e.g. app.api.chat) only need
+# Re-export artifact helpers so callers (e.g. app.chat.router) only need
 # one internal import instead of two, keeping that file under the fan-out
 # budget enforced by sentrux's no_god_files rule. ``__all__`` makes
 # these public re-exports for mypy without tripping ruff's PLC0414.

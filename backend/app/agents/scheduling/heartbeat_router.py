@@ -97,7 +97,7 @@ def get_heartbeat_router() -> APIRouter:
 def _get_scheduler(request: Request) -> JobScheduler | None:
     """Pull the live JobScheduler off ``app.state``.
 
-    Mirrors ``app.api.scheduled_jobs._get_scheduler`` — the scheduler
+    Mirrors ``app.agents.scheduling.jobs_router._get_scheduler`` — the scheduler
     lifespan stashes the instance there when ``SCHEDULER_ENABLED=true``.
     Returns ``None`` so the handler can 503 with a clean message
     instead of crashing on a missing attribute.

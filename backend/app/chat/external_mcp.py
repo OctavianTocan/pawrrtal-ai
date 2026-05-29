@@ -1,6 +1,6 @@
 """External MCP server loader for the chat router (#317).
 
-Pulled out of :mod:`app.api.chat` so the router stays under sentrux's
+Pulled out of :mod:`app.chat.router` so the router stays under sentrux's
 ``no_god_files`` fan-out budget. The function reads the authenticated
 user's enabled MCP server rows from the database and projects them
 into the shape :func:`app.core.agent_tools.build_agent_tools` expects.

@@ -36,7 +36,7 @@ containers =
     app
 layers =
     cli : infrastructure.app_factory : infrastructure.router_registry : infrastructure.startup : infrastructure.shutdown
-    api : integrations
+    chat : conversations : agents : workspace : projects : governance : integrations
     crud
     models : schemas : governance_models : lcm_models : mcp_models
     core : infrastructure.auth : infrastructure.database : infrastructure.event_bus : infrastructure.lifecycle : infrastructure.logging : infrastructure.middleware : infrastructure.models : infrastructure.observability
@@ -102,10 +102,15 @@ ignore_imports =
 name = No new import cycles outside the known db ↔ models pair
 type = forbidden
 source_modules =
-    app.api
+    app.chat
+    app.conversations
+    app.agents
+    app.workspace
+    app.projects
+    app.governance
+    app.integrations
     app.crud
     app.core
-    app.integrations
 forbidden_modules =
     app.main
     app.cli

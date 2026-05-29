@@ -15,18 +15,17 @@ from fastapi.routing import APIRouter
 from opentelemetry import trace as _otel_trace
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api._chat_cost_budget import enforce_cost_budget
-from app.api._chat_events import publish_turn_started
-from app.api._chat_permissions import (
-    build_chat_permission_check,
-    load_external_mcp_configs,
-)
-
 # ``ChannelMessage`` is re-exported by ``app.channels.__init__``; we
 # pull all three names from the same package to keep chat.py's
 # fan-out under sentrux's ``no_god_files`` budget.
 from app.channels import ChannelMessage, resolve_channel, surface_from_header
 from app.channels.turn_runner import ChatTurnInput, EventHook, run_turn
+from app.chat.cost_budget import enforce_cost_budget
+from app.chat.events import publish_turn_started
+from app.chat.permissions import (
+    build_chat_permission_check,
+    load_external_mcp_configs,
+)
 from app.core.agent_loop.hooks import build_pre_turn_hooks
 from app.core.agent_loop.tools import build_agent_tools
 from app.core.providers import StreamEvent, default_model, resolve_llm

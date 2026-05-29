@@ -1,6 +1,6 @@
 """Per-request permission-gate builder for ``/api/v1/chat``.
 
-Extracted from :mod:`app.api.chat` to keep that module's fan-out
+Extracted from :mod:`app.chat.router` to keep that module's fan-out
 under the sentrux god-file threshold (15). The chat router needs
 three governance/loop modules to assemble a per-turn permission
 gate (``permissions``, ``workspace_context``, ``agent_loop.types``);
@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
-from app.api._chat_external_mcp import (
+from app.chat.external_mcp import (
     # Re-export keeps chat.py fan-out under sentrux budget.
     load_external_mcp_configs as load_external_mcp_configs,  # noqa: PLC0414
 )
