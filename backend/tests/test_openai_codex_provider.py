@@ -567,7 +567,8 @@ def test_discover_vendored_codex_bin_returns_none_without_fallback_flag(monkeypa
     """Without the dev-fallback flag, discovery must NOT return a PATH match."""
     from app.providers.openai_codex import _vendor
 
-    monkeypatch.setattr(_vendor, "_vendored_sdk_src_path", lambda: tmp_path / "nope")
+    isolated_sdk_src = tmp_path / "isolated-backend" / "vendor" / "codex" / "sdk" / "python" / "src"
+    monkeypatch.setattr(_vendor, "_vendored_sdk_src_path", lambda: isolated_sdk_src)
     monkeypatch.delenv("OPENAI_CODEX_ALLOW_PATH_FALLBACK", raising=False)
 
     # PATH has codex available locally on most dev machines via Homebrew.
@@ -584,7 +585,8 @@ def test_discover_vendored_codex_bin_uses_path_when_flag_enabled(monkeypatch, tm
     fake_bin.write_text("#!/bin/sh\necho 0.0.0\n")
     fake_bin.chmod(0o755)
 
-    monkeypatch.setattr(_vendor, "_vendored_sdk_src_path", lambda: tmp_path / "nope")
+    isolated_sdk_src = tmp_path / "isolated-backend" / "vendor" / "codex" / "sdk" / "python" / "src"
+    monkeypatch.setattr(_vendor, "_vendored_sdk_src_path", lambda: isolated_sdk_src)
     monkeypatch.setenv("OPENAI_CODEX_ALLOW_PATH_FALLBACK", "true")
     monkeypatch.setattr(_vendor, "_shutil_which", lambda name: str(fake_bin))
 
