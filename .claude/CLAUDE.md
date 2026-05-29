@@ -57,7 +57,7 @@ restructure lands fully:
   (`integrations/webhooks/`) and the empty `integrations/notion/` stub
   were also removed.
 - xAI auth (OAuth device-code + credential resolution) lives under
-  `app/core/providers/xai/`, not `app/integrations/xai/`.
+  `app/providers/xai/`, not `app/integrations/xai/`.
 
 ## Rules
 Claude Code rules live in `.claude/rules/`. They fire automatically based on file path globs. Every rule has a `Verify` question — use it before committing.

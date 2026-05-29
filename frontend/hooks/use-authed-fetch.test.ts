@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthedFetch } from './use-authed-fetch';
 
 const replaceMock = vi.fn();
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
 vi.mock('next/navigation', () => ({
 	useRouter: () => ({
@@ -25,7 +26,7 @@ describe('useAuthedFetch', (): void => {
 			method: 'GET',
 		});
 
-		expect(fetch).toHaveBeenCalledWith('http://localhost:8000/api/v1/conversations', {
+		expect(fetch).toHaveBeenCalledWith(`${apiBaseUrl}/api/v1/conversations`, {
 			method: 'GET',
 			credentials: 'include',
 			cache: 'no-store',

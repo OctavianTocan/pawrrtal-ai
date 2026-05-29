@@ -147,3 +147,24 @@ def test_host_authenticated_with_workspace_uses_workspace_key(
     # Sanity check: without the workspace path, the gate stays False
     # because global settings is still empty.
     assert host_authenticated(Host.xai) is False
+
+
+def test_host_authenticated_with_workspace_uses_xai_oauth_token(
+    tmp_path: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """xAI OAuth-only workspaces should still show xAI models in the picker."""
+    from pathlib import Path
+    from unittest.mock import patch
+
+    workspace_root = Path(str(tmp_path))
+    from app.providers.factory import settings as factory_settings
+
+    monkeypatch.setattr(factory_settings, "xai_api_key", "")
+    with (
+        patch(
+            "app.infrastructure.keys.load_workspace_env",
+            return_value={"XAI_OAUTH_ACCESS_TOKEN": "oauth-only-token"},
+        ),
+        patch("app.infrastructure.keys.resolve_api_key", return_value=None),
+    ):
+        assert host_authenticated(Host.xai, workspace_root=workspace_root) is True

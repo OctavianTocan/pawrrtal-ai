@@ -66,11 +66,12 @@ this table must always agree.
 
 
 # Host → (workspace env-key, settings attribute) used by the picker
-# filter (issue #370). The env-key path is what every provider invokes
-# at request time via :func:`app.infrastructure.keys.resolve_api_key` — keeping
-# the same key here means the picker's "has credentials" answer can
-# never disagree with the provider's. The settings attribute is the
-# fallback when there is no workspace context (system callers).
+# filter (issue #370). The env-key path is what most providers invoke
+# at request time via :func:`app.infrastructure.keys.resolve_api_key`.
+# xAI is the exception: workspace OAuth credentials also authenticate
+# the host, so :func:`host_authenticated` handles that branch directly.
+# The settings attribute is the fallback when there is no workspace
+# context (system callers).
 #
 # Add a new row when introducing a new :class:`Host` member.
 _HOST_AUTH_KEYS: dict[Host, tuple[str, str]] = {
@@ -112,7 +113,7 @@ def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> boo
       catalog only routes OpenAI models, so the OpenAI key is the
       single credential we need.
     * ``opencode_go``: non-empty ``OPENCODE_API_KEY``.
-    * ``xai``: non-empty ``XAI_API_KEY``.
+    * ``xai``: non-empty workspace OAuth access token or ``XAI_API_KEY``.
     * ``openai_codex``: non-empty ``OPENAI_CODEX_OAUTH_TOKEN`` (or valid ~/.codex/auth.json).
 
     Add a new entry to :data:`_HOST_ENV_KEY` when introducing a new
@@ -138,6 +139,9 @@ def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> boo
         return True
 
     if workspace_root is not None:
+        if host is Host.xai:
+            return _xai_workspace_authenticated(workspace_root, env_key)
+
         # ``resolve_api_key`` already does workspace → settings fallback,
         # so this single call covers both the per-workspace and the
         # global-default paths in one pass.
@@ -146,6 +150,20 @@ def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> boo
         return bool(resolve_api_key(workspace_root, env_key))
     # No workspace context — gate on the gateway-global setting only.
     return bool(getattr(settings, settings_attr))
+
+
+def _xai_workspace_authenticated(workspace_root: Path, env_key: str) -> bool:
+    """Return whether a workspace has xAI OAuth or legacy API-key auth."""
+    from app.infrastructure.keys import (  # noqa: PLC0415
+        load_workspace_env,
+        resolve_api_key,
+    )
+    from app.providers.xai.credentials import ACCESS_ENV_KEY  # noqa: PLC0415
+
+    env = load_workspace_env(workspace_root)
+    if env.get(ACCESS_ENV_KEY, "").strip():
+        return True
+    return bool(resolve_api_key(workspace_root, env_key))
 
 
 # Module-import-time exhaustiveness check — converts the "every

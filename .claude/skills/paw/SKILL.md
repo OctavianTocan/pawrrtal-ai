@@ -67,7 +67,7 @@ The chat stream is **custom SSE**: one JSON dict per `data:` line, terminated by
 ### Verify a Codex provider change end-to-end
 
 ```bash
-# After making a change to backend/app/core/providers/openai_codex/...
+# After making a change to backend/app/providers/openai_codex/...
 just paw verify codex --json | jq '.checks[] | select(.passed == false)'
 ```
 

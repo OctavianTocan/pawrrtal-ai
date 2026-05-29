@@ -47,15 +47,20 @@ def test_shutdown_hooks_iterate_in_reverse_order() -> None:
 
 def test_module_level_decorator_uses_default_registry() -> None:
     """The @startup_hook decorator registers on the module-level singleton."""
-    initial_count = len(default_registry.startup_hooks())
+    initial_hooks = list(default_registry._startup)
 
-    @startup_hook(order=999)
-    async def example_hook(app: FastAPI) -> None:
-        pass
+    try:
+        initial_count = len(default_registry.startup_hooks())
 
-    hooks = default_registry.startup_hooks()
-    assert len(hooks) == initial_count + 1
-    assert any(h.fn is example_hook for h in hooks)
+        @startup_hook(order=999)
+        async def example_hook(app: FastAPI) -> None:
+            pass
+
+        hooks = default_registry.startup_hooks()
+        assert len(hooks) == initial_count + 1
+        assert any(h.fn is example_hook for h in hooks)
+    finally:
+        default_registry._startup[:] = initial_hooks
 
 
 @pytest.mark.anyio

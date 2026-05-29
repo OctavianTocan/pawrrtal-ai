@@ -1,22 +1,22 @@
 ---
 description: Providers must stay tool-agnostic. Tool composition is the chat router's job.
-paths: ["backend/app/core/providers/**", "backend/app/api/chat.py"]
+paths: ["backend/app/providers/**", "backend/app/chat/router.py"]
 ---
 
 # Architecture: No Tools In Providers
 
 The agent-loop architecture is provider-neutral. Providers translate
 the cross-provider `AgentTool` shape (defined in
-`backend/app/core/agent_loop/types.py`) into their SDK's tool format
+`backend/app/agents/types.py`) into their SDK's tool format
 — but they **never reach into specific tool factories**.
 
 ## Rule
 
-Files under `backend/app/core/providers/` **MAY NOT** import from
-`backend/app/core/tools/*`.
+Files under `backend/app/providers/` **MAY NOT** import from
+`backend/app/tools/*`.
 
 Tool composition (which tools the agent gets this turn) lives in the
-**chat router** (`backend/app/api/chat.py`). Adding a new tool means
+**chat router** (`backend/app/chat/router.py`). Adding a new tool means
 appending to the list in the router, never touching a provider.
 
 ## Why
@@ -45,14 +45,14 @@ appending to the list in the router, never touching a provider.
   `providers/_claude_tool_bridge.py` wraps every `AgentTool` in a
   `claude_agent_sdk.tool` decorator and assembles them into one
   in-process MCP server.
-- Importing `app.core.agent_loop.types.AgentTool` itself — the
+- Importing `app.agents.types.AgentTool` itself — the
   abstract dataclass, not a tool factory — is fine.
 
 ## Wrong (don't do this)
 
 ```python
-# backend/app/core/providers/gemini_provider.py
-from app.core.tools.exa_search_agent import make_exa_search_tool  # ❌
+# backend/app/providers/gemini/provider.py
+from app.tools.exa_search_agent import make_exa_search_tool  # ❌
 
 class GeminiLLM:
     async def stream(self, ..., tools=None, ...):
@@ -65,9 +65,9 @@ class GeminiLLM:
 ## Right
 
 ```python
-# backend/app/api/chat.py
-from app.core.tools.workspace_files import make_workspace_tools
-from app.core.tools.exa_search_agent import make_exa_search_tool
+# backend/app/chat/router.py
+from app.tools.workspace_files import make_workspace_tools
+from app.tools.exa_search_agent import make_exa_search_tool
 
 agent_tools: list[AgentTool] = []
 agent_tools.extend(make_workspace_tools(root))
@@ -79,7 +79,7 @@ async for event in provider.stream(..., tools=agent_tools, ...):
 ```
 
 ```python
-# backend/app/core/providers/gemini_provider.py
+# backend/app/providers/gemini/provider.py
 class GeminiLLM:
     async def stream(self, ..., tools=None, ...):
         # Pure passthrough — no tool composition here.
@@ -91,9 +91,9 @@ class GeminiLLM:
 
 `scripts/check-no-tools-in-providers.py` runs in the backend pytest
 CI workflow before the test deps install. It uses Python's `ast`
-module to walk each file under `backend/app/core/providers/` and
+module to walk each file under `backend/app/providers/` and
 fails CI if any `import` or `from ... import` statement has a
-module path that starts with `app.core.tools.`.
+module path that starts with `app.tools.`.
 
 ```sh
 python3 scripts/check-no-tools-in-providers.py        # default
@@ -109,8 +109,8 @@ the bridge layer).
 
 ## References
 
-- `backend/app/core/agent_loop/types.py` — `AgentTool` dataclass.
-- `backend/app/core/providers/_claude_tool_bridge.py` — example of
+- `backend/app/agents/types.py` — `AgentTool` dataclass.
+- `backend/app/providers/claude/tool_bridge.py` — example of
   a provider-internal bridge that's allowed.
-- `backend/app/api/chat.py` — canonical example of the chat-router
+- `backend/app/chat/router.py` — canonical example of the chat-router
   composition pattern.

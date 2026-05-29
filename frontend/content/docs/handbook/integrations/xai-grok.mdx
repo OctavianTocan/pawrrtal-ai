@@ -23,8 +23,8 @@ keys, and the small surface a developer typically touches.
 | Context window | 1M tokens |
 | Price (input / output) | $1.25 / $2.50 per 1M tokens |
 | SDK | [`xai-sdk>=1.12.0`](https://github.com/xai-org/xai-sdk-python) |
-| Provider class | `backend/app/core/providers/xai_provider.py:XaiLLM` |
-| Env key | `XAI_API_KEY` (workspace-overridable) |
+| Provider class | `backend/app/providers/xai/provider.py:XaiLLM` |
+| Env key | Workspace xAI OAuth token, falling back to `XAI_API_KEY` |
 
 The canonical wire form is `xai:xai/grok-4.3`; the bare
 `xai/grok-4.3` resolves to the same triple via `CANONICAL_HOST`
@@ -33,7 +33,7 @@ ADR](../decisions/2026-05-14-model-id-canonical-format-and-backend-catalog)).
 
 ## Catalog entry
 
-Grok 4.3 lives in `backend/app/core/providers/catalog.py` and surfaces
+Grok 4.3 lives in `backend/app/providers/catalog.py` and surfaces
 through `GET /api/v1/models` without any router or schema change:
 
 ```python
@@ -55,30 +55,30 @@ factory, or schema change.
 
 ## API keys
 
-`XAI_API_KEY` follows Pawrrtal's standard env-key resolution. The chat
-path calls `resolve_api_key(workspace_id, "XAI_API_KEY")`, which checks
-the workspace-encrypted store first and falls back to
+The chat path uses `resolve_xai_credentials(workspace_root)`, which
+prefers a workspace xAI OAuth access token, refreshes it when needed,
+then falls back to the workspace `XAI_API_KEY` and finally
 `settings.xai_api_key` from the gateway env.
 
 To configure per-workspace, the user pastes the key into Settings →
 Workspace Env (this works because `XAI_API_KEY` is on
-`OVERRIDABLE_KEYS` in `backend/app/core/keys.py` and mirrored in the
+`OVERRIDABLE_KEYS` in `backend/app/infrastructure/keys.py` and mirrored in the
 frontend's `WORKSPACE_ENV_KEY_IDS` + `KEY_METAS` for the settings row).
 
 For local dev without a configured workspace, set `XAI_API_KEY` in the
-backend `.env`. The STT path (`backend/app/api/stt.py`) honours the
-same key.
+backend `.env`. The web STT endpoint was removed in the backend
+restructure; `XAI_API_KEY` now powers Grok chat only.
 
 ## Reasoning effort
 
-Pawrrtal's chat composer exposes a 4-bucket UI knob:
-`low | medium | high | extra-high`. Grok 4.3 only accepts two levels
-(`EFFORT_LOW` / `EFFORT_HIGH`) and 400s on anything else, including
-`EFFORT_MEDIUM` and `EFFORT_NONE`. `_map_reasoning_effort` collapses
-the 4 buckets onto 2:
+Pawrrtal's chat composer exposes a 5-bucket UI knob:
+`minimal | low | medium | high | extra-high`. Grok 4.3 accepts
+`EFFORT_NONE`, `EFFORT_LOW`, and `EFFORT_HIGH`; `_map_reasoning_effort`
+collapses the 5 buckets onto those 3 values:
 
 | UI selection | Wire value |
 |---|---|
+| `minimal` | `chat_pb2.ReasoningEffort.EFFORT_NONE` |
 | `low`, `medium` | `chat_pb2.ReasoningEffort.EFFORT_LOW` |
 | `high`, `extra-high` | `chat_pb2.ReasoningEffort.EFFORT_HIGH` |
 | `None` | field omitted, server picks the model default |
@@ -99,35 +99,35 @@ per-turn `UsageAccumulator` that the cost ledger consumes.
 
 ```
 ┌──────────────────────────────────────────────────────┐
-│ api/chat.py                                          │
-│   ↓ resolve_llm("xai:xai/grok-4.3", workspace_id)    │
+│ chat/router.py                                       │
+│   ↓ resolve_llm("xai:xai/grok-4.3", workspace_root)  │
 │ providers/factory.py                                 │
 │   ↓ HOST_TO_PROVIDER[Host.xai] → XaiLLM              │
-│ providers/xai_provider.py: XaiLLM.stream             │
+│ providers/xai/provider.py: XaiLLM.stream             │
 │   ↓ make_xai_stream_fn(model, ws, system_prompt,…)   │
-│ providers/_xai_messages.py                           │
+│ providers/xai/messages.py                            │
 │   ↓ build_xai_messages / build_xai_tools (protos)    │
 │ xai_sdk.AsyncClient.chat.create(...).stream()        │
 │   ↓ Chunk / Response                                 │
-│ providers/_xai_stream.py                             │
+│ providers/xai/stream.py                              │
 │   ↓ deltas / tool_calls / usage → LLMEvent shapes    │
-│ agent_loop → providers/_xai_events.py                │
+│ agent_loop → providers/xai/events.py                 │
 │   ↓ AgentEvent → StreamEvent (text / thinking /      │
 │     tool_result / done / usage)                      │
 └──────────────────────────────────────────────────────┘
 ```
 
-Files (all under `backend/app/core/providers/`):
+Files (all under `backend/app/providers/xai/`):
 
-- `xai_provider.py` — the `XaiLLM` class + `make_xai_stream_fn`.
-- `_xai_messages.py` — typed `chat_pb2.Message` / `chat_pb2.Tool`
+- `provider.py` — the `XaiLLM` class + `make_xai_stream_fn`.
+- `messages.py` — typed `chat_pb2.Message` / `chat_pb2.Tool`
   builders. Assistant messages with `tool_calls` build the proto
   directly because `xai_sdk.chat.assistant()` only exposes
   text / image / file content.
-- `_xai_stream.py` — `Chunk` → `LLMEvent` translation, tool-call
+- `stream.py` — `Chunk` → `LLMEvent` translation, tool-call
   extraction off the accumulated `Response`, `UsageAccumulator`
   driven by `Response.cost_usd` + `Response.usage.{prompt,completion}_tokens`.
-- `_xai_events.py` — `AgentEvent` → `StreamEvent`.
+- `events.py` — `AgentEvent` → `StreamEvent`.
 
 The split is enforced by the project's 500-line file-line budget
 (`scripts/check-file-lines.mjs`).

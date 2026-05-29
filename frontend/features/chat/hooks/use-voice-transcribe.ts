@@ -5,6 +5,12 @@ import { useAuthedFetch } from '@/hooks/use-authed-fetch';
 import { toast } from '@/lib/toast';
 import { attachVoiceAnalyserMeter, detachVoiceAnalyserMeter } from './voice-analyser-meter';
 
+/** Voice transcription is intentionally unavailable after the STT backend removal. */
+export const VOICE_TRANSCRIPTION_AVAILABLE = false;
+
+const VOICE_TRANSCRIPTION_UNAVAILABLE_MESSAGE =
+	'Voice transcription is not available on this deployment. Type your message instead.';
+
 /** Lifecycle states the recorder cycles through. */
 export type VoiceRecordingStatus =
 	| 'idle'
@@ -69,9 +75,9 @@ type AuthedFetchLike = (input: string, init?: RequestInit) => Promise<Response>;
  * (``backend/app/api/stt.py``, ``backend/app/integrations/voice/``) were
  * removed during the backend restructure. This helper now returns a clear
  * "not available" message instead of POSTing to a 404 endpoint and
- * silently failing. The composer UI and the recorder state machine are
- * unchanged so re-introducing a single backend later is a one-line flip
- * back to the network call.
+ * silently failing. The composer hides the mic affordance while this
+ * flag is off; the hook keeps this defensive failure path for callers
+ * that invoke it directly.
  */
 async function requestVoiceTranscription(
 	_fetcher: AuthedFetchLike,
@@ -80,8 +86,7 @@ async function requestVoiceTranscription(
 ): Promise<{ transcript: string | null; errorMessage: string | null }> {
 	return {
 		transcript: null,
-		errorMessage:
-			'Voice transcription is not available on this deployment. Type your message instead.',
+		errorMessage: VOICE_TRANSCRIPTION_UNAVAILABLE_MESSAGE,
 	};
 }
 
@@ -108,16 +113,17 @@ function awaitFinalBlob(
 }
 
 /**
- * Records microphone audio and uploads it to the xAI STT proxy on stop.
+ * Records microphone audio and uploads it to the configured STT proxy on stop.
  *
  * The flow:
  *   1. `startRecording()` — request mic permission, start `MediaRecorder`.
- *   2. `stopRecording()`  — stop the recorder, POST the blob to `/api/v1/stt`,
+ *   2. `stopRecording()`  — stop the recorder, transcribe the blob, and
  *                            return the transcript text.
  *   3. `cancelRecording()` — abort without uploading.
  *
  * MediaRecorder is the browser's recommended capture API and works in all
- * evergreen browsers. The xAI proxy accepts the default WebM/Opus output.
+ * evergreen browsers. While STT is disabled, `startRecording()` fails
+ * before requesting microphone permission.
  */
 export function useVoiceTranscribe(): UseVoiceTranscribeResult {
 	const fetcher = useAuthedFetch();
@@ -131,9 +137,6 @@ export function useVoiceTranscribe(): UseVoiceTranscribeResult {
 	const audioContextRef = useRef<AudioContext | null>(null);
 	const meterRafRef = useRef<number | null>(null);
 	const [meterLevel, setMeterLevel] = useState(0);
-	// Latch for stopRecording's `dataavailable` → `stop` race: when the
-	// recorder stops, we wait on this promise to resolve with the final
-	// blob before posting. Reset every recording cycle.
 	const finalBlobResolverRef = useRef<((blob: Blob | null) => void) | null>(null);
 
 	const releaseStream = useCallback((): void => {
@@ -151,8 +154,6 @@ export function useVoiceTranscribe(): UseVoiceTranscribeResult {
 		finalBlobResolverRef.current = null;
 	}, []);
 
-	// Always release the mic if the consumer unmounts mid-recording so we
-	// don't leak the OS-level capture indicator.
 	useEffect(() => {
 		return () => {
 			releaseStream();
@@ -161,6 +162,12 @@ export function useVoiceTranscribe(): UseVoiceTranscribeResult {
 
 	const startRecording = useCallback(async (): Promise<void> => {
 		if (status === 'recording' || status === 'requesting-permission') {
+			return;
+		}
+		if (!VOICE_TRANSCRIPTION_AVAILABLE) {
+			setStatus('error');
+			setError(VOICE_TRANSCRIPTION_UNAVAILABLE_MESSAGE);
+			toast.error(VOICE_TRANSCRIPTION_UNAVAILABLE_MESSAGE);
 			return;
 		}
 		if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
@@ -201,7 +208,6 @@ export function useVoiceTranscribe(): UseVoiceTranscribeResult {
 				finalBlobResolverRef.current = null;
 			};
 
-			// 250 ms timeslice so `stop` waits for in-flight `dataavailable` chunks.
 			recorder.start(250);
 			setStatus('recording');
 		} catch (capturedError) {
@@ -237,7 +243,7 @@ export function useVoiceTranscribe(): UseVoiceTranscribeResult {
 		if (errorMessage !== null) {
 			setStatus('error');
 			setError(errorMessage);
-			toast.error('Transcription failed. Try again in a moment.');
+			toast.error(errorMessage);
 			return null;
 		}
 		setStatus('idle');

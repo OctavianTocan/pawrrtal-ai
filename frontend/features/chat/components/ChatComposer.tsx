@@ -20,7 +20,7 @@ import {
 	DEFAULT_PLAN_MODE_VISIBLE,
 } from '../constants';
 import type { ChatModelOption } from '../hooks/use-chat-models';
-import { useVoiceTranscribe } from '../hooks/use-voice-transcribe';
+import { useVoiceTranscribe, VOICE_TRANSCRIPTION_AVAILABLE } from '../hooks/use-voice-transcribe';
 import {
 	AttachButton,
 	AutoReviewSelector,
@@ -205,25 +205,27 @@ function ComposerSendCluster({
 				isError={catalogStatus === 'error'}
 				isLoading={catalogStatus === 'loading'}
 			/>
-			<ComposerTooltip
-				content={isTranscribing ? 'Transcribing...' : 'Click to dictate or hold ^M'}
-			>
-				<Button
-					aria-label="Start voice input"
-					aria-pressed={isRecording}
-					className="size-8 rounded-full text-muted-foreground hover:bg-foreground/[0.08] hover:text-foreground"
-					disabled={isTranscribing}
-					onClick={onStartRecording}
-					size="icon-sm"
-					type="button"
-					variant="ghost"
+			{VOICE_TRANSCRIPTION_AVAILABLE ? (
+				<ComposerTooltip
+					content={isTranscribing ? 'Transcribing...' : 'Click to dictate or hold ^M'}
 				>
-					<MicIcon
-						aria-hidden="true"
-						className={cn('size-3.5', isTranscribing && 'animate-pulse')}
-					/>
-				</Button>
-			</ComposerTooltip>
+					<Button
+						aria-label="Start voice input"
+						aria-pressed={isRecording}
+						className="size-8 rounded-full text-muted-foreground hover:bg-foreground/[0.08] hover:text-foreground"
+						disabled={isTranscribing}
+						onClick={onStartRecording}
+						size="icon-sm"
+						type="button"
+						variant="ghost"
+					>
+						<MicIcon
+							aria-hidden="true"
+							className={cn('size-3.5', isTranscribing && 'animate-pulse')}
+						/>
+					</Button>
+				</ComposerTooltip>
+			) : null}
 			<ComposerTooltip content={isTranscribing ? 'Wait for transcription' : 'Send message'}>
 				<PromptInputSubmit
 					className={cn(

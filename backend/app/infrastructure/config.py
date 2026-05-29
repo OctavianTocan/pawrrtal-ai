@@ -315,10 +315,10 @@ class Settings(BaseSettings):
         Path(__file__).resolve().parents[3] / "backend" / "templates" / "workspace"
     )
 
-    # ── Ops platform: webhooks (PR 11) ───────────────────────────────────
-    # When False the POST /webhooks routes return 503 with a clear
-    # "not configured" message. Setting either secret to a non-empty
-    # value implicitly enables the matching provider.
+    # ── Ops platform: webhooks (removed) ─────────────────────────────────
+    # Compatibility placeholders retained so existing .env files still
+    # parse. The backend restructure removed the POST /webhooks routes;
+    # setting these values does not expose a webhook receiver.
     webhook_api_enabled: bool = False
     # Shared bearer token for non-GitHub providers.
     webhook_api_secret: str = ""

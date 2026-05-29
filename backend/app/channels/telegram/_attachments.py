@@ -95,12 +95,9 @@ async def collect_attachments(message: Message, bot: Bot) -> TelegramAttachments
     * **photo** (``message.photo``): largest ``PhotoSize`` is downloaded,
       base64-encoded, and added to ``images``. Telegram photos are
       always JPEG; we hard-code ``image/jpeg``.
-    * **voice / audio** (``message.voice`` / ``message.audio``): the
-      audio is downloaded and transcribed through the configured STT
-      backend; the transcript is added as a
-      ``[User sent a voice message. Transcription: ...]`` annotation.
-      When STT is unconfigured or fails, a metadata-only annotation
-      is added instead.
+    * **voice / audio** (``message.voice`` / ``message.audio``):
+      metadata-only annotations are added. The STT backend was removed
+      in the backend restructure, so we do not download audio files.
     * **document** (``message.document``): converted to Markdown via
       markitdown when under the size cap, then inlined as a bounded
       excerpt. Oversized or unsupported documents fall back to a
@@ -180,7 +177,7 @@ async def _add_voice_transcription(
     bot: Bot,
     annotations: list[str],
 ) -> None:
-    """Download + transcribe a Telegram voice message."""
+    """Annotate a Telegram voice message without transcription."""
     voice = message.voice
     duration = getattr(voice, "duration", None) or 0
     file_id = getattr(voice, "file_id", None)
@@ -197,22 +194,12 @@ async def _add_voice_transcription(
     if duration > _VOICE_LONG_DURATION_SECONDS:
         logger.info("TELEGRAM_VOICE_LONG duration=%d", duration)
 
-    raw_bytes = await _download_file(bot, file_id, label="voice")
-    if raw_bytes is None:
-        annotations.append(
-            f"[User sent a voice message ({duration}s) but we couldn't download it.]"
-        )
-        return
-
-    transcript = await _transcribe_audio(raw_bytes)
-    if transcript is None:
-        annotations.append(
-            f"[User sent a voice message ({duration}s). "
-            "Transcription is not available on this surface yet — ask the "
-            "user to retype the relevant bits if it matters.]"
-        )
-        return
-    annotations.append(f"[User sent a voice message ({duration}s). Transcription: {transcript}]")
+    del bot  # no download while voice transcription is intentionally disabled
+    annotations.append(
+        f"[User sent a voice message ({duration}s). "
+        "Transcription is not available on this surface yet — ask the "
+        "user to retype the relevant bits if it matters.]"
+    )
 
 
 async def _add_audio_transcription(
@@ -220,7 +207,7 @@ async def _add_audio_transcription(
     bot: Bot,
     annotations: list[str],
 ) -> None:
-    """Download + transcribe a Telegram audio file (treated like voice)."""
+    """Annotate a Telegram audio file without transcription."""
     audio = message.audio
     title = getattr(audio, "title", None) or "audio clip"
     duration = getattr(audio, "duration", None) or 0
@@ -230,18 +217,8 @@ async def _add_audio_transcription(
         annotations.append(f"[User sent an audio file: {title} ({duration}s).]")
         return
 
-    raw_bytes = await _download_file(bot, file_id, label="audio")
-    if raw_bytes is None:
-        annotations.append(f"[User sent an audio file: {title} ({duration}s).]")
-        return
-
-    transcript = await _transcribe_audio(raw_bytes)
-    if transcript is None:
-        annotations.append(f"[User sent an audio file: {title} ({duration}s).]")
-        return
-    annotations.append(
-        f"[User sent an audio file: {title} ({duration}s). Transcription: {transcript}]"
-    )
+    del bot  # no download while voice transcription is intentionally disabled
+    annotations.append(f"[User sent an audio file: {title} ({duration}s).]")
 
 
 async def _add_document_extraction(
@@ -311,22 +288,6 @@ async def _download_file(bot: Bot, file_id: str, *, label: str) -> bytes | None:
             file_id,
         )
         return None
-
-
-async def _transcribe_audio(audio_bytes: bytes) -> str | None:
-    """Voice transcription is disabled on this surface.
-
-    The four-backend transcriber abstraction (``app.integrations.voice``)
-    was removed in the backend restructure (spec §10). Voice messages
-    still reach the agent as a metadata-only annotation via the callers
-    in this module — the model sees ``[User sent a voice message …]``
-    and can ask the user to retype the relevant bits.
-
-    Re-introduce a single transcription backend later if/when the
-    feature becomes load-bearing.
-    """
-    del audio_bytes  # unused — voice transcription is intentionally disabled
-    return None
 
 
 async def _extract_markdown_from_bytes(raw_bytes: bytes, *, file_name: str) -> str | None:
