@@ -1,6 +1,6 @@
 """``/status`` command for the Telegram channel.
 
-Extracted from :mod:`app.integrations.telegram.handlers` to keep that
+Extracted from :mod:`app.channels.telegram.handlers` to keep that
 file under the 500-line budget enforced by
 ``scripts/check-file-lines.mjs``. The /status surface is wholly
 self-contained (pure formatters + one async handler + its own copy
@@ -20,6 +20,18 @@ from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# Re-export so callers in ``bot.py`` import all LCM-flavoured handlers
+# from one module path — keeping ``bot.py``'s fan-out under sentrux's
+# ``no_god_files`` budget (issue #303 added the second helper). The
+# underlying implementations live in their own per-command files to
+# keep each module focused on one command.
+from app.channels.telegram.compact_command import (
+    handle_compact_command as handle_compact_command,  # noqa: PLC0414
+)
+from app.channels.telegram.lcm_status import (
+    handle_lcm_command as handle_lcm_command,  # noqa: PLC0414
+)
+from app.channels.telegram.model_defaults import resolve_effective_model_id
 from app.core.config import settings
 from app.core.providers.catalog import default_model, find
 from app.core.providers.model_id import InvalidModelId, parse_model_id
@@ -29,25 +41,12 @@ from app.crud.channel import (
 )
 from app.crud.conversation import ConversationStatus, get_conversation_status
 
-# Re-export so callers in ``bot.py`` import all LCM-flavoured handlers
-# from one module path — keeping ``bot.py``'s fan-out under sentrux's
-# ``no_god_files`` budget (issue #303 added the second helper). The
-# underlying implementations live in their own per-command files to
-# keep each module focused on one command.
-from app.integrations.telegram.compact_command import (
-    handle_compact_command as handle_compact_command,  # noqa: PLC0414
-)
-from app.integrations.telegram.lcm_status import (
-    handle_lcm_command as handle_lcm_command,  # noqa: PLC0414
-)
-from app.integrations.telegram.model_defaults import resolve_effective_model_id
-
 
 class _TelegramSenderLike(Protocol):
     """Structural type for the subset of ``TelegramSender`` /status needs.
 
     Declared as a Protocol so this module does not import from
-    ``app.integrations.telegram.handlers`` — sentrux's ``max_cycles=0``
+    ``app.channels.telegram.handlers`` — sentrux's ``max_cycles=0``
     architecture rule forbids any handlers↔status import edge (even
     under ``TYPE_CHECKING``).  The concrete ``TelegramSender``
     dataclass in ``handlers.py`` already satisfies this shape, so

@@ -13,8 +13,8 @@ The split is along clean seams:
 * :func:`finalize_turn_delivery` — post-stream cleanup of the
   placeholder + final-answer message (#288, #293, #306).
 
-Draft streaming helpers (Workstream 1) live in
-:mod:`app.channels._telegram_draft`.
+Draft streaming helpers (Workstream 1) live alongside the Telegram
+delivery modules in this package.
 """
 
 from __future__ import annotations
@@ -28,8 +28,7 @@ from typing import TYPE_CHECKING
 
 from app.core.providers.base import StreamEvent
 
-from ._telegram_finalize import finalize_turn_delivery
-from .telegram_delivery import (
+from .delivery import (
     format_tool_use,
     safe_edit,
     safe_edit_html,
@@ -37,7 +36,8 @@ from .telegram_delivery import (
     safe_send_text,
     thinking_html,
 )
-from .telegram_progress import (
+from .finalize import finalize_turn_delivery
+from .progress import (
     render_tool_error,
     render_tool_success,
     render_tools_in_flight,

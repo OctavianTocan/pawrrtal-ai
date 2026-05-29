@@ -10,7 +10,7 @@ Supports three shapes:
   to the user's default, without switching to anything else.
 
 The aiogram glue lives in
-:mod:`app.integrations.telegram.model_picker_runtime`; this module
+:mod:`app.channels.telegram.model_picker_runtime`; this module
 stays framework-free and unit-testable.
 """
 
@@ -22,6 +22,9 @@ from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.channels.telegram.dev_admin import resolve_or_autolink_telegram_user
+from app.channels.telegram.reasoning_notify import maybe_append_model_switch_notice
+from app.channels.telegram.sender import TelegramSender
 from app.core.providers.catalog import find
 from app.core.providers.model_id import InvalidModelId, parse_model_id
 from app.crud.channel import (
@@ -29,9 +32,6 @@ from app.crud.channel import (
     update_conversation_model,
 )
 from app.crud.user_preferences import set_user_default_model_id
-from app.integrations.telegram.dev_admin import resolve_or_autolink_telegram_user
-from app.integrations.telegram.reasoning_notify import maybe_append_model_switch_notice
-from app.integrations.telegram.sender import TelegramSender
 
 logger = logging.getLogger(__name__)
 

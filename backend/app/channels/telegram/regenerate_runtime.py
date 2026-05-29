@@ -24,17 +24,18 @@ from __future__ import annotations
 
 import logging
 import uuid
+from importlib import import_module
 from typing import TYPE_CHECKING, cast
 
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.channel import get_user_id_for_external
-from app.infrastructure.database.legacy import async_session_maker
-from app.integrations.telegram.regenerate_keyboard import (
+from app.channels.telegram.regenerate_keyboard import (
     REGEN_CALLBACK_PREFIX,  # re-exported for bot.py one-stop import
     parse_regenerate_callback_data,
 )
+from app.crud.channel import get_user_id_for_external
+from app.infrastructure.database.legacy import async_session_maker
 from app.models import ChatMessage, Conversation
 
 if TYPE_CHECKING:
@@ -102,14 +103,11 @@ async def handle_regenerate_callback(*, callback: CallbackQuery) -> None:
     await message.answer(_REGENERATING_NOTICE)
     await callback.answer("Regenerating…")
 
-    # Drive the turn pipeline directly. Imported lazily to avoid a
-    # ``bot ↔ regenerate_runtime`` circular import (bot.py imports
-    # this module to register the callback handler; this module
-    # needs bot.py's ``_run_llm_turn`` helper to re-fire the turn).
-    from app.integrations.telegram.bot import (  # noqa: PLC0415 — see docstring
-        _run_llm_turn,
-    )
-    from app.integrations.telegram.handlers import (  # noqa: PLC0415
+    # Drive the turn pipeline directly. Imported dynamically to avoid a
+    # ``bot ↔ regenerate_runtime`` static cycle in sentrux while still
+    # reusing bot.py's turn helper.
+    _run_llm_turn = import_module("app.channels.telegram.bot")._run_llm_turn
+    from app.channels.telegram.handlers import (  # noqa: PLC0415
         TelegramTurnContext,
     )
 

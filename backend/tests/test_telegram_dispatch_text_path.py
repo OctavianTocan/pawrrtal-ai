@@ -17,7 +17,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.channels._telegram_dispatch import dispatch_text_delta
+from app.channels.telegram.dispatch import dispatch_text_delta
 
 
 def _make_bot() -> AsyncMock:

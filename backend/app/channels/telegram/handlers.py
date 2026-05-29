@@ -33,25 +33,24 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+# Re-export so ``bot.py`` imports both ``handle_plain_message`` and
+# ``collect_attachments`` from the same module — keeps ``bot.py`` under
+# sentrux's ``no_god_files`` fan-out budget without forcing a registry
+# refactor in this PR (the long-term home is #281).
+from app.channels.telegram._attachments import (
+    collect_attachments as collect_attachments,  # noqa: PLC0414
+)
+from app.channels.telegram.bot_permissions import (
+    build_telegram_permission_check as build_telegram_permission_check,  # noqa: PLC0414
+)
+from app.channels.telegram.dev_admin import resolve_or_autolink_telegram_user
+from app.channels.telegram.model_defaults import resolve_effective_model_id
+from app.channels.telegram.sender import TelegramSender as TelegramSender  # noqa: PLC0414
 from app.crud.channel import (
     get_or_create_telegram_conversation_full,
     redeem_link_code,
     update_conversation_verbose_level,
 )
-
-# Re-export so ``bot.py`` imports both ``handle_plain_message`` and
-# ``collect_attachments`` from the same module — keeps ``bot.py`` under
-# sentrux's ``no_god_files`` fan-out budget without forcing a registry
-# refactor in this PR (the long-term home is #281).
-from app.integrations.telegram._attachments import (
-    collect_attachments as collect_attachments,  # noqa: PLC0414
-)
-from app.integrations.telegram.bot_permissions import (
-    build_telegram_permission_check as build_telegram_permission_check,  # noqa: PLC0414
-)
-from app.integrations.telegram.dev_admin import resolve_or_autolink_telegram_user
-from app.integrations.telegram.model_defaults import resolve_effective_model_id
-from app.integrations.telegram.sender import TelegramSender as TelegramSender  # noqa: PLC0414
 
 # Loose match for the link-code shape (8 chars from the look-alike-free
 # alphabet defined in app.crud.channel). Used to distinguish "user pasted
@@ -97,10 +96,10 @@ _VERBOSE_OK_MESSAGE = "Verbose level set to {level} ({label})."
 _VERBOSE_FAIL_MESSAGE = "Couldn't update verbose level — please try again."
 
 # The ``/status`` feature (formatters + handler + its copy constants)
-# lives in :mod:`app.integrations.telegram.status` to keep this file
+# lives in :mod:`app.channels.telegram.status` to keep this file
 # under the file-line budget.  Re-exported below so existing callers
 # (``bot.py``, tests) keep importing from ``handlers``.
-from app.integrations.telegram.status import (  # noqa: E402
+from app.channels.telegram.status import (  # noqa: E402
     _VERBOSE_LABELS,
 )
 
@@ -387,5 +386,5 @@ async def handle_verbose_command(
 
 
 # ``handle_status_command`` + ``_render_status_message`` are imported
-# at the top of this module from ``app.integrations.telegram.status``
+# at the top of this module from ``app.channels.telegram.status``
 # and re-exported, so historical call sites keep working.

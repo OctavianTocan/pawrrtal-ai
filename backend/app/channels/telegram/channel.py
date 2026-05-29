@@ -20,11 +20,18 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from app.channels.base import ChannelMessage
 from app.core.config import settings
 from app.core.providers.base import StreamEvent
 from app.core.tools.send_message import SendFn
 
-from ._telegram_dispatch import (
+from .delivery import (
+    final_reply_text,
+    optional_int,
+    routing_kwargs,
+    safe_edit_html,
+)
+from .dispatch import (
     ToolLineState,
     capture_terminal_event,
     dispatch_text_delta,
@@ -35,16 +42,9 @@ from ._telegram_dispatch import (
     prepare_thinking_block,
     prepare_tools_block,
 )
-from .base import ChannelMessage
-from .telegram_delivery import (
-    final_reply_text,
-    optional_int,
-    routing_kwargs,
-    safe_edit_html,
-)
-from .telegram_html import md_to_telegram_html
-from .telegram_progress import ProgressState, render_working
-from .telegram_progress import render_initial as render_initial  # noqa: PLC0414
+from .html import md_to_telegram_html
+from .progress import ProgressState, render_working
+from .progress import render_initial as render_initial  # noqa: PLC0414
 
 if TYPE_CHECKING:
     from aiogram import Bot
@@ -77,7 +77,7 @@ def _build_regenerate_markup(conversation_id: Any) -> Any | None:
     """Build the regenerate inline keyboard when the feature flag is on (#368)."""
     if not settings.telegram_regenerate_button_enabled:
         return None
-    from app.integrations.telegram.regenerate_keyboard import regenerate_markup_for  # noqa: PLC0415
+    from app.channels.telegram.regenerate_keyboard import regenerate_markup_for  # noqa: PLC0415
 
     return regenerate_markup_for(conversation_id)
 

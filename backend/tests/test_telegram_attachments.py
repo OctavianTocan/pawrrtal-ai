@@ -1,4 +1,4 @@
-"""Tests for ``app.integrations.telegram._attachments``.
+"""Tests for ``app.channels.telegram._attachments``.
 
 Closes the actionable parts of #304 + #305: the collect_attachments
 helper turns Telegram :class:`Message` payloads into image inputs +
@@ -21,7 +21,7 @@ from aiogram.types import Message
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.integrations.telegram._attachments import collect_attachments  # noqa: E402
+from app.channels.telegram._attachments import collect_attachments  # noqa: E402
 
 pytestmark = pytest.mark.anyio
 
@@ -150,7 +150,7 @@ async def test_document_message_extracts_markdown(monkeypatch: pytest.MonkeyPatc
         return "# Hello\n\nWorld."
 
     monkeypatch.setattr(
-        "app.integrations.telegram._attachments._extract_markdown_from_bytes",
+        "app.channels.telegram._attachments._extract_markdown_from_bytes",
         fake_extract,
     )
 

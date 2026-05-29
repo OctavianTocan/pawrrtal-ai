@@ -1,4 +1,4 @@
-"""Tests for :func:`app.integrations.telegram.model_defaults.resolve_effective_model_id`.
+"""Tests for :func:`app.channels.telegram.model_defaults.resolve_effective_model_id`.
 
 The resolver owns the three-step fallback chain that every Telegram
 surface walks. Centralising it means every regression here is caught
@@ -14,9 +14,9 @@ import uuid
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.channels.telegram.model_defaults import resolve_effective_model_id
 from app.core.providers.catalog import MODEL_CATALOG, default_model
 from app.infrastructure.database.legacy import User
-from app.integrations.telegram.model_defaults import resolve_effective_model_id
 
 
 @pytest.mark.anyio

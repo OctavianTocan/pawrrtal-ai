@@ -21,12 +21,12 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.channels._telegram_dispatch import (
+from app.channels.telegram.dispatch import (
     ToolLineState,
     handle_tool_result,
     handle_tool_use,
 )
-from app.channels.telegram_progress import (
+from app.channels.telegram.progress import (
     PREVIEW_MAX_CHARS,
     TOOL_ERROR_MAX_CHARS,
     render_initial,

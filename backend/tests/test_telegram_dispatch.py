@@ -1,4 +1,4 @@
-"""Unit tests for :mod:`app.channels._telegram_dispatch` per-event helpers.
+"""Unit tests for :mod:`app.channels.telegram.dispatch` per-event helpers.
 
 Focus: the ``handle_thinking`` state machine after the #345 / #351 / #353
 fixes. xAI streams per-token (one logical block, ``block_index=0`` for
@@ -25,7 +25,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.channels._telegram_dispatch import handle_thinking
+from app.channels.telegram.dispatch import handle_thinking
 
 
 def _make_bot() -> AsyncMock:

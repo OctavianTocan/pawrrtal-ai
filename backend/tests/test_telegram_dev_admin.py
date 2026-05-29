@@ -22,20 +22,20 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.crud.channel import get_user_id_for_external, issue_link_code
-from app.infrastructure.database.legacy import User
-from app.integrations.telegram.dev_admin import (
+from app.channels.telegram.dev_admin import (
     TELEGRAM_PROVIDER,
     resolve_or_autolink_telegram_user,
 )
-from app.integrations.telegram.handlers import (
+from app.channels.telegram.handlers import (
     PROVIDER,
     TelegramTurnContext,
     handle_plain_message,
     handle_start_command,
 )
-from app.integrations.telegram.sender import TelegramSender
+from app.channels.telegram.sender import TelegramSender
+from app.core.config import settings
+from app.crud.channel import get_user_id_for_external, issue_link_code
+from app.infrastructure.database.legacy import User
 from app.models import ChannelBinding, Workspace
 
 pytestmark = pytest.mark.anyio
@@ -346,7 +346,7 @@ async def test_autolink_recovers_from_concurrent_insert_race(
         )
 
     monkeypatch.setattr(
-        "app.integrations.telegram.dev_admin.get_user_id_for_external",
+        "app.channels.telegram.dev_admin.get_user_id_for_external",
         lookup_misses_then_recovers,
     )
 

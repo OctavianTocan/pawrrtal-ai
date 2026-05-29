@@ -15,7 +15,7 @@ from typing import cast
 
 import pytest
 
-from app.channels.telegram_errors import (
+from app.channels.telegram.errors import (
     ErrorKind,
     classify_error,
     render_agent_terminated_card,

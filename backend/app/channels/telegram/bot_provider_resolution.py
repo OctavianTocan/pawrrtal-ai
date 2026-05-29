@@ -1,6 +1,6 @@
 """Provider resolution helper with auto-clear safety net.
 
-Extracted from :mod:`app.integrations.telegram.bot` to keep that module's
+Extracted from :mod:`app.channels.telegram.bot` to keep that module's
 fan-out under the sentrux god-file threshold (15). The catalog / model-id
 machinery used by this helper accounts for ~4 of bot.py's import edges;
 hoisting it out concentrates them in one place.
@@ -14,13 +14,13 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
+from app.channels.telegram.handlers import TelegramTurnContext
 from app.core.providers import resolve_llm
 from app.core.providers.base import AILLM
 from app.core.providers.catalog import default_model, require_known
 from app.core.providers.model_id import InvalidModelId, UnknownModelId
 from app.crud.channel import update_conversation_model
 from app.infrastructure.database.legacy import async_session_maker
-from app.integrations.telegram.handlers import TelegramTurnContext
 
 logger = logging.getLogger(__name__)
 

@@ -20,18 +20,18 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.core.providers.catalog import MODEL_CATALOG
-from app.integrations.telegram.model_picker import (
+from app.channels.telegram.model_picker import (
     NOOP_CALLBACK,
     ModelCallback,
     ModelPickerState,
     build_set_default_keyboard,
 )
-from app.integrations.telegram.model_picker_runtime import (
+from app.channels.telegram.model_picker_runtime import (
     _handle_model_select,
     _handle_set_default,
     handle_model_picker_callback,
 )
+from app.core.providers.catalog import MODEL_CATALOG
 
 
 def _make_callback(*, data: str, with_message: bool = True) -> MagicMock:
@@ -77,7 +77,7 @@ class TestHandleSetDefault:
         assert rows is not None
         callback = _make_callback(data=rows[0][0].callback_data)
         with patch(
-            "app.integrations.telegram.model_picker_runtime.set_user_default_model_from_callback",
+            "app.channels.telegram.model_picker_runtime.set_user_default_model_from_callback",
             new=AsyncMock(return_value=True),
         ):
             await handle_model_picker_callback(callback=callback)
@@ -97,7 +97,7 @@ class TestHandleSetDefault:
         assert rows is not None
         callback = _make_callback(data=rows[0][0].callback_data)
         with patch(
-            "app.integrations.telegram.model_picker_runtime.set_user_default_model_from_callback",
+            "app.channels.telegram.model_picker_runtime.set_user_default_model_from_callback",
             new=AsyncMock(return_value=False),
         ):
             await handle_model_picker_callback(callback=callback)
@@ -113,7 +113,7 @@ class TestHandleSetDefault:
         callback = _make_callback(data="mdl:d:deadbeef:0")
         set_default_mock = AsyncMock(return_value=True)
         with patch(
-            "app.integrations.telegram.model_picker_runtime.set_user_default_model_from_callback",
+            "app.channels.telegram.model_picker_runtime.set_user_default_model_from_callback",
             new=set_default_mock,
         ):
             await handle_model_picker_callback(callback=callback)
@@ -139,11 +139,11 @@ class TestHandleModelSelectButtonBranching:
         )
         with (
             patch(
-                "app.integrations.telegram.model_picker_runtime.handle_model_command",
+                "app.channels.telegram.model_picker_runtime.handle_model_command",
                 new=AsyncMock(return_value="Model switched ✅"),
             ),
             patch(
-                "app.integrations.telegram.model_picker_runtime.get_model_picker_state",
+                "app.channels.telegram.model_picker_runtime.get_model_picker_state",
                 new=AsyncMock(return_value=state),
             ),
         ):
@@ -174,15 +174,15 @@ class TestHandleModelSelectButtonBranching:
         )
         with (
             patch(
-                "app.integrations.telegram.model_picker_runtime.handle_model_command",
+                "app.channels.telegram.model_picker_runtime.handle_model_command",
                 new=AsyncMock(return_value="Model switched ✅"),
             ),
             patch(
-                "app.integrations.telegram.model_picker_runtime.get_model_picker_state",
+                "app.channels.telegram.model_picker_runtime.get_model_picker_state",
                 new=AsyncMock(return_value=state),
             ),
             patch(
-                "app.integrations.telegram.model_picker_runtime.build_set_default_keyboard",
+                "app.channels.telegram.model_picker_runtime.build_set_default_keyboard",
                 return_value=None,
             ),
             caplog.at_level(logging.WARNING),
@@ -209,11 +209,11 @@ class TestHandleModelSelectButtonBranching:
         )
         with (
             patch(
-                "app.integrations.telegram.model_picker_runtime.handle_model_command",
+                "app.channels.telegram.model_picker_runtime.handle_model_command",
                 new=AsyncMock(return_value="Model switched ✅"),
             ),
             patch(
-                "app.integrations.telegram.model_picker_runtime.get_model_picker_state",
+                "app.channels.telegram.model_picker_runtime.get_model_picker_state",
                 new=AsyncMock(return_value=state),
             ),
         ):

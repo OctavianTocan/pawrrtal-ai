@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.integrations.telegram.model_command import _parse_model_args, _ParsedArgs
+from app.channels.telegram.model_command import _parse_model_args, _ParsedArgs
 
 
 @pytest.mark.parametrize(

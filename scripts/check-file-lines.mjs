@@ -90,7 +90,7 @@ const EXEMPT_PATH_FRAGMENTS = [
 	// TODO(pawrrtal-cct follow-up): split these and remove the exemption.
 	'backend/app/core/agent_loop/loop.py',
 	'backend/app/core/providers/claude/provider.py',
-	'backend/app/integrations/telegram/bot.py',
+	'backend/app/channels/telegram/bot.py',
 	// LCM retrieval lab (PR #258) — two files still over budget. ``evals.py``
 	// is the largest (873 lines: harness + scenarios + answerer + retrievers
 	// all in one) and the natural split is into an ``evals/`` package

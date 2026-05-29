@@ -1,8 +1,8 @@
 """Per-model reasoning-effort picker for the Telegram channel.
 
-Shape mirrors :mod:`app.integrations.telegram.model_picker` — pure
+Shape mirrors :mod:`app.channels.telegram.model_picker` — pure
 formatter + button builder + callback parser. The aiogram glue lives in
-:mod:`app.integrations.telegram.thinking_picker_runtime` so this module
+:mod:`app.channels.telegram.thinking_picker_runtime` so this module
 stays framework-free and unit-testable.
 
 Single-screen picker: the levels that show up are exactly those the
@@ -21,6 +21,7 @@ from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.channels.telegram.model_defaults import resolve_effective_model_id
 from app.core.providers.catalog import (
     CATALOG_ETAG,
     MODEL_CATALOG,
@@ -33,7 +34,6 @@ from app.crud.channel import (
     get_or_create_telegram_conversation_full,
     get_user_id_for_external,
 )
-from app.integrations.telegram.model_defaults import resolve_effective_model_id
 
 PROVIDER = "telegram"
 THINKING_CALLBACK_PREFIX = "thk:"

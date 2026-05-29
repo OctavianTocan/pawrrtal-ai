@@ -1,6 +1,6 @@
 """Telegram-side adapter for the cross-provider permission gate.
 
-Extracted out of :mod:`app.integrations.telegram.bot` to keep that module's
+Extracted out of :mod:`app.channels.telegram.bot` to keep that module's
 fan-out under the sentrux god-file threshold (15). All the permission
 machinery is concentrated here; ``bot.py`` only imports the single
 factory function below.
@@ -11,13 +11,14 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from app.channels.telegram import SURFACE_TELEGRAM
 from app.core.agent_loop.types import PermissionCheckFn, PermissionCheckResult
 from app.core.governance.permissions import (
     PermissionContext,
     build_default_permission_check,
 )
 from app.core.governance.workspace_context import load_workspace_context
+
+from .channel import SURFACE_TELEGRAM
 
 
 def build_telegram_permission_check(

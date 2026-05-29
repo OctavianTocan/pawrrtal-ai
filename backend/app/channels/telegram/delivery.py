@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from app.core.tools.display import fallback_tool_display
 
-from .telegram_html import md_to_telegram_html
+from .html import md_to_telegram_html
 
 if TYPE_CHECKING:
     from aiogram import Bot

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
+from app.channels.telegram import telegram_lifespan
 from app.core.event_bus import AgentHandler, NotificationService
 from app.infrastructure.lifecycle import shutdown_hook, startup_hook
-from app.integrations.telegram import telegram_lifespan
 
 if TYPE_CHECKING:
     from fastapi import FastAPI

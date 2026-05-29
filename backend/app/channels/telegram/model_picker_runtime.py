@@ -5,17 +5,16 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from app.infrastructure.database.legacy import async_session_maker
-from app.integrations.telegram.model_command import (
+from app.channels.telegram.model_command import (
     handle_model_command,
     set_user_default_model_from_callback,
 )
 
 # Re-exported so bot.py imports both via one module.
-from app.integrations.telegram.model_picker import (
+from app.channels.telegram.model_picker import (
     MODEL_CALLBACK_PREFIX as MODEL_CALLBACK_PREFIX,  # noqa: PLC0414
 )
-from app.integrations.telegram.model_picker import (
+from app.channels.telegram.model_picker import (
     NOOP_CALLBACK,
     ModelButton,
     ModelCallback,
@@ -35,7 +34,8 @@ from app.integrations.telegram.model_picker import (
     picker_stale_message,
     resolve_model_selection,
 )
-from app.integrations.telegram.sender import TelegramSender
+from app.channels.telegram.sender import TelegramSender
+from app.infrastructure.database.legacy import async_session_maker
 
 if TYPE_CHECKING:
     from aiogram.types import (

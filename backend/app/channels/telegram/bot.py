@@ -1,7 +1,7 @@
 """aiogram-backed Telegram bot service.
 
 Thin glue between aiogram's ``Bot`` + ``Dispatcher`` and the framework-free
-handlers in :mod:`app.integrations.telegram.handlers`. Two boot modes:
+handlers in :mod:`app.channels.telegram.handlers`. Two boot modes:
 
 - **polling** (default; works on a laptop with no inbound connectivity):
   the FastAPI lifespan launches a background task that calls
@@ -26,28 +26,16 @@ import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-# ``ChannelMessage`` is re-exported via :mod:`app.channels` (its
-# ``__init__.py`` already does the lift) so bot.py imports both
-# ``resolve_channel`` and ``ChannelMessage`` from the same module —
-# one fewer fan-out hit for sentrux's ``no_god_files`` budget.
-from app.channels import ChannelMessage, resolve_channel
-
-# ``render_initial`` is re-exported via :mod:`app.channels.telegram`
-# to keep bot.py under sentrux's ``no_god_files`` fan-out budget.
-from app.channels.telegram import SURFACE_TELEGRAM, make_telegram_sender, render_initial
-from app.channels.telegram_delivery import safe_edit_html
-from app.channels.turn_runner import ChatTurnInput, run_turn
-from app.core.agent_loop.hooks import build_pre_turn_hooks
-from app.core.agent_loop.tools import build_agent_tools
-from app.core.config import settings
-from app.infrastructure.database.legacy import async_session_maker
-from app.integrations.telegram.bot_provider_resolution import (
+from app.channels.base import ChannelMessage
+from app.channels.telegram.bot_provider_resolution import (
     resolve_provider_with_auto_clear,
 )
-from app.integrations.telegram.handlers import (
+from app.channels.telegram.delivery import safe_edit_html
+from app.channels.telegram.handlers import (
     TelegramSender,
     TelegramTurnContext,
     build_telegram_permission_check,
@@ -63,50 +51,31 @@ from app.integrations.telegram.handlers import (
 # imports it from :mod:`sender`) so bot.py imports both
 # ``handle_plain_message`` and ``TelegramSender`` from the same module
 # — keeps bot.py under sentrux's ``no_god_files`` fan-out budget.
-from app.integrations.telegram.message_queue import (
+from app.channels.telegram.message_queue import (
     ChatMessageQueueDispatcher,
     QueuedTurn,
-)
-
-# ``MODEL_CALLBACK_PREFIX`` is re-exported via
-# :mod:`model_picker_runtime` to keep bot.py under sentrux's
-# ``no_god_files`` fan-out budget.
-from app.integrations.telegram.model_picker_runtime import (
-    MODEL_CALLBACK_PREFIX,
-    answer_model_command,
-    handle_model_picker_callback,
 )
 
 # The reasoning-effort backstop lives in its own module so bot.py
 # doesn't take a separate fan-out hit on the resolver + DB seam +
 # notice formatter.
-from app.integrations.telegram.reasoning_notify import normalize_reasoning_and_notify
-
-# Regenerate-keyboard runtime (#368) — re-exports the callback prefix
-# so bot.py imports both the registration prefix + handler from one
-# module, keeping the fan-out under the sentrux ``no_god_files``
-# budget. Same trick as the model / thinking / verbose pickers.
-from app.integrations.telegram.regenerate_runtime import (
-    REGEN_CALLBACK_PREFIX,
-    handle_regenerate_callback,
-)
+from app.channels.telegram.reasoning_notify import normalize_reasoning_and_notify
 
 # ``compact_command`` is re-exported via :mod:`status` to keep bot.py
 # under sentrux's ``no_god_files`` fan-out budget (same trick as
 # ``handle_lcm_command``).
-from app.integrations.telegram.status import (
+from app.channels.telegram.status import (
     handle_compact_command,
     handle_lcm_command,
     handle_status_command,
 )
+from app.channels.turn_runner import ChatTurnInput, run_turn
+from app.core.agent_loop.hooks import build_pre_turn_hooks
+from app.core.agent_loop.tools import build_agent_tools
+from app.core.config import settings
+from app.infrastructure.database.legacy import async_session_maker
 
-# ``THINKING_CALLBACK_PREFIX`` is re-exported via
-# :mod:`thinking_picker_runtime` for the same fan-out reason.
-from app.integrations.telegram.thinking_picker_runtime import (
-    THINKING_CALLBACK_PREFIX,
-    answer_thinking_command,
-    handle_thinking_picker_callback,
-)
+from .channel import SURFACE_TELEGRAM, make_telegram_sender, render_initial
 
 if TYPE_CHECKING:
     from aiogram import Bot, Dispatcher
@@ -431,6 +400,8 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
             )
             channel_message["metadata"]["message_id"] = thinking_msg.message_id
 
+    from app.channels.registry import resolve_channel  # noqa: PLC0415
+
     turn_input = ChatTurnInput(
         conversation_id=context.conversation_id,
         user_id=context.pawrrtal_user_id,
@@ -626,11 +597,13 @@ def _register_telegram_command_handlers(dispatcher: Dispatcher) -> None:
         text = message.text or ""
         parts = text.strip().split(maxsplit=1)
         model_arg = parts[1].strip() if len(parts) > 1 else ""
-        await answer_model_command(message=message, model_arg=model_arg)
+        model_picker_runtime = import_module("app.channels.telegram.model_picker_runtime")
+        await model_picker_runtime.answer_model_command(message=message, model_arg=model_arg)
 
     @dispatcher.message(Command("thinking"))
     async def _on_thinking(message: Message) -> None:
-        await answer_thinking_command(message=message)
+        thinking_picker_runtime = import_module("app.channels.telegram.thinking_picker_runtime")
+        await thinking_picker_runtime.answer_thinking_command(message=message)
 
     @dispatcher.message(Command("status"))
     async def _on_status(message: Message) -> None:
@@ -689,20 +662,29 @@ def _register_telegram_lcm_command_handlers(dispatcher: Dispatcher) -> None:
 
 def _register_telegram_callback_handlers(dispatcher: Dispatcher) -> None:
     """Register inline-keyboard callback handlers on the aiogram dispatcher."""
-
-    @dispatcher.callback_query(lambda query: (query.data or "").startswith(MODEL_CALLBACK_PREFIX))
-    async def _on_model_picker(callback: CallbackQuery) -> None:
-        await handle_model_picker_callback(callback=callback)
+    model_picker_runtime = import_module("app.channels.telegram.model_picker_runtime")
+    regenerate_runtime = import_module("app.channels.telegram.regenerate_runtime")
+    thinking_picker_runtime = import_module("app.channels.telegram.thinking_picker_runtime")
 
     @dispatcher.callback_query(
-        lambda query: (query.data or "").startswith(THINKING_CALLBACK_PREFIX)
+        lambda query: (query.data or "").startswith(model_picker_runtime.MODEL_CALLBACK_PREFIX)
+    )
+    async def _on_model_picker(callback: CallbackQuery) -> None:
+        await model_picker_runtime.handle_model_picker_callback(callback=callback)
+
+    @dispatcher.callback_query(
+        lambda query: (query.data or "").startswith(
+            thinking_picker_runtime.THINKING_CALLBACK_PREFIX
+        )
     )
     async def _on_thinking_picker(callback: CallbackQuery) -> None:
-        await handle_thinking_picker_callback(callback=callback)
+        await thinking_picker_runtime.handle_thinking_picker_callback(callback=callback)
 
-    @dispatcher.callback_query(lambda query: (query.data or "").startswith(REGEN_CALLBACK_PREFIX))
+    @dispatcher.callback_query(
+        lambda query: (query.data or "").startswith(regenerate_runtime.REGEN_CALLBACK_PREFIX)
+    )
     async def _on_regenerate(callback: CallbackQuery) -> None:
-        await handle_regenerate_callback(callback=callback)
+        await regenerate_runtime.handle_regenerate_callback(callback=callback)
 
 
 def _register_telegram_message_handler(dispatcher: Dispatcher) -> None:

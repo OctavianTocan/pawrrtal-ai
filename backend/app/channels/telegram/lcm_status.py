@@ -4,7 +4,7 @@ Surfaces Lossless Context Management state for the current conversation
 so the operator can diagnose memory regressions from Telegram without
 SSH'ing into the server. Closes #303.
 
-Mirrors :mod:`app.integrations.telegram.status` in shape: pure
+Mirrors :mod:`app.channels.telegram.status` in shape: pure
 formatter + one async handler + its own copy constants. Stays under
 the 500-line budget.
 """
@@ -30,7 +30,7 @@ from app.models import LCMContextItem, LCMSummary
 class _TelegramSenderLike(Protocol):
     """Structural type for the subset of ``TelegramSender`` /lcm needs.
 
-    Same shape as :class:`app.integrations.telegram.status._TelegramSenderLike`
+    Same shape as :class:`app.channels.telegram.status._TelegramSenderLike`
     — declared independently here so the two modules don't import each
     other (sentrux's ``max_cycles=0`` forbids it).
     """

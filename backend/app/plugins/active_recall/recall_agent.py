@@ -8,7 +8,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.channels.telegram_html import md_to_telegram_html
+from app.channels.telegram.html import md_to_telegram_html
 from app.core.agent_loop.types import AgentTool, PermissionCheckResult
 from app.core.config import settings
 from app.core.governance.permissions import (

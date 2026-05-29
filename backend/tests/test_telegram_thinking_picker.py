@@ -6,9 +6,7 @@ import uuid
 
 import pytest
 
-from app.core.providers.catalog import MODEL_CATALOG, ModelEntry, default_model, find
-from app.core.providers.model_id import Host, parse_model_id
-from app.integrations.telegram.thinking_picker import (
+from app.channels.telegram.thinking_picker import (
     THINKING_CALLBACK_PREFIX,
     ThinkingCallback,
     ThinkingPickerState,
@@ -20,6 +18,8 @@ from app.integrations.telegram.thinking_picker import (
     parse_thinking_callback_data,
     resolve_select,
 )
+from app.core.providers.catalog import MODEL_CATALOG, ModelEntry, default_model, find
+from app.core.providers.model_id import Host, parse_model_id
 
 
 def _entry(host: Host, model: str) -> ModelEntry:

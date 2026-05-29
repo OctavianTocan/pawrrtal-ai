@@ -1,6 +1,6 @@
 """aiogram runtime glue for the Telegram thinking picker.
 
-Mirrors :mod:`app.integrations.telegram.model_picker_runtime` — keeps
+Mirrors :mod:`app.channels.telegram.model_picker_runtime` — keeps
 the picker module framework-free so it can be unit-tested without
 aiogram, while this file owns the aiogram-shaped IO.
 """
@@ -9,15 +9,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
-from app.crud.channel import update_conversation_reasoning_effort
-from app.infrastructure.database.legacy import async_session_maker
-from app.integrations.telegram.handlers import TelegramSender
+from app.channels.telegram.handlers import TelegramSender
 
 # Re-exported so bot.py imports both via one module.
-from app.integrations.telegram.thinking_picker import (
+from app.channels.telegram.thinking_picker import (
     THINKING_CALLBACK_PREFIX as THINKING_CALLBACK_PREFIX,  # noqa: PLC0414
 )
-from app.integrations.telegram.thinking_picker import (
+from app.channels.telegram.thinking_picker import (
     ThinkingButton,
     ThinkingCallback,
     ThinkingPickerState,
@@ -32,6 +30,8 @@ from app.integrations.telegram.thinking_picker import (
     picker_stale_message,
     resolve_select,
 )
+from app.crud.channel import update_conversation_reasoning_effort
+from app.infrastructure.database.legacy import async_session_maker
 
 if TYPE_CHECKING:
     from aiogram.types import (

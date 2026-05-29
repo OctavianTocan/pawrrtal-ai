@@ -10,14 +10,14 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from .telegram_delivery import (
+from .delivery import (
     safe_delete,
     safe_edit,
     safe_edit_html,
     safe_send_text,
     thinking_html,
 )
-from .telegram_html import md_to_telegram_html
+from .html import md_to_telegram_html
 
 if TYPE_CHECKING:
     from aiogram import Bot

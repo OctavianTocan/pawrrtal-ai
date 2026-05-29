@@ -28,6 +28,7 @@ from typing import Protocol
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.channels.telegram.model_defaults import resolve_effective_model_id
 from app.core.config import settings
 from app.core.lcm import compact_leaf_if_needed
 from app.core.lcm.background import acquire_lcm_lock
@@ -37,7 +38,6 @@ from app.crud.channel import (
     get_user_id_for_external,
 )
 from app.infrastructure.database.legacy import async_session_maker
-from app.integrations.telegram.model_defaults import resolve_effective_model_id
 
 
 class _TelegramSenderLike(Protocol):

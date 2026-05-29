@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.integrations.telegram.compact_command import handle_compact_command
+from app.channels.telegram.compact_command import handle_compact_command
 
 
 def _sender(*, user_id: int = 42, thread_id: int | None = None) -> SimpleNamespace:
@@ -20,7 +20,7 @@ async def test_returns_disabled_message_when_lcm_off() -> None:
     fake_settings = SimpleNamespace(
         lcm_enabled=False, lcm_fresh_tail_count=64, lcm_leaf_chunk_tokens=20_000
     )
-    with patch("app.integrations.telegram.compact_command.settings", fake_settings):
+    with patch("app.channels.telegram.compact_command.settings", fake_settings):
         reply = await handle_compact_command(sender=_sender(), session=AsyncMock())
     assert "LCM is disabled" in reply
 
@@ -32,9 +32,9 @@ async def test_returns_not_bound_when_no_user_binding() -> None:
         lcm_enabled=True, lcm_fresh_tail_count=64, lcm_leaf_chunk_tokens=20_000
     )
     with (
-        patch("app.integrations.telegram.compact_command.settings", fake_settings),
+        patch("app.channels.telegram.compact_command.settings", fake_settings),
         patch(
-            "app.integrations.telegram.compact_command.get_user_id_for_external",
+            "app.channels.telegram.compact_command.get_user_id_for_external",
             AsyncMock(return_value=None),
         ),
     ):
@@ -57,26 +57,26 @@ async def test_returns_nothing_to_compact_when_compactor_returns_false() -> None
         return _NoopLockCM()
 
     with (
-        patch("app.integrations.telegram.compact_command.settings", fake_settings),
+        patch("app.channels.telegram.compact_command.settings", fake_settings),
         patch(
-            "app.integrations.telegram.compact_command.get_user_id_for_external",
+            "app.channels.telegram.compact_command.get_user_id_for_external",
             AsyncMock(return_value=fake_user),
         ),
         patch(
-            "app.integrations.telegram.compact_command.get_or_create_telegram_conversation_full",
+            "app.channels.telegram.compact_command.get_or_create_telegram_conversation_full",
             AsyncMock(return_value=fake_conversation),
         ),
         patch(
-            "app.integrations.telegram.compact_command.resolve_effective_model_id",
+            "app.channels.telegram.compact_command.resolve_effective_model_id",
             AsyncMock(return_value="agent-sdk:anthropic/claude-sonnet-4-6"),
         ),
         patch(
-            "app.integrations.telegram.compact_command.compact_leaf_if_needed",
+            "app.channels.telegram.compact_command.compact_leaf_if_needed",
             AsyncMock(return_value=False),
         ),
-        patch("app.integrations.telegram.compact_command.acquire_lcm_lock", _noop_lock),
+        patch("app.channels.telegram.compact_command.acquire_lcm_lock", _noop_lock),
         patch(
-            "app.integrations.telegram.compact_command.async_session_maker",
+            "app.channels.telegram.compact_command.async_session_maker",
             return_value=_AsyncSessionCM(),
         ),
     ):
@@ -103,26 +103,26 @@ async def test_returns_compacted_message_on_success() -> None:
         return _NoopLockCM()
 
     with (
-        patch("app.integrations.telegram.compact_command.settings", fake_settings),
+        patch("app.channels.telegram.compact_command.settings", fake_settings),
         patch(
-            "app.integrations.telegram.compact_command.get_user_id_for_external",
+            "app.channels.telegram.compact_command.get_user_id_for_external",
             AsyncMock(return_value=fake_user),
         ),
         patch(
-            "app.integrations.telegram.compact_command.get_or_create_telegram_conversation_full",
+            "app.channels.telegram.compact_command.get_or_create_telegram_conversation_full",
             AsyncMock(return_value=fake_conversation),
         ),
         patch(
-            "app.integrations.telegram.compact_command.resolve_effective_model_id",
+            "app.channels.telegram.compact_command.resolve_effective_model_id",
             AsyncMock(return_value="agent-sdk:anthropic/claude-sonnet-4-6"),
         ),
         patch(
-            "app.integrations.telegram.compact_command.compact_leaf_if_needed",
+            "app.channels.telegram.compact_command.compact_leaf_if_needed",
             AsyncMock(return_value=True),
         ),
-        patch("app.integrations.telegram.compact_command.acquire_lcm_lock", _noop_lock),
+        patch("app.channels.telegram.compact_command.acquire_lcm_lock", _noop_lock),
         patch(
-            "app.integrations.telegram.compact_command.async_session_maker",
+            "app.channels.telegram.compact_command.async_session_maker",
             return_value=_AsyncSessionCM(),
         ),
     ):

@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from app.integrations.telegram.message_queue import (
+from app.channels.telegram.message_queue import (
     ChatMessageQueueDispatcher,
     QueuedTurn,
 )
