@@ -8,20 +8,20 @@ from uuid import uuid4
 
 import pytest
 
-from app.core.providers.agy_cli.command import AGY_BINARY_NAME, build_agy_command
-from app.core.providers.agy_cli.logs import classify_log_line
-from app.core.providers.agy_cli.output import (
+from app.providers.agy_cli.command import AGY_BINARY_NAME, build_agy_command
+from app.providers.agy_cli.logs import classify_log_line
+from app.providers.agy_cli.output import (
     AGY_FINAL_CLOSE,
     AGY_FINAL_OPEN,
     build_framed_prompt,
     extract_final_answer,
     is_timeout_output,
 )
-from app.core.providers.agy_cli.provider import AgyCliLLM
-from app.core.providers.agy_cli.session import parse_conversation_id
-from app.core.providers.catalog import MODEL_CATALOG
-from app.core.providers.factory import resolve_llm
-from app.core.providers.model_id import Host, Vendor, parse_model_id
+from app.providers.agy_cli.provider import AgyCliLLM
+from app.providers.agy_cli.session import parse_conversation_id
+from app.providers.catalog import MODEL_CATALOG
+from app.providers.factory import resolve_llm
+from app.providers.model_id import Host, Vendor, parse_model_id
 
 
 def test_parse_model_id_accepts_agy_cli_host() -> None:
@@ -165,8 +165,8 @@ async def test_agy_provider_yields_last_framed_answer(
             b"<pawrrtal_final>old</pawrrtal_final>\n<pawrrtal_final>new</pawrrtal_final>\n"
         )
 
-    monkeypatch.setattr("app.core.providers.agy_cli.provider.is_agy_cli_available", lambda: True)
-    monkeypatch.setattr("app.core.providers.agy_cli.provider._make_log_file", lambda _cid: log_file)
+    monkeypatch.setattr("app.providers.agy_cli.provider.is_agy_cli_available", lambda: True)
+    monkeypatch.setattr("app.providers.agy_cli.provider._make_log_file", lambda _cid: log_file)
     monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_spawn)
 
     provider = AgyCliLLM("gemini-3.5-flash-high", workspace_root=tmp_path)
@@ -193,8 +193,8 @@ async def test_agy_provider_surfaces_timeout_as_error(
         log_file.write_text("")
         return FakeProcess(b"Error: timed out waiting for response\n", returncode=0)
 
-    monkeypatch.setattr("app.core.providers.agy_cli.provider.is_agy_cli_available", lambda: True)
-    monkeypatch.setattr("app.core.providers.agy_cli.provider._make_log_file", lambda _cid: log_file)
+    monkeypatch.setattr("app.providers.agy_cli.provider.is_agy_cli_available", lambda: True)
+    monkeypatch.setattr("app.providers.agy_cli.provider._make_log_file", lambda _cid: log_file)
     monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_spawn)
 
     provider = AgyCliLLM("gemini-3.5-flash-high", workspace_root=tmp_path)
@@ -223,8 +223,8 @@ async def test_agy_provider_surfaces_unframed_stdout_as_error(
         log_file.write_text("")
         return FakeProcess(b"plain answer\n", returncode=0)
 
-    monkeypatch.setattr("app.core.providers.agy_cli.provider.is_agy_cli_available", lambda: True)
-    monkeypatch.setattr("app.core.providers.agy_cli.provider._make_log_file", lambda _cid: log_file)
+    monkeypatch.setattr("app.providers.agy_cli.provider.is_agy_cli_available", lambda: True)
+    monkeypatch.setattr("app.providers.agy_cli.provider._make_log_file", lambda _cid: log_file)
     monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_spawn)
 
     provider = AgyCliLLM("gemini-3.5-flash-high", workspace_root=tmp_path)

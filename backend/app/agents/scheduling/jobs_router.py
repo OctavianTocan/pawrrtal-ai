@@ -16,9 +16,9 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.core.scheduler import JobScheduler
+from app.agents.scheduling import JobScheduler
 from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import User, get_async_session
 from app.models import ScheduledJob
 from app.schemas import ScheduledJobCreate, ScheduledJobRead

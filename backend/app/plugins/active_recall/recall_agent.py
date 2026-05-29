@@ -8,21 +8,21 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
+from app.agents.plugins.types import PreTurnHookContext
+from app.agents.types import AgentTool, PermissionCheckResult
 from app.channels.telegram.html import md_to_telegram_html
-from app.core.agent_loop.types import AgentTool, PermissionCheckResult
-from app.core.config import settings
-from app.core.governance.permissions import (
+from app.governance.permissions import (
     PermissionContext,
     build_default_permission_check,
 )
-from app.core.keys import resolve_api_key
-from app.core.plugins.types import PreTurnHookContext
-from app.core.providers._errors import ProviderError
-from app.core.providers.factory import resolve_llm
-from app.core.tools.errors import ToolError
-from app.core.tools.lcm_grep_agent import make_lcm_grep_tool
-from app.core.tools.lcm_search_agent import make_lcm_search_tool
-from app.core.tools.workspace_files import make_list_dir_tool, make_read_file_tool
+from app.infrastructure.config import settings
+from app.infrastructure.keys import resolve_api_key
+from app.providers._errors import ProviderError
+from app.providers.factory import resolve_llm
+from app.tools.errors import ToolError
+from app.tools.lcm_grep_agent import make_lcm_grep_tool
+from app.tools.lcm_search_agent import make_lcm_search_tool
+from app.tools.workspace_files import make_list_dir_tool, make_read_file_tool
 
 logger = logging.getLogger(__name__)
 

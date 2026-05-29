@@ -17,12 +17,12 @@ import logging
 from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.core.governance.cost_tracker import (
+from app.governance.cost_tracker import (
     CostBudget,
     PostgresCostLedger,
     per_request_reservation_usd,
 )
+from app.infrastructure.config import settings
 
 logger = logging.getLogger(__name__)
 

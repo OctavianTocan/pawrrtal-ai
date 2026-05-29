@@ -11,7 +11,7 @@ import json
 import re
 from typing import Any
 
-from app.core.agent_loop.display import ToolDisplayPayload
+from app.agents.display import ToolDisplayPayload
 
 UUID_PATTERN = re.compile(
     r"\b[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}\b"

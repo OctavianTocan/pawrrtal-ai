@@ -21,10 +21,8 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.keys import load_workspace_env
-from app.core.persona_bootstrap import IDENTITY_BEGIN, IDENTITY_END
-from app.core.workspace import _build_preferences_md, seed_workspace
 from app.infrastructure.database.legacy import User
+from app.infrastructure.keys import load_workspace_env
 from app.models import UserPersonalization, Workspace
 from app.workspace.crud import (
     DEV_ADMIN_WORKSPACE_DIRNAME,
@@ -34,6 +32,8 @@ from app.workspace.crud import (
     get_default_workspace,
     list_workspaces,
 )
+from app.workspace.persona_bootstrap import IDENTITY_BEGIN, IDENTITY_END
+from app.workspace.service import _build_preferences_md, seed_workspace
 
 
 def _make_personalization(**kwargs: Any) -> UserPersonalization:
@@ -56,7 +56,7 @@ def _make_personalization(**kwargs: Any) -> UserPersonalization:
 
 def _patch_workspace_base(tmp_path: Path) -> Any:
     """Patch ``workspace_base_dir`` only; leave template paths real."""
-    from app.core.config import settings
+    from app.infrastructure.config import settings
 
     return patch.object(settings, "workspace_base_dir", str(tmp_path))
 

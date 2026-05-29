@@ -36,7 +36,7 @@ from app.channels.telegram.progress import (
     render_tools_in_flight,
     render_working,
 )
-from app.core.providers.base import StreamEvent
+from app.providers.base import StreamEvent
 
 # ---------------------------------------------------------------------------
 # Static renderers

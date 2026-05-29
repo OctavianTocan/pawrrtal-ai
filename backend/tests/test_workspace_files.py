@@ -14,8 +14,8 @@ from pathlib import Path
 
 import pytest
 
-from app.core.tools.errors import ToolError, ToolErrorCode
-from app.core.tools.workspace_files import make_workspace_tools
+from app.tools.errors import ToolError, ToolErrorCode
+from app.tools.workspace_files import make_workspace_tools
 
 
 @pytest.fixture

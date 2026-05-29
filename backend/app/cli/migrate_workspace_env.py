@@ -20,8 +20,8 @@ import uuid
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.keys import migrate_user_keyed_env_file
 from app.infrastructure.database.legacy import async_session_maker
+from app.infrastructure.keys import migrate_user_keyed_env_file
 from app.models import Workspace
 
 logger = logging.getLogger(__name__)

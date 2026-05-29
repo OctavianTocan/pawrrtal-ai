@@ -1,6 +1,6 @@
 """Issue #251 — LCM retrieval observability panel tests.
 
-Covers ``app.core.lcm.observe.describe_assembled_context`` and the
+Covers ``app.lcm.observe.describe_assembled_context`` and the
 ``GET /api/v1/lcm/conversations/{id}/context`` route registered in
 ``app.infrastructure.observability.lcm.router``.  The behaviours nailed down here:
 
@@ -27,8 +27,8 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.lcm.observe import describe_assembled_context
 from app.infrastructure.database.legacy import User
+from app.lcm.observe import describe_assembled_context
 from app.models import (
     ChatMessage,
     Conversation,

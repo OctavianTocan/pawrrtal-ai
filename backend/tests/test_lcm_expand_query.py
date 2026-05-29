@@ -23,7 +23,6 @@ from unittest.mock import MagicMock
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.tools.lcm_expand_query import lcm_expand_query
 from app.infrastructure.database.legacy import User
 from app.models import (
     ChatMessage,
@@ -31,6 +30,7 @@ from app.models import (
     LCMContextItem,
     LCMSummary,
 )
+from app.tools.lcm_expand_query import lcm_expand_query
 
 # Helpers
 
@@ -126,13 +126,13 @@ def _make_failing_provider() -> Any:
 
 
 def _patch_provider(monkeypatch: pytest.MonkeyPatch, provider: Any) -> None:
-    import app.core.tools.lcm_expand_query as _mod
+    import app.tools.lcm_expand_query as _mod
 
     monkeypatch.setattr(_mod, "resolve_llm", lambda *a, **kw: provider)
 
 
 def _patch_settings(monkeypatch: pytest.MonkeyPatch) -> None:
-    import app.core.tools.lcm_expand_query as _mod
+    import app.tools.lcm_expand_query as _mod
 
     class _Fake:
         lcm_summary_model = ""

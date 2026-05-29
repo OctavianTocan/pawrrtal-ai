@@ -15,8 +15,8 @@ from typing import Any, cast
 import pytest
 from google.genai import types as gtypes
 
-from app.core.agent_loop.loop import agent_loop
-from app.core.agent_loop.types import (
+from app.agents.loop import agent_loop
+from app.agents.types import (
     AgentContext,
     AgentEvent,
     AgentLoopConfig,
@@ -29,7 +29,7 @@ from app.core.agent_loop.types import (
     ToolCallContent,
     UserMessage,
 )
-from app.core.providers.gemini import provider as gemini_provider
+from app.providers.gemini import provider as gemini_provider
 
 
 async def _execute_noop(tool_call_id: str, **kwargs: object) -> str:

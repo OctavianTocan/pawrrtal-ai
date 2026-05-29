@@ -24,10 +24,10 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import app.channels.crud as channel_crud
+from app.agents.scheduling import JobScheduler
 from app.agents.scheduling.crud import sync_workspace_heartbeats
-from app.core.config import settings
-from app.core.scheduler import JobScheduler
 from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import User, get_async_session
 from app.workspace.crud import get_default_workspace
 

@@ -22,9 +22,8 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.core.tools.skills import read_skill_manifest
 from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import User, get_async_session
 from app.models import Workspace
 from app.schemas import (
@@ -38,6 +37,7 @@ from app.schemas import (
     WorkspaceTreeResponse,
     WorkspaceUpdate,
 )
+from app.tools.skills import read_skill_manifest
 from app.workspace.crud import (
     create_workspace,
     delete_workspace,

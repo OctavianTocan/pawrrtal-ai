@@ -1,7 +1,7 @@
 """Issue #253 — ranked lcm_search tests.
 
-Covers ``app.core.tools.lcm_search.lcm_search`` and the AgentTool
-factory in ``app.core.tools.lcm_search_agent``.
+Covers ``app.tools.lcm_search.lcm_search`` and the AgentTool
+factory in ``app.tools.lcm_search_agent``.
 
 What we nail down:
 
@@ -30,17 +30,17 @@ from pathlib import Path
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.agent_loop.tools import build_agent_tools
-from app.core.config import settings
-from app.core.tools.lcm_search import (
+from app.agents.tools import build_agent_tools
+from app.infrastructure.config import settings
+from app.infrastructure.database.legacy import User
+from app.models import ChatMessage, Conversation, LCMSummary
+from app.tools.lcm_search import (
     LCMSearchResult,
     _tokenize_query,
     format_results,
     lcm_search,
 )
-from app.core.tools.lcm_search_agent import make_lcm_search_tool
-from app.infrastructure.database.legacy import User
-from app.models import ChatMessage, Conversation, LCMSummary
+from app.tools.lcm_search_agent import make_lcm_search_tool
 
 
 async def _make_conversation(session: AsyncSession, user: User) -> Conversation:

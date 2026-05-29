@@ -14,7 +14,7 @@ import pytest
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.core.tools.report_issue import make_report_issue_tool  # noqa: E402
+from app.tools.report_issue import make_report_issue_tool  # noqa: E402
 
 pytestmark = pytest.mark.anyio
 
@@ -55,7 +55,7 @@ def _patch_github(
 def _patch_token(token: str | None = FAKE_TOKEN) -> Any:
     """Patch resolve_api_key to return the given token."""
     return patch(
-        "app.core.tools.report_issue.resolve_api_key",
+        "app.tools.report_issue.resolve_api_key",
         return_value=token,
     )
 
@@ -63,7 +63,7 @@ def _patch_token(token: str | None = FAKE_TOKEN) -> Any:
 def _patch_repo(repo: str = FAKE_REPO) -> Any:
     """Patch settings.github_issues_repo."""
     return patch(
-        "app.core.tools.report_issue.settings",
+        "app.tools.report_issue.settings",
         github_issues_repo=repo,
     )
 

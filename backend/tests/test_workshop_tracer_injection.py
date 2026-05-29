@@ -11,7 +11,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from app.core.observability.workshop import (
+from app.infrastructure.observability.workshop import (
     reset_tracer_for_tests,
     set_tracer_for_tests,
     turn_span,

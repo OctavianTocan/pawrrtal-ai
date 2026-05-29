@@ -16,11 +16,11 @@ from pathlib import Path
 
 from app.channels.crud import update_conversation_model
 from app.channels.telegram.handlers import TelegramTurnContext
-from app.core.providers import resolve_llm
-from app.core.providers.base import AILLM
-from app.core.providers.catalog import default_model, require_known
-from app.core.providers.model_id import InvalidModelId, UnknownModelId
 from app.infrastructure.database.legacy import async_session_maker
+from app.providers import resolve_llm
+from app.providers.base import AILLM
+from app.providers.catalog import default_model, require_known
+from app.providers.model_id import InvalidModelId, UnknownModelId
 
 logger = logging.getLogger(__name__)
 

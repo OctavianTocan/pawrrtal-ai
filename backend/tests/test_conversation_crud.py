@@ -19,10 +19,10 @@ from app.conversations.crud import (
     update_conversation_model,
     update_conversation_title,
 )
-from app.core.providers.catalog import MODEL_CATALOG
-from app.core.providers.model_id import Host
 from app.infrastructure.database.legacy import User
 from app.models import Conversation
+from app.providers.catalog import MODEL_CATALOG
+from app.providers.model_id import Host
 from app.schemas import ConversationCreate, ConversationUpdate
 
 

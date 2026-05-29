@@ -30,6 +30,8 @@ from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from app.agents.hooks import build_pre_turn_hooks
+from app.agents.tools import build_agent_tools
 from app.channels.base import ChannelMessage
 from app.channels.telegram.bot_provider_resolution import (
     resolve_provider_with_auto_clear,
@@ -70,9 +72,7 @@ from app.channels.telegram.status import (
     handle_status_command,
 )
 from app.channels.turn_runner import ChatTurnInput, run_turn
-from app.core.agent_loop.hooks import build_pre_turn_hooks
-from app.core.agent_loop.tools import build_agent_tools
-from app.core.config import settings
+from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
 
 from .channel import SURFACE_TELEGRAM, make_telegram_sender, render_initial
@@ -373,7 +373,7 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
     # but model changes (via /model, the picker, or any future
     # surface) can leave the stored value out of sync with what the
     # model honours. The shared resolver in
-    # `app.core.providers.reasoning` adapts or clears the override;
+    # `app.providers.reasoning` adapts or clears the override;
     # the helper sends a Telegram notice whenever a change happens
     # so the new behaviour isn't silent. Returns ``None`` for the
     # "let the provider pick its default" case.

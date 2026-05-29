@@ -22,9 +22,9 @@ from fastapi import Depends
 from fastapi.routing import APIRouter
 from pydantic import BaseModel, Field
 
-from app.core.providers import resolve_llm
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.database.legacy import User
+from app.providers import resolve_llm
 
 logger = logging.getLogger(__name__)
 

@@ -23,7 +23,7 @@ import pytest
 # Support for the vendored Codex repo (added as git submodule at
 # backend/vendor/codex per the integration plan). Must come BEFORE the
 # try-import block below so the lazy `__getattr__` in
-# app.core.providers.openai_codex can resolve SDK symbols.
+# app.providers.openai_codex can resolve SDK symbols.
 # -----------------------------------------------------------------------------
 VENDORED_CODEX_PYTHON_SDK = (
     Path(__file__).parent.parent / "vendor" / "codex" / "sdk" / "python" / "src"
@@ -37,9 +37,9 @@ if VENDORED_CODEX_PYTHON_SDK.exists() and str(VENDORED_CODEX_PYTHON_SDK) not in 
 # the original commented implementation.
 _IMPORT_ERROR: Exception | None = None
 try:
-    from app.core.providers.base import StreamEvent
-    from app.core.providers.openai_codex import OpenAICodexProvider
-    from app.core.providers.openai_codex.auth import (
+    from app.providers.base import StreamEvent
+    from app.providers.openai_codex import OpenAICodexProvider
+    from app.providers.openai_codex.auth import (
         OpenAICodexAuthError,
         resolve_openai_codex_auth,
     )
@@ -54,7 +54,7 @@ except Exception as import_exc:
 # Image plugin symbols are guarded separately because the plugin has its own
 # activation story (see openai_codex_image_gen/ and the plugin registry).
 try:
-    from app.core.agent_loop.types import AgentTool
+    from app.agents.types import AgentTool
     from app.plugins.openai_codex_image_gen.codex_image_agent import generate_image_with_codex_agent
 except Exception:
     generate_image_with_codex_agent = None  # type: ignore
@@ -131,8 +131,8 @@ async def test_provider_passes_validated_reasoning_summary(monkeypatch):
     if OpenAICodexProvider is None:
         pytest.skip("provider not importable")
 
-    from app.core.providers.openai_codex import ReasoningSummary
-    from app.core.providers.openai_codex.provider import (
+    from app.providers.openai_codex import ReasoningSummary
+    from app.providers.openai_codex.provider import (
         _get_default_reasoning_summary,
     )
 
@@ -191,7 +191,7 @@ def test_build_app_server_config_passes_through_codex_bin(tmp_path: Path) -> Non
     """build_app_server_config respects an explicit codex_bin."""
     if _IMPORT_ERROR:
         pytest.skip("Core provider/auth symbols not importable")
-    from app.core.providers.openai_codex.auth import build_app_server_config
+    from app.providers.openai_codex.auth import build_app_server_config
 
     cfg = build_app_server_config(codex_bin=tmp_path / "codex")
     assert cfg["codex_bin"] == str(tmp_path / "codex")
@@ -319,7 +319,7 @@ async def test_provider_stream_emits_codex_thread_created_event(monkeypatch):
     if OpenAICodexProvider is None:
         pytest.skip("provider not importable")
 
-    from app.core.providers.openai_codex import provider as provider_mod
+    from app.providers.openai_codex import provider as provider_mod
 
     fake_codex = _build_fake_codex(turn_notifications=[])
 
@@ -342,7 +342,7 @@ async def test_stream_yields_error_event_on_thread_start_exception(monkeypatch):
     if OpenAICodexProvider is None:
         pytest.skip("provider not importable")
 
-    from app.core.providers.openai_codex import provider as provider_mod
+    from app.providers.openai_codex import provider as provider_mod
 
     fake_codex = _build_fake_codex(thread_start_raises=RuntimeError("Codex refused thread"))
 
@@ -366,7 +366,7 @@ async def test_stream_yields_error_event_on_turn_stream_exception(monkeypatch):
     if OpenAICodexProvider is None:
         pytest.skip("provider not importable")
 
-    from app.core.providers.openai_codex import provider as provider_mod
+    from app.providers.openai_codex import provider as provider_mod
 
     fake_codex = _build_fake_codex(turn_stream_raises=RuntimeError("stream blew up"))
 
@@ -390,7 +390,7 @@ async def test_stream_resumes_existing_thread_when_thread_id_provided(monkeypatc
     if OpenAICodexProvider is None:
         pytest.skip("provider not importable")
 
-    from app.core.providers.openai_codex import provider as provider_mod
+    from app.providers.openai_codex import provider as provider_mod
 
     fake_codex = _build_fake_codex(turn_notifications=[])
 
@@ -432,7 +432,7 @@ def _make_real_payload(payload_cls_name: str, **payload_kwargs: object) -> objec
 
     Returns None when the SDK isn't importable (test will skip).
     """
-    from app.core.providers.openai_codex._vendor import get_openai_codex_module
+    from app.providers.openai_codex._vendor import get_openai_codex_module
 
     sdk = get_openai_codex_module()
     v2 = getattr(getattr(sdk, "generated", None), "v2_all", None)
@@ -457,7 +457,7 @@ def test_event_mapper_skips_non_notification_inputs():
     if _IMPORT_ERROR:
         pytest.skip("Implementation modules not importable")
 
-    from app.core.providers.openai_codex.events import map_codex_notification_to_stream_events
+    from app.providers.openai_codex.events import map_codex_notification_to_stream_events
 
     weird = object()
     events = list(map_codex_notification_to_stream_events(weird))
@@ -469,7 +469,7 @@ def test_event_mapper_handles_text_delta():
     if _IMPORT_ERROR:
         pytest.skip("Implementation modules not importable")
 
-    from app.core.providers.openai_codex.events import map_codex_notification_to_stream_events
+    from app.providers.openai_codex.events import map_codex_notification_to_stream_events
 
     payload = _make_real_payload("AgentMessageDeltaNotification", delta="Hello", **_NOTIF_ROUTING)
     if payload is None:
@@ -484,7 +484,7 @@ def test_event_mapper_handles_reasoning_summary_delta():
     if _IMPORT_ERROR:
         pytest.skip("Implementation modules not importable")
 
-    from app.core.providers.openai_codex.events import map_codex_notification_to_stream_events
+    from app.providers.openai_codex.events import map_codex_notification_to_stream_events
 
     payload = _make_real_payload(
         "ReasoningSummaryTextDeltaNotification",
@@ -505,7 +505,7 @@ def test_event_mapper_handles_reasoning_text_delta():
     if _IMPORT_ERROR:
         pytest.skip("Implementation modules not importable")
 
-    from app.core.providers.openai_codex.events import map_codex_notification_to_stream_events
+    from app.providers.openai_codex.events import map_codex_notification_to_stream_events
 
     payload = _make_real_payload(
         "ReasoningTextDeltaNotification",
@@ -531,8 +531,8 @@ def test_map_pawrrtal_reasoning_to_codex_handles_known_values():
     if _IMPORT_ERROR:
         pytest.skip("Implementation modules not importable")
 
-    from app.core.providers.openai_codex import ReasoningEffort
-    from app.core.providers.openai_codex.provider import _map_pawrrtal_reasoning_to_codex
+    from app.providers.openai_codex import ReasoningEffort
+    from app.providers.openai_codex.provider import _map_pawrrtal_reasoning_to_codex
 
     assert _map_pawrrtal_reasoning_to_codex(None) is None
     assert _map_pawrrtal_reasoning_to_codex("minimal") == ReasoningEffort.minimal
@@ -549,7 +549,7 @@ def test_build_codex_run_input_accepts_history_and_prompt():
     if _IMPORT_ERROR:
         pytest.skip("Implementation modules not importable")
 
-    from app.core.providers.openai_codex.inputs import build_codex_run_input
+    from app.providers.openai_codex.inputs import build_codex_run_input
 
     history = [{"role": "user", "content": "earlier"}]
     result = build_codex_run_input(question="new question", history=history)
@@ -565,7 +565,7 @@ def test_build_codex_run_input_accepts_history_and_prompt():
 
 def test_discover_vendored_codex_bin_returns_none_without_fallback_flag(monkeypatch, tmp_path):
     """Without the dev-fallback flag, discovery must NOT return a PATH match."""
-    from app.core.providers.openai_codex import _vendor
+    from app.providers.openai_codex import _vendor
 
     monkeypatch.setattr(_vendor, "_vendored_sdk_src_path", lambda: tmp_path / "nope")
     monkeypatch.delenv("OPENAI_CODEX_ALLOW_PATH_FALLBACK", raising=False)
@@ -578,7 +578,7 @@ def test_discover_vendored_codex_bin_returns_none_without_fallback_flag(monkeypa
 
 def test_discover_vendored_codex_bin_uses_path_when_flag_enabled(monkeypatch, tmp_path):
     """With the flag on, fall back to PATH-resolved codex if no vendored binary."""
-    from app.core.providers.openai_codex import _vendor
+    from app.providers.openai_codex import _vendor
 
     fake_bin = tmp_path / "fake-codex"
     fake_bin.write_text("#!/bin/sh\necho 0.0.0\n")

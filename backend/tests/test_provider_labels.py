@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.core.providers.labels import (
+from app.providers.labels import (
     HOST_LABELS,
     VENDOR_LABELS,
     host_label,
@@ -12,7 +12,7 @@ from app.core.providers.labels import (
     vendor_label,
     vendor_label_from_slug,
 )
-from app.core.providers.model_id import Host, Vendor
+from app.providers.model_id import Host, Vendor
 
 
 def test_every_host_enum_has_a_label() -> None:

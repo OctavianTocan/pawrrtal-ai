@@ -1,6 +1,6 @@
 """End-to-end tests for the LCM retrieval eval harness (issue #252).
 
-Drives :mod:`app.core.lcm.evals` over the seeded scenarios from
+Drives :mod:`app.lcm.evals` over the seeded scenarios from
 :mod:`tests.evals.scenarios` in baseline / LCM-assembled / LCM-grep
 modes and asserts the harness reports the expected pass/fail
 distribution.
@@ -16,14 +16,14 @@ from __future__ import annotations
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.lcm.evals import (
+from app.infrastructure.database.legacy import User
+from app.lcm.evals import (
     LCMEvalMode,
     LCMEvalResult,
     run_eval,
     run_eval_matrix,
     seed_scenario,
 )
-from app.infrastructure.database.legacy import User
 from tests.evals.scenarios import all_scenarios
 
 

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from app.core.telemetry import setup_tracing
 from app.infrastructure.lifecycle import startup_hook
+from app.infrastructure.telemetry import setup_tracing
 
 if TYPE_CHECKING:
     from fastapi import FastAPI

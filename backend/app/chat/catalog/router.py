@@ -10,11 +10,11 @@ from fastapi.routing import APIRouter
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.providers.catalog import CATALOG_ETAG, MODEL_CATALOG, ModelEntry
-from app.core.providers.factory import host_authenticated
-from app.core.providers.model_id import Host
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.database.legacy import User, get_async_session
+from app.providers.catalog import CATALOG_ETAG, MODEL_CATALOG, ModelEntry
+from app.providers.factory import host_authenticated
+from app.providers.model_id import Host
 from app.workspace.crud import get_default_workspace
 
 

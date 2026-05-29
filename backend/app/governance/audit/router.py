@@ -1,7 +1,7 @@
 """Audit log query API.
 
 Per-user read-only views over the ``audit_events`` table. Writes go
-through :class:`app.core.governance.audit.AuditLogger` and never
+through :class:`app.governance.audit.AuditLogger` and never
 through this router.
 
 Routes
@@ -22,7 +22,6 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.governance.audit.crud import (
     DEFAULT_DASHBOARD_WINDOW_HOURS,
     DEFAULT_LIST_LIMIT,
@@ -31,6 +30,7 @@ from app.governance.audit.crud import (
     list_audit_events_for_user,
 )
 from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import User, get_async_session
 from app.schemas import AuditEventRead
 

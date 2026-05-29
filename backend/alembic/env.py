@@ -5,7 +5,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool, text
 
 from alembic import context
-from app.core.config import settings
+from app.infrastructure.config import settings
 
 # Stable advisory-lock id so concurrent `alembic upgrade head` invocations
 # (e.g. Railway rolling deploys booting two replicas at once) serialise

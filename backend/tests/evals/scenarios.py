@@ -15,7 +15,7 @@ the model's input.
 
 from __future__ import annotations
 
-from app.core.lcm.evals import LCMEvalScenario, SeedSummary
+from app.lcm.evals import LCMEvalScenario, SeedSummary
 
 # Padding turns are reused everywhere we need to push the target fact
 # beyond the fresh-tail window.  Distinct content per index keeps the

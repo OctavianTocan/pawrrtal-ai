@@ -31,7 +31,7 @@ from app.channels.telegram.model_picker_runtime import (
     _handle_set_default,
     handle_model_picker_callback,
 )
-from app.core.providers.catalog import MODEL_CATALOG
+from app.providers.catalog import MODEL_CATALOG
 
 
 def _make_callback(*, data: str, with_message: bool = True) -> MagicMock:
@@ -231,7 +231,7 @@ class TestHandleModelSelectButtonBranching:
 
 def _catalog_token() -> str:
     """Return the current catalog token used by select/set_default callbacks."""
-    from app.core.providers.catalog import CATALOG_ETAG
+    from app.providers.catalog import CATALOG_ETAG
 
     return CATALOG_ETAG[:8]
 

@@ -36,9 +36,9 @@ containers =
     app
 layers =
     cli : infrastructure.app_factory : infrastructure.router_registry : infrastructure.startup : infrastructure.shutdown
-    chat : conversations : agents : workspace : projects : governance : integrations
-    models : schemas : governance_models : lcm_models : mcp_models
-    core : infrastructure.auth : infrastructure.database : infrastructure.event_bus : infrastructure.lifecycle : infrastructure.logging : infrastructure.middleware : infrastructure.models : infrastructure.observability
+    chat : conversations : agents : providers : tools : lcm : workspace : projects : governance : integrations : schemas
+    models : governance_models : lcm_models : mcp_models
+    infrastructure.auth : infrastructure.database : infrastructure.lifecycle : infrastructure.logging : infrastructure.middleware : infrastructure.models
 ; `app.channels` is intentionally NOT in any layer here:
 ; `channels/base.py` + `channels/registry.py` are foundational, but
 ; `channels/turn_runner.py` (added in #204) is orchestration that
@@ -46,10 +46,18 @@ layers =
 ; should be split — tracked as a follow-up. Until then it stays
 ; unlayered (sentrux ignores unlayered files).
 ;
+; `app.core`, `app.infrastructure.event_bus`, and
+; `app.infrastructure.observability` are also intentionally unlayered
+; during the backend-domain restructuring branch. They are mixed
+; utility/orchestration packages: domains still read core config helpers,
+; while the remaining core helpers, event bus, and observability code
+; also call back into domain/provider surfaces. They should be split in
+; focused follow-ups rather than misrepresented as lower-level packages.
+;
 ; PR #223 extracted `Base` into `app.db_base`, breaking the legacy
 ; `app.db -> app.models` cycle that previously needed grandfathering here.
 ;
-; Stack A (PRs #208–#225) landed several `app.core.*` modules that read ORM
+; Stack A (PRs #208–#225) landed several modules that read ORM
 ; rows / call CRUD directly — pragmatic for governance/audit pipelines that
 ; need to write audit_event/cost_ledger rows in-process. Grandfathered here
 ; so this contract doesn't block onward work; each entry should be flattened
@@ -60,18 +68,18 @@ ignore_imports =
     ; Exporters (markdown / html / json) previously imported the
     ; ``Conversation`` + ``ChatMessage`` ORM rows directly. They now
     ; take ``ConversationLike`` + ``MessageLike`` Protocols from
-    ; ``app.core.exporters.types`` and stay layer-pure. (Cluster A
+    ; ``app.conversations.exports.types`` and stay layer-pure. (Cluster A
     ; flatten — exporters → models — has landed.)
-    app.core.governance.audit -> app.models
-    app.core.governance.cost_tracker -> app.models
-    app.core.scheduler.scheduler -> app.models
-    app.core.event_bus.handlers -> app.workspace.crud
+    app.governance.audit -> app.models
+    app.governance.cost_tracker -> app.models
+    app.agents.scheduling.scheduler -> app.models
+    app.infrastructure.event_bus.handlers -> app.workspace.crud
     ; AgentHandler optionally persists scheduled-job responses into a
     ; target conversation (e.g. the heartbeat sink). Lazy-imports the
     ; chat_message CRUD inside the persistence helper so the bus
     ; module stays decoupled at load time; flatten in a follow-up
     ; alongside the workspace one above.
-    app.core.event_bus.handlers -> app.conversations.messages_crud
+    app.infrastructure.event_bus.handlers -> app.conversations.messages_crud
     ; LCM (Stack B / PRs #186–#196) owns three ORM tables
     ; (lcm_summaries, lcm_summary_sources, lcm_context_items) and must
     ; read/write them directly to assemble context, compact leaves, and
@@ -79,20 +87,20 @@ ignore_imports =
     ; exporter grandfathers above — flatten in a follow-up (e.g. inject
     ; a Protocol the caller satisfies, or move the side-effect into the
     ; api/crud layer).
-    app.core.lcm -> app.models
-    app.core.lcm.condense -> app.models
-    app.core.tools.lcm_describe -> app.models
-    app.core.tools.lcm_grep -> app.models
-    app.core.tools.lcm_expand_query -> app.models
+    app.lcm -> app.models
+    app.lcm.condense -> app.models
+    app.tools.lcm_describe -> app.models
+    app.tools.lcm_grep -> app.models
+    app.tools.lcm_expand_query -> app.models
     ; LCM Retrieval Lab (PR #258 / issues #251–#256) extends the same
     ; substrate — observability, ranked search, eval harness, semantic
     ; retrieval — and must read the same ORM tables (now plus
     ; lcm_embeddings).  Grandfathered alongside the older LCM entries
     ; until the entire LCM stack is flattened in one pass.
-    app.core.lcm.embeddings -> app.models
-    app.core.lcm.evals -> app.models
-    app.core.lcm.observe -> app.models
-    app.core.tools.lcm_search -> app.models
+    app.lcm.embeddings -> app.models
+    app.lcm.evals -> app.models
+    app.lcm.observe -> app.models
+    app.tools.lcm_search -> app.models
 
 ; --- Contract 2: the legacy db ↔ models cycle is the one cycle sentrux
 ; allows (max_cycles = 1). Pin it explicitly so any *new* cycle fails CI. -
@@ -104,11 +112,13 @@ source_modules =
     app.chat
     app.conversations
     app.agents
+    app.providers
+    app.tools
+    app.lcm
     app.workspace
     app.projects
     app.governance
     app.integrations
-    app.core
 forbidden_modules =
     app.main
     app.cli

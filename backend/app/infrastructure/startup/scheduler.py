@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from app.core.config import settings
-from app.core.scheduler import JobScheduler, set_active_scheduler
+from app.agents.scheduling import JobScheduler, set_active_scheduler
+from app.infrastructure.config import settings
 from app.infrastructure.lifecycle import shutdown_hook, startup_hook
 
 if TYPE_CHECKING:

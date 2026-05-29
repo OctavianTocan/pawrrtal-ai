@@ -11,7 +11,7 @@ import uuid
 
 import pytest
 
-from app.core.event_bus import (
+from app.infrastructure.event_bus import (
     AgentHandler,
     AgentResponseEvent,
     EventBus,

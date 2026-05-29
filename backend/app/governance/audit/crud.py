@@ -5,7 +5,7 @@ no application code ever updates them. The retention purge (called
 from the scheduler lifespan, PR 12) is the only path that deletes
 rows, and it deletes whole rows by age, never edits.
 
-Writes go through :class:`app.core.governance.audit.AuditLogger`. This
+Writes go through :class:`app.governance.audit.AuditLogger`. This
 module only exposes list/get/dashboard queries.
 """
 

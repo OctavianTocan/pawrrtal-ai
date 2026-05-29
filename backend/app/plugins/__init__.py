@@ -1,7 +1,7 @@
 """In-tree plugin packages.
 
 Importing this module triggers each subpackage's import, which registers
-the plugin against ``app.core.plugins.registry``.
+the plugin against ``app.agents.plugins.registry``.
 """
 
 # Trigger plugin registration as import side-effects.

@@ -27,12 +27,12 @@ from typing import TYPE_CHECKING
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
+from app.infrastructure.config import settings
 from app.models import ChannelBinding, ChannelLinkCode
 
 if TYPE_CHECKING:
-    from app.core.providers.reasoning import ReasoningResolution
     from app.models import Conversation
+    from app.providers.reasoning import ReasoningResolution
 
 # Code alphabet excludes look-alikes (0/O, 1/I/L) so support tickets
 # don't end up arguing over what the user actually typed. Eight chars
@@ -413,10 +413,10 @@ async def normalize_conversation_reasoning_effort(
     normalize touched it. Returns ``(None, None)`` when the row
     doesn't exist (treated as a no-op for caller simplicity).
     """
-    from app.core.providers.reasoning import (  # noqa: PLC0415
+    from app.models import Conversation  # noqa: PLC0415
+    from app.providers.reasoning import (  # noqa: PLC0415
         resolve_reasoning_effort,
     )
-    from app.models import Conversation  # noqa: PLC0415
 
     row = await session.get(Conversation, conversation_id)
     if row is None:

@@ -10,7 +10,7 @@ import pytest
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.core.tools.now import make_now_tool  # noqa: E402
+from app.tools.now import make_now_tool  # noqa: E402
 
 pytestmark = pytest.mark.anyio
 

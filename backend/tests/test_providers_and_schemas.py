@@ -14,13 +14,13 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from app.core import keys
-from app.core.config import settings
-from app.core.providers.claude import ClaudeLLM
-from app.core.providers.factory import resolve_llm
-from app.core.providers.gemini import GeminiLLM
-from app.core.providers.litellm_provider import LiteLLMLLM
-from app.core.providers.model_id import InvalidModelId, Vendor
+from app.infrastructure import keys
+from app.infrastructure.config import settings
+from app.providers.claude import ClaudeLLM
+from app.providers.factory import resolve_llm
+from app.providers.gemini import GeminiLLM
+from app.providers.litellm_provider import LiteLLMLLM
+from app.providers.model_id import InvalidModelId, Vendor
 from app.schemas import ConversationCreate, ConversationUpdate, UserCreate
 
 
@@ -304,7 +304,7 @@ def test_resolve_api_key_two_users_are_isolated(
 
 def test_resolve_llm_routes_agy_cli_via_host_table() -> None:
     """``agy-cli:google/gemini-3.5-flash-high`` routes to AgyCliLLM."""
-    from app.core.providers.agy_cli.provider import AgyCliLLM
+    from app.providers.agy_cli.provider import AgyCliLLM
 
     provider = resolve_llm("agy-cli:google/gemini-3.5-flash-high")
     assert isinstance(provider, AgyCliLLM)

@@ -1,6 +1,6 @@
 """Issue #255 - LCM context packing tests.
 
-Covers ``app.core.lcm.pack.pack_context``.
+Covers ``app.lcm.pack.pack_context``.
 
 Behaviour we pin down:
 
@@ -24,7 +24,7 @@ Behaviour we pin down:
 
 from __future__ import annotations
 
-from app.core.lcm.pack import (
+from app.lcm.pack import (
     REASON_BROAD_SUMMARY_PREFERENCE,
     REASON_BUDGET_EXCEEDED,
     REASON_DUPLICATE_SOURCE_CHAIN,

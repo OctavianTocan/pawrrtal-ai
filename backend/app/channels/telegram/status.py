@@ -38,9 +38,9 @@ from app.channels.telegram.lcm_status import (
 )
 from app.channels.telegram.model_defaults import resolve_effective_model_id
 from app.conversations.crud import ConversationStatus, get_conversation_status
-from app.core.config import settings
-from app.core.providers.catalog import default_model, find
-from app.core.providers.model_id import InvalidModelId, parse_model_id
+from app.infrastructure.config import settings
+from app.providers.catalog import default_model, find
+from app.providers.model_id import InvalidModelId, parse_model_id
 
 
 class _TelegramSenderLike(Protocol):

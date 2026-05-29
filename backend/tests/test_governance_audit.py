@@ -1,4 +1,4 @@
-"""Tests for ``app.core.governance.audit``.
+"""Tests for ``app.governance.audit``.
 
 Covers:
 
@@ -20,12 +20,12 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.core.governance.audit import (
+from app.governance.audit import (
     AuditLogger,
     assess_command_risk,
     assess_file_access_risk,
 )
+from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import User
 from app.models import AuditEvent
 

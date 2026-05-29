@@ -23,13 +23,13 @@ from pathlib import Path
 
 import pytest
 
-from app.core.providers.base import StreamEvent
-from app.core.tools.artifact import (
+from app.providers.base import StreamEvent
+from app.tools.artifact import (
     ArtifactValidationError,
     build_artifact,
     llm_summary_for,
 )
-from app.core.tools.artifact_agent import (
+from app.tools.artifact_agent import (
     ARTIFACT_TOOL_NAME,
     make_artifact_tool,
 )
@@ -288,7 +288,7 @@ def test_artifact_tool_is_registered_in_build_agent_tools(tmp_path: Path) -> Non
     It also verifies no duplicate tool names are registered.
     """
 
-    from app.core.agent_loop.tools import build_agent_tools
+    from app.agents.tools import build_agent_tools
 
     tools = build_agent_tools(workspace_root=tmp_path)
     tool_names = [t.name for t in tools]

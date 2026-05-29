@@ -61,7 +61,7 @@ def get_db_url(args: argparse.Namespace) -> str:
         # Try to load from app config as last resort.
         try:
             sys.path.insert(0, str(Path(__file__).parent.parent / "backend"))
-            from app.core.config import settings  # type: ignore[import]
+            from app.infrastructure.config import settings  # type: ignore[import]
             url = str(settings.database_url)
         except Exception as exc:
             print(f"ERROR: Could not determine database URL: {exc}", file=sys.stderr)

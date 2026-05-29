@@ -59,7 +59,7 @@ async def test_allowlist_blocks_unlisted_email_with_generic_message() -> None:
 
 def test_allowed_emails_set_parses_comma_separated_values() -> None:
     """The settings property splits, strips, and lowercases the env value."""
-    from app.core.config import Settings
+    from app.infrastructure.config import Settings
 
     # Build a fresh Settings instance with our test value.  Use object.__setattr__
     # so we don't have to bother with the BaseSettings constructor.
@@ -70,7 +70,7 @@ def test_allowed_emails_set_parses_comma_separated_values() -> None:
 
     # Pydantic settings requires all required fields; pull from the real
     # settings instance and override just `allowed_emails`.
-    from app.core.config import settings as real_settings
+    from app.infrastructure.config import settings as real_settings
 
     overridden = real_settings.model_copy(update={"allowed_emails": raw})
     assert overridden.allowed_emails_set == frozenset({"tavi@example.com", "esther@example.com"})
@@ -78,7 +78,7 @@ def test_allowed_emails_set_parses_comma_separated_values() -> None:
 
 def test_allowed_emails_set_is_empty_when_unset() -> None:
     """No env var → empty frozenset → gate is disabled."""
-    from app.core.config import settings as real_settings
+    from app.infrastructure.config import settings as real_settings
 
     overridden = real_settings.model_copy(update={"allowed_emails": ""})
     assert overridden.allowed_emails_set == frozenset()

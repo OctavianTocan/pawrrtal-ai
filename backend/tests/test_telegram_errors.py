@@ -29,7 +29,7 @@ from app.channels.telegram.errors import (
     render_timeout_card,
     render_unknown_model_card,
 )
-from app.core.providers.base import StreamEvent
+from app.providers.base import StreamEvent
 
 # ---------------------------------------------------------------------------
 # Helpers

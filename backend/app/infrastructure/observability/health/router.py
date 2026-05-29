@@ -26,7 +26,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
+from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import get_async_session
 
 log = logging.getLogger(__name__)

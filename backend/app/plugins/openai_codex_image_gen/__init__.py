@@ -10,11 +10,11 @@ Codex SDK integration plan.
 
 from __future__ import annotations
 
-from app.core.plugins import (
+from app.agents.plugins import (
     EnvKeySpec,
     Plugin,
 )
-from app.core.plugins.registry import register_plugin
+from app.agents.plugins.registry import register_plugin
 from app.plugins.openai_codex_image_gen.plugin import make_codex_image_tool
 
 codex_image_plugin = Plugin(

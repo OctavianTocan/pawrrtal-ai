@@ -14,7 +14,6 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.governance.cost.crud import (
     DEFAULT_LIST_LIMIT,
     MAX_LIST_LIMIT,
@@ -23,6 +22,7 @@ from app.governance.cost.crud import (
     per_model_breakdown,
 )
 from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import User, get_async_session
 from app.schemas import CostLedgerRead, CostSummaryRead
 

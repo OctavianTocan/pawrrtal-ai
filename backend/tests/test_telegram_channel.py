@@ -44,8 +44,8 @@ from app.channels.telegram.status import (
     handle_status_command,
 )
 from app.conversations.crud import ConversationStatus
-from app.core.providers.base import StreamEvent
-from app.core.providers.catalog import default_model
+from app.providers.base import StreamEvent
+from app.providers.catalog import default_model
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -486,7 +486,9 @@ class TestTelegramChannelDeliver:
             metadata={"bot": bot, "chat_id": 1, "message_id": 2},
         )
         channel = TelegramChannel()
-        with patch("app.channels.telegram.channel.settings.telegram_regenerate_button_enabled", True):
+        with patch(
+            "app.channels.telegram.channel.settings.telegram_regenerate_button_enabled", True
+        ):
             async for _ in channel.deliver(_stream({"type": "delta", "content": "answer"}), msg):
                 pass
 
@@ -505,7 +507,9 @@ class TestTelegramChannelDeliver:
         bot = _make_bot()
         msg = _make_channel_message(bot, chat_id=1, message_id=2)
         channel = TelegramChannel()
-        with patch("app.channels.telegram.channel.settings.telegram_regenerate_button_enabled", False):
+        with patch(
+            "app.channels.telegram.channel.settings.telegram_regenerate_button_enabled", False
+        ):
             async for _ in channel.deliver(_stream({"type": "delta", "content": "answer"}), msg):
                 pass
 

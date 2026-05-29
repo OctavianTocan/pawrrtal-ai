@@ -16,28 +16,21 @@ from typing import TYPE_CHECKING, Any
 from sqlalchemy import exc as sa_exc
 from sqlalchemy import select, update
 
+from app.agents.plugins.types import PreTurnHook, PreTurnHookContext
 from app.channels._turn_cost import record_turn_cost_if_enabled
 from app.channels._turn_runtime_context import system_prompt_for_turn
 from app.channels._turn_workspace import workspace_system_prompt
+from app.chat.aggregator import ChatTurnAggregator, should_emit_event
 from app.conversations.messages_crud import (
     append_assistant_placeholder,
     append_user_message,
     finalize_assistant_message,
     get_messages_for_conversation,
 )
-from app.core.chat_aggregator import ChatTurnAggregator, should_emit_event
-from app.core.config import settings
-from app.core.event_bus import TurnCompletedEvent, publish_if_available
-from app.core.lcm import (
-    assemble_context as lcm_assemble_context,
-)
-from app.core.lcm import (
-    ingest_message as lcm_ingest_message,
-)
-from app.core.lcm import (
-    schedule_lcm_compaction,
-)
-from app.core.observability import (
+from app.infrastructure.config import settings
+from app.infrastructure.database.legacy import async_session_maker
+from app.infrastructure.event_bus import TurnCompletedEvent, publish_if_available
+from app.infrastructure.observability import (
     TurnSpanRecorder,
     aggregator_stop_reason,
     build_llm_view_messages,
@@ -45,8 +38,15 @@ from app.core.observability import (
     turn_span,
     workshop_event_hook,
 )
-from app.core.plugins.types import PreTurnHook, PreTurnHookContext
-from app.infrastructure.database.legacy import async_session_maker
+from app.lcm import (
+    assemble_context as lcm_assemble_context,
+)
+from app.lcm import (
+    ingest_message as lcm_ingest_message,
+)
+from app.lcm import (
+    schedule_lcm_compaction,
+)
 from app.models import Conversation
 
 # Strong references to in-flight codex_thread_id persist tasks so they
@@ -105,9 +105,9 @@ async def await_pending_codex_persist_tasks(
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from app.agents.types import AgentTool, PermissionCheckFn
     from app.channels.base import Channel, ChannelMessage
-    from app.core.agent_loop.types import AgentTool, PermissionCheckFn
-    from app.core.providers.base import AILLM, ReasoningEffort, StreamEvent
+    from app.providers.base import AILLM, ReasoningEffort, StreamEvent
 
 logger = logging.getLogger(__name__)
 
@@ -280,7 +280,7 @@ async def run_turn(
     Wraps the turn body in a Workshop-compatible OTel ``turn_span`` so
     every LLM stream and tool call dispatched downstream lands in the
     same trace.  When telemetry is disabled the spans are no-ops and
-    add zero overhead (see ``app.core.telemetry.setup_tracing``).
+    add zero overhead (see ``app.infrastructure.telemetry.setup_tracing``).
 
     ``_finalize_turn`` runs **inside** ``turn_span`` but **outside**
     ``llm_span``: a database failure during persist + cost-ledger write

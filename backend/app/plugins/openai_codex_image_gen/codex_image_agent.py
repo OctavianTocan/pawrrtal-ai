@@ -35,7 +35,7 @@ async def generate_image_with_codex_agent(
     # Lazy import: the provider package's `__init__` runs the vendored SDK
     # discovery dance, which we only want triggered when this plugin is
     # actually invoked.
-    from app.core.providers.openai_codex import OpenAICodexProvider  # noqa: PLC0415
+    from app.providers.openai_codex import OpenAICodexProvider  # noqa: PLC0415
 
     try:
         provider = OpenAICodexProvider(

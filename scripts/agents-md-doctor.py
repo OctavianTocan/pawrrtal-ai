@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Health check for the agent's identity files (SOUL/AGENTS/USER/IDENTITY).
 
-The system prompt assembled by ``app.core.tools.agents_md`` reads from
+The system prompt assembled by ``app.tools.agents_md`` reads from
 ``SOUL.md`` and ``AGENTS.md`` at the workspace root.  Those files
 silently grow over time as the agent (or the operator) appends
 guidance, identities drift, and user notes accumulate — until one day
@@ -18,7 +18,7 @@ workspace directory and get a per-file report:
   - status                 (OK / WARN / FAIL relative to thresholds)
 
 Soft threshold: 8 KB per file.  Hard threshold: 64 KB
-(``_MAX_BYTES`` in ``app.core.tools.agents_md`` — anything above this
+(``_MAX_BYTES`` in ``app.tools.agents_md`` — anything above this
 is silently truncated when assembled into the prompt, so files past
 that point are losing content the agent will never see).
 
@@ -52,7 +52,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 # Files we check, in the order we report them.  Mirrors
-# ``app.core.tools.agents_md.PROTECTED_FILENAMES`` plus the canonical
+# ``app.tools.agents_md.PROTECTED_FILENAMES`` plus the canonical
 # ordering used when assembling the system prompt (SOUL first).
 IDENTITY_FILES: tuple[str, ...] = ("SOUL.md", "AGENTS.md", "USER.md", "IDENTITY.md")
 

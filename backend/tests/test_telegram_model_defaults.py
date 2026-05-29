@@ -15,8 +15,8 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.channels.telegram.model_defaults import resolve_effective_model_id
-from app.core.providers.catalog import MODEL_CATALOG, default_model
 from app.infrastructure.database.legacy import User
+from app.providers.catalog import MODEL_CATALOG, default_model
 
 
 @pytest.mark.anyio

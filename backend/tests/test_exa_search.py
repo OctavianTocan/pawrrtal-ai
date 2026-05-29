@@ -2,15 +2,15 @@
 
 Coverage layers:
 
-* Core (``app.core.tools.exa_search``) — payload shape, headers, error
+* Core (``app.tools.exa_search``) — payload shape, headers, error
   branches, response normalisation, num-results clamping, and the
   Markdown formatter.
 
 The Claude-specific Exa adapter was removed when tool composition
 moved into the chat router.  Exa now flows through the same
-:class:`app.core.agent_loop.types.AgentTool` path as every other
+:class:`app.agents.types.AgentTool` path as every other
 app-defined tool, bridged by
-:mod:`app.core.providers._claude_tool_bridge` for the Claude provider
+:mod:`app.providers._claude_tool_bridge` for the Claude provider
 — see ``test_claude_tool_bridge.py``.
 
 The HTTP boundary is mocked with ``httpx.MockTransport`` so no test
@@ -26,7 +26,7 @@ from typing import Any
 import httpx
 import pytest
 
-from app.core.tools.exa_search import (
+from app.tools.exa_search import (
     DEFAULT_NUM_RESULTS,
     EXA_API_URL,
     MAX_NUM_RESULTS,
@@ -62,7 +62,7 @@ def _install_mock_transport(
         kwargs.pop("transport", None)
         return real_async_client(*args, transport=httpx.MockTransport(_capturing_handler), **kwargs)
 
-    monkeypatch.setattr("app.core.tools.exa_search.httpx.AsyncClient", _factory)
+    monkeypatch.setattr("app.tools.exa_search.httpx.AsyncClient", _factory)
     return captured
 
 
@@ -103,7 +103,7 @@ async def test_missing_api_key_returns_error_without_calling_exa(
 ) -> None:
     """Without an EXA_API_KEY the core MUST short-circuit before any HTTP call."""
     requests = _install_mock_transport(monkeypatch, lambda _request: _ok_response({"results": []}))
-    monkeypatch.setattr("app.core.tools.exa_search.settings.exa_api_key", "")
+    monkeypatch.setattr("app.tools.exa_search.settings.exa_api_key", "")
 
     result = await exa_search("anything")
 
@@ -118,7 +118,7 @@ async def test_explicit_api_key_overrides_settings(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Passing ``api_key`` directly bypasses settings — used by tests / scripts."""
-    monkeypatch.setattr("app.core.tools.exa_search.settings.exa_api_key", "")
+    monkeypatch.setattr("app.tools.exa_search.settings.exa_api_key", "")
     captured = _install_mock_transport(monkeypatch, lambda _r: _ok_response({"results": []}))
 
     result = await exa_search("hello", api_key="explicit-key")

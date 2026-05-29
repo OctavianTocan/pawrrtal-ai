@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from app.core.telemetry import shutdown_tracing
 from app.infrastructure.lifecycle import shutdown_hook
+from app.infrastructure.telemetry import shutdown_tracing
 
 if TYPE_CHECKING:
     from fastapi import FastAPI

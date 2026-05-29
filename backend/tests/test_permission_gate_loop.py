@@ -12,7 +12,7 @@ from typing import Any
 
 import pytest
 
-from app.core.agent_loop.types import AgentTool, PermissionCheckResult
+from app.agents.types import AgentTool, PermissionCheckResult
 from tests.agent_harness import (
     ScriptedStreamFn,
     echo_tool,

@@ -1,4 +1,4 @@
-"""Tests for ``app.core.event_bus.bus.EventBus``.
+"""Tests for ``app.infrastructure.event_bus.bus.EventBus``.
 
 Covers the pub/sub contract: typed dispatch, global subscribers,
 concurrent dispatch (no head-of-line blocking), and error isolation
@@ -11,7 +11,7 @@ import asyncio
 
 import pytest
 
-from app.core.event_bus import (
+from app.infrastructure.event_bus import (
     AgentResponseEvent,
     Event,
     EventBus,

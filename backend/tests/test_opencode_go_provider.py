@@ -19,12 +19,12 @@ from uuid import uuid4
 
 import pytest
 
-from app.core.agent_loop.types import AgentMessage, AgentTool
-from app.core.providers.base import StreamEvent
-from app.core.providers.catalog import find
-from app.core.providers.factory import resolve_llm
-from app.core.providers.model_id import Host, Vendor, parse_model_id
-from app.core.providers.opencode_go.events import (
+from app.agents.types import AgentMessage, AgentTool
+from app.providers.base import StreamEvent
+from app.providers.catalog import find
+from app.providers.factory import resolve_llm
+from app.providers.model_id import Host, Vendor, parse_model_id
+from app.providers.opencode_go.events import (
     ToolCallBuffer,
     _UsageAccumulator,
     build_openai_messages,
@@ -32,7 +32,7 @@ from app.core.providers.opencode_go.events import (
     compute_cost_usd,
     read_reasoning,
 )
-from app.core.providers.opencode_go.provider import (
+from app.providers.opencode_go.provider import (
     OpencodeGoLLM,
     OpencodeGoLLMConfig,
 )
@@ -186,7 +186,7 @@ def test_build_openai_tools_emits_function_shape() -> None:
 
 def test_build_openai_messages_prepends_system_and_renders_all_roles() -> None:
     """User / assistant (text + tool-call) / tool-result roles round-trip."""
-    from app.core.agent_loop.types import (
+    from app.agents.types import (
         AssistantMessage,
         TextContent,
         ToolCallContent,
@@ -316,7 +316,7 @@ def test_resolve_llm_returns_opencodego_with_catalog_costs(
 @pytest.fixture(autouse=True)
 def _set_opencode_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
     """Provide a dummy API key so the fail-fast guard does not short-circuit."""
-    from app.core.config import settings as _settings
+    from app.infrastructure.config import settings as _settings
 
     monkeypatch.setattr(_settings, "opencode_api_key", "test-key")
 

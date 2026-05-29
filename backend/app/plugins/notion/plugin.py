@@ -1,7 +1,7 @@
 """Plugin manifest for the Notion integration.
 
 Importing this module registers the plugin against the global
-:mod:`app.core.plugins.registry`.  ``app.plugins.__init__`` is
+:mod:`app.agents.plugins.registry`.  ``app.plugins.__init__`` is
 responsible for triggering the import; nothing else should import this
 file directly (importing it twice would attempt a duplicate
 registration and raise).
@@ -9,7 +9,7 @@ registration and raise).
 
 from __future__ import annotations
 
-from app.core.plugins import (
+from app.agents.plugins import (
     EnvKeySpec,
     Plugin,
     register_plugin,

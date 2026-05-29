@@ -22,8 +22,8 @@ from app.channels.crud import (
     issue_link_code,
     list_bindings,
 )
-from app.core.config import settings
 from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import User, get_async_session
 from app.schemas import ChannelBindingRead, TelegramLinkCodeRead
 

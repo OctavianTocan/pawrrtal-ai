@@ -26,7 +26,7 @@ from app.channels.telegram.handlers import (
     handle_start_command,
 )
 from app.channels.telegram.sender import TelegramSender
-from app.core.config import settings
+from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import User
 
 pytestmark = pytest.mark.anyio

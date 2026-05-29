@@ -29,8 +29,8 @@ from app.channels.crud import (
 from app.channels.telegram.dev_admin import resolve_or_autolink_telegram_user
 from app.channels.telegram.reasoning_notify import maybe_append_model_switch_notice
 from app.channels.telegram.sender import TelegramSender
-from app.core.providers.catalog import find
-from app.core.providers.model_id import InvalidModelId, parse_model_id
+from app.providers.catalog import find
+from app.providers.model_id import InvalidModelId, parse_model_id
 from app.workspace.preferences_crud import set_user_default_model_id
 
 logger = logging.getLogger(__name__)

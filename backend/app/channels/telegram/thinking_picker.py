@@ -26,14 +26,14 @@ from app.channels.crud import (
     get_user_id_for_external,
 )
 from app.channels.telegram.model_defaults import resolve_effective_model_id
-from app.core.providers.catalog import (
+from app.providers.catalog import (
     CATALOG_ETAG,
     MODEL_CATALOG,
     ModelEntry,
     default_model,
     find,
 )
-from app.core.providers.model_id import InvalidModelId, parse_model_id
+from app.providers.model_id import InvalidModelId, parse_model_id
 
 PROVIDER = "telegram"
 THINKING_CALLBACK_PREFIX = "thk:"

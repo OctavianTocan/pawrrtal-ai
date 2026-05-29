@@ -19,9 +19,9 @@ from pathlib import Path
 
 import pytest
 
-from app.core.agent_loop.types import AgentTool
-from app.core.tools.errors import ToolErrorCode
-from app.core.tools.python_exec import make_virtual_python_tool
+from app.agents.types import AgentTool
+from app.tools.errors import ToolErrorCode
+from app.tools.python_exec import make_virtual_python_tool
 from tests.agent_harness import (
     ScriptedStreamFn,
     run_scenario,

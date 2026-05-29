@@ -21,9 +21,9 @@ from pathlib import Path
 import pytest
 from httpx import AsyncClient
 
-from app.core import keys
-from app.core.config import settings
-from app.core.keys import OVERRIDABLE_KEYS
+from app.infrastructure import keys
+from app.infrastructure.config import settings
+from app.infrastructure.keys import OVERRIDABLE_KEYS
 from app.models import Workspace
 
 

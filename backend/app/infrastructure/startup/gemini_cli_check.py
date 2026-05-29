@@ -16,8 +16,8 @@ import logging
 import shutil
 from typing import TYPE_CHECKING
 
-from app.core.providers.gemini_cli import GEMINI_BINARY_NAME, is_gemini_cli_available
 from app.infrastructure.lifecycle import startup_hook
+from app.providers.gemini_cli import GEMINI_BINARY_NAME, is_gemini_cli_available
 
 if TYPE_CHECKING:
     from fastapi import FastAPI

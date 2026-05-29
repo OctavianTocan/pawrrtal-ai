@@ -3,7 +3,7 @@
 Pulled out of :mod:`app.chat.router` so the router stays under sentrux's
 ``no_god_files`` fan-out budget. The function reads the authenticated
 user's enabled MCP server rows from the database and projects them
-into the shape :func:`app.core.agent_tools.build_agent_tools` expects.
+into the shape :func:`app.agents.tools.build_agent_tools` expects.
 
 Any database error is logged and swallowed: a broken row must never
 prevent a chat turn from running with the core tool set.

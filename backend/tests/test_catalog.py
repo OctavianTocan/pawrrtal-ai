@@ -1,10 +1,10 @@
-"""Tests for :mod:`app.core.providers.catalog`."""
+"""Tests for :mod:`app.providers.catalog`."""
 
 from __future__ import annotations
 
 import pytest
 
-from app.core.providers.catalog import (
+from app.providers.catalog import (
     CATALOG_ETAG,
     MODEL_CATALOG,
     ModelEntry,
@@ -13,7 +13,7 @@ from app.core.providers.catalog import (
     is_known,
     require_known,
 )
-from app.core.providers.model_id import (
+from app.providers.model_id import (
     Host,
     InvalidModelId,
     UnknownModelId,
@@ -83,7 +83,7 @@ def test_etag_is_stable() -> None:
     assert isinstance(CATALOG_ETAG, str)
     assert len(CATALOG_ETAG) == 16
     # Importing twice yields the same hash (module-level computation).
-    from app.core.providers.catalog import CATALOG_ETAG as ETAG_AGAIN
+    from app.providers.catalog import CATALOG_ETAG as ETAG_AGAIN
 
     assert ETAG_AGAIN == CATALOG_ETAG
 

@@ -19,14 +19,14 @@ from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.keys import (
+from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.database.legacy import User, get_async_session
+from app.infrastructure.keys import (
     OVERRIDABLE_KEYS,
     VALUE_FORBIDDEN_CHARS,
     load_workspace_env,
     save_workspace_env,
 )
-from app.infrastructure.auth.users import get_allowed_user
-from app.infrastructure.database.legacy import User, get_async_session
 from app.models import Workspace
 
 # NOTE: Numeric limits on key count (was MAX_KEYS=10) and per-value length

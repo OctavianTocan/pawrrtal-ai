@@ -1,6 +1,6 @@
 """Read-side CRUD over ``cost_ledger`` for the cost API.
 
-Writes go through :class:`app.core.governance.cost_tracker.PostgresCostLedger`.
+Writes go through :class:`app.governance.cost_tracker.PostgresCostLedger`.
 This module exposes the slow-path queries powering ``GET /api/v1/cost``:
 window aggregate, per-model breakdown, raw row listing.
 """

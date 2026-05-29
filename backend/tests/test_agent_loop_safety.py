@@ -16,7 +16,7 @@ import asyncio
 
 import pytest
 
-from app.core.agent_loop import (
+from app.agents import (
     AgentContext,
     AgentLoopConfig,
     AgentSafetyConfig,

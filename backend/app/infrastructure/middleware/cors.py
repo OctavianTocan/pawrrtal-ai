@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.types import ASGIApp
 
-from app.core.config import settings
+from app.infrastructure.config import settings
 
 
 def with_cors(asgi_app: ASGIApp) -> ASGIApp:

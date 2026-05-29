@@ -2,12 +2,12 @@
 
 Centralises the mapping from host slugs to their required ``settings``
 attribute so that :mod:`model_picker` can filter unauthenticated hosts
-without pulling in ``app.core.config`` directly.
+without pulling in ``app.infrastructure.config`` directly.
 """
 
 from __future__ import annotations
 
-from app.core.config import settings
+from app.infrastructure.config import settings
 
 # Host → settings field that must be non-empty for the host to appear in
 # the picker (#370). Hosts that don't require a gateway API key

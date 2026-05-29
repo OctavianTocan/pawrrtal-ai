@@ -15,8 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.channels.crud import get_or_create_telegram_conversation_full, get_user_id_for_external
 from app.channels.telegram.model_auth import is_host_authenticated
 from app.channels.telegram.model_defaults import resolve_effective_model_id
-from app.core.providers.catalog import CATALOG_ETAG, MODEL_CATALOG, ModelEntry
-from app.core.providers.labels import host_label_from_slug, vendor_label_from_slug
+from app.providers.catalog import CATALOG_ETAG, MODEL_CATALOG, ModelEntry
+from app.providers.labels import host_label_from_slug, vendor_label_from_slug
 from app.workspace.preferences_crud import get_user_default_model_id
 
 ModelCallbackAction = Literal["providers", "vendors", "list", "select", "set_default"]

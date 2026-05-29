@@ -34,7 +34,7 @@ from litellm.exceptions import (
     UnsupportedParamsError as LiteLLMUnsupportedParamsError,
 )
 
-from app.core.agent_loop.types import (
+from app.agents.types import (
     AgentMessage,
     AgentTool,
     LLMDoneEvent,
@@ -42,22 +42,22 @@ from app.core.agent_loop.types import (
     LLMTextDeltaEvent,
     TextContent,
 )
-from app.core.providers._errors import (
+from app.providers._errors import (
     ProviderAuthError,
     ProviderRateLimitError,
     ProviderTimeoutError,
     ProviderUnknownError,
     ProviderUnsupportedParamError,
 )
-from app.core.providers.base import StreamEvent
-from app.core.providers.litellm_provider import (
+from app.providers.base import StreamEvent
+from app.providers.litellm_provider import (
     LiteLLMLLM,
     _build_litellm_messages,
     _classify_litellm_exception,
     _litellm_model_string,
     open_litellm_stream,
 )
-from app.core.providers.model_id import Vendor
+from app.providers.model_id import Vendor
 from tests.agent_harness import ScriptedStreamFn, text_turn
 
 
@@ -267,7 +267,7 @@ async def test_open_litellm_stream_returns_iterator_on_success(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Happy path: returns the LiteLLM async iterator."""
-    import app.core.providers.litellm_provider as mod
+    import app.providers.litellm_provider as mod
 
     iterator = _fake_chunks()
 
@@ -291,7 +291,7 @@ async def test_open_litellm_stream_maps_auth_error_to_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``LiteLLMAuthenticationError`` surfaces as raises ``ProviderAuthError``."""
-    import app.core.providers.litellm_provider as mod
+    import app.providers.litellm_provider as mod
 
     async def _raise_auth(**_kwargs: object) -> AsyncIterator[object]:
         raise _make_auth_error()
@@ -312,7 +312,7 @@ async def test_open_litellm_stream_maps_rate_limit_error_to_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``LiteLLMRateLimitError`` surfaces as raises ``ProviderRateLimitError``."""
-    import app.core.providers.litellm_provider as mod
+    import app.providers.litellm_provider as mod
 
     async def _raise_rate(**_kwargs: object) -> AsyncIterator[object]:
         raise _make_rate_limit_error()
@@ -333,7 +333,7 @@ async def test_open_litellm_stream_maps_unsupported_param_to_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``LiteLLMUnsupportedParamsError`` surfaces with ``param`` + ``model``."""
-    import app.core.providers.litellm_provider as mod
+    import app.providers.litellm_provider as mod
 
     async def _raise_unsupported(**_kwargs: object) -> AsyncIterator[object]:
         raise _make_unsupported_params_error()
@@ -357,7 +357,7 @@ async def test_open_litellm_stream_missing_key_is_auth_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A missing API key collapses into ``ProviderAuthError`` (single match arm)."""
-    import app.core.providers.litellm_provider as mod
+    import app.providers.litellm_provider as mod
 
     monkeypatch.setattr(mod, "_resolve_litellm_api_key", lambda *_a, **_kw: None)
 
@@ -387,7 +387,7 @@ async def test_open_litellm_stream_with_litellm_bad_request_error(
     Before the catch-tuple fix this raised raw out of ``FutureResult`` because
     ``litellm.BadRequestError`` does not inherit from ``litellm.APIError``.
     """
-    import app.core.providers.litellm_provider as mod
+    import app.providers.litellm_provider as mod
 
     async def _raise_bad_request(**_kwargs: object) -> AsyncIterator[object]:
         raise LiteLLMBadRequestError(
@@ -475,7 +475,7 @@ async def test_open_litellm_stream_unmapped_vendor_returns_provider_auth_error(
     keeps the message readable; the broadened catch tuple also catches the
     raw ``KeyError`` as a belt-and-braces safety net.
     """
-    import app.core.providers.litellm_provider as mod
+    import app.providers.litellm_provider as mod
 
     monkeypatch.setattr(mod, "_resolve_litellm_api_key", lambda *_a, **_kw: None)
 

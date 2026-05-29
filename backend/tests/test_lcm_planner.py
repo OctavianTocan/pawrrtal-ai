@@ -1,6 +1,6 @@
 """Issue #256 - LCM query planner tests.
 
-Covers ``app.core.lcm.planner.plan_query``.
+Covers ``app.lcm.planner.plan_query``.
 
 Behaviour we pin down:
 
@@ -21,7 +21,7 @@ Behaviour we pin down:
 
 from __future__ import annotations
 
-from app.core.lcm.planner import LCMQueryPlan, plan_query
+from app.lcm.planner import LCMQueryPlan, plan_query
 
 
 def test_plan_exact_fact_intent_for_pinpoint_question() -> None:

@@ -34,7 +34,7 @@ dependencies = [
     "markitdown[all]>=0.1.1",
     "xai-sdk>=1.12.0",
     # ``openai`` is a core dependency now that the OpenCode Go provider
-    # ships in-tree (``app.core.providers.opencode_go_provider`` —
+    # ships in-tree (``app.providers.opencode_go_provider`` —
     # OpenAI-compatible gateway at https://opencode.ai/zen/go/v1).  The
     # LiteLLM provider also depends on it transitively for the
     # OpenAI-compat protocol.  Listing here means the voice-via-openai
@@ -44,7 +44,7 @@ dependencies = [
     # The Codex CLI binary is built from the submodule at
     # ``backend/vendor/codex`` (pinned at ``rust-v0.134.0``). The binary
     # lives at ``backend/vendor/codex/codex-rs/target/release/codex``
-    # and is discovered by ``app.core.providers.openai_codex._vendor``
+    # and is discovered by ``app.providers.openai_codex._vendor``
     # before the SDK's bundled-binary fallback is consulted. Build with
     # ``cargo build --release -p codex-cli --bin codex --manifest-path
     # backend/vendor/codex/codex-rs/Cargo.toml``.  We deliberately don't

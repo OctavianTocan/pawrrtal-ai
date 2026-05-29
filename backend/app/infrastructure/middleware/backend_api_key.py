@@ -11,7 +11,7 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 
-from app.core.config import settings
+from app.infrastructure.config import settings
 
 # Paths that bypass the API-key check so health probes and the OpenAPI
 # docs remain reachable without a key even in locked-down deployments.

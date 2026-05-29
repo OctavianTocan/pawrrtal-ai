@@ -22,12 +22,14 @@
 			"!**/.zed",
 			"!**/.vscode",
 			"!**/.sentrux",
+			"!**/.antigravitycli",
 			"!**/coverage",
 			"!**/.stagehand-cache",
 			"!**/playwright-report",
 			"!**/test-results",
 			"!frontend/e2e/output",
 			"!frontend/lib",
+			"!backend/vendor",
 			"!third_party"
 		]
 	},

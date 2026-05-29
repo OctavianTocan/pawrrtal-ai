@@ -20,8 +20,8 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.channels.turn_runner import ChatTurnInput, _guarded_stream
-from app.core.chat_aggregator import ChatTurnAggregator
-from app.core.providers.base import StreamEvent
+from app.chat.aggregator import ChatTurnAggregator
+from app.providers.base import StreamEvent
 
 
 class _ScriptedProvider:

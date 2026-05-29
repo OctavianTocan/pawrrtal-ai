@@ -15,6 +15,9 @@ from fastapi.routing import APIRouter
 from opentelemetry import trace as _otel_trace
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.hooks import build_pre_turn_hooks
+from app.agents.tools import build_agent_tools
+
 # ``ChannelMessage`` is re-exported by ``app.channels.__init__``; we
 # pull all three names from the same package to keep chat.py's
 # fan-out under sentrux's ``no_god_files`` budget.
@@ -30,18 +33,16 @@ from app.conversations.crud import (
     apply_model_switch_and_normalize_reasoning,
     get_conversation,
 )
-from app.core.agent_loop.hooks import build_pre_turn_hooks
-from app.core.agent_loop.tools import build_agent_tools
-from app.core.providers import StreamEvent, default_model, resolve_llm
-from app.core.tools.artifact_agent import (
+from app.infrastructure.auth.users import get_allowed_user
+from app.infrastructure.database.legacy import User, get_async_session
+from app.infrastructure.middleware.logging import get_request_id
+from app.providers import StreamEvent, default_model, resolve_llm
+from app.schemas import ChatRequest
+from app.tools.artifact_agent import (
     ARTIFACT_TOOL_NAME,
     ArtifactValidationError,
     build_artifact,
 )
-from app.infrastructure.auth.users import get_allowed_user
-from app.infrastructure.database.legacy import User, get_async_session
-from app.infrastructure.middleware.logging import get_request_id
-from app.schemas import ChatRequest
 from app.workspace.crud import get_default_workspace
 
 logger = logging.getLogger(__name__)
@@ -122,7 +123,7 @@ async def _require_workspace(
     """Return the user's default workspace ``(id, path)`` or reject the chat turn.
 
     Returns the workspace UUID alongside the directory path so callers
-    can pass both into :func:`app.core.agent_tools.build_agent_tools` —
+    can pass both into :func:`app.agents.tools.build_agent_tools` —
     the UUID drives plugin activation (and, post-migration, env-key
     resolution); the path drives the existing core workspace tools.
     """
@@ -321,7 +322,7 @@ def get_chat_router() -> APIRouter:
         # writes its transcripts under the user's workspace rather than
         # the uvicorn process directory.
         provider = resolve_llm(model_id, workspace_root=root)
-        # Per-turn tool composition lives in `app.core.agent_tools` —
+        # Per-turn tool composition lives in `app.agents.tools` —
         # the chat router only decides *that* the agent gets tools,
         # not *which* (that's the builder's job, and where future
         # per-agent / per-user permission gating will land).  Provider

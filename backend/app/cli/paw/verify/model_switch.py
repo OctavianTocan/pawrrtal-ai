@@ -22,7 +22,7 @@ from app.cli.paw.config import PersonaState
 from app.cli.paw.http import PawClient
 from app.cli.paw.verify import helpers
 from app.cli.paw.verify.scenarios import ScenarioResult
-from app.core.providers.model_id import InvalidModelId, parse_model_id
+from app.providers.model_id import InvalidModelId, parse_model_id
 
 TURN_1_TEXT = "Say hi in two words."
 TURN_2_TEXT = "Now say bye in two words."

@@ -1,7 +1,7 @@
 """Database CRUD helpers for Workspace rows.
 
 These functions own the DB read/write side of workspace management.
-Filesystem seeding lives in ``app.core.workspace`` (``seed_workspace``).
+Filesystem seeding lives in ``app.workspace.service`` (``seed_workspace``).
 """
 
 from __future__ import annotations
@@ -18,8 +18,8 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.core.workspace import seed_workspace
+from app.infrastructure.config import settings
+from app.workspace.service import seed_workspace
 
 log = logging.getLogger(__name__)
 

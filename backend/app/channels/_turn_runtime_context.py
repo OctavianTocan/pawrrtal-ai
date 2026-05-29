@@ -3,9 +3,9 @@
 Tiny helper that keeps :mod:`app.channels.turn_runner` below the
 fan-out budget the architecture gate (sentrux ``no_god_files``)
 enforces.  Without this seam the runner would pull
-:mod:`app.core.providers.catalog`, :mod:`app.core.providers.model_id`,
-:mod:`app.core.agent_loop.safety_factory`, and
-:mod:`app.core.runtime_context` directly — four imports that all live
+:mod:`app.providers.catalog`, :mod:`app.providers.model_id`,
+:mod:`app.agents.safety_factory`, and
+:mod:`app.agents.runtime_context` directly — four imports that all live
 together purely for the system-prompt assembly path.
 
 Closes the runtime-context plumbing for issues #289, #291, #294, #309.
@@ -16,15 +16,15 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from app.agents.runtime_context import ProviderIdentity, append_runtime_context
+from app.agents.safety_factory import safety_from_settings
 from app.channels._turn_workspace import workspace_system_prompt
-from app.core.agent_loop.safety_factory import safety_from_settings
-from app.core.config import settings
-from app.core.providers.catalog import find as find_catalog_entry
-from app.core.providers.model_id import InvalidModelId, parse_model_id
-from app.core.runtime_context import ProviderIdentity, append_runtime_context
+from app.infrastructure.config import settings
+from app.providers.catalog import find as find_catalog_entry
+from app.providers.model_id import InvalidModelId, parse_model_id
 
 if TYPE_CHECKING:
-    from app.core.agent_loop.types import AgentTool
+    from app.agents.types import AgentTool
 
 
 def system_prompt_for_turn(

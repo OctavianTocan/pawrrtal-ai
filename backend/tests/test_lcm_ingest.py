@@ -25,8 +25,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.lcm import assemble_context, ingest_message
 from app.infrastructure.database.legacy import User
+from app.lcm import assemble_context, ingest_message
 from app.models import (
     ChatMessage,
     Conversation,

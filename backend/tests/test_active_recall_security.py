@@ -9,10 +9,10 @@ from typing import Any
 
 import pytest
 
-from app.core.agent_loop.types import AgentTool, PermissionCheckResult
-from app.core.plugins.types import PreTurnHookContext
-from app.core.tools.workspace_files import make_workspace_tools
+from app.agents.plugins.types import PreTurnHookContext
+from app.agents.types import AgentTool, PermissionCheckResult
 from app.plugins.active_recall.recall_agent import run_active_recall
+from app.tools.workspace_files import make_workspace_tools
 
 
 class CapturingProvider:

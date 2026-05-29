@@ -26,7 +26,7 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.plugins import ToolContext, all_plugins
+from app.agents.plugins import ToolContext, all_plugins
 from app.infrastructure.database.legacy import User
 from app.models import NotionOperationLog, Workspace
 from app.plugins.notion import notion_plugin

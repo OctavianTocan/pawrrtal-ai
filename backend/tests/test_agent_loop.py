@@ -26,8 +26,8 @@ from typing import Any
 
 import pytest
 
-from app.core.agent_loop.loop import agent_loop
-from app.core.agent_loop.types import (
+from app.agents.loop import agent_loop
+from app.agents.types import (
     AgentContext,
     AgentEvent,
     AgentLoopConfig,

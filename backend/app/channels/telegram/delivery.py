@@ -6,14 +6,14 @@ import html as html_lib
 import logging
 from typing import TYPE_CHECKING, Any
 
-from app.core.tools.display import fallback_tool_display
+from app.tools.display import fallback_tool_display
 
 from .html import md_to_telegram_html
 
 if TYPE_CHECKING:
     from aiogram import Bot
 
-    from app.core.providers.base import StreamEvent
+    from app.providers.base import StreamEvent
 
 logger = logging.getLogger(__name__)
 

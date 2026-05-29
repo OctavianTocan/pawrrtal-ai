@@ -22,13 +22,13 @@ from datetime import UTC, datetime
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.tools.lcm_grep import _excerpt, lcm_grep
 from app.infrastructure.database.legacy import User
 from app.models import (
     ChatMessage,
     Conversation,
     LCMSummary,
 )
+from app.tools.lcm_grep import _excerpt, lcm_grep
 
 # Helpers
 

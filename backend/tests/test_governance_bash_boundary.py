@@ -1,4 +1,4 @@
-"""Tests for ``app.core.governance.bash_boundary``.
+"""Tests for ``app.governance.bash_boundary``.
 
 Port-of-port — exercises every CCT scenario plus the bash separators
 our agent loop sees in practice (``&&``, ``||``, ``;``, ``|``, ``&``).
@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 
-from app.core.governance.bash_boundary import check_bash_directory_boundary
+from app.governance.bash_boundary import check_bash_directory_boundary
 
 
 @pytest.fixture

@@ -28,9 +28,9 @@ from app.channels.telegram.model_picker import (
     resolve_model_selection,
 )
 from app.channels.telegram.sender import TelegramSender
-from app.core.config import settings
-from app.core.providers.catalog import MODEL_CATALOG, default_model
-from app.core.providers.model_id import Host
+from app.infrastructure.config import settings
+from app.providers.catalog import MODEL_CATALOG, default_model
+from app.providers.model_id import Host
 
 
 @pytest.fixture(autouse=True)

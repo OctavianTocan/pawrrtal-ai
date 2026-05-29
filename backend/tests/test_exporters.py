@@ -1,4 +1,4 @@
-"""Tests for ``app.core.exporters`` — golden-output checks per format."""
+"""Tests for ``app.conversations.exports`` — golden-output checks per format."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 
 import pytest
 
-from app.core.exporters import render_html, render_json, render_markdown
+from app.conversations.exports import render_html, render_json, render_markdown
 from app.models import ChatMessage, Conversation
 
 

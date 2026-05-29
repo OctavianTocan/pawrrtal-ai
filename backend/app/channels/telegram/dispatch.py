@@ -26,7 +26,7 @@ import time
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
-from app.core.providers.base import StreamEvent
+from app.providers.base import StreamEvent
 
 from .delivery import (
     format_tool_use,

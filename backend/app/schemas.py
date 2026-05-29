@@ -12,10 +12,10 @@ from typing import Annotated, Any, Literal
 from fastapi_users import schemas
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
 
-from app.core.config import settings
-from app.core.providers.base import ReasoningEffort
-from app.core.providers.catalog import default_model
-from app.core.providers.model_id import InvalidModelId, parse_model_id
+from app.infrastructure.config import settings
+from app.providers.base import ReasoningEffort
+from app.providers.catalog import default_model
+from app.providers.model_id import InvalidModelId, parse_model_id
 
 logger = logging.getLogger(__name__)
 

@@ -1,4 +1,4 @@
-"""Tests for ``app.core.runtime_context``.
+"""Tests for ``app.agents.runtime_context``.
 
 Per-turn system-prompt block covering current time (#294), active model
 (#309), iteration budget (#291), and tool inventory (#289).
@@ -15,8 +15,7 @@ import pytest
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.core.agent_loop.types import AgentSafetyConfig, AgentTool  # noqa: E402
-from app.core.runtime_context import (  # noqa: E402
+from app.agents.runtime_context import (  # noqa: E402
     ProviderIdentity,
     append_runtime_context,
     compose_current_time_block,
@@ -25,6 +24,7 @@ from app.core.runtime_context import (  # noqa: E402
     compose_runtime_identity_block,
     compose_tool_inventory_block,
 )
+from app.agents.types import AgentSafetyConfig, AgentTool  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Fixtures + helpers

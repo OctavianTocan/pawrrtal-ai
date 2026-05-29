@@ -24,9 +24,9 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.lcm import assemble_context, compact_leaf_if_needed
-from app.core.lcm.condense import _condense_at_depth
 from app.infrastructure.database.legacy import User
+from app.lcm import assemble_context, compact_leaf_if_needed
+from app.lcm.condense import _condense_at_depth
 from app.models import (
     ChatMessage,
     Conversation,
@@ -133,11 +133,11 @@ def _make_provider(answer: str = "CONDENSED") -> Any:
 
 
 def _patch(monkeypatch: pytest.MonkeyPatch, provider: Any) -> None:
-    import app.core.lcm as _lcm
-    import app.core.lcm.condense as _lcm_condense
+    import app.lcm as _lcm
+    import app.lcm.condense as _lcm_condense
 
     monkeypatch.setattr(_lcm, "resolve_llm", lambda *a, **kw: provider)
-    # Condensation lives in app.core.lcm.condense (split out for the
+    # Condensation lives in app.lcm.condense (split out for the
     # file-line budget) — patch its resolve_llm import too so
     # monkeypatched providers reach _condense_at_depth.
     monkeypatch.setattr(_lcm_condense, "resolve_llm", lambda *a, **kw: provider)
@@ -339,13 +339,13 @@ async def test_compact_triggers_condensation_when_depth_ge_1(
     _patch(monkeypatch, _make_provider("compacted+condensed"))
 
     # Patch settings so incremental_max_depth=1 and fresh_tail=2.
-    # Both ``app.core.lcm`` and ``app.core.lcm.condense`` hold their own
+    # Both ``app.lcm`` and ``app.lcm.condense`` hold their own
     # ``settings`` binding (each imported the symbol at module load),
     # so the patch has to land on both — otherwise the cascade reads
     # the real settings object and the test passes only by accident
     # when the real defaults happen to align with ``_S``.
-    import app.core.lcm as _lcm
-    import app.core.lcm.condense as _lcm_condense
+    import app.lcm as _lcm
+    import app.lcm.condense as _lcm_condense
 
     class _S:
         lcm_summary_model = ""
@@ -452,8 +452,8 @@ async def test_compact_skips_condensation_when_depth_is_0(
 
     _patch(monkeypatch, _make_provider("leaf"))
 
-    import app.core.lcm as _lcm
-    import app.core.lcm.condense as _lcm_condense
+    import app.lcm as _lcm
+    import app.lcm.condense as _lcm_condense
 
     class _S:
         lcm_summary_model = ""

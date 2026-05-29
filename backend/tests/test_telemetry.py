@@ -21,7 +21,7 @@ import pytest
 def _clean_telemetry_state(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Reset the module-level _initialised flag between cases."""
     monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
-    import app.core.telemetry as telemetry_module
+    import app.infrastructure.telemetry as telemetry_module
 
     importlib.reload(telemetry_module)
     yield
@@ -32,7 +32,7 @@ def _clean_telemetry_state(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
 @pytest.mark.usefixtures("_clean_telemetry_state")
 def test_setup_tracing_is_a_noop_without_endpoint() -> None:
     """Default state — no env var, no init, no failure."""
-    from app.core.telemetry import setup_tracing
+    from app.infrastructure.telemetry import setup_tracing
 
     # Should return cleanly even with no app.
     setup_tracing(app=None)
@@ -44,7 +44,7 @@ def test_setup_tracing_is_idempotent_when_enabled(monkeypatch: pytest.MonkeyPatc
     """Calling setup twice with an endpoint doesn't double-instrument."""
     monkeypatch.setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://otel-collector:4318")
     monkeypatch.setenv("OTEL_SERVICE_NAME", "pawrrtal-test")
-    from app.core.telemetry import setup_tracing, shutdown_tracing
+    from app.infrastructure.telemetry import setup_tracing, shutdown_tracing
 
     setup_tracing(app=None)
     setup_tracing(
@@ -56,7 +56,7 @@ def test_setup_tracing_is_idempotent_when_enabled(monkeypatch: pytest.MonkeyPatc
 @pytest.mark.usefixtures("_clean_telemetry_state")
 def test_get_tracer_returns_noop_tracer_when_disabled() -> None:
     """Call sites can call ``get_tracer().start_as_current_span()`` unconditionally."""
-    from app.core.telemetry import get_tracer
+    from app.infrastructure.telemetry import get_tracer
 
     tracer = get_tracer("pawrrtal.test")
     # The OTel API returns a NoOpTracer when no provider is installed —
@@ -69,7 +69,7 @@ def test_get_tracer_returns_noop_tracer_when_disabled() -> None:
 @pytest.mark.usefixtures("_clean_telemetry_state")
 def test_shutdown_tracing_is_safe_before_init() -> None:
     """Calling shutdown before setup should be a clean no-op."""
-    from app.core.telemetry import shutdown_tracing
+    from app.infrastructure.telemetry import shutdown_tracing
 
     shutdown_tracing()  # No exception.
 
@@ -97,7 +97,7 @@ def test_setup_tracing_handles_missing_optional_packages_gracefully(
     for name in fake_modules:
         sys.modules[name] = None  # type: ignore[assignment]
     try:
-        from app.core.telemetry import setup_tracing
+        from app.infrastructure.telemetry import setup_tracing
 
         # Should not raise even though one of the imports is broken.
         setup_tracing(app=None)
@@ -115,7 +115,7 @@ def test_otel_enabled_reads_endpoint_env_var(monkeypatch: pytest.MonkeyPatch) ->
     from pathlib import Path
     from tempfile import TemporaryDirectory
 
-    import app.core.telemetry as telemetry_module
+    import app.infrastructure.telemetry as telemetry_module
 
     with TemporaryDirectory() as tmp:
         monkeypatch.setattr(telemetry_module, "_BACKEND_DIR", Path(tmp))
@@ -137,7 +137,7 @@ def test_json_exporter_sends_valid_otlp_json(monkeypatch: pytest.MonkeyPatch) ->
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
-    import app.core.telemetry as telemetry_module
+    import app.infrastructure.telemetry as telemetry_module
 
     received: list[bytes] = []
 
@@ -184,7 +184,7 @@ def test_drop_grpc_connect_spans_filters_connect_names() -> None:
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 
-    import app.core.telemetry as telemetry_module
+    import app.infrastructure.telemetry as telemetry_module
 
     exported_names: list[str] = []
 
@@ -226,7 +226,7 @@ def test_drop_grpc_connect_spans_passes_through_empty_batches() -> None:
     from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import SimpleSpanProcessor, SpanExportResult
 
-    import app.core.telemetry as telemetry_module
+    import app.infrastructure.telemetry as telemetry_module
 
     called = False
 

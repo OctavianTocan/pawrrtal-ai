@@ -13,7 +13,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
 if TYPE_CHECKING:
-    from app.core.providers.reasoning import ReasoningResolution
+    from app.providers.reasoning import ReasoningResolution
 
 # Re-export so the chat router imports the normalize seam from
 # ``crud.conversation`` — which it's already importing — instead of
@@ -295,7 +295,7 @@ async def apply_model_switch_and_normalize_reasoning(
     # consumes provider modules. Resolving the catalog lazily here
     # mirrors the original lazy import in ``normalize_conversation_
     # reasoning_effort`` for the same reason.
-    from app.core.providers.reasoning import (  # noqa: PLC0415
+    from app.providers.reasoning import (  # noqa: PLC0415
         resolve_reasoning_effort,
     )
 

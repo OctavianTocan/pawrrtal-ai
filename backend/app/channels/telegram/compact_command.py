@@ -2,7 +2,7 @@
 
 Forces an LCM leaf-compaction pass on the caller's current
 conversation. Distinct from the background trigger fired after every
-turn (``app.core.lcm.background.schedule_lcm_compaction``) in two ways:
+turn (``app.lcm.background.schedule_lcm_compaction``) in two ways:
 
 1. **Synchronous.** Calls :func:`compact_leaf_if_needed` directly so
    the reply reflects what actually happened on this turn — number of
@@ -33,11 +33,11 @@ from app.channels.crud import (
     get_user_id_for_external,
 )
 from app.channels.telegram.model_defaults import resolve_effective_model_id
-from app.core.config import settings
-from app.core.lcm import compact_leaf_if_needed
-from app.core.lcm.background import acquire_lcm_lock
-from app.core.providers.model_id import InvalidModelId
+from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
+from app.lcm import compact_leaf_if_needed
+from app.lcm.background import acquire_lcm_lock
+from app.providers.model_id import InvalidModelId
 
 
 class _TelegramSenderLike(Protocol):

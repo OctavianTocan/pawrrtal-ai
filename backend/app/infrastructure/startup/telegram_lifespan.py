@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from app.channels.telegram import telegram_lifespan
-from app.core.event_bus import AgentHandler, NotificationService
+from app.infrastructure.event_bus import AgentHandler, NotificationService
 from app.infrastructure.lifecycle import shutdown_hook, startup_hook
 
 if TYPE_CHECKING:

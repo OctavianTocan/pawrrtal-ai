@@ -24,7 +24,7 @@ from enum import StrEnum
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from app.core.providers.base import StreamEvent
+    from app.providers.base import StreamEvent
 
 logger = logging.getLogger(__name__)
 

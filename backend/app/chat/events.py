@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import uuid
 
-from app.core.event_bus import TurnStartedEvent
-from app.core.event_bus.global_bus import publish_if_available
+from app.infrastructure.event_bus import TurnStartedEvent
+from app.infrastructure.event_bus.global_bus import publish_if_available
 
 
 async def publish_turn_started(

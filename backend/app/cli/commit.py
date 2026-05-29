@@ -23,7 +23,7 @@ if not os.environ.get("GOOGLE_API_KEY"):
     print("GOOGLE_API_KEY not found in environment or .env file.", file=sys.stderr)
     sys.exit(1)
 
-from app.core.providers import resolve_llm  # noqa: E402
+from app.providers import resolve_llm  # noqa: E402
 
 COMMIT_AGENT_MODEL = os.environ.get("COMMIT_AGENT_MODEL", "google-ai:google/gemini-3.1-flash-lite")
 

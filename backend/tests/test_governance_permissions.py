@@ -1,4 +1,4 @@
-"""Tests for ``app.core.governance.permissions``.
+"""Tests for ``app.governance.permissions``.
 
 Each individual check covers one denial dimension; the composed
 default bundle is exercised end-to-end to confirm short-circuit
@@ -13,7 +13,7 @@ from typing import Any
 
 import pytest
 
-from app.core.governance.permissions import (
+from app.governance.permissions import (
     PermissionContext,
     PermissionDecision,
     build_default_permission_check,

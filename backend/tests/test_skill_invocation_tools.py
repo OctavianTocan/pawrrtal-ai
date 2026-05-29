@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from app.core.tools.skill_invocation import (
+from app.tools.skill_invocation import (
     make_invoke_skill_tool,
     make_list_skills_tool,
     make_read_skill_tool,

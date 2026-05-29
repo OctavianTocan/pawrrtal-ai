@@ -11,12 +11,12 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from app.core.agent_loop.types import PermissionCheckFn, PermissionCheckResult
-from app.core.governance.permissions import (
+from app.agents.types import PermissionCheckFn, PermissionCheckResult
+from app.governance.permissions import (
     PermissionContext,
     build_default_permission_check,
 )
-from app.core.governance.workspace_context import load_workspace_context
+from app.governance.workspace_context import load_workspace_context
 
 from .channel import SURFACE_TELEGRAM
 

@@ -333,7 +333,7 @@ async def handle_verbose_command(
     """Process a ``/verbose <0|1|2>`` command and persist the override.
 
     Mirrors CCT's ``/verbose`` semantics — see
-    :func:`app.core.chat_aggregator.should_emit_event` for the
+    :func:`app.chat.aggregator.should_emit_event` for the
     filtering applied at each level.
 
     Args:

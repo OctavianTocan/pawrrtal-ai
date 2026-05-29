@@ -22,10 +22,10 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from app.core.agent_loop.display import ToolDisplay
-from app.core.agent_loop.types import AgentTool
-from app.core.keys import resolve_api_key
-from app.core.plugins.types import ToolContext
+from app.agents.display import ToolDisplay
+from app.agents.plugins.types import ToolContext
+from app.agents.types import AgentTool
+from app.infrastructure.keys import resolve_api_key
 from app.plugins.notion.audit import with_audit
 from app.plugins.notion.display import _format_ntn_display
 from app.plugins.notion.ntn_client import NtnError, call_ntn

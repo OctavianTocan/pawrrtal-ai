@@ -22,7 +22,7 @@ import pytest
 
 from app.channels.base import ChannelMessage
 from app.channels.telegram import TelegramChannel
-from app.core.providers.base import StreamEvent
+from app.providers.base import StreamEvent
 
 
 class FakeBot:

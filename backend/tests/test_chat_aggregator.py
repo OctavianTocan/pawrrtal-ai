@@ -4,7 +4,7 @@ Mirrors the frontend `chat-reducer.test.ts` so live and rehydrated views
 end up with identical shapes.
 """
 
-from app.core.chat_aggregator import ChatTurnAggregator
+from app.chat.aggregator import ChatTurnAggregator
 
 
 def test_delta_events_concatenate_into_content() -> None:

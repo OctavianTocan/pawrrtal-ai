@@ -13,16 +13,16 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID
 
+from app.agents.types import PermissionCheckFn, PermissionCheckResult
 from app.chat.external_mcp import (
     # Re-export keeps chat.py fan-out under sentrux budget.
     load_external_mcp_configs as load_external_mcp_configs,  # noqa: PLC0414
 )
-from app.core.agent_loop.types import PermissionCheckFn, PermissionCheckResult
-from app.core.governance.permissions import (
+from app.governance.permissions import (
     PermissionContext,
     build_default_permission_check,
 )
-from app.core.governance.workspace_context import load_workspace_context
+from app.governance.workspace_context import load_workspace_context
 
 
 def build_chat_permission_check(
@@ -41,7 +41,7 @@ def build_chat_permission_check(
     signature so the context never leaks into the agent loop. Both
     providers consume the same closure — Claude via the SDK's
     ``can_use_tool`` hook, Gemini via
-    :class:`~app.core.agent_loop.types.AgentLoopConfig.permission_check`.
+    :class:`~app.agents.types.AgentLoopConfig.permission_check`.
 
     Workspace context drives ``enabled_tools`` so the gate respects
     the workspace's ``.agent/protocols/permissions.md`` allow list

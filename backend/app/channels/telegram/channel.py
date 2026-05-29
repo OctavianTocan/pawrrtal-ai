@@ -21,9 +21,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from app.channels.base import ChannelMessage
-from app.core.config import settings
-from app.core.providers.base import StreamEvent
-from app.core.tools.send_message import SendFn
+from app.infrastructure.config import settings
+from app.providers.base import StreamEvent
+from app.tools.send_message import SendFn
 
 from .delivery import (
     final_reply_text,
@@ -385,7 +385,7 @@ def make_telegram_sender(
     message_thread_id: int | None = None,
     reply_to_message_id: int | None = None,
 ) -> SendFn:
-    """Return a :data:`~app.core.tools.send_message.SendFn` for Telegram.
+    """Return a :data:`~app.tools.send_message.SendFn` for Telegram.
 
     The returned coroutine routes delivery based on MIME type::
 
@@ -410,8 +410,8 @@ def make_telegram_sender(
         reply_to_message_id: Optional inbound message id to reply to.
 
     Returns:
-        An async :data:`~app.core.tools.send_message.SendFn` callback ready
-        to pass to :func:`~app.core.tools.send_message.make_send_message_tool`.
+        An async :data:`~app.tools.send_message.SendFn` callback ready
+        to pass to :func:`~app.tools.send_message.make_send_message_tool`.
     """
 
     async def _send(

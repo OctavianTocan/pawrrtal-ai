@@ -19,13 +19,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.lcm.observe import (
-    LCMContextDebugResponse,
-    describe_assembled_context,
-)
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.database.legacy import User, get_async_session
 from app.infrastructure.models.conversation import Conversation
+from app.lcm.observe import (
+    LCMContextDebugResponse,
+    describe_assembled_context,
+)
 
 logger = logging.getLogger(__name__)
 

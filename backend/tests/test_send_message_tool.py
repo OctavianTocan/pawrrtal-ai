@@ -2,7 +2,7 @@
 
 Covers the two halves of the media delivery proof:
 
-Part 1 — send_message AgentTool (``app.core.tools.send_message``)
+Part 1 — send_message AgentTool (``app.tools.send_message``)
   - text-only call succeeds (no file)
   - attachment path resolved correctly from workspace root
   - attachment outside workspace root is rejected
@@ -32,8 +32,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.channels.telegram import make_telegram_sender
-from app.core.tools.errors import ToolError, ToolErrorCode
-from app.core.tools.send_message import _detect_mime, _resolve_attachment, make_send_message_tool
+from app.tools.errors import ToolError, ToolErrorCode
+from app.tools.send_message import _detect_mime, _resolve_attachment, make_send_message_tool
 
 # ---------------------------------------------------------------------------
 # Fixtures

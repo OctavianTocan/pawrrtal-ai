@@ -5,7 +5,7 @@ and ``user_id`` second to match the project's CRUD parameter-order
 rule.
 
 Config storage is opaque JSON (a string column) at this layer — the
-agent-side bridge (see :mod:`app.core.tools.external_mcp`) is the
+agent-side bridge (see :mod:`app.tools.external_mcp`) is the
 single source of truth for the wire shape, so growing new transports
 needs no migration.
 """

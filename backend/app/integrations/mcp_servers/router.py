@@ -27,7 +27,7 @@ class McpServerPayload(BaseModel):
     """Request body for create / update endpoints.
 
     ``config`` is opaque JSON; the bridge in
-    :mod:`app.core.tools.external_mcp` is the single source of truth
+    :mod:`app.tools.external_mcp` is the single source of truth
     for the wire shape.
     """
 

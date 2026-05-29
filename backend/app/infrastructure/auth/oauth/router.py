@@ -27,8 +27,8 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
 from app.infrastructure.auth.users import auth_backend, get_jwt_strategy
+from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import User, get_async_session
 
 # Tokens for state values are kept in-process for the lifetime of the

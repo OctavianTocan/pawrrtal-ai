@@ -14,7 +14,7 @@ stays under sentrux's ``no_god_files`` budget. The public helpers:
   when the user-visible level changed.
 
 Both wrap the pure resolver in
-:mod:`app.core.providers.reasoning`; the resolver itself stays
+:mod:`app.providers.reasoning`; the resolver itself stays
 side-effect-free and DB-agnostic.
 """
 
@@ -24,14 +24,14 @@ import uuid
 from typing import TYPE_CHECKING
 
 from app.channels.crud import normalize_conversation_reasoning_effort
-from app.core.providers.reasoning import format_adaptation_notice
 from app.infrastructure.database.legacy import async_session_maker
+from app.providers.reasoning import format_adaptation_notice
 
 if TYPE_CHECKING:
     from aiogram.types import Message
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from app.core.providers.base import ReasoningEffort
+    from app.providers.base import ReasoningEffort
 
 
 async def normalize_reasoning_and_notify(

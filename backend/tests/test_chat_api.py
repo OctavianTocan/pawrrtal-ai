@@ -6,10 +6,10 @@ from uuid import uuid4
 import pytest
 from httpx import AsyncClient
 
-from app.core.agent_loop.types import AgentSafetyConfig
-from app.core.providers.catalog import default_model
-from app.core.providers.gemini import GeminiLLM
+from app.agents.types import AgentSafetyConfig
 from app.models import Workspace  # used via fixture type hint
+from app.providers.catalog import default_model
+from app.providers.gemini import GeminiLLM
 from tests.agent_harness import ScriptedStreamFn, echo_tool, text_turn, tool_call_turn
 
 
@@ -245,7 +245,9 @@ async def test_chat_stream_converts_provider_exception_to_error_event(
             raise RuntimeError("provider failed")
             yield {"type": "delta", "content": "unreachable"}
 
-    monkeypatch.setattr("app.chat.router.resolve_llm", lambda _model_id, **kwargs: FailingProvider())
+    monkeypatch.setattr(
+        "app.chat.router.resolve_llm", lambda _model_id, **kwargs: FailingProvider()
+    )
 
     response = await client.post(
         "/api/v1/chat/",
@@ -347,7 +349,7 @@ async def test_chat_safety_layer_fires_and_surfaces_agent_terminated(
 
     # Limit to 3 iterations via the safety factory.
     monkeypatch.setattr(
-        "app.core.providers.gemini.provider.safety_from_settings",
+        "app.providers.gemini.provider.safety_from_settings",
         lambda _settings: AgentSafetyConfig(
             max_iterations=3,
             max_wall_clock_seconds=None,
@@ -357,7 +359,9 @@ async def test_chat_safety_layer_fires_and_surfaces_agent_terminated(
     )
 
     monkeypatch.setattr("app.chat.router.resolve_llm", lambda _model_id, **_kw: provider)
-    monkeypatch.setattr("app.chat.router.build_agent_tools", lambda *_args, **_kw: [echo_tool("ping")])
+    monkeypatch.setattr(
+        "app.chat.router.build_agent_tools", lambda *_args, **_kw: [echo_tool("ping")]
+    )
 
     conversation_id = uuid4()
     await client.post(f"/api/v1/conversations/{conversation_id}", json={"title": "Safety Test"})
