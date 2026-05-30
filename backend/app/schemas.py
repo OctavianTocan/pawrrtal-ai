@@ -4,65 +4,15 @@ These are *not* database models — they define the shape of data flowing
 through the API layer.
 """
 
-import logging
 import uuid
 from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from fastapi_users import schemas
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
-from app.infrastructure.config import settings
 from app.providers.base import ReasoningEffort
-from app.providers.catalog import default_model
-from app.providers.model_id import InvalidModelId, parse_model_id
-
-logger = logging.getLogger(__name__)
-
-
-def _canonicalise_model_id(raw: str | None) -> str | None:
-    """Rewrite any accepted input shape to canonical form.
-
-    Canonical form is ``host:vendor/model``. ``None`` passes through.
-
-    Raises:
-        ValueError: If the string fails to parse (FastAPI maps this
-            to HTTP 422).
-    """
-    if raw is None:
-        return None
-    try:
-        return parse_model_id(raw).id
-    except InvalidModelId as exc:
-        # Re-raise as ValueError so Pydantic generates a clean 422.
-        raise ValueError(str(exc)) from exc
-
-
-def _canonicalise_model_id_for_read(raw: str | None) -> str | None:
-    """Output validator for ``ConversationRead.model_id``.
-
-    Defaults to strict (matches the input contract). When
-    ``settings.strict_conversation_read_validation`` is ``False``,
-    a non-canonical stored value falls back to the catalog default
-    and is logged. Operator escape hatch, not a documented contract.
-    """
-    if raw is None:
-        return None
-    try:
-        return parse_model_id(raw).id
-    except InvalidModelId as exc:
-        if settings.strict_conversation_read_validation:
-            raise ValueError(str(exc)) from exc
-        logger.warning(
-            "CONVERSATION_READ_FALLBACK bad_model_id=%r error=%s",
-            raw,
-            exc,
-        )
-        return default_model().id
-
-
-CanonicalModelId = Annotated[str | None, AfterValidator(_canonicalise_model_id)]
-CanonicalModelIdForRead = Annotated[str | None, AfterValidator(_canonicalise_model_id_for_read)]
+from app.schema_model_id import CanonicalModelId, CanonicalModelIdForRead
 
 # --- User schemas (provided by fastapi-users) --------------------------------
 

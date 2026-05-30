@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
-revision = '027_add_codex_thread_id_to_conversations'
+revision = '027'
 down_revision = '026_add_fire_at_to_scheduled_jobs'
 branch_labels = None
 depends_on = None

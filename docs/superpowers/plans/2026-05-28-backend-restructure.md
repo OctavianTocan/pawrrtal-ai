@@ -690,7 +690,7 @@ app = create_app()
 
 ```bash
 cd backend && uv run pytest tests/ -x -q
-cd backend && uv run uvicorn app.main:app --reload &  # smoke
+cd backend && uv run uvicorn main:app --reload &  # smoke
 sleep 5
 curl -s http://localhost:8000/api/v1/health
 kill %1
@@ -1085,7 +1085,7 @@ ls -la backend/app/integrations/xai/
 cat backend/app/integrations/xai/oauth.py backend/app/integrations/xai/credentials.py
 ```
 
-Create `backend/app/core/providers/xai/auth.py` containing the merged content:
+Create `backend/app/providers/xai/auth.py` containing the merged content:
 
 ```python
 """xAI provider auth: OAuth device-code flow + credential resolution.
@@ -1107,7 +1107,7 @@ cd backend && rg -l 'from app\.integrations\.xai' | \
     -e 's|from app\.integrations\.xai import|from app.core.providers.xai.auth import|g'
 
 rm -rf backend/app/integrations/xai/
-git add backend/app/integrations/ backend/app/core/providers/xai/
+git add backend/app/integrations/ backend/app/providers/xai/
 ```
 
 ### Task 6.4: Verify + commit

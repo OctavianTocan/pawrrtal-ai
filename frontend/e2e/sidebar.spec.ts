@@ -13,25 +13,11 @@
 import { expect, test } from './fixtures';
 
 test.describe('sidebar', () => {
-	test.beforeEach(async ({ context }) => {
-		const backend = process.env.E2E_API_URL ?? 'http://localhost:8000';
-		// ``context.request`` shares cookies with the browser context, so
-		// the dev-login session cookie is available for the personalization
-		// and conversation seed calls below.
-		const loginResponse = await context.request.post(`${backend}/auth/dev-login`);
-		expect(loginResponse.ok()).toBe(true);
-		const provisionResponse = await context.request.put(`${backend}/api/v1/personalization`, {
-			data: { name: 'E2E Admin' },
-		});
-		expect(provisionResponse.ok()).toBe(true);
-		const conversationResponse = await context.request.post(
-			`${backend}/api/v1/conversations/${crypto.randomUUID()}`,
-			{ data: { title: 'E2E Seed Conversation' } }
-		);
-		expect(conversationResponse.ok()).toBe(true);
-	});
-
-	test('renders the seeded conversation in the sidebar', async ({ page }) => {
+	test('renders the seeded conversation in the sidebar', async ({
+		page,
+		authenticatedPageWithWorkspaceAndChat,
+	}) => {
+		void authenticatedPageWithWorkspaceAndChat;
 		// Wait for the conversations API response alongside navigation so the
 		// sidebar has data before the assertion fires. Without this, a slow
 		// SQLite cold-query in CI can race with the assertion timeout.
@@ -45,15 +31,21 @@ test.describe('sidebar', () => {
 			page.goto('/'),
 		]);
 		expect(conversationsResponse.ok()).toBe(true);
-		// The seeded conversation appears in the conversation list. This is the
-		// load-bearing assertion — the New-chat affordance is now an icon-only
-		// button with no exposed accessible name, so we no longer assert it
-		// directly; the seeded-conversation row reaching visibility implies the
-		// sidebar list rendered.
-		await expect(page.getByText('E2E Seed Conversation')).toBeVisible({ timeout: 15_000 });
+		// The seeded conversation appears in the conversation list, and the
+		// primary New Session control remains accessible by name.
+		await expect(page.getByRole('button', { name: /new session/i })).toBeVisible({
+			timeout: 15_000,
+		});
+		await expect(page.getByText('E2E Seed Conversation').first()).toBeVisible({
+			timeout: 15_000,
+		});
 	});
 
-	test('renders the user profile section in the sidebar footer', async ({ page }) => {
+	test('renders the user profile section in the sidebar footer', async ({
+		page,
+		authenticatedPageWithWorkspace,
+	}) => {
+		void authenticatedPageWithWorkspace;
 		await page.goto('/');
 		// The sidebar footer shows the provisioned user name once the
 		// personalization query resolves. Allow extra time for cold CI.

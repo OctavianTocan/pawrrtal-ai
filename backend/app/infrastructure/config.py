@@ -7,6 +7,12 @@ from urllib.parse import urlparse
 from pydantic import Field, PositiveInt, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.infrastructure.config_urls import (
+    async_database_url,
+    normalize_database_url,
+    sync_database_url,
+)
+
 
 class Settings(BaseSettings):
     """Application settings. This class uses Pydantic's BaseSettings to automatically read environment variables and provide type validation."""
@@ -452,20 +458,7 @@ class Settings(BaseSettings):
     @property
     def _normalized_database_url(self) -> str:
         """Return the configured database URL in a normalized form."""
-        url = self.database_url.strip()
-        if not url:
-            filename = self.sqlite_db_filename.strip() or "pawrrtal.db"
-            return f"sqlite:///./{filename}"
-
-        parsed = urlparse(url)
-        if parsed.scheme.startswith(("postgresql", "sqlite")):
-            return url
-
-        # Treat bare filesystem paths as SQLite database files.
-        if not parsed.scheme:
-            return f"sqlite:///{url}"
-
-        return url
+        return normalize_database_url(self.database_url, self.sqlite_db_filename)
 
     @property
     def is_sqlite(self) -> bool:
@@ -479,12 +472,7 @@ class Settings(BaseSettings):
         PostgreSQL URLs are normalized to the installed psycopg driver, while
         SQLite async URLs are converted back to the sync sqlite dialect.
         """
-        url = self._normalized_database_url
-        if url.startswith("postgresql://"):
-            return url.replace("postgresql://", "postgresql+psycopg://", 1)
-        if url.startswith("sqlite+aiosqlite://"):
-            return url.replace("sqlite+aiosqlite://", "sqlite://", 1)
-        return url
+        return sync_database_url(self._normalized_database_url)
 
     @property
     def db_url_async(self) -> str:
@@ -493,12 +481,7 @@ class Settings(BaseSettings):
         PostgreSQL URLs are normalized to the psycopg async dialect and SQLite
         sync URLs are converted to the aiosqlite dialect.
         """
-        url = self._normalized_database_url
-        if url.startswith("postgresql://"):
-            return url.replace("postgresql://", "postgresql+psycopg://", 1)
-        if url.startswith("sqlite://") and not url.startswith("sqlite+aiosqlite://"):
-            return url.replace("sqlite://", "sqlite+aiosqlite://", 1)
-        return url
+        return async_database_url(self._normalized_database_url)
 
 
 settings = Settings()

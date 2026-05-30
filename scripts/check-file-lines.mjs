@@ -124,18 +124,6 @@ const EXEMPT_PATH_FRAGMENTS = [
 	'backend/app/channels/_telegram_dispatch.py',
 	'backend/app/channels/telegram.py',
 	'backend/app/agents/types.py',
-	// Restructure prep (bean pawrrtal-uhvn) — these files were already past
-	// 500 lines on ``development`` and surface now that the file-lines gate
-	// finally runs on this branch. Splitting them is explicitly out of scope
-	// for the restructure PR (spec §10 non-goals); follow-up beans track the
-	// flatten work. Remove these exemptions once the corresponding splits
-	// land.
-	'backend/app/cli/paw/commands/workspaces.py',
-	'backend/app/cli/paw/commands/conversations.py',
-	'backend/app/providers/litellm_provider.py',
-	'backend/app/workspace/router.py',
-	'backend/app/infrastructure/config.py',
-	'backend/app/schemas.py',
 ];
 
 /** Recursively yield every source file under `dir` that we should check. */

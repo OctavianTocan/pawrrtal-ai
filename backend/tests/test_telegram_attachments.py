@@ -116,10 +116,11 @@ async def test_voice_message_emits_metadata_annotation_only() -> None:
     bot = _make_bot_with_photo(raw)
 
     attachments = await collect_attachments(message, bot)
-    annotation = next(iter(attachments.text_annotations), "")
-    assert "voice message" in annotation.lower()
-    assert "4s" in annotation
-    assert "Transcription:" not in annotation
+    assert any(
+        "voice message" in annotation.lower() and "4s" in annotation
+        for annotation in attachments.text_annotations
+    )
+    assert all("Transcription:" not in annotation for annotation in attachments.text_annotations)
 
 
 async def test_document_message_without_file_id_falls_back_to_metadata() -> None:

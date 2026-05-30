@@ -33,12 +33,12 @@ export interface UseVoiceTranscribeResult {
 	/** Begin capturing microphone audio. Resolves once recording is live. */
 	startRecording: () => Promise<void>;
 	/**
-	 * Stop the recorder and POST the captured blob to the backend STT proxy.
+	 * Stop the recorder and request transcription when the deployment enables it.
 	 *
 	 * Resolves with the transcript text on success, or `null` if recording
-	 * was cancelled / produced no audio. Failure surfaces a toast and
-	 * resolves to `null` rather than throwing — composers don't need to
-	 * try/catch.
+	 * was cancelled / produced no audio. On this deployment, voice transcription
+	 * is intentionally disabled and callers get the permanent "not available"
+	 * message instead of a retryable upload failure.
 	 */
 	stopRecording: () => Promise<string | null>;
 	/** Discard the current recording without uploading anything. */
@@ -113,12 +113,12 @@ function awaitFinalBlob(
 }
 
 /**
- * Records microphone audio and uploads it to the configured STT proxy on stop.
+ * Records microphone audio and requests transcription on stop when enabled.
  *
  * The flow:
  *   1. `startRecording()` — request mic permission, start `MediaRecorder`.
- *   2. `stopRecording()`  — stop the recorder, transcribe the blob, and
- *                            return the transcript text.
+ *   2. `stopRecording()`  — stop the recorder, request transcription, and
+ *                            return the transcript text when available.
  *   3. `cancelRecording()` — abort without uploading.
  *
  * MediaRecorder is the browser's recommended capture API and works in all

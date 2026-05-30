@@ -40,7 +40,7 @@ Secondary wins that fall out naturally:
 
 ## 1. Target tree
 
-```
+```text
 backend/
   main.py                            # ~10 lines: from infrastructure.app_factory import create_app; app = create_app()
   pyproject.toml                     # `returns` dep removed; mypy plugin entry removed
@@ -255,7 +255,7 @@ except DomainError as e:
 
 ### ORM tables → `infrastructure/models/`
 
-```
+```text
 infrastructure/models/
   base.py                    # Base = declarative_base(); shared
   user.py                    # User, UserPreferences
@@ -292,7 +292,7 @@ Sentrux layer rule: `infrastructure/models/` is the lowest layer (highest sentru
 
 Current: 176 flat test files in `tests/`. Target:
 
-```
+```text
 tests/
   conftest.py                  # global fixtures (db_session, test_user, dev_admin)
   agent_harness.py             # ScriptedStreamFn (unchanged)

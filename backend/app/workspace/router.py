@@ -31,7 +31,6 @@ from app.schemas import (
     SkillRead,
     WorkspaceCreate,
     WorkspaceFileContent,
-    WorkspaceFileNode,
     WorkspaceFileWrite,
     WorkspaceRead,
     WorkspaceTreeResponse,
@@ -45,6 +44,7 @@ from app.workspace.crud import (
     list_workspaces,
     update_workspace,
 )
+from app.workspace.filesystem import build_tree, has_symlink_parent, safe_child
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -67,66 +67,6 @@ async def _get_owned_workspace(
     if ws is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Workspace not found")
     return ws
-
-
-def _safe_child(root: Path, relative: str, *, follow_final_symlink: bool = True) -> Path:
-    """Resolve a workspace-relative path and verify it stays inside the root.
-
-    Raises 400 if the path escapes the workspace root (directory traversal).
-    """
-    candidate = root / relative
-    resolved = candidate.resolve() if follow_final_symlink else candidate.parent.resolve()
-    try:
-        resolved.relative_to(root.resolve())
-    except ValueError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Path must be inside the workspace",
-        ) from exc
-    return resolved if follow_final_symlink else candidate
-
-
-def _has_symlink_parent(root: Path, relative: str) -> bool:
-    """Return True when any parent component in ``relative`` is a symlink."""
-    current = root
-    parts = Path(relative).parts[:-1]
-    for part in parts:
-        current = current / part
-        if current.is_symlink():
-            return True
-    return False
-
-
-def _build_tree(root: Path, relative_root: Path | None = None) -> list[WorkspaceFileNode]:
-    """Recursively build a flat list of file-tree nodes.
-
-    ``relative_root`` is the workspace root used to compute workspace-relative
-    paths; it defaults to ``root`` on the first call.
-    """
-    if relative_root is None:
-        relative_root = root
-
-    nodes: list[WorkspaceFileNode] = []
-    try:
-        entries = sorted(root.iterdir(), key=lambda p: (p.is_file(), p.name))
-    except PermissionError:
-        return nodes
-
-    for entry in entries:
-        rel = entry.relative_to(relative_root).as_posix()
-        if entry.is_dir():
-            nodes.append(WorkspaceFileNode(name=entry.name, path=rel, is_dir=True))
-            nodes.extend(_build_tree(entry, relative_root))
-        else:
-            nodes.append(
-                WorkspaceFileNode(
-                    name=entry.name,
-                    path=rel,
-                    is_dir=False,
-                    size=entry.stat().st_size,
-                )
-            )
-    return nodes
 
 
 # ---------------------------------------------------------------------------
@@ -323,7 +263,7 @@ def _register_tree_route(router: APIRouter) -> None:
             )
         return WorkspaceTreeResponse(
             workspace_id=ws.id,
-            nodes=_build_tree(root),
+            nodes=build_tree(root),
         )
 
 
@@ -339,7 +279,7 @@ def _register_file_routes(router: APIRouter) -> None:
     ) -> WorkspaceFileContent:
         """Read a file's text content from the workspace."""
         ws = await _get_owned_workspace(workspace_id, user, session)
-        target = _safe_child(Path(ws.path), file_path)
+        target = safe_child(Path(ws.path), file_path)
 
         if not target.exists():
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")
@@ -373,9 +313,9 @@ def _register_file_routes(router: APIRouter) -> None:
     ) -> WorkspaceFileContent:
         """Create or replace a text file inside the workspace."""
         ws = await _get_owned_workspace(workspace_id, user, session)
-        target = _safe_child(Path(ws.path), file_path, follow_final_symlink=False)
+        target = safe_child(Path(ws.path), file_path, follow_final_symlink=False)
 
-        if _has_symlink_parent(Path(ws.path), file_path) or target.is_symlink():
+        if has_symlink_parent(Path(ws.path), file_path) or target.is_symlink():
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot write through a workspace symlink",
@@ -403,9 +343,9 @@ def _register_file_routes(router: APIRouter) -> None:
     ) -> None:
         """Delete a file from the workspace.  Does not delete directories."""
         ws = await _get_owned_workspace(workspace_id, user, session)
-        target = _safe_child(Path(ws.path), file_path, follow_final_symlink=False)
+        target = safe_child(Path(ws.path), file_path, follow_final_symlink=False)
 
-        if _has_symlink_parent(Path(ws.path), file_path):
+        if has_symlink_parent(Path(ws.path), file_path):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Cannot delete through a workspace symlink",
@@ -494,7 +434,7 @@ def _register_serve_route(router: APIRouter) -> None:
             )
 
         root = await anyio.to_thread.run_sync(Path(ws.path).resolve)
-        target = _safe_child(root, file_path)
+        target = safe_child(root, file_path)
 
         if not target.exists():
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="File not found")

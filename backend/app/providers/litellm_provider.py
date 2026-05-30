@@ -61,19 +61,18 @@ from app.agents import (
 from app.agents.safety_factory import safety_from_settings
 from app.agents.types import PermissionCheckFn, TextContent
 from app.infrastructure.config import settings
-from app.infrastructure.keys import resolve_api_key
 
-from ._errors import (
-    ProviderAuthError,
-    ProviderError,
-    ProviderRateLimitError,
-    ProviderTimeoutError,
-    ProviderUnknownError,
-    ProviderUnsupportedParamError,
-)
 from ._stream_logging import log_provider_stream_event
 from .base import ReasoningEffort, StreamEvent
 from .gemini.events import agent_event_to_stream_event, identity_convert
+from .litellm_helpers import (
+    VENDOR_API_KEY_NAME,
+    build_litellm_messages,
+    classify_litellm_exception,
+    delta_text,
+    litellm_model_string,
+    resolve_litellm_api_key,
+)
 from .model_id import Vendor
 
 if TYPE_CHECKING:
@@ -81,104 +80,11 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-
-# Workspace-facing env-var name per vendor.  ``resolve_api_key`` reads
-# the encrypted per-workspace ``.env`` first and falls back to the
-# matching ``Settings`` attribute (see ``app/core/keys.py``).
-_VENDOR_API_KEY_NAME: dict[Vendor, str] = {
-    Vendor.openai: "OPENAI_API_KEY",
-    Vendor.xai: "XAI_API_KEY",
-}
-
-
-def _litellm_model_string(vendor: Vendor, model: str) -> str:
-    """Format ``vendor`` + ``model`` for ``litellm.acompletion(model=...)``.
-
-    LiteLLM dispatches by the ``<provider>/<model>`` prefix; the
-    provider strings happen to match our ``Vendor`` enum values for
-    every vendor we support today.  When a future vendor diverges
-    (e.g. ``mistral`` → ``mistral_chat``) add a per-vendor override
-    table rather than reaching for ``str.replace``.
-    """
-    return f"{vendor.value}/{model}"
-
-
-def _resolve_litellm_api_key(vendor: Vendor, workspace_root: Path | None) -> str | None:
-    """Resolve the API key for ``vendor`` honouring workspace overrides."""
-    key_name = _VENDOR_API_KEY_NAME.get(vendor)
-    if key_name is None:
-        return None
-    if workspace_root is not None:
-        return resolve_api_key(workspace_root, key_name) or None
-    settings_attr = {
-        Vendor.openai: "openai_api_key",
-        Vendor.xai: "xai_api_key",
-    }[vendor]
-    value = getattr(settings, settings_attr, "") or ""
-    return value or None
-
-
-def _build_litellm_messages(
-    messages: list[AgentMessage],
-    system_prompt: str,
-    images: list[dict[str, str]] | None = None,
-) -> list[dict[str, Any]]:
-    """Convert agent-loop messages to LiteLLM's OpenAI-shaped messages.
-
-    PR 09: when ``images`` is supplied, the last user message becomes a
-    multimodal content list (images first, then the text question)
-    matching OpenAI's shape.
-    """
-    out: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
-
-    last_user_idx = -1
-    for idx, msg in enumerate(messages):
-        if msg["role"] == "user":
-            last_user_idx = idx
-
-    for idx, msg in enumerate(messages):
-        if msg["role"] == "user":
-            text = msg["content"]
-            if idx == last_user_idx and images:
-                content_list: list[dict[str, Any]] = [{"type": "text", "text": text}]
-                for img in images:
-                    if "data" in img:
-                        media_type = img.get("media_type", "image/png")
-                        data_uri = f"data:{media_type};base64,{img['data']}"
-                        content_list.append({"type": "image_url", "image_url": {"url": data_uri}})
-                out.append({"role": "user", "content": content_list})
-            elif text.strip():
-                out.append({"role": "user", "content": text})
-            continue
-        if msg["role"] == "assistant":
-            text_parts = [b["text"] for b in msg["content"] if b["type"] == "text"]
-            joined = "".join(text_parts)
-            if joined.strip():
-                out.append({"role": "assistant", "content": joined})
-            continue
-        # ``toolResult`` messages are dropped silently in v1 — no
-        # roundtrip is possible without the tool-call message that
-        # produced them.  Once tools land, emit the matching
-        # ``{"role": "tool", "tool_call_id": ..., "content": ...}``
-        # shape here.
-    return out
-
-
-def _delta_text(chunk: Any) -> str:
-    """Extract the streamed text fragment from one LiteLLM chunk.
-
-    LiteLLM normalises every provider's chunk into the OpenAI shape:
-    ``chunk.choices[0].delta.content`` is the new text (or ``None``
-    on chunks that only carry tool calls / finish_reason / usage).
-    """
-    choices = getattr(chunk, "choices", None) or []
-    if not choices:
-        return ""
-    delta = getattr(choices[0], "delta", None)
-    if delta is None:
-        return ""
-    content = getattr(delta, "content", None)
-    return content or ""
+_build_litellm_messages = build_litellm_messages
+_classify_litellm_exception = classify_litellm_exception
+_delta_text = delta_text
+_litellm_model_string = litellm_model_string
+_resolve_litellm_api_key = resolve_litellm_api_key
 
 
 # Map Pawrrtal's five-level ``ReasoningEffort`` literal onto OpenAI's
@@ -218,63 +124,6 @@ _LITELLM_REASONING_EFFORT: dict[str, str] = {
 # closed-set classifier behaviour so a future migration has the seam
 # already covered.
 # ---------------------------------------------------------------------------
-
-
-def _extract_retry_after(exc: BaseException) -> float | None:
-    """Pull a ``Retry-After`` hint off a LiteLLM exception's HTTP response.
-
-    LiteLLM does not promote the header onto the exception itself —
-    callers have to read ``exc.response.headers`` (see
-    ``vendor/litellm/.../exceptions.py``). The header may be missing,
-    non-numeric (HTTP date), or absent entirely; in any of those
-    cases we return ``None`` so the caller can apply its own backoff.
-    """
-    response = getattr(exc, "response", None)
-    if response is None:
-        return None
-    headers = getattr(response, "headers", None)
-    if headers is None:
-        return None
-    raw = headers.get("Retry-After") or headers.get("retry-after")
-    if raw is None:
-        return None
-    try:
-        return float(raw)
-    except (TypeError, ValueError):
-        return None
-
-
-def _classify_litellm_exception(exc: BaseException, *, model: str) -> ProviderError:
-    """Map a LiteLLM SDK exception onto our closed ``ProviderError`` set.
-
-    The mapping order matters — ``UnsupportedParamsError`` is a
-    subclass of ``BadRequestError`` which is itself a subclass of the
-    generic ``APIError``, so the narrowest variants are matched first.
-    Unrecognised exceptions fall into :class:`ProviderUnknownError`
-    carrying the original message verbatim so on-call still has
-    something to grep for.
-    """
-    if isinstance(exc, LiteLLMAuthenticationError):
-        return ProviderAuthError(message=str(exc))
-    if isinstance(exc, LiteLLMRateLimitError):
-        # LiteLLM's ``RateLimitError.__init__`` does not set a
-        # ``retry_after`` attribute; the actual hint is on the upstream
-        # HTTP response's ``Retry-After`` header (see
-        # ``litellm/exceptions.py``). Parse from there, falling back
-        # gracefully when the response / header is missing or the
-        # value is malformed.
-        retry_after = _extract_retry_after(exc)
-        return ProviderRateLimitError(message=str(exc), retry_after=retry_after)
-    if isinstance(exc, LiteLLMUnsupportedParamsError):
-        param = str(getattr(exc, "param", "") or "")
-        return ProviderUnsupportedParamError(
-            message=str(exc),
-            param=param,
-            model=model,
-        )
-    if isinstance(exc, LiteLLMTimeout):
-        return ProviderTimeoutError(message=str(exc))
-    return ProviderUnknownError(message=str(exc))
 
 
 async def open_litellm_stream(
@@ -321,10 +170,10 @@ async def open_litellm_stream(
             # Translate "missing key" into an auth error so the caller
             # can match a single ProviderAuthError variant regardless
             # of whether the upstream or our key resolution rejected.
-            # Vendors that aren't in ``_VENDOR_API_KEY_NAME`` still need
+            # Vendors that aren't in ``VENDOR_API_KEY_NAME`` still need
             # a readable hint — fall back to the vendor's enum value
             # so we never blow up with a raw ``KeyError`` here.
-            key_label = _VENDOR_API_KEY_NAME.get(vendor, vendor.value)
+            key_label = VENDOR_API_KEY_NAME.get(vendor, vendor.value)
             raise LiteLLMAuthenticationError(
                 message=(
                     f"missing {key_label} — set it in the workspace env or as a gateway env var."
@@ -368,7 +217,7 @@ async def open_litellm_stream(
         # of the function. ``openai.APIError`` is the upstream common
         # base.
         openai.APIError,
-        # Defensive: a missing entry in ``_VENDOR_API_KEY_NAME`` or
+        # Defensive: a missing entry in ``VENDOR_API_KEY_NAME`` or
         # any other dict-keyed lookup inside ``_open`` should never
         # crash out unclassified — collapse to ``ProviderUnknownError``.
         KeyError,
@@ -430,11 +279,11 @@ def make_litellm_stream_fn(
 
         api_key = _resolve_litellm_api_key(vendor, workspace_root)
         if not api_key:
-            # ``_VENDOR_API_KEY_NAME`` is keyed by the providers we
+            # ``VENDOR_API_KEY_NAME`` is keyed by the providers we
             # actively support — fall back to the vendor enum value so
             # the user-facing error never trips on a ``KeyError`` for
             # a not-yet-mapped vendor.
-            key_label = _VENDOR_API_KEY_NAME.get(vendor, vendor.value)
+            key_label = VENDOR_API_KEY_NAME.get(vendor, vendor.value)
             error_text = (
                 f"LiteLLM error: missing {key_label} — "
                 "set it in the workspace env or as a gateway env var."

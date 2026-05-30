@@ -1564,7 +1564,7 @@ class TestHandleStatusCommand:
                 new=AsyncMock(return_value=fake_conv),
             ),
             patch(
-                # Phase 2: ``get_conversation_status`` returns
+                # Phase 2: ``get_conversation_status`` returns the status DTO directly.
                 "app.channels.telegram.status.get_conversation_status",
                 new=AsyncMock(return_value=fake_status),
             ),
