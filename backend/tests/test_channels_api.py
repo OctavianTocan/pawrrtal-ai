@@ -8,11 +8,12 @@ by going through the framework-thin handlers in
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from typing import Any
 
 import pytest
-from fastapi import HTTPException
-from httpx import AsyncClient
+from fastapi import FastAPI, HTTPException
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.channels.crud import (
@@ -21,15 +22,16 @@ from app.channels.crud import (
     issue_link_code,
     list_bindings,
 )
-from app.channels.router import _ensure_telegram_webhook_enabled
+from app.channels.router import _ensure_telegram_webhook_enabled, get_channels_router
 from app.channels.telegram.handlers import (
     PROVIDER,
     handle_plain_message,
     handle_start_command,
 )
 from app.channels.telegram.sender import TelegramSender
+from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.config import settings
-from app.infrastructure.database.legacy import User
+from app.infrastructure.database.legacy import User, get_async_session
 
 pytestmark = pytest.mark.anyio
 
@@ -41,26 +43,48 @@ def telegram_configured(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "telegram_bot_username", "pawrrtal_test_bot")
 
 
+@pytest.fixture
+async def channels_client(
+    db_session: AsyncSession,
+    test_user: User,
+) -> AsyncGenerator[AsyncClient]:
+    """Provide a focused client for the channels router."""
+    app = FastAPI()
+
+    async def override_session() -> AsyncGenerator[AsyncSession]:
+        yield db_session
+
+    app.dependency_overrides[get_async_session] = override_session
+    app.dependency_overrides[get_allowed_user] = lambda: test_user
+    app.include_router(get_channels_router())
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as test_client:
+        yield test_client
+
+    app.dependency_overrides.clear()
+
+
 async def test_link_returns_503_when_telegram_unconfigured(
-    client: AsyncClient,
+    channels_client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Frontend gets a clean disabled-state signal when no token is set."""
     monkeypatch.setattr(settings, "telegram_bot_token", "")
     monkeypatch.setattr(settings, "telegram_bot_username", "")
 
-    response = await client.post("/api/v1/channels/telegram/link")
+    response = await channels_client.post("/api/v1/channels/telegram/link")
 
     assert response.status_code == 503
     assert "not configured" in response.json()["detail"].lower()
 
 
 async def test_link_issues_code_with_deep_link(
-    client: AsyncClient,
+    channels_client: AsyncClient,
     telegram_configured: None,
 ) -> None:
     """The link endpoint returns plaintext code + deep link, exactly once."""
-    response = await client.post("/api/v1/channels/telegram/link")
+    response = await channels_client.post("/api/v1/channels/telegram/link")
 
     assert response.status_code == 200
     body: dict[str, Any] = response.json()
@@ -70,16 +94,16 @@ async def test_link_issues_code_with_deep_link(
     assert "expires_at" in body
 
 
-async def test_list_channels_starts_empty(client: AsyncClient) -> None:
+async def test_list_channels_starts_empty(channels_client: AsyncClient) -> None:
     """A user without bindings sees an empty list (never null)."""
-    response = await client.get("/api/v1/channels")
+    response = await channels_client.get("/api/v1/channels")
     assert response.status_code == 200
     assert response.json() == []
 
 
-async def test_unlink_is_idempotent(client: AsyncClient) -> None:
+async def test_unlink_is_idempotent(channels_client: AsyncClient) -> None:
     """DELETE on a non-existent binding still returns 204 so the UI can fire-and-forget."""
-    response = await client.delete("/api/v1/channels/telegram/link")
+    response = await channels_client.delete("/api/v1/channels/telegram/link")
     assert response.status_code == 204
 
 
