@@ -17,7 +17,7 @@ import app.cli.paw.commands.project.service as service_module
 from app.cli.paw import config as paw_config
 from app.cli.paw.commands.project import cli as project_module
 from app.cli.paw.commands.project.preflight import PreflightCheck
-from app.cli.paw.commands.project.state import PROJECT_STATE_SCHEMA_VERSION
+from app.cli.paw.commands.project.state import PROJECT_STATE_SCHEMA_VERSION, repo_root
 from app.cli.paw.main import app
 
 
@@ -384,7 +384,7 @@ def test_project_service_install_writes_user_unit_and_enables_now(
 
     unit_path = tmp_path / "xdg" / "systemd" / "user" / "pawrrtal-dev.service"
     unit = unit_path.read_text()
-    assert "WorkingDirectory=/mnt/HC_Volume_105512717/dev/pawrrtal" in unit
+    assert f"WorkingDirectory={repo_root()}" in unit
     assert "ExecStart=/fake/bin/bun run dev.ts" in unit
     assert 'Environment="DATABASE_URL="' in unit
     assert fake_systemd == [
