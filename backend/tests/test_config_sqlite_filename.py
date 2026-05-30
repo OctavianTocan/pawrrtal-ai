@@ -16,7 +16,7 @@ import pytest
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.core.config import Settings  # noqa: E402 — sys.path tweak above must precede
+from app.infrastructure.config import Settings  # noqa: E402 — sys.path tweak above must precede
 
 _REQUIRED_DEFAULTS: dict[str, str] = {
     "AUTH_SECRET": "x",

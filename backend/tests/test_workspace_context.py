@@ -1,4 +1,4 @@
-"""Tests for ``app.core.governance.workspace_context``.
+"""Tests for ``app.governance.workspace_context``.
 
 The loader reads root context files plus the workspace's internal
 ``.agent/`` skills/protocols tree and produces a single struct. These
@@ -12,12 +12,12 @@ from pathlib import Path
 
 import pytest
 
-from app.core.config import settings
-from app.core.governance.workspace_context import (
+from app.governance.workspace_context import (
     SettingsPermissions,
     load_workspace_context,
 )
-from app.core.persona_bootstrap import IDENTITY_BEGIN, IDENTITY_END
+from app.infrastructure.config import settings
+from app.workspace.persona_bootstrap import IDENTITY_BEGIN, IDENTITY_END
 
 
 def _write(path: Path, body: str) -> None:

@@ -5,9 +5,9 @@ from __future__ import annotations
 import pytest
 from httpx import AsyncClient
 
-from app.core.providers.catalog import MODEL_CATALOG
-from app.core.providers.factory import host_authenticated
-from app.core.providers.model_id import Host
+from app.providers.catalog import MODEL_CATALOG
+from app.providers.factory import host_authenticated
+from app.providers.model_id import Host
 
 
 def _authed_catalog_count() -> int:
@@ -137,13 +137,34 @@ def test_host_authenticated_with_workspace_uses_workspace_key(
     workspace_root = Path(str(tmp_path))
     # Force global setting empty so the gate can't accidentally pass
     # via the fallback path; the test would be silently weak otherwise.
-    from app.core.providers.factory import settings as factory_settings
+    from app.providers.factory import settings as factory_settings
 
     monkeypatch.setattr(factory_settings, "xai_api_key", "")
     # Stub the shared key resolver to simulate a workspace-keyed
     # deployment: workspace has the key, global doesn't.
-    with patch("app.core.keys.resolve_api_key", return_value="ws-only-token"):
+    with patch("app.infrastructure.keys.resolve_api_key", return_value="ws-only-token"):
         assert host_authenticated(Host.xai, workspace_root=workspace_root) is True
     # Sanity check: without the workspace path, the gate stays False
     # because global settings is still empty.
     assert host_authenticated(Host.xai) is False
+
+
+def test_host_authenticated_with_workspace_uses_xai_oauth_token(
+    tmp_path: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """xAI OAuth-only workspaces should still show xAI models in the picker."""
+    from pathlib import Path
+    from unittest.mock import patch
+
+    workspace_root = Path(str(tmp_path))
+    from app.providers.factory import settings as factory_settings
+
+    monkeypatch.setattr(factory_settings, "xai_api_key", "")
+    with (
+        patch(
+            "app.infrastructure.keys.load_workspace_env",
+            return_value={"XAI_OAUTH_ACCESS_TOKEN": "oauth-only-token"},
+        ),
+        patch("app.infrastructure.keys.resolve_api_key", return_value=None),
+    ):
+        assert host_authenticated(Host.xai, workspace_root=workspace_root) is True

@@ -1,6 +1,6 @@
 """Issue #254 - semantic retrieval + RRF blending tests.
 
-Covers ``app.core.lcm.embeddings``:
+Covers ``app.lcm.embeddings``:
 
 - Deterministic hash embedder is stable across runs and gives
   paraphrases similar (non-zero, > 0) cosine.
@@ -29,7 +29,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.lcm.embeddings import (
+from app.infrastructure.database.legacy import User
+from app.lcm.embeddings import (
     EMBEDDING_DIM,
     DeterministicHashEmbedder,
     SemanticHit,
@@ -40,20 +41,19 @@ from app.core.lcm.embeddings import (
     semantic_search,
     upsert_embedding,
 )
-from app.core.lcm.evals import (
+from app.lcm.evals import (
     LCMEvalMode,
     run_eval,
     seed_embeddings_for_conversation,
     seed_scenario,
 )
-from app.core.tools.lcm_search import LCMSearchResult
-from app.db import User
 from app.models import (
     ChatMessage,
     Conversation,
     LCMEmbedding,
     LCMSummary,
 )
+from app.tools.lcm_search import LCMSearchResult
 from tests.evals.scenarios import all_scenarios
 
 

@@ -35,7 +35,7 @@ import uuid
 from collections.abc import AsyncIterator
 from typing import Any, Protocol, TypedDict
 
-from app.core.providers.base import StreamEvent
+from app.providers.base import StreamEvent
 
 # ---------------------------------------------------------------------------
 # Normalized message types

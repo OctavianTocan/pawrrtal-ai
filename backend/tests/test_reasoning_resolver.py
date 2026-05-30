@@ -1,6 +1,6 @@
 """Tests for the shared reasoning-effort resolver.
 
-The resolver lives in ``app.core.providers.reasoning`` and is the
+The resolver lives in ``app.providers.reasoning`` and is the
 single source of truth used by every entry point that touches
 ``Conversation.reasoning_effort`` — the chat router, the Telegram
 ``/model`` command, the Telegram turn entry point, and the
@@ -12,9 +12,9 @@ from __future__ import annotations
 
 import pytest
 
-from app.core.providers.catalog import MODEL_CATALOG
-from app.core.providers.model_id import Host
-from app.core.providers.reasoning import (
+from app.providers.catalog import MODEL_CATALOG
+from app.providers.model_id import Host
+from app.providers.reasoning import (
     ReasoningResolution,
     format_adaptation_notice,
     resolve_reasoning_effort,

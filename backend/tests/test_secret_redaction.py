@@ -1,4 +1,4 @@
-"""Tests for ``app.core.governance.secret_redaction``.
+"""Tests for ``app.governance.secret_redaction``.
 
 The regex set is the surface the rest of the audit / persistence
 stack relies on for "secrets never reach disk". A new secret prefix
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.core.governance.secret_redaction import (
+from app.governance.secret_redaction import (
     redact_mapping,
     redact_secrets,
 )

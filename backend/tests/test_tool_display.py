@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.core.agent_loop.types import AgentTool
-from app.core.tools.display import (
+from app.agents.types import AgentTool
+from app.tools.display import (
     fallback_tool_display,
     render_tool_display,
     summarize_path,
     visible_argument_keys,
 )
-from app.core.tools.workspace_files import make_workspace_tools
+from app.tools.workspace_files import make_workspace_tools
 
 
 async def _noop_execute(tool_call_id: str, **kwargs: object) -> str:

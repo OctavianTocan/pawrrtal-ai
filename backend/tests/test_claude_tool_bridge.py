@@ -1,10 +1,10 @@
 """Tests for the Claude-side cross-provider tool bridge.
 
-Covers :mod:`app.core.providers._claude_tool_bridge` and its wiring
-into :class:`app.core.providers.claude_provider.ClaudeLLM`.
+Covers :mod:`app.providers._claude_tool_bridge` and its wiring
+into :class:`app.providers.claude_provider.ClaudeLLM`.
 
 The bridge translates the provider-neutral
-:class:`app.core.agent_loop.types.AgentTool` shape into Claude's
+:class:`app.agents.types.AgentTool` shape into Claude's
 in-process MCP server format (``create_sdk_mcp_server`` + the
 ``mcp__<server>__<tool>`` allowed-tools whitelist).  These tests
 verify:
@@ -24,10 +24,10 @@ from uuid import uuid4
 
 import pytest
 
-from app.core.agent_loop.types import AgentTool
-from app.core.providers.claude import ClaudeLLM, ClaudeLLMConfig
-from app.core.providers.claude import tool_bridge as bridge
-from app.core.providers.claude.tool_bridge import (
+from app.agents.types import AgentTool
+from app.providers.claude import ClaudeLLM, ClaudeLLMConfig
+from app.providers.claude import tool_bridge as bridge
+from app.providers.claude.tool_bridge import (
     MCP_SERVER_NAME,
     allowed_tool_ids,
     build_mcp_server,

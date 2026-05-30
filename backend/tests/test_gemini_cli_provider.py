@@ -45,29 +45,29 @@ from acp.schema import (
     UserMessageChunk,
 )
 
-from app.core.providers.base import StreamEvent
-from app.core.providers.catalog import MODEL_CATALOG
-from app.core.providers.factory import resolve_llm
-from app.core.providers.gemini_cli import (
+from app.providers.base import StreamEvent
+from app.providers.catalog import MODEL_CATALOG
+from app.providers.factory import resolve_llm
+from app.providers.gemini_cli import (
     GeminiCliLLM,
     is_gemini_cli_available,
     render_history_prefix,
 )
-from app.core.providers.gemini_cli.acp import AcpFatalError, _drain_queue, open_session
-from app.core.providers.gemini_cli.client import (
+from app.providers.gemini_cli.acp import AcpFatalError, _drain_queue, open_session
+from app.providers.gemini_cli.client import (
     PawrrtalAcpClient,
     pick_allow_option,
 )
-from app.core.providers.gemini_cli.events import (
+from app.providers.gemini_cli.events import (
     _stream_event_for_update,
     _tool_progress_event,
     _usage_event,
     text_from_content_block,
     text_from_tool_content_item,
 )
-from app.core.providers.gemini_cli.fs import ensure_workspace_path, slice_text
-from app.core.providers.gemini_cli.provider import _spawn_subprocess
-from app.core.providers.model_id import Host, Vendor
+from app.providers.gemini_cli.fs import ensure_workspace_path, slice_text
+from app.providers.gemini_cli.provider import _spawn_subprocess
+from app.providers.model_id import Host, Vendor
 
 # ---------------------------------------------------------------------------
 # Catalog
@@ -113,7 +113,7 @@ def test_factory_routes_gemini_cli_host_to_gemini_cli_llm(model: str) -> None:
 def test_factory_keeps_google_ai_host_on_native_provider() -> None:
     # Sanity check — adding gemini-cli must not steal the canonical
     # google-ai routing from the native SDK provider.
-    from app.core.providers.gemini import GeminiLLM
+    from app.providers.gemini import GeminiLLM
 
     native = resolve_llm("google-ai:google/gemini-3-flash-preview")
     assert isinstance(native, GeminiLLM)
@@ -125,7 +125,7 @@ def test_factory_host_table_is_exhaustive() -> None:
     # wiring it into ``HOST_TO_PROVIDER`` — the module-level assertion
     # in factory.py would have raised at import time, so this is a
     # belt-and-braces check that every member has a class.
-    from app.core.providers.factory import HOST_TO_PROVIDER
+    from app.providers.factory import HOST_TO_PROVIDER
 
     assert set(HOST_TO_PROVIDER) == set(Host)
 
@@ -137,7 +137,7 @@ def test_factory_host_table_is_exhaustive() -> None:
 
 def test_is_gemini_cli_available_when_binary_present(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "app.core.providers.gemini_cli.provider.shutil.which",
+        "app.providers.gemini_cli.provider.shutil.which",
         lambda _name: "/usr/local/bin/gemini",
     )
     assert is_gemini_cli_available() is True
@@ -145,7 +145,7 @@ def test_is_gemini_cli_available_when_binary_present(monkeypatch: pytest.MonkeyP
 
 def test_is_gemini_cli_available_when_binary_missing(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "app.core.providers.gemini_cli.provider.shutil.which",
+        "app.providers.gemini_cli.provider.shutil.which",
         lambda _name: None,
     )
     assert is_gemini_cli_available() is False
@@ -735,7 +735,7 @@ async def test_spawn_subprocess_resolves_relative_workspace_root(
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
-        "app.core.providers.gemini_cli.provider.asyncio.create_subprocess_exec",
+        "app.providers.gemini_cli.provider.asyncio.create_subprocess_exec",
         fake_create_subprocess_exec,
     )
 
@@ -795,7 +795,7 @@ async def test_stream_yields_error_event_when_binary_missing(
     tmp_path: Path,
 ) -> None:
     monkeypatch.setattr(
-        "app.core.providers.gemini_cli.provider.shutil.which",
+        "app.providers.gemini_cli.provider.shutil.which",
         lambda _name: None,
     )
     provider = GeminiCliLLM("gemini-2.5-pro", workspace_root=tmp_path)
@@ -818,7 +818,7 @@ async def test_stream_yields_error_event_when_spawn_returns_none(
     tmp_path: Path,
 ) -> None:
     monkeypatch.setattr(
-        "app.core.providers.gemini_cli.provider.shutil.which",
+        "app.providers.gemini_cli.provider.shutil.which",
         lambda _name: "/usr/local/bin/gemini",
     )
 
@@ -826,7 +826,7 @@ async def test_stream_yields_error_event_when_spawn_returns_none(
         return None
 
     monkeypatch.setattr(
-        "app.core.providers.gemini_cli.provider._spawn_subprocess",
+        "app.providers.gemini_cli.provider._spawn_subprocess",
         fake_spawn,
     )
     provider = GeminiCliLLM("gemini-2.5-pro", workspace_root=tmp_path)
@@ -850,7 +850,7 @@ async def test_stream_drops_images_tools_and_reasoning_for_protocol_parity(
     # list does not raise — the provider logs and ignores. The binary
     # is missing so the stream terminates with a single error event.
     monkeypatch.setattr(
-        "app.core.providers.gemini_cli.provider.shutil.which",
+        "app.providers.gemini_cli.provider.shutil.which",
         lambda _name: None,
     )
     provider = GeminiCliLLM("gemini-2.5-pro", workspace_root=tmp_path)

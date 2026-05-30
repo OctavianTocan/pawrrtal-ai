@@ -22,7 +22,7 @@ from uuid import uuid4
 import pytest
 from xai_sdk.proto import chat_pb2
 
-from app.core.agent_loop.types import (
+from app.agents.types import (
     AgentTool,
     AssistantMessage,
     TextContent,
@@ -31,17 +31,16 @@ from app.core.agent_loop.types import (
     ToolResultMessage,
     UserMessage,
 )
-from app.core.providers.xai.messages import (
+from app.providers.xai.messages import (
     build_xai_messages,
     build_xai_tools,
 )
-from app.core.providers.xai.provider import (
+from app.providers.xai.provider import (
     XaiLLM,
     _map_reasoning_effort,
-    _resolve_xai_api_key,
     make_xai_stream_fn,
 )
-from app.core.providers.xai.stream import (
+from app.providers.xai.stream import (
     UsageAccumulator,
     deltas_from_chunk,
     done_event_from_response,
@@ -147,7 +146,8 @@ class _FakeChatNamespace:
 class _FakeAsyncClient:
     """Async-context-manager stand-in for ``xai_sdk.AsyncClient``."""
 
-    def __init__(self, steps: list[tuple[Any, Any]]) -> None:
+    def __init__(self, steps: list[tuple[Any, Any]], api_key: str = "") -> None:
+        self.api_key = api_key
         self.chat = _FakeChatNamespace(steps)
 
     async def __aenter__(self) -> _FakeAsyncClient:
@@ -166,9 +166,14 @@ def _patch_async_client(
 ) -> _FakeAsyncClient:
     """Patch ``AsyncClient`` in the provider module and return the fake."""
     fake = _FakeAsyncClient(steps)
+
+    def _client_factory(**kwargs: Any) -> _FakeAsyncClient:
+        fake.api_key = kwargs.get("api_key", "")
+        return fake
+
     monkeypatch.setattr(
-        "app.core.providers.xai.provider.AsyncClient",
-        lambda **_kwargs: fake,
+        "app.providers.xai.provider.AsyncClient",
+        _client_factory,
     )
     return fake
 
@@ -300,31 +305,51 @@ def test_build_messages_drops_empty_user_messages() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _resolve_xai_api_key
+# resolve_xai_credentials integration
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_api_key_uses_settings_when_no_workspace(
+@pytest.mark.anyio
+async def test_stream_fn_uses_gateway_xai_key_without_workspace(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """No workspace_id → use the gateway-global key from Settings."""
+    """No workspace root uses the gateway-global xAI key."""
     monkeypatch.setattr(
-        "app.core.providers.xai.provider.settings",
+        "app.providers.xai.credentials.settings",
         SimpleNamespace(xai_api_key="gateway-key"),
     )
-    assert _resolve_xai_api_key(None) == "gateway-key"
-
-
-def test_resolve_api_key_workspace_override(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """workspace_root present → delegate to resolve_api_key (mocked)."""
-    workspace_root = Path("/tmp/some-workspace")
-    monkeypatch.setattr(
-        "app.core.providers.xai.provider.resolve_api_key",
-        lambda wr, key: "workspace-key" if (wr, key) == (workspace_root, "XAI_API_KEY") else None,
+    fake = _patch_async_client(
+        monkeypatch, [(_fake_response(content="hi"), _fake_chunk(content="hi"))]
     )
-    assert _resolve_xai_api_key(workspace_root) == "workspace-key"
+
+    stream_fn = make_xai_stream_fn("grok-4.3", None, system_prompt="sys")
+    async for _ in stream_fn([], []):
+        pass
+
+    assert fake.api_key == "gateway-key"
+
+
+@pytest.mark.anyio
+async def test_stream_fn_prefers_workspace_xai_oauth_token(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Workspace OAuth tokens authenticate the same stream path as legacy keys."""
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir()
+    monkeypatch.setattr(
+        "app.providers.xai.credentials.load_workspace_env",
+        lambda wr: {"XAI_OAUTH_ACCESS_TOKEN": "oauth-token"} if wr == workspace_root else {},
+    )
+    fake = _patch_async_client(
+        monkeypatch, [(_fake_response(content="hi"), _fake_chunk(content="hi"))]
+    )
+
+    stream_fn = make_xai_stream_fn("grok-4.3", workspace_root, system_prompt="sys")
+    async for _ in stream_fn([], []):
+        pass
+
+    assert fake.api_key == "oauth-token"
 
 
 # ---------------------------------------------------------------------------
@@ -459,7 +484,7 @@ def test_usage_record_returns_none_when_nothing_reported() -> None:
 
 def test_usage_accumulator_sums_across_iterations() -> None:
     """The accumulator sums multiple :class:`UsageRecord` instances."""
-    from app.core.providers.xai.stream import UsageRecord
+    from app.providers.xai.stream import UsageRecord
 
     sink = UsageAccumulator()
     sink.absorb(UsageRecord(input_tokens=10, output_tokens=5, cost_usd=0.001))
@@ -614,7 +639,7 @@ async def test_stream_fn_surfaces_upstream_error_as_done_event(
             return None
 
     monkeypatch.setattr(
-        "app.core.providers.xai.provider.AsyncClient",
+        "app.providers.xai.provider.AsyncClient",
         lambda **_kwargs: _ExplodingClient(),
     )
 

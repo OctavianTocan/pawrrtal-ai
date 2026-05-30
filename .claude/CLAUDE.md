@@ -36,6 +36,29 @@ just dev     # starts both frontend + backend
 - DB models in `backend/app/models.py`, schemas in `backend/app/schemas.py`
 - Mutations always go through React Query (`@tanstack/react-query`)
 
+## Backend restructure (in progress, branch `restructure/backend-domains`)
+
+The backend is being restructured into a hybrid `domains/ + infrastructure/`
+layout. Spec at `docs/superpowers/specs/2026-05-28-backend-restructure-design.md`,
+plan at `docs/superpowers/plans/2026-05-28-backend-restructure.md`. Until the
+restructure lands fully:
+
+- New plumbing (lifecycle, middleware, app factory) goes under
+  `backend/app/infrastructure/`. The `LifecycleRegistry` at
+  `infrastructure/lifecycle.py` is the seam for new startup hooks — add one
+  file under `infrastructure/startup/<concern>.py` rather than editing the
+  lifespan body in `main.py`.
+- Typed exception tree lives at `app/exceptions.py` (roots) plus
+  per-domain `<domain>/exceptions.py`. New error sites raise these; do not
+  introduce new uses of the (now-removed) `returns` library.
+- Voice transcription (`/api/v1/stt`, the 4-backend transcriber, telegram
+  voice-attachment transcription) was removed in the restructure; voice
+  messages reach the agent as a metadata-only annotation. Webhooks
+  (`integrations/webhooks/`) and the empty `integrations/notion/` stub
+  were also removed.
+- xAI auth (OAuth device-code + credential resolution) lives under
+  `app/providers/xai/`, not `app/integrations/xai/`.
+
 ## Rules
 Claude Code rules live in `.claude/rules/`. They fire automatically based on file path globs. Every rule has a `Verify` question — use it before committing.
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from app.integrations.telegram.regenerate_keyboard import (
+from app.channels.telegram.regenerate_keyboard import (
     REGEN_CALLBACK_PREFIX,
     parse_regenerate_callback_data,
     regenerate_button_for,

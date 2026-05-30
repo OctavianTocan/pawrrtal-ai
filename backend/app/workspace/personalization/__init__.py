@@ -1,0 +1,1 @@
+"""Workspace personalization router package."""

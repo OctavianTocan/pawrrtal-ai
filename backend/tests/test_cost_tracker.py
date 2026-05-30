@@ -1,4 +1,4 @@
-"""Tests for ``app.core.governance.cost_tracker``.
+"""Tests for ``app.governance.cost_tracker``.
 
 Covers the cost-rate computation, the ledger record/aggregate path,
 and the per-request reservation defaults.  ``CostBudget`` itself is
@@ -13,7 +13,7 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.governance.cost_tracker import (
+from app.governance.cost_tracker import (
     TOKENS_PER_MTOK,
     CostBudget,
     PostgresCostLedger,
@@ -21,10 +21,10 @@ from app.core.governance.cost_tracker import (
     per_request_reservation_usd,
     record_turn_cost,
 )
-from app.core.providers.catalog import ModelEntry
-from app.core.providers.model_id import Host, Vendor
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import CostLedger
+from app.providers.catalog import ModelEntry
+from app.providers.model_id import Host, Vendor
 
 pytestmark = pytest.mark.anyio
 

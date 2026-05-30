@@ -22,7 +22,7 @@ from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime
 from typing import Any
 
-from app.db import async_session_maker
+from app.infrastructure.database.legacy import async_session_maker
 from app.models import NotionOperationLog
 from app.plugins.notion.ntn_client import NtnError
 

@@ -28,9 +28,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.lcm import assemble_context, compact_leaf_if_needed
-from app.core.providers.base import StreamEvent
-from app.db import User
+from app.infrastructure.database.legacy import User
+from app.lcm import assemble_context, compact_leaf_if_needed
 from app.models import (
     ChatMessage,
     Conversation,
@@ -38,6 +37,7 @@ from app.models import (
     LCMSummary,
     LCMSummarySource,
 )
+from app.providers.base import StreamEvent
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -129,7 +129,7 @@ def _make_failing_provider() -> Any:
 
 # Patch the provider resolution so compaction uses our mock.
 def _patch_resolve_llm(monkeypatch: pytest.MonkeyPatch, provider: Any) -> None:
-    import app.core.lcm as _lcm
+    import app.lcm as _lcm
 
     monkeypatch.setattr(_lcm, "resolve_llm", lambda *args, **kwargs: provider)
 
@@ -525,7 +525,7 @@ async def test_schedule_lcm_compaction_runs_background_task_under_lock(
 
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
-    import app.core.lcm.background as bg_mod
+    import app.lcm.background as bg_mod
 
     conv = await _make_conversation(db_session, test_user)
     conv_id = conv.id
@@ -590,7 +590,7 @@ async def test_schedule_lcm_compaction_serializes_concurrent_calls(
 
     from sqlalchemy.ext.asyncio import async_sessionmaker
 
-    import app.core.lcm.background as bg_mod
+    import app.lcm.background as bg_mod
 
     conv = await _make_conversation(db_session, test_user)
     await _seed_context(
@@ -650,7 +650,7 @@ async def test_schedule_lcm_compaction_disabled_is_noop(
     db_session: AsyncSession, test_user: User, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """When lcm_enabled is False, schedule_lcm_compaction is a no-op."""
-    import app.core.lcm.background as bg_mod
+    import app.lcm.background as bg_mod
 
     conv = await _make_conversation(db_session, test_user)
     monkeypatch.setattr(bg_mod.settings, "lcm_enabled", False)
@@ -675,7 +675,7 @@ async def test_finalize_turn_triggers_lcm_compaction(
     from unittest.mock import AsyncMock
 
     from app.channels.turn_runner import ChatTurnInput, _finalize_turn
-    from app.core.chat_aggregator import ChatTurnAggregator
+    from app.chat.aggregator import ChatTurnAggregator
 
     conv = await _make_conversation(db_session, test_user)
 

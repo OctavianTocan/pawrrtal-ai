@@ -1,28 +1,45 @@
-import contextlib
+import asyncio
 import html as html_lib
 import logging
 import os
 import time
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.channels.telegram_html import md_to_telegram_html
-from app.core.agent_loop.types import AgentTool, PermissionCheckResult
-from app.core.config import settings
-from app.core.governance.permissions import (
+from app.agents.plugins.types import PreTurnHookContext
+from app.agents.types import AgentTool, PermissionCheckResult
+from app.channels.telegram.html import md_to_telegram_html
+from app.governance.permissions import (
     PermissionContext,
     build_default_permission_check,
 )
-from app.core.keys import resolve_api_key
-from app.core.plugins.types import PreTurnHookContext
-from app.core.providers.factory import resolve_llm
-from app.core.tools.lcm_grep_agent import make_lcm_grep_tool
-from app.core.tools.lcm_search_agent import make_lcm_search_tool
-from app.core.tools.workspace_files import make_list_dir_tool, make_read_file_tool
+from app.infrastructure.config import settings
+from app.infrastructure.keys import resolve_api_key
+from app.providers._errors import ProviderError
+from app.providers.factory import resolve_llm
+from app.tools.errors import ToolError
+from app.tools.lcm_grep_agent import make_lcm_grep_tool
+from app.tools.lcm_search_agent import make_lcm_search_tool
+from app.tools.workspace_files import make_list_dir_tool, make_read_file_tool
 
 logger = logging.getLogger(__name__)
+
+# Cap on recalled-context length injected into the main agent's system prompt.
+# Mirrored verbatim in the system prompt's "max 600 characters" instruction.
+_RECALL_MAX_CHARS: int = 600
+
+# Wall-clock cap on the draft-updater callback. The recall sub-agent's
+# event loop calls draft_updater() to surface progress in Telegram; a
+# slow updater (network jitter, Telegram rate-limit) used to block the
+# event loop. Beyond this deadline we log + skip the update.
+_DRAFT_UPDATE_TIMEOUT_S: float = 2.0
+
+DraftUpdater = Callable[[str], Awaitable[None]]
+"""Typed alias for the draft-updater callback. Receives the rendered HTML
+chunk; returns ``None``. Implementations should be idempotent — the same
+chunk may be passed twice if a retry fires."""
 
 
 def _parse_bool(val: Any, default: bool) -> bool:
@@ -85,9 +102,9 @@ def _apply_stream_event(tel: _StreamTelemetry, event: dict[str, Any]) -> None:
         tel.error_msg = f"agent_terminated: {event.get('content')}"
 
 
-async def _collect_stream_telemetry(
+async def _collect_stream_telemetry(  # noqa: C901 — narrow per-event dispatch; splitting hurts readability
     stream: AsyncIterator[Any],
-    draft_updater: Any | None = None,
+    draft_updater: DraftUpdater | None = None,
 ) -> tuple[str, list[str], int, int, float, str | None]:
     """Consume provider stream, aggregate text, and collect wide-event telemetry."""
     tel = _StreamTelemetry()
@@ -117,8 +134,13 @@ async def _collect_stream_telemetry(
                 rendered_reply = html_lib.escape(reply)
             html += f"\n\n<i>{rendered_reply}</i>"
 
-        with contextlib.suppress(Exception):
-            await draft_updater(html)
+        try:
+            await asyncio.wait_for(draft_updater(html), timeout=_DRAFT_UPDATE_TIMEOUT_S)
+        except TimeoutError:
+            logger.warning("ACTIVE_RECALL_DRAFT_TIMEOUT timeout_s=%.1f", _DRAFT_UPDATE_TIMEOUT_S)
+        except Exception:
+            # Draft is non-essential UX; never let a render bug break recall.
+            logger.warning("ACTIVE_RECALL_DRAFT_FAILED", exc_info=True)
 
     # Initial draft
     await _update_draft()
@@ -298,7 +320,12 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
         # Intentionally mentioning the active recall agent in the response so the assistant knows where it came from.
         return f"Here's some context that your Active Recall agent found: {answer}"
 
-    except Exception as exc:
+    except (TimeoutError, ProviderError, ToolError) as exc:
+        # Narrow set of expected runtime failures: the sub-agent timed
+        # out, the LLM provider returned a typed error, or a tool call
+        # raised a typed tool error. Real config / import / assertion
+        # bugs propagate so we see them loudly in CI rather than
+        # silently masking the recall hook.
         duration_ms = (time.perf_counter() - start_time) * 1000.0
         tools_str = ",".join(tools_called) or "none"
         logger.exception(

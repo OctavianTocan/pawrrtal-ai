@@ -1,8 +1,8 @@
-from app.core.plugins import (
+from app.agents.plugins import (
     EnvKeySpec,
     Plugin,
 )
-from app.core.plugins.registry import register_plugin
+from app.agents.plugins.registry import register_plugin
 from app.plugins.active_recall.recall_agent import run_active_recall
 
 active_recall_plugin = Plugin(

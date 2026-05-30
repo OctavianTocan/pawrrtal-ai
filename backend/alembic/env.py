@@ -5,7 +5,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool, text
 
 from alembic import context
-from app.core.config import settings
+from app.infrastructure.config import settings
 
 # Stable advisory-lock id so concurrent `alembic upgrade head` invocations
 # (e.g. Railway rolling deploys booting two replicas at once) serialise
@@ -22,7 +22,7 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Import metadata from the app models so autogenerate can detect changes.
-from app.db_base import Base
+from app.infrastructure.models.base import Base
 from app import models  # noqa: F401  — registers all ORM models
 
 target_metadata = Base.metadata

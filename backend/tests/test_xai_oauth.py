@@ -5,7 +5,7 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from app.integrations.xai.oauth import (
+from app.providers.xai.oauth import (
     OAuthError,
     poll_for_token,
     refresh_token,

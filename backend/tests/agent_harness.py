@@ -44,7 +44,7 @@ import dataclasses
 from collections.abc import AsyncIterator, Sequence
 from typing import Any
 
-from app.core.agent_loop import (
+from app.agents import (
     AgentContext,
     AgentEvent,
     AgentLoopConfig,
@@ -54,7 +54,7 @@ from app.core.agent_loop import (
     UserMessage,
     agent_loop,
 )
-from app.core.agent_loop.types import (
+from app.agents.types import (
     LLMDoneEvent,
     LLMEvent,
     LLMTextDeltaEvent,

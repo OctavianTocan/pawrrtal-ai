@@ -9,8 +9,8 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from app.core.agent_loop.types import AgentTool
-from app.core.plugins.types import ToolContext
+from app.agents.plugins.types import ToolContext
+from app.agents.types import AgentTool
 from app.plugins.openai_codex_image_gen.codex_image_agent import (
     generate_image_with_codex_agent,
 )

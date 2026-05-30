@@ -21,7 +21,7 @@ from typing import Any
 
 import pytest
 
-from app.core.agent_loop import (
+from app.agents import (
     AgentContext,
     AgentEvent,
     AgentLoopConfig,
@@ -35,7 +35,7 @@ from app.core.agent_loop import (
     UserMessage,
     agent_loop,
 )
-from app.core.agent_loop.types import TextContent, ToolCallContent
+from app.agents.types import TextContent, ToolCallContent
 from tests.agent_harness import (
     ScriptedStreamFn,
     echo_tool,
@@ -396,14 +396,14 @@ async def test_message_context_grows_across_turns() -> None:
     After a tool call, the LLM's next invocation must include the
     tool result in the messages list, proving history accumulation works.
     """
-    from app.core.agent_loop import (
+    from app.agents import (
         AgentContext,
         AgentLoopConfig,
         AgentSafetyConfig,
         UserMessage,
         agent_loop,
     )
-    from app.core.agent_loop.types import (
+    from app.agents.types import (
         LLMDoneEvent,
         LLMTextDeltaEvent,
         LLMToolCallEvent,

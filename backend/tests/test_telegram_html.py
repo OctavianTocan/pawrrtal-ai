@@ -16,7 +16,7 @@ Covers the key Markdown constructs the AI model produces:
 
 from __future__ import annotations
 
-from app.channels.telegram_html import md_to_telegram_html
+from app.channels.telegram.html import md_to_telegram_html
 
 
 class TestMdToTelegramHtml:

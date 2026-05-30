@@ -1,10 +1,10 @@
-"""Tests for :mod:`app.core.providers.model_id`."""
+"""Tests for :mod:`app.providers.model_id`."""
 
 from __future__ import annotations
 
 import pytest
 
-from app.core.providers.model_id import (
+from app.providers.model_id import (
     CANONICAL_HOST,
     Host,
     InvalidModelId,

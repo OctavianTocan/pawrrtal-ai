@@ -17,7 +17,7 @@ Verbs:
 
 Not implemented: ``paw mcp test``. The backend exposes no
 ping/health endpoint per row today (the external-MCP bridge in
-``app.core.tools.external_mcp`` is invoked only during a chat
+``app.tools.external_mcp`` is invoked only during a chat
 turn). A test verb can be added later when a probe endpoint lands.
 
 Output modes mirror ``paw channels`` / ``paw workspaces``:

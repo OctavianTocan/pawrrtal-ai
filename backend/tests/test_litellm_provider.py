@@ -34,7 +34,7 @@ from litellm.exceptions import (
     UnsupportedParamsError as LiteLLMUnsupportedParamsError,
 )
 
-from app.core.agent_loop.types import (
+from app.agents.types import (
     AgentMessage,
     AgentTool,
     LLMDoneEvent,
@@ -42,22 +42,22 @@ from app.core.agent_loop.types import (
     LLMTextDeltaEvent,
     TextContent,
 )
-from app.core.providers._errors import (
+from app.providers._errors import (
     ProviderAuthError,
     ProviderRateLimitError,
     ProviderTimeoutError,
     ProviderUnknownError,
     ProviderUnsupportedParamError,
 )
-from app.core.providers.base import StreamEvent
-from app.core.providers.litellm_provider import (
+from app.providers.base import StreamEvent
+from app.providers.litellm_provider import (
     LiteLLMLLM,
     _build_litellm_messages,
     _classify_litellm_exception,
     _litellm_model_string,
     open_litellm_stream,
 )
-from app.core.providers.model_id import Vendor
+from app.providers.model_id import Vendor
 from tests.agent_harness import ScriptedStreamFn, text_turn
 
 
@@ -183,7 +183,7 @@ def test_build_litellm_messages_prepends_system_and_drops_tool_messages() -> Non
 # Returns Phase 3 — ``open_litellm_stream`` + ``_classify_litellm_exception``.
 #
 # The returns pilot exposes the connection phase of a LiteLLM completion as a
-# ``FutureResult[AsyncIterator[Any], ProviderError]``. These tests pin the
+# ``AsyncIterator[Any]`` (raises ``ProviderError`` on failure). These tests pin the
 # SDK-exception → ProviderError mapping and the happy-path open. Mid-stream
 # behaviour is still exception-driven and stays covered by the existing
 # StreamFn/agent-loop tests above.
@@ -234,14 +234,12 @@ def _make_timeout_error() -> LiteLLMTimeout:
 def test_classify_litellm_exception_auth() -> None:
     err = _classify_litellm_exception(_make_auth_error(), model="openai/gpt-4o")
     assert isinstance(err, ProviderAuthError)
-    assert err.kind == "auth"
     assert "bad key" in err.message
 
 
 def test_classify_litellm_exception_rate_limit() -> None:
     err = _classify_litellm_exception(_make_rate_limit_error(), model="openai/gpt-4o")
     assert isinstance(err, ProviderRateLimitError)
-    assert err.kind == "rate_limit"
     # ``retry_after`` is best-effort; the SDK does not always populate it.
     assert err.retry_after is None or isinstance(err.retry_after, float)
 
@@ -249,7 +247,6 @@ def test_classify_litellm_exception_rate_limit() -> None:
 def test_classify_litellm_exception_unsupported_param() -> None:
     err = _classify_litellm_exception(_make_unsupported_params_error(), model="openai/gpt-4o")
     assert isinstance(err, ProviderUnsupportedParamError)
-    assert err.kind == "unsupported_param"
     assert err.param == "reasoning_effort"
     assert err.model == "openai/gpt-4o"
 
@@ -257,13 +254,11 @@ def test_classify_litellm_exception_unsupported_param() -> None:
 def test_classify_litellm_exception_timeout() -> None:
     err = _classify_litellm_exception(_make_timeout_error(), model="openai/gpt-4o")
     assert isinstance(err, ProviderTimeoutError)
-    assert err.kind == "timeout"
 
 
 def test_classify_litellm_exception_unknown_fallback() -> None:
     err = _classify_litellm_exception(RuntimeError("boom"), model="openai/gpt-4o")
     assert isinstance(err, ProviderUnknownError)
-    assert err.kind == "unknown"
     assert "boom" in err.message
 
 
@@ -271,8 +266,8 @@ def test_classify_litellm_exception_unknown_fallback() -> None:
 async def test_open_litellm_stream_returns_iterator_on_success(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Happy path: ``IOSuccess`` wrapping the LiteLLM async iterator."""
-    import app.core.providers.litellm_provider as mod
+    """Happy path: returns the LiteLLM async iterator."""
+    import app.providers.litellm_provider as mod
 
     iterator = _fake_chunks()
 
@@ -283,22 +278,20 @@ async def test_open_litellm_stream_returns_iterator_on_success(
     monkeypatch.setattr(mod, "_resolve_litellm_api_key", lambda *_a, **_kw: "sk-test")
     monkeypatch.setattr(litellm, "acompletion", _fake_acompletion)
 
-    future = open_litellm_stream(
+    result = await open_litellm_stream(
         Vendor.openai,
         "gpt-4o-mini",
         messages=[{"role": "user", "content": "hi"}],
     )
-    io_result = await future
-    inner = io_result.unwrap()._inner_value
-    assert inner is iterator
+    assert result is iterator
 
 
 @pytest.mark.anyio
 async def test_open_litellm_stream_maps_auth_error_to_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``LiteLLMAuthenticationError`` surfaces as ``IOFailure(ProviderAuthError)``."""
-    import app.core.providers.litellm_provider as mod
+    """``LiteLLMAuthenticationError`` surfaces as raises ``ProviderAuthError``."""
+    import app.providers.litellm_provider as mod
 
     async def _raise_auth(**_kwargs: object) -> AsyncIterator[object]:
         raise _make_auth_error()
@@ -306,22 +299,20 @@ async def test_open_litellm_stream_maps_auth_error_to_failure(
     monkeypatch.setattr(mod, "_resolve_litellm_api_key", lambda *_a, **_kw: "sk-test")
     monkeypatch.setattr(litellm, "acompletion", _raise_auth)
 
-    future = open_litellm_stream(
-        Vendor.openai,
-        "gpt-4o-mini",
-        messages=[{"role": "user", "content": "hi"}],
-    )
-    io_result = await future
-    inner = io_result.failure()._inner_value
-    assert isinstance(inner, ProviderAuthError)
+    with pytest.raises(ProviderAuthError):
+        await open_litellm_stream(
+            Vendor.openai,
+            "gpt-4o-mini",
+            messages=[{"role": "user", "content": "hi"}],
+        )
 
 
 @pytest.mark.anyio
 async def test_open_litellm_stream_maps_rate_limit_error_to_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``LiteLLMRateLimitError`` surfaces as ``IOFailure(ProviderRateLimitError)``."""
-    import app.core.providers.litellm_provider as mod
+    """``LiteLLMRateLimitError`` surfaces as raises ``ProviderRateLimitError``."""
+    import app.providers.litellm_provider as mod
 
     async def _raise_rate(**_kwargs: object) -> AsyncIterator[object]:
         raise _make_rate_limit_error()
@@ -329,14 +320,12 @@ async def test_open_litellm_stream_maps_rate_limit_error_to_failure(
     monkeypatch.setattr(mod, "_resolve_litellm_api_key", lambda *_a, **_kw: "sk-test")
     monkeypatch.setattr(litellm, "acompletion", _raise_rate)
 
-    future = open_litellm_stream(
-        Vendor.openai,
-        "gpt-4o-mini",
-        messages=[{"role": "user", "content": "hi"}],
-    )
-    io_result = await future
-    inner = io_result.failure()._inner_value
-    assert isinstance(inner, ProviderRateLimitError)
+    with pytest.raises(ProviderRateLimitError):
+        await open_litellm_stream(
+            Vendor.openai,
+            "gpt-4o-mini",
+            messages=[{"role": "user", "content": "hi"}],
+        )
 
 
 @pytest.mark.anyio
@@ -344,7 +333,7 @@ async def test_open_litellm_stream_maps_unsupported_param_to_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """``LiteLLMUnsupportedParamsError`` surfaces with ``param`` + ``model``."""
-    import app.core.providers.litellm_provider as mod
+    import app.providers.litellm_provider as mod
 
     async def _raise_unsupported(**_kwargs: object) -> AsyncIterator[object]:
         raise _make_unsupported_params_error()
@@ -352,14 +341,13 @@ async def test_open_litellm_stream_maps_unsupported_param_to_failure(
     monkeypatch.setattr(mod, "_resolve_litellm_api_key", lambda *_a, **_kw: "sk-test")
     monkeypatch.setattr(litellm, "acompletion", _raise_unsupported)
 
-    future = open_litellm_stream(
-        Vendor.openai,
-        "gpt-4o-mini",
-        messages=[{"role": "user", "content": "hi"}],
-    )
-    io_result = await future
-    inner = io_result.failure()._inner_value
-    assert isinstance(inner, ProviderUnsupportedParamError)
+    with pytest.raises(ProviderUnsupportedParamError) as excinfo:
+        await open_litellm_stream(
+            Vendor.openai,
+            "gpt-4o-mini",
+            messages=[{"role": "user", "content": "hi"}],
+        )
+    inner = excinfo.value
     assert inner.param == "reasoning_effort"
     assert inner.model == "openai/gpt-4o-mini"
 
@@ -369,18 +357,16 @@ async def test_open_litellm_stream_missing_key_is_auth_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A missing API key collapses into ``ProviderAuthError`` (single match arm)."""
-    import app.core.providers.litellm_provider as mod
+    import app.providers.litellm_provider as mod
 
     monkeypatch.setattr(mod, "_resolve_litellm_api_key", lambda *_a, **_kw: None)
 
-    future = open_litellm_stream(
-        Vendor.openai,
-        "gpt-4o-mini",
-        messages=[{"role": "user", "content": "hi"}],
-    )
-    io_result = await future
-    inner = io_result.failure()._inner_value
-    assert isinstance(inner, ProviderAuthError)
+    with pytest.raises(ProviderAuthError):
+        await open_litellm_stream(
+            Vendor.openai,
+            "gpt-4o-mini",
+            messages=[{"role": "user", "content": "hi"}],
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -401,7 +387,7 @@ async def test_open_litellm_stream_with_litellm_bad_request_error(
     Before the catch-tuple fix this raised raw out of ``FutureResult`` because
     ``litellm.BadRequestError`` does not inherit from ``litellm.APIError``.
     """
-    import app.core.providers.litellm_provider as mod
+    import app.providers.litellm_provider as mod
 
     async def _raise_bad_request(**_kwargs: object) -> AsyncIterator[object]:
         raise LiteLLMBadRequestError(
@@ -413,14 +399,13 @@ async def test_open_litellm_stream_with_litellm_bad_request_error(
     monkeypatch.setattr(mod, "_resolve_litellm_api_key", lambda *_a, **_kw: "sk-test")
     monkeypatch.setattr(litellm, "acompletion", _raise_bad_request)
 
-    future = open_litellm_stream(
-        Vendor.openai,
-        "gpt-4o-mini",
-        messages=[{"role": "user", "content": "hi"}],
-    )
-    io_result = await future
-    inner = io_result.failure()._inner_value
-    assert isinstance(inner, ProviderUnknownError)
+    with pytest.raises(ProviderUnknownError) as excinfo:
+        await open_litellm_stream(
+            Vendor.openai,
+            "gpt-4o-mini",
+            messages=[{"role": "user", "content": "hi"}],
+        )
+    inner = excinfo.value
     assert "bad request body" in inner.message
 
 
@@ -490,16 +475,15 @@ async def test_open_litellm_stream_unmapped_vendor_returns_provider_auth_error(
     keeps the message readable; the broadened catch tuple also catches the
     raw ``KeyError`` as a belt-and-braces safety net.
     """
-    import app.core.providers.litellm_provider as mod
+    import app.providers.litellm_provider as mod
 
     monkeypatch.setattr(mod, "_resolve_litellm_api_key", lambda *_a, **_kw: None)
 
-    future = open_litellm_stream(
-        Vendor.deepseek,
-        "deepseek-chat",
-        messages=[{"role": "user", "content": "hi"}],
-    )
-    io_result = await future
-    inner = io_result.failure()._inner_value
-    assert isinstance(inner, ProviderAuthError)
+    with pytest.raises(ProviderAuthError) as excinfo:
+        await open_litellm_stream(
+            Vendor.deepseek,
+            "deepseek-chat",
+            messages=[{"role": "user", "content": "hi"}],
+        )
+    inner = excinfo.value
     assert "deepseek" in inner.message

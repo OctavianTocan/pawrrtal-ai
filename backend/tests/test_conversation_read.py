@@ -10,8 +10,8 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from app.core.config import settings
-from app.core.providers.catalog import default_model
+from app.infrastructure.config import settings
+from app.providers.catalog import default_model
 from app.schemas import ChatRequest, ConversationRead
 
 

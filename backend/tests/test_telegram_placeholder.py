@@ -20,8 +20,8 @@ import pytest
 
 from app.channels.base import ChannelMessage
 from app.channels.telegram import TelegramChannel
-from app.channels.telegram_progress import PREVIEW_MAX_CHARS
-from app.core.providers.base import StreamEvent
+from app.channels.telegram.progress import PREVIEW_MAX_CHARS
+from app.providers.base import StreamEvent
 
 # ---------------------------------------------------------------------------
 # Helpers

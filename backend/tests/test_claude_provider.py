@@ -2,7 +2,7 @@
 
 The Claude SDK runs the Claude Code CLI as a subprocess. We do not exercise
 that subprocess in unit tests — instead, we mock :func:`claude_agent_sdk.query`
-(re-exported into ``app.core.providers.claude_provider`` as ``query``) and
+(re-exported into ``app.providers.claude_provider`` as ``query``) and
 assert that:
 
 - :class:`ClaudeLLM` builds correct :class:`ClaudeAgentOptions`
@@ -38,13 +38,13 @@ from claude_agent_sdk import (
     UserMessage,
 )
 
-from app.core.providers import (
+from app.providers import (
     ClaudeLLM,
     ClaudeLLMConfig,
     StreamEvent,
 )
-from app.core.providers.claude import provider as cp_module
-from app.core.providers.claude.provider import (
+from app.providers.claude import provider as cp_module
+from app.providers.claude.provider import (
     _events_from_message,
     _resolve_sdk_model,
     _tool_result_to_text,
@@ -265,7 +265,7 @@ class TestEventsFromMessage:
 
     def test_assistant_tool_use_block_uses_display_map(self) -> None:
         """Tool use blocks should prefer shared display metadata when available."""
-        from app.core.tools.display import make_tool_display
+        from app.tools.display import make_tool_display
 
         message = AssistantMessage(
             content=[
@@ -928,7 +928,7 @@ class TestFactory:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """A token configured in settings must reach :class:`ClaudeLLMConfig`."""
-        from app.core.providers import factory
+        from app.providers import factory
 
         monkeypatch.setattr(factory.settings, "claude_code_oauth_token", "from-config")
 
@@ -938,7 +938,7 @@ class TestFactory:
 
     def test_resolve_llm_omits_token_when_blank(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """A blank token in settings must coerce to ``None`` so we don't forward an empty value."""
-        from app.core.providers import factory
+        from app.providers import factory
 
         monkeypatch.setattr(factory.settings, "claude_code_oauth_token", "")
 

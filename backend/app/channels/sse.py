@@ -26,7 +26,7 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncIterator
 
-from app.core.providers.base import StreamEvent
+from app.providers.base import StreamEvent
 
 from .base import Channel, ChannelMessage
 

@@ -2,9 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuthedFetch } from '@/hooks/use-authed-fetch';
-import { API_ENDPOINTS } from '@/lib/api';
 import { toast } from '@/lib/toast';
 import { attachVoiceAnalyserMeter, detachVoiceAnalyserMeter } from './voice-analyser-meter';
+
+/** Voice transcription is intentionally unavailable after the STT backend removal. */
+export const VOICE_TRANSCRIPTION_AVAILABLE = false;
+
+const VOICE_TRANSCRIPTION_UNAVAILABLE_MESSAGE =
+	'Voice transcription is not available on this deployment. Type your message instead.';
 
 /** Lifecycle states the recorder cycles through. */
 export type VoiceRecordingStatus =
@@ -28,12 +33,12 @@ export interface UseVoiceTranscribeResult {
 	/** Begin capturing microphone audio. Resolves once recording is live. */
 	startRecording: () => Promise<void>;
 	/**
-	 * Stop the recorder and POST the captured blob to the backend STT proxy.
+	 * Stop the recorder and request transcription when the deployment enables it.
 	 *
 	 * Resolves with the transcript text on success, or `null` if recording
-	 * was cancelled / produced no audio. Failure surfaces a toast and
-	 * resolves to `null` rather than throwing — composers don't need to
-	 * try/catch.
+	 * was cancelled / produced no audio. On this deployment, voice transcription
+	 * is intentionally disabled and callers get the permanent "not available"
+	 * message instead of a retryable upload failure.
 	 */
 	stopRecording: () => Promise<string | null>;
 	/** Discard the current recording without uploading anything. */
@@ -61,44 +66,28 @@ function pickRecorderMimeType(): string {
 	return '';
 }
 
-/**
- * Builds the multipart/form-data body sent to the STT proxy.
- *
- * The xAI endpoint requires `file` to be the LAST field — `FormData.append`
- * preserves insertion order, so the body construction is sequential here.
- */
-function buildSttFormData(audio: Blob, mimeType: string): FormData {
-	const formData = new FormData();
-	formData.append('language', 'en');
-	formData.append('format', 'true');
-	const extension = mimeType.includes('mp4') ? 'mp4' : 'webm';
-	formData.append('file', audio, `voice-note.${extension}`);
-	return formData;
-}
-
 type AuthedFetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
 /**
- * POSTs captured audio to the STT proxy and returns trimmed transcript text,
- * or an error message when the network/parse path fails.
+ * Voice transcription is disabled on this deployment.
+ *
+ * The backend STT route + the 4-backend transcriber abstraction
+ * (``backend/app/api/stt.py``, ``backend/app/integrations/voice/``) were
+ * removed during the backend restructure. This helper now returns a clear
+ * "not available" message instead of POSTing to a 404 endpoint and
+ * silently failing. The composer hides the mic affordance while this
+ * flag is off; the hook keeps this defensive failure path for callers
+ * that invoke it directly.
  */
 async function requestVoiceTranscription(
-	fetcher: AuthedFetchLike,
-	audio: Blob,
-	mimeType: string
+	_fetcher: AuthedFetchLike,
+	_audio: Blob,
+	_mimeType: string
 ): Promise<{ transcript: string | null; errorMessage: string | null }> {
-	try {
-		const response = await fetcher(API_ENDPOINTS.stt.transcribe, {
-			method: 'POST',
-			body: buildSttFormData(audio, mimeType),
-		});
-		const payload = (await response.json()) as { text?: string };
-		const transcript = (payload.text ?? '').trim();
-		return { transcript: transcript || null, errorMessage: null };
-	} catch (cause) {
-		const message = cause instanceof Error ? cause.message : 'Transcription failed.';
-		return { transcript: null, errorMessage: message };
-	}
+	return {
+		transcript: null,
+		errorMessage: VOICE_TRANSCRIPTION_UNAVAILABLE_MESSAGE,
+	};
 }
 
 /**
@@ -124,16 +113,17 @@ function awaitFinalBlob(
 }
 
 /**
- * Records microphone audio and uploads it to the xAI STT proxy on stop.
+ * Records microphone audio and requests transcription on stop when enabled.
  *
  * The flow:
  *   1. `startRecording()` — request mic permission, start `MediaRecorder`.
- *   2. `stopRecording()`  — stop the recorder, POST the blob to `/api/v1/stt`,
- *                            return the transcript text.
+ *   2. `stopRecording()`  — stop the recorder, request transcription, and
+ *                            return the transcript text when available.
  *   3. `cancelRecording()` — abort without uploading.
  *
  * MediaRecorder is the browser's recommended capture API and works in all
- * evergreen browsers. The xAI proxy accepts the default WebM/Opus output.
+ * evergreen browsers. While STT is disabled, `startRecording()` fails
+ * before requesting microphone permission.
  */
 export function useVoiceTranscribe(): UseVoiceTranscribeResult {
 	const fetcher = useAuthedFetch();
@@ -147,9 +137,6 @@ export function useVoiceTranscribe(): UseVoiceTranscribeResult {
 	const audioContextRef = useRef<AudioContext | null>(null);
 	const meterRafRef = useRef<number | null>(null);
 	const [meterLevel, setMeterLevel] = useState(0);
-	// Latch for stopRecording's `dataavailable` → `stop` race: when the
-	// recorder stops, we wait on this promise to resolve with the final
-	// blob before posting. Reset every recording cycle.
 	const finalBlobResolverRef = useRef<((blob: Blob | null) => void) | null>(null);
 
 	const releaseStream = useCallback((): void => {
@@ -167,8 +154,6 @@ export function useVoiceTranscribe(): UseVoiceTranscribeResult {
 		finalBlobResolverRef.current = null;
 	}, []);
 
-	// Always release the mic if the consumer unmounts mid-recording so we
-	// don't leak the OS-level capture indicator.
 	useEffect(() => {
 		return () => {
 			releaseStream();
@@ -177,6 +162,12 @@ export function useVoiceTranscribe(): UseVoiceTranscribeResult {
 
 	const startRecording = useCallback(async (): Promise<void> => {
 		if (status === 'recording' || status === 'requesting-permission') {
+			return;
+		}
+		if (!VOICE_TRANSCRIPTION_AVAILABLE) {
+			setStatus('error');
+			setError(VOICE_TRANSCRIPTION_UNAVAILABLE_MESSAGE);
+			toast.error(VOICE_TRANSCRIPTION_UNAVAILABLE_MESSAGE);
 			return;
 		}
 		if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
@@ -217,7 +208,6 @@ export function useVoiceTranscribe(): UseVoiceTranscribeResult {
 				finalBlobResolverRef.current = null;
 			};
 
-			// 250 ms timeslice so `stop` waits for in-flight `dataavailable` chunks.
 			recorder.start(250);
 			setStatus('recording');
 		} catch (capturedError) {
@@ -253,7 +243,7 @@ export function useVoiceTranscribe(): UseVoiceTranscribeResult {
 		if (errorMessage !== null) {
 			setStatus('error');
 			setError(errorMessage);
-			toast.error('Transcription failed. Try again in a moment.');
+			toast.error(errorMessage);
 			return null;
 		}
 		setStatus('idle');

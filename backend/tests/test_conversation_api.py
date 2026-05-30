@@ -7,7 +7,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db import User
+from app.infrastructure.database.legacy import User
 from app.models import Conversation
 
 
@@ -134,7 +134,7 @@ async def test_generate_conversation_title_persists_usable_title(
         return '"Better   Title"'
 
     monkeypatch.setattr(
-        "app.api.conversations.generate_text_once",
+        "app.conversations.router.generate_text_once",
         _fake_generate_text,
     )
 

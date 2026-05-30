@@ -49,7 +49,7 @@ LS_EVENT_TYPE_WIDTH = 28
 LS_RISK_WIDTH = 8
 LS_SUCCESS_WIDTH = 7
 
-# Mirrors ``app.crud.audit.MAX_LIST_LIMIT`` so the CLI rejects
+# Mirrors ``app.governance.audit.crud.MAX_LIST_LIMIT`` so the CLI rejects
 # out-of-range values before the round-trip with a friendly hint.
 MAX_LIST_LIMIT = 1000
 

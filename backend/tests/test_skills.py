@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from app.core.tools.skills import read_skill_manifest
+from app.tools.skills import read_skill_manifest
 
 
 def _make_skill_dir(skills_dir: Path, name: str, with_skill_md: bool = True) -> Path:

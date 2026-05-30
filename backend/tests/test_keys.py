@@ -1,4 +1,4 @@
-"""Unit tests for app.core.keys.
+"""Unit tests for app.infrastructure.keys.
 
 Covers:
   * Round-trip save/load — values come back out unchanged.
@@ -19,8 +19,8 @@ from uuid import uuid4
 
 import pytest
 
-from app.core import keys
-from app.core.config import settings
+from app.infrastructure import keys
+from app.infrastructure.config import settings
 
 
 @pytest.fixture

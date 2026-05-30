@@ -10,7 +10,7 @@ import pytest
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.core.tools.tasks_md import (  # noqa: E402
+from app.tools.tasks_md import (  # noqa: E402
     make_add_task_tool,
     make_complete_task_tool,
     make_list_tasks_tool,

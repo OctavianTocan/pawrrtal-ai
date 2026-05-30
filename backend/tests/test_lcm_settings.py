@@ -12,7 +12,7 @@ from __future__ import annotations
 
 def test_lcm_settings_have_safe_defaults() -> None:
     """All LCM knobs must have sane off-by-default values."""
-    from app.core.config import Settings
+    from app.infrastructure.config import Settings
 
     # Build a fresh Settings instance with NO env overrides so the test
     # inspects the schema defaults, not the developer's local .env.

@@ -4,6 +4,7 @@ import type { ChatStreamEvent } from '../types';
 import { useChat } from './use-chat';
 
 const replaceMock = vi.fn();
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
 vi.mock('next/navigation', () => ({
 	useRouter: () => ({
@@ -74,7 +75,7 @@ describe('useChat', (): void => {
 			{ type: 'delta', content: 'lo' },
 		]);
 
-		expect(fetch).toHaveBeenCalledWith('http://localhost:8000/api/v1/chat', {
+		expect(fetch).toHaveBeenCalledWith(`${apiBaseUrl}/api/v1/chat`, {
 			method: 'POST',
 			body: JSON.stringify({
 				question: 'Hi',

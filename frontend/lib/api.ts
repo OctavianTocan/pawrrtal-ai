@@ -255,14 +255,6 @@ export const API_ENDPOINTS = {
 		 */
 		get: '/token',
 	},
-	/** Speech-to-text proxy endpoints (xAI behind the backend). */
-	stt: {
-		/**
-		 * Transcribe an uploaded audio blob via the xAI STT proxy.
-		 * @returns `/api/v1/stt`
-		 */
-		transcribe: '/api/v1/stt',
-	},
 	/** Personalization wizard (home-page modal) endpoints. */
 	personalization: {
 		/** Read the authenticated user's personalization profile. */

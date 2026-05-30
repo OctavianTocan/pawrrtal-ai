@@ -5,11 +5,11 @@ from __future__ import annotations
 import pytest
 from xai_sdk.proto import chat_pb2
 
-from app.core.agent_loop.types import AgentMessage, UserMessage
-from app.core.providers.gemini.messages import build_gemini_contents
-from app.core.providers.litellm_provider import _build_litellm_messages
-from app.core.providers.opencode_go.events import build_openai_messages
-from app.core.providers.xai.messages import build_xai_messages
+from app.agents.types import AgentMessage, UserMessage
+from app.providers.gemini.messages import build_gemini_contents
+from app.providers.litellm_provider import _build_litellm_messages
+from app.providers.opencode_go.events import build_openai_messages
+from app.providers.xai.messages import build_xai_messages
 
 pytestmark = pytest.mark.anyio
 

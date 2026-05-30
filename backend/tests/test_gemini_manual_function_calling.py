@@ -13,7 +13,7 @@ from types import SimpleNamespace
 import pytest
 from google.genai import types as gtypes
 
-from app.core.agent_loop.types import (
+from app.agents.types import (
     AgentMessage,
     AgentTool,
     AssistantMessage,
@@ -25,7 +25,7 @@ from app.core.agent_loop.types import (
     ToolResultMessage,
     UserMessage,
 )
-from app.core.providers.gemini import provider as gemini_provider
+from app.providers.gemini import provider as gemini_provider
 
 
 async def _execute_noop(tool_call_id: str, **kwargs: object) -> str:

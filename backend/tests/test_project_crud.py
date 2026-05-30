@@ -5,19 +5,19 @@ from uuid import uuid4
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.crud.conversation import (
+from app.conversations.crud import (
     create_conversation,
     get_conversation,
     update_conversation,
 )
-from app.crud.project import (
+from app.infrastructure.database.legacy import User
+from app.projects.crud import (
     create_project,
     delete_project,
     get_project,
     list_projects,
     update_project,
 )
-from app.db import User
 from app.schemas import (
     ConversationCreate,
     ConversationUpdate,
@@ -120,9 +120,8 @@ async def test_delete_project_removes_project_row(
     gone = await get_project(test_user.id, db_session, project.id)
     assert gone is None
 
-    # Phase 2: ``get_conversation`` returns ``Maybe[Conversation]``;
     # unwrap to assert the surviving row stayed intact.
-    survivor = (await get_conversation(test_user.id, db_session, conversation.id)).value_or(None)
+    survivor = await get_conversation(test_user.id, db_session, conversation.id)
     assert survivor is not None
 
 
@@ -154,7 +153,7 @@ async def test_assign_then_unassign_conversation_to_project(
         conversation.id,
         db_session,
     )
-    attached = (await get_conversation(test_user.id, db_session, conversation.id)).value_or(None)
+    attached = await get_conversation(test_user.id, db_session, conversation.id)
     assert attached is not None
     assert attached.project_id == project.id
 
@@ -165,6 +164,6 @@ async def test_assign_then_unassign_conversation_to_project(
         conversation.id,
         db_session,
     )
-    detached = (await get_conversation(test_user.id, db_session, conversation.id)).value_or(None)
+    detached = await get_conversation(test_user.id, db_session, conversation.id)
     assert detached is not None
     assert detached.project_id is None

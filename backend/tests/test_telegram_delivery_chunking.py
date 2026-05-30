@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.channels.telegram_delivery import (
+from app.channels.telegram.delivery import (
     MAX_MESSAGE_LEN,
     chunk_html_for_telegram,
     safe_send_html,

@@ -6,6 +6,7 @@ import { createQueryClientWrapper, createTestQueryClient } from '@/test/utils/re
 import { useCreateConversation } from './use-create-conversation';
 
 const replaceMock = vi.fn();
+const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
 vi.mock('next/navigation', () => ({
 	useRouter: () => ({
@@ -49,7 +50,7 @@ describe('useCreateConversation', (): void => {
 		});
 
 		expect(fetch).toHaveBeenCalledWith(
-			'http://localhost:8000/api/v1/conversations/client-reserved-id',
+			`${apiBaseUrl}/api/v1/conversations/client-reserved-id`,
 			{
 				method: 'POST',
 				body: JSON.stringify({ title: 'Hello' }),

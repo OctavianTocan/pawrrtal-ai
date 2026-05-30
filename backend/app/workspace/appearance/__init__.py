@@ -1,0 +1,1 @@
+"""Workspace appearance router package."""

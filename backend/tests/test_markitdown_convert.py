@@ -18,10 +18,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.core.agent_loop.tools import build_agent_tools
-from app.core.agent_loop.types import AgentTool
-from app.core.tools.errors import ToolErrorCode
-from app.core.tools.markitdown_convert import make_markitdown_tool
+from app.agents.tools import build_agent_tools
+from app.agents.types import AgentTool
+from app.tools.errors import ToolErrorCode
+from app.tools.markitdown_convert import make_markitdown_tool
 
 
 @pytest.fixture
@@ -102,7 +102,7 @@ async def test_directory_target_returns_wrong_kind(workspace: Path) -> None:
 @pytest.mark.anyio
 async def test_successful_conversion_returns_markdown(workspace: Path) -> None:
     fake_cls = _fake_converter("# Hello\n")
-    with patch("app.core.tools.markitdown_convert.MarkItDown", fake_cls):
+    with patch("app.tools.markitdown_convert.MarkItDown", fake_cls):
         tool = _tool(workspace)
         out = await tool.execute("call-6", path="report.html")
     assert out == "# Hello\n"
@@ -111,7 +111,7 @@ async def test_successful_conversion_returns_markdown(workspace: Path) -> None:
 @pytest.mark.anyio
 async def test_empty_text_content_returns_placeholder(workspace: Path) -> None:
     fake_cls = _fake_converter("")
-    with patch("app.core.tools.markitdown_convert.MarkItDown", fake_cls):
+    with patch("app.tools.markitdown_convert.MarkItDown", fake_cls):
         tool = _tool(workspace)
         out = await tool.execute("call-7", path="report.html")
     assert out == "(empty document)"
@@ -127,7 +127,7 @@ async def test_converter_exception_returns_io_error(workspace: Path) -> None:
     instance = MagicMock()
     instance.convert.side_effect = RuntimeError("unsupported format")
     fake_cls = MagicMock(return_value=instance)
-    with patch("app.core.tools.markitdown_convert.MarkItDown", fake_cls):
+    with patch("app.tools.markitdown_convert.MarkItDown", fake_cls):
         tool = _tool(workspace)
         out = await tool.execute("call-8", path="report.html")
     assert out.startswith(f"[{ToolErrorCode.IO_ERROR.value}]")
@@ -141,7 +141,7 @@ async def test_converter_exception_returns_io_error(workspace: Path) -> None:
 
 def test_convert_to_markdown_in_build_agent_tools(tmp_path: Path) -> None:
     (tmp_path / "AGENTS.md").write_text("# Test workspace")
-    with patch("app.core.keys.resolve_api_key", return_value=None):
+    with patch("app.infrastructure.keys.resolve_api_key", return_value=None):
         tools = build_agent_tools(workspace_root=tmp_path)
 
     names = [t.name for t in tools]
@@ -152,7 +152,7 @@ def test_convert_to_markdown_precedes_send_message(tmp_path: Path) -> None:
     """convert_to_markdown must be registered before send_message."""
     (tmp_path / "AGENTS.md").write_text("# Test workspace")
     send_fn = AsyncMock(return_value=None)
-    with patch("app.core.keys.resolve_api_key", return_value=None):
+    with patch("app.infrastructure.keys.resolve_api_key", return_value=None):
         tools = build_agent_tools(workspace_root=tmp_path, send_fn=send_fn)
 
     names = [t.name for t in tools]

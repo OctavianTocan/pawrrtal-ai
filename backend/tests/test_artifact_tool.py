@@ -23,13 +23,13 @@ from pathlib import Path
 
 import pytest
 
-from app.core.providers.base import StreamEvent
-from app.core.tools.artifact import (
+from app.providers.base import StreamEvent
+from app.tools.artifact import (
     ArtifactValidationError,
     build_artifact,
     llm_summary_for,
 )
-from app.core.tools.artifact_agent import (
+from app.tools.artifact_agent import (
     ARTIFACT_TOOL_NAME,
     make_artifact_tool,
 )
@@ -224,7 +224,7 @@ def test_execute_validation_is_surface_independent() -> None:
 
 
 def test_maybe_artifact_event_emits_for_render_artifact_tool_use() -> None:
-    from app.api.chat import _maybe_artifact_event
+    from app.chat.router import _maybe_artifact_event
 
     event: StreamEvent = {
         "type": "tool_use",
@@ -244,7 +244,7 @@ def test_maybe_artifact_event_emits_for_render_artifact_tool_use() -> None:
 
 
 def test_maybe_artifact_event_returns_none_for_other_tools() -> None:
-    from app.api.chat import _maybe_artifact_event
+    from app.chat.router import _maybe_artifact_event
 
     event: StreamEvent = {
         "type": "tool_use",
@@ -256,7 +256,7 @@ def test_maybe_artifact_event_returns_none_for_other_tools() -> None:
 
 
 def test_maybe_artifact_event_returns_none_for_invalid_spec() -> None:
-    from app.api.chat import _maybe_artifact_event
+    from app.chat.router import _maybe_artifact_event
 
     event: StreamEvent = {
         "type": "tool_use",
@@ -270,7 +270,7 @@ def test_maybe_artifact_event_returns_none_for_invalid_spec() -> None:
 
 
 def test_maybe_artifact_event_returns_none_for_non_tool_events() -> None:
-    from app.api.chat import _maybe_artifact_event
+    from app.chat.router import _maybe_artifact_event
 
     delta: StreamEvent = {"type": "delta", "content": "hello"}
     assert _maybe_artifact_event(delta) is None
@@ -288,7 +288,7 @@ def test_artifact_tool_is_registered_in_build_agent_tools(tmp_path: Path) -> Non
     It also verifies no duplicate tool names are registered.
     """
 
-    from app.core.agent_loop.tools import build_agent_tools
+    from app.agents.tools import build_agent_tools
 
     tools = build_agent_tools(workspace_root=tmp_path)
     tool_names = [t.name for t in tools]

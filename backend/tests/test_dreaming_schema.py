@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.core.dreaming import parse_dreaming_output
+from app.lcm.dreaming import parse_dreaming_output
 
 
 def test_parse_clean_json_returns_populated_output() -> None:

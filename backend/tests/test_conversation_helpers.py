@@ -3,7 +3,7 @@
 from datetime import datetime
 from uuid import uuid4
 
-from app.api.conversations import _normalize_generated_title, _serialize_chat_message
+from app.conversations.router import _normalize_generated_title, _serialize_chat_message
 from app.models import ChatMessage
 
 

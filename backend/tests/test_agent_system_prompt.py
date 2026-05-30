@@ -4,13 +4,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.channels.turn_runner import _workspace_system_prompt
-from app.core.agent_loop import (
+from app.agents import (
     DEFAULT_AGENT_SYSTEM_PROMPT,
     PAW_CORE_SYSTEM_PROMPT,
     compose_agent_system_prompt,
 )
-from app.core.persona_bootstrap import IDENTITY_BEGIN, IDENTITY_END
+from app.channels.turn_runner import _workspace_system_prompt
+from app.workspace.persona_bootstrap import IDENTITY_BEGIN, IDENTITY_END
 
 
 def test_default_prompt_identifies_the_agent_as_a_paw() -> None:

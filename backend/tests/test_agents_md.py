@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.core.persona_bootstrap import IDENTITY_BEGIN, IDENTITY_END
-from app.core.tools.agents_md import (
+from app.tools.agents_md import (
     PROTECTED_FILENAMES,
     assemble_workspace_prompt,
     read_skills_index,
 )
+from app.workspace.persona_bootstrap import IDENTITY_BEGIN, IDENTITY_END
 
 
 def _write(path: Path, body: str) -> None:

@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from app.core import keys
-from app.core.config import settings
+from app.infrastructure import keys
+from app.infrastructure.config import settings
 
 
 @pytest.fixture

@@ -1,4 +1,4 @@
-"""Tests for ``app.core.chat_aggregator.should_emit_event``.
+"""Tests for ``app.chat.aggregator.should_emit_event``.
 
 Covers the three CCT-style verbose levels (0/1/2) and confirms the
 right event types survive each level.
@@ -9,13 +9,13 @@ from __future__ import annotations
 import pytest
 
 from app.channels.turn_runner import _should_deliver_event
-from app.core.chat_aggregator import (
+from app.chat.aggregator import (
     VERBOSE_DETAILED,
     VERBOSE_NORMAL,
     VERBOSE_QUIET,
     should_emit_event,
 )
-from app.core.providers.base import StreamEvent
+from app.providers.base import StreamEvent
 
 
 def _ev(t: str, **kw: object) -> StreamEvent:

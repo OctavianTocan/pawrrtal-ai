@@ -17,9 +17,9 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.core.agent_loop.types import AgentTool
-from app.core.tools.exa_search import ExaSearchResult
-from app.core.tools.exa_search_agent import make_exa_search_tool
+from app.agents.types import AgentTool
+from app.tools.exa_search import ExaSearchResult
+from app.tools.exa_search_agent import make_exa_search_tool
 
 # ---------------------------------------------------------------------------
 # make_exa_search_tool — shape
@@ -77,7 +77,7 @@ class TestExaSearchToolExecute:
         }
         tool = make_exa_search_tool()
         with patch(
-            "app.core.tools.exa_search_agent.exa_search",
+            "app.tools.exa_search_agent.exa_search",
             new=AsyncMock(return_value=fake_result),
         ):
             result = await tool.execute("dummy-id", query="python async")
@@ -95,7 +95,7 @@ class TestExaSearchToolExecute:
         }
         tool = make_exa_search_tool()
         with patch(
-            "app.core.tools.exa_search_agent.exa_search",
+            "app.tools.exa_search_agent.exa_search",
             new=AsyncMock(return_value=error_result),
         ):
             result = await tool.execute("dummy-id", query="test")
@@ -107,7 +107,7 @@ class TestExaSearchToolExecute:
         """num_results kwarg should be forwarded to the core function."""
         mock_search = AsyncMock(return_value={"query": "x", "results": [], "error": None})
         tool = make_exa_search_tool()
-        with patch("app.core.tools.exa_search_agent.exa_search", new=mock_search):
+        with patch("app.tools.exa_search_agent.exa_search", new=mock_search):
             await tool.execute("dummy-id", query="x", num_results=3)
 
         mock_search.assert_called_once()
@@ -118,7 +118,7 @@ class TestExaSearchToolExecute:
         """include_full_text kwarg should be forwarded to the core function."""
         mock_search = AsyncMock(return_value={"query": "x", "results": [], "error": None})
         tool = make_exa_search_tool()
-        with patch("app.core.tools.exa_search_agent.exa_search", new=mock_search):
+        with patch("app.tools.exa_search_agent.exa_search", new=mock_search):
             await tool.execute("dummy-id", query="x", include_full_text=True)
 
         _, kwargs = mock_search.call_args
@@ -128,7 +128,7 @@ class TestExaSearchToolExecute:
         """When num_results is not supplied it should default to 5."""
         mock_search = AsyncMock(return_value={"query": "x", "results": [], "error": None})
         tool = make_exa_search_tool()
-        with patch("app.core.tools.exa_search_agent.exa_search", new=mock_search):
+        with patch("app.tools.exa_search_agent.exa_search", new=mock_search):
             await tool.execute("dummy-id", query="x")
 
         _, kwargs = mock_search.call_args
@@ -158,8 +158,8 @@ class TestGeminiToolPassthrough:
         """Tools supplied by the caller arrive at the StreamFn unmodified."""
         import uuid
 
-        from app.core.agent_loop.types import AgentMessage
-        from app.core.providers.gemini import GeminiLLM
+        from app.agents.types import AgentMessage
+        from app.providers.gemini import GeminiLLM
 
         in_tools = [make_exa_search_tool()]
         captured_tools: list[AgentTool] | None = None
@@ -170,7 +170,7 @@ class TestGeminiToolPassthrough:
             nonlocal captured_tools
             captured_tools = list(tools)
             # Yield a clean stop so agent_loop exits immediately.
-            from app.core.agent_loop.types import LLMDoneEvent, TextContent
+            from app.agents.types import LLMDoneEvent, TextContent
 
             yield LLMDoneEvent(
                 type="done",
@@ -201,8 +201,8 @@ class TestGeminiToolPassthrough:
         """
         import uuid
 
-        from app.core.agent_loop.types import AgentMessage
-        from app.core.providers.gemini import GeminiLLM
+        from app.agents.types import AgentMessage
+        from app.providers.gemini import GeminiLLM
 
         captured_tools: list[AgentTool] | None = None
 
@@ -211,7 +211,7 @@ class TestGeminiToolPassthrough:
         ) -> AsyncIterator[Any]:
             nonlocal captured_tools
             captured_tools = list(tools)
-            from app.core.agent_loop.types import LLMDoneEvent, TextContent
+            from app.agents.types import LLMDoneEvent, TextContent
 
             yield LLMDoneEvent(
                 type="done",
@@ -221,7 +221,7 @@ class TestGeminiToolPassthrough:
 
         provider = GeminiLLM("gemini-test")
         with (
-            patch("app.core.config.settings.exa_api_key", "test-key"),
+            patch("app.infrastructure.config.settings.exa_api_key", "test-key"),
             patch.object(provider, "_stream_fn", recording_stream_fn),
         ):
             async for _ in provider.stream("hello", uuid.uuid4(), uuid.uuid4(), history=[]):
@@ -240,7 +240,7 @@ class TestGeminiToolPassthrough:
         """
         import uuid
 
-        from app.core.providers.gemini import GeminiLLM
+        from app.providers.gemini import GeminiLLM
         from tests.agent_harness import ScriptedStreamFn, text_turn, tool_call_turn
 
         exa_tool = make_exa_search_tool()
@@ -266,7 +266,7 @@ class TestGeminiToolPassthrough:
         events = []
         with (
             patch(
-                "app.core.tools.exa_search_agent.exa_search",
+                "app.tools.exa_search_agent.exa_search",
                 new=AsyncMock(return_value=error_result),
             ),
             patch.object(provider, "_stream_fn", script),

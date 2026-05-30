@@ -32,13 +32,13 @@ This README documents the current `development` branch feature surface. Some fea
 
 Always-on core: web chat, conversations, model catalog, workspaces, workspace file APIs, artifact rendering, MarkItDown conversion, current-time tool, task tools, skill discovery tools, cost/audit APIs, health probes, and settings sections that are wired in the frontend.
 
-Key-gated: Claude (`CLAUDE_CODE_OAUTH_TOKEN`), Gemini (`GEMINI_API_KEY`), xAI Grok (`XAI_API_KEY`), OpenAI chat via LiteLLM (`OPENAI_API_KEY`), OpenCode Go gateway (`OPENCODE_API_KEY`), Exa search (`EXA_API_KEY`), image generation (`OPENAI_CODEX_OAUTH_TOKEN`), xAI STT (`XAI_API_KEY`), Mistral/OpenAI voice backends, Notion (`NOTION_API_KEY`), Telegram (`TELEGRAM_BOT_TOKEN` + `TELEGRAM_BOT_USERNAME`), OAuth providers, and webhook secrets.
+Key-gated: Claude (`CLAUDE_CODE_OAUTH_TOKEN`), Gemini (`GEMINI_API_KEY`), xAI Grok (workspace xAI OAuth or `XAI_API_KEY`), OpenAI chat via LiteLLM (`OPENAI_API_KEY`), OpenCode Go gateway (`OPENCODE_API_KEY`), Exa search (`EXA_API_KEY`), image generation (`OPENAI_CODEX_OAUTH_TOKEN`), Notion (`NOTION_API_KEY`), Telegram (`TELEGRAM_BOT_TOKEN` + `TELEGRAM_BOT_USERNAME`), and OAuth providers.
 
-Feature-flagged or off by default: LCM (`LCM_ENABLED=false`), scheduler (`SCHEDULER_ENABLED=false`), webhook receiver (`WEBHOOK_API_ENABLED=false`), chat rate limiting (`CHAT_RATE_LIMIT_PER_MINUTE=0`), Claude sandboxing (`CLAUDE_SANDBOX_ENABLED=false`), and in-process Python (`VIRTUAL_PYTHON_ENABLED=false`).
+Feature-flagged or off by default: LCM (`LCM_ENABLED=false`), scheduler (`SCHEDULER_ENABLED=false`), chat rate limiting (`CHAT_RATE_LIMIT_PER_MINUTE=0`), Claude sandboxing (`CLAUDE_SANDBOX_ENABLED=false`), and in-process Python (`VIRTUAL_PYTHON_ENABLED=false`).
 
-Native OpenAI Codex integration is available via the first-class `openai-codex` host (powered by the official `openai_codex` Python SDK + local Codex app-server). Models appear as `openai-codex:gpt-5.5` etc. once the vendored submodule is initialized (`git submodule update --init --recursive` in `backend/vendor/codex`). See `backend/app/core/providers/openai_codex/` for details.
+Native OpenAI Codex integration is available via the first-class `openai-codex` host (powered by the official `openai_codex` Python SDK + local Codex app-server). Models appear as `openai-codex:gpt-5.5` etc. once the vendored submodule is initialized (`git submodule update --init --recursive` in `backend/vendor/codex`). See `backend/app/providers/openai_codex/` for details.
 
-Known caveats: Apple OAuth callback is currently stubbed and returns 501. The event-bus `AgentHandler` path for webhook/scheduled agent turns is present, but should be verified before relying on it in production. The in-process Python tool is explicitly unsandboxed and should stay single-tenant/operator-only.
+Known caveats: Apple OAuth callback is currently stubbed and returns 501. The scheduled agent-turn path is present, but should be verified before relying on it in production. The in-process Python tool is explicitly unsandboxed and should stay single-tenant/operator-only.
 
 ---
 
@@ -83,7 +83,7 @@ Telegram is a first-class channel, not just a notification bridge.
 - **Topic support**: Topic thread IDs are preserved, conversations can be per-topic, and auto-title can rename Telegram forum topics when the bot has rights.
 - **Status surfaces**: `/status` reports gateway uptime, current model, verbose level, conversation age, message counts, token usage when available, and running/idle status. `/lcm` reports LCM context and summary state when LCM is enabled.
 - **Inbound photos**: The largest Telegram photo is downloaded and forwarded to vision-capable models as base64 image input.
-- **Inbound voice/audio**: Voice and audio files are transcribed through the configured voice backend when available, otherwise the agent receives bounded metadata annotations.
+- **Inbound voice/audio**: Voice and audio files reach the agent as bounded metadata annotations. The previous STT backend was removed in the backend restructure.
 - **Inbound documents**: Documents under the size cap are converted to bounded Markdown via MarkItDown and inlined as annotations. Oversized or unsupported files fall back to metadata annotations.
 - **Outbound media tools**: On Telegram turns, the agent can use `send_image_to_user`, `send_voice_to_user`, and `send_document_to_user` wrappers over the channel send function.
 
@@ -133,14 +133,10 @@ Workspace file tools are scoped to the workspace root and reject absolute paths/
 - **Execution model**: Notion calls run through the official `ntn` CLI with the token injected per call and temp-home isolation.
 - **Auditability**: Every `ntn` invocation is logged in `notion_operation_logs`.
 
-### Voice and STT
+### Voice and Audio
 
-- **Web STT endpoint**: `POST /api/v1/stt` accepts an uploaded audio file and returns transcript JSON.
-- **xAI backend (default)**: `VOICE_PROVIDER=xai` uses the xAI STT HTTP endpoint via `XaiSttTranscriber`. The web `/api/v1/stt` route resolves `XAI_API_KEY` from the user's default workspace first then the gateway global; the Telegram bot reads the global setting.
-- **Mistral backend**: `VOICE_PROVIDER=mistral` uses Mistral Voxtral when `VOICE_MISTRAL_API_KEY` is set and the optional dependency is installed.
-- **OpenAI backend**: `VOICE_PROVIDER=openai` uses Whisper through the OpenAI SDK when `VOICE_OPENAI_API_KEY` is set and the optional dependency is installed.
-- **Local backend**: `VOICE_PROVIDER=local` shells out to ffmpeg and whisper.cpp.
-- **Telegram reuse**: Telegram voice/audio attachments use the same transcriber abstraction (including the xAI backend) and fall back to metadata annotations only when no key is configured.
+- **Metadata-only**: Web STT and the voice transcriber abstraction were removed in the backend restructure. Telegram voice/audio attachments are preserved as metadata annotations instead of transcripts.
+- **Compatibility settings**: `VOICE_*` env settings may still exist in older deployments, but they are no-op placeholders.
 
 ### Lossless Context Management
 
@@ -205,8 +201,8 @@ Placeholder settings sections currently listed in the nav but not fully wired:
 - **Request logging**: Every request gets a request id for log correlation.
 - **Health probes**: `/api/v1/health` is liveness. `/api/v1/health/ready` checks DB connectivity and at least one configured LLM provider.
 - **OpenTelemetry**: Traces include `pawrrtal.turn` and `pawrrtal.llm.chat` spans, model/user/conversation/surface metadata, usage, cost, and Workshop/OpenLLMetry-compatible event hooks.
-- **Event bus**: A process-local async pub/sub bus publishes turn, webhook, scheduled, and agent-response events.
-- **Webhook receiver**: `WEBHOOK_API_ENABLED=true` enables `/webhooks/{provider}`. GitHub uses HMAC-SHA256. Generic providers use a bearer secret. Deliveries are deduped before publishing to the event bus.
+- **Event bus**: A process-local async pub/sub bus publishes turn, scheduled, and agent-response events.
+- **Webhook receiver**: The backend restructure removed the `/webhooks/{provider}` receiver. `WEBHOOK_*` env settings are no-op compatibility placeholders.
 - **Scheduler**: `SCHEDULER_ENABLED=true` starts a cron scheduler. The API can list historical jobs regardless of the flag, but create/delete live jobs require a running scheduler.
 
 ### Desktop shells
@@ -226,7 +222,7 @@ Placeholder settings sections currently listed in the nav but not fully wired:
 | Database    | PostgreSQL (prod, Railway), SQLite + aiosqlite (tests / fresh dev) |
 | Providers   | `claude-agent-sdk` (Anthropic), `google-genai` (Gemini), `xai-sdk` (Grok, gRPC), `litellm` (OpenAI chat), OpenCode Go gateway (GLM-5.1, Kimi K2.6) |
 | Channels    | aiogram (Telegram polling or webhook), SSE (web/electron) |
-| Voice        | xAI STT, Mistral Voxtral, OpenAI Whisper, local whisper.cpp |
+| Voice        | Metadata annotations only; STT removed |
 | Encryption  | Fernet (workspace `.env`) |
 | Desktop     | Electron, Electrobun |
 | Toolchain   | Bun, uv, Biome, Ruff, mypy strict, Bandit, just, Lefthook |
@@ -316,7 +312,7 @@ WORKSPACE_SETTINGS_FILENAME=.claude/settings.json
 GEMINI_API_KEY=
 CLAUDE_CODE_OAUTH_TOKEN=
 OPENAI_API_KEY=                  # OpenAI chat via LiteLLM
-XAI_API_KEY=                     # Grok chat + xAI STT
+XAI_API_KEY=                     # Grok chat fallback when workspace OAuth/key is absent
 OPENCODE_API_KEY=                # SST OpenCode Go gateway (GLM-5.1, Kimi K2.6)
 OPENCODE_GO_BASE_URL=https://opencode.ai/zen/go/v1
 EXA_API_KEY=
@@ -387,7 +383,7 @@ APPLE_OAUTH_PRIVATE_KEY=
 APPLE_OAUTH_REDIRECT_URI=
 OAUTH_POST_LOGIN_REDIRECT=http://localhost:53001/
 
-# Voice / STT
+# Voice / audio metadata only; STT removed
 VOICE_PROVIDER=xai
 VOICE_MISTRAL_API_KEY=
 VOICE_OPENAI_API_KEY=
@@ -458,26 +454,18 @@ pawrrtal/
 ├─ backend/
 │  ├─ main.py                       # FastAPI app composition + lifespan
 │  ├─ app/
-│  │  ├─ api/                       # Routers: chat, conversations, models,
-│  │  │                             # workspace, env, channels, cost, audit,
-│  │  │                             # stt, oauth, projects, exports, jobs, health
-│  │  ├─ channels/                  # Channel protocol, turn_runner, sse, telegram
-│  │  ├─ core/
-│  │  │  ├─ agent_loop/             # Provider-neutral loop, types, safety
-│  │  │  ├─ agent_tools.py          # Per-turn tool composition
-│  │  │  ├─ event_bus/              # Typed pub/sub for turns, webhooks, jobs
-│  │  │  ├─ plugins/                # Plugin registry + types
-│  │  │  ├─ providers/              # ClaudeLLM, GeminiLLM, catalog, model_id
-│  │  │  └─ tools/                  # Concrete tool implementations
-│  │  ├─ crud/                      # SQLAlchemy CRUD per domain
-│  │  ├─ integrations/
-│  │  │  ├─ notion/                 # Notion plugin via ntn CLI
-│  │  │  ├─ telegram/               # aiogram bot, handlers, status, model picker
-│  │  │  ├─ voice/                  # Mistral, OpenAI, whisper.cpp transcribers
-│  │  │  └─ webhooks/               # HMAC/Bearer webhook receiver
-│  │  ├─ governance_models.py       # audit_events, cost_ledger, scheduled_jobs, ...
-│  │  ├─ models.py                  # User, Conversation, Message, Workspace, LCM, ...
-│  │  └─ schemas.py                 # Pydantic API schemas
+│  │  ├─ agents/                    # Provider-neutral agent loop, types, safety
+│  │  ├─ api/                       # FastAPI router aggregation
+│  │  ├─ chat/                      # Chat router, models catalog, completions
+│  │  ├─ channels/                  # Channel protocol, SSE, Telegram
+│  │  ├─ conversations/             # Conversation CRUD, exports, route handlers
+│  │  ├─ governance/                # Audit, cost, scheduled jobs, health
+│  │  ├─ infrastructure/            # App factory, auth, DB, middleware, lifecycle
+│  │  ├─ integrations/              # External app integrations that remain
+│  │  ├─ plugins/                   # Plugin registry and plugin implementations
+│  │  ├─ providers/                 # Claude, Gemini, xAI, LiteLLM, Codex, etc.
+│  │  ├─ tools/                     # Concrete tool implementations
+│  │  └─ workspace/                 # Workspace files, env, appearance, personalization
 │  ├─ alembic/
 │  ├─ Dockerfile
 │  └─ railway.toml
@@ -569,10 +557,7 @@ POST   /api/v1/channels/telegram/link
 DELETE /api/v1/channels/telegram/link
 POST   /api/v1/channels/telegram/webhook        # Telegram webhook mode only
 
-# Voice / STT
-POST   /api/v1/stt
-
-# Cost / audit / scheduler / webhooks / health
+# Cost / audit / scheduler / health
 GET    /api/v1/cost/
 GET    /api/v1/cost/ledger
 GET    /api/v1/audit/
@@ -581,7 +566,6 @@ GET    /api/v1/scheduled-jobs/
 POST   /api/v1/scheduled-jobs/                  # scheduler enabled only
 DELETE /api/v1/scheduled-jobs/:id
 POST   /api/v1/heartbeat/sync                   # reconcile HEARTBEAT.md → scheduled_jobs
-POST   /webhooks/:provider                      # webhook API enabled only
 GET    /api/v1/health
 GET    /api/v1/health/ready
 ```

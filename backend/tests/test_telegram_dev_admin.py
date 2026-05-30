@@ -22,20 +22,21 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.crud.channel import get_user_id_for_external, issue_link_code
-from app.db import User
-from app.integrations.telegram.dev_admin import (
+from app.channels.crud import get_user_id_for_external, issue_link_code
+from app.channels.telegram.dev_admin import (
     TELEGRAM_PROVIDER,
     resolve_or_autolink_telegram_user,
 )
-from app.integrations.telegram.handlers import (
+from app.channels.telegram.handlers import (
     PROVIDER,
     TelegramTurnContext,
     handle_plain_message,
     handle_start_command,
+    handle_whoami_command,
 )
-from app.integrations.telegram.sender import TelegramSender
+from app.channels.telegram.sender import TelegramSender
+from app.infrastructure.config import settings
+from app.infrastructure.database.legacy import User
 from app.models import ChannelBinding, Workspace
 
 pytestmark = pytest.mark.anyio
@@ -282,6 +283,42 @@ async def test_empty_start_from_unknown_user_still_nudges(
     assert "don't recognize" in reply.lower()
 
 
+async def test_whoami_reports_sender_identity_and_unbound_state(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """``/whoami`` shows the numeric Telegram IDs needed for dev-admin config."""
+    monkeypatch.setattr(settings, "telegram_dev_admin_id", DEV_ADMIN_TELEGRAM_ID)
+
+    sender = _make_sender(OTHER_TELEGRAM_ID)
+    reply = await handle_whoami_command(sender=sender, session=db_session)
+
+    assert f"user_id: {OTHER_TELEGRAM_ID}" in reply
+    assert f"chat_id: {OTHER_TELEGRAM_ID}" in reply
+    assert "pawrrtal_user_id: unbound" in reply
+    assert f"telegram_dev_admin_id: {DEV_ADMIN_TELEGRAM_ID}" in reply
+    assert "dev_admin_match: false" in reply
+
+
+async def test_whoami_reports_bound_dev_admin_match(
+    db_session: AsyncSession,
+    monkeypatch: pytest.MonkeyPatch,
+    admin_workspace_root: Path,
+    seeded_admin_user: User,
+) -> None:
+    """``/whoami`` confirms when the sender is the configured dev-admin."""
+    monkeypatch.setattr(settings, "telegram_dev_admin_id", DEV_ADMIN_TELEGRAM_ID)
+
+    sender = _make_sender(DEV_ADMIN_TELEGRAM_ID)
+    await resolve_or_autolink_telegram_user(session=db_session, sender=sender)
+    reply = await handle_whoami_command(sender=sender, session=db_session)
+
+    assert f"user_id: {DEV_ADMIN_TELEGRAM_ID}" in reply
+    assert f"pawrrtal_user_id: {seeded_admin_user.id}" in reply
+    assert f"telegram_dev_admin_id: {DEV_ADMIN_TELEGRAM_ID}" in reply
+    assert "dev_admin_match: true" in reply
+
+
 async def test_autolink_recovers_from_concurrent_insert_race(
     db_session: AsyncSession,
     monkeypatch: pytest.MonkeyPatch,
@@ -297,7 +334,7 @@ async def test_autolink_recovers_from_concurrent_insert_race(
     own commit then trips the unique constraint and falls through to the
     recovery path's re-query, which surfaces the winner.
     """
-    from app.crud import channel as channel_module
+    import app.channels.crud as channel_module
 
     monkeypatch.setattr(settings, "telegram_dev_admin_id", DEV_ADMIN_TELEGRAM_ID)
 
@@ -346,7 +383,7 @@ async def test_autolink_recovers_from_concurrent_insert_race(
         )
 
     monkeypatch.setattr(
-        "app.integrations.telegram.dev_admin.get_user_id_for_external",
+        "app.channels.telegram.dev_admin.get_user_id_for_external",
         lookup_misses_then_recovers,
     )
 

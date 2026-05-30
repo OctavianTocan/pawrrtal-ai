@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Architectural gate: providers must NOT import from ``app.core.tools.*``.
+"""Architectural gate: providers must NOT import from ``app.tools.*``.
 
 The agent-loop architecture is provider-neutral: providers translate
-the cross-provider :class:`app.core.agent_loop.types.AgentTool` shape
+the cross-provider :class:`app.agents.types.AgentTool` shape
 into their SDK's tool format, but they don't reach into specific tool
 factories.  Tool composition (which tools the agent gets this turn)
-lives in the chat router (``app/api/chat.py``).
+lives in the chat router (``app/chat/router.py``).
 
 Why enforce in CI rather than just code review:
 
@@ -18,8 +18,8 @@ Why enforce in CI rather than just code review:
 
 What this script enforces:
 
-  * Files under ``backend/app/core/providers/`` MAY NOT import any
-    module whose dotted path starts with ``app.core.tools.``.
+  * Files under ``backend/app/providers/`` MAY NOT import any
+    module whose dotted path starts with ``app.tools.``.
   * Provider-internal *bridges* live next to the provider as
     ``providers/_*_tool_bridge.py`` and are allowed — they translate
     the abstract :class:`AgentTool` shape and are NOT imports of
@@ -46,11 +46,11 @@ from dataclasses import dataclass
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-PROVIDERS_DIR = REPO_ROOT / "backend" / "app" / "core" / "providers"
+PROVIDERS_DIR = REPO_ROOT / "backend" / "app" / "providers"
 
-# Forbidden import-prefix (matches ``import app.core.tools.X`` and
-# ``from app.core.tools[.X] import Y``).
-FORBIDDEN_PREFIX = "app.core.tools"
+# Forbidden import-prefix (matches ``import app.tools.X`` and
+# ``from app.tools[.X] import Y``).
+FORBIDDEN_PREFIX = "app.tools"
 
 
 @dataclass(frozen=True)
@@ -135,7 +135,7 @@ def main(argv: list[str]) -> int:
         print(f"  {rel}:{o.line}  {o.statement}", file=sys.stderr)
     print(
         "\nProviders must stay tool-agnostic.  Move the import into the chat router\n"
-        "(`backend/app/api/chat.py`) or a non-provider module.  See\n"
+        "(`backend/app/chat/router.py`) or a non-provider module.  See\n"
         "`.claude/rules/architecture/no-tools-in-providers.md`.",
         file=sys.stderr,
     )

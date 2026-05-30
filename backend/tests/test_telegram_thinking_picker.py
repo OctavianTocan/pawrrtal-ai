@@ -6,9 +6,7 @@ import uuid
 
 import pytest
 
-from app.core.providers.catalog import MODEL_CATALOG, ModelEntry, default_model, find
-from app.core.providers.model_id import Host, parse_model_id
-from app.integrations.telegram.thinking_picker import (
+from app.channels.telegram.thinking_picker import (
     THINKING_CALLBACK_PREFIX,
     ThinkingCallback,
     ThinkingPickerState,
@@ -20,6 +18,8 @@ from app.integrations.telegram.thinking_picker import (
     parse_thinking_callback_data,
     resolve_select,
 )
+from app.providers.catalog import MODEL_CATALOG, ModelEntry, default_model, find
+from app.providers.model_id import Host, parse_model_id
 
 
 def _entry(host: Host, model: str) -> ModelEntry:
@@ -279,7 +279,7 @@ def test_grok_picker_minimal_button_maps_to_no_thinking_for_xai() -> None:
     boundary here keeps the picker UI and the provider mapping
     locked in step.
     """
-    from app.core.providers.xai.provider import _map_reasoning_effort
+    from app.providers.xai.provider import _map_reasoning_effort
 
     try:
         from xai_sdk.proto.v6 import chat_pb2

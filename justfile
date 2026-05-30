@@ -32,19 +32,19 @@ push:
 
 # Lint check (read-only) — Biome (JS/TS) + ruff (Python)
 lint: lint-py
-    bunx --bun @biomejs/biome check --no-errors-on-unmatched --files-ignore-unknown=true .
+    bunx --bun @biomejs/biome@2.4.15 check --no-errors-on-unmatched --files-ignore-unknown=true .
 
 # Lint and auto-fix — Biome (JS/TS) + ruff (Python)
 lint-fix: lint-py-fix
-    bunx --bun @biomejs/biome check --write --no-errors-on-unmatched --files-ignore-unknown=true .
+    bunx --bun @biomejs/biome@2.4.15 check --write --no-errors-on-unmatched --files-ignore-unknown=true .
 
 # Format — Biome (JS/TS) + ruff (Python)
 format: format-py
-    bunx --bun @biomejs/biome format --write .
+    bunx --bun @biomejs/biome@2.4.15 format --write .
 
 # Check (read-only) — Biome + ruff lint + ruff format check
 check: check-py
-    bunx --bun @biomejs/biome check --no-errors-on-unmatched --files-ignore-unknown=true .
+    bunx --bun @biomejs/biome@2.4.15 check --no-errors-on-unmatched --files-ignore-unknown=true .
 
 # --- Python: ruff (lint + format) and mypy (type check) ----------------------
 

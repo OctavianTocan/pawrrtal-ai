@@ -38,9 +38,9 @@ def _block_openai_codex() -> Iterator[None]:
     for mod in list(sys.modules):
         if mod in {
             "openai_codex",
-            "app.core.providers.factory",
-            "app.core.providers.openai_codex",
-        } or mod.startswith(("openai_codex.", "app.core.providers.openai_codex.")):
+            "app.providers.factory",
+            "app.providers.openai_codex",
+        } or mod.startswith(("openai_codex.", "app.providers.openai_codex.")):
             sys.modules.pop(mod, None)
 
     blocker = _OpenAICodexBlocker()
@@ -54,18 +54,18 @@ def _block_openai_codex() -> Iterator[None]:
         for mod in list(sys.modules):
             if mod in {
                 "openai_codex",
-                "app.core.providers.factory",
-                "app.core.providers.openai_codex",
-            } or mod.startswith(("openai_codex.", "app.core.providers.openai_codex.")):
+                "app.providers.factory",
+                "app.providers.openai_codex",
+            } or mod.startswith(("openai_codex.", "app.providers.openai_codex.")):
                 sys.modules.pop(mod, None)
 
 
 @pytest.mark.usefixtures("_block_openai_codex")
 def test_factory_imports_without_codex_runtime() -> None:
     """Importing the factory must succeed even when openai_codex cannot be imported."""
-    factory = importlib.import_module("app.core.providers.factory")
+    factory = importlib.import_module("app.providers.factory")
 
-    from app.core.providers.model_id import Host
+    from app.providers.model_id import Host
 
     # All hosts are still registered…
     assert Host.agent_sdk in factory.HOST_TO_PROVIDER
@@ -78,7 +78,7 @@ def test_factory_imports_without_codex_runtime() -> None:
 @pytest.mark.usefixtures("_block_openai_codex")
 def test_factory_codex_resolution_raises_when_runtime_unavailable() -> None:
     """When a Codex model is actually requested with no runtime, raise — never silently fall back."""
-    factory = importlib.import_module("app.core.providers.factory")
+    factory = importlib.import_module("app.providers.factory")
 
     # Use a canonical wire string for a Codex model. The lazy resolver
     # in factory.resolve_llm should attempt the import and fail.

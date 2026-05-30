@@ -17,13 +17,15 @@ generator — same connection lifecycle the Telegram path already uses.
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, cast
 from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
 
+from app.channels.sse import SSEChannel
 from app.models import Workspace
+from app.providers.base import StreamEvent
 
 
 class _FakeProvider:
@@ -65,7 +67,7 @@ async def test_chat_router_does_not_pass_request_session_into_turn_input(
         json={"title": "SQLite Lifecycle"},
     )
     monkeypatch.setattr(
-        "app.api.chat.resolve_llm",
+        "app.chat.router.resolve_llm",
         lambda _model_id, **kwargs: _FakeProvider(),
     )
 
@@ -81,7 +83,7 @@ async def test_chat_router_does_not_pass_request_session_into_turn_input(
         captured.update(kwargs)
         return _OriginalChatTurnInput(**kwargs)
 
-    monkeypatch.setattr("app.api.chat.ChatTurnInput", _capturing_chat_turn_input)
+    monkeypatch.setattr("app.chat.router.ChatTurnInput", _capturing_chat_turn_input)
 
     response = await client.post(
         "/api/v1/chat/",
@@ -118,7 +120,7 @@ async def test_chat_finalizes_assistant_status_on_sqlite(
         json={"title": "Finalize"},
     )
     monkeypatch.setattr(
-        "app.api.chat.resolve_llm",
+        "app.chat.router.resolve_llm",
         lambda _model_id, **kwargs: _FakeProvider(),
     )
 
@@ -140,6 +142,35 @@ async def test_chat_finalizes_assistant_status_on_sqlite(
         f"got {final.get('assistant_status')!r}. The streaming generator's "
         "persistence path must not depend on the request session."
     )
+
+
+@pytest.mark.anyio
+async def test_sse_done_frame_waits_for_turn_finalization() -> None:
+    """SSE must not emit ``[DONE]`` before the assistant row is finalized.
+
+    Real CLI/browser clients commonly stop reading when they see the terminal
+    SSE frame. If the channel emits ``[DONE]`` before ``_finalize_turn`` runs,
+    an immediate messages refetch can observe the assistant row as still
+    ``streaming`` even though the visible response completed.
+    """
+    from app.channels.turn_runner import _finalizing_stream
+
+    finalized = False
+
+    async def _source() -> AsyncIterator[StreamEvent]:
+        yield {"type": "delta", "content": "ok"}
+
+    async def _finalize() -> None:
+        nonlocal finalized
+        finalized = True
+
+    channel = SSEChannel()
+    async for chunk in channel.deliver(
+        _finalizing_stream(_source(), _finalize),
+        message=cast(Any, {}),
+    ):
+        if chunk == b"data: [DONE]\n\n":
+            assert finalized
 
 
 @pytest.mark.anyio
@@ -170,7 +201,7 @@ async def test_finalize_turn_leaves_message_complete_on_cost_write_failure(
         json={"title": "Cost Failure"},
     )
     monkeypatch.setattr(
-        "app.api.chat.resolve_llm",
+        "app.chat.router.resolve_llm",
         lambda _model_id, **kwargs: _FakeProvider(),
     )
 

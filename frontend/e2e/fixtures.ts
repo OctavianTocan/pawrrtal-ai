@@ -9,8 +9,8 @@
  * state leakage.
  *
  * `devLogin` does just the auth half: hits `/auth/dev-login`, confirms
- * the response is 2xx, and returns. The session cookie lands in the
- * context's cookie jar automatically.
+ * the response is 2xx, and installs the session cookie into the browser
+ * context.
  *
  * `ensureProvisionedWorkspace` adds the workspace seed via the
  * personalization upsert endpoint (which calls
@@ -21,12 +21,48 @@
  * the backend, not through UI clicks.
  */
 
-import { type APIRequestContext, type BrowserContext, test as base } from '@playwright/test';
+import { type BrowserContext, test as base } from '@playwright/test';
 import { E2E_SKIP_ONBOARDING_STORAGE_KEY } from '../features/onboarding/v2/OnboardingFlow';
 
 const BACKEND_URL = process.env.E2E_API_URL ?? 'http://localhost:8000';
 
 const BACKEND_CONFIG_STORAGE_KEY = 'pawrrtal:backend-config';
+const SESSION_COOKIE_NAME = 'session_token';
+
+async function readResponseSummary(response: Response): Promise<string> {
+	const body = await response.text();
+	return body.length > 0 ? `${response.status} ${body}` : `${response.status}`;
+}
+
+function extractSessionCookie(setCookie: string | null): string {
+	const cookieValue = setCookie?.match(/session_token=([^;]+)/)?.[1];
+	if (cookieValue === undefined) {
+		throw new Error('Dev login returned 2xx but no session_token cookie.');
+	}
+	return cookieValue;
+}
+
+async function authedBackendFetch({
+	cookieValue,
+	method,
+	path,
+	body,
+}: {
+	cookieValue: string;
+	method: 'POST' | 'PUT';
+	path: string;
+	body: Record<string, unknown>;
+}): Promise<Response> {
+	return fetch(`${BACKEND_URL}${path}`, {
+		method,
+		headers: {
+			'content-type': 'application/json',
+			cookie: `${SESSION_COOKIE_NAME}=${cookieValue}`,
+			'x-e2e-run': '1',
+		},
+		body: JSON.stringify(body),
+	});
+}
 
 /**
  * Authenticate the supplied browser context with the dev-admin user.
@@ -35,13 +71,32 @@ const BACKEND_CONFIG_STORAGE_KEY = 'pawrrtal:backend-config';
  * header is captured into the context's cookie jar so subsequent
  * `page.goto()` calls share the auth session.
  */
-async function devLogin(context: BrowserContext): Promise<void> {
-	const response = await context.request.post(`${BACKEND_URL}/auth/dev-login`);
-	if (!response.ok()) {
+async function devLogin(context: BrowserContext): Promise<string> {
+	const response = await fetch(`${BACKEND_URL}/auth/dev-login`, {
+		method: 'POST',
+		headers: { 'x-e2e-run': '1' },
+	});
+	if (!response.ok) {
 		throw new Error(
-			`Dev login failed (${response.status()}). Make sure ADMIN_EMAIL + ADMIN_PASSWORD are set in backend/.env and the backend is running.`
+			`Dev login failed (${await readResponseSummary(response)}). Make sure ADMIN_EMAIL + ADMIN_PASSWORD are set in backend/.env and the backend is running.`
 		);
 	}
+	const cookieValue = extractSessionCookie(response.headers.get('set-cookie'));
+	const backendHost = new URL(BACKEND_URL).hostname;
+	const cookieUrls = Array.from(
+		new Set([`http://${backendHost}`, 'http://localhost', 'http://127.0.0.1'])
+	);
+	await context.addCookies(
+		cookieUrls.map((url) => ({
+			name: SESSION_COOKIE_NAME,
+			value: cookieValue,
+			url,
+			httpOnly: true,
+			secure: false,
+			sameSite: 'Lax' as const,
+		}))
+	);
+	return cookieValue;
 }
 
 /**
@@ -53,15 +108,16 @@ async function devLogin(context: BrowserContext): Promise<void> {
  * fully rendered (sidebar, chat composer, settings) call this after
  * `devLogin`.
  */
-async function ensureProvisionedWorkspace(request: APIRequestContext): Promise<void> {
-	const response = await request.put(`${BACKEND_URL}/api/v1/personalization`, {
-		data: {
-			name: 'E2E Admin',
-		},
+async function ensureProvisionedWorkspace(cookieValue: string): Promise<void> {
+	const response = await authedBackendFetch({
+		cookieValue,
+		method: 'PUT',
+		path: '/api/v1/personalization',
+		body: { name: 'E2E Admin' },
 	});
-	if (!response.ok()) {
+	if (!response.ok) {
 		throw new Error(
-			`Provisioning the dev workspace failed (${response.status()}). The PUT /api/v1/personalization endpoint is required for sidebar / home-shell tests to land on a populated app shell.`
+			`Provisioning the dev workspace failed (${await readResponseSummary(response)}). The PUT /api/v1/personalization endpoint is required for sidebar / home-shell tests to land on a populated app shell.`
 		);
 	}
 }
@@ -76,14 +132,17 @@ async function ensureProvisionedWorkspace(request: APIRequestContext): Promise<v
  * to ``/api/v1/conversations/{id}`` — matching the FE's
  * ``createConversationFirst`` pattern.
  */
-async function seedConversation(request: APIRequestContext): Promise<void> {
+async function seedConversation(cookieValue: string): Promise<void> {
 	const conversationId = crypto.randomUUID();
-	const response = await request.post(`${BACKEND_URL}/api/v1/conversations/${conversationId}`, {
-		data: { title: 'E2E Seed Conversation' },
+	const response = await authedBackendFetch({
+		cookieValue,
+		method: 'POST',
+		path: `/api/v1/conversations/${conversationId}`,
+		body: { title: 'E2E Seed Conversation' },
 	});
-	if (!response.ok()) {
+	if (!response.ok) {
 		throw new Error(
-			`Seeding the dev conversation failed (${response.status()}). The sidebar Projects header only renders when at least one chat row exists.`
+			`Seeding the dev conversation failed (${await readResponseSummary(response)}). The sidebar Projects header only renders when at least one chat row exists.`
 		);
 	}
 }
@@ -149,8 +208,8 @@ export const test = base.extend<E2EFixtures>({
 
 	authenticatedPageWithWorkspace: [
 		async ({ context }, use) => {
-			await devLogin(context);
-			await ensureProvisionedWorkspace(context.request);
+			const cookieValue = await devLogin(context);
+			await ensureProvisionedWorkspace(cookieValue);
 			await use();
 		},
 		{ auto: false },
@@ -158,9 +217,9 @@ export const test = base.extend<E2EFixtures>({
 
 	authenticatedPageWithWorkspaceAndChat: [
 		async ({ context }, use) => {
-			await devLogin(context);
-			await ensureProvisionedWorkspace(context.request);
-			await seedConversation(context.request);
+			const cookieValue = await devLogin(context);
+			await ensureProvisionedWorkspace(cookieValue);
+			await seedConversation(cookieValue);
 			await use();
 		},
 		{ auto: false },

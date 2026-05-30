@@ -21,16 +21,16 @@ from uuid import UUID
 
 import pytest
 
-from app.core.agent_loop.tools import build_agent_tools
-from app.core.agent_loop.types import AgentTool
-from app.core.plugins import (
+from app.agents.plugins import (
     EnvKeySpec,
     Plugin,
     ToolContext,
     all_plugins,
     register_plugin,
 )
-from app.core.plugins.registry import reset_for_tests
+from app.agents.plugins.registry import reset_for_tests
+from app.agents.tools import build_agent_tools
+from app.agents.types import AgentTool
 
 
 @pytest.fixture(autouse=True)
@@ -100,7 +100,7 @@ class TestPluginsContributeToolsToAgent:
             )
         )
 
-        with patch("app.core.keys.resolve_api_key", return_value=None):
+        with patch("app.infrastructure.keys.resolve_api_key", return_value=None):
             tools = build_agent_tools(
                 workspace_root=tmp_workspace,
                 user_id=uuid.uuid4(),
@@ -121,7 +121,7 @@ class TestPluginsContributeToolsToAgent:
             )
         )
 
-        with patch("app.core.keys.resolve_api_key", return_value=None):
+        with patch("app.infrastructure.keys.resolve_api_key", return_value=None):
             tools = build_agent_tools(
                 workspace_root=tmp_workspace,
                 user_id=uuid.uuid4(),
@@ -144,7 +144,7 @@ class TestActivationGating:
         )
 
         # resolve_api_key returns None → required key missing → plugin skipped.
-        with patch("app.core.keys.resolve_api_key", return_value=None):
+        with patch("app.infrastructure.keys.resolve_api_key", return_value=None):
             tools = build_agent_tools(
                 workspace_root=tmp_workspace,
                 user_id=uuid.uuid4(),
@@ -174,8 +174,8 @@ class TestActivationGating:
             return "secret-value" if key_name == "NEEDY_API_KEY" else None
 
         with (
-            patch("app.core.keys.resolve_api_key", side_effect=_resolve),
-            patch("app.core.plugins.registry.resolve_api_key", side_effect=_resolve),
+            patch("app.infrastructure.keys.resolve_api_key", side_effect=_resolve),
+            patch("app.agents.plugins.registry.resolve_api_key", side_effect=_resolve),
         ):
             tools = build_agent_tools(
                 workspace_root=tmp_workspace,
@@ -198,7 +198,7 @@ class TestActivationGating:
             )
         )
 
-        with patch("app.core.keys.resolve_api_key", return_value=None):
+        with patch("app.infrastructure.keys.resolve_api_key", return_value=None):
             tools = build_agent_tools(
                 workspace_root=tmp_workspace,
                 user_id=uuid.uuid4(),
@@ -221,7 +221,7 @@ class TestLegacyCallersUnaffected:
             )
         )
 
-        with patch("app.core.keys.resolve_api_key", return_value=None):
+        with patch("app.infrastructure.keys.resolve_api_key", return_value=None):
             tools = build_agent_tools(workspace_root=tmp_workspace)
 
         assert "alpha_tool" not in [t.name for t in tools]
@@ -236,7 +236,7 @@ class TestLegacyCallersUnaffected:
             )
         )
 
-        with patch("app.core.keys.resolve_api_key", return_value=None):
+        with patch("app.infrastructure.keys.resolve_api_key", return_value=None):
             tools = build_agent_tools(workspace_root=tmp_workspace, workspace_id=uuid.uuid4())
 
         assert "alpha_tool" not in [t.name for t in tools]

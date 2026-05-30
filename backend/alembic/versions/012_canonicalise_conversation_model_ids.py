@@ -12,7 +12,7 @@ catalog uses (``catalog.MODEL_CATALOG``). Empty strings become
 ``NULL`` so the validator's ``None`` early-return covers them.
 
 The mapping is hand-rolled (not imported from
-``app.core.providers.catalog``) on purpose: Alembic migrations must
+``app.providers.catalog``) on purpose: Alembic migrations must
 stay runnable even if the catalog module changes shape later. If the
 catalog renames a model the migration still reflects the *historical*
 identifiers that ever existed in the database.

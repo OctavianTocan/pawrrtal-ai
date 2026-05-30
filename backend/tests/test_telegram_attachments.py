@@ -1,4 +1,4 @@
-"""Tests for ``app.integrations.telegram._attachments``.
+"""Tests for ``app.channels.telegram._attachments``.
 
 Closes the actionable parts of #304 + #305: the collect_attachments
 helper turns Telegram :class:`Message` payloads into image inputs +
@@ -21,7 +21,7 @@ from aiogram.types import Message
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(BACKEND_ROOT))
 
-from app.integrations.telegram._attachments import collect_attachments  # noqa: E402
+from app.channels.telegram._attachments import collect_attachments  # noqa: E402
 
 pytestmark = pytest.mark.anyio
 
@@ -101,50 +101,26 @@ async def test_voice_message_without_file_id_emits_metadata_annotation() -> None
     )
 
 
-async def test_voice_message_transcribes_when_backend_configured(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
+async def test_voice_message_emits_metadata_annotation_only() -> None:
+    """Voice transcription was removed in the backend restructure.
+
+    Voice messages now reach the agent as a metadata-only annotation;
+    the four-backend transcriber abstraction (``app.integrations.voice``)
+    is gone. The model sees ``[User sent a voice message …]`` and can
+    ask the user to retype the relevant bits.
+    """
     raw = b"OggS\x00fake-voice"
     message = _make_message(
         voice=SimpleNamespace(duration=4, file_id="voice-id", file_size=len(raw)),
     )
-    bot = _make_bot_with_photo(raw)  # reuse the same download mock
-
-    async def fake_transcribe(_audio_bytes: bytes) -> str:
-        return "hello world"
-
-    fake_transcriber = SimpleNamespace(transcribe=fake_transcribe)
-    monkeypatch.setattr(
-        "app.integrations.voice.resolve_transcriber",
-        lambda: fake_transcriber,
-    )
-
-    attachments = await collect_attachments(message, bot)
-    annotation = next(iter(attachments.text_annotations), "")
-    assert "Transcription: hello world" in annotation
-
-
-async def test_voice_message_transcription_failure_falls_back(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from app.integrations.voice import TranscriptionError
-
-    raw = b"OggS\x00fake-voice"
-    message = _make_message(
-        voice=SimpleNamespace(duration=2, file_id="voice-id", file_size=len(raw)),
-    )
     bot = _make_bot_with_photo(raw)
 
-    async def explode(_audio_bytes: bytes) -> str:
-        raise TranscriptionError("backend down")
-
-    monkeypatch.setattr(
-        "app.integrations.voice.resolve_transcriber",
-        lambda: SimpleNamespace(transcribe=explode),
-    )
-
     attachments = await collect_attachments(message, bot)
-    assert any("Transcription is not available" in line for line in attachments.text_annotations)
+    assert any(
+        "voice message" in annotation.lower() and "4s" in annotation
+        for annotation in attachments.text_annotations
+    )
+    assert all("Transcription:" not in annotation for annotation in attachments.text_annotations)
 
 
 async def test_document_message_without_file_id_falls_back_to_metadata() -> None:
@@ -175,7 +151,7 @@ async def test_document_message_extracts_markdown(monkeypatch: pytest.MonkeyPatc
         return "# Hello\n\nWorld."
 
     monkeypatch.setattr(
-        "app.integrations.telegram._attachments._extract_markdown_from_bytes",
+        "app.channels.telegram._attachments._extract_markdown_from_bytes",
         fake_extract,
     )
 

@@ -13,13 +13,13 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.chat_aggregator import ChatTurnAggregator
-from app.core.config import settings
-from app.core.governance.cost_tracker import (
+from app.chat.aggregator import ChatTurnAggregator
+from app.governance.cost_tracker import (
     PostgresCostLedger,
     record_turn_cost,
 )
-from app.core.providers.model_id import parse_model_id
+from app.infrastructure.config import settings
+from app.providers.model_id import parse_model_id
 
 logger = logging.getLogger(__name__)
 

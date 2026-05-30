@@ -9,11 +9,8 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.core.config import settings
-from app.core.providers.catalog import MODEL_CATALOG, default_model
-from app.core.providers.model_id import Host
-from app.integrations.telegram.model_auth import is_host_authenticated
-from app.integrations.telegram.model_picker import (
+from app.channels.telegram.model_auth import is_host_authenticated
+from app.channels.telegram.model_picker import (
     ModelButton,
     ModelCallback,
     build_default_already_set_keyboard,
@@ -30,7 +27,10 @@ from app.integrations.telegram.model_picker import (
     parse_model_callback_data,
     resolve_model_selection,
 )
-from app.integrations.telegram.sender import TelegramSender
+from app.channels.telegram.sender import TelegramSender
+from app.infrastructure.config import settings
+from app.providers.catalog import MODEL_CATALOG, default_model
+from app.providers.model_id import Host
 
 
 @pytest.fixture(autouse=True)
@@ -241,7 +241,7 @@ async def test_get_model_picker_state_returns_none_for_unbound_sender() -> None:
     sender = TelegramSender(user_id=1, chat_id=1, username=None, full_name=None)
 
     with patch(
-        "app.integrations.telegram.model_picker.get_user_id_for_external",
+        "app.channels.telegram.model_picker.get_user_id_for_external",
         new=AsyncMock(return_value=None),
     ):
         state = await get_model_picker_state(sender=sender, session=AsyncMock())
@@ -257,19 +257,19 @@ async def test_get_model_picker_state_reads_conversation_override() -> None:
 
     with (
         patch(
-            "app.integrations.telegram.model_picker.get_user_id_for_external",
+            "app.channels.telegram.model_picker.get_user_id_for_external",
             new=AsyncMock(return_value=uuid.uuid4()),
         ),
         patch(
-            "app.integrations.telegram.model_picker.get_or_create_telegram_conversation_full",
+            "app.channels.telegram.model_picker.get_or_create_telegram_conversation_full",
             new=AsyncMock(return_value=conversation),
         ),
         patch(
-            "app.integrations.telegram.model_picker.get_user_default_model_id",
+            "app.channels.telegram.model_picker.get_user_default_model_id",
             new=AsyncMock(return_value=None),
         ),
         patch(
-            "app.integrations.telegram.model_picker.resolve_effective_model_id",
+            "app.channels.telegram.model_picker.resolve_effective_model_id",
             new=AsyncMock(return_value=override),
         ),
     ):
@@ -289,19 +289,19 @@ async def test_get_model_picker_state_falls_back_to_user_default() -> None:
 
     with (
         patch(
-            "app.integrations.telegram.model_picker.get_user_id_for_external",
+            "app.channels.telegram.model_picker.get_user_id_for_external",
             new=AsyncMock(return_value=uuid.uuid4()),
         ),
         patch(
-            "app.integrations.telegram.model_picker.get_or_create_telegram_conversation_full",
+            "app.channels.telegram.model_picker.get_or_create_telegram_conversation_full",
             new=AsyncMock(return_value=conversation),
         ),
         patch(
-            "app.integrations.telegram.model_picker.get_user_default_model_id",
+            "app.channels.telegram.model_picker.get_user_default_model_id",
             new=AsyncMock(return_value=user_default),
         ),
         patch(
-            "app.integrations.telegram.model_picker.resolve_effective_model_id",
+            "app.channels.telegram.model_picker.resolve_effective_model_id",
             new=AsyncMock(return_value=user_default),
         ),
     ):
@@ -340,7 +340,7 @@ def test_parse_legacy_list_callback_without_host_returns_none() -> None:
 
 def test_pagination_first_page_omits_prev_button(monkeypatch: pytest.MonkeyPatch) -> None:
     """First page must not emit a < Prev button — taking it produces a stale alert."""
-    import app.integrations.telegram.model_picker as picker_module
+    import app.channels.telegram.model_picker as picker_module
 
     monkeypatch.setattr(picker_module, "_MODEL_PAGE_SIZE", 1)
     rows = build_models_keyboard(
@@ -391,7 +391,7 @@ def test_build_set_default_keyboard_returns_none_for_unknown_model() -> None:
 
 
 def test_build_default_already_set_keyboard_emits_inert_button() -> None:
-    from app.integrations.telegram.model_picker import NOOP_CALLBACK
+    from app.channels.telegram.model_picker import NOOP_CALLBACK
 
     rows = build_default_already_set_keyboard()
     assert rows == [[ModelButton(text="⭐ Already your default", callback_data=NOOP_CALLBACK)]]
@@ -414,7 +414,7 @@ def test_parse_set_default_rejects_stale_catalog_token() -> None:
 
 def test_pagination_last_page_omits_next_button(monkeypatch: pytest.MonkeyPatch) -> None:
     """Last page must not emit a Next > button."""
-    import app.integrations.telegram.model_picker as picker_module
+    import app.channels.telegram.model_picker as picker_module
 
     monkeypatch.setattr(picker_module, "_MODEL_PAGE_SIZE", 1)
     # The catalog currently exposes 19 OpenAI models under LiteLLM

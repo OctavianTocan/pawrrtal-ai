@@ -1,4 +1,4 @@
-"""Unit tests for ``app.core.observability.workshop``.
+"""Unit tests for ``app.infrastructure.observability.workshop``.
 
 The recorders are exercised against an in-memory OTel ``TracerProvider``
 so each test captures the spans that were emitted and asserts on the
@@ -30,10 +30,10 @@ from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from app.core.agent_loop.types import AgentMessage
-from app.core.observability import workshop as workshop_module
-from app.core.observability._recorders import TurnSpanRecorder
-from app.core.observability.workshop import (
+from app.agents.types import AgentMessage
+from app.infrastructure.observability import workshop as workshop_module
+from app.infrastructure.observability._recorders import TurnSpanRecorder
+from app.infrastructure.observability.workshop import (
     llm_span,
     tool_span,
     turn_span,
@@ -378,7 +378,7 @@ def test_event_hook_mirrors_stream_events_onto_recorder(
 
 def test_build_llm_view_messages_renders_history_and_question() -> None:
     """Conversation history flows into the Workshop ``gen_ai.input.messages`` panel."""
-    from app.core.observability._turn_view import build_llm_view_messages
+    from app.infrastructure.observability._turn_view import build_llm_view_messages
 
     rendered = build_llm_view_messages(
         history=[
@@ -402,7 +402,7 @@ def test_build_llm_view_messages_renders_history_and_question() -> None:
 
 def test_build_llm_view_messages_skips_unknown_roles() -> None:
     """Rows with unexpected roles (system, tool) are dropped, not crash-rendered."""
-    from app.core.observability._turn_view import build_llm_view_messages
+    from app.infrastructure.observability._turn_view import build_llm_view_messages
 
     rendered = build_llm_view_messages(
         history=[

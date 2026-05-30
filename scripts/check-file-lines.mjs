@@ -51,6 +51,7 @@ const SKIP_DIRECTORIES = new Set([
 	'packages',
 	'tests',
 	'__tests__',
+	'vendor', // vendored submodules (e.g. backend/vendor/codex) follow their own line conventions
 ]);
 
 /** File extensions we care about. */
@@ -87,9 +88,9 @@ const EXEMPT_PATH_FRAGMENTS = [
 	//   - providers/claude_provider.py → split sandbox/retry/multimodal helpers (PR 05)
 	//   - integrations/telegram/bot.py → split typing-indicator + permission helpers (PR 03 + PR 07)
 	// TODO(pawrrtal-cct follow-up): split these and remove the exemption.
-	'backend/app/core/agent_loop/loop.py',
-	'backend/app/core/providers/claude/provider.py',
-	'backend/app/integrations/telegram/bot.py',
+	'backend/app/agents/loop.py',
+	'backend/app/providers/claude/provider.py',
+	'backend/app/channels/telegram/bot.py',
 	// LCM retrieval lab (PR #258) — two files still over budget. ``evals.py``
 	// is the largest (873 lines: harness + scenarios + answerer + retrievers
 	// all in one) and the natural split is into an ``evals/`` package
@@ -97,8 +98,8 @@ const EXEMPT_PATH_FRAGMENTS = [
 	// storage + semantic + RRF; split semantic vs RRF blender.
 	// TODO(pawrrtal-lcm-split follow-up): land the two splits and
 	// remove this exemption.
-	'backend/app/core/lcm/evals.py',
-	'backend/app/core/lcm/embeddings.py',
+	'backend/app/lcm/evals.py',
+	'backend/app/lcm/embeddings.py',
 	// Gemini CLI ACP client landed at 551 lines on ``development`` after
 	// the structured-stream-logging work in fe43674. The file mixes ACP
 	// handshake, prompt-drive, and stream translation; the natural split
@@ -107,7 +108,7 @@ const EXEMPT_PATH_FRAGMENTS = [
 	// unrelated PRs (e.g. autocomplete) don't pay for the split.
 	// TODO(pawrrtal-gemini-cli-split follow-up): land the split and
 	// remove this exemption.
-	'backend/app/core/providers/gemini_cli/client.py',
+	'backend/app/providers/gemini_cli/client.py',
 	// turn_runner grew past 500 after the active-recall + structured
 	// logging work landed on development. The natural split is to
 	// extract the post-turn hook orchestration (LCM compact, recall,
@@ -118,11 +119,11 @@ const EXEMPT_PATH_FRAGMENTS = [
 	// grew these files past 500. Each has a documented split plan in the
 	// refactor PRs (#394, #403, #409). Exempt until those land.
 	'backend/app/models.py',
-	'backend/app/core/providers/opencode_go_provider.py',
-	'backend/app/core/providers/gemini_provider.py',
+	'backend/app/providers/opencode_go_provider.py',
+	'backend/app/providers/gemini_provider.py',
 	'backend/app/channels/_telegram_dispatch.py',
 	'backend/app/channels/telegram.py',
-	'backend/app/core/agent_loop/types.py',
+	'backend/app/agents/types.py',
 ];
 
 /** Recursively yield every source file under `dir` that we should check. */

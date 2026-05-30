@@ -21,7 +21,7 @@ import pytest
 
 from app.channels.base import ChannelMessage
 from app.channels.telegram import TelegramChannel
-from app.core.providers.base import StreamEvent
+from app.providers.base import StreamEvent
 
 pytestmark = pytest.mark.anyio
 
@@ -50,6 +50,15 @@ def _make_bot() -> AsyncMock:
     bot.delete_message = AsyncMock()
     bot.send_message = AsyncMock(return_value=SimpleNamespace(message_id=777))
     return bot
+
+
+@pytest.fixture(autouse=True)
+def _disable_regenerate_button_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep legacy interleaving assertions independent of developer env flags."""
+    monkeypatch.setattr(
+        "app.channels.telegram.channel.settings.telegram_regenerate_button_enabled",
+        False,
+    )
 
 
 async def test_text_after_thinking_renders_as_new_message() -> None:

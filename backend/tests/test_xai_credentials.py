@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from app.integrations.xai.credentials import (
+from app.providers.xai.credentials import (
     ACCESS_ENV_KEY,
     EXPIRES_AT_ENV_KEY,
     REFRESH_ENV_KEY,
@@ -48,7 +48,7 @@ def test_needs_refresh_returns_false_for_malformed_date() -> None:
 @pytest.mark.anyio
 async def test_resolve_returns_gateway_key_when_no_workspace() -> None:
     """No workspace → fall back to settings.xai_api_key."""
-    with patch("app.integrations.xai.credentials.settings") as mock_settings:
+    with patch("app.providers.xai.credentials.settings") as mock_settings:
         mock_settings.xai_api_key = "gateway-key"
         result = await resolve_xai_credentials(None)
     assert result == "gateway-key"
@@ -57,7 +57,7 @@ async def test_resolve_returns_gateway_key_when_no_workspace() -> None:
 @pytest.mark.anyio
 async def test_resolve_returns_none_when_nothing_configured() -> None:
     """No workspace, no gateway key → None."""
-    with patch("app.integrations.xai.credentials.settings") as mock_settings:
+    with patch("app.providers.xai.credentials.settings") as mock_settings:
         mock_settings.xai_api_key = ""
         result = await resolve_xai_credentials(None)
     assert result is None
@@ -73,9 +73,9 @@ async def test_resolve_prefers_oauth_over_legacy(tmp_path: Path) -> None:
         EXPIRES_AT_ENV_KEY: future_expiry,
     }
     with (
-        patch("app.integrations.xai.credentials.load_workspace_env", return_value=env),
-        patch("app.integrations.xai.credentials.resolve_api_key", return_value="legacy-key"),
-        patch("app.integrations.xai.credentials.settings") as mock_settings,
+        patch("app.providers.xai.credentials.load_workspace_env", return_value=env),
+        patch("app.providers.xai.credentials.resolve_api_key", return_value="legacy-key"),
+        patch("app.providers.xai.credentials.settings") as mock_settings,
     ):
         mock_settings.xai_api_key = "gateway-key"
         result = await resolve_xai_credentials(tmp_path)
@@ -86,9 +86,9 @@ async def test_resolve_prefers_oauth_over_legacy(tmp_path: Path) -> None:
 async def test_resolve_falls_back_to_legacy_when_no_oauth(tmp_path: Path) -> None:
     """No OAuth tokens → use the workspace XAI_API_KEY."""
     with (
-        patch("app.integrations.xai.credentials.load_workspace_env", return_value={}),
-        patch("app.integrations.xai.credentials.resolve_api_key", return_value="legacy-key"),
-        patch("app.integrations.xai.credentials.settings") as mock_settings,
+        patch("app.providers.xai.credentials.load_workspace_env", return_value={}),
+        patch("app.providers.xai.credentials.resolve_api_key", return_value="legacy-key"),
+        patch("app.providers.xai.credentials.settings") as mock_settings,
     ):
         mock_settings.xai_api_key = "gateway-key"
         result = await resolve_xai_credentials(tmp_path)
