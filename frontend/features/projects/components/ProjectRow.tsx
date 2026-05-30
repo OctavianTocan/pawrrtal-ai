@@ -24,6 +24,10 @@ export interface ProjectRowProps {
 	onConversationDrop: (conversationId: string) => void;
 }
 
+function acceptsConversation(event: React.DragEvent<HTMLElement>): boolean {
+	return Array.from(event.dataTransfer.types).includes(CONVERSATION_DRAG_MIME);
+}
+
 /**
  * Single project row in the sidebar's Projects list.
  *
@@ -47,10 +51,6 @@ export function ProjectRow({
 	onConversationDrop,
 }: ProjectRowProps): React.JSX.Element {
 	const [isDropTarget, setIsDropTarget] = useState(false);
-
-	const acceptsConversation = (event: React.DragEvent<HTMLElement>): boolean => {
-		return Array.from(event.dataTransfer.types).includes(CONVERSATION_DRAG_MIME);
-	};
 
 	const handleDragEnter = (event: React.DragEvent<HTMLElement>): void => {
 		if (!acceptsConversation(event)) return;
