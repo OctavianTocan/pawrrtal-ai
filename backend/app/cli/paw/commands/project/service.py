@@ -15,9 +15,16 @@ from urllib.parse import urlparse
 
 import typer
 
+from app.cli.paw.commands.project.service_tailscale import (
+    DEFAULT_TAILSCALE_HTTPS_PORT,
+    TAILSCALE_ROUTES,
+    serve_port_has_config,
+    tailscale_origin_label,
+    tailscale_public_origin,
+    tailscale_self_dns_name,
+)
 from app.cli.paw.commands.project.state import (
     DEFAULT_BACKEND_URL,
-    DEFAULT_FRONTEND_URL,
     repo_root,
     service_state_path,
 )
@@ -30,12 +37,7 @@ SERVICE_NAME = "pawrrtal-dev.service"
 TAILSCALE_PROFILE = "tailscale"
 TAILSCALE_SERVICE_NAME = "pawrrtal-dev-tailscale.service"
 SERVICE_STATE_SCHEMA_VERSION = 1
-TAILSCALE_ROUTES = (
-    ("/", DEFAULT_FRONTEND_URL),
-    ("/api/v1", DEFAULT_BACKEND_URL),
-    ("/auth", DEFAULT_BACKEND_URL),
-    ("/users", DEFAULT_BACKEND_URL),
-)
+ROUTE_FIELD_COUNT = 2
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +49,7 @@ class ServiceProfileState:
     service_name: str
     installed_at: str
     tailscale_host: str | None = None
+    tailscale_port: int = DEFAULT_TAILSCALE_HTTPS_PORT
     public_url: str | None = None
     routes: tuple[tuple[str, str], ...] = ()
 
@@ -96,14 +99,19 @@ def _systemd_env_line(name: str, value: str) -> str:
     return f'Environment="{name}={escaped}"'
 
 
-def _unit_text(*, profile: str = "local", tailscale_host: str | None = None) -> str:
+def _unit_text(
+    *,
+    profile: str = "local",
+    tailscale_host: str | None = None,
+    tailscale_port: int = DEFAULT_TAILSCALE_HTTPS_PORT,
+) -> str:
     """Render the user service unit for the current checkout."""
     bun = _require_binary("bun")
     root = repo_root()
     cache_root = root / ".cache"
     path = os.environ.get("PATH", "")
     dev_database_url = os.environ.get("PAWRRTAL_DEV_DATABASE_URL", "")
-    public_origin = f"https://{tailscale_host}" if tailscale_host else ""
+    public_origin = tailscale_public_origin(tailscale_host, tailscale_port)
     env_lines = [
         _systemd_env_line("PATH", path),
         _systemd_env_line("UV_CACHE_DIR", str(cache_root / "uv")),
@@ -116,7 +124,7 @@ def _unit_text(*, profile: str = "local", tailscale_host: str | None = None) -> 
             [
                 _systemd_env_line("NEXT_PUBLIC_BROWSER_API_BASE", ""),
                 _systemd_env_line("BACKEND_INTERNAL_URL", DEFAULT_BACKEND_URL),
-                _systemd_env_line("NEXT_ALLOWED_DEV_ORIGINS", public_origin),
+                _systemd_env_line("NEXT_ALLOWED_DEV_ORIGINS", tailscale_host or ""),
                 _systemd_env_line(
                     "GOOGLE_OAUTH_REDIRECT_URI",
                     f"{public_origin}/api/v1/auth/oauth/google/callback",
@@ -231,9 +239,24 @@ def _load_service_state(profile: str) -> ServiceProfileState | None:
         service_name=str(raw.get("service_name", _service_name(profile))),
         installed_at=str(raw.get("installed_at", "")),
         tailscale_host=raw.get("tailscale_host"),
+        tailscale_port=int(raw.get("tailscale_port", DEFAULT_TAILSCALE_HTTPS_PORT)),
         public_url=raw.get("public_url"),
-        routes=tuple(tuple(route) for route in raw.get("routes", [])),
+        routes=_load_routes(raw.get("routes", [])),
     )
+
+
+def _load_routes(raw_routes: object) -> tuple[tuple[str, str], ...]:
+    """Return valid persisted ``(path, target)`` route tuples."""
+    if not isinstance(raw_routes, list):
+        return ()
+    routes: list[tuple[str, str]] = []
+    for route in raw_routes:
+        if not isinstance(route, list | tuple) or len(route) != ROUTE_FIELD_COUNT:
+            continue
+        path_prefix, target = route
+        if isinstance(path_prefix, str) and isinstance(target, str):
+            routes.append((path_prefix, target))
+    return tuple(routes)
 
 
 def _save_service_state(profile: str, state: ServiceProfileState) -> None:
@@ -248,7 +271,7 @@ def _delete_service_state(profile: str) -> None:
     service_state_path(profile).unlink(missing_ok=True)
 
 
-def _preflight_tailscale_profile(hostname: str) -> None:
+def _preflight_tailscale_profile(hostname: str, port: int) -> None:
     """Validate Tailscale Serve can be safely owned by Pawrrtal."""
     if os.environ.get("BACKEND_API_KEY"):
         raise LocalError(
@@ -256,29 +279,24 @@ def _preflight_tailscale_profile(hostname: str) -> None:
             hint="Use Tailscale ACLs plus Pawrrtal login for this private profile.",
         )
     _require_binary("tailscale")
-    _tailscale_json("status", "--json")
-    status = _tailscale_json("serve", "status", "--json")
-    if _serve_status_has_config(status) and _load_service_state(TAILSCALE_PROFILE) is None:
+    status = _tailscale_json("status", "--json")
+    self_dns_name = tailscale_self_dns_name(status)
+    if self_dns_name != hostname:
+        hint = f"This node is {self_dns_name}." if self_dns_name else None
+        raise LocalError("--tailscale-host must match this Tailscale node.", hint=hint)
+    serve_status = _tailscale_json("serve", "status", "--json")
+    has_owned_state = _load_service_state(TAILSCALE_PROFILE) is not None
+    if serve_port_has_config(serve_status, hostname=hostname, port=port) and not has_owned_state:
         raise LocalError(
-            "Tailscale Serve already has configuration not owned by Pawrrtal.",
-            hint="Inspect `tailscale serve status --json` before installing this profile.",
+            "Tailscale Serve already has configuration on the requested Pawrrtal origin.",
+            hint=(
+                f"Inspect `tailscale serve status --json` or choose another "
+                f"`--tailscale-port` for {tailscale_origin_label(hostname, port)}."
+            ),
         )
-    if not hostname.endswith(".ts.net"):
-        raise LocalError("--tailscale-host must be a .ts.net hostname.")
 
 
-def _serve_status_has_config(value: object) -> bool:
-    """Return true when Tailscale Serve status contains non-empty config."""
-    if value in (None, False, "", 0):
-        return False
-    if isinstance(value, dict):
-        return any(_serve_status_has_config(child) for child in value.values())
-    if isinstance(value, list):
-        return any(_serve_status_has_config(child) for child in value)
-    return True
-
-
-def _apply_tailscale_routes() -> None:
+def _apply_tailscale_routes(port: int) -> None:
     """Publish local loopback services through Tailscale Serve path routes."""
     for path_prefix, target in TAILSCALE_ROUTES:
         _run_tailscale(
@@ -286,20 +304,20 @@ def _apply_tailscale_routes() -> None:
             "--bg",
             "--yes",
             "--https",
-            "443",
+            str(port),
             "--set-path",
             path_prefix,
             target,
         )
 
 
-def _clear_tailscale_routes() -> None:
+def _clear_tailscale_routes(port: int) -> None:
     """Remove Pawrrtal-owned Tailscale Serve path routes."""
     for path_prefix, _target in reversed(TAILSCALE_ROUTES):
         _run_tailscale(
             "serve",
             "--https",
-            "443",
+            str(port),
             "--set-path",
             path_prefix,
             "off",
@@ -317,6 +335,13 @@ def install(
         "--tailscale-host",
         help="Tailscale HTTPS hostname for --profile tailscale, e.g. host.tailnet.ts.net.",
     ),
+    tailscale_port: int = typer.Option(
+        DEFAULT_TAILSCALE_HTTPS_PORT,
+        "--tailscale-port",
+        min=1,
+        max=65535,
+        help="Tailscale HTTPS port for --profile tailscale.",
+    ),
     linger: bool = typer.Option(
         False,
         "--linger",
@@ -328,10 +353,13 @@ def install(
     hostname = _normalize_tailscale_host(tailscale_host) if profile == TAILSCALE_PROFILE else None
     _preflight_systemd()
     if hostname is not None:
-        _preflight_tailscale_profile(hostname)
+        _preflight_tailscale_profile(hostname, tailscale_port)
     unit_path = _unit_path(profile)
     unit_path.parent.mkdir(parents=True, exist_ok=True)
-    unit_path.write_text(_unit_text(profile=profile, tailscale_host=hostname), encoding="utf-8")
+    unit_path.write_text(
+        _unit_text(profile=profile, tailscale_host=hostname, tailscale_port=tailscale_port),
+        encoding="utf-8",
+    )
     _systemctl("daemon-reload")
     service_name = _service_name(profile)
     if enable:
@@ -342,7 +370,8 @@ def install(
     elif now:
         _systemctl("start", service_name)
     if hostname is not None:
-        _apply_tailscale_routes()
+        _apply_tailscale_routes(tailscale_port)
+        public_origin = tailscale_public_origin(hostname, tailscale_port)
         _save_service_state(
             profile,
             ServiceProfileState(
@@ -351,7 +380,8 @@ def install(
                 service_name=service_name,
                 installed_at=datetime.now(UTC).isoformat(),
                 tailscale_host=hostname,
-                public_url=f"https://{hostname}/",
+                tailscale_port=tailscale_port,
+                public_url=f"{public_origin}/",
                 routes=TAILSCALE_ROUTES,
             ),
         )
@@ -368,8 +398,9 @@ def uninstall(
     profile = _normalize_profile(profile)
     service_name = _service_name(profile)
     _systemctl("disable", "--now", service_name)
-    if profile == TAILSCALE_PROFILE and _load_service_state(profile) is not None:
-        _clear_tailscale_routes()
+    state = _load_service_state(profile)
+    if profile == TAILSCALE_PROFILE and state is not None:
+        _clear_tailscale_routes(state.tailscale_port)
         _delete_service_state(profile)
     unit_path = _unit_path(profile)
     unit_path.unlink(missing_ok=True)

@@ -16,6 +16,7 @@ from typer.testing import CliRunner
 import app.cli.paw.commands.project.service as service_module
 from app.cli.paw import config as paw_config
 from app.cli.paw.commands.project import cli as project_module
+from app.cli.paw.commands.project import service_tailscale
 from app.cli.paw.commands.project.preflight import PreflightCheck
 from app.cli.paw.commands.project.state import PROJECT_STATE_SCHEMA_VERSION, repo_root
 from app.cli.paw.main import app
@@ -429,7 +430,13 @@ def test_project_service_install_tailscale_profile_configures_owned_routes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """The Tailscale profile writes profile env and applies owned Serve routes."""
-    monkeypatch.setattr(service_module, "_tailscale_json", lambda *_args: {})
+
+    def fake_tailscale_json(*args: str) -> dict[str, Any]:
+        if args == ("status", "--json"):
+            return {"Self": {"DNSName": "pawrrtal.example.ts.net."}}
+        return {}
+
+    monkeypatch.setattr(service_module, "_tailscale_json", fake_tailscale_json)
 
     result = runner.invoke(
         app,
@@ -441,6 +448,8 @@ def test_project_service_install_tailscale_profile_configures_owned_routes(
             "tailscale",
             "--tailscale-host",
             "pawrrtal.example.ts.net",
+            "--tailscale-port",
+            "7447",
         ],
     )
 
@@ -449,12 +458,13 @@ def test_project_service_install_tailscale_profile_configures_owned_routes(
     unit = unit_path.read_text()
     assert 'Environment="NEXT_PUBLIC_BROWSER_API_BASE="' in unit
     assert 'Environment="BACKEND_INTERNAL_URL=http://127.0.0.1:8000"' in unit
+    assert 'Environment="NEXT_ALLOWED_DEV_ORIGINS=pawrrtal.example.ts.net"' in unit
     assert (
-        'Environment="GOOGLE_OAUTH_REDIRECT_URI=https://pawrrtal.example.ts.net/api/v1/auth/oauth/google/callback"'
+        'Environment="GOOGLE_OAUTH_REDIRECT_URI=https://pawrrtal.example.ts.net:7447/api/v1/auth/oauth/google/callback"'
         in unit
     )
     assert (
-        'Environment="APPLE_OAUTH_REDIRECT_URI=https://pawrrtal.example.ts.net/api/v1/auth/oauth/apple/callback"'
+        'Environment="APPLE_OAUTH_REDIRECT_URI=https://pawrrtal.example.ts.net:7447/api/v1/auth/oauth/apple/callback"'
         in unit
     )
     assert [
@@ -463,7 +473,7 @@ def test_project_service_install_tailscale_profile_configures_owned_routes(
         "--bg",
         "--yes",
         "--https",
-        "443",
+        "7447",
         "--set-path",
         "/",
         "http://localhost:53001",
@@ -474,14 +484,14 @@ def test_project_service_install_tailscale_profile_configures_owned_routes(
         "--bg",
         "--yes",
         "--https",
-        "443",
+        "7447",
         "--set-path",
-        "/api/v1",
-        "http://127.0.0.1:8000",
+        "/api/v1/",
+        "http://127.0.0.1:8000/api/v1/",
     ] in fake_systemd
     state_path = paw_config.profile_dir("tailscale") / "project-service.json"
     state = json.loads(state_path.read_text())
-    assert state["public_url"] == "https://pawrrtal.example.ts.net/"
+    assert state["public_url"] == "https://pawrrtal.example.ts.net:7447/"
 
 
 def test_project_service_install_tailscale_refuses_existing_unowned_serve_config(
@@ -492,8 +502,14 @@ def test_project_service_install_tailscale_refuses_existing_unowned_serve_config
     """Existing unowned Tailscale Serve config is a hard stop."""
 
     def fake_tailscale_json(*args: str) -> dict[str, Any]:
+        if args == ("status", "--json"):
+            return {"Self": {"DNSName": "pawrrtal.example.ts.net."}}
         if args == ("serve", "status", "--json"):
-            return {"HTTPS": {"443": {"Handlers": {"/": {"Proxy": "http://other"}}}}}
+            return {
+                "Web": {
+                    "pawrrtal.example.ts.net:443": {"Handlers": {"/": {"Proxy": "http://other"}}}
+                }
+            }
         return {}
 
     monkeypatch.setattr(service_module, "_tailscale_json", fake_tailscale_json)
@@ -512,6 +528,38 @@ def test_project_service_install_tailscale_refuses_existing_unowned_serve_config
     )
 
     assert result.exit_code == 1
+    assert not any(call[:3] == ["tailscale", "serve", "--bg"] for call in fake_systemd)
+
+
+def test_project_service_install_tailscale_rejects_other_node_host(
+    runner: CliRunner,
+    fake_systemd: list[list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The Tailscale profile only installs for the current node's MagicDNS host."""
+
+    def fake_tailscale_json(*args: str) -> dict[str, Any]:
+        if args == ("status", "--json"):
+            return {"Self": {"DNSName": "openclaw-vps.example.ts.net."}}
+        return {}
+
+    monkeypatch.setattr(service_module, "_tailscale_json", fake_tailscale_json)
+
+    result = runner.invoke(
+        app,
+        [
+            "project",
+            "service",
+            "install",
+            "--profile",
+            "tailscale",
+            "--tailscale-host",
+            "pawrrtal.example.ts.net",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert isinstance(result.exception, SystemExit)
     assert not any(call[:3] == ["tailscale", "serve", "--bg"] for call in fake_systemd)
 
 
@@ -535,8 +583,9 @@ def test_project_service_uninstall_tailscale_removes_owned_paths_only(
                 "service_name": "pawrrtal-dev-tailscale.service",
                 "installed_at": "2026-05-30T00:00:00+00:00",
                 "tailscale_host": "pawrrtal.example.ts.net",
-                "public_url": "https://pawrrtal.example.ts.net/",
-                "routes": [],
+                "tailscale_port": 7447,
+                "public_url": "https://pawrrtal.example.ts.net:7447/",
+                "routes": [list(route) for route in service_tailscale.TAILSCALE_ROUTES],
             }
         )
     )
@@ -547,14 +596,14 @@ def test_project_service_uninstall_tailscale_removes_owned_paths_only(
     assert not unit_path.exists()
     assert not (state_dir / "project-service.json").exists()
     assert ["tailscale", "serve", "reset"] not in fake_systemd
-    assert ["tailscale", "serve", "--https", "443", "--set-path", "/", "off"] in fake_systemd
+    assert ["tailscale", "serve", "--https", "7447", "--set-path", "/", "off"] in fake_systemd
     assert [
         "tailscale",
         "serve",
         "--https",
-        "443",
+        "7447",
         "--set-path",
-        "/api/v1",
+        "/api/v1/",
         "off",
     ] in fake_systemd
 

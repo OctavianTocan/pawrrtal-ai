@@ -77,12 +77,15 @@ function readBackendConfig(): BackendConfig {
 }
 
 /**
- * True when the runtime backend config has been explicitly configured in this
- * browser profile. This is the authoritative readiness signal for onboarding.
+ * True when the active browser API target is usable without asking the user for
+ * more configuration. Same-origin deployments intentionally use an empty base.
  */
 export function hasBackendConfig(): boolean {
 	const config = readStoredBackendConfig();
-	return Boolean(config?.url && config.url.trim());
+	if (config) {
+		return Boolean(config.url.trim());
+	}
+	return BROWSER_API_BASE_URL.trim().length > 0 || BROWSER_API_BASE_URL === '';
 }
 
 /** Stable identifier for the active backend target. */

@@ -120,6 +120,32 @@ async def test_webhook_requires_configured_secret(
     assert exc_info.value.status_code == 403
 
 
+async def test_webhook_returns_404_without_service(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Webhook route stays hidden when no Telegram service is registered."""
+    monkeypatch.setattr(settings, "telegram_mode", "webhook")
+    monkeypatch.setattr(settings, "telegram_webhook_secret", "expected-secret")
+
+    with pytest.raises(HTTPException) as exc_info:
+        _ensure_telegram_webhook_enabled(None, "expected-secret")
+
+    assert exc_info.value.status_code == 404
+
+
+async def test_webhook_returns_404_outside_webhook_mode(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Polling-mode deployments do not expose the Telegram webhook route."""
+    monkeypatch.setattr(settings, "telegram_mode", "polling")
+    monkeypatch.setattr(settings, "telegram_webhook_secret", "expected-secret")
+
+    with pytest.raises(HTTPException) as exc_info:
+        _ensure_telegram_webhook_enabled(object(), "expected-secret")
+
+    assert exc_info.value.status_code == 404
+
+
 async def test_webhook_rejects_bad_secret(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -131,6 +157,16 @@ async def test_webhook_rejects_bad_secret(
         _ensure_telegram_webhook_enabled(object(), "wrong")
 
     assert exc_info.value.status_code == 403
+
+
+async def test_webhook_accepts_matching_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A configured webhook deployment accepts the exact Telegram secret."""
+    monkeypatch.setattr(settings, "telegram_mode", "webhook")
+    monkeypatch.setattr(settings, "telegram_webhook_secret", "expected-secret")
+
+    _ensure_telegram_webhook_enabled(object(), "expected-secret")
 
 
 async def test_redeem_via_start_handler_creates_binding(

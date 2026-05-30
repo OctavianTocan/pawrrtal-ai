@@ -17,6 +17,32 @@ const OAUTH_START_URLS = {
 	apple: '/api/v1/auth/oauth/apple/start',
 } as const;
 
+type OAuthProvider = keyof typeof OAUTH_START_URLS;
+
+interface SsoButtonProps {
+	disabled: boolean;
+	icon: React.ReactNode;
+	label: string;
+	provider: OAuthProvider;
+}
+
+function SsoButton({ disabled, icon, label, provider }: SsoButtonProps): React.JSX.Element {
+	return (
+		<Button
+			className="cursor-pointer gap-2"
+			disabled={disabled}
+			onClick={() => {
+				window.location.href = getBrowserApiUrl(OAUTH_START_URLS[provider]);
+			}}
+			type="button"
+			variant="outline"
+		>
+			{icon}
+			{label}
+		</Button>
+	);
+}
+
 export interface LoginFormViewProps extends Omit<React.ComponentProps<'div'>, 'onSubmit'> {
 	/** Unique ID prefix for form field elements. */
 	emailId: string;
@@ -154,34 +180,18 @@ export function LoginFormView({
 								 * "not configured" message otherwise — see
 								 * backend/app/api/oauth.py.
 								 */}
-								<Button
-									className="cursor-pointer gap-2"
+								<SsoButton
 									disabled={isLoading}
-									onClick={() => {
-										window.location.href = getBrowserApiUrl(
-											OAUTH_START_URLS.google
-										);
-									}}
-									type="button"
-									variant="outline"
-								>
-									<GoogleIcon className="size-4" />
-									Continue with Google
-								</Button>
-								<Button
-									className="cursor-pointer gap-2"
+									icon={<GoogleIcon className="size-4" />}
+									label="Continue with Google"
+									provider="google"
+								/>
+								<SsoButton
 									disabled={isLoading}
-									onClick={() => {
-										window.location.href = getBrowserApiUrl(
-											OAUTH_START_URLS.apple
-										);
-									}}
-									type="button"
-									variant="outline"
-								>
-									<AppleIcon className="size-4" />
-									Continue with Apple
-								</Button>
+									icon={<AppleIcon className="size-4" />}
+									label="Continue with Apple"
+									provider="apple"
+								/>
 								<FieldDescription className="text-center">
 									Don&apos;t have an account? <Link href="/signup">Sign up</Link>
 								</FieldDescription>

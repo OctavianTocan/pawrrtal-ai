@@ -284,7 +284,7 @@ just paw project service logs --follow
 just paw project service uninstall
 
 # Optional private Tailscale HTTPS profile:
-just paw project service install --profile tailscale --tailscale-host <host.tailnet.ts.net>
+just paw project service install --profile tailscale --tailscale-host <host.tailnet.ts.net> --tailscale-port 7447
 just paw project service status --profile tailscale
 just paw project service uninstall --profile tailscale
 
@@ -297,7 +297,7 @@ Before changing startup code, run `just env-check`. It catches missing binaries,
 
 The service helper writes `~/.config/systemd/user/pawrrtal-dev.service` and manages it through `systemctl --user`. It uses the same `dev.ts` orchestrator as `just dev`, defaults to the local SQLite database, and preserves `PAWRRTAL_DEV_DATABASE_URL` when you intentionally want a non-SQLite dev database.
 
-The Tailscale profile writes `pawrrtal-dev-tailscale.service`, keeps Next.js and FastAPI bound to loopback, and publishes one private HTTPS origin through Tailscale Serve. Browser API calls go same-origin through that URL; server-side Next.js fetches still use `BACKEND_INTERNAL_URL=http://127.0.0.1:8000`. The profile refuses existing unowned Serve config instead of overwriting it. It is intended for private tailnet use, not public Funnel exposure.
+The Tailscale profile writes `pawrrtal-dev-tailscale.service`, keeps Next.js and FastAPI bound to loopback, and publishes one private HTTPS origin through Tailscale Serve. Use `--tailscale-port` when port 443 is already serving another local tool. Browser API calls go same-origin through that URL; server-side Next.js fetches still use `BACKEND_INTERNAL_URL=http://127.0.0.1:8000`. The profile refuses existing unowned Serve config on the requested origin instead of overwriting it. It is intended for private tailnet use, not public Funnel exposure.
 
 ### Docker
 
@@ -358,7 +358,6 @@ CORS_ORIGIN_REGEX=^https:\/\/.*\.vercel\.app$
 COOKIE_DOMAIN=
 COOKIE_SAMESITE=lax
 COOKIE_SECURE=false
-BACKEND_INTERNAL_URL=http://127.0.0.1:8000
 
 # Channels: Telegram
 TELEGRAM_BOT_TOKEN=
@@ -447,6 +446,12 @@ OTEL_EXPORTER_OTLP_HEADERS=
 # Dev admin login, disabled when ENV=prod
 ADMIN_EMAIL=admin@pawrrtal-ai.dev
 ADMIN_PASSWORD=admin1234
+```
+
+Next.js server-only fetches use `BACKEND_INTERNAL_URL` when the frontend needs to reach the backend through a private loopback or service-network URL. Set it in the frontend/server runtime, not in the FastAPI backend environment:
+
+```bash
+BACKEND_INTERNAL_URL=http://127.0.0.1:8000
 ```
 
 ### Per-workspace API keys

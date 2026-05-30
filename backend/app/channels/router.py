@@ -12,6 +12,7 @@ when those adapters land.
 
 from __future__ import annotations
 
+import secrets
 from typing import Any, Protocol, cast
 from urllib.parse import quote
 
@@ -74,7 +75,7 @@ def _ensure_telegram_webhook_enabled(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Telegram webhook secret is required.",
         )
-    if secret_token != settings.telegram_webhook_secret:
+    if not secrets.compare_digest(secret_token or "", settings.telegram_webhook_secret):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Bad webhook secret.",

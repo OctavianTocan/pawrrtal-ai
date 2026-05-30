@@ -25,14 +25,15 @@ export default async function ConversationPage({ params }: ConversationPageProps
 	// (e.g., switching to a database-backed session).
 	const [{ conversationId }, cookieStore] = await Promise.all([params, cookies()]);
 	const sessionToken = cookieStore.get('session_token');
+	const headers = new Headers({ 'content-type': 'application/json' });
+	if (sessionToken?.value) {
+		headers.set('Cookie', `session_token=${sessionToken.value}`);
+	}
 
 	const response = await serverApiFetch(API_ENDPOINTS.conversations.getMessages(conversationId), {
 		cache: 'no-store',
 		method: 'GET',
-		headers: {
-			'content-type': 'application/json',
-			Cookie: `session_token=${sessionToken?.value}`,
-		},
+		headers,
 	});
 
 	// Uses Next.js experimental authInterrupts feature.

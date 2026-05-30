@@ -265,11 +265,13 @@ export function StepServer({ profile, onPatch, onContinue }: StepServerProps): R
 			});
 			if (res.ok) {
 				dispatchStepServer({ type: 'verification-succeeded' });
+				dispatchStepServer({ type: 'verification-stopped' });
 			} else {
 				dispatchStepServer({
 					type: 'verification-failed',
 					message: `Server responded with HTTP ${res.status}. Check the URL and try again.`,
 				});
+				dispatchStepServer({ type: 'verification-stopped' });
 			}
 		} catch {
 			dispatchStepServer({
@@ -277,7 +279,6 @@ export function StepServer({ profile, onPatch, onContinue }: StepServerProps): R
 				message:
 					'Could not reach the server. Check the URL, your network, or the server logs.',
 			});
-		} finally {
 			dispatchStepServer({ type: 'verification-stopped' });
 		}
 	}, [url]);

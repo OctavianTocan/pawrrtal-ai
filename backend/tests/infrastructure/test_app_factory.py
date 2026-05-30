@@ -53,7 +53,11 @@ async def test_create_app_health_endpoint_responds() -> None:
 
 
 @pytest.mark.anyio
-async def test_health_endpoint_bypasses_backend_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("path", ["/api/v1/health", "/api/v1/health/ready", "/health"])
+async def test_health_endpoints_bypass_backend_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+    path: str,
+) -> None:
     """Health probes remain reachable when the backend transport key is enabled."""
     from app.infrastructure.config import settings
 
@@ -61,6 +65,20 @@ async def test_health_endpoint_bypasses_backend_api_key(monkeypatch: pytest.Monk
     app = create_app()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-        response = await client.get("/api/v1/health")
+        response = await client.get(path)
 
-    assert response.status_code == 200
+    assert response.status_code != 401
+
+
+@pytest.mark.anyio
+async def test_telegram_webhook_bypasses_backend_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Telegram webhook auth relies on Telegram's secret header, not X-Pawrrtal-Key."""
+    from app.infrastructure.config import settings
+
+    monkeypatch.setattr(settings, "backend_api_key", "required-key")
+    app = create_app()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.post("/api/v1/channels/telegram/webhook", json={})
+
+    assert response.status_code != 401

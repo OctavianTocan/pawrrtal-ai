@@ -17,6 +17,13 @@ describe('apiFetch URL resolution', (): void => {
 		expect(fetch).toHaveBeenCalledWith('/api/v1/health', undefined);
 	});
 
+	it('treats same-origin browser API defaults as configured', async (): Promise<void> => {
+		vi.stubEnv('NEXT_PUBLIC_BROWSER_API_BASE', '');
+		const { hasBackendConfig } = await import('./api');
+
+		expect(hasBackendConfig()).toBe(true);
+	});
+
 	it('keeps legacy absolute local defaults when no same-origin base is configured', async (): Promise<void> => {
 		vi.stubEnv('NEXT_PUBLIC_API_URL', 'http://localhost:8000');
 		const { apiFetch } = await import('./api');

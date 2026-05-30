@@ -35,6 +35,7 @@ import {
 } from './handlers/fs';
 import { handleShellKill, handleShellRun, handleShellSpawnStreaming } from './handlers/shell';
 import { getMode, resolvePrompt, setMode, setPromptFn } from './permissions';
+import { resolveRemoteAppUrl } from './remote-url';
 import { type StartedServer, startNextServer } from './server';
 import { createStore } from './store';
 import { addRoot, ensureDefaultWorkspaceRoot, listRoots, removeRoot } from './workspace';
@@ -63,18 +64,6 @@ const savedWindow = windowStore.get('window');
 // Mutable references — assigned after the Next.js server is ready.
 let win: BrowserWindow<PawrrtalRPCType> | undefined;
 let server: StartedServer | undefined;
-
-function resolveRemoteAppUrl(value: string | undefined): string | null {
-	if (!value) return null;
-	const parsed = new URL(value);
-	if (parsed.protocol !== 'https:') {
-		throw new Error('PAWRRTAL_REMOTE_URL must be an https:// URL.');
-	}
-	if (parsed.hostname === 'localhost' || parsed.hostname.endsWith('.localhost')) {
-		throw new Error('PAWRRTAL_REMOTE_URL cannot point at localhost.');
-	}
-	return parsed.origin;
-}
 
 // ─── RPC definition (replaces ipc.ts + preload.ts) ───────────────────────────
 
