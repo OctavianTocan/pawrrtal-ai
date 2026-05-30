@@ -17,11 +17,18 @@ describe('apiFetch URL resolution', (): void => {
 		expect(fetch).toHaveBeenCalledWith('/api/v1/health', undefined);
 	});
 
-	it('treats same-origin browser API defaults as configured', async (): Promise<void> => {
+	it('treats explicit same-origin browser config as configured', async (): Promise<void> => {
 		vi.stubEnv('NEXT_PUBLIC_BROWSER_API_BASE', '');
+		const { hasBackendConfig, saveBackendConfig } = await import('./api');
+
+		saveBackendConfig({ url: window.location.origin, apiKey: '' });
+		expect(hasBackendConfig()).toBe(true);
+	});
+
+	it('does not treat the implicit localhost fallback as configured', async (): Promise<void> => {
 		const { hasBackendConfig } = await import('./api');
 
-		expect(hasBackendConfig()).toBe(true);
+		expect(hasBackendConfig()).toBe(false);
 	});
 
 	it('keeps legacy absolute local defaults when no same-origin base is configured', async (): Promise<void> => {

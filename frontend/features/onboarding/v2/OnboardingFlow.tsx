@@ -59,7 +59,7 @@ export const ONBOARDING_COMPLETE_STORAGE_KEY = 'pawrrtal:onboarding-v2-complete'
 
 /** Wizard step IDs in render order. */
 const STEP_IDS = ['identity', 'server', 'context', 'personality', 'messaging'] as const;
-type StepId = (typeof STEP_IDS)[number];
+export type StepId = (typeof STEP_IDS)[number];
 
 interface OnboardingFlowState {
 	open: boolean;
@@ -170,6 +170,8 @@ function finishOnboarding(dispatch: React.Dispatch<OnboardingFlowAction>): void 
 export interface OnboardingFlowProps {
 	/** Open on first mount. Defaults to false (event-driven). */
 	initialOpen?: boolean;
+	/** Step shown when the flow opens on first mount. Defaults to identity. */
+	initialStep?: StepId;
 	/** Listen for the OPEN_ONBOARDING_FLOW_EVENT to open. Defaults to true. */
 	listenForOpenEvent?: boolean;
 }
@@ -188,6 +190,7 @@ export interface OnboardingFlowProps {
  */
 export function OnboardingFlow({
 	initialOpen = false,
+	initialStep = 'identity',
 	listenForOpenEvent = true,
 }: OnboardingFlowProps): React.JSX.Element {
 	// The reducer initializer reads the E2E skip flag exactly once on mount.
@@ -207,7 +210,7 @@ export function OnboardingFlow({
 		(): OnboardingFlowState => ({
 			open: shouldInitiallyOpenFlow(initialOpen),
 			profile: loadPersonalizationProfile(),
-			step: 'identity',
+			step: initialStep,
 		})
 	);
 	const { open, profile, step } = flowState;

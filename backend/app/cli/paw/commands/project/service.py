@@ -124,7 +124,10 @@ def _unit_text(
             [
                 _systemd_env_line("NEXT_PUBLIC_BROWSER_API_BASE", ""),
                 _systemd_env_line("BACKEND_INTERNAL_URL", DEFAULT_BACKEND_URL),
-                _systemd_env_line("NEXT_ALLOWED_DEV_ORIGINS", tailscale_host or ""),
+                _systemd_env_line(
+                    "NEXT_ALLOWED_DEV_ORIGINS",
+                    ",".join(origin for origin in [tailscale_host, "127.0.0.1"] if origin),
+                ),
                 _systemd_env_line(
                     "GOOGLE_OAUTH_REDIRECT_URI",
                     f"{public_origin}/api/v1/auth/oauth/google/callback",

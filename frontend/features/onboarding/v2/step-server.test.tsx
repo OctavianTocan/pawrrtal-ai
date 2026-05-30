@@ -31,6 +31,10 @@ function renderStep(overrides: Partial<Parameters<typeof StepServer>[0]> = {}) {
 // ---------------------------------------------------------------------------
 
 describe('StepServer', () => {
+	beforeEach(() => {
+		window.localStorage.clear();
+	});
+
 	describe('initial render', () => {
 		it('defaults to hosted mode when profile has no remoteServerUrl', () => {
 			renderStep();
@@ -75,6 +79,7 @@ describe('StepServer', () => {
 			fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
 			expect(onPatch).toHaveBeenCalledWith({ remoteServerUrl: '' });
 			expect(onContinue).toHaveBeenCalled();
+			expect(window.localStorage.getItem('pawrrtal:backend-config')).toBeTruthy();
 		});
 
 		it('is disabled when self-hosted mode has an empty URL', () => {

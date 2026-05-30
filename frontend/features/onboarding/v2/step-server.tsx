@@ -5,7 +5,7 @@ import type * as React from 'react';
 import { useCallback, useId, useReducer } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { clearBackendConfig, saveBackendConfig } from '@/lib/api';
+import { BROWSER_API_BASE_URL, saveBackendConfig } from '@/lib/api';
 import type { PersonalizationProfile } from '@/lib/personalization/storage';
 import { cn } from '@/lib/utils';
 import { OnboardingShell } from './onboarding-shell';
@@ -285,7 +285,7 @@ export function StepServer({ profile, onPatch, onContinue }: StepServerProps): R
 
 	const handleContinue = useCallback(() => {
 		if (mode === 'hosted') {
-			clearBackendConfig();
+			saveBackendConfig({ url: BROWSER_API_BASE_URL || window.location.origin, apiKey: '' });
 			onPatch({ remoteServerUrl: '' });
 			onContinue();
 			return;

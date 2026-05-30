@@ -458,7 +458,7 @@ def test_project_service_install_tailscale_profile_configures_owned_routes(
     unit = unit_path.read_text()
     assert 'Environment="NEXT_PUBLIC_BROWSER_API_BASE="' in unit
     assert 'Environment="BACKEND_INTERNAL_URL=http://127.0.0.1:8000"' in unit
-    assert 'Environment="NEXT_ALLOWED_DEV_ORIGINS=pawrrtal.example.ts.net"' in unit
+    assert 'Environment="NEXT_ALLOWED_DEV_ORIGINS=pawrrtal.example.ts.net,127.0.0.1"' in unit
     assert (
         'Environment="GOOGLE_OAUTH_REDIRECT_URI=https://pawrrtal.example.ts.net:7447/api/v1/auth/oauth/google/callback"'
         in unit
