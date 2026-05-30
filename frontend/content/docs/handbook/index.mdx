@@ -83,8 +83,11 @@ DESIGN.md                canonical design tokens (mirrors globals.css)
 ## Conventions worth knowing before your first PR
 
 - **`just` is the task runner.** `just dev` for both servers,
-  `just check` for the unified lint gate, `just check-all` for the
-  full pre-push gate.
+  `just paw project up` for a detached CLI-launched stack,
+  `just paw project down` to stop it, `just env-check` for the fast
+  non-starting environment gate, `just smoke-dev` before claiming the
+  local app boots end-to-end, `just check` for the unified lint gate,
+  and `just check-all` for the full pre-push gate.
 - **500-line file cap** on `.ts` / `.tsx` / `.py` (enforced by
   `scripts/check-file-lines.mjs`).
 - **Nesting depth ≤ 3** in functions

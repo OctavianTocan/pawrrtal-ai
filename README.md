@@ -265,6 +265,32 @@ bun run dev
 ```
 
 The dev orchestrator clears stale ports, removes the Next.js dev lock, and launches Next.js on `:53001` plus FastAPI on `:8000` with hot reload. Local dev uses plain `localhost`.
+It also pins `UV_CACHE_DIR` and `XDG_CACHE_HOME` under `.cache/` so `uv` does not try to write to a read-only home cache.
+
+The same full-stack lifecycle is available through the project CLI:
+
+```bash
+just paw project up        # Start frontend + backend in the background
+just paw project status    # Check both services
+just paw project logs      # Print the combined detached log path
+just paw project down      # Stop the tracked process group
+just paw env check         # Verify cache/config writability, binaries, and ports
+
+# Optional user systemd service:
+just paw project service install          # Install, enable, and start
+just paw project service install --linger # Also start at machine boot
+just paw project service status
+just paw project service logs --follow
+just paw project service uninstall
+
+# Short aliases:
+just paw run
+just paw stop
+```
+
+Before changing startup code, run `just env-check`. It catches missing binaries, unwritable cache/config paths, occupied dev ports, and environments that cannot bind local sockets. Before claiming the local app boots end-to-end, run `just smoke-dev`; it preflights the environment, starts the detached stack, checks status, and stops it.
+
+The service helper writes `~/.config/systemd/user/pawrrtal-dev.service` and manages it through `systemctl --user`. It uses the same `dev.ts` orchestrator as `just dev`, defaults to the local SQLite database, and preserves `PAWRRTAL_DEV_DATABASE_URL` when you intentionally want a non-SQLite dev database.
 
 ### Docker
 
@@ -578,6 +604,10 @@ GET    /api/v1/health/ready
 # Dev / build
 just dev              # Frontend + backend with hot reload
 just dev-telegram     # Force Telegram polling locally
+just paw project up   # Detached frontend + backend through the CLI
+just paw project down # Stop the detached CLI-launched project
+just env-check        # Fast non-starting CLI environment check
+just smoke-dev        # Start/status/stop smoke for the full local app
 just install          # bun install + uv sync
 just clean            # Drop build caches
 

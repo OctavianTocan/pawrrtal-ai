@@ -5,6 +5,7 @@
  * frontend's package.json `dev` script. No proxies, no HTTPS, no special
  * routing — just the two processes.
  */
+import { mkdir } from 'node:fs/promises';
 import { $ } from 'bun';
 import {
 	DEV_BACKEND_PORT,
@@ -15,6 +16,14 @@ import {
 
 const SQLITE_DB_FILENAME_PREFIX = 'pawrrtal';
 const MAX_BRANCH_FILENAME_LENGTH = 80;
+const DEV_CACHE_DIR = '.cache';
+const DEV_DATABASE_URL_ENV = 'PAWRRTAL_DEV_DATABASE_URL';
+
+await mkdir(`${DEV_CACHE_DIR}/uv`, { recursive: true });
+await mkdir(`${DEV_CACHE_DIR}/xdg`, { recursive: true });
+process.env.UV_CACHE_DIR ??= `${DEV_CACHE_DIR}/uv`;
+process.env.XDG_CACHE_HOME ??= `${DEV_CACHE_DIR}/xdg`;
+process.env.DATABASE_URL = process.env[DEV_DATABASE_URL_ENV] ?? '';
 
 /**
  * Resolve a filesystem-safe SQLite filename scoped to the current git branch
@@ -45,9 +54,9 @@ await $`lsof -ti:${DEV_BACKEND_PORT} | xargs kill -9`.quiet().nothrow();
 await $`rm -rf frontend/.next/dev/lock`.quiet().nothrow();
 
 // Scope the implicit SQLite database to the current git branch. Honour an
-// existing `SQLITE_DB_FILENAME` override (one-off experiments) and never
-// overwrite an explicit `DATABASE_URL` — the backend's config falls through
-// to `SQLITE_DB_FILENAME` only when `DATABASE_URL` is empty.
+// existing `SQLITE_DB_FILENAME` override (one-off experiments). Local dev
+// defaults to SQLite even when the shell exports a global DATABASE_URL; set
+// PAWRRTAL_DEV_DATABASE_URL to opt into a non-SQLite dev database.
 if (!process.env.SQLITE_DB_FILENAME) {
 	const branchDbFilename = await sqliteDbFilenameForBranch();
 	if (branchDbFilename) {

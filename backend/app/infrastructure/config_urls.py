@@ -12,6 +12,9 @@ def normalize_database_url(database_url: str, sqlite_db_filename: str) -> str:
         filename = sqlite_db_filename.strip() or "pawrrtal.db"
         return f"sqlite:///./{filename}"
 
+    if url.startswith("postgres://"):
+        return url.replace("postgres://", "postgresql://", 1)
+
     parsed = urlparse(url)
     if parsed.scheme.startswith(("postgresql", "sqlite")):
         return url

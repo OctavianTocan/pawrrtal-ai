@@ -20,6 +20,7 @@ from app.cli.paw.commands import mcp as mcp_cmd
 from app.cli.paw.commands import messages as messages_cmd
 from app.cli.paw.commands import mirror as mirror_cmd
 from app.cli.paw.commands import models as models_cmd
+from app.cli.paw.commands import project as project_cmd
 from app.cli.paw.commands import record as record_cmd
 from app.cli.paw.commands import replay as replay_cmd
 from app.cli.paw.commands import verify as verify_cmd
@@ -48,6 +49,21 @@ app.add_typer(
     name="dev",
     help="Dev backend process lifecycle (up/down/status).",
 )
+
+app.add_typer(
+    project_cmd.app,
+    name="project",
+    help="Full local project lifecycle (frontend + backend).",
+)
+
+app.add_typer(
+    project_cmd.env_app,
+    name="env",
+    help="Environment checks for CLI and local dev workflows.",
+)
+
+app.command("run")(project_cmd.run_project)
+app.command("stop")(project_cmd.stop_project)
 
 # login + logout sit at the top level (not under `paw auth`) so muscle memory
 # matches gh/aws/gcloud. Re-register the underlying functions directly because

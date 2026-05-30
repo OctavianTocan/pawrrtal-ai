@@ -440,6 +440,20 @@ class Settings(BaseSettings):
             return value.lstrip("@")
         return value
 
+    @field_validator("telegram_verbose_default", mode="before")
+    @classmethod
+    def _coerce_telegram_verbose_default(cls, value: object) -> object:
+        """Coerce env-file string values before Literal validation."""
+        if isinstance(value, str) and value.strip() in {"0", "1", "2"}:
+            return int(value)
+        return value
+
+    @field_validator("workspace_base_dir", mode="after")
+    @classmethod
+    def _expand_workspace_base_dir(cls, value: str) -> str:
+        """Expand home-relative workspace roots from env files."""
+        return str(Path(value).expanduser())
+
     @model_validator(mode="after")
     def validate_secure_cookie(self) -> "Settings":
         """Reject misconfigurations where ``SameSite=none`` is paired with insecure cookies."""

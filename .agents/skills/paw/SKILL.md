@@ -18,6 +18,12 @@ When verifying claims like "the X provider works end-to-end" or "the chat roundt
 
 ```bash
 just paw doctor                                # health-check the persona + backend
+just paw env check                             # check cache/config writability, binaries, ports
+just env-check                                 # same check through repo-local writable dirs
+just paw project up                            # start the full local app in the background
+just paw project down                          # stop the CLI-launched full local app
+just paw project service install               # install/start the user systemd dev service
+just smoke-dev                                 # preflight + start + status + stop
 just paw login --dev-admin                     # seed the dev persona (cookie + workspace)
 just paw verify codex --json                   # end-to-end Codex proof
 just paw verify all --json                     # every shippable suite
@@ -48,6 +54,8 @@ Every row reflects a shipped subcommand. Source: `backend/app/cli/paw/commands/`
 | record / replay  | `record COMMAND…`, `replay --from FILE`                        | local (respx-backed)                     |
 | fanout           | `<N> COMMAND…`                                                 | local orchestrator over N parallel personas |
 | mirror           | `--upstream URL COMMAND…`                                      | local vs remote SSE diff                  |
+| env              | `check`                                                        | local environment preflight               |
+| project          | `up`, `down`, `status`, `logs`, `service ...` plus root `run`/`stop` aliases | local full-stack lifecycle (frontend + backend; pid file at `<PAW_CONFIG_DIR>/<profile>/project.json`) |
 | verify           | `codex`, `chat-roundtrip`, `model-switch`, `telegram`, `cost`, `lcm`, `all` | end-to-end                   |
 | doctor           | (no verb)                                                      | local + ping `/api/v1/health` + models   |
 | dev              | `up`, `down`, `status`                                         | local backend lifecycle (pid file at `<PAW_CONFIG_DIR>/<profile>/dev.json`) |
@@ -143,6 +151,31 @@ just paw verify all --json
 
 Runs `codex` + `chat-roundtrip` + `model-switch` + `telegram` + `cost` + `lcm` in sequence; aggregate exit code is 6 if any single suite fails.
 
+### Run or stop the whole local project
+
+```bash
+just paw env check
+just env-check
+just paw project up
+just paw project status --json
+just paw project logs
+just paw project down
+just paw project service install
+just paw project service status
+just paw project service logs --follow
+just paw project service uninstall
+
+# Short aliases:
+just paw run
+just paw stop
+```
+
+`paw project up` launches the same root `dev.ts` orchestrator as `just dev`, but detaches it and stores state in `<PAW_CONFIG_DIR>/<profile>/project.json`. It writes combined output to `<PAW_CONFIG_DIR>/<profile>/project.log`, waits for both Next.js (`http://localhost:53001`) and FastAPI (`http://127.0.0.1:8000`) to respond, and `project down` stops the tracked process group. Use `paw dev up/down/status` only when you need the backend half by itself.
+
+`paw project service install` writes a user systemd unit at `~/.config/systemd/user/pawrrtal-dev.service`, reloads systemd, and enables/starts it with `systemctl --user enable --now`. Use `--linger` when you want the user service to start at machine boot without an interactive login. Manage it with `paw project service start|stop|restart|status|logs|uninstall`.
+
+`paw env check` and `paw project preflight` are non-interactive gates for agents. They fail before spawning if required binaries are missing, cache/config directories are not writable, dev ports are already occupied, or the current environment cannot bind local sockets. `just env-check` wraps the same check with repo-local writable state (`.cache/paw`, `.cache/uv`, `.cache/xdg`). `just smoke-dev` is the end-to-end startup gate: preflight, start, status, stop.
+
 ### Capture a fixture for unit tests, then replay offline
 
 ```bash
@@ -199,6 +232,9 @@ Every command supports:
 | `PAW_CONFIG_DIR` | Config root (default: `~/.config/pawrrtal`)                      |
 | `PAW_RECORD`     | Capture HTTP + SSE traffic to this JSONL path                    |
 | `PAW_E2E`        | `1` in pytest → run the live E2E suite (boots a real backend)    |
+| `UV_CACHE_DIR`   | Set by `dev.ts` / `paw project up` to `.cache/uv` when unset     |
+| `XDG_CACHE_HOME` | Set by `dev.ts` / `paw project up` to `.cache/xdg` when unset    |
+| `PAWRRTAL_DEV_DATABASE_URL` | Explicit non-SQLite database URL for `dev.ts` / the user service |
 
 ## Pitfalls
 
@@ -207,6 +243,8 @@ Every command supports:
 - `ChatRequest.conversation_id` is **required**. Always create the conversation first (the `--new` flag does this for you).
 - `paw messages get` takes `(conversation_id, index)` since the backend exposes no `/messages/{id}` route — messages are indexed positionally within a conversation.
 - `paw workspaces` now ships full CRUD (`create`/`rename`/`delete`), not just read verbs. Use it to script multi-workspace tests.
+- `paw project up` is the full app launcher; `paw dev up` is backend-only. If frontend is missing, you probably used the backend-only command.
+- Run `paw env check` before debugging startup. It catches missing binaries, unwritable cache/config paths, occupied dev ports, and socket-bind denial before the stack emits nested tool traces.
 - The chat stream emits both provider-native `delta` events and a router-injected `message` event (`backend/app/chat/router.py`). `paw conversations send` accumulates both into `final_text`.
 - Cookies are stored at `~/.config/pawrrtal/<profile>/cookies.txt` (Mozilla format, mode `0600`). They include `Expires=...` headers with commas — `paw` uses a real cookie jar, never `.split(",")`.
 - The Python SDK for Codex is pinned to `0.131.0a4` and the runtime to `openai-codex-cli-bin==0.131.0a4` (matched pair; upstream Python SDK hasn't moved past 0.131.0a4 even though CLI side reached 0.134.0).

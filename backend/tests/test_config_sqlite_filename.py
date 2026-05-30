@@ -71,7 +71,32 @@ def test_database_url_wins_over_sqlite_filename(isolated_env: None) -> None:
     assert settings._normalized_database_url == "postgresql://u:p@h:5432/d"
 
 
+def test_legacy_postgres_url_is_normalized(isolated_env: None) -> None:
+    """Legacy ``postgres://`` URLs are converted before SQLAlchemy sees them."""
+    settings = Settings(
+        _env_file=None,
+        database_url="postgres://u:p@h:5432/d",
+    )
+    assert settings._normalized_database_url == "postgresql://u:p@h:5432/d"
+    assert settings.db_url_async == "postgresql+psycopg://u:p@h:5432/d"
+
+
 def test_empty_sqlite_filename_falls_back_to_default(isolated_env: None) -> None:
     """A blank ``SQLITE_DB_FILENAME`` falls back to the canonical default."""
     settings = Settings(_env_file=None, sqlite_db_filename="   ")
     assert settings._normalized_database_url == "sqlite:///./pawrrtal.db"
+
+
+def test_workspace_base_dir_expands_home(isolated_env: None) -> None:
+    """``WORKSPACE_BASE_DIR=~/.pawrrtal/workspaces`` is stored as an absolute path."""
+    settings = Settings(
+        _env_file=None,
+        workspace_base_dir="~/.pawrrtal/workspaces",
+    )
+    assert settings.workspace_base_dir == str(Path.home() / ".pawrrtal" / "workspaces")
+
+
+def test_telegram_verbose_default_accepts_env_string(isolated_env: None) -> None:
+    """``TELEGRAM_VERBOSE_DEFAULT=2`` from an env file validates as a level."""
+    settings = Settings(_env_file=None, telegram_verbose_default="2")
+    assert settings.telegram_verbose_default == 2

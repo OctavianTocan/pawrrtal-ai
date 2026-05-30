@@ -22,6 +22,19 @@ dev-telegram:
 paw *ARGS:
     cd backend && uv run paw {{ARGS}}
 
+# Fast local environment check for agents and CI smoke loops. This does not
+# start servers; it verifies writable cache/config paths, binaries, and ports.
+env-check:
+    cd backend && PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" uv run paw env check
+
+# Start, probe, and stop the full local app. Use this before claiming that
+# the developer startup path works end-to-end.
+smoke-dev:
+    cd backend && PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" uv run paw project preflight
+    cd backend && PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" uv run paw project up --boot-timeout 45
+    cd backend && PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" uv run paw project status
+    cd backend && PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" uv run paw project down
+
 # Auto-generate conventional commit via Gemini
 commit *ARGS:
     cd backend && uv run python -m app.cli.commit {{ARGS}}
