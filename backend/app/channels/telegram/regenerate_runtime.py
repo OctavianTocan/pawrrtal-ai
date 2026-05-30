@@ -132,7 +132,7 @@ async def handle_regenerate_callback(*, callback: CallbackQuery) -> None:
         message=_RegenerateMessageView(
             original=message,
             user_text=last_user_text,
-        ),  # type: ignore[arg-type]
+        ),
         context=turn_context,
         images=None,
         text_annotations=None,

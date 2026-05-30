@@ -47,6 +47,7 @@ from app.channels.telegram.handlers import (
     handle_start_command,
     handle_stop_command,
     handle_verbose_command,
+    handle_whoami_command,
 )
 
 # ``TelegramSender`` is re-exported via :mod:`handlers` (which already
@@ -91,6 +92,7 @@ _TELEGRAM_COMMANDS: tuple[tuple[str, str], ...] = (
     ("verbose", "Set detail level: 0 quiet, 1 tools, 2 thinking"),
     ("stop", "Stop the active run"),
     ("status", "Show gateway + conversation status"),
+    ("whoami", "Show your Telegram ID and Pawrrtal binding"),
     ("lcm", "Show LCM (long-context memory) status for this conversation"),
     ("compact", "Force an LCM leaf-compaction pass now"),
 )
@@ -629,7 +631,20 @@ def _register_telegram_command_handlers(dispatcher: Dispatcher) -> None:
             )
         await message.answer(reply)
 
+    _register_telegram_identity_command_handlers(dispatcher)
     _register_telegram_lcm_command_handlers(dispatcher)
+
+
+def _register_telegram_identity_command_handlers(dispatcher: Dispatcher) -> None:
+    """Register identity/diagnostic commands."""
+    from aiogram.filters import Command  # noqa: PLC0415
+
+    @dispatcher.message(Command("whoami"))
+    async def _on_whoami(message: Message) -> None:
+        sender = _sender_from_message(message)
+        async with async_session_maker() as session:
+            reply = await handle_whoami_command(sender=sender, session=session)
+        await message.answer(reply)
 
 
 def _register_telegram_lcm_command_handlers(dispatcher: Dispatcher) -> None:

@@ -55,9 +55,12 @@ def _parse_iso8601(value: Any) -> datetime | None:
         return None
     text = value.replace("Z", "+00:00") if value.endswith("Z") else value
     try:
-        return datetime.fromisoformat(text)
+        parsed = datetime.fromisoformat(text)
     except ValueError:
         return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed
 
 
 async def _list_channels(client: PawClient) -> list[dict[str, Any]]:

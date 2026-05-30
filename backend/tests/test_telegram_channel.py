@@ -88,6 +88,15 @@ def _make_bot() -> AsyncMock:
     return bot
 
 
+@pytest.fixture(autouse=True)
+def _disable_regenerate_button_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep legacy delivery assertions independent of developer env flags."""
+    monkeypatch.setattr(
+        "app.channels.telegram.channel.settings.telegram_regenerate_button_enabled",
+        False,
+    )
+
+
 # ---------------------------------------------------------------------------
 # TelegramChannel.surface
 # ---------------------------------------------------------------------------
@@ -135,6 +144,7 @@ async def test_refresh_telegram_commands_sets_current_command_menu() -> None:
         "verbose",
         "stop",
         "status",
+        "whoami",
         "lcm",
         "compact",
     ]

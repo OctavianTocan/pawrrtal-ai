@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import pytest
 from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
@@ -22,19 +24,20 @@ def test_create_app_returns_fastapi_instance() -> None:
 def test_create_app_registers_expected_middleware() -> None:
     """The factory wires the operational middleware from the old main module."""
     app = create_app()
-    middleware_classes = {middleware.cls for middleware in app.user_middleware}
-    assert middleware_classes == {
+    middleware_classes = {cast(type[object], middleware.cls) for middleware in app.user_middleware}
+    expected_classes: set[type[object]] = {
         BackendApiKeyMiddleware,
         ChatRateLimitMiddleware,
         RequestLoggingMiddleware,
     }
+    assert middleware_classes == expected_classes
 
 
 def test_register_routers_adds_health_endpoint() -> None:
     """Router registration exposes the canonical public health endpoint."""
     app = FastAPI()
     register_routers(app)
-    assert any(route.path == "/api/v1/health" for route in app.routes)
+    assert any(getattr(route, "path", None) == "/api/v1/health" for route in app.routes)
 
 
 @pytest.mark.anyio

@@ -52,6 +52,15 @@ def _make_bot() -> AsyncMock:
     return bot
 
 
+@pytest.fixture(autouse=True)
+def _disable_regenerate_button_by_default(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep legacy interleaving assertions independent of developer env flags."""
+    monkeypatch.setattr(
+        "app.channels.telegram.channel.settings.telegram_regenerate_button_enabled",
+        False,
+    )
+
+
 async def test_text_after_thinking_renders_as_new_message() -> None:
     """thinking → text renders thinking via edit (placeholder) and text via send."""
     bot = _make_bot()

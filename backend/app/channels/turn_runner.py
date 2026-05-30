@@ -7,7 +7,7 @@ import logging
 import time
 import uuid
 from collections import Counter
-from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine, Iterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -57,6 +57,7 @@ from app.models import Conversation
 # Drained at app shutdown via ``await_pending_codex_persist_tasks``
 # (called from ``main.lifespan``'s finally block).
 _PENDING_CODEX_PERSIST_TASKS: set[asyncio.Task[None]] = set()
+_PENDING_TURN_FINALIZE_TASKS: set[asyncio.Task[None]] = set()
 
 # Soft cap on the shutdown drain timeout. The UPDATE is small enough
 # that 10 s is generous; tests can override.
@@ -67,6 +68,12 @@ def _register_codex_persist_task(task: asyncio.Task[None]) -> None:
     """Track an in-flight persist task so shutdown can await it."""
     _PENDING_CODEX_PERSIST_TASKS.add(task)
     task.add_done_callback(_PENDING_CODEX_PERSIST_TASKS.discard)
+
+
+def _register_turn_finalize_task(task: asyncio.Task[None]) -> None:
+    """Track an in-flight turn finalizer so cancellation cannot GC it."""
+    _PENDING_TURN_FINALIZE_TASKS.add(task)
+    task.add_done_callback(_PENDING_TURN_FINALIZE_TASKS.discard)
 
 
 async def await_pending_codex_persist_tasks(
@@ -282,11 +289,10 @@ async def run_turn(
     same trace.  When telemetry is disabled the spans are no-ops and
     add zero overhead (see ``app.infrastructure.telemetry.setup_tracing``).
 
-    ``_finalize_turn`` runs **inside** ``turn_span`` but **outside**
-    ``llm_span``: a database failure during persist + cost-ledger write
-    is a turn-level problem, not an LLM problem, so it must not bleed
-    into ``llm_span``'s error path (which would otherwise mark a
-    successful LLM call as ``Status.ERROR`` with a database message).
+    ``_finalize_turn`` is idempotently triggered before the channel sees
+    end-of-stream. This lets SSE finalize the assistant row before it emits
+    ``[DONE]``, so clients that stop reading at the terminal frame cannot
+    race the persistence path.
     """
     started_at = time.perf_counter()
     history, assistant_message_id = await _load_history_and_persist(turn_input)
@@ -320,6 +326,23 @@ async def run_turn(
         request_id=_request_id_from_extras(turn_input.log_extras),
         model_id=model_id,
     ) as turn_recorder:
+        finalized = False
+
+        async def finalize_once() -> None:
+            nonlocal finalized
+            if finalized:
+                return
+            finalized = True
+            await _finalize_turn(
+                turn_input=turn_input,
+                aggregator=aggregator,
+                assistant_message_id=assistant_message_id,
+                started_at=started_at,
+                event_count=counter.value,
+                event_breakdown=counter.by_type,
+                ttft_ms=turn_recorder.ttft_ms,
+            )
+
         try:
             async for chunk in _stream_with_llm_span(
                 turn_input=turn_input,
@@ -330,18 +353,11 @@ async def run_turn(
                 event_hooks=event_hooks,
                 model_id=model_id,
                 turn_recorder=turn_recorder,
+                finalize_turn=finalize_once,
             ):
                 yield chunk
         finally:
-            await _finalize_turn(
-                turn_input=turn_input,
-                aggregator=aggregator,
-                assistant_message_id=assistant_message_id,
-                started_at=started_at,
-                event_count=counter.value,
-                event_breakdown=counter.by_type,
-                ttft_ms=turn_recorder.ttft_ms,
-            )
+            await finalize_once()
 
 
 async def _stream_with_llm_span(
@@ -354,6 +370,7 @@ async def _stream_with_llm_span(
     event_hooks: list[EventHook] | None,
     model_id: str | None,
     turn_recorder: TurnSpanRecorder,
+    finalize_turn: Callable[[], Coroutine[Any, Any, None]],
 ) -> AsyncIterator[bytes]:
     """Yield channel chunks under one ``llm_span`` context manager.
 
@@ -371,35 +388,55 @@ async def _stream_with_llm_span(
     user turn — so operators debugging a multi-turn conversation
     see the same context the provider sees.
     """
-    with llm_span(
-        model_id=model_id or _MODEL_ID_UNKNOWN,
-        messages=build_llm_view_messages(history, turn_input.question),
-        system_prompt=system_prompt,
-    ) as llm_recorder:
-        hooks = [
-            workshop_event_hook(llm_recorder, turn_recorder=turn_recorder),
-            *(event_hooks or []),
-        ]
-        try:
-            async for chunk in turn_input.channel.deliver(
-                _guarded_stream(
+
+    async def event_stream() -> AsyncIterator[StreamEvent]:
+        with llm_span(
+            model_id=model_id or _MODEL_ID_UNKNOWN,
+            messages=build_llm_view_messages(history, turn_input.question),
+            system_prompt=system_prompt,
+        ) as llm_recorder:
+            hooks = [
+                workshop_event_hook(llm_recorder, turn_recorder=turn_recorder),
+                *(event_hooks or []),
+            ]
+            try:
+                async for event in _guarded_stream(
                     turn_input=turn_input,
                     history=history,
                     system_prompt=system_prompt,
                     aggregator=aggregator,
                     counter=counter,
                     hooks=hooks,
-                ),
-                turn_input.channel_message,
-            ):
-                yield chunk
-        finally:
-            llm_recorder.record_stop(aggregator_stop_reason(aggregator))
-            llm_recorder.record_usage(
-                input_tokens=aggregator.total_input_tokens,
-                output_tokens=aggregator.total_output_tokens,
-                cost_usd=aggregator.total_cost_usd,
-            )
+                ):
+                    yield event
+            finally:
+                llm_recorder.record_stop(aggregator_stop_reason(aggregator))
+                llm_recorder.record_usage(
+                    input_tokens=aggregator.total_input_tokens,
+                    output_tokens=aggregator.total_output_tokens,
+                    cost_usd=aggregator.total_cost_usd,
+                )
+
+    stream = _finalizing_stream(event_stream(), finalize_turn)
+    async for chunk in turn_input.channel.deliver(
+        stream,
+        turn_input.channel_message,
+    ):
+        yield chunk
+
+
+async def _finalizing_stream(
+    stream: AsyncIterator[StreamEvent],
+    finalize_turn: Callable[[], Coroutine[Any, Any, None]],
+) -> AsyncIterator[StreamEvent]:
+    """Finalize the turn before the channel observes end-of-stream."""
+    try:
+        async for event in stream:
+            yield event
+    finally:
+        finalize_task: asyncio.Task[None] = asyncio.create_task(finalize_turn())
+        _register_turn_finalize_task(finalize_task)
+        await asyncio.shield(finalize_task)
 
 
 async def _guarded_stream(

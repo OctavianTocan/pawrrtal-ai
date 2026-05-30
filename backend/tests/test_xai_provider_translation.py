@@ -166,9 +166,14 @@ def _patch_async_client(
 ) -> _FakeAsyncClient:
     """Patch ``AsyncClient`` in the provider module and return the fake."""
     fake = _FakeAsyncClient(steps)
+
+    def _client_factory(**kwargs: Any) -> _FakeAsyncClient:
+        fake.api_key = kwargs.get("api_key", "")
+        return fake
+
     monkeypatch.setattr(
         "app.providers.xai.provider.AsyncClient",
-        lambda **kwargs: setattr(fake, "api_key", kwargs.get("api_key", "")) or fake,
+        _client_factory,
     )
     return fake
 

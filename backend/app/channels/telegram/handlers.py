@@ -52,6 +52,7 @@ from app.channels.telegram.bot_permissions import (
 from app.channels.telegram.dev_admin import resolve_or_autolink_telegram_user
 from app.channels.telegram.model_defaults import resolve_effective_model_id
 from app.channels.telegram.sender import TelegramSender as TelegramSender  # noqa: PLC0414
+from app.infrastructure.config import settings
 
 # Loose match for the link-code shape (8 chars from the look-alike-free
 # alphabet defined in app.channels.crud). Used to distinguish "user pasted
@@ -176,6 +177,39 @@ async def handle_start_command(
         binding.user_id,
     )
     return _BIND_OK_MESSAGE
+
+
+async def handle_whoami_command(
+    *,
+    sender: TelegramSender,
+    session: AsyncSession,
+) -> str:
+    """Return the Telegram identity and Pawrrtal binding for this chat.
+
+    This is intentionally operator-facing: it gives the exact numeric
+    Telegram IDs needed for ``TELEGRAM_DEV_ADMIN_ID`` and confirms
+    whether the current sender is bound to a Pawrrtal user.
+    """
+    pawrrtal_user_id = await resolve_or_autolink_telegram_user(session=session, sender=sender)
+    dev_admin_id = settings.telegram_dev_admin_id
+    dev_admin_match = dev_admin_id is not None and int(dev_admin_id) == sender.user_id
+    bound_user = str(pawrrtal_user_id) if pawrrtal_user_id is not None else "unbound"
+    configured_admin = str(dev_admin_id) if dev_admin_id is not None else "unset"
+    username = f"@{sender.username}" if sender.username else "none"
+    full_name = sender.full_name or "none"
+    thread_id = str(sender.thread_id) if sender.thread_id is not None else "none"
+
+    return (
+        "Telegram identity\n"
+        f"user_id: {sender.user_id}\n"
+        f"chat_id: {sender.chat_id}\n"
+        f"thread_id: {thread_id}\n"
+        f"username: {username}\n"
+        f"full_name: {full_name}\n"
+        f"pawrrtal_user_id: {bound_user}\n"
+        f"telegram_dev_admin_id: {configured_admin}\n"
+        f"dev_admin_match: {str(dev_admin_match).lower()}"
+    )
 
 
 async def handle_plain_message(

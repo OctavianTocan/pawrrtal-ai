@@ -56,11 +56,11 @@ def _vendored_sdk_src_path() -> Path:
                                 openai_codex/
     """
     # This file lives at:
-    #   backend/app/core/providers/openai_codex/_vendor.py
-    # We need to walk up to the backend/ directory (5 levels).
+    #   backend/app/providers/openai_codex/_vendor.py
+    # We need to walk up to the backend/ directory.
     here = Path(__file__).resolve()
-    # parents[0] = openai_codex/, [1] = providers/, [2] = core/, [3] = app/, [4] = backend/
-    backend_dir = here.parents[4]
+    # parents[0] = openai_codex/, [1] = providers/, [2] = app/, [3] = backend/
+    backend_dir = here.parents[3]
     vendored = backend_dir / "vendor" / "codex" / "sdk" / "python" / "src"
     return vendored
 
@@ -96,8 +96,7 @@ def discover_vendored_codex_bin() -> Path | None:
     explicitly or to build the submodule binary.
     """
     try:
-        backend_dir = _vendored_sdk_src_path().parents[3]  # go up from sdk/python/src
-        codex_root = backend_dir / "vendor" / "codex"
+        codex_root = _vendored_sdk_src_path().parents[2]  # go up from sdk/python/src
 
         candidates = [
             codex_root / "codex-rs" / "target" / "release" / "codex",
