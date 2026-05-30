@@ -13,13 +13,20 @@ from starlette.responses import JSONResponse, Response
 
 from app.infrastructure.config import settings
 
-# Paths that bypass the API-key check so health probes and the OpenAPI
-# docs remain reachable without a key even in locked-down deployments.
-_EXEMPT_PREFIXES = (
+# Paths that bypass the API-key check so health probes and the OpenAPI docs
+# remain reachable without a key even in locked-down deployments.
+_EXEMPT_PATHS = {
     "/health",
+    "/api/v1/health",
+    "/api/v1/health/ready",
     "/docs",
     "/redoc",
     "/openapi.json",
+    # Telegram validates this endpoint with X-Telegram-Bot-Api-Secret-Token.
+    "/api/v1/channels/telegram/webhook",
+}
+
+_EXEMPT_PREFIXES = (
     # OAuth start redirects initiate from the browser; no key there.
     "/api/v1/auth/oauth/",
 )
@@ -45,7 +52,7 @@ class BackendApiKeyMiddleware(BaseHTTPMiddleware):
 
         # Exempt paths bypass the key check.
         path = request.url.path
-        if any(path.startswith(prefix) for prefix in _EXEMPT_PREFIXES):
+        if path in _EXEMPT_PATHS or any(path.startswith(prefix) for prefix in _EXEMPT_PREFIXES):
             return await call_next(request)
 
         provided = request.headers.get("X-Pawrrtal-Key", "")

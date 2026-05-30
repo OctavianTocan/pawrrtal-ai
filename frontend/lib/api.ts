@@ -1,11 +1,19 @@
 /**
- * Base URL for all API requests.
- * Determined from NEXT_PUBLIC_API_URL environment variable.
+ * Browser base URL for API requests.
+ * Determined from NEXT_PUBLIC_BROWSER_API_BASE, falling back to the legacy
+ * NEXT_PUBLIC_API_URL environment variable.
  *
  * Default targets the local FastAPI dev server on `http://localhost:8000`.
- * In production (Vercel) the env var must be set to the deployed API origin.
+ * Same-origin deployments can set this to an empty string so browser requests
+ * go through the current origin's reverse proxy.
  */
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
+export const BROWSER_API_BASE_URL =
+	process.env.NEXT_PUBLIC_BROWSER_API_BASE ??
+	process.env.NEXT_PUBLIC_API_URL ??
+	'http://localhost:8000';
+
+/** @deprecated Use BROWSER_API_BASE_URL for browser code and server-api.ts for RSC fetches. */
+export const API_BASE_URL = BROWSER_API_BASE_URL;
 
 /**
  * Backend API key for the X-Pawrrtal-Key header.
@@ -48,19 +56,19 @@ function readStoredBackendConfig(): BackendConfig | null {
 
 function normalizeBackendConfigUrl(url: string): string {
 	if (!url.trim()) {
-		return API_BASE_URL;
+		return BROWSER_API_BASE_URL;
 	}
 	try {
 		const parsed = new URL(url);
-		return parsed.toString();
+		return parsed.toString().replace(/\/$/, '');
 	} catch {
-		return url.trim();
+		return url.trim().replace(/\/$/, '');
 	}
 }
 
 function readBackendConfig(): BackendConfig {
 	const buildTimeKey = process.env.NEXT_PUBLIC_BACKEND_API_KEY ?? '';
-	const defaults: BackendConfig = { url: API_BASE_URL, apiKey: buildTimeKey };
+	const defaults: BackendConfig = { url: BROWSER_API_BASE_URL, apiKey: buildTimeKey };
 	const stored = readStoredBackendConfig();
 	if (stored) {
 		return stored;
@@ -113,13 +121,31 @@ export function saveBackendConfig(config: BackendConfig): void {
 }
 
 /** Clear the runtime backend config override (reverts to build-time defaults). */
-function clearBackendConfig(): void {
+export function clearBackendConfig(): void {
 	try {
 		window.localStorage.removeItem(BACKEND_CONFIG_STORAGE_KEY);
 		emitBackendConfigChange();
 	} catch {
 		/* ignore */
 	}
+}
+
+function buildApiUrl(baseUrl: string, path: string): string {
+	if (/^https?:\/\//.test(path)) {
+		return path;
+	}
+	const normalizedBase = normalizeBackendConfigUrl(baseUrl);
+	if (!normalizedBase) {
+		return path;
+	}
+	const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+	return `${normalizedBase}${normalizedPath}`;
+}
+
+/** Return the browser-visible URL for an API path using the active runtime config. */
+export function getBrowserApiUrl(path: string): string {
+	const { url } = readBackendConfig();
+	return buildApiUrl(url, path);
 }
 
 /**
@@ -135,16 +161,17 @@ function clearBackendConfig(): void {
  */
 export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
 	const { url: baseUrl, apiKey } = readBackendConfig();
+	const requestUrl = buildApiUrl(baseUrl, path);
 	// Only wrap headers in a Headers object when we actually need to inject
 	// X-Pawrrtal-Key.  When no key is configured (local dev, tests) we pass
 	// init through unchanged so callers that stub `fetch` get back the same
 	// plain-object headers they supplied — keeping test assertions simple.
 	if (!apiKey) {
-		return fetch(`${baseUrl}${path}`, init);
+		return fetch(requestUrl, init);
 	}
 	const headers = new Headers(init?.headers);
 	headers.set('X-Pawrrtal-Key', apiKey);
-	return fetch(`${baseUrl}${path}`, { ...init, headers });
+	return fetch(requestUrl, { ...init, headers });
 }
 
 /**

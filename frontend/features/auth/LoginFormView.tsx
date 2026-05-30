@@ -8,13 +8,13 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { API_BASE_URL } from '@/lib/api';
+import { getBrowserApiUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 /** Backend OAuth start URLs the SSO buttons navigate to. */
 const OAUTH_START_URLS = {
-	google: `${API_BASE_URL}/api/v1/auth/oauth/google/start`,
-	apple: `${API_BASE_URL}/api/v1/auth/oauth/apple/start`,
+	google: '/api/v1/auth/oauth/google/start',
+	apple: '/api/v1/auth/oauth/apple/start',
 } as const;
 
 export interface LoginFormViewProps extends Omit<React.ComponentProps<'div'>, 'onSubmit'> {
@@ -158,7 +158,9 @@ export function LoginFormView({
 									className="cursor-pointer gap-2"
 									disabled={isLoading}
 									onClick={() => {
-										window.location.href = OAUTH_START_URLS.google;
+										window.location.href = getBrowserApiUrl(
+											OAUTH_START_URLS.google
+										);
 									}}
 									type="button"
 									variant="outline"
@@ -170,7 +172,9 @@ export function LoginFormView({
 									className="cursor-pointer gap-2"
 									disabled={isLoading}
 									onClick={() => {
-										window.location.href = OAUTH_START_URLS.apple;
+										window.location.href = getBrowserApiUrl(
+											OAUTH_START_URLS.apple
+										);
 									}}
 									type="button"
 									variant="outline"

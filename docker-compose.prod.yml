@@ -78,13 +78,14 @@ services:
         # Server-side Next.js API calls use the internal Docker network.
         # Client-side browser calls hit /api/* via Nginx (same origin),
         # so no NEXT_PUBLIC_ env is needed at runtime for browser fetches.
-        NEXT_PUBLIC_API_URL: http://backend:8000
+        NEXT_PUBLIC_BROWSER_API_BASE: ""
     restart: unless-stopped
     depends_on:
       backend:
         condition: service_healthy
     environment:
       NODE_ENV: production
+      BACKEND_INTERNAL_URL: http://backend:8000
     # `expose` makes :3000 reachable on the Docker network only.
     # Nginx is the public surface — never publish frontend on the host.
     expose:

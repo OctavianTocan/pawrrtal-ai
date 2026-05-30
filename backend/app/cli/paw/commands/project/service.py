@@ -3,20 +3,52 @@
 from __future__ import annotations
 
 import getpass
+import json
 import os
 import shutil
 import subprocess
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
+from urllib.parse import urlparse
 
 import typer
 
-from app.cli.paw.commands.project.state import repo_root
+from app.cli.paw.commands.project.state import (
+    DEFAULT_BACKEND_URL,
+    DEFAULT_FRONTEND_URL,
+    repo_root,
+    service_state_path,
+)
 from app.cli.paw.errors import LocalError
 from app.cli.paw.output import emit_human
 
 app = typer.Typer(no_args_is_help=True)
 
 SERVICE_NAME = "pawrrtal-dev.service"
+TAILSCALE_PROFILE = "tailscale"
+TAILSCALE_SERVICE_NAME = "pawrrtal-dev-tailscale.service"
+SERVICE_STATE_SCHEMA_VERSION = 1
+TAILSCALE_ROUTES = (
+    ("/", DEFAULT_FRONTEND_URL),
+    ("/api/v1", DEFAULT_BACKEND_URL),
+    ("/auth", DEFAULT_BACKEND_URL),
+    ("/users", DEFAULT_BACKEND_URL),
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ServiceProfileState:
+    """Persisted state for a managed project service profile."""
+
+    schema_version: int
+    profile: str
+    service_name: str
+    installed_at: str
+    tailscale_host: str | None = None
+    public_url: str | None = None
+    routes: tuple[tuple[str, str], ...] = ()
 
 
 def _unit_dir() -> Path:
@@ -26,9 +58,23 @@ def _unit_dir() -> Path:
     return config_home / "systemd" / "user"
 
 
-def _unit_path() -> Path:
+def _unit_path(profile: str = "local") -> Path:
     """Return the generated service unit path."""
-    return _unit_dir() / SERVICE_NAME
+    return _unit_dir() / _service_name(profile)
+
+
+def _service_name(profile: str) -> str:
+    """Return the systemd unit name for a service profile."""
+    return (
+        TAILSCALE_SERVICE_NAME if _normalize_profile(profile) == TAILSCALE_PROFILE else SERVICE_NAME
+    )
+
+
+def _normalize_profile(profile: str) -> str:
+    """Validate and normalize a service profile name."""
+    if profile not in {"local", TAILSCALE_PROFILE}:
+        raise LocalError("--profile must be either `local` or `tailscale`.")
+    return profile
 
 
 def _require_binary(name: str) -> str:
@@ -50,13 +96,14 @@ def _systemd_env_line(name: str, value: str) -> str:
     return f'Environment="{name}={escaped}"'
 
 
-def _unit_text() -> str:
+def _unit_text(*, profile: str = "local", tailscale_host: str | None = None) -> str:
     """Render the user service unit for the current checkout."""
     bun = _require_binary("bun")
     root = repo_root()
     cache_root = root / ".cache"
     path = os.environ.get("PATH", "")
     dev_database_url = os.environ.get("PAWRRTAL_DEV_DATABASE_URL", "")
+    public_origin = f"https://{tailscale_host}" if tailscale_host else ""
     env_lines = [
         _systemd_env_line("PATH", path),
         _systemd_env_line("UV_CACHE_DIR", str(cache_root / "uv")),
@@ -64,10 +111,28 @@ def _unit_text() -> str:
         _systemd_env_line("DATABASE_URL", ""),
         _systemd_env_line("PAWRRTAL_DEV_DATABASE_URL", dev_database_url),
     ]
+    if profile == TAILSCALE_PROFILE:
+        env_lines.extend(
+            [
+                _systemd_env_line("NEXT_PUBLIC_BROWSER_API_BASE", ""),
+                _systemd_env_line("BACKEND_INTERNAL_URL", DEFAULT_BACKEND_URL),
+                _systemd_env_line("NEXT_ALLOWED_DEV_ORIGINS", public_origin),
+                _systemd_env_line(
+                    "GOOGLE_OAUTH_REDIRECT_URI",
+                    f"{public_origin}/api/v1/auth/oauth/google/callback",
+                ),
+                _systemd_env_line(
+                    "APPLE_OAUTH_REDIRECT_URI",
+                    f"{public_origin}/api/v1/auth/oauth/apple/callback",
+                ),
+                _systemd_env_line("OAUTH_POST_LOGIN_REDIRECT", f"{public_origin}/"),
+                _systemd_env_line("BACKEND_API_KEY", ""),
+            ]
+        )
     return "\n".join(
         [
             "[Unit]",
-            "Description=Pawrrtal local dev server",
+            f"Description=Pawrrtal {profile} dev server",
             "After=network.target",
             "",
             "[Service]",
@@ -108,10 +173,150 @@ def _systemctl(*args: str, check: bool = True) -> subprocess.CompletedProcess[st
     return _run(["systemctl", "--user", *args], check=check)
 
 
+def _preflight_systemd() -> None:
+    """Fail before writing unit files when user systemd is unavailable."""
+    result = _systemctl("is-system-running", check=False)
+    output = (result.stdout or result.stderr or "").strip()
+    if "Failed to connect to bus" in output or "Operation not permitted" in output:
+        raise LocalError(
+            "User systemd is not available in this environment.",
+            hint=output or "Run from a login session with a user systemd bus.",
+        )
+
+
+def _run_tailscale(*args: str, check: bool = True) -> subprocess.CompletedProcess[str]:
+    """Run a Tailscale CLI command."""
+    return _run(["tailscale", *args], check=check)
+
+
+def _tailscale_json(*args: str) -> dict[str, Any]:
+    """Run a Tailscale command that emits JSON and parse the result."""
+    result = _run_tailscale(*args)
+    stdout = result.stdout.strip()
+    if not stdout:
+        return {}
+    try:
+        parsed = json.loads(stdout)
+    except json.JSONDecodeError as exc:
+        raise LocalError("Tailscale returned invalid JSON.", hint=stdout) from exc
+    return parsed if isinstance(parsed, dict) else {"value": parsed}
+
+
+def _normalize_tailscale_host(host: str | None) -> str:
+    """Normalize a bare Tailscale hostname or URL to a hostname."""
+    candidate = (host or "").strip()
+    if not candidate:
+        raise LocalError("--tailscale-host is required for --profile tailscale.")
+    parsed = urlparse(candidate if "://" in candidate else f"https://{candidate}")
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise LocalError("--tailscale-host must be a HTTPS Tailscale hostname.")
+    hostname = parsed.hostname.lower()
+    if not hostname.endswith(".ts.net"):
+        raise LocalError("--tailscale-host must be a .ts.net hostname.")
+    return hostname
+
+
+def _load_service_state(profile: str) -> ServiceProfileState | None:
+    """Read service profile state when present."""
+    path = service_state_path(profile)
+    if not path.exists():
+        return None
+    try:
+        raw = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    return ServiceProfileState(
+        schema_version=int(raw.get("schema_version", SERVICE_STATE_SCHEMA_VERSION)),
+        profile=str(raw.get("profile", profile)),
+        service_name=str(raw.get("service_name", _service_name(profile))),
+        installed_at=str(raw.get("installed_at", "")),
+        tailscale_host=raw.get("tailscale_host"),
+        public_url=raw.get("public_url"),
+        routes=tuple(tuple(route) for route in raw.get("routes", [])),
+    )
+
+
+def _save_service_state(profile: str, state: ServiceProfileState) -> None:
+    """Persist service profile state."""
+    path = service_state_path(profile)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(asdict(state), indent=2, sort_keys=True), encoding="utf-8")
+
+
+def _delete_service_state(profile: str) -> None:
+    """Remove service profile state if it exists."""
+    service_state_path(profile).unlink(missing_ok=True)
+
+
+def _preflight_tailscale_profile(hostname: str) -> None:
+    """Validate Tailscale Serve can be safely owned by Pawrrtal."""
+    if os.environ.get("BACKEND_API_KEY"):
+        raise LocalError(
+            "The Tailscale profile does not support BACKEND_API_KEY.",
+            hint="Use Tailscale ACLs plus Pawrrtal login for this private profile.",
+        )
+    _require_binary("tailscale")
+    _tailscale_json("status", "--json")
+    status = _tailscale_json("serve", "status", "--json")
+    if _serve_status_has_config(status) and _load_service_state(TAILSCALE_PROFILE) is None:
+        raise LocalError(
+            "Tailscale Serve already has configuration not owned by Pawrrtal.",
+            hint="Inspect `tailscale serve status --json` before installing this profile.",
+        )
+    if not hostname.endswith(".ts.net"):
+        raise LocalError("--tailscale-host must be a .ts.net hostname.")
+
+
+def _serve_status_has_config(value: object) -> bool:
+    """Return true when Tailscale Serve status contains non-empty config."""
+    if value in (None, False, "", 0):
+        return False
+    if isinstance(value, dict):
+        return any(_serve_status_has_config(child) for child in value.values())
+    if isinstance(value, list):
+        return any(_serve_status_has_config(child) for child in value)
+    return True
+
+
+def _apply_tailscale_routes() -> None:
+    """Publish local loopback services through Tailscale Serve path routes."""
+    for path_prefix, target in TAILSCALE_ROUTES:
+        _run_tailscale(
+            "serve",
+            "--bg",
+            "--yes",
+            "--https",
+            "443",
+            "--set-path",
+            path_prefix,
+            target,
+        )
+
+
+def _clear_tailscale_routes() -> None:
+    """Remove Pawrrtal-owned Tailscale Serve path routes."""
+    for path_prefix, _target in reversed(TAILSCALE_ROUTES):
+        _run_tailscale(
+            "serve",
+            "--https",
+            "443",
+            "--set-path",
+            path_prefix,
+            "off",
+            check=False,
+        )
+
+
 @app.command("install")
 def install(
     enable: bool = typer.Option(True, "--enable/--no-enable", help="Enable the unit."),
     now: bool = typer.Option(True, "--now/--no-now", help="Start the unit after install."),
+    profile: str = typer.Option("local", "--profile", help="Service profile: local or tailscale."),
+    tailscale_host: str | None = typer.Option(
+        None,
+        "--tailscale-host",
+        help="Tailscale HTTPS hostname for --profile tailscale, e.g. host.tailnet.ts.net.",
+    ),
     linger: bool = typer.Option(
         False,
         "--linger",
@@ -119,58 +324,97 @@ def install(
     ),
 ) -> None:
     """Install the Pawrrtal dev server as a user systemd service."""
-    unit_path = _unit_path()
+    profile = _normalize_profile(profile)
+    hostname = _normalize_tailscale_host(tailscale_host) if profile == TAILSCALE_PROFILE else None
+    _preflight_systemd()
+    if hostname is not None:
+        _preflight_tailscale_profile(hostname)
+    unit_path = _unit_path(profile)
     unit_path.parent.mkdir(parents=True, exist_ok=True)
-    unit_path.write_text(_unit_text(), encoding="utf-8")
+    unit_path.write_text(_unit_text(profile=profile, tailscale_host=hostname), encoding="utf-8")
     _systemctl("daemon-reload")
+    service_name = _service_name(profile)
     if enable:
-        args = ["enable", SERVICE_NAME]
+        args = ["enable", service_name]
         if now:
             args.insert(1, "--now")
         _systemctl(*args)
     elif now:
-        _systemctl("start", SERVICE_NAME)
+        _systemctl("start", service_name)
+    if hostname is not None:
+        _apply_tailscale_routes()
+        _save_service_state(
+            profile,
+            ServiceProfileState(
+                schema_version=SERVICE_STATE_SCHEMA_VERSION,
+                profile=profile,
+                service_name=service_name,
+                installed_at=datetime.now(UTC).isoformat(),
+                tailscale_host=hostname,
+                public_url=f"https://{hostname}/",
+                routes=TAILSCALE_ROUTES,
+            ),
+        )
     if linger:
         _run(["loginctl", "enable-linger", _current_user()])
-    emit_human(f"installed {SERVICE_NAME} at {unit_path}")
+    emit_human(f"installed {service_name} at {unit_path}")
 
 
 @app.command("uninstall")
-def uninstall() -> None:
+def uninstall(
+    profile: str = typer.Option("local", "--profile", help="Service profile: local or tailscale."),
+) -> None:
     """Disable and remove the Pawrrtal dev server user systemd service."""
-    _systemctl("disable", "--now", SERVICE_NAME)
-    unit_path = _unit_path()
+    profile = _normalize_profile(profile)
+    service_name = _service_name(profile)
+    _systemctl("disable", "--now", service_name)
+    if profile == TAILSCALE_PROFILE and _load_service_state(profile) is not None:
+        _clear_tailscale_routes()
+        _delete_service_state(profile)
+    unit_path = _unit_path(profile)
     unit_path.unlink(missing_ok=True)
     _systemctl("daemon-reload")
-    emit_human(f"removed {SERVICE_NAME}")
+    emit_human(f"removed {service_name}")
 
 
 @app.command("start")
-def start() -> None:
+def start(profile: str = typer.Option("local", "--profile")) -> None:
     """Start the user systemd service."""
-    _systemctl("start", SERVICE_NAME)
-    emit_human(f"started {SERVICE_NAME}")
+    profile = _normalize_profile(profile)
+    service_name = _service_name(profile)
+    _systemctl("start", service_name)
+    emit_human(f"started {service_name}")
 
 
 @app.command("stop")
-def stop() -> None:
+def stop(profile: str = typer.Option("local", "--profile")) -> None:
     """Stop the user systemd service."""
-    _systemctl("stop", SERVICE_NAME)
-    emit_human(f"stopped {SERVICE_NAME}")
+    profile = _normalize_profile(profile)
+    service_name = _service_name(profile)
+    _systemctl("stop", service_name)
+    emit_human(f"stopped {service_name}")
 
 
 @app.command("restart")
-def restart() -> None:
+def restart(profile: str = typer.Option("local", "--profile")) -> None:
     """Restart the user systemd service."""
-    _systemctl("restart", SERVICE_NAME)
-    emit_human(f"restarted {SERVICE_NAME}")
+    profile = _normalize_profile(profile)
+    service_name = _service_name(profile)
+    _systemctl("restart", service_name)
+    emit_human(f"restarted {service_name}")
 
 
 @app.command("status")
-def status() -> None:
+def status(profile: str = typer.Option("local", "--profile")) -> None:
     """Show user systemd service status."""
-    result = _systemctl("status", SERVICE_NAME, "--no-pager", check=False)
-    emit_human((result.stdout or result.stderr).strip())
+    profile = _normalize_profile(profile)
+    service_name = _service_name(profile)
+    result = _systemctl("status", service_name, "--no-pager", check=False)
+    body = (result.stdout or result.stderr).strip()
+    state = _load_service_state(profile)
+    if state and state.public_url:
+        body = f"{body}\npublic_url: {state.public_url}"
+    emit_human(body)
     raise typer.Exit(code=result.returncode)
 
 
@@ -178,9 +422,19 @@ def status() -> None:
 def logs(
     follow: bool = typer.Option(False, "--follow", "-f", help="Follow logs."),
     lines: int = typer.Option(100, "--lines", min=1, help="Number of log lines to show."),
+    profile: str = typer.Option("local", "--profile"),
 ) -> None:
     """Show journal logs for the user systemd service."""
-    args = ["journalctl", "--user", "-u", SERVICE_NAME, "--no-pager", "-n", str(lines)]
+    profile = _normalize_profile(profile)
+    args = [
+        "journalctl",
+        "--user",
+        "-u",
+        _service_name(profile),
+        "--no-pager",
+        "-n",
+        str(lines),
+    ]
     if follow:
         args.append("-f")
     result = _run(args, check=False)

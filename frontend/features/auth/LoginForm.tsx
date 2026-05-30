@@ -1,6 +1,5 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import type React from 'react';
 import { useId, useState } from 'react';
 import { useDevAdminLoginMutation, useLoginMutation } from './hooks/use-login-mutations';
@@ -29,7 +28,7 @@ interface LoginFormProps extends React.ComponentProps<'div'> {
  * Delegates all rendering to `LoginFormView`.
  *
  * @param canUseDevAdminLogin - Whether to show the dev-only admin shortcut button.
- * @param postLoginTarget - Validated path to ``router.push`` after sign-in.
+ * @param postLoginTarget - Validated path to load after sign-in.
  */
 export function LoginForm({
 	className,
@@ -46,8 +45,6 @@ export function LoginForm({
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
 	const [localErrorMessage, setLocalErrorMessage] = useState('');
-
-	const { push } = useRouter();
 
 	const loginMutation = useLoginMutation();
 	const devLoginMutation = useDevAdminLoginMutation();
@@ -88,7 +85,7 @@ export function LoginForm({
 
 		try {
 			await loginMutation.mutateAsync({ email, password });
-			push(postLoginTarget);
+			window.location.replace(postLoginTarget);
 		} catch (error) {
 			setFriendlyNetworkError(error);
 		}
@@ -102,7 +99,7 @@ export function LoginForm({
 
 		try {
 			await devLoginMutation.mutateAsync();
-			push(postLoginTarget);
+			window.location.replace(postLoginTarget);
 		} catch (error) {
 			setFriendlyNetworkError(error);
 		}

@@ -5,7 +5,7 @@ import type * as React from 'react';
 import { useCallback, useId, useReducer } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { API_BASE_URL, saveBackendConfig } from '@/lib/api';
+import { clearBackendConfig, saveBackendConfig } from '@/lib/api';
 import type { PersonalizationProfile } from '@/lib/personalization/storage';
 import { cn } from '@/lib/utils';
 import { OnboardingShell } from './onboarding-shell';
@@ -258,11 +258,12 @@ export function StepServer({ profile, onPatch, onContinue }: StepServerProps): R
 		}
 		dispatchStepServer({ type: 'verification-started' });
 		try {
-			// Ping the health endpoint — a 200 with any body is enough.
+			// Ping the health endpoint — a 2xx response proves the URL and keyless
+			// health surface are actually usable.
 			const res = await fetch(`${url.trim()}/api/v1/health`, {
 				signal: AbortSignal.timeout(6000),
 			});
-			if (res.ok || res.status < 500) {
+			if (res.ok) {
 				dispatchStepServer({ type: 'verification-succeeded' });
 			} else {
 				dispatchStepServer({
@@ -283,10 +284,7 @@ export function StepServer({ profile, onPatch, onContinue }: StepServerProps): R
 
 	const handleContinue = useCallback(() => {
 		if (mode === 'hosted') {
-			saveBackendConfig({
-				url: API_BASE_URL,
-				apiKey: process.env.NEXT_PUBLIC_BACKEND_API_KEY ?? '',
-			});
+			clearBackendConfig();
 			onPatch({ remoteServerUrl: '' });
 			onContinue();
 			return;

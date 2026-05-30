@@ -50,3 +50,17 @@ async def test_create_app_health_endpoint_responds() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+@pytest.mark.anyio
+async def test_health_endpoint_bypasses_backend_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Health probes remain reachable when the backend transport key is enabled."""
+    from app.infrastructure.config import settings
+
+    monkeypatch.setattr(settings, "backend_api_key", "required-key")
+    app = create_app()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
+        response = await client.get("/api/v1/health")
+
+    assert response.status_code == 200

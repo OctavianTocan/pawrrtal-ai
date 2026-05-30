@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 import pytest
+from fastapi import HTTPException
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,6 +21,7 @@ from app.channels.crud import (
     issue_link_code,
     list_bindings,
 )
+from app.channels.router import _ensure_telegram_webhook_enabled
 from app.channels.telegram.handlers import (
     PROVIDER,
     handle_plain_message,
@@ -79,6 +81,32 @@ async def test_unlink_is_idempotent(client: AsyncClient) -> None:
     """DELETE on a non-existent binding still returns 204 so the UI can fire-and-forget."""
     response = await client.delete("/api/v1/channels/telegram/link")
     assert response.status_code == 204
+
+
+async def test_webhook_requires_configured_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Webhook requests are rejected when no Telegram secret is configured."""
+    monkeypatch.setattr(settings, "telegram_mode", "webhook")
+    monkeypatch.setattr(settings, "telegram_webhook_secret", "")
+
+    with pytest.raises(HTTPException) as exc_info:
+        _ensure_telegram_webhook_enabled(object(), None)
+
+    assert exc_info.value.status_code == 403
+
+
+async def test_webhook_rejects_bad_secret(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Webhook requests must include the configured Telegram secret header."""
+    monkeypatch.setattr(settings, "telegram_mode", "webhook")
+    monkeypatch.setattr(settings, "telegram_webhook_secret", "expected-secret")
+
+    with pytest.raises(HTTPException) as exc_info:
+        _ensure_telegram_webhook_enabled(object(), "wrong")
+
+    assert exc_info.value.status_code == 403
 
 
 async def test_redeem_via_start_handler_creates_binding(

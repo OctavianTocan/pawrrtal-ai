@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import ipaddress
 import logging
 import time
 import uuid
@@ -29,6 +30,7 @@ from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
 from typing import TYPE_CHECKING
+from urllib.parse import urlparse
 
 from app.agents.hooks import build_pre_turn_hooks
 from app.agents.tools import build_agent_tools
@@ -926,6 +928,9 @@ async def telegram_lifespan() -> AsyncIterator[TelegramService | None]:
         url = settings.telegram_webhook_url
         if not url:
             raise RuntimeError("TELEGRAM_MODE=webhook requires TELEGRAM_WEBHOOK_URL to be set.")
+        _validate_telegram_webhook_url(url)
+        if not settings.telegram_webhook_secret:
+            raise RuntimeError("TELEGRAM_MODE=webhook requires TELEGRAM_WEBHOOK_SECRET.")
         secret = settings.telegram_webhook_secret or None
         await service.bot.set_webhook(
             url=url,
@@ -949,3 +954,19 @@ async def telegram_lifespan() -> AsyncIterator[TelegramService | None]:
             await service.bot.session.close()
         except Exception:
             logger.warning("TELEGRAM_SHUTDOWN session_close_failed", exc_info=True)
+
+
+def _validate_telegram_webhook_url(url: str) -> None:
+    """Reject webhook URLs Telegram cannot reach or that weaken local profiles."""
+    parsed = urlparse(url)
+    if parsed.scheme != "https" or not parsed.hostname:
+        raise RuntimeError("TELEGRAM_WEBHOOK_URL must be an HTTPS URL with a public hostname.")
+    hostname = parsed.hostname.lower()
+    if hostname in {"localhost", "127.0.0.1", "::1"} or hostname.endswith(".localhost"):
+        raise RuntimeError("TELEGRAM_WEBHOOK_URL cannot point at localhost.")
+    if hostname.endswith(".ts.net"):
+        raise RuntimeError("TELEGRAM_WEBHOOK_URL cannot use a tailnet-only .ts.net hostname.")
+    with contextlib.suppress(ValueError):
+        ip = ipaddress.ip_address(hostname)
+        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved:
+            raise RuntimeError("TELEGRAM_WEBHOOK_URL must use a public IP or DNS hostname.")

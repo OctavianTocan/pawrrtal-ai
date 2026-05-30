@@ -12,6 +12,7 @@ when those adapters land.
 
 from __future__ import annotations
 
+from typing import Any, Protocol, cast
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
@@ -28,6 +29,13 @@ from app.infrastructure.database.legacy import User, get_async_session
 from app.schemas import ChannelBindingRead, TelegramLinkCodeRead
 
 _TELEGRAM = "telegram"
+
+
+class _TelegramWebhookService(Protocol):
+    """Minimal service surface needed by the Telegram webhook endpoint."""
+
+    async def feed_webhook_update(self, update: Any) -> None:
+        """Dispatch a validated Telegram update."""
 
 
 def _telegram_configured() -> bool:
@@ -49,6 +57,28 @@ def _build_deep_link(code: str) -> str | None:
     if not settings.telegram_bot_username:
         return None
     return f"https://t.me/{settings.telegram_bot_username}?start={quote(code)}"
+
+
+def _ensure_telegram_webhook_enabled(
+    service: object | None,
+    secret_token: str | None,
+) -> None:
+    """Reject requests unless Telegram webhook mode and secret validation pass."""
+    if service is None or settings.telegram_mode != "webhook":
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Telegram webhook is not enabled on this deployment.",
+        )
+    if not settings.telegram_webhook_secret:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Telegram webhook secret is required.",
+        )
+    if secret_token != settings.telegram_webhook_secret:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bad webhook secret.",
+        )
 
 
 def get_channels_router() -> APIRouter:
@@ -129,25 +159,14 @@ def get_channels_router() -> APIRouter:
         configured secret — standard Telegram webhook hardening.
         """
         service = getattr(request.app.state, "telegram_service", None)
-        if service is None or settings.telegram_mode != "webhook":
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Telegram webhook is not enabled on this deployment.",
-            )
-        if (
-            settings.telegram_webhook_secret
-            and x_telegram_bot_api_secret_token != settings.telegram_webhook_secret
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Bad webhook secret.",
-            )
+        _ensure_telegram_webhook_enabled(service, x_telegram_bot_api_secret_token)
         # Local import keeps aiogram out of the import graph for
         # deployments that don't run the channel.
         from aiogram.types import Update  # noqa: PLC0415
 
         body = await request.json()
         update = Update.model_validate(body)
-        await service.feed_webhook_update(update)
+        webhook_service = cast("_TelegramWebhookService", service)
+        await webhook_service.feed_webhook_update(update)
 
     return router

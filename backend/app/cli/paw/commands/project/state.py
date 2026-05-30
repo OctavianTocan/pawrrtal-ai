@@ -48,6 +48,11 @@ def project_log_path(profile: str) -> Path:
     return profile_dir(profile) / "project.log"
 
 
+def service_state_path(profile: str) -> Path:
+    """Return the service-profile state path for ``profile``."""
+    return profile_dir(profile) / "project-service.json"
+
+
 def load_state(profile: str) -> ProjectState | None:
     """Read the project state file, or ``None`` when absent/unreadable."""
     path = project_state_path(profile)

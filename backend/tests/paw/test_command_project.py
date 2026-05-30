@@ -388,6 +388,7 @@ def test_project_service_install_writes_user_unit_and_enables_now(
     assert "ExecStart=/fake/bin/bun run dev.ts" in unit
     assert 'Environment="DATABASE_URL="' in unit
     assert fake_systemd == [
+        ["systemctl", "--user", "is-system-running"],
         ["systemctl", "--user", "daemon-reload"],
         ["systemctl", "--user", "enable", "--now", "pawrrtal-dev.service"],
     ]
@@ -419,6 +420,154 @@ def test_project_service_install_can_enable_linger(
     result = runner.invoke(app, ["project", "service", "install", "--linger"])
     assert result.exit_code == 0, result.stdout
     assert ["loginctl", "enable-linger", "octavian"] in fake_systemd
+
+
+def test_project_service_install_tailscale_profile_configures_owned_routes(
+    runner: CliRunner,
+    fake_systemd: list[list[str]],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The Tailscale profile writes profile env and applies owned Serve routes."""
+    monkeypatch.setattr(service_module, "_tailscale_json", lambda *_args: {})
+
+    result = runner.invoke(
+        app,
+        [
+            "project",
+            "service",
+            "install",
+            "--profile",
+            "tailscale",
+            "--tailscale-host",
+            "pawrrtal.example.ts.net",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    unit_path = tmp_path / "xdg" / "systemd" / "user" / "pawrrtal-dev-tailscale.service"
+    unit = unit_path.read_text()
+    assert 'Environment="NEXT_PUBLIC_BROWSER_API_BASE="' in unit
+    assert 'Environment="BACKEND_INTERNAL_URL=http://127.0.0.1:8000"' in unit
+    assert (
+        'Environment="GOOGLE_OAUTH_REDIRECT_URI=https://pawrrtal.example.ts.net/api/v1/auth/oauth/google/callback"'
+        in unit
+    )
+    assert (
+        'Environment="APPLE_OAUTH_REDIRECT_URI=https://pawrrtal.example.ts.net/api/v1/auth/oauth/apple/callback"'
+        in unit
+    )
+    assert [
+        "tailscale",
+        "serve",
+        "--bg",
+        "--yes",
+        "--https",
+        "443",
+        "--set-path",
+        "/",
+        "http://localhost:53001",
+    ] in fake_systemd
+    assert [
+        "tailscale",
+        "serve",
+        "--bg",
+        "--yes",
+        "--https",
+        "443",
+        "--set-path",
+        "/api/v1",
+        "http://127.0.0.1:8000",
+    ] in fake_systemd
+    state_path = paw_config.profile_dir("tailscale") / "project-service.json"
+    state = json.loads(state_path.read_text())
+    assert state["public_url"] == "https://pawrrtal.example.ts.net/"
+
+
+def test_project_service_install_tailscale_refuses_existing_unowned_serve_config(
+    runner: CliRunner,
+    fake_systemd: list[list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Existing unowned Tailscale Serve config is a hard stop."""
+
+    def fake_tailscale_json(*args: str) -> dict[str, Any]:
+        if args == ("serve", "status", "--json"):
+            return {"HTTPS": {"443": {"Handlers": {"/": {"Proxy": "http://other"}}}}}
+        return {}
+
+    monkeypatch.setattr(service_module, "_tailscale_json", fake_tailscale_json)
+
+    result = runner.invoke(
+        app,
+        [
+            "project",
+            "service",
+            "install",
+            "--profile",
+            "tailscale",
+            "--tailscale-host",
+            "pawrrtal.example.ts.net",
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert not any(call[:3] == ["tailscale", "serve", "--bg"] for call in fake_systemd)
+
+
+def test_project_service_uninstall_tailscale_removes_owned_paths_only(
+    runner: CliRunner,
+    fake_systemd: list[list[str]],
+    tmp_path: Path,
+) -> None:
+    """Tailscale uninstall removes only after Pawrrtal state says it owns the profile."""
+    unit_dir = tmp_path / "xdg" / "systemd" / "user"
+    unit_dir.mkdir(parents=True)
+    unit_path = unit_dir / "pawrrtal-dev-tailscale.service"
+    unit_path.write_text("[Unit]\nDescription=old\n")
+    state_dir = paw_config.profile_dir("tailscale")
+    state_dir.mkdir(parents=True, exist_ok=True)
+    (state_dir / "project-service.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "profile": "tailscale",
+                "service_name": "pawrrtal-dev-tailscale.service",
+                "installed_at": "2026-05-30T00:00:00+00:00",
+                "tailscale_host": "pawrrtal.example.ts.net",
+                "public_url": "https://pawrrtal.example.ts.net/",
+                "routes": [],
+            }
+        )
+    )
+
+    result = runner.invoke(app, ["project", "service", "uninstall", "--profile", "tailscale"])
+
+    assert result.exit_code == 0, result.stdout
+    assert not unit_path.exists()
+    assert not (state_dir / "project-service.json").exists()
+    assert ["tailscale", "serve", "reset"] not in fake_systemd
+    assert ["tailscale", "serve", "--https", "443", "--set-path", "/", "off"] in fake_systemd
+    assert [
+        "tailscale",
+        "serve",
+        "--https",
+        "443",
+        "--set-path",
+        "/api/v1",
+        "off",
+    ] in fake_systemd
+
+
+def test_project_service_commands_reject_unknown_profile(
+    runner: CliRunner,
+    fake_systemd: list[list[str]],
+) -> None:
+    """Every service verb rejects profile typos instead of falling back to local."""
+    result = runner.invoke(app, ["project", "service", "status", "--profile", "tailcale"])
+
+    assert result.exit_code == 1
+    assert fake_systemd == []
 
 
 def test_project_service_uninstall_disables_and_removes_unit(

@@ -9,9 +9,8 @@
 #             native Next.js image optimisation
 #
 # Build-time ARG:
-#   NEXT_PUBLIC_API_URL  defaults to http://backend:8000 (Docker internal
-#                        network). Override when building for a different
-#                        target (e.g. a public domain).
+#   NEXT_PUBLIC_BROWSER_API_BASE  defaults to same-origin browser API calls.
+#                                Override only for browser-direct backends.
 #
 # Notes:
 #   - Node version is pinned to a specific minor for reproducibility.
@@ -50,11 +49,10 @@ ENV NODE_ENV=production
 # NEXT_PUBLIC_* must be set BEFORE `bun run build` because Next.js inlines
 # these values into the client bundle at build time.
 #
-# Server-side Next.js calls (RSC, Server Actions) use this URL directly.
-# Client-side browser calls hit /api/* via Nginx (same origin) so the
-# baked value is mostly irrelevant in the browser — the proxy handles it.
-ARG NEXT_PUBLIC_API_URL=http://backend:8000
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# Client-side browser calls hit /api/* via Nginx (same origin). Server-side
+# Next.js calls use BACKEND_INTERNAL_URL at runtime.
+ARG NEXT_PUBLIC_BROWSER_API_BASE=""
+ENV NEXT_PUBLIC_BROWSER_API_BASE=$NEXT_PUBLIC_BROWSER_API_BASE
 
 RUN bun run build
 

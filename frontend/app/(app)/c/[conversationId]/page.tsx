@@ -1,12 +1,7 @@
 import { cookies } from 'next/headers';
 import { notFound, unauthorized } from 'next/navigation';
 import ChatContainer from '@/features/chat/ChatContainer';
-import { API_BASE_URL, API_ENDPOINTS } from '@/lib/api';
-
-// Server components cannot use localStorage, so read the key from the build-time
-// env var. In demo builds it is baked in; for production deployments configure
-// NEXT_PUBLIC_BACKEND_API_KEY in the server's environment.
-const SERVER_API_KEY = process.env.NEXT_PUBLIC_BACKEND_API_KEY ?? '';
+import { API_ENDPOINTS, serverApiFetch } from '@/lib/server-api';
 
 /** Route params for `/c/:conversationId`. */
 interface ConversationPageProps {
@@ -31,18 +26,14 @@ export default async function ConversationPage({ params }: ConversationPageProps
 	const [{ conversationId }, cookieStore] = await Promise.all([params, cookies()]);
 	const sessionToken = cookieStore.get('session_token');
 
-	const response = await fetch(
-		API_BASE_URL + API_ENDPOINTS.conversations.getMessages(conversationId),
-		{
-			cache: 'no-store',
-			method: 'GET',
-			headers: {
-				'content-type': 'application/json',
-				Cookie: `session_token=${sessionToken?.value}`,
-				...(SERVER_API_KEY ? { 'X-Pawrrtal-Key': SERVER_API_KEY } : {}),
-			},
-		}
-	);
+	const response = await serverApiFetch(API_ENDPOINTS.conversations.getMessages(conversationId), {
+		cache: 'no-store',
+		method: 'GET',
+		headers: {
+			'content-type': 'application/json',
+			Cookie: `session_token=${sessionToken?.value}`,
+		},
+	});
 
 	// Uses Next.js experimental authInterrupts feature.
 	if (response.status === 401) {

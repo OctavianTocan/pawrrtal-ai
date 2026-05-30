@@ -102,7 +102,6 @@ class Settings(BaseSettings):
     cookie_secure: bool | None = None
     # The base directory where workspaces will be stored. Each workspace can contain files, configurations, and other resources specific to a user's project or environment.
     workspace_base_dir: str = "/data/workspaces"
-
     # ── Agent loop safety ────────────────────────────────────────────────
     # See backend/app/core/agent_loop/types.py::AgentSafetyConfig for the
     # behavioural contract.  All four caps accept None to opt out of the
@@ -422,8 +421,7 @@ class Settings(BaseSettings):
     @property
     def voice_max_size_bytes(self) -> int:
         """Voice size cap in bytes (the handler validates against this)."""
-        bytes_per_mb = 1024 * 1024
-        return self.voice_max_size_mb * bytes_per_mb
+        return self.voice_max_size_mb * 1024 * 1024
 
     @field_validator("telegram_bot_username", mode="before")
     @classmethod

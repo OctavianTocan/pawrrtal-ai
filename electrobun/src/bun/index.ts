@@ -42,6 +42,8 @@ import { addRoot, ensureDefaultWorkspaceRoot, listRoots, removeRoot } from './wo
 // ELECTROBUN_DEV is not reliably propagated in v1.18 — detect dev mode via
 // PAWRRTAL_REPO_ROOT, which the 'bun start' script injects.
 const isDev = Boolean(process.env.PAWRRTAL_REPO_ROOT);
+const remoteAppUrl = resolveRemoteAppUrl(process.env.PAWRRTAL_REMOTE_URL);
+const isRemoteMode = remoteAppUrl !== null;
 
 // ─── Window state persistence ────────────────────────────────────────────────
 // Restores the previous window size between launches (mirrors Electron shell).
@@ -61,6 +63,18 @@ const savedWindow = windowStore.get('window');
 // Mutable references — assigned after the Next.js server is ready.
 let win: BrowserWindow<PawrrtalRPCType> | undefined;
 let server: StartedServer | undefined;
+
+function resolveRemoteAppUrl(value: string | undefined): string | null {
+	if (!value) return null;
+	const parsed = new URL(value);
+	if (parsed.protocol !== 'https:') {
+		throw new Error('PAWRRTAL_REMOTE_URL must be an https:// URL.');
+	}
+	if (parsed.hostname === 'localhost' || parsed.hostname.endsWith('.localhost')) {
+		throw new Error('PAWRRTAL_REMOTE_URL cannot point at localhost.');
+	}
+	return parsed.origin;
+}
 
 // ─── RPC definition (replaces ipc.ts + preload.ts) ───────────────────────────
 
@@ -198,7 +212,9 @@ ApplicationMenu.setApplicationMenu([
 
 // ─── Startup ──────────────────────────────────────────────────────────────────
 
-ensureDefaultWorkspaceRoot();
+if (!isRemoteMode) {
+	ensureDefaultWorkspaceRoot();
+}
 
 // Open the splash window immediately — views://splash/index.html is a proper
 // secure context (crypto.subtle works), unlike data: URLs.
@@ -210,12 +226,14 @@ win = new BrowserWindow({
 	// trafficLightOffset moves them down so they sit inside the nav bar.
 	titleBarStyle: 'hiddenInset',
 	trafficLightOffset: { x: 10, y: 16 },
-	rpc,
+	...(isRemoteMode ? {} : { rpc }),
 });
 
-setPromptFn((request) => {
-	win?.webview.rpc.send.permissionsPrompt(request);
-});
+if (!isRemoteMode) {
+	setPromptFn((request) => {
+		win?.webview.rpc.send.permissionsPrompt(request);
+	});
+}
 
 // ─── Drag region + traffic-light safe zone injection ────────────────────────
 // Injects a <style> tag directly using -webkit-app-region: drag so the
@@ -254,12 +272,14 @@ function injectDragRegion() {
 	win?.webview.executeJavascript(INJECT_DRAG_REGION);
 }
 
-win.webview.on('did-navigate', () => {
-	injectDragRegion();
-});
-win.webview.on('did-navigate-in-page', () => {
-	injectDragRegion();
-});
+if (!isRemoteMode) {
+	win.webview.on('did-navigate', () => {
+		injectDragRegion();
+	});
+	win.webview.on('did-navigate-in-page', () => {
+		injectDragRegion();
+	});
+}
 
 // ─── Graceful shutdown ─────────────────────────────────────────────────────
 // Kill the spawned Next.js server when the window closes to avoid ghost
@@ -273,18 +293,22 @@ win.on('close', async () => {
 ApplicationMenu.on('application-menu-clicked', (event: unknown) => {
 	const { action } = event as { action: string };
 	if (action === 'new-chat') {
-		win?.webview.rpc.send.menuNewChat({});
+		win?.webview.rpc?.send.menuNewChat({});
 	}
 });
 
 // Start frontend + backend, then navigate the splash to the real URL.
-startNextServer({ isDev })
-	.then((started) => {
-		server = started;
-		win?.webview.loadURL(started.url);
-	})
-	.catch((err: unknown) => {
-		const reason = err instanceof Error ? err.message : String(err);
-		console.error('[electrobun] startup failed:', reason);
-		process.exit(1);
-	});
+if (remoteAppUrl) {
+	win.webview.loadURL(remoteAppUrl);
+} else {
+	startNextServer({ isDev })
+		.then((started) => {
+			server = started;
+			win?.webview.loadURL(started.url);
+		})
+		.catch((err: unknown) => {
+			const reason = err instanceof Error ? err.message : String(err);
+			console.error('[electrobun] startup failed:', reason);
+			process.exit(1);
+		});
+}

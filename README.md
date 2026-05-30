@@ -283,6 +283,11 @@ just paw project service status
 just paw project service logs --follow
 just paw project service uninstall
 
+# Optional private Tailscale HTTPS profile:
+just paw project service install --profile tailscale --tailscale-host <host.tailnet.ts.net>
+just paw project service status --profile tailscale
+just paw project service uninstall --profile tailscale
+
 # Short aliases:
 just paw run
 just paw stop
@@ -291,6 +296,8 @@ just paw stop
 Before changing startup code, run `just env-check`. It catches missing binaries, unwritable cache/config paths, occupied dev ports, and environments that cannot bind local sockets. Before claiming the local app boots end-to-end, run `just smoke-dev`; it preflights the environment, starts the detached stack, checks status, and stops it.
 
 The service helper writes `~/.config/systemd/user/pawrrtal-dev.service` and manages it through `systemctl --user`. It uses the same `dev.ts` orchestrator as `just dev`, defaults to the local SQLite database, and preserves `PAWRRTAL_DEV_DATABASE_URL` when you intentionally want a non-SQLite dev database.
+
+The Tailscale profile writes `pawrrtal-dev-tailscale.service`, keeps Next.js and FastAPI bound to loopback, and publishes one private HTTPS origin through Tailscale Serve. Browser API calls go same-origin through that URL; server-side Next.js fetches still use `BACKEND_INTERNAL_URL=http://127.0.0.1:8000`. The profile refuses existing unowned Serve config instead of overwriting it. It is intended for private tailnet use, not public Funnel exposure.
 
 ### Docker
 
@@ -351,6 +358,7 @@ CORS_ORIGIN_REGEX=^https:\/\/.*\.vercel\.app$
 COOKIE_DOMAIN=
 COOKIE_SAMESITE=lax
 COOKIE_SECURE=false
+BACKEND_INTERNAL_URL=http://127.0.0.1:8000
 
 # Channels: Telegram
 TELEGRAM_BOT_TOKEN=
