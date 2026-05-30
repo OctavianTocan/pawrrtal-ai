@@ -156,28 +156,32 @@ async def _put_workspace_env(
     return data if isinstance(data, dict) else {}
 
 
+async def _delete_workspace_env_key(
+    client: PawClient,
+    workspace_id: str,
+    key: str,
+) -> dict[str, Any]:
+    try:
+        await client.request(
+            "DELETE",
+            f"/api/v1/workspaces/{workspace_id}/env/{key}",
+            expect=(204,),
+        )
+        return {"key": key, "deleted": True}
+    except ApiError as e:
+        if e.status_code == HTTP_NOT_FOUND:
+            return {"key": key, "deleted": False, "reason": "not_found"}
+        raise
+
+
 async def _delete_workspace_env_keys(
     state: PersonaState,
     workspace_id: str,
     keys: list[str],
 ) -> list[dict[str, Any]]:
     """Issue one DELETE per key, treating 404 as a soft no-op."""
-    results: list[dict[str, Any]] = []
     async with PawClient(state) as client:
-        for key in keys:
-            try:
-                await client.request(
-                    "DELETE",
-                    f"/api/v1/workspaces/{workspace_id}/env/{key}",
-                    expect=(204,),
-                )
-                results.append({"key": key, "deleted": True})
-            except ApiError as e:
-                if e.status_code == HTTP_NOT_FOUND:
-                    results.append({"key": key, "deleted": False, "reason": "not_found"})
-                else:
-                    raise
-    return results
+        return [await _delete_workspace_env_key(client, workspace_id, key) for key in keys]
 
 
 @files_app.command("ls")

@@ -10,7 +10,8 @@ from litellm.exceptions import RateLimitError as LiteLLMRateLimitError
 from litellm.exceptions import Timeout as LiteLLMTimeout
 from litellm.exceptions import UnsupportedParamsError as LiteLLMUnsupportedParamsError
 
-from app.agents import AgentMessage
+from app.agents import AgentMessage, AssistantMessage
+from app.agents.types import TextContent, ToolCallContent
 from app.infrastructure.config import settings
 from app.infrastructure.keys import resolve_api_key
 
@@ -50,6 +51,47 @@ def resolve_litellm_api_key(vendor: Vendor, workspace_root: Path | None) -> str 
     return value or None
 
 
+def _last_user_message_index(messages: list[AgentMessage]) -> int:
+    return max((idx for idx, msg in enumerate(messages) if msg["role"] == "user"), default=-1)
+
+
+def _image_content(text: str, images: list[dict[str, str]]) -> list[dict[str, Any]]:
+    content_list: list[dict[str, Any]] = [{"type": "text", "text": text}]
+    for img in images:
+        if "data" not in img:
+            continue
+        media_type = img.get("media_type", "image/png")
+        data_uri = f"data:{media_type};base64,{img['data']}"
+        content_list.append({"type": "image_url", "image_url": {"url": data_uri}})
+    return content_list
+
+
+def _user_message_content(
+    *,
+    text: str,
+    idx: int,
+    last_user_idx: int,
+    images: list[dict[str, str]] | None,
+) -> str | list[dict[str, Any]] | None:
+    if idx == last_user_idx and images:
+        return _image_content(text, images)
+    if text.strip():
+        return text
+    return None
+
+
+def _assistant_message_content(message: AssistantMessage) -> str | None:
+    text_parts = [b["text"] for b in _assistant_text_blocks(message["content"])]
+    joined = "".join(text_parts)
+    return joined if joined.strip() else None
+
+
+def _assistant_text_blocks(
+    content: list[TextContent | ToolCallContent],
+) -> list[TextContent]:
+    return [block for block in content if block["type"] == "text"]
+
+
 def build_litellm_messages(
     messages: list[AgentMessage],
     system_prompt: str,
@@ -57,31 +99,23 @@ def build_litellm_messages(
 ) -> list[dict[str, Any]]:
     """Convert agent-loop messages to LiteLLM's OpenAI-shaped messages."""
     out: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
-
-    last_user_idx = -1
-    for idx, msg in enumerate(messages):
-        if msg["role"] == "user":
-            last_user_idx = idx
+    last_user_idx = _last_user_message_index(messages)
 
     for idx, msg in enumerate(messages):
         if msg["role"] == "user":
-            text = msg["content"]
-            if idx == last_user_idx and images:
-                content_list: list[dict[str, Any]] = [{"type": "text", "text": text}]
-                for img in images:
-                    if "data" in img:
-                        media_type = img.get("media_type", "image/png")
-                        data_uri = f"data:{media_type};base64,{img['data']}"
-                        content_list.append({"type": "image_url", "image_url": {"url": data_uri}})
-                out.append({"role": "user", "content": content_list})
-            elif text.strip():
-                out.append({"role": "user", "content": text})
+            content = _user_message_content(
+                text=msg["content"],
+                idx=idx,
+                last_user_idx=last_user_idx,
+                images=images,
+            )
+            if content is not None:
+                out.append({"role": "user", "content": content})
             continue
         if msg["role"] == "assistant":
-            text_parts = [b["text"] for b in msg["content"] if b["type"] == "text"]
-            joined = "".join(text_parts)
-            if joined.strip():
-                out.append({"role": "assistant", "content": joined})
+            content = _assistant_message_content(msg)
+            if content is not None:
+                out.append({"role": "assistant", "content": content})
             continue
     return out
 
