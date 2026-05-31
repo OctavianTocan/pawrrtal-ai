@@ -329,6 +329,7 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
         raise RuntimeError("Telegram message has no bot; refusing to stream.")
     thinking_msg = await message.answer(
         render_initial(),
+        reply_parameters=_reply_parameters(message.message_id),
     )
 
     # Keep startup imports lazy and keep fan-out count within limit
@@ -418,6 +419,7 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
             # Spawn a new placeholder so the active recall message stays in the chat history
             thinking_msg = await message.answer(
                 render_initial(),
+                reply_parameters=_reply_parameters(message.message_id),
             )
             channel_message["metadata"]["message_id"] = thinking_msg.message_id
 
