@@ -71,6 +71,7 @@ OVERRIDABLE_KEYS: frozenset[str] = frozenset(
         "ACTIVE_RECALL_ENABLED",
         "ACTIVE_RECALL_MODEL",
         "ACTIVE_RECALL_SEARCH_WORKSPACE",
+        "ACTIVE_RECALL_TIMEOUT_S",
         "ACTIVE_RECALL_SYSTEM_PROMPT",
     }
 )

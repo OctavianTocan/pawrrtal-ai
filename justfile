@@ -20,7 +20,7 @@ dev-telegram:
 #   just paw doctor --json
 #   just paw doctor --profile staging
 paw *ARGS:
-    cd backend && uv run paw {{ARGS}}
+    @BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"; SAFE="$(printf "%s" "$BRANCH" | sed -E 's/[^A-Za-z0-9._-]+/-/g; s/-+/-/g; s/^[-.]+//; s/[-.]+$//' | cut -c1-80)"; if [ -z "$SAFE" ] || [ "$SAFE" = "HEAD" ]; then SAFE=""; fi; DATABASE_URL="" SQLITE_DB_FILENAME="${SAFE:+pawrrtal-$SAFE.db}" uv run --project backend paw {{ARGS}}
 
 # Fast local environment check for agents and CI smoke loops. This does not
 # start servers; it verifies writable cache/config paths, binaries, and ports.

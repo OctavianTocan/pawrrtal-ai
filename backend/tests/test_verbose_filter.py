@@ -49,7 +49,7 @@ class TestQuiet:
 
 
 class TestNormal:
-    """Level 1 — adds tool calls + artifacts; thinking still suppressed."""
+    """Level 1 — adds tool calls, artifacts, and safe thinking summaries."""
 
     @pytest.mark.parametrize(
         "ev",
@@ -67,6 +67,15 @@ class TestNormal:
 
     def test_thinking_dropped(self) -> None:
         assert should_emit_event(_ev("thinking", content="thoughts"), VERBOSE_NORMAL) is False
+
+    def test_summary_thinking_kept(self) -> None:
+        assert (
+            should_emit_event(
+                _ev("thinking", content="safe summary", summary=True),
+                VERBOSE_NORMAL,
+            )
+            is True
+        )
 
 
 class TestDetailed:

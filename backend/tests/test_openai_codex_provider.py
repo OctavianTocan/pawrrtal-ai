@@ -11,10 +11,14 @@ Test buckets:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import sys
 import uuid
+from collections.abc import AsyncIterator
 from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -68,7 +72,7 @@ except Exception:
 
 IMAGE_PLUGIN_XFAIL = pytest.mark.xfail(
     reason="openai_codex_image_gen plugin activation pending (bean pawrrtal-roi0)",
-    strict=False,
+    run=False,
 )
 
 
@@ -254,62 +258,114 @@ def test_provider_creates_client_lazily():
 # -----------------------------------------------------------------------------
 
 
+class _FakeHandle:
+    """Minimal async turn handle for provider stream tests."""
+
+    def __init__(
+        self,
+        *,
+        notifications: list[object],
+        turn_stream: AsyncIterator[object] | None,
+        turn_stream_raises: Exception | None,
+    ) -> None:
+        self.notifications = notifications
+        self.turn_stream = turn_stream
+        self.turn_stream_raises = turn_stream_raises
+
+    async def stream(self) -> AsyncIterator[object]:
+        if self.turn_stream is not None:
+            async for notification in self.turn_stream:
+                yield notification
+            return
+        if self.turn_stream_raises is not None:
+            raise self.turn_stream_raises
+        for notification in self.notifications:
+            yield notification
+
+
+class _FakeThread:
+    """Minimal Codex thread that records the latest run input."""
+
+    id = "thr_test_123"
+
+    def __init__(self, owner: _FakeCodex) -> None:
+        self.owner = owner
+
+    async def turn(self, run_input, **kw):
+        self.owner.last_run_input = run_input
+        self.owner.last_turn_kwargs = kw
+        return _FakeHandle(
+            notifications=self.owner.notifications,
+            turn_stream=self.owner.turn_stream,
+            turn_stream_raises=self.owner.turn_stream_raises,
+        )
+
+
+class _FakeSyncClient:
+    _approval_handler = None
+
+
+class _FakeInnerClient:
+    _sync = _FakeSyncClient()
+
+
+class _FakeCodex:
+    """Minimal AsyncCodex surface the provider touches."""
+
+    _client = _FakeInnerClient()
+
+    def __init__(
+        self,
+        *,
+        notifications: list[object],
+        turn_stream: AsyncIterator[object] | None,
+        thread_start_raises: Exception | None,
+        turn_stream_raises: Exception | None,
+    ) -> None:
+        self.notifications = notifications
+        self.turn_stream = turn_stream
+        self.thread_start_raises = thread_start_raises
+        self.turn_stream_raises = turn_stream_raises
+        self.thread_start_calls = 0
+        self.thread_resume_calls = 0
+        self.resumed_thread_ids: list[str] = []
+        self.last_run_input: object | None = None
+        self.last_turn_kwargs: dict[str, Any] | None = None
+
+    async def _ensure_initialized(self) -> None:
+        return None
+
+    async def thread_start(self, **kw: Any) -> _FakeThread:
+        self.thread_start_calls += 1
+        if self.thread_start_raises is not None:
+            raise self.thread_start_raises
+        return _FakeThread(self)
+
+    async def thread_resume(self, tid: str, **kw: Any) -> _FakeThread:
+        self.thread_resume_calls += 1
+        self.resumed_thread_ids.append(tid)
+        thread = _FakeThread(self)
+        thread.id = tid
+        return thread
+
+    async def close(self) -> None:
+        return None
+
+
 def _build_fake_codex(
     *,
     turn_notifications: list[object] | None = None,
+    turn_stream: AsyncIterator[object] | None = None,
     thread_start_raises: Exception | None = None,
     turn_stream_raises: Exception | None = None,
-) -> object:
-    """Build a fake AsyncCodex that mimics the surface the provider touches.
-
-    The provider calls (in order):
-        codex._ensure_initialized()
-        codex.thread_start(...)  -> thread
-        thread.turn(run_input, ...)  -> handle
-        async for notification in handle.stream(): ...
-    Each step is independently overridable for negative tests.
-    """
-    notifs = list(turn_notifications or [])
-
-    class _FakeHandle:
-        async def stream(self):
-            if turn_stream_raises is not None:
-                raise turn_stream_raises
-            for n in notifs:
-                yield n
-
-    class _FakeThread:
-        id = "thr_test_123"
-
-        async def turn(self, run_input, **kw):
-            return _FakeHandle()
-
-    class _FakeSyncClient:
-        _approval_handler = None
-
-    class _FakeInnerClient:
-        _sync = _FakeSyncClient()
-
-    class _FakeCodex:
-        _client = _FakeInnerClient()
-
-        async def _ensure_initialized(self):
-            return None
-
-        async def thread_start(self, **kw):
-            if thread_start_raises is not None:
-                raise thread_start_raises
-            return _FakeThread()
-
-        async def thread_resume(self, tid, **kw):
-            t = _FakeThread()
-            t.id = tid
-            return t
-
-        async def close(self):
-            return None
-
-    return _FakeCodex()
+) -> _FakeCodex:
+    """Build a fake AsyncCodex that mimics the surface the provider touches."""
+    return _FakeCodex(
+        notifications=list(turn_notifications or []),
+        turn_stream=turn_stream,
+        thread_start_raises=thread_start_raises,
+        turn_stream_raises=turn_stream_raises,
+    )
 
 
 @pytest.mark.anyio
@@ -355,9 +411,8 @@ async def test_stream_yields_error_event_on_thread_start_exception(monkeypatch):
     provider = provider_mod.OpenAICodexProvider("gpt-5.5")
     events = [e async for e in provider.stream("test", uuid.uuid4(), uuid.uuid4())]
 
-    assert len(events) == 1
-    assert events[0]["type"] == "error"
-    assert "Failed to start/resume Codex thread" in events[0]["content"]
+    assert events[-1]["type"] == "error"
+    assert "Failed to start/resume Codex thread" in events[-1]["content"]
 
 
 @pytest.mark.anyio
@@ -407,12 +462,52 @@ async def test_stream_resumes_existing_thread_when_thread_id_provided(monkeypatc
             "follow up",
             uuid.uuid4(),
             uuid.uuid4(),
+            history=[{"role": "user", "content": "old"}],
+            per_turn_context="memory for this turn",
             codex_thread_id="thr_existing_abc",
         )
     ]
 
     kinds = [(e.get("type"), e.get("kind")) for e in events]
     assert ("internal", "codex_thread_created") not in kinds
+    assert fake_codex.thread_start_calls == 0
+    assert fake_codex.thread_resume_calls == 1
+    assert fake_codex.resumed_thread_ids == ["thr_existing_abc"]
+    run_input = fake_codex.last_run_input
+    assert isinstance(run_input, list)
+    rendered = [getattr(item, "text", "") for item in run_input]
+    assert rendered == [
+        "[Current turn context]\nmemory for this turn",
+        "follow up",
+    ]
+
+
+@pytest.mark.anyio
+async def test_stream_heartbeat_does_not_cancel_silent_codex_stream(monkeypatch):
+    """A quiet Codex stream should keep waiting after heartbeat messages."""
+    if OpenAICodexProvider is None:
+        pytest.skip("provider not importable")
+
+    from app.providers.openai_codex import provider as provider_mod
+
+    async def _slow_stream() -> AsyncIterator[object]:
+        await asyncio.sleep(0.02)
+        yield _make_real_payload("AgentMessageDeltaNotification", delta="done", **_NOTIF_ROUTING)
+
+    fake_codex = _build_fake_codex(turn_stream=_slow_stream())
+
+    async def _fake_ensure_codex(self):
+        self._codex = fake_codex
+        return self._codex
+
+    monkeypatch.setattr(provider_mod, "_CODEX_SILENCE_HEARTBEAT_SECONDS", 0.001)
+    monkeypatch.setattr(provider_mod.OpenAICodexProvider, "_ensure_codex", _fake_ensure_codex)
+
+    provider = provider_mod.OpenAICodexProvider("gpt-5.5")
+    events = [e async for e in provider.stream("test", uuid.uuid4(), uuid.uuid4())]
+
+    assert any(e.get("content", "").startswith("Codex is still working") for e in events)
+    assert any(e.get("type") == "delta" and e.get("content") == "done" for e in events)
 
 
 # =============================================================================
@@ -520,6 +615,142 @@ def test_event_mapper_handles_reasoning_text_delta():
     assert any(e.get("type") == "thinking" and e.get("summary") is False for e in events)
 
 
+def test_event_mapper_handles_command_item_lifecycle():
+    """Codex command item start/complete becomes Telegram-renderable tool events."""
+    if _IMPORT_ERROR:
+        pytest.skip("Implementation modules not importable")
+
+    from app.providers.openai_codex.events import map_codex_notification_to_stream_events
+
+    item = {
+        "type": "commandExecution",
+        "id": "cmd_1",
+        "command": "pwd",
+        "commandActions": [],
+        "cwd": "/workspace",
+        "status": "completed",
+        "aggregatedOutput": "/workspace\n",
+        "exitCode": 0,
+    }
+    started = _make_real_payload(
+        "ItemStartedNotification",
+        item=item,
+        started_at_ms=1,
+        thread_id="thr_1",
+        turn_id="turn_1",
+    )
+    completed = _make_real_payload(
+        "ItemCompletedNotification",
+        item=item,
+        completed_at_ms=2,
+        thread_id="thr_1",
+        turn_id="turn_1",
+    )
+    if started is None or completed is None:
+        pytest.skip("SDK item lifecycle notifications not constructable")
+
+    events = [
+        *map_codex_notification_to_stream_events(started),
+        *map_codex_notification_to_stream_events(completed),
+    ]
+
+    assert any(e.get("type") == "tool_use" and e.get("tool_use_id") == "cmd_1" for e in events)
+    assert any(
+        e.get("type") == "tool_result"
+        and e.get("tool_use_id") == "cmd_1"
+        and e.get("is_error") is False
+        for e in events
+    )
+
+
+def test_event_mapper_decodes_command_exec_output_as_progress():
+    """Legacy command exec output deltas use base64 and stay non-terminal."""
+    if _IMPORT_ERROR:
+        pytest.skip("Implementation modules not importable")
+
+    from app.providers.openai_codex.events import map_codex_notification_to_stream_events
+
+    payload = _make_real_payload(
+        "CommandExecOutputDeltaNotification",
+        delta_base64="aGVsbG8K",
+        process_id=7,
+        stream="stdout",
+        cap_reached=False,
+    )
+    if payload is None:
+        pytest.skip("SDK CommandExecOutputDeltaNotification not constructable")
+
+    events = list(map_codex_notification_to_stream_events(payload))
+
+    assert events == [
+        {
+            "type": "tool_progress",
+            "tool_use_id": "7",
+            "content": "stdout: hello",
+        }
+    ]
+
+
+def test_event_mapper_handles_turn_plan_as_safe_thinking_summary():
+    """Codex plan updates should be visible in normal Telegram verbosity."""
+    if _IMPORT_ERROR:
+        pytest.skip("Implementation modules not importable")
+
+    from app.providers.openai_codex.events import map_codex_notification_to_stream_events
+
+    payload = _make_real_payload(
+        "TurnPlanUpdatedNotification",
+        explanation="Plan",
+        plan=[{"step": "Inspect files", "status": "inProgress"}],
+        thread_id="thr_1",
+        turn_id="turn_1",
+    )
+    if payload is None:
+        pytest.skip("SDK TurnPlanUpdatedNotification not constructable")
+
+    events = list(map_codex_notification_to_stream_events(payload))
+    assert any(
+        e.get("type") == "thinking"
+        and e.get("summary") is True
+        and "Inspect files" in e.get("content", "")
+        for e in events
+    )
+
+
+def test_event_mapper_uses_last_usage_not_thread_total(monkeypatch):
+    """Codex usage events must bill the latest model request, not the thread total."""
+    if _IMPORT_ERROR:
+        pytest.skip("Implementation modules not importable")
+
+    from app.providers.openai_codex import events as events_mod
+
+    class UsageNotification:
+        token_usage: Any
+
+    def fake_sdk(name: str) -> type[UsageNotification] | None:
+        return UsageNotification if name == "ThreadTokenUsageUpdatedNotification" else None
+
+    payload = UsageNotification()
+    payload.token_usage = SimpleNamespace(
+        last=SimpleNamespace(input_tokens=97, output_tokens=3),
+        total=SimpleNamespace(input_tokens=194, output_tokens=6),
+    )
+
+    monkeypatch.setattr(events_mod, "_sdk", fake_sdk)
+
+    mapped = list(events_mod.map_codex_notification_to_stream_events(payload))
+
+    assert mapped == [
+        {
+            "type": "usage",
+            "input_tokens": 97,
+            "output_tokens": 3,
+            "total_input_tokens": 194,
+            "total_output_tokens": 6,
+        }
+    ]
+
+
 # =============================================================================
 # REASONING EFFORT MAPPING
 # =============================================================================
@@ -556,6 +787,126 @@ def test_build_codex_run_input_accepts_history_and_prompt():
     # Translation layer may return a TextInput, a list of input items,
     # or a str depending on history shape — all are acceptable for v1.
     assert result is not None
+
+
+@pytest.mark.anyio
+async def test_ensure_codex_thread_returns_existing_id(monkeypatch):
+    """Thread ensure is idempotent and does not touch the SDK when a row exists."""
+    if OpenAICodexProvider is None:
+        pytest.skip("provider not importable")
+
+    from app.providers.openai_codex import threads as threads_mod
+    from app.providers.openai_codex.provider import OpenAICodexProvider as Provider
+
+    async def fail_ensure_codex(_self):
+        raise AssertionError("SDK should not be touched")
+
+    monkeypatch.setattr(threads_mod, "system_prompt_for_turn", lambda *args, **kwargs: None)
+    expected_hash = threads_mod.codex_thread_prompt_hash(
+        model_id="gpt-5.5",
+        workspace_root=None,
+        system_prompt=threads_mod.CODEX_LIGHT_SYSTEM_PROMPT,
+        developer_instructions=threads_mod.CODEX_DEVELOPER_INSTRUCTIONS,
+    )
+
+    async def fake_load(_conversation_id):
+        return ("thr_existing", expected_hash)
+
+    monkeypatch.setattr(threads_mod, "load_codex_thread_state", fake_load)
+    monkeypatch.setattr(Provider, "_ensure_codex", fail_ensure_codex)
+
+    provider = Provider("gpt-5.5")
+    thread_id = await threads_mod.ensure_codex_thread_id(
+        conversation_id=uuid.uuid4(),
+        provider=provider,
+        workspace_root=None,
+        model_id="openai-codex:openai/gpt-5.5",
+        tools=[],
+        reasoning_effort=None,
+    )
+
+    assert thread_id == "thr_existing"
+
+
+@pytest.mark.anyio
+async def test_ensure_codex_thread_returns_missing_state_without_precreate(monkeypatch):
+    """Missing native thread ids wait for the first real Codex turn."""
+    if OpenAICodexProvider is None:
+        pytest.skip("provider not importable")
+
+    from app.providers.openai_codex import threads as threads_mod
+    from app.providers.openai_codex.provider import OpenAICodexProvider as Provider
+
+    async def fake_load(_conversation_id):
+        return None
+
+    async def fail_ensure_codex(_self):
+        raise AssertionError("SDK should not be touched")
+
+    monkeypatch.setattr(threads_mod, "system_prompt_for_turn", lambda *args, **kwargs: None)
+    monkeypatch.setattr(threads_mod, "load_codex_thread_state", fake_load)
+    monkeypatch.setattr(Provider, "_ensure_codex", fail_ensure_codex)
+
+    provider = Provider("gpt-5.5")
+    state = await threads_mod.ensure_codex_thread_state(
+        conversation_id=uuid.uuid4(),
+        provider=provider,
+        workspace_root=None,
+        model_id="openai-codex:openai/gpt-5.5",
+        tools=[],
+        reasoning_effort=None,
+    )
+
+    assert state.thread_id is None
+    assert state.prompt_hash == threads_mod.codex_thread_prompt_hash(
+        model_id="gpt-5.5",
+        workspace_root=None,
+        system_prompt=threads_mod.CODEX_LIGHT_SYSTEM_PROMPT,
+        developer_instructions=threads_mod.CODEX_DEVELOPER_INSTRUCTIONS,
+    )
+
+
+@pytest.mark.anyio
+async def test_ensure_codex_thread_restarts_when_prompt_hash_changes(monkeypatch):
+    """Prompt-shape changes invalidate old native Codex threads."""
+    if OpenAICodexProvider is None:
+        pytest.skip("provider not importable")
+
+    from app.providers.openai_codex import threads as threads_mod
+    from app.providers.openai_codex.provider import OpenAICodexProvider as Provider
+
+    async def fake_load(_conversation_id):
+        return ("thr_old", "old_hash")
+
+    persisted: list[tuple[uuid.UUID, str | None, str | None]] = []
+
+    async def fake_persist(conversation_id, thread_id, prompt_hash=None):
+        persisted.append((conversation_id, thread_id, prompt_hash))
+
+    async def fail_ensure_codex(_self):
+        raise AssertionError("SDK should not be touched")
+
+    monkeypatch.setattr(threads_mod, "load_codex_thread_state", fake_load)
+    monkeypatch.setattr(threads_mod, "persist_codex_thread_id", fake_persist)
+    monkeypatch.setattr(Provider, "_ensure_codex", fail_ensure_codex)
+
+    conversation_id = uuid.uuid4()
+    provider = Provider("gpt-5.5")
+
+    state = await threads_mod.ensure_codex_thread_state(
+        conversation_id=conversation_id,
+        provider=provider,
+        workspace_root=None,
+        model_id="openai-codex:openai/gpt-5.5",
+        tools=[],
+        reasoning_effort=None,
+    )
+
+    assert state.thread_id is None
+    assert state.prompt_hash != "old_hash"
+    assert persisted[0][0] == conversation_id
+    assert persisted[0][1] is None
+    assert persisted[0][2] != "old_hash"
 
 
 # =============================================================================

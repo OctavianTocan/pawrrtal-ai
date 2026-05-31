@@ -9,7 +9,7 @@ from web) never re-sorted the sidebar.  These tests pin the fix.
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.conversations.messages_crud import (
     append_assistant_placeholder,
     append_user_message,
+    fail_stale_streaming_messages,
     finalize_assistant_message,
 )
 from app.infrastructure.database.legacy import User
@@ -56,6 +57,35 @@ async def test_append_user_message_bumps_conversation_updated_at(
     await db_session.refresh(conv)
 
     assert conv.updated_at > old
+
+
+@pytest.mark.anyio
+async def test_fail_stale_streaming_messages_marks_old_placeholders_failed(
+    db_session: AsyncSession, test_user: User
+) -> None:
+    """Startup repair makes interrupted assistant turns visible instead of stuck."""
+    old = datetime(2025, 1, 1)
+    conv = await _make_conversation(db_session, test_user, when=old)
+    placeholder = await append_assistant_placeholder(
+        db_session,
+        conversation_id=conv.id,
+        user_id=test_user.id,
+    )
+    placeholder.updated_at = old
+    db_session.add(placeholder)
+    await db_session.commit()
+
+    repaired = await fail_stale_streaming_messages(
+        db_session,
+        older_than=timedelta(seconds=30),
+        reason="interrupted",
+    )
+    await db_session.commit()
+    await db_session.refresh(placeholder)
+
+    assert repaired == 1
+    assert placeholder.assistant_status == "failed"
+    assert placeholder.content == "interrupted"
 
 
 @pytest.mark.anyio

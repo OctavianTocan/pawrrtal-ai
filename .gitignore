@@ -5,6 +5,7 @@ node_modules/
 /.pnp
 .pnp.*
 .venv/
+.cache/
 .mypy_cache/
 .pytest_cache/
 .ruff_cache/

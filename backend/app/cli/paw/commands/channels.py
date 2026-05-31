@@ -32,14 +32,20 @@ Output modes mirror ``paw conversations`` / ``paw workspaces``:
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 
+import httpx
 import typer
+from sqlalchemy import select
 
+from app.cli.paw.commands.channel_diagnostics import diagnose_telegram_state as _diagnose_telegram
 from app.cli.paw.config import PersonaState, load_state
 from app.cli.paw.errors import LocalError
 from app.cli.paw.http import PawClient
 from app.cli.paw.output import emit_human, emit_json, emit_plain_rows, require_one_output_mode
+from app.infrastructure.config import settings
+from app.infrastructure.database.legacy import User, async_session_maker
+from app.infrastructure.models.channel import ChannelBinding
 
 # Column widths for `paw channels list` on an 80-col terminal: 12-char
 # provider, 30-char external user id (Telegram numeric IDs fit easily),
@@ -52,6 +58,7 @@ LS_HANDLE_WIDTH = 24
 # provider lands as a sibling Typer subcommand, not a string literal
 # scattered across helpers.
 TELEGRAM_PROVIDER = "telegram"
+TELEGRAM_SEND_OK_STATUS = 200
 
 app = typer.Typer(
     help="Manage third-party messaging channel bindings (Telegram link / unlink).",
@@ -67,9 +74,14 @@ unlink_app = typer.Typer(
     help="Drop an existing channel binding (idempotent).",
     no_args_is_help=True,
 )
+send_app = typer.Typer(
+    help="Send an operator test message through a channel.",
+    no_args_is_help=True,
+)
 
 app.add_typer(link_app, name="link")
 app.add_typer(unlink_app, name="unlink")
+app.add_typer(send_app, name="send")
 
 
 # --------------------------------------------------------------------------- #
@@ -219,6 +231,109 @@ def unlink_telegram(
     emit_human(f"unlinked {TELEGRAM_PROVIDER}")
 
 
+@send_app.command("telegram")
+def send_telegram(
+    text: str = typer.Option(..., "--text", help="Text to send."),
+    chat_id: str | None = typer.Option(None, "--chat-id", help="Telegram chat id."),
+    user_email: str | None = typer.Option(
+        None,
+        "--user-email",
+        help="Resolve the Telegram chat id from this local Pawrrtal user.",
+    ),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Send a trusted local operator test message via the configured bot token.
+
+    Exactly one of ``--chat-id`` or ``--user-email`` is required. This bypasses
+    the public HTTP API because it is meant for local setup verification before
+    a user can drive the normal Telegram bot flow.
+    """
+    if bool(chat_id) == bool(user_email):
+        raise LocalError("Specify exactly one of --chat-id or --user-email.")
+    result = asyncio.run(_send_telegram(chat_id=chat_id, user_email=user_email, text=text))
+    if json_out:
+        emit_json(result)
+        return
+    emit_human(
+        f"sent telegram message.\n"
+        f"  chat_id:    {result.get('chat_id')}\n"
+        f"  message_id: {result.get('message_id')}"
+    )
+
+
+@app.command("diagnose-telegram")
+def diagnose_telegram(
+    limit: int = typer.Option(10, "--limit", min=1, max=50),
+    conversation_id: str | None = typer.Option(
+        None,
+        "--conversation-id",
+        help="Include a focused trace for one Telegram/Pawrrtal conversation.",
+    ),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Inspect local Telegram binding and recent persisted turn state."""
+    payload = asyncio.run(_diagnose_telegram(limit=limit, conversation_id=conversation_id))
+    if json_out:
+        emit_json(payload)
+        return
+    lines = [
+        f"telegram_configured: {payload['configured']}",
+        f"telegram_mode: {payload['mode']}",
+        f"bindings: {len(payload['bindings'])}",
+        f"recent_messages: {len(payload['recent_messages'])}",
+        f"stuck_streaming_messages: {len(payload['stuck_streaming_messages'])}",
+    ]
+    lines.extend(
+        (
+            "stuck\t"
+            f"{message['created_at']}\t"
+            f"conversation={message['conversation_id']}\t"
+            f"ordinal={message['ordinal']}\t"
+            f"model={message['model_id'] or ''}"
+        )
+        for message in payload["stuck_streaming_messages"]
+    )
+    if payload.get("conversation_trace"):
+        trace = payload["conversation_trace"]
+        lines.extend(
+            [
+                "conversation_trace:",
+                f"  id: {trace['conversation_id']}",
+                f"  model_id: {trace['model_id'] or ''}",
+                f"  codex_thread_id: {trace['codex_thread_id'] or ''}",
+                f"  skill_prompt_mode: {trace.get('workspace_skill_prompt_mode') or ''}",
+                f"  message_count: {len(trace['messages'])}",
+                f"  usage_rows: {len(trace.get('recent_usage') or [])}",
+            ]
+        )
+        lines.extend(
+            (
+                "  usage\t"
+                f"{usage['created_at']}\t"
+                f"in={usage['input_tokens']}\t"
+                f"out={usage['output_tokens']}\t"
+                f"cost={usage['cost_usd']:.6f}\t"
+                f"model={usage['model_id']}"
+            )
+            for usage in trace.get("recent_usage") or []
+        )
+        lines.extend(
+            (
+                "  message\t"
+                f"{message['created_at']}\t"
+                f"ordinal={message['ordinal']}\t"
+                f"role={message['role']}\t"
+                f"status={message['assistant_status'] or ''}\t"
+                f"duration_ms={message['duration_ms'] or ''}\t"
+                f"timeline={message['timeline_count']}\t"
+                f"thinking_chars={message['thinking_chars']}\t"
+                f"content={message['content_preview']}"
+            )
+            for message in trace["messages"]
+        )
+    emit_human("\n".join(lines))
+
+
 # --------------------------------------------------------------------------- #
 # HTTP helpers
 # --------------------------------------------------------------------------- #
@@ -255,3 +370,52 @@ async def _unlink_provider(state: PersonaState, provider: str) -> dict[str, Any]
             expect=(204,),
         )
     return {"unlinked": True, "provider": provider}
+
+
+async def _send_telegram(
+    *,
+    chat_id: str | None,
+    user_email: str | None,
+    text: str,
+) -> dict[str, Any]:
+    """Send a Telegram message through the configured bot token."""
+    token = settings.telegram_bot_token
+    if not token:
+        raise LocalError("TELEGRAM_BOT_TOKEN is not configured.")
+    resolved_chat_id = chat_id or await _telegram_chat_id_for_email(user_email or "")
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    async with httpx.AsyncClient(timeout=20.0) as client:
+        response = await client.post(
+            url,
+            json={"chat_id": resolved_chat_id, "text": text},
+        )
+    if response.status_code != TELEGRAM_SEND_OK_STATUS:
+        raise LocalError(
+            "Telegram sendMessage failed.",
+            hint=f"status={response.status_code} body={response.text[:200]}",
+        )
+    body = response.json()
+    result = body.get("result") if isinstance(body, dict) else None
+    if not isinstance(result, dict):
+        raise LocalError("Telegram sendMessage returned an unexpected response.")
+    return {
+        "ok": True,
+        "chat_id": str(result.get("chat", {}).get("id", resolved_chat_id)),
+        "message_id": result.get("message_id"),
+    }
+
+
+async def _telegram_chat_id_for_email(email: str) -> str:
+    """Resolve a local user's Telegram chat id from the configured database."""
+    user_model = cast(Any, User)
+    async with async_session_maker() as session:
+        result = await session.execute(
+            select(ChannelBinding.external_chat_id)
+            .join(User, user_model.id == ChannelBinding.user_id)
+            .where(user_model.email == email, ChannelBinding.provider == TELEGRAM_PROVIDER)
+            .limit(1)
+        )
+        chat_id = result.scalar_one_or_none()
+    if not chat_id:
+        raise LocalError(f"No Telegram binding found for user email {email}.")
+    return str(chat_id)

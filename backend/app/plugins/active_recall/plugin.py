@@ -26,6 +26,11 @@ active_recall_plugin = Plugin(
             required=False,
         ),
         EnvKeySpec(
+            name="ACTIVE_RECALL_TIMEOUT_S",
+            label="Active Recall Timeout Seconds",
+            required=False,
+        ),
+        EnvKeySpec(
             name="ACTIVE_RECALL_SYSTEM_PROMPT",
             label="Active Recall System Prompt",
             required=False,

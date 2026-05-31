@@ -387,6 +387,9 @@ def test_project_service_install_writes_user_unit_and_enables_now(
     unit = unit_path.read_text()
     assert f"WorkingDirectory={repo_root()}" in unit
     assert "ExecStart=/fake/bin/bun run dev.ts" in unit
+    assert "RestartSec=15" in unit
+    assert "KillMode=control-group" in unit
+    assert "StartLimitBurst=3" in unit
     assert 'Environment="DATABASE_URL="' in unit
     assert fake_systemd == [
         ["systemctl", "--user", "is-system-running"],

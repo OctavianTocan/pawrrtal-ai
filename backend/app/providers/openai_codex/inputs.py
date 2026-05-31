@@ -136,6 +136,7 @@ def build_codex_run_input(
     question: str,
     history: list[dict[str, Any]] | None = None,
     system_prompt: str | None = None,
+    per_turn_context: str | None = None,
     images: list[dict[str, str]] | None = None,
 ) -> RunInput:
     """Convert a Pawrrtal turn (history + question + images) into a Codex ``RunInput``.
@@ -153,12 +154,17 @@ def build_codex_run_input(
         history: Previous messages in Pawrrtal format (role/content/thinking/etc.).
         system_prompt: Optional system/developer instructions (usually passed
             via `base_instructions` on thread_start instead).
+        per_turn_context: Optional context produced by pre-turn hooks. Native
+            resumed Codex threads receive this without replaying app history.
         images: Optional list of image dicts (`{"url": ...}` or `{"path": ...}`).
 
     Returns:
         A `RunInput` ready to be passed to `thread.turn(...)` or `thread.run(...)`.
     """
     items: list[InputItem] = []
+
+    if per_turn_context:
+        items.append(TextInput(text=f"[Current turn context]\n{per_turn_context}"))
 
     # 1. Replay conversation history (if any)
     if history:

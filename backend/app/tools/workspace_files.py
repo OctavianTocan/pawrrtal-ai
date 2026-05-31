@@ -347,7 +347,7 @@ def _list_dir_sync(target: Path, raw_path: str, root: Path) -> str:
 
 
 async def _list_dir_body(*, target: Path, raw_path: str, root: Path, **_: Any) -> str:
-    return await anyio.to_thread.run_sync(_list_dir_sync, target, raw_path, root)
+    return _list_dir_sync(target, raw_path, root)
 
 
 # ---------------------------------------------------------------------------

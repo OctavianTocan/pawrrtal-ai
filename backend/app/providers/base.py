@@ -30,7 +30,7 @@ class StreamEvent(TypedDict, total=False):
     carries ``name`` + ``input``).
     """
 
-    type: str  # "delta" | "thinking" | "tool_use" | "tool_result" | "error" | "artifact" | "message" | "usage"
+    type: str  # "delta" | "thinking" | "tool_use" | "tool_progress" | "tool_result" | "error" | "artifact" | "message" | "usage"
     content: str  # for delta and thinking
     # Block-boundary metadata for ``thinking`` events: same value = same
     # thinking block, different value = paragraph boundary between
@@ -67,6 +67,11 @@ class StreamEvent(TypedDict, total=False):
     input_tokens: int
     output_tokens: int
     cost_usd: float
+    # Provider diagnostics for cumulative thread/session counters. These
+    # are intentionally not consumed by the cost ledger; ``input_tokens`` /
+    # ``output_tokens`` stay per-turn.
+    total_input_tokens: int
+    total_output_tokens: int
     # ``thinking`` events: ``True`` when the delta is a "summary" thinking
     # block (renderers may collapse / style differently). Currently only
     # emitted by the openai_codex provider, which separates summary vs raw
@@ -90,6 +95,12 @@ class StreamEvent(TypedDict, total=False):
     # the caller to persist for resume on the next turn (codex stores
     # this on the Conversation row).
     thread_id: str
+    # ``transient`` events are user-visible progress chrome only. Channels
+    # may render them, but aggregators and cost/trace accounting should not
+    # persist them as assistant content.
+    transient: bool
+    # Optional coarse progress label for transient events.
+    stage: str
 
 
 class AILLM(Protocol):

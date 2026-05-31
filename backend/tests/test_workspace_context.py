@@ -109,8 +109,7 @@ class TestPromptAssembly:
 
     def test_bootstrap_injection_suppressed_after_identity_completed(self, tmp_path: Path) -> None:
         """When bootstrap is done, the bootstrap body must not be force-
-        injected ahead of the skill catalogue. (It still appears inside
-        the catalogue because every skill body lands there.)
+        injected ahead of the skill catalogue.
         """
         _write(tmp_path / "AGENTS.md", "operating rules")
         _write(
@@ -141,6 +140,37 @@ class TestSkillsCatalogue:
         assert ctx.system_prompt is not None
         assert "## Available Skills" in ctx.system_prompt
         assert "summarize" in ctx.system_prompt
+        assert "Path: `.agent/skills/summarize/SKILL.md`" in ctx.system_prompt
+        assert "When the user asks" not in ctx.system_prompt
+
+    def test_full_skill_prompt_mode_includes_body(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(settings, "workspace_skill_prompt_mode", "full")
+        _write(
+            tmp_path / ".agent" / "skills" / "summarize" / "SKILL.md",
+            "description: summarize a doc\n\nWhen the user asks…",
+        )
+
+        ctx = load_workspace_context(tmp_path)
+
+        assert ctx.system_prompt is not None
+        assert "When the user asks" in ctx.system_prompt
+
+    def test_off_skill_prompt_mode_keeps_skills_out_of_prompt(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.setattr(settings, "workspace_skill_prompt_mode", "off")
+        _write(tmp_path / "AGENTS.md", "operating rules")
+        _write(
+            tmp_path / ".agent" / "skills" / "summarize" / "SKILL.md",
+            "description: summarize a doc\n\nWhen the user asks…",
+        )
+
+        ctx = load_workspace_context(tmp_path)
+
+        assert len(ctx.skills) == 1
+        assert ctx.system_prompt == "operating rules"
 
     def test_skipped_skill_without_manifest(self, tmp_path: Path) -> None:
         # Empty directory under skills/ — no SKILL.md → skipped silently.

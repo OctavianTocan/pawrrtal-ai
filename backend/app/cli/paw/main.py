@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import typer
 
+from app.cli.paw.commands import admin as admin_cmd
 from app.cli.paw.commands import api as api_cmd
 from app.cli.paw.commands import audit as audit_cmd
 from app.cli.paw.commands import auth as auth_cmd
@@ -76,6 +77,12 @@ app.add_typer(
     auth_cmd.app,
     name="auth",
     help="Auth status.",
+)
+
+app.add_typer(
+    admin_cmd.app,
+    name="admin",
+    help="Trusted local operator commands.",
 )
 
 # `conv` alias is a v2 follow-up; for now the canonical verb is `conversations`.

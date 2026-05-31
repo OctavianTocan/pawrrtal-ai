@@ -83,6 +83,24 @@ describe('applyChatEvent', () => {
 		expect(msg.tool_calls?.[0]?.result).toBe('[]');
 	});
 
+	it('records tool_progress without completing the tool', () => {
+		let msg = blankAssistant();
+		msg = applyChatEvent(msg, {
+			type: 'tool_use',
+			tool_use_id: 't1',
+			name: 'web_search',
+			input: {},
+		});
+		msg = applyChatEvent(msg, {
+			type: 'tool_progress',
+			tool_use_id: 't1',
+			content: 'fetching page',
+		});
+
+		expect(msg.tool_calls?.[0]?.status).toBe('pending');
+		expect(msg.tool_calls?.[0]?.result).toBe('fetching page');
+	});
+
 	it('appends artifact payloads in arrival order', () => {
 		let msg = blankAssistant();
 		msg = applyChatEvent(msg, {

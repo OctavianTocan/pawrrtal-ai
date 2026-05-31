@@ -2,8 +2,8 @@
  * Discriminated SSE event shapes and rich message types for the chat feature.
  *
  * @fileoverview The backend `/api/v1/chat` endpoint emits five event kinds
- * over Server-Sent Events: `delta`, `thinking`, `tool_use`, `tool_result`,
- * and `error`. The transport (`useChat`) turns each frame into a
+ * over Server-Sent Events: `delta`, `thinking`, `tool_use`, `tool_progress`,
+ * `tool_result`, and `error`. The transport (`useChat`) turns each frame into a
  * {@link ChatStreamEvent}; the container collapses the stream into a
  * {@link import('@/lib/types').ChatMessage} that the UI can render —
  * reasoning panel above the body, chronologically-ordered tool rows, source
@@ -46,6 +46,13 @@ export interface ChatToolResultEvent {
 	content: string;
 }
 
+/** Non-terminal progress for a previously emitted tool use. */
+export interface ChatToolProgressEvent {
+	type: 'tool_progress';
+	tool_use_id: string;
+	content: string;
+}
+
 /** Backend-surfaced stream-level error (provider failure, rate limit, etc.). */
 export interface ChatErrorEvent {
 	type: 'error';
@@ -76,6 +83,7 @@ export type ChatStreamEvent =
 	| ChatDeltaEvent
 	| ChatThinkingEvent
 	| ChatToolUseEvent
+	| ChatToolProgressEvent
 	| ChatToolResultEvent
 	| ChatArtifactEvent
 	| ChatErrorEvent

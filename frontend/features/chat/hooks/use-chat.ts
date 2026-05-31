@@ -34,6 +34,7 @@ const CHAT_EVENT_TYPES = [
 	'delta',
 	'thinking',
 	'tool_use',
+	'tool_progress',
 	'tool_result',
 	'artifact',
 	'error',

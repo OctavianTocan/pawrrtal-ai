@@ -115,11 +115,12 @@ describe('useChat', (): void => {
 		).resolves.toEqual([{ type: 'delta', content: 'Split' }]);
 	});
 
-	it('yields thinking, tool_use, and tool_result events alongside deltas', async (): Promise<void> => {
+	it('yields thinking, tool_use, tool_progress, and tool_result events alongside deltas', async (): Promise<void> => {
 		vi.mocked(fetch).mockResolvedValue(
 			createStreamResponse([
 				'data: {"type":"thinking","content":"Let me search..."}\n\n',
 				'data: {"type":"tool_use","tool_use_id":"t1","name":"web_search","input":{"q":"foo"},"display":{"present":"Searching the web for foo"}}\n\n',
+				'data: {"type":"tool_progress","tool_use_id":"t1","content":"fetching"}\n\n',
 				'data: {"type":"tool_result","tool_use_id":"t1","content":"result body"}\n\n',
 				'data: {"type":"delta","content":"Done."}\n\n',
 				'data: [DONE]\n\n',
@@ -146,6 +147,7 @@ describe('useChat', (): void => {
 				input: { q: 'foo' },
 				display: { present: 'Searching the web for foo' },
 			},
+			{ type: 'tool_progress', tool_use_id: 't1', content: 'fetching' },
 			{ type: 'tool_result', tool_use_id: 't1', content: 'result body' },
 			{ type: 'delta', content: 'Done.' },
 		]);

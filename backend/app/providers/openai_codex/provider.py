@@ -15,9 +15,12 @@ resulting notifications back to native `StreamEvent` records.
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import time
 import uuid
 from collections.abc import AsyncIterator
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -33,6 +36,7 @@ from app.providers.openai_codex.events import (
     map_codex_notification_to_stream_events,
 )
 from app.providers.openai_codex.inputs import build_codex_run_input
+from app.providers.openai_codex.prompting import CODEX_DEVELOPER_INSTRUCTIONS
 
 # Make sure the vendored SDK is on sys.path before we statically import from
 # it. ``_vendor.ensure_openai_codex_available`` injects the vendored source
@@ -51,11 +55,13 @@ except RuntimeError as exc:
 # shim returns ``Any`` to keep the package import cheap, which defeats type
 # checking inside this module. The shim still serves the public Pawrrtal
 # surface (``from app.providers.openai_codex import OpenAICodexProvider``).
-from openai_codex import AppServerConfig, AsyncCodex, TextInput
+from openai_codex import ApprovalMode, AppServerConfig, AsyncCodex, TextInput
 from openai_codex.generated.v2_all import ReasoningEffort as CodexReasoningEffort
+from openai_codex.generated.v2_all import SandboxMode
 
 logger = logging.getLogger(__name__)
 
+_CODEX_SILENCE_HEARTBEAT_SECONDS = 5.0
 
 _DENY_ALL_DECISION: dict[str, str] = {"decision": "deny"}
 
@@ -138,6 +144,11 @@ class OpenAICodexProvider:
         self._codex_bin = codex_bin
         self._codex: AsyncCodex | None = None
 
+    @property
+    def model_id(self) -> str:
+        """Native Codex model id used when creating or resuming SDK threads."""
+        return self._model_id
+
     async def _ensure_codex(self) -> AsyncCodex:
         """Lazily create the AsyncCodex client (one per provider instance)."""
         if self._codex is not None:
@@ -201,6 +212,7 @@ class OpenAICodexProvider:
         system_prompt: str | None = None,
         reasoning_effort: PawReasoningEffort | None = None,
         codex_thread_id: str | None = None,
+        per_turn_context: str | None = None,
         images: list[dict[str, str]] | None = None,
         **kwargs: Any,
     ) -> AsyncIterator[StreamEvent]:
@@ -212,7 +224,23 @@ class OpenAICodexProvider:
                 self._model_id,
             )
 
+        yield {
+            "type": "thinking",
+            "content": "Starting Codex",
+            "summary": True,
+            "block_index": 0,
+            "transient": True,
+            "stage": "starting",
+        }
         codex = await self._ensure_codex()
+        yield {
+            "type": "thinking",
+            "content": "Preparing the Codex session",
+            "summary": True,
+            "block_index": 1,
+            "transient": True,
+            "stage": "preparing",
+        }
         await codex._ensure_initialized()  # ensure the app-server is up
 
         # Thread lifecycle: prefer resuming an existing Codex thread when we have one
@@ -221,12 +249,62 @@ class OpenAICodexProvider:
         # is handled by the turn runner / caller when we emit a thread creation signal.
         try:
             if codex_thread_id:
-                thread = await codex.thread_resume(codex_thread_id)
+                yield {
+                    "type": "thinking",
+                    "content": "Resuming the Codex thread",
+                    "summary": True,
+                    "block_index": 2,
+                    "transient": True,
+                    "stage": "thread",
+                }
+                try:
+                    thread = await codex.thread_resume(codex_thread_id)
+                except Exception as exc:
+                    if not _is_missing_codex_rollout_error(exc):
+                        raise
+                    logger.warning(
+                        "openai_codex: persisted thread has no rollout; starting a fresh thread",
+                        exc_info=True,
+                    )
+                    yield {
+                        "type": "thinking",
+                        "content": "Opening a new Codex thread",
+                        "summary": True,
+                        "block_index": 2,
+                        "transient": True,
+                        "stage": "thread",
+                    }
+                    thread = await codex.thread_start(
+                        model=self._model_id,
+                        cwd=str(self._workspace_root) if self._workspace_root else None,
+                        base_instructions=system_prompt,
+                        developer_instructions=CODEX_DEVELOPER_INSTRUCTIONS,
+                        approval_mode=ApprovalMode.deny_all,
+                        sandbox=SandboxMode.read_only,
+                    )
+                    new_thread_id = getattr(thread, "id", None)
+                    if isinstance(new_thread_id, str) and new_thread_id:
+                        yield {
+                            "type": "internal",
+                            "kind": "codex_thread_created",
+                            "thread_id": new_thread_id,
+                        }
             else:
+                yield {
+                    "type": "thinking",
+                    "content": "Opening a new Codex thread",
+                    "summary": True,
+                    "block_index": 2,
+                    "transient": True,
+                    "stage": "thread",
+                }
                 thread = await codex.thread_start(
                     model=self._model_id,
                     cwd=str(self._workspace_root) if self._workspace_root else None,
                     base_instructions=system_prompt,
+                    developer_instructions=CODEX_DEVELOPER_INSTRUCTIONS,
+                    approval_mode=ApprovalMode.deny_all,
+                    sandbox=SandboxMode.read_only,
                 )
                 # Signal to the caller that a new thread was created so it can be
                 # persisted against the conversation for future resume. The
@@ -250,7 +328,8 @@ class OpenAICodexProvider:
         try:
             run_input = build_codex_run_input(
                 question=question,
-                history=history,
+                history=[] if codex_thread_id else history,
+                per_turn_context=per_turn_context,
                 images=images,
             )
         except Exception:
@@ -260,6 +339,14 @@ class OpenAICodexProvider:
         effort = _map_pawrrtal_reasoning_to_codex(reasoning_effort)
 
         try:
+            yield {
+                "type": "thinking",
+                "content": "Sending the turn to Codex",
+                "summary": True,
+                "block_index": 3,
+                "transient": True,
+                "stage": "sending",
+            }
             handle = await thread.turn(
                 run_input,
                 effort=effort,
@@ -268,10 +355,8 @@ class OpenAICodexProvider:
 
             # The high-level async handle exposes a stream of Notification objects.
             # We consume it directly.
-            async for notification in handle.stream():
-                for event in map_codex_notification_to_stream_events(notification):
-                    if event:
-                        yield event
+            async for event in _stream_codex_notifications(handle):
+                yield event
 
         except Exception as exc:
             logger.exception("openai_codex: turn streaming failed")
@@ -284,3 +369,49 @@ class OpenAICodexProvider:
 
 # Backwards-compat alias used in a few places during the transition.
 CodexLLM = OpenAICodexProvider
+
+
+def _is_missing_codex_rollout_error(exc: Exception) -> bool:
+    """Return True when the SDK cannot resume an empty/precreated thread."""
+    return "no rollout found for thread id" in str(exc).lower()
+
+
+async def _stream_codex_notifications(handle: Any) -> AsyncIterator[StreamEvent]:
+    """Yield mapped Codex events while emitting silence heartbeats."""
+    notification_stream = handle.stream().__aiter__()
+    wait_started_at = time.monotonic()
+    next_notification = asyncio.create_task(notification_stream.__anext__())
+    try:
+        while True:
+            done, _pending = await asyncio.wait(
+                {next_notification},
+                timeout=_CODEX_SILENCE_HEARTBEAT_SECONDS,
+            )
+            if not done:
+                elapsed = round(time.monotonic() - wait_started_at)
+                yield {
+                    "type": "thinking",
+                    "content": f"Codex is still working ({elapsed}s)",
+                    "summary": True,
+                    "block_index": 4 + elapsed,
+                    "transient": True,
+                    "stage": "waiting",
+                }
+                continue
+            try:
+                notification = next_notification.result()
+            except StopAsyncIteration:
+                break
+            next_notification = asyncio.create_task(notification_stream.__anext__())
+            for event in _mapped_notification_events(notification):
+                yield event
+    finally:
+        if not next_notification.done():
+            next_notification.cancel()
+            with suppress(asyncio.CancelledError):
+                await next_notification
+
+
+def _mapped_notification_events(notification: Any) -> list[StreamEvent]:
+    """Return truthy mapped stream events for one Codex notification."""
+    return [event for event in map_codex_notification_to_stream_events(notification) if event]

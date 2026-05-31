@@ -76,6 +76,9 @@ class Conversation(Base):
     # Codex SDK thread ID for native openai_codex provider resume support.
     # Stored when the provider emits a "codex_thread_created" internal event.
     codex_thread_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # SHA-256 fingerprint of the prompt/model used to create codex_thread_id.
+    # A mismatch means prompt shape changed and the native thread must restart.
+    codex_thread_prompt_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
     # Lifecycle marker for the auto-title feature:
     # NULL = not yet titled, "auto" = generated, "user" = user-edited.
     title_set_by: Mapped[str | None] = mapped_column(String(16), nullable=True)

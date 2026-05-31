@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import AsyncIterator
+from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -25,6 +27,7 @@ from app.channels.base import ChannelMessage
 from app.channels.telegram import SURFACE_TELEGRAM, TelegramChannel
 from app.channels.telegram.bot import (
     _refresh_telegram_commands_best_effort,
+    _run_llm_turn,
     refresh_telegram_commands,
 )
 from app.channels.telegram.bot_provider_resolution import (
@@ -36,6 +39,11 @@ from app.channels.telegram.handlers import (
     handle_stop_command,
 )
 from app.channels.telegram.model_command import handle_model_command
+from app.channels.telegram.runtime_guards import (
+    TelegramPollingLock,
+    defer_command_refresh,
+    should_refresh_commands,
+)
 from app.channels.telegram.sender import TelegramSender
 from app.channels.telegram.status import (
     _format_duration,
@@ -164,6 +172,29 @@ async def test_refresh_telegram_commands_best_effort_logs_and_continues(
     assert "TELEGRAM_COMMANDS_REFRESH_FAILED" in caplog.text
 
 
+def test_telegram_polling_lock_allows_one_owner() -> None:
+    """Only one process can own polling for a bot token at a time."""
+    first = TelegramPollingLock(token="test-token")
+    second = TelegramPollingLock(token="test-token")
+    try:
+        assert first.acquire() is True
+        assert second.acquire() is False
+    finally:
+        first.release()
+        second.release()
+
+
+def test_telegram_command_refresh_cooldown() -> None:
+    """Command refresh state survives process restarts through a temp marker."""
+    token = f"test-token-{uuid.uuid4()}"
+
+    assert should_refresh_commands(token=token, now=100.0) is True
+    defer_command_refresh(token=token, seconds=60.0, now=100.0)
+
+    assert should_refresh_commands(token=token, now=159.0) is False
+    assert should_refresh_commands(token=token, now=160.0) is True
+
+
 # ---------------------------------------------------------------------------
 # TelegramChannel.deliver — streaming behaviour
 # ---------------------------------------------------------------------------
@@ -215,6 +246,31 @@ class TestTelegramChannelDeliver:
 
         bot.delete_message.assert_not_called()
         bot.send_message.assert_not_called()
+        bot.edit_message_text.assert_any_call(
+            chat_id=7, message_id=99, text="hi", reply_markup=None
+        )
+
+    async def test_transient_thinking_updates_placeholder_without_persisted_block(self) -> None:
+        """Synthetic provider progress edits the placeholder and stays out of thinking blocks."""
+        bot = _make_bot()
+        msg = _make_channel_message(bot, chat_id=7, message_id=99)
+        channel = TelegramChannel()
+
+        events: list[StreamEvent] = [
+            {
+                "type": "thinking",
+                "content": "Preparing the Codex session",
+                "summary": True,
+                "transient": True,
+            },
+            {"type": "delta", "content": "hi"},
+        ]
+        async for _ in channel.deliver(_stream(*events), msg):
+            pass
+
+        edit_texts = [call.kwargs["text"] for call in bot.edit_message_text.call_args_list]
+        assert any("Preparing the Codex session" in text for text in edit_texts)
+        assert not any("💭 <b>Thinking...</b>" in text for text in edit_texts)
         bot.edit_message_text.assert_any_call(
             chat_id=7, message_id=99, text="hi", reply_markup=None
         )
@@ -1313,6 +1369,66 @@ class TestResolveProviderWithAutoClear:
         assert provider is fake_default_provider
 
 
+@pytest.mark.anyio
+async def test_run_llm_turn_passes_ensured_codex_thread_id(tmp_path: Path) -> None:
+    """Telegram turns must resume the native Codex thread just like web turns."""
+    context = TelegramTurnContext(
+        pawrrtal_user_id=uuid.uuid4(),
+        conversation_id=uuid.uuid4(),
+        model_id="openai-codex:openai/gpt-5.5",
+        thread_id=None,
+    )
+    workspace = SimpleNamespace(path=str(tmp_path), id=uuid.uuid4())
+    message = SimpleNamespace(
+        bot=AsyncMock(),
+        chat=SimpleNamespace(id=7424950903),
+        message_id=123,
+        text="hello",
+        caption=None,
+        answer=AsyncMock(return_value=SimpleNamespace(message_id=999)),
+    )
+    captured = {}
+
+    async def fake_run_turn(turn_input: Any) -> AsyncIterator[bytes]:
+        captured["turn_input"] = turn_input
+        if False:
+            yield b""
+
+    fake_session_maker = MagicMock()
+    fake_session_maker.return_value.__aenter__ = AsyncMock(return_value=AsyncMock())
+    fake_session_maker.return_value.__aexit__ = AsyncMock(return_value=None)
+
+    with (
+        patch("app.channels.telegram.bot.async_session_maker", new=fake_session_maker),
+        patch("app.workspace.crud.get_default_workspace", AsyncMock(return_value=workspace)),
+        patch("app.channels.telegram.bot.build_agent_tools", MagicMock(return_value=[])),
+        patch(
+            "app.channels.telegram.bot.resolve_provider_with_auto_clear",
+            AsyncMock(return_value=(MagicMock(), None)),
+        ),
+        patch(
+            "app.channels.telegram.bot.normalize_reasoning_and_notify",
+            AsyncMock(return_value=None),
+        ),
+        patch(
+            "app.providers.openai_codex.threads.ensure_codex_thread_state",
+            AsyncMock(
+                return_value=SimpleNamespace(
+                    thread_id="thr_telegram",
+                    prompt_hash="hash_telegram",
+                    lightweight_prompt=True,
+                )
+            ),
+        ),
+        patch("app.channels.telegram.bot.run_turn", new=fake_run_turn),
+    ):
+        await _run_llm_turn(message=cast(Any, message), context=context)
+
+    assert captured["turn_input"].codex_thread_id == "thr_telegram"
+    assert captured["turn_input"].codex_thread_prompt_hash == "hash_telegram"
+    assert captured["turn_input"].codex_lightweight_prompt is True
+
+
 # ---------------------------------------------------------------------------
 # handle_status_command + formatter helpers
 # ---------------------------------------------------------------------------
@@ -1462,8 +1578,10 @@ class TestRenderStatusMessage:
         )
         assert "⚠️" in rendered
         assert "running" in rendered
-        # Verbose level falls back to settings default (1 = normal) when None.
-        assert "Verbose: 1" in rendered
+        # Verbose level falls back to the configured Telegram default when None.
+        from app.infrastructure.config import settings
+
+        assert f"Verbose: {settings.telegram_verbose_default}" in rendered
 
     def test_handles_tz_naive_started_at_from_db(self) -> None:
         """Regression: ``Conversation.created_at`` is tz-naive in the DB.

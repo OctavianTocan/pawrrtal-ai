@@ -400,10 +400,19 @@ def get_chat_router() -> APIRouter:
             else None
         )
 
-        # Load Codex thread id (if any) before constructing the frozen ChatTurnInput.
-        from app.channels.turn_runner import load_codex_thread_id  # noqa: PLC0415
+        # Ensure native Codex threads are created before the first streamed turn.
+        # Non-Codex providers return None and keep the existing history path.
+        from app.providers.openai_codex.threads import ensure_codex_thread_state  # noqa: PLC0415
 
-        codex_thread_id = await load_codex_thread_id(request.conversation_id)
+        codex_thread_state = await ensure_codex_thread_state(
+            conversation_id=request.conversation_id,
+            provider=provider,
+            workspace_root=root,
+            model_id=model_id,
+            tools=agent_tools,
+            reasoning_effort=effective_reasoning_effort,
+            question=request.question,
+        )
 
         # ``db_session`` is intentionally left at its ``None`` default so the
         # turn runner opens its own ``async_session_maker()`` session inside
@@ -438,7 +447,9 @@ def get_chat_router() -> APIRouter:
                 "surface": surface,
             },
             pre_turn_hooks=build_pre_turn_hooks(),
-            codex_thread_id=codex_thread_id,
+            codex_thread_id=codex_thread_state.thread_id,
+            codex_thread_prompt_hash=codex_thread_state.prompt_hash,
+            codex_lightweight_prompt=codex_thread_state.lightweight_prompt,
         )
         hooks: list[EventHook] = [_artifact_hook, _drain_send_queue]
 

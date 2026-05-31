@@ -29,12 +29,14 @@ class _ScriptedProvider:
 
     def __init__(self, events: list[StreamEvent]) -> None:
         self._events = events
+        self.stream_kwargs: dict[str, Any] = {}
 
     def stream(
         self,
         *_args: Any,
-        **_kwargs: Any,
+        **kwargs: Any,
     ) -> AsyncIterator[StreamEvent]:
+        self.stream_kwargs = kwargs
         return self._iter()
 
     async def _iter(self) -> AsyncIterator[StreamEvent]:
@@ -62,6 +64,17 @@ def _make_turn_input(provider: _ScriptedProvider, *, verbose_level: int) -> Chat
         log_extras={},
         verbose_level=verbose_level,
         reasoning_effort=None,
+    )
+
+
+def _make_codex_turn_input(provider: _ScriptedProvider) -> ChatTurnInput:
+    """Build a turn input that simulates a native resumed Codex thread."""
+    turn_input = _make_turn_input(provider, verbose_level=2)
+    return ChatTurnInput(
+        **{
+            **turn_input.__dict__,
+            "codex_thread_id": "thr_existing",
+        }
     )
 
 
@@ -109,6 +122,7 @@ async def test_hooks_observe_thinking_at_verbose_normal() -> None:
             turn_input=turn_input,
             history=[],
             system_prompt=None,
+            per_turn_context=None,
             aggregator=aggregator,
             counter=counter,  # type: ignore[arg-type]
             hooks=[recording_hook],
@@ -120,3 +134,94 @@ async def test_hooks_observe_thinking_at_verbose_normal() -> None:
     assert any(e.get("type") == "delta" for e in seen_events)
     # The channel saw only the delta — the filter still gates rendering.
     assert [e.get("type") for e in delivered] == ["delta"]
+
+
+@pytest.mark.anyio
+async def test_resumed_codex_thread_does_not_replay_pawrrtal_history() -> None:
+    """Native Codex threads own continuity, so app history must not be replayed."""
+    provider = _ScriptedProvider([{"type": "delta", "content": "ok"}])
+    turn_input = _make_codex_turn_input(provider)
+    aggregator = ChatTurnAggregator()
+    counter = _Counter()
+    history = [{"role": "user", "content": "old"}]
+
+    delivered = [
+        e
+        async for e in _guarded_stream(
+            turn_input=turn_input,
+            history=history,
+            system_prompt=None,
+            per_turn_context="# PRE-TURN CONTEXT\n\nmemory",
+            aggregator=aggregator,
+            counter=counter,  # type: ignore[arg-type]
+            hooks=[],
+        )
+    ]
+
+    assert delivered == [{"type": "delta", "content": "ok"}]
+    assert provider.stream_kwargs["history"] == []
+    assert provider.stream_kwargs["codex_thread_id"] == "thr_existing"
+    assert provider.stream_kwargs["per_turn_context"] == "# PRE-TURN CONTEXT\n\nmemory"
+
+
+@pytest.mark.anyio
+async def test_transient_progress_is_delivered_but_not_persisted() -> None:
+    """Transient progress is UI chrome, not assistant thinking history."""
+    provider = _ScriptedProvider(
+        [
+            {
+                "type": "thinking",
+                "content": "Preparing the Codex session",
+                "summary": True,
+                "transient": True,
+            },
+            {"type": "delta", "content": "ok"},
+        ]
+    )
+    turn_input = _make_turn_input(provider, verbose_level=1)
+    aggregator = ChatTurnAggregator()
+    counter = _Counter()
+
+    delivered = [
+        e
+        async for e in _guarded_stream(
+            turn_input=turn_input,
+            history=[],
+            system_prompt=None,
+            per_turn_context=None,
+            aggregator=aggregator,
+            counter=counter,  # type: ignore[arg-type]
+            hooks=[],
+        )
+    ]
+
+    assert [e.get("content") for e in delivered] == ["Preparing the Codex session", "ok"]
+    assert aggregator.thinking == ""
+    assert aggregator.content == "ok"
+    assert counter.by_type == {"delta": 1}
+
+
+@pytest.mark.anyio
+async def test_non_codex_turn_replays_pawrrtal_history() -> None:
+    """Non-native providers still receive app-side history."""
+    provider = _ScriptedProvider([{"type": "delta", "content": "ok"}])
+    turn_input = _make_turn_input(provider, verbose_level=2)
+    aggregator = ChatTurnAggregator()
+    counter = _Counter()
+    history = [{"role": "user", "content": "old"}]
+
+    _ = [
+        e
+        async for e in _guarded_stream(
+            turn_input=turn_input,
+            history=history,
+            system_prompt=None,
+            per_turn_context=None,
+            aggregator=aggregator,
+            counter=counter,  # type: ignore[arg-type]
+            hooks=[],
+        )
+    ]
+
+    assert provider.stream_kwargs["history"] == history
+    assert "codex_thread_id" not in provider.stream_kwargs

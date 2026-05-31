@@ -15,6 +15,7 @@ Event taxonomy (as of 2026-05-27, mined from
 * ``delta``           — provider-native text chunk
 * ``thinking``        — provider-native reasoning content
 * ``tool_use``        — provider-native tool invocation
+* ``tool_progress``   — provider-native non-terminal tool progress
 * ``tool_result``     — provider-native tool result
 * ``artifact``        — router-injected (``chat.py:105``) + ``openai_codex/events.py:132``
 * ``usage``           — provider-native token usage (e.g. ``openai_codex/events.py:154``)
@@ -48,6 +49,7 @@ KNOWN_EVENT_TYPES: frozenset[str] = frozenset(
         "delta",
         "thinking",
         "tool_use",
+        "tool_progress",
         "tool_result",
         "artifact",
         "usage",

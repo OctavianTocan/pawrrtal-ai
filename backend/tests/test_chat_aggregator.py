@@ -68,6 +68,23 @@ def test_tool_result_completes_matching_call() -> None:
     assert agg.tool_calls[0].display == {"present": "Searching the web for x"}
 
 
+def test_tool_progress_updates_matching_call_without_completing() -> None:
+    """A tool_progress event stores preview output but keeps the call pending."""
+    agg = ChatTurnAggregator()
+    agg.apply(
+        {
+            "type": "tool_use",
+            "tool_use_id": "t1",
+            "name": "codex_command",
+            "input": {"command": "pytest"},
+        }
+    )
+    agg.apply({"type": "tool_progress", "tool_use_id": "t1", "content": "collected 12 items"})
+
+    assert agg.tool_calls[0].status == "pending"
+    assert agg.tool_calls[0].result == "collected 12 items"
+
+
 def test_persisted_shape_failed_with_no_content_uses_error_text() -> None:
     """Failed turns with no streamed content render the error verbatim."""
     agg = ChatTurnAggregator()

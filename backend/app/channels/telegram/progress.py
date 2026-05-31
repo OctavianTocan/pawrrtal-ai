@@ -47,6 +47,12 @@ def render_initial() -> str:
     return "🤔 Processing your request..."
 
 
+def render_transient_status(status: str) -> str:
+    """Return HTML for a short-lived provider progress status."""
+    text = html.escape(status.strip() or "Working")
+    return f"🤔 <b>{text}</b>"
+
+
 def render_starting(model: str, tool_count: int) -> str:
     """Return HTML for the 'starting' state — model known, first event received.
 
@@ -98,7 +104,34 @@ def render_tools_in_flight(tool_names: list[str]) -> str:
     return f"🔧 <b>Using tools:</b>\n{esc_names}"
 
 
-def render_tool_success(tool_display: str, elapsed_ms: int) -> str:
+MAX_TOOL_TRACE_CHARS = 3600
+
+
+def render_bounded_tools_block(header: str, lines: list[str]) -> str:
+    """Join complete Telegram HTML fragments without cutting tags."""
+    output = header
+    omitted = 0
+    for line in lines:
+        candidate = f"{output}\n\n{line}"
+        if len(candidate) > MAX_TOOL_TRACE_CHARS:
+            omitted += 1
+            continue
+        output = candidate
+    if omitted:
+        marker = f"\n\n<i>{omitted} tool update{'s' if omitted != 1 else ''} omitted</i>"
+        if len(output) + len(marker) <= MAX_TOOL_TRACE_CHARS:
+            output = f"{output}{marker}"
+    return output
+
+
+TOOL_RESULT_PREVIEW_MAX_CHARS = 700
+
+
+def render_tool_success(
+    tool_display: str,
+    elapsed_ms: int,
+    result_preview: str | None = None,
+) -> str:
     """Return HTML for a completed tool call — success path.
 
     Args:
@@ -107,12 +140,38 @@ def render_tool_success(tool_display: str, elapsed_ms: int) -> str:
             ``format_tool_use`` in ``telegram_delivery.py`` already produces
             display-safe text).
         elapsed_ms: Wall-clock duration of the tool call in milliseconds.
+        result_preview: Optional compact stdout/result preview to show under
+            the completed tool row.
 
     Returns:
         Telegram HTML string for one tool line.
     """
     esc = html.escape(tool_display)
-    return f"✅ <b>{esc}</b> ({elapsed_ms}ms)"
+    line = f"✅ <b>{esc}</b> ({elapsed_ms}ms)"
+    preview = (result_preview or "").strip()
+    if not preview:
+        return line
+    omitted = len(preview) > TOOL_RESULT_PREVIEW_MAX_CHARS
+    if omitted:
+        preview = preview[:TOOL_RESULT_PREVIEW_MAX_CHARS].rstrip()
+    esc_preview = html.escape(preview)
+    suffix = "\n<i>more omitted</i>" if omitted else ""
+    return f"{line}\n\n<code>{esc_preview}</code>{suffix}"
+
+
+TOOL_PROGRESS_PREVIEW_MAX_CHARS = 500
+
+
+def render_tool_progress(tool_display: str, result_preview: str) -> str:
+    """Return HTML for a still-running tool with a compact progress preview."""
+    esc = html.escape(tool_display)
+    preview = result_preview.strip()
+    if len(preview) > TOOL_PROGRESS_PREVIEW_MAX_CHARS:
+        preview = preview[:TOOL_PROGRESS_PREVIEW_MAX_CHARS].rstrip()
+    esc_preview = html.escape(preview)
+    if not esc_preview:
+        return f"⏳ <b>{esc}</b>"
+    return f"⏳ <b>{esc}</b>\n\n<code>{esc_preview}</code>"
 
 
 # Maximum characters of error text shown in a tool error card.

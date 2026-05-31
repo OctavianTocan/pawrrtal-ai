@@ -65,6 +65,12 @@ from app.channels.telegram.message_queue import (
 # doesn't take a separate fan-out hit on the resolver + DB seam +
 # notice formatter.
 from app.channels.telegram.reasoning_notify import normalize_reasoning_and_notify
+from app.channels.telegram.runtime_guards import (
+    COMMAND_REFRESH_COOLDOWN_SECONDS,
+    TelegramPollingLock,
+    defer_command_refresh,
+    should_refresh_commands,
+)
 
 # ``compact_command`` is re-exported via :mod:`status` to keep bot.py
 # under sentrux's ``no_god_files`` fan-out budget (same trick as
@@ -386,6 +392,17 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
         conversation_id=context.conversation_id,
         model_id=context.model_id,
     )
+    from app.providers.openai_codex.threads import ensure_codex_thread_state  # noqa: PLC0415
+
+    codex_thread_state = await ensure_codex_thread_state(
+        conversation_id=context.conversation_id,
+        provider=provider,
+        workspace_root=Path(workspace.path) if workspace is not None else None,
+        model_id=context.model_id,
+        tools=agent_tools,
+        reasoning_effort=effective_effort,
+        question=user_text,
+    )
 
     has_active_recall = False
 
@@ -432,6 +449,9 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
         ),
         pre_turn_hooks=pre_turn_hooks,
         reasoning_effort=effective_effort,
+        codex_thread_id=codex_thread_state.thread_id,
+        codex_thread_prompt_hash=codex_thread_state.prompt_hash,
+        codex_lightweight_prompt=codex_thread_state.lightweight_prompt,
     )
 
     async def _do_stream() -> None:
@@ -517,6 +537,7 @@ class TelegramService:
     bot: Bot
     dispatcher: Dispatcher
     polling_task: asyncio.Task[None] | None = None
+    polling_lock: TelegramPollingLock | None = None
 
     async def feed_webhook_update(self, update: Update) -> None:
         """Hand a single ``Update`` parsed from the webhook body to aiogram.
@@ -768,9 +789,18 @@ async def refresh_telegram_commands(bot: Bot) -> None:
 
 async def _refresh_telegram_commands_best_effort(bot: Bot) -> None:
     """Refresh command menu without turning Telegram startup into a hard dependency."""
+    token = settings.telegram_bot_token
+    if token and not should_refresh_commands(token=token):
+        logger.info("TELEGRAM_COMMANDS_REFRESH_SKIPPED reason=cooldown")
+        return
     try:
         await refresh_telegram_commands(bot)
-    except Exception:
+        if token:
+            defer_command_refresh(token=token, seconds=COMMAND_REFRESH_COOLDOWN_SECONDS)
+    except Exception as exc:
+        retry_after = float(getattr(exc, "retry_after", 0.0) or 0.0)
+        if token and retry_after > 0:
+            defer_command_refresh(token=token, seconds=retry_after)
         logger.warning("TELEGRAM_COMMANDS_REFRESH_FAILED", exc_info=True)
 
 
@@ -912,34 +942,44 @@ async def telegram_lifespan() -> AsyncIterator[TelegramService | None]:
         return
 
     service = build_telegram_service()
-    await _refresh_telegram_commands_best_effort(service.bot)
-
-    if settings.telegram_mode == "polling":
-        # Drop any leftover webhook so polling actually receives updates;
-        # Telegram silently swallows getUpdates calls when a webhook is
-        # set, which is one of the most painful local-dev footguns.
-        await service.bot.delete_webhook(drop_pending_updates=True)
-        logger.info("TELEGRAM_BOOT mode=polling")
-        service.polling_task = asyncio.create_task(
-            service.dispatcher.start_polling(service.bot, handle_signals=False),
-            name="telegram-polling",
-        )
-    else:
-        url = settings.telegram_webhook_url
-        if not url:
-            raise RuntimeError("TELEGRAM_MODE=webhook requires TELEGRAM_WEBHOOK_URL to be set.")
-        _validate_telegram_webhook_url(url)
-        if not settings.telegram_webhook_secret:
-            raise RuntimeError("TELEGRAM_MODE=webhook requires TELEGRAM_WEBHOOK_SECRET.")
-        secret = settings.telegram_webhook_secret or None
-        await service.bot.set_webhook(
-            url=url,
-            secret_token=secret,
-            drop_pending_updates=True,
-        )
-        logger.info("TELEGRAM_BOOT mode=webhook url=%s", url)
 
     try:
+        if settings.telegram_mode == "polling":
+            polling_lock = TelegramPollingLock(token=settings.telegram_bot_token)
+            if not polling_lock.acquire():
+                logger.warning(
+                    "TELEGRAM_POLLING_DISABLED reason=lock_held lock_path=%s",
+                    polling_lock.path,
+                )
+                yield service
+                return
+            service.polling_lock = polling_lock
+            await _refresh_telegram_commands_best_effort(service.bot)
+            # Drop any leftover webhook so polling actually receives updates;
+            # Telegram silently swallows getUpdates calls when a webhook is
+            # set, which is one of the most painful local-dev footguns.
+            await service.bot.delete_webhook(drop_pending_updates=True)
+            logger.info("TELEGRAM_BOOT mode=polling")
+            service.polling_task = asyncio.create_task(
+                service.dispatcher.start_polling(service.bot, handle_signals=False),
+                name="telegram-polling",
+            )
+        else:
+            await _refresh_telegram_commands_best_effort(service.bot)
+            url = settings.telegram_webhook_url
+            if not url:
+                raise RuntimeError("TELEGRAM_MODE=webhook requires TELEGRAM_WEBHOOK_URL to be set.")
+            _validate_telegram_webhook_url(url)
+            if not settings.telegram_webhook_secret:
+                raise RuntimeError("TELEGRAM_MODE=webhook requires TELEGRAM_WEBHOOK_SECRET.")
+            secret = settings.telegram_webhook_secret or None
+            await service.bot.set_webhook(
+                url=url,
+                secret_token=secret,
+                drop_pending_updates=True,
+            )
+            logger.info("TELEGRAM_BOOT mode=webhook url=%s", url)
+
         yield service
     finally:
         await shutdown_chat_queue_dispatcher()
@@ -954,6 +994,8 @@ async def telegram_lifespan() -> AsyncIterator[TelegramService | None]:
             await service.bot.session.close()
         except Exception:
             logger.warning("TELEGRAM_SHUTDOWN session_close_failed", exc_info=True)
+        if service.polling_lock is not None:
+            service.polling_lock.release()
 
 
 def _validate_telegram_webhook_url(url: str) -> None:

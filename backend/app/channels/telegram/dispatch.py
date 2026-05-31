@@ -23,7 +23,6 @@ import asyncio
 import html as html_lib
 import logging
 import time
-from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 from app.providers.base import StreamEvent
@@ -38,10 +37,13 @@ from .delivery import (
 )
 from .finalize import finalize_turn_delivery
 from .progress import (
+    render_bounded_tools_block,
     render_tool_error,
+    render_tool_progress,
     render_tool_success,
     render_tools_in_flight,
 )
+from .tool_state import ToolLineState
 
 if TYPE_CHECKING:
     from aiogram import Bot
@@ -56,6 +58,7 @@ __all__ = [
     "finalize_turn_delivery",
     "handle_text_delta",
     "handle_thinking",
+    "handle_tool_progress",
     "handle_tool_result",
     "handle_tool_use",
     "prepare_thinking_block",
@@ -67,36 +70,7 @@ __all__ = [
 _EDIT_DEBOUNCE_CHARS = 40
 _MAX_EDIT_INTERVAL_S = 3.0
 _EMPTY_RESPONSE_FALLBACK = "⚠️ The agent finished without producing a reply. Please try again."
-
-
-# ---------------------------------------------------------------------------
-# Per-tool state tracking (Workstream 4)
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class ToolLineState:
-    """State for a single tool call line in the tools-trace message.
-
-    Tracks display text and timing so we can mutate from in-flight
-    → success/failure once the ``tool_result`` event arrives.
-    """
-
-    call_id: str
-    display: str
-    """Formatted display string (icon + label) for the in-flight state."""
-    compact: str | None = None
-    """Formatted display string for the completed state (compact/past tense)."""
-    started_at: float = field(default_factory=time.monotonic)
-    result_line: str | None = None
-    """Set to the rendered success/error HTML when the result arrives."""
-
-    @property
-    def rendered_line(self) -> str:
-        """Current display line — result if available, else in-flight."""
-        if self.result_line is not None:
-            return self.result_line
-        return self.display
+_MAX_IN_FLIGHT_TOOLS = 10
 
 
 def _render_tools_block(
@@ -111,10 +85,17 @@ def _render_tools_block(
     in the body — that would (a) duplicate the header, and (b) leak
     unescaped ``display`` text into Telegram's HTML parser.
     """
-    lines = [s.result_line for s in tool_states.values() if s.result_line is not None]
-    header = render_tools_in_flight(in_flight_names)
+    lines: list[str] = []
+    for state in tool_states.values():
+        line = state.result_line or state.progress_line
+        if line is not None:
+            lines.append(line)
+    shown_in_flight = in_flight_names[:_MAX_IN_FLIGHT_TOOLS]
+    if len(in_flight_names) > _MAX_IN_FLIGHT_TOOLS:
+        shown_in_flight.append(f"+{len(in_flight_names) - _MAX_IN_FLIGHT_TOOLS} more")
+    header = render_tools_in_flight(shown_in_flight)
     if lines:
-        return f"{header}\n\n" + "\n".join(lines)
+        return render_bounded_tools_block(header, lines)
     return header
 
 
@@ -252,7 +233,11 @@ async def handle_tool_result(
         raw_error = str(event.get("content") or "Error")
         state.result_line = render_tool_error(display_str, raw_error)
     else:
-        state.result_line = render_tool_success(display_str, elapsed_ms)
+        state.result_line = render_tool_success(
+            display_str,
+            elapsed_ms,
+            str(event.get("content") or "") or None,
+        )
 
     in_flight = [s.display for s in tool_states.values() if s.result_line is None]
     tool_trace = _render_tools_block(tool_states, in_flight)
@@ -260,6 +245,43 @@ async def handle_tool_result(
     now = asyncio.get_event_loop().time()
     await safe_edit_html(bot, chat_id, message_id, tool_trace)
     return tool_trace, 0, now
+
+
+async def handle_tool_progress(
+    *,
+    event: StreamEvent,
+    bot: Bot,
+    chat_id: int | str,
+    message_id: int,
+    tool_trace: str,
+    chars_since_edit: int,
+    last_edit_at: float,
+    tool_states: dict[str, ToolLineState],
+) -> tuple[str, int, float]:
+    """Update a still-running tool preview without marking it complete."""
+    call_id = str(event.get("tool_use_id") or "")
+    state = tool_states.get(call_id)
+    if state is None:
+        logger.debug(
+            "TELEGRAM_TOOL_PROGRESS_NO_STATE call_id=%s chat_id=%s",
+            call_id,
+            chat_id,
+        )
+        return tool_trace, chars_since_edit, last_edit_at
+
+    display_str = state.compact if state.compact else state.display
+    content = str(event.get("content") or "")
+    state.progress_line = render_tool_progress(display_str, content)
+    in_flight = [s.display for s in tool_states.values() if s.result_line is None]
+    tool_trace = _render_tools_block(tool_states, in_flight)
+
+    now = asyncio.get_event_loop().time()
+    next_chars_since_edit = chars_since_edit + len(content)
+    elapsed = now - last_edit_at
+    if next_chars_since_edit >= _EDIT_DEBOUNCE_CHARS or elapsed >= _MAX_EDIT_INTERVAL_S:
+        await safe_edit_html(bot, chat_id, message_id, tool_trace)
+        return tool_trace, 0, now
+    return tool_trace, next_chars_since_edit, last_edit_at
 
 
 # Inserted between thinking deltas whose ``block_index`` differs (#353).

@@ -9,7 +9,7 @@ full chain-of-thought state.
 from __future__ import annotations
 
 import uuid
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import func, select, update
@@ -179,3 +179,34 @@ async def finalize_assistant_message(
     conversation_id = result.scalar_one_or_none()
     if conversation_id is not None:
         await _touch_conversation(session, conversation_id, now)
+
+
+async def fail_stale_streaming_messages(
+    session: AsyncSession,
+    *,
+    older_than: timedelta,
+    reason: str,
+) -> int:
+    """Mark interrupted assistant placeholders as failed.
+
+    A hard process restart can strand assistant rows at
+    ``assistant_status="streaming"`` because the stream finalizer never
+    runs. Startup repair turns old placeholders into visible failures so
+    users are not left with a permanently-running turn.
+    """
+    now = _now()
+    cutoff = now - older_than
+    result = await session.execute(
+        update(ChatMessage)
+        .where(
+            ChatMessage.role == "assistant",
+            ChatMessage.assistant_status == "streaming",
+            ChatMessage.updated_at < cutoff,
+        )
+        .values(
+            assistant_status="failed",
+            content=reason,
+            updated_at=now,
+        )
+    )
+    return int(getattr(result, "rowcount", 0) or 0)

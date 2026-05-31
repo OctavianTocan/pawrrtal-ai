@@ -110,6 +110,13 @@ export function applyChatEvent(message: ChatMessage, event: ChatStreamEvent): Ch
 			);
 			return { ...message, tool_calls: updated };
 		}
+		case 'tool_progress': {
+			const calls = message.tool_calls ?? [];
+			const updated = calls.map((call) =>
+				call.id === event.tool_use_id ? { ...call, result: event.content } : call
+			);
+			return { ...message, tool_calls: updated };
+		}
 		case 'artifact': {
 			// The matching `tool_use` for `render_artifact` arrives just
 			// before this event and is already in `tool_calls` — we keep

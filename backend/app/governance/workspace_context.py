@@ -18,9 +18,10 @@ What we read
      ``bootstrap_completed: true``.
    * ``.agent/skills/_index.md`` — the always-in-context skill map.
 2. **Skills** — one ``SkillDef`` per ``.agent/skills/<name>/SKILL.md``.
-   The body of each SKILL.md is appended to the system prompt under
-   a "## Available Skills" section so providers without native skill
-   loading (Gemini, future) still surface the skill catalogue.
+   By default the system prompt gets a compact manifest of skill names,
+   descriptions, and paths; full SKILL.md bodies remain available through
+   the workspace skill tools and can be restored with
+   ``WORKSPACE_SKILL_PROMPT_MODE=full``.
 3. **Permissions** — ``.agent/protocols/permissions.md`` is appended
    to the prompt for conversational guidance. The mechanical allow/deny
    gate currently returns "no opinion" (permissive default); a
@@ -68,6 +69,8 @@ _SKILL_MANIFEST = "SKILL.md"
 # has at least one skill. Kept short so it doesn't fight with the
 # operating-rules text from AGENTS.md.
 _SKILLS_HEADING = "## Available Skills"
+_SKILLS_OFF_MODES = {"", "off", "none", "false", "0"}
+_SKILLS_FULL_MODE = "full"
 
 
 @dataclass(frozen=True)
@@ -178,10 +181,13 @@ def load_workspace_context(root: Path) -> WorkspaceContext:
 
     if loaded:
         logger.debug(
-            "WORKSPACE_CONTEXT_LOADED root=%s files=%s skills=%d allow=%d deny=%d",
+            "WORKSPACE_CONTEXT_LOADED root=%s files=%s skills=%d skill_prompt_mode=%s "
+            "prompt_chars=%d allow=%d deny=%d",
             root,
             [str(p.relative_to(root)) for p in loaded],
             len(skills),
+            _skill_prompt_mode(),
+            len(system_prompt or ""),
             len(permissions.allow),
             len(permissions.deny),
         )
@@ -288,7 +294,7 @@ def _assemble_system_prompt(
         parts.append(base_prompt)
     if permissions_text is not None:
         parts.append(permissions_text)
-    if skills:
+    if skills and _skill_prompt_mode() not in _SKILLS_OFF_MODES:
         parts.append(_format_skills_catalogue(skills))
     if not parts:
         return None
@@ -298,20 +304,38 @@ def _assemble_system_prompt(
 def _format_skills_catalogue(skills: list[SkillDef]) -> str:
     """Render a skill list as a Markdown section the model can read.
 
-    Includes the description (when present) and the full body of each
-    skill so the model can decide when to follow it. For long skills
-    this can grow the prompt — operators can drop the ``.agent/skills/``
-    directory or set ``WORKSPACE_CONTEXT_ENABLED=false`` to disable.
+    The default manifest mode keeps provider prompts responsive: it
+    includes discovery metadata only and relies on the workspace skill
+    tools for full bodies. Operators can set
+    ``WORKSPACE_SKILL_PROMPT_MODE=full`` to restore the legacy full-body
+    prompt injection.
     """
     lines: list[str] = [_SKILLS_HEADING, ""]
     for skill in skills:
         lines.append(f"### {skill.name}")
         if skill.description:
             lines.append(skill.description)
+        lines.append(f"Path: `{_relative_skill_path(skill)}`")
+        if _skill_prompt_mode() == _SKILLS_FULL_MODE:
             lines.append("")
-        lines.append(skill.body.strip())
+            lines.append(skill.body.strip())
         lines.append("")
     return "\n".join(lines).rstrip()
+
+
+def _skill_prompt_mode() -> str:
+    """Return the normalized workspace skill prompt mode."""
+    return str(settings.workspace_skill_prompt_mode or "manifest").strip().lower()
+
+
+def _relative_skill_path(skill: SkillDef) -> str:
+    """Return a stable workspace-relative-ish path for prompt display."""
+    parts = skill.path.parts
+    try:
+        idx = parts.index(".agent")
+    except ValueError:
+        return skill.path.name
+    return "/".join(parts[idx:])
 
 
 def _resolve_enabled_tools(perms: SettingsPermissions) -> frozenset[str] | None:

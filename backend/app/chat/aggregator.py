@@ -69,16 +69,17 @@ def should_emit_event(event: StreamEvent, verbose_level: int) -> bool:
     Level semantics (matches CCT):
     * ``0`` (quiet) — only ``delta`` (final answer) + ``error`` + ``usage``
       survive.  Tool calls and thinking are dropped.
-    * ``1`` (normal, default) — adds ``tool_use`` + ``tool_result`` +
-      ``artifact`` + ``message`` so the user sees what the agent is
-      doing inline.  Thinking still suppressed.
+    * ``1`` (normal, default) — adds ``tool_use`` + ``tool_progress`` +
+      ``tool_result`` + ``artifact`` + ``message`` plus safe thinking
+      summaries so the user sees what the agent is doing inline. Raw
+      thinking remains suppressed.
     * ``2`` (detailed) — adds ``thinking`` so chain-of-thought is
       visible.  Everything passes through.
     """
     event_type = event.get("type")
     if verbose_level >= VERBOSE_DETAILED:
         return True
-    if event_type == "thinking":
+    if event_type == "thinking" and not event.get("summary"):
         return False
     if verbose_level >= VERBOSE_NORMAL:
         return True
@@ -170,13 +171,8 @@ class ChatTurnAggregator:
             )
             self.timeline.append({"kind": "tool", "toolCallId": tool_use_id})
             return
-        if event_type == "tool_result":
-            tool_use_id = str(event.get("tool_use_id", ""))
-            for call in self.tool_calls:
-                if call.id == tool_use_id:
-                    call.result = event.get("content")
-                    call.status = "completed"
-                    break
+        if event_type in {"tool_result", "tool_progress"}:
+            self._apply_tool_update(event, complete=event_type == "tool_result")
             return
         if event_type == "error":
             self.error_text = event.get("content") or "Chat stream failed."
@@ -188,6 +184,16 @@ class ChatTurnAggregator:
             self.total_input_tokens += int(event.get("input_tokens", 0) or 0)
             self.total_output_tokens += int(event.get("output_tokens", 0) or 0)
             self.total_cost_usd += float(event.get("cost_usd", 0.0) or 0.0)
+
+    def _apply_tool_update(self, event: StreamEvent, *, complete: bool) -> None:
+        """Apply terminal or non-terminal tool output to a tracked call."""
+        tool_use_id = str(event.get("tool_use_id", ""))
+        for call in self.tool_calls:
+            if call.id == tool_use_id:
+                call.result = event.get("content")
+                if complete:
+                    call.status = "completed"
+                break
 
     def duration_seconds(self) -> int:
         """Whole-second elapsed time since the first delta/thinking/tool event."""

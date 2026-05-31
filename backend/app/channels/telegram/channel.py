@@ -34,17 +34,18 @@ from .delivery import (
 from .dispatch import (
     ToolLineState,
     capture_terminal_event,
-    dispatch_text_delta,
     finalize_turn_delivery,
     handle_thinking,
+    handle_tool_progress,
     handle_tool_result,
     handle_tool_use,
     prepare_thinking_block,
     prepare_tools_block,
 )
 from .html import md_to_telegram_html
-from .progress import ProgressState, render_working
 from .progress import render_initial as render_initial  # noqa: PLC0414
+from .progress import render_transient_status
+from .text_delivery import TextDeliveryState, handle_delta_event
 
 if TYPE_CHECKING:
     from aiogram import Bot
@@ -52,14 +53,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 SURFACE_TELEGRAM = "telegram"
-
-# Send an edit when this many new characters have accumulated since the last
-# edit.  Keeps the perceived update cadence snappy without hammering the API.
-_EDIT_DEBOUNCE_CHARS = 40
-
-# Hard upper bound between edits in wall-clock seconds.  Ensures the user
-# sees *something* change even when the model emits many tiny tokens.
-_MAX_EDIT_INTERVAL_S = 3.0
 
 # Prefix glyphs for non-text outcomes (short to avoid crowding the message).
 _AGENT_TERMINATED_PREFIX = "⚠️ "
@@ -132,7 +125,7 @@ class TelegramChannel:
         # we open a fresh Telegram message for the new tools block and
         # rebind this slot so subsequent edits land there.
         tool_message_id: int = message_id
-        answer_text = ""
+        text_state = TextDeliveryState(last_edit_at=asyncio.get_event_loop().time())
         thinking_text = ""
         thinking_message_id: int | None = message_id
         # #306/#307: interleaved text deltas open their own Telegram
@@ -142,10 +135,6 @@ class TelegramChannel:
         # path. On a text → tools/thinking transition,
         # ``prepare_text_block`` resets the slot so the next delta
         # opens a fresh message.
-        text_buffer = ""
-        text_message_id: int | None = None
-        text_chars_since_edit = 0
-        text_last_edit_at = asyncio.get_event_loop().time()
         chars_since_edit = 0
         last_edit_at = asyncio.get_event_loop().time()
         # ``previous_thinking_block_index`` tracks the ``block_index``
@@ -180,7 +169,6 @@ class TelegramChannel:
         # forming inside the placeholder. Tool turns let
         # ``handle_tool_use`` overwrite the placeholder with the tools
         # header directly — no intermediate "Starting…" banner.
-        progress_state: ProgressState = ProgressState.INITIAL
         # Re-paint the placeholder defensively. The caller (bot.py) creates
         # it with the same text, so Telegram returns "message not modified"
         # which ``safe_edit_html`` silently swallows. This keeps deliver()
@@ -190,6 +178,16 @@ class TelegramChannel:
 
         async for event in stream:
             etype = event.get("type")
+
+            if event.get("transient"):
+                if first_block_kind is None:
+                    await safe_edit_html(
+                        bot,
+                        chat_id,
+                        message_id,
+                        render_transient_status(str(event.get("content") or "Working")),
+                    )
+                continue
 
             if etype == "tool_use":
                 first_block_kind = (
@@ -225,8 +223,11 @@ class TelegramChannel:
                 )
                 continue
 
-            if etype == "tool_result":
-                tool_trace, chars_since_edit, last_edit_at = await handle_tool_result(
+            if etype in {"tool_result", "tool_progress"}:
+                tool_handler = (
+                    handle_tool_result if etype == "tool_result" else handle_tool_progress
+                )
+                tool_trace, chars_since_edit, last_edit_at = await tool_handler(
                     event=event,
                     bot=bot,
                     chat_id=chat_id,
@@ -271,49 +272,14 @@ class TelegramChannel:
                 continue
 
             if etype == "delta":
-                chunk: str = event.get("content", "")
-                answer_text += chunk
-                # Content-preview: when the placeholder hasn't yet been
-                # consumed by a tool or thinking block, edit it to show
-                # the assistant's emerging answer (truncated, italic).
-                # Debounced by the same chars/time budget as text edits
-                # so we don't hammer Telegram's rate limit.
-                # Skipped in draft mode — the animated draft already
-                # shows the streaming answer.
-                if first_block_kind is None and chunk:
-                    preview_now = asyncio.get_event_loop().time()
-                    if progress_state == ProgressState.INITIAL:
-                        progress_state = ProgressState.WORKING
-                        await safe_edit_html(bot, chat_id, message_id, render_working(answer_text))
-                        text_last_edit_at = preview_now
-                        text_chars_since_edit = 0
-                    else:
-                        text_chars_since_edit += len(chunk)
-                        elapsed = preview_now - text_last_edit_at
-                        if (
-                            text_chars_since_edit >= _EDIT_DEBOUNCE_CHARS
-                            or elapsed >= _MAX_EDIT_INTERVAL_S
-                        ):
-                            await safe_edit_html(
-                                bot, chat_id, message_id, render_working(answer_text)
-                            )
-                            text_last_edit_at = preview_now
-                            text_chars_since_edit = 0
-                (
-                    text_buffer,
-                    text_message_id,
-                    text_chars_since_edit,
-                    text_last_edit_at,
-                    rendered,
-                ) = await dispatch_text_delta(
-                    chunk=chunk,
-                    previous_block_kind=previous_block_kind,
+                rendered = await handle_delta_event(
+                    event=event,
                     bot=bot,
                     chat_id=chat_id,
-                    text_buffer=text_buffer,
-                    text_message_id=text_message_id,
-                    chars_since_edit=text_chars_since_edit,
-                    last_edit_at=text_last_edit_at,
+                    placeholder_message_id=message_id,
+                    text_state=text_state,
+                    first_block_kind=first_block_kind,
+                    previous_block_kind=previous_block_kind,
                     reply_to_message_id=reply_to_message_id,
                     message_thread_id=message_thread_id,
                 )
@@ -344,7 +310,7 @@ class TelegramChannel:
         # full answer via ``safe_send_text`` to persist the conversation.
         # Any terminal_message (error / agent_terminated) flushes regardless.
         final_text = final_reply_text(
-            answer_text="" if text_message_id is not None else answer_text,
+            answer_text="" if text_state.message_id is not None else text_state.answer_text,
             terminal_message=terminal_message,
             terminal_prefix=terminal_prefix,
         )
@@ -356,8 +322,8 @@ class TelegramChannel:
             previous_block_kind=previous_block_kind,
             tool_trace=tool_trace,
             thinking_text=thinking_text,
-            text_message_id=text_message_id,
-            text_buffer=text_buffer,
+            text_message_id=text_state.message_id,
+            text_buffer=text_state.buffer,
             final_text=final_text,
             reply_to_message_id=reply_to_message_id,
             message_thread_id=message_thread_id,

@@ -6,6 +6,7 @@ import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from app.agents.plugins.types import PreTurnHookContext
@@ -36,6 +37,10 @@ _RECALL_MAX_CHARS: int = 600
 # event loop. Beyond this deadline we log + skip the update.
 _DRAFT_UPDATE_TIMEOUT_S: float = 2.0
 
+# Active Recall runs before every main-agent turn. Keep the default short so a
+# missed recall is cheap, while allowing workspace/env overrides for deeper use.
+_DEFAULT_RECALL_TIMEOUT_S: float = 2.5
+
 DraftUpdater = Callable[[str], Awaitable[None]]
 """Typed alias for the draft-updater callback. Receives the rendered HTML
 chunk; returns ``None``. Implementations should be idempotent — the same
@@ -49,6 +54,27 @@ def _parse_bool(val: Any, default: bool) -> bool:
     if isinstance(val, bool):
         return val
     return str(val).lower() in ("true", "1", "yes", "on")
+
+
+def _parse_positive_float(val: Any, default: float) -> float:
+    """Parse a positive float config value, falling back on invalid input."""
+    if val is None or val == "":
+        return default
+    try:
+        parsed = float(val)
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
+def _resolve_active_recall_timeout_s(workspace_root: Path) -> float:
+    val_timeout_s = resolve_api_key(workspace_root, "ACTIVE_RECALL_TIMEOUT_S")
+    if val_timeout_s is None:
+        val_timeout_s = os.environ.get("ACTIVE_RECALL_TIMEOUT_S")
+    return _parse_positive_float(
+        val_timeout_s,
+        default=_DEFAULT_RECALL_TIMEOUT_S,
+    )
 
 
 SYSTEM_PROMPT = """
@@ -122,9 +148,9 @@ async def _collect_stream_telemetry(  # noqa: C901 — narrow per-event dispatch
 
         safe_trace = html_lib.escape(trace_str)
         html = (
-            f"💭 Recalling memory...\n\n<code>{safe_trace}</code>"
+            f"💭 <b>Recalling memory...</b>\n\n<i>{safe_trace}</i>"
             if safe_trace
-            else "💭 Recalling memory..."
+            else "💭 <b>Recalling memory...</b>"
         )
 
         reply = "".join(tel.parts).strip()
@@ -175,6 +201,53 @@ async def _collect_stream_telemetry(  # noqa: C901 — narrow per-event dispatch
     )
 
 
+async def _run_recall_stream(
+    ctx: PreTurnHookContext,
+    model_id: str,
+    system_prompt: str,
+    search_workspace: bool,
+) -> tuple[str, list[str], int, int, float, str | None]:
+    provider = resolve_llm(model_id)
+    lcm_tools: list[AgentTool] = [
+        make_lcm_grep_tool(conversation_id=ctx.conversation_id),
+        make_lcm_search_tool(conversation_id=ctx.conversation_id),
+    ]
+    if search_workspace:
+        lcm_tools.extend(
+            [
+                make_read_file_tool(ctx.workspace_root),
+                make_list_dir_tool(ctx.workspace_root),
+            ]
+        )
+
+    permission_context = PermissionContext(
+        user_id=str(ctx.user_id),
+        workspace_root=ctx.workspace_root,
+        conversation_id=str(ctx.conversation_id),
+        surface="active_recall",
+    )
+    gate = build_default_permission_check()
+
+    async def permission_check(tool_name: str, arguments: dict[str, Any]) -> PermissionCheckResult:
+        decision = await gate(tool_name, arguments, permission_context)
+        return PermissionCheckResult(
+            allow=decision.allow,
+            reason=decision.reason,
+            violation_type=decision.violation_type,
+        )
+
+    stream = provider.stream(
+        question=ctx.question,
+        conversation_id=uuid.uuid4(),
+        user_id=ctx.user_id,
+        history=None,
+        tools=lcm_tools,
+        system_prompt=system_prompt or SYSTEM_PROMPT,
+        permission_check=permission_check,
+    )
+    return await _collect_stream_telemetry(stream, draft_updater=ctx.draft_updater)
+
+
 async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
     """Search LCM for context relevant to the user's question before the main agent turn."""
     # Resolve ACTIVE_RECALL_ENABLED
@@ -203,7 +276,9 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
     val_search_ws = resolve_api_key(ctx.workspace_root, "ACTIVE_RECALL_SEARCH_WORKSPACE")
     if val_search_ws is None:
         val_search_ws = os.environ.get("ACTIVE_RECALL_SEARCH_WORKSPACE")
-    active_recall_search_workspace = _parse_bool(val_search_ws, default=True)
+    active_recall_search_workspace = _parse_bool(val_search_ws, default=False)
+
+    active_recall_timeout_s = _resolve_active_recall_timeout_s(ctx.workspace_root)
 
     # Resolve ACTIVE_RECALL_SYSTEM_PROMPT
     active_recall_system_prompt = resolve_api_key(ctx.workspace_root, "ACTIVE_RECALL_SYSTEM_PROMPT")
@@ -222,48 +297,6 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
             ctx.conversation_id,
             ctx.user_id,
         )
-        provider = resolve_llm(active_recall_model)
-        # We give the agent its tools.
-        lcm_tools: list[AgentTool] = [
-            make_lcm_grep_tool(conversation_id=ctx.conversation_id),
-            make_lcm_search_tool(conversation_id=ctx.conversation_id),
-        ]
-        if active_recall_search_workspace:
-            lcm_tools.extend(
-                [
-                    make_read_file_tool(ctx.workspace_root),
-                    make_list_dir_tool(ctx.workspace_root),
-                ]
-            )
-
-        permission_context = PermissionContext(
-            user_id=str(ctx.user_id),
-            workspace_root=ctx.workspace_root,
-            conversation_id=str(ctx.conversation_id),
-            surface="active_recall",
-        )
-        gate = build_default_permission_check()
-
-        async def permission_check(
-            tool_name: str, arguments: dict[str, Any]
-        ) -> PermissionCheckResult:
-            decision = await gate(tool_name, arguments, permission_context)
-            return PermissionCheckResult(
-                allow=decision.allow,
-                reason=decision.reason,
-                violation_type=decision.violation_type,
-            )
-
-        stream = provider.stream(
-            question=ctx.question,
-            conversation_id=uuid.uuid4(),  # isolated; not a real turn TODO: This should be easier to do. (Making a subagent that doesn't use real turns).
-            user_id=ctx.user_id,
-            history=None,
-            tools=lcm_tools,
-            system_prompt=active_recall_system_prompt or SYSTEM_PROMPT,
-            permission_check=permission_check,
-        )
-
         (
             answer,
             tools_called,
@@ -271,7 +304,15 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
             output_tokens,
             cost_usd,
             error_msg,
-        ) = await _collect_stream_telemetry(stream, draft_updater=ctx.draft_updater)
+        ) = await asyncio.wait_for(
+            _run_recall_stream(
+                ctx,
+                active_recall_model,
+                active_recall_system_prompt,
+                active_recall_search_workspace,
+            ),
+            timeout=active_recall_timeout_s,
+        )
 
         duration_ms = (time.perf_counter() - start_time) * 1000.0
         tools_str = ",".join(tools_called) or "none"
@@ -320,7 +361,23 @@ async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
         # Intentionally mentioning the active recall agent in the response so the assistant knows where it came from.
         return f"Here's some context that your Active Recall agent found: {answer}"
 
-    except (TimeoutError, ProviderError, ToolError) as exc:
+    except TimeoutError:
+        duration_ms = (time.perf_counter() - start_time) * 1000.0
+        tools_str = ",".join(tools_called) or "none"
+        logger.warning(
+            "ACTIVE_RECALL_OUT conversation_id=%s user_id=%s status=timeout "
+            "duration_ms=%.1f tools_called=[%s] input_tokens=%d output_tokens=%d cost_usd=%.6f timeout_s=%.1f",
+            ctx.conversation_id,
+            ctx.user_id,
+            duration_ms,
+            tools_str,
+            input_tokens,
+            output_tokens,
+            cost_usd,
+            active_recall_timeout_s,
+        )
+        return None
+    except (ProviderError, ToolError) as exc:
         # Narrow set of expected runtime failures: the sub-agent timed
         # out, the LLM provider returned a typed error, or a tool call
         # raised a typed tool error. Real config / import / assertion

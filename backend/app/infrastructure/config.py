@@ -305,12 +305,11 @@ class Settings(BaseSettings):
     # root prompt files plus the internal ``.agent/`` skills/protocols
     # tree and assemble the unified system prompt.
     workspace_context_enabled: bool = True
-    # Workspace-relative path to the skills directory. Each subdirectory
-    # is expected to contain a ``SKILL.md`` file.
+    # Workspace-relative path to the skills directory.
     workspace_skills_dir_name: str = ".agent/skills"
-    # Workspace-relative path to the permissions file. Today the loader
-    # only treats it as documentation for the agent; a Markdown →
-    # allowlist parser is future work.
+    # Prompt shape for workspace skills: compact manifest, legacy full, or off.
+    workspace_skill_prompt_mode: Literal["manifest", "full", "off"] = "manifest"
+    # Workspace-relative permissions file; parsed as prompt text today.
     workspace_settings_filename: str = ".agent/protocols/permissions.md"
 
     # ── Workspace seeding: template sources ──────────────────────────────

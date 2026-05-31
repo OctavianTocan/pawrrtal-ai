@@ -23,6 +23,7 @@ import pytest
 
 from app.channels.telegram.dispatch import (
     ToolLineState,
+    handle_tool_progress,
     handle_tool_result,
     handle_tool_use,
 )
@@ -34,6 +35,7 @@ from app.channels.telegram.progress import (
     render_tool_error,
     render_tool_success,
     render_tools_in_flight,
+    render_transient_status,
     render_working,
 )
 from app.providers.base import StreamEvent
@@ -52,6 +54,13 @@ class TestRenderInitial:
     def test_contains_expected_content(self) -> None:
         result = render_initial()
         assert "Processing" in result or "🤔" in result
+
+
+class TestRenderTransientStatus:
+    def test_status_is_escaped(self) -> None:
+        result = render_transient_status("<starting>")
+        assert "<starting>" not in result
+        assert "&lt;starting&gt;" in result
 
 
 class TestRenderStarting:
@@ -380,3 +389,60 @@ class TestHandleToolResult:
         call_kwargs = bot.edit_message_text.await_args.kwargs
         assert call_kwargs["chat_id"] == 5
         assert call_kwargs["message_id"] == 20
+
+
+@pytest.mark.anyio
+class TestHandleToolProgress:
+    def _make_state(self, call_id: str, display: str = "read_file") -> ToolLineState:
+        return ToolLineState(call_id=call_id, display=display)
+
+    async def test_progress_updates_preview_without_completing_tool(self) -> None:
+        bot = _make_bot()
+        tool_states = {"call_1": self._make_state("call_1", "run tests")}
+        trace, _, _ = await handle_tool_progress(
+            event={
+                "type": "tool_progress",
+                "tool_use_id": "call_1",
+                "content": "collected 12 items",
+            },
+            bot=bot,
+            chat_id=1,
+            message_id=10,
+            tool_trace="",
+            chars_since_edit=40,
+            last_edit_at=0.0,
+            tool_states=tool_states,
+        )
+
+        state = tool_states["call_1"]
+        assert state.result_line is None
+        assert state.progress_line is not None
+        assert "collected 12 items" in state.progress_line
+        assert "✅" not in state.progress_line
+        assert "collected 12 items" in trace
+        bot.edit_message_text.assert_awaited_once()
+
+    async def test_large_tool_trace_omits_complete_fragments_without_cutting_html(self) -> None:
+        bot = _make_bot()
+        tool_states = {f"call_{i}": self._make_state(f"call_{i}", f"tool_{i}") for i in range(12)}
+        for state in tool_states.values():
+            state.progress_line = f"⏳ <b>{state.display}</b>\n\n<code>{'x' * 600}</code>"
+
+        trace, _, _ = await handle_tool_progress(
+            event={
+                "type": "tool_progress",
+                "tool_use_id": "call_0",
+                "content": "still running",
+            },
+            bot=bot,
+            chat_id=1,
+            message_id=10,
+            tool_trace="",
+            chars_since_edit=40,
+            last_edit_at=0.0,
+            tool_states=tool_states,
+        )
+
+        assert len(trace) <= 3600
+        assert trace.count("<code>") == trace.count("</code>")
+        assert "omitted" in trace

@@ -21,6 +21,8 @@ shapes must never raise. They are logged at debug level and ignored.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import logging
 from collections.abc import Iterator
 from typing import Any
@@ -31,6 +33,12 @@ from app.providers.base import StreamEvent
 # notification classes lazily inside the mapper (avoids circular import during
 # package init, since __init__.py imports provider which imports us).
 from ._vendor import get_openai_codex_module
+from .tool_events import (
+    plan_text,
+    tool_result_for_item,
+    tool_use_for_item,
+    truncate_tool_output,
+)
 
 _openai_codex_mod = None
 
@@ -52,6 +60,7 @@ def _get_sdk_type(name: str) -> Any:
 
 
 logger = logging.getLogger(__name__)
+
 
 # Cached resolved types (populated on first use of the mapper)
 _sdk_types: dict[str, Any] = {}
@@ -82,28 +91,284 @@ def _handle_item_completed(item: Any) -> Iterator[StreamEvent]:
             "data": getattr(inner, "result", None) or inner,
             "provider": "openai_codex",
         }
+        return
+
+    tool_result = tool_result_for_item(inner)
+    if tool_result is not None:
+        yield tool_result
 
 
-def map_codex_notification_to_stream_events(  # noqa: C901, PLR0911, PLR0912
-    notification: Any,
-) -> Iterator[StreamEvent]:
+def _map_turn_lifecycle(payload: Any) -> list[StreamEvent] | None:
+    """Map turn-start, plan, diff, and item-start notifications."""
+    TurnStartedT = _sdk("TurnStartedNotification")  # noqa: N806
+    if TurnStartedT and isinstance(payload, TurnStartedT):
+        return [
+            {
+                "type": "thinking",
+                "content": "Codex started the turn",
+                "summary": True,
+                "block_index": 0,
+                "transient": True,
+                "stage": "started",
+            }
+        ]
+
+    TurnPlanUpdatedT = _sdk("TurnPlanUpdatedNotification")  # noqa: N806
+    if TurnPlanUpdatedT and isinstance(payload, TurnPlanUpdatedT):
+        plan = plan_text(
+            getattr(payload, "plan", None),
+            getattr(payload, "explanation", None),
+        )
+        return (
+            [
+                {
+                    "type": "thinking",
+                    "content": plan,
+                    "summary": True,
+                    "block_index": 1,
+                }
+            ]
+            if plan
+            else []
+        )
+
+    TurnDiffUpdatedT = _sdk("TurnDiffUpdatedNotification")  # noqa: N806
+    if TurnDiffUpdatedT and isinstance(payload, TurnDiffUpdatedT):
+        diff = getattr(payload, "diff", None)
+        return (
+            [
+                {
+                    "type": "thinking",
+                    "content": "Codex prepared file changes.",
+                    "summary": True,
+                    "block_index": 1,
+                }
+            ]
+            if diff
+            else []
+        )
+
+    PlanDeltaT = _sdk("PlanDeltaNotification")  # noqa: N806
+    if PlanDeltaT and isinstance(payload, PlanDeltaT):
+        delta = getattr(payload, "delta", None)
+        return (
+            [
+                {
+                    "type": "thinking",
+                    "content": str(delta),
+                    "summary": True,
+                    "block_index": 1,
+                }
+            ]
+            if delta
+            else []
+        )
+
+    ItemStartedT = _sdk("ItemStartedNotification")  # noqa: N806
+    if ItemStartedT and isinstance(payload, ItemStartedT):
+        event = tool_use_for_item(payload.item)
+        return [event] if event is not None else []
+
+    return None
+
+
+def _map_text_and_reasoning(payload: Any) -> list[StreamEvent] | None:
+    """Map normal assistant output plus reasoning/thinking deltas."""
+    AgentMessageDeltaT = _sdk("AgentMessageDeltaNotification")  # noqa: N806
+    if AgentMessageDeltaT and isinstance(payload, AgentMessageDeltaT):
+        return [{"type": "delta", "content": payload.delta}] if payload.delta else []
+
+    ReasoningSummaryT = _sdk("ReasoningSummaryTextDeltaNotification")  # noqa: N806
+    if ReasoningSummaryT and isinstance(payload, ReasoningSummaryT):
+        return (
+            [
+                {
+                    "type": "thinking",
+                    "content": payload.delta,
+                    "summary": True,
+                    "block_index": 2,
+                }
+            ]
+            if payload.delta
+            else []
+        )
+
+    ReasoningTextT = _sdk("ReasoningTextDeltaNotification")  # noqa: N806
+    if ReasoningTextT and isinstance(payload, ReasoningTextT):
+        return (
+            [
+                {
+                    "type": "thinking",
+                    "content": payload.delta,
+                    "summary": False,
+                    "block_index": 3,
+                }
+            ]
+            if payload.delta
+            else []
+        )
+
+    return None
+
+
+def _map_tool_progress(payload: Any) -> list[StreamEvent] | None:
+    """Map tool-progress notifications emitted while Codex works."""
+    CommandOutputT = _sdk("CommandExecutionOutputDeltaNotification")  # noqa: N806
+    if CommandOutputT and isinstance(payload, CommandOutputT):
+        return (
+            [
+                {
+                    "type": "tool_progress",
+                    "tool_use_id": payload.item_id,
+                    "content": truncate_tool_output(payload.delta),
+                }
+            ]
+            if payload.delta
+            else []
+        )
+
+    CommandExecOutputT = _sdk("CommandExecOutputDeltaNotification")  # noqa: N806
+    if CommandExecOutputT and isinstance(payload, CommandExecOutputT):
+        process_id = str(getattr(payload, "process_id", "") or "command")
+        delta = _decode_command_exec_delta(payload)
+        return [_command_exec_progress_event(payload, process_id, delta)] if delta else []
+
+    FileChangeOutputT = _sdk("FileChangeOutputDeltaNotification")  # noqa: N806
+    if FileChangeOutputT and isinstance(payload, FileChangeOutputT):
+        return (
+            [
+                {
+                    "type": "tool_progress",
+                    "tool_use_id": payload.item_id,
+                    "content": truncate_tool_output(payload.delta),
+                }
+            ]
+            if payload.delta
+            else []
+        )
+
+    McpProgressT = _sdk("McpToolCallProgressNotification")  # noqa: N806
+    if McpProgressT and isinstance(payload, McpProgressT):
+        return [
+            {
+                "type": "tool_progress",
+                "tool_use_id": payload.item_id,
+                "content": truncate_tool_output(str(payload.message)),
+            }
+        ]
+
+    return None
+
+
+def _command_exec_progress_event(payload: Any, process_id: str, delta: str) -> StreamEvent:
+    """Build a progress event from a legacy command-exec delta payload."""
+    stream = str(getattr(payload, "stream", "") or "").strip()
+    cap_reached = bool(getattr(payload, "cap_reached", False))
+    prefix = f"{stream}: " if stream else ""
+    suffix = "\n... output cap reached" if cap_reached else ""
+    return {
+        "type": "tool_progress",
+        "tool_use_id": process_id,
+        "content": truncate_tool_output(f"{prefix}{delta}{suffix}"),
+    }
+
+
+def _map_completion_status(payload: Any) -> list[StreamEvent] | None:
+    """Map turn completion, item completion, warnings, and reroutes."""
+    TurnCompletedT = _sdk("TurnCompletedNotification")  # noqa: N806
+    if TurnCompletedT and isinstance(payload, TurnCompletedT):
+        turn = payload.turn
+        events: list[StreamEvent] = []
+        if turn.status == "failed" and turn.error:
+            msg = turn.error.message or str(turn.error)
+            events.append({"type": "error", "content": f"Codex turn failed: {msg}"})
+        events.append({"type": "done"})
+        return events
+
+    ItemCompletedT = _sdk("ItemCompletedNotification")  # noqa: N806
+    if ItemCompletedT and isinstance(payload, ItemCompletedT):
+        return list(_handle_item_completed(payload.item))
+
+    WarningT = _sdk("WarningNotification")  # noqa: N806
+    if WarningT and isinstance(payload, WarningT):
+        message = getattr(payload, "message", None)
+        return [_warning_event(str(message))] if message else []
+
+    ConfigWarningT = _sdk("ConfigWarningNotification")  # noqa: N806
+    if ConfigWarningT and isinstance(payload, ConfigWarningT):
+        message = getattr(payload, "message", None)
+        return [_warning_event(str(message))] if message else []
+
+    ModelReroutedT = _sdk("ModelReroutedNotification")  # noqa: N806
+    if ModelReroutedT and isinstance(payload, ModelReroutedT):
+        return [_warning_event("Codex rerouted the model for this turn.")]
+
+    return None
+
+
+def _warning_event(message: str) -> StreamEvent:
+    """Create a summary thinking event for warning-like Codex notifications."""
+    return {"type": "thinking", "content": message, "summary": True, "block_index": 4}
+
+
+def _map_accounting_and_errors(payload: Any) -> list[StreamEvent] | None:
+    """Map usage, explicit errors, and unknown notifications."""
+    UsageT = _sdk("ThreadTokenUsageUpdatedNotification")  # noqa: N806
+    if UsageT and isinstance(payload, UsageT):
+        usage = payload.token_usage
+        last = getattr(usage, "last", None)
+        total = getattr(usage, "total", None)
+        if last is None:
+            return []
+        event: StreamEvent = {
+            "type": "usage",
+            "input_tokens": getattr(last, "input_tokens", 0) or 0,
+            "output_tokens": getattr(last, "output_tokens", 0) or 0,
+        }
+        if total is not None:
+            event["total_input_tokens"] = getattr(total, "input_tokens", 0) or 0
+            event["total_output_tokens"] = getattr(total, "output_tokens", 0) or 0
+        return [event]
+
+    ErrorT = _sdk("ErrorNotification")  # noqa: N806
+    if ErrorT and isinstance(payload, ErrorT):
+        err = payload.error
+        msg = getattr(err, "message", None) or str(err)
+        return [{"type": "error", "content": f"Codex error: {msg}"}]
+
+    UnknownT = _sdk("UnknownNotification")  # noqa: N806
+    if UnknownT and isinstance(payload, UnknownT):
+        logger.debug("openai_codex.events: UnknownNotification params=%s", payload.params)
+        return []
+
+    return None
+
+
+def _mapped_payload_events(payload: Any) -> list[StreamEvent] | None:
+    """Dispatch a Codex payload to the first matching focused mapper."""
+    for mapper in (
+        _map_turn_lifecycle,
+        _map_text_and_reasoning,
+        _map_tool_progress,
+        _map_completion_status,
+        _map_accounting_and_errors,
+    ):
+        events = mapper(payload)
+        if events is not None:
+            return events
+    return None
+
+
+def map_codex_notification_to_stream_events(notification: Any) -> Iterator[StreamEvent]:
     """Convert one Codex SDK Notification into zero or more Pawrrtal StreamEvents.
 
     This is the critical translation layer that makes Codex feel native
     (deltas, thinking blocks, tool calls, artifacts, usage, completion, errors).
 
-    Ruff's ``C901`` / ``PLR0911`` / ``PLR0912`` (cyclomatic + return-count +
-    branch-count) are suppressed at the function level: the dispatch is a
-    flat ``isinstance`` chain — one branch per SDK notification class —
-    where every branch is intentionally a top-level ``if … return`` so the
-    mapper stays grep-friendly per notification kind. Splitting it into
-    helpers would obscure the 1:1 SDK-type → StreamEvent mapping, which is
-    the core value of this module.
-
-    Local variables that hold SDK type *classes* use PascalCase (``NotificationT``,
-    ``AgentMessageDeltaT``, …) because they are types resolved at runtime;
-    ``# noqa: N806`` is applied per-line on those lines. Renaming them to
-    ``snake_case`` would lie about their kind.
+    Local variables that hold SDK type *classes* use PascalCase
+    (``NotificationT``) because they are types resolved at runtime; ``# noqa:
+    N806`` is applied on that line. Renaming it to ``snake_case`` would lie
+    about its kind.
     """
     NotificationT = _sdk("Notification")  # noqa: N806
     if NotificationT and not isinstance(notification, NotificationT):
@@ -111,99 +376,25 @@ def map_codex_notification_to_stream_events(  # noqa: C901, PLR0911, PLR0912
         return
 
     payload = getattr(notification, "payload", notification)
-
-    # ------------------------------------------------------------------
-    # Text output (normal assistant message deltas)
-    # ------------------------------------------------------------------
-    AgentMessageDeltaT = _sdk("AgentMessageDeltaNotification")  # noqa: N806
-    if AgentMessageDeltaT and isinstance(payload, AgentMessageDeltaT):
-        if payload.delta:
-            yield {"type": "delta", "content": payload.delta}
+    events = _mapped_payload_events(payload)
+    if events is not None:
+        yield from events
         return
 
-    # ------------------------------------------------------------------
-    # Reasoning / thinking (summary + raw)
-    # ------------------------------------------------------------------
-    ReasoningSummaryT = _sdk("ReasoningSummaryTextDeltaNotification")  # noqa: N806
-    if ReasoningSummaryT and isinstance(payload, ReasoningSummaryT):
-        if payload.delta:
-            yield {
-                "type": "thinking",
-                "content": payload.delta,
-                "summary": True,
-            }
-        return
-
-    ReasoningTextT = _sdk("ReasoningTextDeltaNotification")  # noqa: N806
-    if ReasoningTextT and isinstance(payload, ReasoningTextT):
-        if payload.delta:
-            yield {
-                "type": "thinking",
-                "content": payload.delta,
-                "summary": False,
-            }
-        return
-
-    # ------------------------------------------------------------------
-    # Turn / item lifecycle completion (most important terminal signal)
-    # ------------------------------------------------------------------
-    TurnCompletedT = _sdk("TurnCompletedNotification")  # noqa: N806
-    if TurnCompletedT and isinstance(payload, TurnCompletedT):
-        turn = payload.turn
-        if turn.status == "failed" and turn.error:
-            msg = turn.error.message or str(turn.error)
-            yield {"type": "error", "content": f"Codex turn failed: {msg}"}
-        yield {"type": "done"}
-        return
-
-    # Item completion can carry final artifacts (images, etc.) or tool results.
-    # The inner-branch logic lives in ``_handle_item_completed`` so this
-    # dispatcher stays under sentrux's cyclomatic budget; the helper keeps the
-    # 1:1 SDK-type → StreamEvent mapping that makes this file grep-friendly.
-    ItemCompletedT = _sdk("ItemCompletedNotification")  # noqa: N806
-    if ItemCompletedT and isinstance(payload, ItemCompletedT):
-        yield from _handle_item_completed(payload.item)
-        return
-
-    # ------------------------------------------------------------------
-    # Usage / cost accounting
-    # ------------------------------------------------------------------
-    UsageT = _sdk("ThreadTokenUsageUpdatedNotification")  # noqa: N806
-    if UsageT and isinstance(payload, UsageT):
-        usage = payload.token_usage
-        # ThreadTokenUsage has .total and .last (TokenUsageBreakdown)
-        total = getattr(usage, "total", None)
-        if total:
-            yield {
-                "type": "usage",
-                "input_tokens": getattr(total, "input_tokens", 0) or 0,
-                "output_tokens": getattr(total, "output_tokens", 0) or 0,
-                # cost_usd will be computed by the cost tracker from model + tokens
-            }
-        return
-
-    # ------------------------------------------------------------------
-    # Explicit errors
-    # ------------------------------------------------------------------
-    ErrorT = _sdk("ErrorNotification")  # noqa: N806
-    if ErrorT and isinstance(payload, ErrorT):
-        err = payload.error
-        msg = getattr(err, "message", None) or str(err)
-        yield {"type": "error", "content": f"Codex error: {msg}"}
-        return
-
-    # ------------------------------------------------------------------
-    # Unknown / not-yet-mapped notifications (defensive no-op)
-    # ------------------------------------------------------------------
-    UnknownT = _sdk("UnknownNotification")  # noqa: N806
-    if UnknownT and isinstance(payload, UnknownT):
-        logger.debug("openai_codex.events: UnknownNotification params=%s", payload.params)
-        return
-
-    # Any other payload we haven't mapped yet — log once for debugging
-    # during rollout, but never crash the stream.
     logger.debug(
         "openai_codex.events: unhandled notification payload type=%s method=%s",
         type(payload).__name__,
         getattr(notification, "method", None),
     )
+
+
+def _decode_command_exec_delta(payload: Any) -> str:
+    """Decode legacy command-exec base64 deltas from the Codex SDK."""
+    raw = getattr(payload, "delta_base64", None)
+    if not raw:
+        return ""
+    try:
+        decoded = base64.b64decode(str(raw), validate=True)
+    except (binascii.Error, ValueError):
+        return ""
+    return decoded.decode("utf-8", errors="replace")

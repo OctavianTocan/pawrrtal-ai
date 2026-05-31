@@ -48,6 +48,7 @@ from app.lcm import (
     schedule_lcm_compaction,
 )
 from app.models import Conversation
+from app.providers.openai_codex.prompting import CODEX_LIGHT_SYSTEM_PROMPT
 
 # Strong references to in-flight codex_thread_id persist tasks so they
 # survive (a) GC, and (b) cancellation of the streaming response.  The
@@ -191,6 +192,12 @@ class ChatTurnInput:
     # For the native openai_codex provider: the Codex thread id to resume
     # if one was previously persisted for this conversation.
     codex_thread_id: str | None = None
+    # Fingerprint of the prompt/model shape used to decide whether the
+    # current Codex thread is reusable.
+    codex_thread_prompt_hash: str | None = None
+    # True for simple Codex chat turns that should not pay the full
+    # workspace prompt / active-recall cost.
+    codex_lightweight_prompt: bool = False
     # These are the pre-turn hooks that will be run before the turn is started. They come from the plugin registry (for now).
     pre_turn_hooks: list[PreTurnHook] | None = None
     # Optional callback for pre-turn hooks to stream draft status back to the channel.
@@ -298,7 +305,9 @@ async def run_turn(
     history, assistant_message_id = await _load_history_and_persist(turn_input)
 
     # --- Pre-turn hooks ---
-    pre_turn_added_context: str | None = await _run_pre_turn_hooks(turn_input)
+    pre_turn_added_context: str | None = None
+    if not turn_input.codex_lightweight_prompt:
+        pre_turn_added_context = await _run_pre_turn_hooks(turn_input)
     if turn_input.on_pre_turn_finished:
         await turn_input.on_pre_turn_finished()
 
@@ -311,13 +320,17 @@ async def run_turn(
     # tool inventory) appended on every turn so the model never has to
     # guess at its environment.  See issues #289, #291, #294, #309 and
     # ``app.channels._turn_runtime_context`` for the rationale.
-    system_prompt = system_prompt_for_turn(
-        turn_input.workspace_root,
-        model_id=model_id,
-        tools=turn_input.tools,
-        extra_context=pre_turn_added_context,
-        reasoning_effort=turn_input.reasoning_effort,
-    )
+    system_prompt: str | None
+    if turn_input.codex_lightweight_prompt:
+        system_prompt = CODEX_LIGHT_SYSTEM_PROMPT
+    else:
+        system_prompt = system_prompt_for_turn(
+            turn_input.workspace_root,
+            model_id=model_id,
+            tools=turn_input.tools,
+            extra_context=pre_turn_added_context,
+            reasoning_effort=turn_input.reasoning_effort,
+        )
 
     with turn_span(
         conversation_id=turn_input.conversation_id,
@@ -348,6 +361,7 @@ async def run_turn(
                 turn_input=turn_input,
                 history=history,
                 system_prompt=system_prompt,
+                per_turn_context=pre_turn_added_context,
                 aggregator=aggregator,
                 counter=counter,
                 event_hooks=event_hooks,
@@ -365,6 +379,7 @@ async def _stream_with_llm_span(
     turn_input: ChatTurnInput,
     history: list[dict[str, str]],
     system_prompt: str | None,
+    per_turn_context: str | None,
     aggregator: ChatTurnAggregator,
     counter: _EventCounter,
     event_hooks: list[EventHook] | None,
@@ -404,6 +419,7 @@ async def _stream_with_llm_span(
                     turn_input=turn_input,
                     history=history,
                     system_prompt=system_prompt,
+                    per_turn_context=per_turn_context,
                     aggregator=aggregator,
                     counter=counter,
                     hooks=hooks,
@@ -444,6 +460,7 @@ async def _guarded_stream(
     turn_input: ChatTurnInput,
     history: list[dict[str, str]],
     system_prompt: str | None,
+    per_turn_context: str | None,
     aggregator: ChatTurnAggregator,
     counter: _EventCounter,
     hooks: list[EventHook],
@@ -463,6 +480,14 @@ async def _guarded_stream(
     # which only happens for conversations bound to the openai_codex
     # provider. The Protocol stays clean.
     extra_kwargs: dict[str, Any] = {}
+    provider_history = history
+    if turn_input.codex_thread_prompt_hash is not None:
+        extra_kwargs["per_turn_context"] = per_turn_context
+        # Native Codex threads are the continuity source for this provider.
+        # When a thread is stale or missing, starting fresh with only this
+        # turn's compact context is much cheaper than replaying Pawrrtal's
+        # UI/audit history into a brand new native thread.
+        provider_history = []
     if turn_input.codex_thread_id is not None:
         extra_kwargs["codex_thread_id"] = turn_input.codex_thread_id
     try:
@@ -470,7 +495,7 @@ async def _guarded_stream(
             turn_input.question,
             turn_input.conversation_id,
             turn_input.user_id,
-            history=history,
+            history=provider_history,
             tools=turn_input.tools or None,
             system_prompt=system_prompt,
             reasoning_effort=turn_input.reasoning_effort,
@@ -487,8 +512,6 @@ async def _guarded_stream(
             # future hook stay behind the filter so /verbose still
             # gates what the channel renders.
             extras = list(_expand_hook_events(event, hooks))
-            if not _should_deliver_event(event, turn_input.verbose_level):
-                continue
             # Handle Codex native provider internal signals (e.g. new thread created
             # so we can persist the thread_id for resume on future turns).
             if event.get("type") == "internal" and event.get("kind") == "codex_thread_created":
@@ -501,10 +524,20 @@ async def _guarded_stream(
                     # collect it and ``main.lifespan`` awaits the set on
                     # shutdown before the event loop exits.
                     persist_task = asyncio.create_task(
-                        persist_codex_thread_id(turn_input.conversation_id, thread_id)
+                        persist_codex_thread_id(
+                            turn_input.conversation_id,
+                            thread_id,
+                            turn_input.codex_thread_prompt_hash,
+                        )
                     )
                     _register_codex_persist_task(persist_task)
                 # Do not forward this internal event to the UI.
+                continue
+            if not _should_deliver_event(event, turn_input.verbose_level):
+                continue
+
+            if event.get("transient"):
+                yield event
                 continue
 
             counter.record(event)
@@ -760,7 +793,11 @@ async def _finalize_turn(
     )
 
 
-async def persist_codex_thread_id(conversation_id: uuid.UUID, thread_id: str) -> None:
+async def persist_codex_thread_id(
+    conversation_id: uuid.UUID,
+    thread_id: str | None,
+    prompt_hash: str | None = None,
+) -> None:
     """Persist a newly created Codex thread id against the conversation.
 
     Called inline from the streaming wrapper when the openai_codex
@@ -776,7 +813,7 @@ async def persist_codex_thread_id(conversation_id: uuid.UUID, thread_id: str) ->
             await session.execute(
                 update(Conversation)
                 .where(Conversation.id == conversation_id)
-                .values(codex_thread_id=thread_id)
+                .values(codex_thread_id=thread_id, codex_thread_prompt_hash=prompt_hash)
             )
             await session.commit()
             logger.debug(
@@ -790,13 +827,23 @@ async def persist_codex_thread_id(conversation_id: uuid.UUID, thread_id: str) ->
 
 async def load_codex_thread_id(conversation_id: uuid.UUID) -> str | None:
     """Load the persisted Codex thread id for resume support (if any)."""
+    state = await load_codex_thread_state(conversation_id)
+    return state[0] if state else None
+
+
+async def load_codex_thread_state(
+    conversation_id: uuid.UUID,
+) -> tuple[str | None, str | None] | None:
+    """Load the persisted Codex thread id and prompt hash for resume support."""
     try:
         async with async_session_maker() as session:
             result = await session.execute(
-                select(Conversation.codex_thread_id).where(Conversation.id == conversation_id)
+                select(Conversation.codex_thread_id, Conversation.codex_thread_prompt_hash).where(
+                    Conversation.id == conversation_id
+                )
             )
             row = result.first()
-            return row[0] if row else None
+            return (row[0], row[1]) if row else None
     except sa_exc.OperationalError:
-        logger.exception("codex: failed to load thread_id for conversation %s", conversation_id)
+        logger.exception("codex: failed to load thread state for conversation %s", conversation_id)
         return None

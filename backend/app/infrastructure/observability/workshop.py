@@ -389,6 +389,8 @@ def workshop_event_hook(
     """
 
     def hook(event: StreamEvent) -> list[StreamEvent]:
+        if event.get("transient"):
+            return []
         if turn_recorder is not None:
             turn_recorder.record_first_event()
         handler = _HOOK_DISPATCH.get(event.get("type", ""))

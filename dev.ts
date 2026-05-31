@@ -5,7 +5,9 @@
  * frontend's package.json `dev` script. No proxies, no HTTPS, no special
  * routing — just the two processes.
  */
+import { type ChildProcess, spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
+import { createServer } from 'node:net';
 import { $ } from 'bun';
 import {
 	DEV_BACKEND_PORT,
@@ -18,6 +20,7 @@ const SQLITE_DB_FILENAME_PREFIX = 'pawrrtal';
 const MAX_BRANCH_FILENAME_LENGTH = 80;
 const DEV_CACHE_DIR = '.cache';
 const DEV_DATABASE_URL_ENV = 'PAWRRTAL_DEV_DATABASE_URL';
+const SHUTDOWN_TIMEOUT_MS = 10_000;
 
 await mkdir(`${DEV_CACHE_DIR}/uv`, { recursive: true });
 await mkdir(`${DEV_CACHE_DIR}/xdg`, { recursive: true });
@@ -45,10 +48,27 @@ async function sqliteDbFilenameForBranch(): Promise<string | null> {
 	return `${SQLITE_DB_FILENAME_PREFIX}-${sanitized}.db`;
 }
 
-// Free up dev ports before starting (handles ghost processes from previous runs).
-// `.nothrow()` keeps the script running even if no process is bound to the port.
-await $`lsof -ti:${DEV_FRONTEND_PORT} | xargs kill -9`.quiet().nothrow();
-await $`lsof -ti:${DEV_BACKEND_PORT} | xargs kill -9`.quiet().nothrow();
+async function assertPortAvailable(port: number, host: string): Promise<void> {
+	await new Promise<void>((resolve, reject) => {
+		const server = createServer();
+		server.once('error', reject);
+		server.listen({ port, host }, () => {
+			server.close((error) => {
+				if (error) reject(error);
+				else resolve();
+			});
+		});
+	}).catch((error: NodeJS.ErrnoException) => {
+		const address = `${host}:${port}`;
+		throw new Error(
+			`Dev port ${address} is already in use or cannot be bound (${error.message}). ` +
+				'Stop the existing dev server before starting Pawrrtal.'
+		);
+	});
+}
+
+await assertPortAvailable(DEV_FRONTEND_PORT, '::');
+await assertPortAvailable(DEV_BACKEND_PORT, '127.0.0.1');
 
 // Clear Next.js dev lock to avoid the "Unable to acquire lock" error on restart.
 await $`rm -rf frontend/.next/dev/lock`.quiet().nothrow();
@@ -69,14 +89,91 @@ console.log(
 	`Starting dev servers — frontend on ${DEV_FRONTEND_URL}, backend on ${DEV_BACKEND_URL}`
 );
 
-// Frontend: plain Next.js dev server. Workspace package, run via bun --filter.
-const frontendPromise = $`bun --filter pawrrtal dev`.quiet(false);
+type ManagedProcess = {
+	name: string;
+	child: ChildProcess;
+};
 
-// Backend: explicit ASGI target via uvicorn. `main.app` is wrapped in CORS
-// middleware, so FastAPI CLI discovery cannot treat it as a raw FastAPI instance.
-const backendPromise =
-	$`uv run --project backend uvicorn main:app --app-dir backend --host 127.0.0.1 --port ${DEV_BACKEND_PORT} --reload --reload-dir backend`.quiet(
-		false
-	);
+function startManagedProcess(
+	name: string,
+	command: string,
+	args: readonly string[]
+): ManagedProcess {
+	const child = spawn(command, [...args], {
+		cwd: process.cwd(),
+		detached: true,
+		env: process.env,
+		stdio: 'inherit',
+	});
+	return { name, child };
+}
 
-await Promise.all([frontendPromise, backendPromise]);
+function waitForExit(processInfo: ManagedProcess): Promise<number> {
+	return new Promise((resolve) => {
+		processInfo.child.once('exit', (code, signal) => {
+			if (signal) {
+				console.error(`${processInfo.name} exited from signal ${signal}`);
+				resolve(1);
+				return;
+			}
+			resolve(code ?? 1);
+		});
+	});
+}
+
+async function stopProcess(processInfo: ManagedProcess): Promise<void> {
+	const pid = processInfo.child.pid;
+	if (!pid || processInfo.child.exitCode !== null) return;
+	try {
+		process.kill(-pid, 'SIGTERM');
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+	}
+	await Promise.race([
+		waitForExit(processInfo),
+		new Promise((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS)),
+	]);
+	if (processInfo.child.exitCode !== null) return;
+	try {
+		process.kill(-pid, 'SIGKILL');
+	} catch (error) {
+		if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+	}
+}
+
+const managedProcesses: ManagedProcess[] = [
+	startManagedProcess('frontend', 'bun', ['--filter', 'pawrrtal', 'dev']),
+	startManagedProcess('backend', 'uv', [
+		'run',
+		'--project',
+		'backend',
+		'uvicorn',
+		'main:app',
+		'--app-dir',
+		'backend',
+		'--host',
+		'127.0.0.1',
+		'--port',
+		String(DEV_BACKEND_PORT),
+		'--reload',
+		'--reload-dir',
+		'backend',
+	]),
+];
+
+let shuttingDown = false;
+
+async function shutdown(exitCode: number): Promise<never> {
+	if (shuttingDown) process.exit(exitCode);
+	shuttingDown = true;
+	await Promise.all(managedProcesses.map((processInfo) => stopProcess(processInfo)));
+	process.exit(exitCode);
+}
+
+process.once('SIGINT', () => void shutdown(130));
+process.once('SIGTERM', () => void shutdown(143));
+
+const exitCode = await Promise.race(
+	managedProcesses.map((processInfo) => waitForExit(processInfo))
+);
+await shutdown(exitCode);
