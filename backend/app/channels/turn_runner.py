@@ -306,8 +306,7 @@ async def run_turn(
 
     # --- Pre-turn hooks ---
     pre_turn_added_context: str | None = None
-    if not turn_input.codex_lightweight_prompt:
-        pre_turn_added_context = await _run_pre_turn_hooks(turn_input)
+    pre_turn_added_context = await _run_pre_turn_hooks(turn_input)
     if turn_input.on_pre_turn_finished:
         await turn_input.on_pre_turn_finished()
 

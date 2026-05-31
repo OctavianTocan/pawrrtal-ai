@@ -1427,6 +1427,9 @@ async def test_run_llm_turn_passes_ensured_codex_thread_id(tmp_path: Path) -> No
     assert captured["turn_input"].codex_thread_id == "thr_telegram"
     assert captured["turn_input"].codex_thread_prompt_hash == "hash_telegram"
     assert captured["turn_input"].codex_lightweight_prompt is True
+    assert "reply_to_message_id" not in captured["turn_input"].channel_message["metadata"]
+    message.answer.assert_awaited_once()
+    assert "reply_parameters" not in message.answer.await_args.kwargs
 
 
 # ---------------------------------------------------------------------------

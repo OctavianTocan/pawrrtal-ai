@@ -19,7 +19,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from app.channels.turn_runner import ChatTurnInput, _guarded_stream
+from app.channels.base import ChannelMessage
+from app.channels.turn_runner import ChatTurnInput, _guarded_stream, run_turn
 from app.chat.aggregator import ChatTurnAggregator
 from app.providers.base import StreamEvent
 
@@ -74,6 +75,7 @@ def _make_codex_turn_input(provider: _ScriptedProvider) -> ChatTurnInput:
         **{
             **turn_input.__dict__,
             "codex_thread_id": "thr_existing",
+            "codex_thread_prompt_hash": "hash",
         }
     )
 
@@ -89,6 +91,20 @@ class _Counter:
         self.value += 1
         etype = event.get("type", "")
         self.by_type[etype] = self.by_type.get(etype, 0) + 1
+
+
+class _PassthroughChannel:
+    """Minimal channel that drains stream events and emits bytes."""
+
+    surface = "test"
+
+    async def deliver(
+        self,
+        stream: AsyncIterator[StreamEvent],
+        _message: ChannelMessage,
+    ) -> AsyncIterator[bytes]:
+        async for event in stream:
+            yield str(event).encode()
 
 
 @pytest.mark.anyio
@@ -225,3 +241,50 @@ async def test_non_codex_turn_replays_pawrrtal_history() -> None:
 
     assert provider.stream_kwargs["history"] == history
     assert "codex_thread_id" not in provider.stream_kwargs
+
+
+@pytest.mark.anyio
+async def test_lightweight_codex_turn_still_runs_pre_turn_hooks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Active Recall must stay visible even when Codex uses compact prompting."""
+    provider = _ScriptedProvider(
+        [
+            {"type": "delta", "content": "ok"},
+            {"type": "done"},
+        ]
+    )
+    hook_called = False
+
+    async def recall_hook(_ctx: Any) -> str:
+        nonlocal hook_called
+        hook_called = True
+        return "memory"
+
+    async def no_persist(_turn_input: ChatTurnInput) -> tuple[list[dict[str, str]], Any]:
+        return [], "assistant-id"
+
+    async def no_finalize(**_kwargs: Any) -> None:
+        return None
+
+    monkeypatch.setattr("app.channels.turn_runner._load_history_and_persist", no_persist)
+    monkeypatch.setattr("app.channels.turn_runner._finalize_turn", no_finalize)
+
+    turn_input = ChatTurnInput(
+        conversation_id=MagicMock(),
+        user_id=MagicMock(),
+        question="hi",
+        provider=provider,
+        channel=_PassthroughChannel(),
+        channel_message=MagicMock(),
+        workspace_root=None,
+        tools=[],
+        pre_turn_hooks=[recall_hook],
+        codex_thread_prompt_hash="hash",
+        codex_lightweight_prompt=True,
+    )
+
+    _ = [chunk async for chunk in run_turn(turn_input)]
+
+    assert hook_called is True
+    assert provider.stream_kwargs["per_turn_context"] == "# PRE-TURN CONTEXT\n\nmemory"
