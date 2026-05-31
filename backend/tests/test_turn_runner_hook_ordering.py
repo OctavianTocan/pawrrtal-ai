@@ -288,3 +288,4 @@ async def test_lightweight_codex_turn_still_runs_pre_turn_hooks(
 
     assert hook_called is True
     assert provider.stream_kwargs["per_turn_context"] == "# PRE-TURN CONTEXT\n\nmemory"
+    assert provider.stream_kwargs["reasoning_effort"] == "low"

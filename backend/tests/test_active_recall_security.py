@@ -20,6 +20,7 @@ class CapturingProvider:
 
     def __init__(self) -> None:
         self.captured_permission_check: Any = None
+        self.captured_question: str | None = None
         self.captured_tools: list[AgentTool] = []
 
     async def stream(
@@ -34,6 +35,7 @@ class CapturingProvider:
         permission_check: Any = None,
         images: list[dict[str, str]] | None = None,
     ) -> AsyncIterator[dict[str, Any]]:
+        self.captured_question = question
         self.captured_permission_check = permission_check
         self.captured_tools = tools or []
         # Return a simple done event
@@ -86,7 +88,11 @@ async def test_run_active_recall_enforces_permission_check(
     )
 
     # Execute active recall. It will invoke CapturingProvider.stream.
-    await run_active_recall(ctx)
+    result = await run_active_recall(ctx)
+    assert result is None
+    assert provider.captured_question is not None
+    assert provider.captured_question.startswith("Find only prior context")
+    assert "USER_REQUEST:\nWhat are my files?" in provider.captured_question
 
     assert provider.captured_permission_check is not None
 

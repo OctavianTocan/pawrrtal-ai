@@ -194,10 +194,12 @@ async def _execute_turn_body(
     chat_id = message.chat.id
     bot = message.bot
     assert bot is not None
-    typing_task = asyncio.create_task(
-        _maintain_typing_indicator(bot, chat_id, context.thread_id),
-        name=f"telegram-typing-{chat_id}",
-    )
+    typing_task: asyncio.Task[None] | None = None
+    if settings.telegram_typing_indicator_enabled:
+        typing_task = asyncio.create_task(
+            _maintain_typing_indicator(bot, chat_id, context.thread_id),
+            name=f"telegram-typing-{chat_id}",
+        )
     try:
         async for _ in run_turn(turn_input):
             pass
@@ -205,9 +207,10 @@ async def _execute_turn_body(
         logger.info("TELEGRAM_STREAM_CANCELLED chat_id=%s", chat_id)
         raise
     finally:
-        typing_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError, Exception):
-            await typing_task
+        if typing_task is not None:
+            typing_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await typing_task
 
     try:
         await _maybe_set_auto_title(
@@ -464,9 +467,9 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
         # return. The dispatcher's per-chat worker drains the queue
         # serially so a second message arriving here gets appended
         # to the same worker's queue instead of clobbering the
-        # in-flight turn. The typing indicator + run_turn + auto-
-        # title block below is bound into a coroutine factory and
-        # handed to the dispatcher as the payload.
+        # in-flight turn. The run_turn + auto-title block below is
+        # bound into a coroutine factory and handed to the dispatcher
+        # as the payload.
         async def _enqueued_body() -> None:
             await _execute_turn_body(
                 message=message,
@@ -491,15 +494,12 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
     if old_task is not None and not old_task.done():
         old_task.cancel()
 
-    # PR 07: persistent typing indicator. Telegram clears the
-    # "typing…" status after ~5 seconds, so we refresh on a timer
-    # for the whole duration of the agent run. Cancelled in the
-    # finally block alongside the stream task so a chat that
-    # finished (or was /stop'd) doesn't keep the indicator up.
-    typing_task = asyncio.create_task(
-        _maintain_typing_indicator(message.bot, chat_id, context.thread_id),
-        name=f"telegram-typing-{chat_id}",
-    )
+    typing_task: asyncio.Task[None] | None = None
+    if settings.telegram_typing_indicator_enabled:
+        typing_task = asyncio.create_task(
+            _maintain_typing_indicator(message.bot, chat_id, context.thread_id),
+            name=f"telegram-typing-{chat_id}",
+        )
 
     task: asyncio.Task[None] = asyncio.create_task(_do_stream())
     _running_tasks[chat_id] = task
@@ -509,9 +509,10 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
         logger.info("TELEGRAM_STREAM_CANCELLED chat_id=%s", chat_id)
     finally:
         _running_tasks.pop(chat_id, None)
-        typing_task.cancel()
-        with contextlib.suppress(asyncio.CancelledError, Exception):
-            await typing_task
+        if typing_task is not None:
+            typing_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await typing_task
 
     # Auto-title: derive a title from the first user message and
     # rename the Telegram topic thread to match.  Fires once only

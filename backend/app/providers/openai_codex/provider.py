@@ -66,6 +66,25 @@ _CODEX_SILENCE_HEARTBEAT_SECONDS = 5.0
 _DENY_ALL_DECISION: dict[str, str] = {"decision": "deny"}
 
 
+def _elapsed_ms(started_at: float) -> float:
+    """Return elapsed monotonic time in milliseconds."""
+    return (time.perf_counter() - started_at) * 1000.0
+
+
+def _log_codex_phase(
+    conversation_id: uuid.UUID,
+    phase: str,
+    started_at: float,
+    **fields: object,
+) -> None:
+    """Log one timed Codex provider phase."""
+    suffix = " ".join(f"{key}={value}" for key, value in fields.items())
+    message = "CODEX_PROVIDER_PHASE conversation_id=%s phase=%s duration_ms=%.1f"
+    if suffix:
+        message = f"{message} {suffix}"
+    logger.info(message, conversation_id, phase, _elapsed_ms(started_at))
+
+
 def _deny_all_approval_handler(method: str, params: dict[str, Any] | None) -> dict[str, Any]:
     """Reject every escalation request.
 
@@ -127,6 +146,26 @@ def _map_pawrrtal_reasoning_to_codex(
         "extra-high": CodexReasoningEffort.high,  # SDK caps at high
     }
     return mapping.get(effort, CodexReasoningEffort.medium)
+
+
+def _build_run_input_for_turn(
+    *,
+    question: str,
+    history: list[dict[str, str]] | None,
+    codex_thread_id: str | None,
+    per_turn_context: str | None,
+    images: list[dict[str, str]] | None,
+) -> Any:
+    """Build SDK input for one Codex turn, falling back across SDK drift."""
+    try:
+        return build_codex_run_input(
+            question=question,
+            history=[] if codex_thread_id else history,
+            per_turn_context=per_turn_context,
+            images=images,
+        )
+    except Exception:
+        return TextInput(text=question) if question else question
 
 
 class OpenAICodexProvider:
@@ -209,6 +248,39 @@ class OpenAICodexProvider:
             return
         sync._approval_handler = _deny_all_approval_handler
 
+    async def _start_thread(
+        self,
+        codex: AsyncCodex,
+        *,
+        system_prompt: str | None,
+        conversation_id: uuid.UUID,
+        phase: str,
+    ) -> tuple[Any, str | None]:
+        """Start a Codex thread and return its SDK id when present."""
+        phase_started_at = time.perf_counter()
+        thread = await codex.thread_start(
+            model=self._model_id,
+            cwd=str(self._workspace_root) if self._workspace_root else None,
+            base_instructions=system_prompt,
+            developer_instructions=CODEX_DEVELOPER_INSTRUCTIONS,
+            approval_mode=ApprovalMode.deny_all,
+            sandbox=SandboxMode.read_only,
+        )
+        _log_codex_phase(conversation_id, phase, phase_started_at)
+        new_thread_id = getattr(thread, "id", None)
+        return thread, new_thread_id if isinstance(new_thread_id, str) and new_thread_id else None
+
+    async def _prepare_codex(self, conversation_id: uuid.UUID) -> AsyncCodex:
+        """Return an initialized Codex client and log startup costs."""
+        was_cached = self._codex is not None
+        provider_started_at = time.perf_counter()
+        codex = await self._ensure_codex()
+        _log_codex_phase(conversation_id, "ensure_client", provider_started_at, cached=was_cached)
+        phase_started_at = time.perf_counter()
+        await codex._ensure_initialized()
+        _log_codex_phase(conversation_id, "ensure_initialized", phase_started_at)
+        return codex
+
     async def stream(
         self,
         question: str,
@@ -240,7 +312,7 @@ class OpenAICodexProvider:
             "transient": True,
             "stage": "starting",
         }
-        codex = await self._ensure_codex()
+        codex = await self._prepare_codex(conversation_id)
         yield {
             "type": "thinking",
             "content": "Preparing the Codex session",
@@ -249,8 +321,6 @@ class OpenAICodexProvider:
             "transient": True,
             "stage": "preparing",
         }
-        await codex._ensure_initialized()  # ensure the app-server is up
-
         # Thread lifecycle: prefer resuming an existing Codex thread when we have one
         # persisted for this conversation. Falls back to fresh thread_start.
         # The actual persistence (storing codex_thread_id on the Conversation row)
@@ -266,7 +336,14 @@ class OpenAICodexProvider:
                     "stage": "thread",
                 }
                 try:
+                    phase_started_at = time.perf_counter()
                     thread = await codex.thread_resume(codex_thread_id)
+                    _log_codex_phase(
+                        conversation_id,
+                        "thread_resume",
+                        phase_started_at,
+                        thread_id=codex_thread_id,
+                    )
                 except Exception as exc:
                     if not _is_missing_codex_rollout_error(exc):
                         raise
@@ -282,16 +359,13 @@ class OpenAICodexProvider:
                         "transient": True,
                         "stage": "thread",
                     }
-                    thread = await codex.thread_start(
-                        model=self._model_id,
-                        cwd=str(self._workspace_root) if self._workspace_root else None,
-                        base_instructions=system_prompt,
-                        developer_instructions=CODEX_DEVELOPER_INSTRUCTIONS,
-                        approval_mode=ApprovalMode.deny_all,
-                        sandbox=SandboxMode.read_only,
+                    thread, new_thread_id = await self._start_thread(
+                        codex,
+                        system_prompt=system_prompt,
+                        conversation_id=conversation_id,
+                        phase="thread_start_after_missing",
                     )
-                    new_thread_id = getattr(thread, "id", None)
-                    if isinstance(new_thread_id, str) and new_thread_id:
+                    if new_thread_id:
                         yield {
                             "type": "internal",
                             "kind": "codex_thread_created",
@@ -306,20 +380,17 @@ class OpenAICodexProvider:
                     "transient": True,
                     "stage": "thread",
                 }
-                thread = await codex.thread_start(
-                    model=self._model_id,
-                    cwd=str(self._workspace_root) if self._workspace_root else None,
-                    base_instructions=system_prompt,
-                    developer_instructions=CODEX_DEVELOPER_INSTRUCTIONS,
-                    approval_mode=ApprovalMode.deny_all,
-                    sandbox=SandboxMode.read_only,
+                thread, new_thread_id = await self._start_thread(
+                    codex,
+                    system_prompt=system_prompt,
+                    conversation_id=conversation_id,
+                    phase="thread_start",
                 )
                 # Signal to the caller that a new thread was created so it can be
                 # persisted against the conversation for future resume. The
                 # turn runner narrows on ``isinstance(thread_id, str)`` so a
                 # missing/empty id is silently dropped rather than persisted.
-                new_thread_id = getattr(thread, "id", None)
-                if isinstance(new_thread_id, str) and new_thread_id:
+                if new_thread_id:
                     yield {
                         "type": "internal",
                         "kind": "codex_thread_created",
@@ -330,19 +401,22 @@ class OpenAICodexProvider:
             yield {"type": "error", "content": f"Failed to start/resume Codex thread: {exc}"}
             return
 
-        # Build rich input using the dedicated translation layer.
-        # This gives us proper history replay, previous thinking, tool results,
-        # and attached images — the main missing piece from the v1 implementation.
-        try:
-            run_input = build_codex_run_input(
-                question=question,
-                history=[] if codex_thread_id else history,
-                per_turn_context=per_turn_context,
-                images=images,
-            )
-        except Exception:
-            # Fallback for any SDK input shape changes or translation issues
-            run_input = TextInput(text=question) if question else question
+        phase_started_at = time.perf_counter()
+        run_input = _build_run_input_for_turn(
+            question=question,
+            history=history,
+            codex_thread_id=codex_thread_id,
+            per_turn_context=per_turn_context,
+            images=images,
+        )
+        _log_codex_phase(
+            conversation_id,
+            "build_input",
+            phase_started_at,
+            history_messages=0 if codex_thread_id else len(history or []),
+            has_per_turn_context=bool(per_turn_context),
+            images=len(images or []),
+        )
 
         effort = _map_pawrrtal_reasoning_to_codex(reasoning_effort)
 
@@ -355,15 +429,32 @@ class OpenAICodexProvider:
                 "transient": True,
                 "stage": "sending",
             }
+            phase_started_at = time.perf_counter()
             handle = await thread.turn(
                 run_input,
                 effort=effort,
                 summary=_get_default_reasoning_summary(),
             )
+            _log_codex_phase(
+                conversation_id,
+                "turn_submit",
+                phase_started_at,
+                resumed=bool(codex_thread_id),
+            )
 
             # The high-level async handle exposes a stream of Notification objects.
             # We consume it directly.
+            phase_started_at = time.perf_counter()
+            saw_event = False
             async for event in _stream_codex_notifications(handle):
+                if not saw_event:
+                    saw_event = True
+                    _log_codex_phase(
+                        conversation_id,
+                        "first_stream_event",
+                        phase_started_at,
+                        event_type=event.get("type"),
+                    )
                 yield event
 
         except Exception as exc:

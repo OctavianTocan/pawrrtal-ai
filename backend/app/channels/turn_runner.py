@@ -497,7 +497,7 @@ async def _guarded_stream(
             history=provider_history,
             tools=turn_input.tools or None,
             system_prompt=system_prompt,
-            reasoning_effort=turn_input.reasoning_effort,
+            reasoning_effort=_provider_reasoning_effort(turn_input),
             permission_check=turn_input.permission_check,
             images=turn_input.images,
             **extra_kwargs,
@@ -571,6 +571,15 @@ def _channel_model_id(channel_message: ChannelMessage | None) -> str | None:
         return None
     model_id = channel_message.get("model_id")
     return model_id
+
+
+def _provider_reasoning_effort(turn_input: ChatTurnInput) -> ReasoningEffort | None:
+    """Return the reasoning effort passed to the provider for this turn."""
+    if turn_input.reasoning_effort is not None:
+        return turn_input.reasoning_effort
+    if turn_input.codex_lightweight_prompt:
+        return "low"
+    return None
 
 
 def _expand_hook_events(

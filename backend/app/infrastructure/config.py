@@ -348,6 +348,7 @@ class Settings(BaseSettings):
     # Default verbose level for new Telegram conversations.
     # 0 = quiet, 1 = normal (tool names live), 2 = detailed (+ thinking).
     telegram_verbose_default: Literal[0, 1, 2] = 1
+    telegram_typing_indicator_enabled: bool = False
     # How often the persistent typing indicator is refreshed. Telegram
     # auto-clears typing after ~5 s so the refresh must be faster.
     telegram_typing_refresh_seconds: float = 2.5
