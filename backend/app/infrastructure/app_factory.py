@@ -18,6 +18,7 @@ from app.infrastructure.router_registry import register_routers
 
 # Import lifecycle modules for decorator side effects.
 from app.infrastructure.shutdown import codex_persist_drain as _codex_persist_drain
+from app.infrastructure.shutdown import codex_provider_cache as _codex_provider_cache
 from app.infrastructure.shutdown import tracing as _shutdown_tracing
 from app.infrastructure.startup import admin_seed as _admin_seed
 from app.infrastructure.startup import database as _database
@@ -42,6 +43,7 @@ _LIFECYCLE_MODULES = (
     _scheduler,
     _telegram_lifespan,
     _codex_persist_drain,
+    _codex_provider_cache,
     _shutdown_tracing,
 )
 

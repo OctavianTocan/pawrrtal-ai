@@ -8,7 +8,10 @@ This module covers:
 - :func:`resolve_api_key` precedence (workspace override > settings fallback)
 """
 
+import uuid
+from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 import pytest
@@ -16,11 +19,12 @@ from pydantic import ValidationError
 
 from app.infrastructure import keys
 from app.infrastructure.config import settings
+from app.providers.base import StreamEvent
 from app.providers.claude import ClaudeLLM
-from app.providers.factory import resolve_llm
+from app.providers.factory import close_openai_codex_provider_cache, resolve_llm
 from app.providers.gemini import GeminiLLM
 from app.providers.litellm_provider import LiteLLMLLM
-from app.providers.model_id import InvalidModelId, Vendor
+from app.providers.model_id import Host, InvalidModelId, Vendor
 from app.schemas import ConversationCreate, ConversationUpdate, UserCreate
 
 
@@ -78,6 +82,71 @@ def test_resolve_llm_routes_explicit_litellm_xai_via_host_table() -> None:
     assert isinstance(provider, LiteLLMLLM)
     assert provider._model == "grok-3-latest"
     assert provider._vendor is Vendor.xai
+
+
+class _FakeCachedCodexProvider:
+    """Tiny provider used to prove factory-level Codex caching."""
+
+    closed = 0
+
+    def __init__(self, model_id: str, *, workspace_root: Path | None = None) -> None:
+        self.model_id = model_id
+        self.workspace_root = workspace_root
+
+    async def close(self) -> None:
+        type(self).closed += 1
+
+    async def stream(
+        self,
+        question: str,
+        conversation_id: uuid.UUID,
+        user_id: uuid.UUID,
+        history: list[dict[str, str]] | None = None,
+        tools: list[Any] | None = None,
+        system_prompt: str | None = None,
+        reasoning_effort: str | None = None,
+        permission_check: Any | None = None,
+        images: list[dict[str, str]] | None = None,
+    ) -> AsyncIterator[StreamEvent]:
+        del (
+            question,
+            conversation_id,
+            user_id,
+            history,
+            tools,
+            system_prompt,
+            reasoning_effort,
+            permission_check,
+            images,
+        )
+        if False:
+            yield {}
+
+
+@pytest.mark.anyio
+async def test_resolve_llm_reuses_openai_codex_provider_per_workspace(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Codex provider resolution keeps the app-server warm across turns."""
+    from app.providers import factory
+
+    await close_openai_codex_provider_cache()
+    _FakeCachedCodexProvider.closed = 0
+    monkeypatch.setitem(factory.HOST_TO_PROVIDER, Host.openai_codex, _FakeCachedCodexProvider)
+
+    first = resolve_llm("openai-codex:openai/gpt-5.5", workspace_root=tmp_path)
+    second = resolve_llm("openai-codex:openai/gpt-5.5", workspace_root=tmp_path)
+    other_workspace = resolve_llm(
+        "openai-codex:openai/gpt-5.5",
+        workspace_root=tmp_path / "other",
+    )
+
+    assert first is second
+    assert other_workspace is not first
+
+    await close_openai_codex_provider_cache()
+    assert _FakeCachedCodexProvider.closed == 2
 
 
 def test_resolve_llm_none_uses_catalog_default() -> None:

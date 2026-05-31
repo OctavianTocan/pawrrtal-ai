@@ -14,6 +14,7 @@ programming error.
 
 from __future__ import annotations
 
+import inspect
 from pathlib import Path
 
 from app.infrastructure.config import settings as settings  # noqa: PLC0414
@@ -82,6 +83,8 @@ _HOST_AUTH_KEYS: dict[Host, tuple[str, str]] = {
     Host.xai: ("XAI_API_KEY", "xai_api_key"),
     Host.openai_codex: ("OPENAI_CODEX_OAUTH_TOKEN", "openai_codex_oauth_token"),
 }
+
+_CODEX_PROVIDER_CACHE: dict[tuple[str, str | None], AILLM] = {}
 
 
 def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> bool:
@@ -233,11 +236,38 @@ def resolve_llm(
         return LiteLLMLLM(parsed.model, parsed.vendor, workspace_root=workspace_root)
     if provider_cls is OpencodeGoLLM:
         return _build_opencode_go(parsed, workspace_root)
-    if provider_cls in {AgyCliLLM, GeminiLLM, GeminiCliLLM, XaiLLM} or (
-        parsed.host is Host.openai_codex
-    ):
+    if parsed.host is Host.openai_codex:
+        return _resolve_cached_openai_codex_provider(provider_cls, parsed, workspace_root)
+    if provider_cls in {AgyCliLLM, GeminiLLM, GeminiCliLLM, XaiLLM}:
         return provider_cls(parsed.model, workspace_root=workspace_root)  # type: ignore[call-arg]
     raise KeyError(f"no provider class registered for host {parsed.host!r}")
+
+
+def _resolve_cached_openai_codex_provider(
+    provider_cls: type[AILLM],
+    parsed: ParsedModelId,
+    workspace_root: Path | None,
+) -> AILLM:
+    """Reuse Codex providers so their owned app-server process stays warm."""
+    key = (parsed.model, str(workspace_root) if workspace_root is not None else None)
+    provider = _CODEX_PROVIDER_CACHE.get(key)
+    if provider is None:
+        provider = provider_cls(parsed.model, workspace_root=workspace_root)  # type: ignore[call-arg]
+        _CODEX_PROVIDER_CACHE[key] = provider
+    return provider
+
+
+async def close_openai_codex_provider_cache() -> None:
+    """Close and clear cached Codex providers during application shutdown."""
+    providers = list(_CODEX_PROVIDER_CACHE.values())
+    _CODEX_PROVIDER_CACHE.clear()
+    for provider in providers:
+        close_method = getattr(provider, "close", None)
+        if close_method is None:
+            continue
+        result = close_method()
+        if inspect.isawaitable(result):
+            await result
 
 
 def _build_opencode_go(parsed: ParsedModelId, workspace_root: Path | None) -> OpencodeGoLLM:

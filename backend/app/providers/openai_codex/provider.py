@@ -149,6 +149,14 @@ class OpenAICodexProvider:
         """Native Codex model id used when creating or resuming SDK threads."""
         return self._model_id
 
+    async def close(self) -> None:
+        """Close the owned Codex app-server client if it has been started."""
+        if self._codex is None:
+            return
+        codex = self._codex
+        self._codex = None
+        await codex.close()
+
     async def _ensure_codex(self) -> AsyncCodex:
         """Lazily create the AsyncCodex client (one per provider instance)."""
         if self._codex is not None:
