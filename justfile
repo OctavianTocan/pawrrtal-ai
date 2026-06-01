@@ -175,8 +175,16 @@ stagehand-e2e:
 install:
 	bash -c 'if git rev-parse --git-dir >/dev/null 2>&1; then git submodule update --init --recursive; fi'
 	bun install
+	cd backend-ts && bun install
 	uv sync --project backend --group dev
 	just install-hooks
+
+# Effect TypeScript workspace (Effect v4; vendor source in backend/vendor/effect-smol)
+install-backend-ts:
+	cd backend-ts && bun install
+
+typecheck-backend-ts:
+	cd backend-ts && bun run typecheck
 
 # Show active tasks from Notion
 tasks:

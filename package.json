@@ -31,7 +31,9 @@
 		"frontend",
 		"frontend/lib/react-dropdown",
 		"frontend/lib/react-overlay",
-		"frontend/lib/react-chat-composer"
+		"frontend/lib/react-chat-composer",
+		"backend-ts/packages/api-core",
+		"backend-ts/apps/api"
 	],
 	"overrides": {
 		"react": "19.2.7",
