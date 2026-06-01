@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from importlib import import_module
 from typing import Any
 
 from ._vendor import ensure_openai_codex_available, get_openai_codex_module
@@ -53,6 +54,8 @@ def _resolve_sdk_symbol(name: str) -> Any:
 
 
 def __getattr__(name: str) -> Any:
+    if name == "threads":
+        return import_module(f"{__name__}.threads")
     if name in _SDK_TOP_LEVEL or name in _SDK_DEEP:
         val = _resolve_sdk_symbol(name)
         if val is None:
@@ -104,4 +107,5 @@ __all__ = [
     "ensure_openai_codex_available",
     "get_openai_codex_module",
     "resolve_openai_codex_auth",
+    "threads",
 ]

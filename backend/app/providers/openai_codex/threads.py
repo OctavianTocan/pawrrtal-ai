@@ -7,6 +7,7 @@ import uuid
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
+from typing import Protocol, cast
 
 from app.agents.types import AgentTool
 from app.channels._turn_runtime_context import system_prompt_for_turn
@@ -17,11 +18,14 @@ from app.providers.openai_codex.prompting import (
     CODEX_LIGHT_SYSTEM_PROMPT,
     should_use_lightweight_codex_prompt,
 )
-from app.providers.openai_codex.provider import (
-    OpenAICodexProvider,
-)
 
 logger = logging.getLogger(__name__)
+
+
+class _OpenAICodexProviderLike(Protocol):
+    """Provider surface this module needs without importing the SDK-backed class."""
+
+    model_id: str
 
 
 @dataclass(frozen=True)
@@ -73,8 +77,9 @@ async def ensure_codex_thread_state(
     threads do not have a materialized rollout yet, so this helper only
     validates existing state. Fresh threads are opened by the first real turn.
     """
-    if not isinstance(provider, OpenAICodexProvider):
+    if not _is_openai_codex_provider(provider):
         return CodexThreadState(thread_id=None, prompt_hash=None)
+    codex_provider = cast(_OpenAICodexProviderLike, provider)
 
     lightweight_prompt = should_use_lightweight_codex_prompt(question)
     system_prompt = (
@@ -89,7 +94,7 @@ async def ensure_codex_thread_state(
         )
     )
     prompt_hash = codex_thread_prompt_hash(
-        model_id=provider.model_id,
+        model_id=codex_provider.model_id,
         workspace_root=workspace_root,
         system_prompt=system_prompt,
         developer_instructions=CODEX_DEVELOPER_INSTRUCTIONS,
@@ -131,6 +136,15 @@ def codex_thread_prompt_hash(
     digest.update(b"\0")
     digest.update(developer_instructions.encode("utf-8"))
     return digest.hexdigest()
+
+
+def _is_openai_codex_provider(provider: object) -> bool:
+    """Return whether ``provider`` is the concrete Codex provider."""
+    provider_cls = provider.__class__
+    return (
+        provider_cls.__name__ == "OpenAICodexProvider"
+        and provider_cls.__module__ == "app.providers.openai_codex.provider"
+    )
 
 
 __all__ = [
