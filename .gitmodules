@@ -7,3 +7,7 @@
 [submodule "backend/vendor/codex"]
 	path = backend/vendor/codex
 	url = https://github.com/openai/codex.git
+[submodule "backend/vendor/effect-smol"]
+	path = backend/vendor/effect-smol
+	url = https://github.com/Effect-TS/effect-smol.git
+	branch = main

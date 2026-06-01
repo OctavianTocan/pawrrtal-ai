@@ -37,6 +37,13 @@ export const DEV_FRONTEND_PORT = 53001;
 export const DEV_BACKEND_PORT = 8000;
 
 /**
+ * Port reserved for the Effect TypeScript strangler API (not wired in `dev.ts` yet).
+ *
+ * Python FastAPI remains on {@link DEV_BACKEND_PORT} until route parity lands.
+ */
+export const DEV_BACKEND_TS_PORT = 8001;
+
+/**
  * URL the desktop shell points at when running against `bun run dev`.
  *
  * Centralised so the dev shell + status log + any future
@@ -74,8 +81,8 @@ export function assertFrontendPortMatchesPackageJson(packageJsonText: string): t
 	if (!packageJsonText.includes(expected)) {
 		throw new Error(
 			`frontend/package.json does not reference the canonical dev port. ` +
-				`Expected the substring '${expected}' in scripts.dev; update package.json ` +
-				`or scripts/dev-ports.ts so the two match.`
+			`Expected the substring '${expected}' in scripts.dev; update package.json ` +
+			`or scripts/dev-ports.ts so the two match.`
 		);
 	}
 	return true;

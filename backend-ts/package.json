@@ -1,0 +1,10 @@
+{
+	"name": "@pawrrtal/backend-ts",
+	"private": true,
+	"type": "module",
+	"workspaces": ["packages/*", "apps/*"],
+	"scripts": {
+		"install:deps": "bun install",
+		"typecheck": "bun run --filter '@pawrrtal/*' typecheck"
+	}
+}
