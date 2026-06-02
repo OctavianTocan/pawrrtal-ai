@@ -5,7 +5,7 @@ on:
     branches: [development, main]
     paths:
       - 'frontend/**'
-      - 'react-doctor.config.json'
+      - 'doctor.config.json'
       - 'package.json'
       - 'bun.lock'
       - '.github/workflows/react-doctor.yml'
@@ -13,7 +13,7 @@ on:
     branches: [development, main]
     paths:
       - 'frontend/**'
-      - 'react-doctor.config.json'
+      - 'doctor.config.json'
       - 'package.json'
       - 'bun.lock'
       - '.github/workflows/react-doctor.yml'
