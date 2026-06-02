@@ -1,0 +1,58 @@
+import { Schema } from 'effect';
+import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from 'effect/unstable/httpapi';
+import { Project, ProjectCreateInput, ProjectId, ProjectUpdateInput } from './Domain';
+import { ProjectNotFoundError } from './Errors';
+
+/**
+ * Projects API group.
+ *
+ * | Endpoint name | Method | Path (under group) | Success        | HTTP status |
+ * |---------------|--------|--------------------|----------------|-------------|
+ * | `list`        | GET    | `/`                | `Project[]`    | 200         |
+ * | `create`      | POST   | `/`                | `Project`      | 201         |
+ * | `update`      | PATCH  | `/:project_id`     | `Project`      | 200         |
+ * | `delete`      | DELETE | `/:project_id`     | no body        | 204         |
+ */
+export class ProjectsApi extends HttpApiGroup.make('projects')
+	.add(
+		HttpApiEndpoint.get('list', '/', {
+			success: Schema.Array(Project),
+		})
+			.annotate(OpenApi.Summary, 'List projects')
+			.annotate(OpenApi.Description, 'List every project for the authenticated user')
+	)
+	.add(
+		HttpApiEndpoint.post('create', '/', {
+			payload: ProjectCreateInput,
+			success: Project.pipe(HttpApiSchema.status('Created')),
+		})
+			.annotate(OpenApi.Summary, 'Create project')
+			.annotate(OpenApi.Description, 'Create a new project for the authenticated user')
+	)
+	.add(
+		HttpApiEndpoint.patch('update', '/:project_id', {
+			params: {
+				project_id: ProjectId,
+			},
+			payload: ProjectUpdateInput,
+			success: Project,
+			error: ProjectNotFoundError,
+		})
+			.annotate(OpenApi.Summary, 'Update project')
+			.annotate(OpenApi.Description, 'Rename a project (only `name` is mutable today)')
+	)
+	.add(
+		HttpApiEndpoint.delete('delete', '/:project_id', {
+			params: {
+				project_id: ProjectId,
+			},
+			success: HttpApiSchema.NoContent,
+			error: ProjectNotFoundError,
+		})
+			.annotate(OpenApi.Summary, 'Delete project')
+			.annotate(
+				OpenApi.Description,
+				'Delete a project; linked conversations are unlinked, not deleted'
+			)
+	)
+	.prefix('/projects') {}

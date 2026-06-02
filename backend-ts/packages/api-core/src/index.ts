@@ -3,5 +3,6 @@
  * Runtime and I/O stay in `apps/api`.
  */
 
-export { PawrrtalApi } from "./Api";
-export { PawrrtalSystemApi } from "./Modules/System/SystemApi";
+export { Api } from './Api';
+export { ProjectsApi } from './Modules/Projects/Api';
+export { SystemApi } from './Modules/System/Api';
