@@ -319,6 +319,94 @@ def test_lab_telegram_media_posts_image_and_voice_payload(
     assert stored["run_id"] == payload["run_id"]
 
 
+def test_lab_telegram_providers_posts_media_for_each_selected_host(
+    runner: CliRunner,
+    seeded: PersonaState,
+    tmp_path: Path,
+) -> None:
+    """``paw lab telegram providers`` runs the media scenario per provider host."""
+    image_path = tmp_path / "sample.jpg"
+    voice_path = tmp_path / "sample.ogg"
+    image_path.write_bytes(b"\xff\xd8fake-jpeg")
+    voice_path.write_bytes(b"OggS fake voice")
+    models = [
+        {"id": "agy-api:google/gemini-2.5-pro", "host": "agy-api"},
+        {"id": MODEL_ID, "host": "agy-api"},
+        {"id": "xai:xai/grok-4.3", "host": "xai"},
+        {"id": "google-ai:google/gemini-3.5-flash", "host": "google-ai"},
+    ]
+    responses = [
+        {"accepted": True, "update_id": 1, "chat_id": "333", "external_user_id": "222"},
+        {"accepted": True, "update_id": 2, "chat_id": "333", "external_user_id": "222"},
+        {
+            "accepted": True,
+            "update_id": 3,
+            "chat_id": "333",
+            "external_user_id": "222",
+            "conversation_id": CONV_ID,
+        },
+        {"accepted": True, "update_id": 4, "chat_id": "333", "external_user_id": "222"},
+        {"accepted": True, "update_id": 5, "chat_id": "333", "external_user_id": "222"},
+        {
+            "accepted": True,
+            "update_id": 6,
+            "chat_id": "333",
+            "external_user_id": "222",
+            "conversation_id": "66666666-7777-8888-9999-000000000000",
+        },
+    ]
+    with respx.mock(base_url=MOCK_BACKEND) as router:
+        router.get("/api/v1/models").mock(return_value=httpx.Response(200, json={"models": models}))
+        simulate = router.post("/api/v1/channels/telegram/simulate").mock(
+            side_effect=[httpx.Response(200, json=row) for row in responses],
+        )
+        result = runner.invoke(
+            app,
+            [
+                "lab",
+                "telegram",
+                "providers",
+                "--host",
+                "agy-api",
+                "--host",
+                "xai",
+                "--text",
+                "describe and transcribe",
+                "--image",
+                str(image_path),
+                "--voice-note",
+                str(voice_path),
+                "--voice-duration",
+                "2",
+                "--json",
+            ],
+        )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["kind"] == "telegram-media-providers"
+    assert payload["summary"]["providers"] == 2
+    assert payload["summary"]["failed_providers"] == 0
+    assert [row["host"] for row in payload["selected_models"]] == ["agy-api", "xai"]
+    assert [run["model_id"] for run in payload["provider_runs"]] == [
+        MODEL_ID,
+        "xai:xai/grok-4.3",
+    ]
+
+    bodies = [json.loads(call.request.content) for call in simulate.calls]
+    assert bodies[0]["text"] == "/new"
+    assert bodies[1]["text"] == f"/model {MODEL_ID}"
+    assert bodies[2]["text"] == "describe and transcribe"
+    assert bodies[2]["image"]["media_type"] == "image/jpeg"
+    assert bodies[2]["voice_note"]["mime_type"] == "audio/ogg"
+    assert bodies[3]["text"] == "/new"
+    assert bodies[4]["text"] == "/model xai:xai/grok-4.3"
+    assert bodies[5]["text"] == "describe and transcribe"
+
+    stored = json.loads(Path(payload["run_path"]).read_text(encoding="utf-8"))
+    assert stored["run_id"] == payload["run_id"]
+
+
 def test_lab_telegram_media_rejects_non_jpeg_photo(
     runner: CliRunner,
     seeded: PersonaState,

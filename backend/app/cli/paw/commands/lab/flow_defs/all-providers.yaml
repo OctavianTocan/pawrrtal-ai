@@ -4,6 +4,8 @@ description: Run the same chat roundtrip invariant against one catalog model per
 commands:
   - paw verify all-providers --json
   - paw lab bench providers --runs 1 --json
+  - paw lab telegram providers --image sample.jpg --voice-note sample.ogg --voice-duration 4 --json
 checks:
   - Each selected provider creates a conversation, streams text, persists an assistant row, and cleans up.
+  - Each selected provider can answer a Telegram media turn after image interpretation and voice transcription.
   - Failures name the model and provider host that broke.

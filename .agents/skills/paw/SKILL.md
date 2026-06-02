@@ -58,7 +58,7 @@ Every row reflects a shipped subcommand. Source: `backend/app/cli/paw/commands/`
 | env              | `check`                                                        | local environment preflight               |
 | project          | `up`, `down`, `status`, `logs`, `service ...` plus root `run`/`stop` aliases | local full-stack lifecycle (frontend + backend; pid file at `<PAW_CONFIG_DIR>/<profile>/project.json`) |
 | verify           | `codex`, `chat-roundtrip`, `model-switch`, `telegram`, `all-providers`, `cost`, `lcm`, `all` | end-to-end                   |
-| lab              | `bench model`, `bench providers`, `runs ls/show/export`, `flows ls/show`, `telegram chat` | exploratory benchmarks + dogfood |
+| lab              | `bench model`, `bench providers`, `runs ls/show/export`, `flows ls/show`, `telegram chat`, `telegram media`, `telegram providers` | exploratory benchmarks + dogfood |
 | doctor           | (no verb)                                                      | local + ping `/api/v1/health` + models   |
 | dev              | `up`, `down`, `status`                                         | local backend lifecycle (pid file at `<PAW_CONFIG_DIR>/<profile>/dev.json`) |
 
@@ -129,6 +129,7 @@ just paw lab bench model --model agy-api:google/gemini-3.5-flash-low --prompt "h
 just paw lab bench providers --runs 1 --json
 just paw lab telegram chat --model agy-api:google/gemini-3.5-flash-low --turns /tmp/telegram-turns.txt --new --verbose 2 --json
 just paw lab telegram media --model agy-api:google/gemini-3.5-flash-low --text "describe and transcribe" --image /tmp/sample.jpg --voice-note /tmp/sample.ogg --voice-duration 4 --new --json
+just paw lab telegram providers --text "describe and transcribe" --image /tmp/sample.jpg --voice-note /tmp/sample.ogg --voice-duration 4 --verbose 2 --json
 just paw lab runs ls --json
 ```
 
@@ -143,6 +144,10 @@ real inbound update without measuring raw CLI startup overhead.
 photo, a voice note, or both. Use it for end-to-end checks that image
 interpretation and xAI voice transcription are happening before the
 selected Paw agent model receives the turn.
+`telegram providers` selects one authenticated model per provider host
+from `/api/v1/models` and runs the same JPEG/voice-note media turn for
+each host, producing one matrix run log with per-provider timing and
+failure rows.
 
 ### Verify cost ledger + budget enforcement
 
