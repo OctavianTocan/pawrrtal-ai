@@ -149,6 +149,7 @@ async def test_refresh_telegram_commands_sets_current_command_menu() -> None:
         "new",
         "model",
         "thinking",
+        "config",
         "verbose",
         "stop",
         "status",
