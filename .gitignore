@@ -144,5 +144,9 @@ package-lock.json
 # Databases
 *.db
 
+# Local vendor reference clones (not submodules). See backend/vendor/README.md.
+backend/vendor/comcom/
+backend/vendor/effect/
+
 # Docker
 */.env.docker

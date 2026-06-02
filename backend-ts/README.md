@@ -11,6 +11,8 @@ Strangler companion to the Python FastAPI app on port `8000`. This workspace use
 
 Pattern mirrors `backend/vendor/comcom` (`@comcom/api-core` + `@apps/api`) but targets Effect v4 imports (`effect/unstable/httpapi`, `@effect/platform-node`, etc.).
 
+Definitions and file conventions: **[CONVENTIONS.md](./CONVENTIONS.md)** (start there when adding a module).
+
 ## Vendor pin
 
 | Field | Value |
