@@ -9,9 +9,11 @@ on:
   pull_request:
     branches: [development, main]
     paths:
+      - 'backend/**/*.py'
       - 'frontend/**'
       - 'scripts/check-file-lines.mjs'
       - 'scripts/check-nesting.mjs'
+      - 'scripts/check-view-container.mjs'
       - 'biome.json'
       - 'package.json'
       - 'bun.lock'
@@ -19,9 +21,11 @@ on:
   push:
     branches: [development, main]
     paths:
+      - 'backend/**/*.py'
       - 'frontend/**'
       - 'scripts/check-file-lines.mjs'
       - 'scripts/check-nesting.mjs'
+      - 'scripts/check-view-container.mjs'
       - 'biome.json'
       - 'package.json'
       - 'bun.lock'

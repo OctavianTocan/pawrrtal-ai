@@ -207,7 +207,6 @@ class Settings(BaseSettings):
     # so the receiving FastAPI route can drop forgeries.
     telegram_webhook_secret: str = ""
     telegram_simulate_enabled: bool = False
-
     # When set, inbound Telegram messages from this numeric user_id are
     # auto-linked to the seeded dev-admin user (``ADMIN_EMAIL``) without
     # the manual ``/start <code>`` flow. Lets the developer skip the

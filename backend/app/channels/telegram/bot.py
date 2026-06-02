@@ -35,10 +35,20 @@ from urllib.parse import urlparse
 from app.agents.hooks import build_pre_turn_hooks
 from app.agents.tools import build_agent_tools
 from app.channels.base import ChannelMessage
-from app.channels.telegram.bot_provider_resolution import (
+from app.channels.telegram.bot_runtime import (
+    COMMAND_REFRESH_COOLDOWN_SECONDS,
+    ChatMessageQueueDispatcher,
+    QueuedTurn,
+    TelegramPollingLock,
+    defer_command_refresh,
+    handle_compact_command,
+    handle_lcm_command,
+    handle_status_command,
+    normalize_reasoning_and_notify,
     resolve_provider_with_auto_clear,
+    safe_edit_html,
+    should_refresh_commands,
 )
-from app.channels.telegram.delivery import safe_edit_html
 from app.channels.telegram.handlers import (
     TelegramSender,
     TelegramTurnContext,
@@ -50,35 +60,6 @@ from app.channels.telegram.handlers import (
     handle_stop_command,
     handle_verbose_command,
     handle_whoami_command,
-)
-
-# ``TelegramSender`` is re-exported via :mod:`handlers` (which already
-# imports it from :mod:`sender`) so bot.py imports both
-# ``handle_plain_message`` and ``TelegramSender`` from the same module
-# — keeps bot.py under sentrux's ``no_god_files`` fan-out budget.
-from app.channels.telegram.message_queue import (
-    ChatMessageQueueDispatcher,
-    QueuedTurn,
-)
-
-# The reasoning-effort backstop lives in its own module so bot.py
-# doesn't take a separate fan-out hit on the resolver + DB seam +
-# notice formatter.
-from app.channels.telegram.reasoning_notify import normalize_reasoning_and_notify
-from app.channels.telegram.runtime_guards import (
-    COMMAND_REFRESH_COOLDOWN_SECONDS,
-    TelegramPollingLock,
-    defer_command_refresh,
-    should_refresh_commands,
-)
-
-# ``compact_command`` is re-exported via :mod:`status` to keep bot.py
-# under sentrux's ``no_god_files`` fan-out budget (same trick as
-# ``handle_lcm_command``).
-from app.channels.telegram.status import (
-    handle_compact_command,
-    handle_lcm_command,
-    handle_status_command,
 )
 from app.channels.turn_runner import ChatTurnInput, load_agy_conversation_id, run_turn
 from app.infrastructure.config import settings
