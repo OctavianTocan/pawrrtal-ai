@@ -73,6 +73,52 @@ def _resolve_workspace_id(state: PersonaState, override: str | None) -> str:
     return workspace_id
 
 
+@workspace_app.command("status")
+def workspace_status(
+    profile: str = typer.Option("default", "--profile"),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Show whether onboarding has a default workspace ready."""
+    state = load_state(profile)
+    payload = asyncio.run(_get_onboarding_status(state))
+    if json_out:
+        emit_json(payload)
+        return
+    workspace = payload.get("workspace") if isinstance(payload, dict) else None
+    workspace_id = workspace.get("id") if isinstance(workspace, dict) else "-"
+    emit_human(
+        f"ready: {'yes' if payload.get('has_workspace_ready') else 'no'}\nworkspace: {workspace_id}"
+    )
+
+
+@workspace_app.command("skills")
+def workspace_skills(
+    workspace: str | None = typer.Option(None, "--workspace"),
+    profile: str = typer.Option("default", "--profile"),
+    json_out: bool = typer.Option(False, "--json"),
+    plain: bool = typer.Option(False, "--plain"),
+) -> None:
+    """List skills available in a workspace."""
+    require_one_output_mode(json_out=json_out, plain=plain)
+    state = load_state(profile)
+    workspace_id = _resolve_workspace_id(state, workspace)
+    skills = asyncio.run(_list_workspace_skills(state, workspace_id))
+    if json_out:
+        emit_json(skills)
+        return
+    if plain:
+        emit_plain_rows(
+            (skill.get("name"), skill.get("trigger"), skill.get("has_skill_md")) for skill in skills
+        )
+        return
+    if not skills:
+        emit_human("No workspace skills found.")
+        return
+    for skill in skills:
+        suffix = "" if skill.get("has_skill_md") else " (missing SKILL.md)"
+        emit_human(f"{skill.get('name')}: {skill.get('summary')}{suffix}")
+
+
 # --------------------------------------------------------------------------- #
 # A. paw workspaces ...
 # --------------------------------------------------------------------------- #
@@ -344,3 +390,23 @@ async def _delete_workspace(state: PersonaState, workspace_id: str) -> dict[str,
                 return {"deleted": False, "reason": "not_found", "id": workspace_id}
             raise
     return {"deleted": True, "id": workspace_id}
+
+
+async def _get_onboarding_status(state: PersonaState) -> dict[str, Any]:
+    """GET /api/v1/workspaces/onboarding-status."""
+    async with PawClient(state) as client:
+        resp = await client.request("GET", "/api/v1/workspaces/onboarding-status", expect=(200,))
+    body = resp.json()
+    return body if isinstance(body, dict) else {}
+
+
+async def _list_workspace_skills(state: PersonaState, workspace_id: str) -> list[dict[str, Any]]:
+    """GET /api/v1/workspaces/{id}/skills."""
+    async with PawClient(state) as client:
+        resp = await client.request(
+            "GET",
+            f"/api/v1/workspaces/{workspace_id}/skills",
+            expect=(200,),
+        )
+    body = resp.json()
+    return [skill for skill in body if isinstance(skill, dict)] if isinstance(body, list) else []

@@ -245,6 +245,35 @@ def audit_show(
     )
 
 
+@app.command("summary")
+def audit_summary(
+    hours: int = typer.Option(
+        24,
+        "--hours",
+        help="Activity window in hours (1..2160).",
+    ),
+    profile: str = typer.Option("default", "--profile"),
+    json_out: bool = typer.Option(False, "--json"),
+    plain: bool = typer.Option(False, "--plain"),
+) -> None:
+    """Show the audit dashboard aggregate for the authenticated persona."""
+    require_one_output_mode(json_out=json_out, plain=plain)
+    if hours < 1 or hours > MAX_DASHBOARD_WINDOW_HOURS:
+        raise LocalError(
+            f"Bad --hours {hours}: expected 1..{MAX_DASHBOARD_WINDOW_HOURS}.",
+            hint="--hours 24",
+        )
+    state = load_state(profile)
+    summary = asyncio.run(_fetch_audit_summary(state, hours=hours))
+    if json_out:
+        emit_json(summary)
+        return
+    if plain:
+        _emit_summary_plain(summary)
+        return
+    _emit_summary_human(summary)
+
+
 def _format_details(details: dict[str, Any]) -> str:
     """Indented key/value rendering for `paw audit show`'s details block."""
     return json.dumps(details, indent=2, sort_keys=True)
@@ -297,3 +326,43 @@ async def _find_audit_event(state: PersonaState, event_id: str) -> dict[str, Any
         since=None,
     )
     return next((e for e in events if str(e.get("id")) == event_id), None)
+
+
+MAX_DASHBOARD_WINDOW_HOURS = 90 * 24
+
+
+async def _fetch_audit_summary(state: PersonaState, *, hours: int) -> dict[str, Any]:
+    """GET /api/v1/audit/summary."""
+    async with PawClient(state) as client:
+        resp = await client.request(
+            "GET",
+            "/api/v1/audit/summary",
+            params={"hours": hours},
+            expect=(200,),
+        )
+    body = resp.json()
+    return body if isinstance(body, dict) else {}
+
+
+def _emit_summary_plain(summary: dict[str, Any]) -> None:
+    """TSV for top-level audit summary fields."""
+    rows: list[tuple[Any, ...]] = []
+    for key, value in summary.items():
+        if isinstance(value, dict):
+            rows.extend((key, child_key, child_value) for child_key, child_value in value.items())
+        else:
+            rows.append((key, value))
+    emit_plain_rows(rows)
+
+
+def _emit_summary_human(summary: dict[str, Any]) -> None:
+    """Compact human view for the audit summary."""
+    total = summary.get("total_events", summary.get("total", "n/a"))
+    emit_human(f"events: {total}")
+    for key in ("by_event_type", "by_risk_level"):
+        section = summary.get(key)
+        if not isinstance(section, dict) or not section:
+            continue
+        emit_human(f"{key}:")
+        for label, count in sorted(section.items()):
+            emit_human(f"  {label}: {count}")

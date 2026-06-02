@@ -40,16 +40,22 @@ Every row reflects a shipped subcommand. Source: `backend/app/cli/paw/commands/`
 | ---------------- | -------------------------------------------------------------- | ---------------------------------------- |
 | auth             | `login`, `logout`, `auth status`                               | `/auth/*`, `/api/v1/users/me`            |
 | workspaces       | `ls`, `show`, `use`, `create`, `rename`, `delete`              | `/api/v1/workspaces`                     |
+| workspace        | `status`, `skills`                                             | `/api/v1/workspaces/onboarding-status`, `/{id}/skills` |
 | workspace env    | `get`, `set`, `unset`                                          | `/api/v1/workspaces/{id}/env`            |
 | workspace files  | `ls`, `cat`, `write`, `rm`                                     | `/api/v1/workspaces/{id}/files`          |
+| projects         | `ls`, `create`, `rename`, `delete`                             | `/api/v1/projects`                       |
+| profile          | `get`, `set`                                                   | `/api/v1/personalization`                |
+| appearance       | `get`, `set`, `reset`                                          | `/api/v1/appearance`                     |
 | channels         | `list`/`ls`, `link telegram`, `unlink telegram`                | `/api/v1/channels` + `/{provider}/link`  |
 | mcp              | `list`/`ls`, `show`, `create`, `update`, `delete`              | `/api/v1/mcp/servers`                    |
 | jobs             | `list`/`ls`, `show`, `create`, `delete`                        | `/api/v1/scheduled-jobs`                 |
 | models           | `ls` (envelope: `{"models": [...], "etag": "..."}`)            | `/api/v1/models`                         |
+| completions      | `autocomplete`                                                 | `/api/v1/completions/autocomplete`       |
 | conversations    | `ls`, `show`, `create`, `send`, `rename`, `delete`, `export`   | `/api/v1/conversations`                  |
 | messages         | `ls`, `get` (by `(conv_id, index)`; no `/messages/{id}` route) | `/api/v1/conversations/{id}/messages`    |
 | cost             | `summary`, `ledger`                                            | `/api/v1/cost`, `/api/v1/cost/ledger`    |
-| audit            | `ls`/`list`, `show`                                            | `/api/v1/audit`                          |
+| audit            | `ls`/`list`, `show`, `summary`                                 | `/api/v1/audit`                          |
+| heartbeat        | `sync`                                                         | `/api/v1/heartbeat/sync`                 |
 | lcm              | `context <conv-id>`                                            | `/api/v1/lcm/conversations/{id}/context` |
 | api (raw)        | `METHOD PATH`, `openapi`, `ls`                                 | any                                      |
 | record / replay  | `record COMMAND…`, `replay --from FILE`                        | local (respx-backed)                     |
@@ -131,6 +137,8 @@ just paw lab telegram chat --model agy-api:google/gemini-3.5-flash-low --turns /
 just paw lab telegram media --model agy-api:google/gemini-3.5-flash-low --text "describe and transcribe" --image /tmp/sample.jpg --voice-note /tmp/sample.ogg --voice-duration 4 --new --json
 just paw lab telegram providers --text "describe and transcribe" --image /tmp/sample.jpg --voice-note /tmp/sample.ogg --voice-duration 4 --verbose 2 --json
 just paw lab runs ls --json
+just paw lab flows show backend-cli-coverage
+just paw lab flows show telegram-polish-loop
 ```
 
 Lab commands write profile-scoped JSON run logs under
@@ -148,6 +156,12 @@ selected Paw agent model receives the turn.
 from `/api/v1/models` and runs the same JPEG/voice-note media turn for
 each host, producing one matrix run log with per-provider timing and
 failure rows.
+Use `backend-cli-coverage` when checking whether a backend route family has
+an opinionated Paw command, a verify suite, a lab flow, or an explicit raw
+`paw api` fallback.
+Use `telegram-polish-loop` when changing Telegram or tool rendering:
+it names the taste checks to inspect before generalizing feedback into
+`.agents/skills/pawrrtal-taste/SKILL.md`, `DESIGN.md`, or another flow.
 
 ### Verify cost ledger + budget enforcement
 

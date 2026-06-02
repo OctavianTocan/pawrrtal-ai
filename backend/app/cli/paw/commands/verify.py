@@ -23,18 +23,20 @@ from collections.abc import Awaitable, Callable
 
 import typer
 
+from app.cli.paw.commands.verify_lazy import (
+    run_all_providers_scenario,
+    run_chat_roundtrip_scenario,
+    run_codex_scenario,
+    run_cost_scenario,
+    run_lcm_scenario,
+    run_model_switch_scenario,
+    run_telegram_scenario,
+)
 from app.cli.paw.config import PersonaState
 from app.cli.paw.errors import LocalError, VerificationFailed
 from app.cli.paw.http import PawClient
 from app.cli.paw.output import emit_human, emit_json
-from app.cli.paw.verify.all_providers import run_all_providers_scenario
-from app.cli.paw.verify.chat_roundtrip import run_chat_roundtrip_scenario
-from app.cli.paw.verify.codex import SCENARIO_HTTP_TIMEOUT_SECONDS, run_codex_scenario
-from app.cli.paw.verify.cost import run_cost_scenario
-from app.cli.paw.verify.lcm import run_lcm_scenario
-from app.cli.paw.verify.model_switch import run_model_switch_scenario
 from app.cli.paw.verify.scenarios import ScenarioResult
-from app.cli.paw.verify.telegram import run_telegram_scenario
 
 # Canonical order all-dispatcher walks when no --include flag narrows it.
 # Order matters: codex first because its credentials are most likely to be
@@ -49,6 +51,7 @@ from app.cli.paw.verify.telegram import run_telegram_scenario
 # only asserts on the read-only LCM debug endpoint — running last keeps
 # the chat-dependent suites grouped together.
 DEFAULT_SUITES = ("codex", "chat-roundtrip", "model-switch", "telegram", "cost", "lcm")
+SCENARIO_HTTP_TIMEOUT_SECONDS = 120.0
 
 app = typer.Typer(
     help="End-to-end provider verification scenarios.",
@@ -80,7 +83,11 @@ def verify_codex(
     result = asyncio.run(
         _run_one(
             state,
-            lambda client: run_codex_scenario(state, client, keep_conversation=keep_conversation),
+            lambda client: run_codex_scenario(
+                state,
+                client,
+                keep_conversation=keep_conversation,
+            ),
         )
     )
     _emit_and_exit(result, json_out=json_out, label="codex")
@@ -109,7 +116,11 @@ def verify_chat_roundtrip(
     result = asyncio.run(
         _run_one(
             state,
-            lambda client: run_chat_roundtrip_scenario(state, client, model_override=model),
+            lambda client: run_chat_roundtrip_scenario(
+                state,
+                client,
+                model_override=model,
+            ),
         )
     )
     _emit_and_exit(result, json_out=json_out, label="chat-roundtrip")

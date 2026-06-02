@@ -1,0 +1,4 @@
+interface:
+  display_name: "Pawrrtal Taste"
+  short_description: "Clean modern Pawrrtal UX rules"
+  default_prompt: "Use Pawrrtal taste rules to make this UI, CLI, Telegram flow, or agent output feel cleaner and more intentional."

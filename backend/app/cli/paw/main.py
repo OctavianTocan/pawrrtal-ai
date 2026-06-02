@@ -6,14 +6,17 @@ import typer
 
 from app.cli.paw.commands import admin as admin_cmd
 from app.cli.paw.commands import api as api_cmd
+from app.cli.paw.commands import appearance as appearance_cmd
 from app.cli.paw.commands import audit as audit_cmd
 from app.cli.paw.commands import auth as auth_cmd
 from app.cli.paw.commands import channels as channels_cmd
+from app.cli.paw.commands import completions as completions_cmd
 from app.cli.paw.commands import conversations as conversations_cmd
 from app.cli.paw.commands import cost as cost_cmd
 from app.cli.paw.commands import dev as dev_cmd
 from app.cli.paw.commands import doctor as doctor_cmd
 from app.cli.paw.commands import fanout as fanout_cmd
+from app.cli.paw.commands import heartbeat as heartbeat_cmd
 from app.cli.paw.commands import jobs as jobs_cmd
 from app.cli.paw.commands import lab as lab_cmd
 from app.cli.paw.commands import lcm as lcm_cmd
@@ -22,7 +25,9 @@ from app.cli.paw.commands import mcp as mcp_cmd
 from app.cli.paw.commands import messages as messages_cmd
 from app.cli.paw.commands import mirror as mirror_cmd
 from app.cli.paw.commands import models as models_cmd
+from app.cli.paw.commands import personalization as personalization_cmd
 from app.cli.paw.commands import project as project_cmd
+from app.cli.paw.commands import projects as projects_cmd
 from app.cli.paw.commands import record as record_cmd
 from app.cli.paw.commands import replay as replay_cmd
 from app.cli.paw.commands import verify as verify_cmd
@@ -86,6 +91,24 @@ app.add_typer(
     help="Trusted local operator commands.",
 )
 
+app.add_typer(
+    projects_cmd.app,
+    name="projects",
+    help="Manage projects.",
+)
+
+app.add_typer(
+    personalization_cmd.app,
+    name="profile",
+    help="Read/update personalization profile.",
+)
+
+app.add_typer(
+    appearance_cmd.app,
+    name="appearance",
+    help="Read/update appearance settings.",
+)
+
 # `conv` alias is a v2 follow-up; for now the canonical verb is `conversations`.
 app.add_typer(
     conversations_cmd.app,
@@ -130,6 +153,12 @@ app.add_typer(
 )
 
 app.add_typer(
+    completions_cmd.app,
+    name="completions",
+    help="Exercise composer completion endpoints.",
+)
+
+app.add_typer(
     messages_cmd.app,
     name="messages",
     help="Inspect persisted chat messages.",
@@ -145,6 +174,12 @@ app.add_typer(
     audit_cmd.app,
     name="audit",
     help="Inspect audit events.",
+)
+
+app.add_typer(
+    heartbeat_cmd.app,
+    name="heartbeat",
+    help="Sync HEARTBEAT.md scheduled checks.",
 )
 
 app.add_typer(

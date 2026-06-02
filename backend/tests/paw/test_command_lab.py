@@ -197,6 +197,21 @@ def test_lab_flows_lists_and_shows_provider_parity(runner: CliRunner) -> None:
     assert any("paw lab bench model" in command for command in flow["commands"])
 
 
+def test_lab_flows_shows_telegram_polish_loop_contract(runner: CliRunner) -> None:
+    """The Telegram polish loop exposes text, media, and review steps."""
+    result = runner.invoke(app, ["lab", "flows", "show", "telegram-polish-loop", "--json"])
+
+    assert result.exit_code == 0, result.stdout
+    flow = json.loads(result.stdout)
+    commands = "\n".join(flow["commands"])
+    checks = "\n".join(flow["checks"])
+    assert "paw lab telegram chat" in commands
+    assert "paw lab telegram media" in commands
+    assert "paw lab telegram providers" in commands
+    assert "review packet" in checks.lower()
+    assert "accepted taste lesson" in checks.lower()
+
+
 def test_lab_telegram_chat_posts_control_and_turn_messages(
     runner: CliRunner,
     seeded: PersonaState,
