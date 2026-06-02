@@ -110,17 +110,11 @@ MAX_TOOL_TRACE_CHARS = 3600
 def render_bounded_tools_block(header: str, lines: list[str]) -> str:
     """Join complete Telegram HTML fragments without cutting tags."""
     output = header
-    omitted = 0
     for line in lines:
         candidate = f"{output}\n\n{line}"
         if len(candidate) > MAX_TOOL_TRACE_CHARS:
-            omitted += 1
             continue
         output = candidate
-    if omitted:
-        marker = f"\n\n<i>{omitted} tool update{'s' if omitted != 1 else ''} omitted</i>"
-        if len(output) + len(marker) <= MAX_TOOL_TRACE_CHARS:
-            output = f"{output}{marker}"
     return output
 
 
@@ -151,12 +145,10 @@ def render_tool_success(
     preview = (result_preview or "").strip()
     if not preview:
         return line
-    omitted = len(preview) > TOOL_RESULT_PREVIEW_MAX_CHARS
-    if omitted:
+    if len(preview) > TOOL_RESULT_PREVIEW_MAX_CHARS:
         preview = preview[:TOOL_RESULT_PREVIEW_MAX_CHARS].rstrip()
     esc_preview = html.escape(preview)
-    suffix = "\n<i>more omitted</i>" if omitted else ""
-    return f"{line}\n\n<code>{esc_preview}</code>{suffix}"
+    return f"{line}\n\n<code>{esc_preview}</code>"
 
 
 TOOL_PROGRESS_PREVIEW_MAX_CHARS = 500

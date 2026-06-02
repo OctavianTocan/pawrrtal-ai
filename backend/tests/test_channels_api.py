@@ -264,8 +264,8 @@ def test_build_simulated_update_supports_image_payload() -> None:
         payload=TelegramSimulateRequest(
             text="what is this?",
             image={
-                "data": base64.b64encode(b"\xff\xd8fake-jpeg").decode("ascii"),
-                "media_type": "image/jpeg",
+                "data": base64.b64encode(b"\x89PNG\r\n\x1a\nfake-png").decode("ascii"),
+                "media_type": "image/png",
             },
         ),
         update_id=1,

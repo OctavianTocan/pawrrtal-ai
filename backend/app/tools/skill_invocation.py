@@ -70,6 +70,11 @@ def _resolve_skill_path(workspace_root: Path, skill_name: str) -> Path:
     return target
 
 
+def _is_exposed_skill(workspace_root: Path, skill_name: str) -> bool:
+    """Return whether ``skill_name`` appears in the workspace skill catalog."""
+    return any(entry.name == skill_name for entry in read_skill_manifest(workspace_root))
+
+
 def _bounded_body(text: str) -> tuple[str, bool]:
     """Return ``(body, truncated)`` capped by line + byte limits."""
     lines = text.splitlines()
@@ -133,6 +138,11 @@ def make_read_skill_tool(*, workspace_root: Path) -> AgentTool:
             target = _resolve_skill_path(Path(workspace_root), name)
         except ToolError as err:
             return err.render()
+        if not _is_exposed_skill(Path(workspace_root), name):
+            return ToolError(
+                ToolErrorCode.NOT_FOUND,
+                f"Skill {name!r} is not exposed by this workspace's skill catalog.",
+            ).render()
         if not target.is_file():
             return ToolError(
                 ToolErrorCode.NOT_FOUND,
@@ -207,6 +217,11 @@ def make_invoke_skill_tool(*, workspace_root: Path) -> AgentTool:
             target = _resolve_skill_path(Path(workspace_root), name)
         except ToolError as err:
             return err.render()
+        if not _is_exposed_skill(Path(workspace_root), name):
+            return ToolError(
+                ToolErrorCode.NOT_FOUND,
+                f"Skill {name!r} is not exposed by this workspace's skill catalog.",
+            ).render()
         if not target.is_file():
             return ToolError(
                 ToolErrorCode.NOT_FOUND,

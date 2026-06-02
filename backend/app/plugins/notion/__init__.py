@@ -1,8 +1,8 @@
 """Notion integration for Pawrrtal.
 
 Importing this package registers the Notion :class:`Plugin` against
-:mod:`app.agents.plugins.registry`, exposing a single ``ntn`` tool to
-any agent whose workspace has a ``NOTION_API_KEY`` configured.
+:mod:`app.agents.plugins.registry`, exposing a single ``notion_cli``
+tool to any agent whose workspace has a ``NOTION_API_KEY`` configured.
 
 Execution is delegated to the official Notion CLI (``ntn``):
 :mod:`app.plugins.notion.ntn_client` shells out per call with the

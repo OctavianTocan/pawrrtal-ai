@@ -1,6 +1,6 @@
 """Audit-log wrapper for Notion tool calls.
 
-The single ``ntn`` tool runs its underlying work through
+The single ``notion_cli`` tool runs its underlying work through
 :func:`with_audit`, which times the call, captures the request/response
 shape, and writes one row to :class:`app.models.NotionOperationLog`.
 Failures are logged with the error string instead of the response so
@@ -54,8 +54,7 @@ async def with_audit(
 
     Args:
         workspace_id: The active workspace; rows cascade with its delete.
-        tool_name: Name of the calling tool (today only ``"ntn"`` — the
-            column kept its old shape for historical row compatibility).
+        tool_name: Name of the calling tool (today only ``"notion_cli"``).
         operation: Coarse bucket — ``"cli"`` for the proxy tool, plus
             whatever legacy values are already in the table from the
             pre-consolidation schema.

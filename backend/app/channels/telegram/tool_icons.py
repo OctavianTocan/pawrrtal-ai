@@ -60,7 +60,7 @@ _TOOL_ICONS: dict[str, str] = {
     "render_artifact": "\U0001f9e9",
     "image_gen": "\U0001f3a8",
     "send_message": "\U0001f4e8",
-    "ntn": "\U0001f4d3",
+    "notion_cli": "\U0001f4d3",
 }
 
 

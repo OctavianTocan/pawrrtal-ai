@@ -46,7 +46,7 @@ Use Telegram as the feel test for conversational UX:
 1. Name the candidate: what changed, which surface it affects, and what taste question needs feedback.
 2. Run text chat through `paw lab telegram chat` with a short turn file that stresses the changed behavior.
 3. When media could affect the feel, run `paw lab telegram media` with a JPEG and/or voice note; use `paw lab telegram providers` when provider parity matters.
-4. Send the user a compact review packet: prompt, model, Telegram-visible transcript, timing, media summary, run path, and the exact taste question.
+4. Build the compact review packet with `paw lab runs review RUN_ID --question "..."`; send the user the prompt, model, persisted transcript, timing, media summary, run path, and exact taste question.
 5. Treat feedback as a candidate rule until the user accepts it or it repeats across runs.
 6. Adjust the implementation, rerun the same flow, then generalize the accepted lesson into this skill, `DESIGN.md`, tests, or a `paw lab flows` checklist.
 

@@ -17,11 +17,12 @@ What we read
      setup, only until the identity block in PREFERENCES.md flips
      ``bootstrap_completed: true``.
    * ``.agent/skills/_index.md`` — the always-in-context skill map.
-2. **Skills** — one ``SkillDef`` per ``.agent/skills/<name>/SKILL.md``.
-   By default the system prompt gets a compact manifest of skill names,
-   descriptions, and paths; full SKILL.md bodies remain available through
-   the workspace skill tools and can be restored with
-   ``WORKSPACE_SKILL_PROMPT_MODE=full``.
+2. **Skills** — one ``SkillDef`` per skill listed by
+   ``.agent/skills/_manifest.jsonl`` when present, otherwise by
+   backwards-compatible directory discovery. By default the system
+   prompt gets a compact manifest of skill names, descriptions, and
+   paths; full SKILL.md bodies remain available through the workspace
+   skill tools and can be restored with ``WORKSPACE_SKILL_PROMPT_MODE=full``.
 3. **Permissions** — ``.agent/protocols/permissions.md`` is appended
    to the prompt for conversational guidance. The mechanical allow/deny
    gate currently returns "no opinion" (permissive default); a
@@ -53,6 +54,7 @@ from app.infrastructure.fs import read_capped_utf8
 from app.tools.agents_md import (
     assemble_workspace_prompt,
 )
+from app.tools.skills import read_skill_manifest
 from app.workspace.persona_bootstrap import is_persona_bootstrap_pending
 
 logger = logging.getLogger(__name__)
@@ -213,15 +215,15 @@ def _empty_context() -> WorkspaceContext:
 
 
 def _load_skills(root: Path, loaded: list[Path]) -> list[SkillDef]:
-    """Walk ``.agent/skills/*/SKILL.md`` and parse each into a SkillDef."""
+    """Load the exposed skill catalog and parse each SKILL.md into a SkillDef."""
     skills_dir = root / settings.workspace_skills_dir_name
     if not skills_dir.exists() or not skills_dir.is_dir():
         return []
     skills: list[SkillDef] = []
-    for entry in sorted(skills_dir.iterdir()):
-        if not entry.is_dir():
+    for entry in read_skill_manifest(root):
+        if not entry.has_skill_md:
             continue
-        manifest_path = entry / _SKILL_MANIFEST
+        manifest_path = skills_dir / entry.name / _SKILL_MANIFEST
         body = read_capped_utf8(manifest_path, max_bytes=_MAX_BYTES)
         if body is None:
             continue

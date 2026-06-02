@@ -177,7 +177,7 @@ def truncate_tool_output(text: str, max_chars: int = _OUTPUT_PREVIEW_MAX_CHARS) 
     value = text.strip()
     if len(value) <= max_chars:
         return value
-    return value[:max_chars].rstrip() + "\n... more omitted"
+    return value[:max_chars].rstrip()
 
 
 def _tool_display(

@@ -65,7 +65,22 @@ async def test_read_skill_returns_bounded_body(tmp_path: Path) -> None:
 async def test_read_skill_unknown_name_returns_not_found(tmp_path: Path) -> None:
     tool = make_read_skill_tool(workspace_root=tmp_path)
     result = await tool.execute(tool_call_id="t1", name="nope")
-    assert "NOT_FOUND" in result or "no SKILL.md" in result
+    assert "not_found" in result or "no SKILL.md" in result
+
+
+async def test_read_skill_rejects_skill_hidden_by_manifest(tmp_path: Path) -> None:
+    _make_skill(tmp_path, "allowed")
+    _make_skill(tmp_path, "hidden")
+    _write_manifest(
+        tmp_path,
+        [{"name": "allowed", "trigger": "use allowed", "summary": "Allowed skill"}],
+    )
+    tool = make_read_skill_tool(workspace_root=tmp_path)
+
+    result = await tool.execute(tool_call_id="t1", name="hidden")
+
+    assert "not_found" in result
+    assert "not exposed" in result
 
 
 async def test_read_skill_rejects_path_traversal(tmp_path: Path) -> None:
@@ -103,4 +118,4 @@ async def test_invoke_skill_requires_name(tmp_path: Path) -> None:
 async def test_invoke_skill_unknown_returns_not_found(tmp_path: Path) -> None:
     tool = make_invoke_skill_tool(workspace_root=tmp_path)
     result = await tool.execute(tool_call_id="t1", name="missing")
-    assert "NOT_FOUND" in result or "no SKILL.md" in result
+    assert "not_found" in result or "no SKILL.md" in result

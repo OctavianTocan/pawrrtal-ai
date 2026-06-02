@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from app.infrastructure.config import settings
+
 log = logging.getLogger(__name__)
 
 _SKILLS_DIR = ".agent/skills"
@@ -44,11 +46,12 @@ def read_skill_manifest(workspace_root: Path) -> list[SkillEntry]:
     1. Parse ``.agent/skills/_manifest.jsonl`` line-by-line into a
        name → dict lookup. Corrupt lines are skipped with a warning;
        the function never raises.
-    2. Scan ``.agent/skills/`` for subdirectories whose names do not
-       start with ``_``.
-    3. Merge each subdirectory with its manifest entry (if any) into a
-       ``SkillEntry``, checking whether ``SKILL.md`` exists.
-    4. Return up to ``_MAX_SKILLS`` entries sorted by name.
+    2. If the manifest has at least one valid entry, treat it as the
+       authoritative allowlist. This keeps copied or backup skill
+       folders from leaking into the agent prompt.
+    3. If the manifest is absent, empty, or fully invalid, fall back to
+       directory discovery for backwards compatibility.
+    4. Return up to ``_MAX_SKILLS`` public entries sorted by name.
 
     Returns an empty list on any I/O error so the API degrades gracefully.
     """
@@ -57,30 +60,57 @@ def read_skill_manifest(workspace_root: Path) -> list[SkillEntry]:
         return []
 
     manifest_lookup = _load_manifest(workspace_root)
+    if manifest_lookup and _looks_like_legacy_manifest(manifest_lookup):
+        template_lookup = _load_manifest(Path(settings.workspace_template_dir))
+        if template_lookup:
+            manifest_lookup = template_lookup
 
     entries: list[SkillEntry] = []
+    if manifest_lookup:
+        for name in sorted(manifest_lookup)[:_MAX_SKILLS]:
+            if not _is_public_skill_name(name):
+                continue
+            meta = manifest_lookup[name]
+            skill_dir = skills_dir / name
+            entries.append(_entry_from_meta(name=name, skill_dir=skill_dir, meta=meta))
+        return entries
+
     try:
         subdirs = sorted(
-            (p for p in skills_dir.iterdir() if p.is_dir() and not p.name.startswith("_")),
+            (p for p in skills_dir.iterdir() if p.is_dir() and _is_public_skill_name(p.name)),
             key=lambda p: p.name,
         )
     except OSError:
         log.warning("Failed to list skills directory: %s", skills_dir)
         return []
 
-    for subdir in subdirs[:_MAX_SKILLS]:
-        meta = manifest_lookup.get(subdir.name, {})
-        entries.append(
-            SkillEntry(
-                name=subdir.name,
-                trigger=meta.get("trigger", "—"),
-                summary=meta.get("summary", "—"),
-                has_skill_md=(subdir / _SKILL_MD_NAME).is_file(),
-                extra={k: v for k, v in meta.items() if k not in ("name", "trigger", "summary")},
-            )
-        )
+    entries.extend(
+        _entry_from_meta(name=subdir.name, skill_dir=subdir, meta={})
+        for subdir in subdirs[:_MAX_SKILLS]
+    )
 
     return entries
+
+
+def _is_public_skill_name(name: str) -> bool:
+    """Return whether ``name`` may be exposed as a workspace skill."""
+    return bool(name) and not name.startswith(("_", "."))
+
+
+def _entry_from_meta(
+    *,
+    name: str,
+    skill_dir: Path,
+    meta: dict[str, Any],
+) -> SkillEntry:
+    """Build a :class:`SkillEntry` for a manifest name or discovered dir."""
+    return SkillEntry(
+        name=name,
+        trigger=meta.get("trigger", "—"),
+        summary=meta.get("summary", "—"),
+        has_skill_md=(skill_dir / _SKILL_MD_NAME).is_file(),
+        extra={k: v for k, v in meta.items() if k not in ("name", "trigger", "summary")},
+    )
 
 
 def _load_manifest(workspace_root: Path) -> dict[str, dict[str, Any]]:
@@ -120,3 +150,22 @@ def _load_manifest(workspace_root: Path) -> dict[str, dict[str, Any]]:
             lookup[name] = entry
 
     return lookup
+
+
+def _looks_like_legacy_manifest(manifest_lookup: dict[str, dict[str, Any]]) -> bool:
+    """Return whether a manifest is an old copied skill inventory."""
+    if any(_has_nonempty_summary(entry) for entry in manifest_lookup.values()):
+        return False
+    return any(
+        isinstance(entry.get("triggers"), list)
+        or isinstance(entry.get("tools"), list)
+        or isinstance(entry.get("category"), str)
+        or isinstance(entry.get("location"), str)
+        for entry in manifest_lookup.values()
+    )
+
+
+def _has_nonempty_summary(entry: dict[str, Any]) -> bool:
+    """Return whether a manifest entry has Pawrrtal display metadata."""
+    summary = entry.get("summary")
+    return isinstance(summary, str) and bool(summary.strip())

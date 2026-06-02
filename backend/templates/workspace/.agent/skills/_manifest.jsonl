@@ -1,0 +1,3 @@
+{"name":"heartbeat","trigger":"reminders, recurring checks, or heartbeat schedules","summary":"Manage and schedule recurring workspace heartbeats and database-bound reminders."}
+{"name":"paw-bootstrap","trigger":"first-run workspace setup","summary":"Guide initial Paw persona setup and mark bootstrap complete."}
+{"name":"paw-persona","trigger":"persona, name, style, emoji, or preference changes","summary":"Maintain the Paw's name, voice, style, emoji, and working preferences."}

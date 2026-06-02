@@ -318,7 +318,7 @@ def _build_media_payload(
         payload["image"] = _encoded_file_payload(
             image_path,
             default_mime="image/jpeg",
-            allowed_mime_types=("image/jpeg",),
+            allowed_mime_types=("image/jpeg", "image/png", "image/webp"),
             label="image",
         )
     if voice_note_path is not None:
@@ -349,7 +349,7 @@ def _encoded_file_payload(
         raise LocalError(f"{label.capitalize()} file does not exist: {path}")
     if not path.is_file():
         raise LocalError(f"{label.capitalize()} path is not a file: {path}")
-    mime_type = mimetypes.guess_type(path.name)[0] or default_mime
+    mime_type = _normalise_media_mime_type(mimetypes.guess_type(path.name)[0] or default_mime)
     if allowed_mime_types is not None and mime_type not in allowed_mime_types:
         allowed = ", ".join(allowed_mime_types)
         raise LocalError(
@@ -361,6 +361,13 @@ def _encoded_file_payload(
         "data": base64.b64encode(path.read_bytes()).decode("ascii"),
         "media_type": mime_type,
     }
+
+
+def _normalise_media_mime_type(mime_type: str) -> str:
+    """Normalize platform-specific MIME guesses to schema-supported names."""
+    if mime_type == "audio/x-wav":
+        return "audio/wav"
+    return mime_type
 
 
 def _media_summary(payload: dict[str, Any]) -> dict[str, Any]:

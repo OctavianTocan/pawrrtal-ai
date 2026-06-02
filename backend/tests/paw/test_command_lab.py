@@ -422,14 +422,59 @@ def test_lab_telegram_providers_posts_media_for_each_selected_host(
     assert stored["run_id"] == payload["run_id"]
 
 
-def test_lab_telegram_media_rejects_non_jpeg_photo(
+def test_lab_telegram_media_accepts_png_photo(
     runner: CliRunner,
     seeded: PersonaState,
     tmp_path: Path,
 ) -> None:
-    """Simulated Telegram photos stay aligned with the JPEG-only Bot API path."""
+    """``paw lab telegram media`` accepts common image/audio fixtures."""
     image_path = tmp_path / "sample.png"
-    image_path.write_bytes(b"not actually png")
+    voice_path = tmp_path / "sample.wav"
+    image_path.write_bytes(b"\x89PNG\r\n\x1a\nfake-png")
+    voice_path.write_bytes(b"RIFF fake wav")
+    with respx.mock(base_url=MOCK_BACKEND) as router:
+        simulate = router.post("/api/v1/channels/telegram/simulate").mock(
+            return_value=httpx.Response(
+                200,
+                json={
+                    "accepted": True,
+                    "update_id": 3,
+                    "chat_id": "333",
+                    "external_user_id": "222",
+                    "conversation_id": CONV_ID,
+                },
+            )
+        )
+        result = runner.invoke(
+            app,
+            [
+                "lab",
+                "telegram",
+                "media",
+                "--model",
+                MODEL_ID,
+                "--image",
+                str(image_path),
+                "--voice-note",
+                str(voice_path),
+                "--json",
+            ],
+        )
+
+    assert result.exit_code == 0, result.stdout
+    body = json.loads(simulate.calls[-1].request.content)
+    assert body["image"]["media_type"] == "image/png"
+    assert body["voice_note"]["mime_type"] == "audio/wav"
+
+
+def test_lab_telegram_media_rejects_unsupported_image_type(
+    runner: CliRunner,
+    seeded: PersonaState,
+    tmp_path: Path,
+) -> None:
+    """Unsupported image extensions still fail before hitting the API."""
+    image_path = tmp_path / "sample.gif"
+    image_path.write_bytes(b"GIF89a")
 
     result = runner.invoke(
         app,

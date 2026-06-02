@@ -21,6 +21,7 @@ import pytest
 from app.channels.telegram.delivery import (
     MAX_MESSAGE_LEN,
     chunk_html_for_telegram,
+    safe_edit_html,
     safe_send_html,
 )
 
@@ -29,6 +30,7 @@ def _make_bot() -> AsyncMock:
     """Bot stub whose ``send_message`` returns a deterministic message_id."""
     bot = AsyncMock()
     bot.send_message = AsyncMock(return_value=SimpleNamespace(message_id=99))
+    bot.edit_message_text = AsyncMock()
     return bot
 
 
@@ -213,3 +215,15 @@ async def test_safe_send_html_returns_first_chunk_message_id() -> None:
         message_thread_id=None,
     )
     assert first_id == 100
+
+
+@pytest.mark.anyio
+async def test_safe_edit_html_uses_chunk_boundary_without_ellipsis() -> None:
+    """Transient edits must not append a fake ``...`` truncation marker."""
+    bot = _make_bot()
+    payload = ("z" * 4000 + "\n\n") * 2
+    await safe_edit_html(bot, chat_id=1, message_id=10, html=payload)
+    bot.edit_message_text.assert_awaited_once()
+    text = bot.edit_message_text.await_args.kwargs["text"]
+    assert len(text) <= MAX_MESSAGE_LEN
+    assert not text.endswith("...")

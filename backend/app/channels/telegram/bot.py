@@ -81,6 +81,7 @@ _TELEGRAM_COMMANDS: tuple[tuple[str, str], ...] = (
     ("new", "Start a new conversation"),
     ("model", "Pick or set the model (no arg = picker)"),
     ("thinking", "Pick the reasoning level for the current model"),
+    ("config", "Toggle workspace features"),
     ("verbose", "Set detail level: 0 quiet, 1 tools, 2 thinking"),
     ("stop", "Stop the active run"),
     ("status", "Show gateway + conversation status"),
@@ -656,8 +657,19 @@ def _register_telegram_command_handlers(dispatcher: Dispatcher) -> None:
             )
         await message.answer(reply)
 
+    _register_telegram_config_command_handler(dispatcher)
     _register_telegram_identity_command_handlers(dispatcher)
     _register_telegram_lcm_command_handlers(dispatcher)
+
+
+def _register_telegram_config_command_handler(dispatcher: Dispatcher) -> None:
+    """Register the workspace config command."""
+    from aiogram.filters import Command  # noqa: PLC0415
+
+    @dispatcher.message(Command("config"))
+    async def _on_config(message: Message) -> None:
+        config_picker_runtime = import_module("app.channels.telegram.config_picker_runtime")
+        await config_picker_runtime.answer_config_command(message=message)
 
 
 def _register_telegram_identity_command_handlers(dispatcher: Dispatcher) -> None:
@@ -703,6 +715,7 @@ def _register_telegram_lcm_command_handlers(dispatcher: Dispatcher) -> None:
 def _register_telegram_callback_handlers(dispatcher: Dispatcher) -> None:
     """Register inline-keyboard callback handlers on the aiogram dispatcher."""
     model_picker_runtime = import_module("app.channels.telegram.model_picker_runtime")
+    config_picker_runtime = import_module("app.channels.telegram.config_picker_runtime")
     regenerate_runtime = import_module("app.channels.telegram.regenerate_runtime")
     thinking_picker_runtime = import_module("app.channels.telegram.thinking_picker_runtime")
 
@@ -719,6 +732,12 @@ def _register_telegram_callback_handlers(dispatcher: Dispatcher) -> None:
     )
     async def _on_thinking_picker(callback: CallbackQuery) -> None:
         await thinking_picker_runtime.handle_thinking_picker_callback(callback=callback)
+
+    @dispatcher.callback_query(
+        lambda query: (query.data or "").startswith(config_picker_runtime.CONFIG_CALLBACK_PREFIX)
+    )
+    async def _on_config_picker(callback: CallbackQuery) -> None:
+        await config_picker_runtime.handle_config_picker_callback(callback=callback)
 
     @dispatcher.callback_query(
         lambda query: (query.data or "").startswith(regenerate_runtime.REGEN_CALLBACK_PREFIX)

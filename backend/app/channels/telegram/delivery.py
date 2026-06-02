@@ -262,7 +262,7 @@ async def safe_edit_html(
 ) -> None:
     """Call ``edit_message_text`` with pre-rendered Telegram HTML."""
     if len(html) > MAX_MESSAGE_LEN:
-        html = html[: MAX_MESSAGE_LEN - 1] + "..."
+        html = chunk_html_for_telegram(html)[0]
     try:
         await bot.edit_message_text(
             chat_id=chat_id,

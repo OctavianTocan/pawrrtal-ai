@@ -422,7 +422,7 @@ class TestHandleToolProgress:
         assert "collected 12 items" in trace
         bot.edit_message_text.assert_awaited_once()
 
-    async def test_large_tool_trace_omits_complete_fragments_without_cutting_html(self) -> None:
+    async def test_large_tool_trace_bounds_complete_fragments_without_omitted_marker(self) -> None:
         bot = _make_bot()
         tool_states = {f"call_{i}": self._make_state(f"call_{i}", f"tool_{i}") for i in range(12)}
         for state in tool_states.values():
@@ -445,4 +445,9 @@ class TestHandleToolProgress:
 
         assert len(trace) <= 3600
         assert trace.count("<code>") == trace.count("</code>")
-        assert "omitted" in trace
+        assert "omitted" not in trace
+
+    def test_large_tool_result_preview_does_not_render_omitted_marker(self) -> None:
+        result = render_tool_success("read_file", 12, "x" * 900)
+        assert "more omitted" not in result
+        assert "omitted" not in result

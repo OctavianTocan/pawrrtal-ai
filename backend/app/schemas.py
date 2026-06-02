@@ -330,7 +330,7 @@ class TelegramSimulateImage(BaseModel):
     """Synthetic Telegram photo payload for the dev-only simulate route."""
 
     data: str
-    media_type: Literal["image/jpeg"] = "image/jpeg"
+    media_type: Literal["image/jpeg", "image/png", "image/webp"] = "image/jpeg"
 
 
 class TelegramSimulateVoiceNote(BaseModel):

@@ -1,4 +1,4 @@
-"""Thin async wrapper around the official Notion CLI (``ntn``).
+"""Bounded wrapper around the official Notion CLI (``ntn``).
 
 The Notion plugin shells out to ``ntn`` through :func:`call_ntn`.  The
 wrapper is deliberately narrow: it injects the workspace-scoped
@@ -17,9 +17,9 @@ up.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import os
+import subprocess  # nosec B404 - required for the fixed-binary ntn wrapper; no shell is used.
 import tempfile
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -96,6 +96,30 @@ def _build_env(token: str, home_dir: str) -> dict[str, str]:
     return env
 
 
+def _run_ntn_sync(
+    *,
+    binary: str,
+    args: Sequence[str],
+    env: dict[str, str],
+    stdin: bytes | None,
+    timeout_seconds: float,
+) -> subprocess.CompletedProcess[bytes]:
+    """Run the blocking subprocess call.
+
+    Python 3.13 async subprocesses and thread handoff both hang in the
+    local sandbox, while direct ``subprocess.run`` remains bounded and
+    kills the child process on timeout.
+    """
+    return subprocess.run(  # noqa: S603  # nosec B603 - fixed binary + argv list, no shell.
+        [binary, *args],
+        input=stdin,
+        env=env,
+        capture_output=True,
+        timeout=timeout_seconds,
+        check=False,
+    )
+
+
 async def call_ntn(
     args: Sequence[str],
     *,
@@ -121,9 +145,9 @@ async def call_ntn(
 
     Raises:
         NtnError: Process exited non-zero.
-        asyncio.TimeoutError: Process hit ``timeout_seconds``.  The
-            caller's audit-log wrapper translates this to a recorded
-            error row, so we don't try to swallow it here.
+        TimeoutError: Process hit ``timeout_seconds``.  The caller's
+            audit-log wrapper translates this to a recorded error row,
+            so we don't try to swallow it here.
     """
     binary = _resolve_binary()
     # Use a per-call ephemeral HOME — see module docstring.  The
@@ -131,23 +155,19 @@ async def call_ntn(
     # subprocess raises mid-flight.
     with tempfile.TemporaryDirectory(prefix="pawrrtal-ntn-home-") as home_dir:
         env = _build_env(token, home_dir)
-        proc = await asyncio.create_subprocess_exec(
-            binary,
-            *args,
-            env=env,
-            stdin=asyncio.subprocess.PIPE if stdin is not None else None,
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-        )
         try:
-            stdout, stderr = await asyncio.wait_for(
-                proc.communicate(input=stdin),
-                timeout=timeout_seconds,
+            completed = _run_ntn_sync(
+                binary=binary,
+                args=args,
+                env=env,
+                stdin=stdin,
+                timeout_seconds=timeout_seconds,
             )
-        except TimeoutError:
-            proc.kill()
-            await proc.wait()
-            raise
-        if proc.returncode != 0:
-            raise NtnError(proc.returncode or -1, stderr.decode(errors="replace"))
-        return NtnResult(stdout=stdout, stderr=stderr)
+        except subprocess.TimeoutExpired as exc:
+            raise TimeoutError(f"ntn timed out after {timeout_seconds:.1f}s") from exc
+        if completed.returncode != 0:
+            raise NtnError(
+                completed.returncode or -1,
+                completed.stderr.decode(errors="replace"),
+            )
+        return NtnResult(stdout=completed.stdout, stderr=completed.stderr)

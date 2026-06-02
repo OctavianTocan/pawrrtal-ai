@@ -1,4 +1,4 @@
-"""Single ``ntn`` tool that proxies to the official Notion CLI.
+"""Single Pawrrtal Notion CLI tool that proxies to the official ``ntn`` binary.
 
 The plugin previously shipped eighteen narrow tools (``notion_search``,
 ``notion_read``, ``notion_create``, …) that each shelled out to one
@@ -9,12 +9,12 @@ both lossy (the agent couldn't reach subcommands we hadn't pre-wired)
 and bug-prone (every wrapper had its own argument shaping that could
 drift from the CLI).
 
-Now there is exactly one tool — ``ntn`` — that accepts an arbitrary
-arg list and pipes the resulting stdout / stderr back to the agent.
-Token isolation and audit logging stay the same: every call still
-goes through :mod:`ntn_client` (workspace-scoped ``NOTION_API_TOKEN``,
-ephemeral ``HOME``) and is recorded to ``notion_operation_logs`` so
-operators can audit what the agent ran.
+Now there is exactly one tool — ``notion_cli`` — that accepts an
+arbitrary arg list and pipes the resulting stdout / stderr back to the
+agent. Token isolation and audit logging stay the same: every call
+still goes through :mod:`ntn_client` (workspace-scoped
+``NOTION_API_TOKEN``, ephemeral ``HOME``) and is recorded to
+``notion_operation_logs`` so operators can audit what the agent ran.
 """
 
 from __future__ import annotations
@@ -37,10 +37,11 @@ NOTION_API_KEY_NAME = "NOTION_API_KEY"
 # returning useful buckets after the consolidation.
 NTN_OPERATION = "cli"
 
-NTN_TOOL_NAME = "ntn"
+NTN_TOOL_NAME = "notion_cli"
 
 NTN_TOOL_DESCRIPTION = (
-    "Run the official Notion CLI (`ntn`). Use this as your one entry point "
+    "Run Pawrrtal's `$notion-cli` tool, backed by the official Notion CLI "
+    "binary (`ntn`). Use this as your one entry point "
     "for everything Notion-related — search, reading pages, creating pages, "
     "updating content, querying databases, posting comments, archiving, "
     "etc. `args` is the argument list passed straight to the binary (no "
@@ -72,7 +73,7 @@ NTN_TOOL_DESCRIPTION = (
 
 
 def make_ntn_tool(ctx: ToolContext) -> AgentTool:
-    """Build the single ``ntn`` proxy tool bound to ``ctx``."""
+    """Build the single ``notion_cli`` proxy tool bound to ``ctx``."""
 
     async def execute(_tool_call_id: str, **kwargs: object) -> str:
         token = resolve_api_key(ctx.workspace_root, NOTION_API_KEY_NAME)

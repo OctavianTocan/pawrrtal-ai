@@ -178,6 +178,27 @@ class TestSkillsCatalogue:
         ctx = load_workspace_context(tmp_path)
         assert ctx.skills == ()
 
+    def test_skill_manifest_is_authoritative_when_present(self, tmp_path: Path) -> None:
+        _write(
+            tmp_path / ".agent" / "skills" / "_manifest.jsonl",
+            '{"name":"allowed","trigger":"use allowed","summary":"Allowed skill"}\n',
+        )
+        _write(
+            tmp_path / ".agent" / "skills" / "allowed" / "SKILL.md",
+            "description: allowed skill\n\nUse this.",
+        )
+        _write(
+            tmp_path / ".agent" / "skills" / "extra" / "SKILL.md",
+            "description: extra skill\n\nDo not expose this.",
+        )
+
+        ctx = load_workspace_context(tmp_path)
+
+        assert [skill.name for skill in ctx.skills] == ["allowed"]
+        assert ctx.system_prompt is not None
+        assert "allowed" in ctx.system_prompt
+        assert "extra" not in ctx.system_prompt
+
 
 class TestPermissions:
     """The Markdown permissions file is appended as conversational context.

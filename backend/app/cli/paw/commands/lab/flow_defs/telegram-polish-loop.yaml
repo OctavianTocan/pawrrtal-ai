@@ -6,6 +6,7 @@ commands:
   - paw lab telegram media --model MODEL --text "describe what you see and transcribe the voice note" --image sample.jpg --voice-note sample.ogg --voice-duration 4 --new --verbose 2 --json
   - paw lab telegram providers --host agy-api --host xai --text "describe what you see and transcribe the voice note" --image sample.jpg --voice-note sample.ogg --voice-duration 4 --verbose 2 --json
   - paw lab runs show RUN_ID --json
+  - paw lab runs review RUN_ID --question "What should feel cleaner before we ship this?"
   - paw lab flows show telegram-polish-loop
 checks:
   - 'Tool labels use Title Case with a clear target, such as "List Folder: backend/app".'

@@ -29,6 +29,7 @@ exist, so agent-authored memory, skills, and user edits survive.
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import shutil
@@ -43,6 +44,7 @@ log = logging.getLogger(__name__)
 
 PREFERENCES_FILENAME = "PREFERENCES.md"
 WORKSPACE_ENV_FILENAME = ".env"
+SKILL_MANIFEST_RELATIVE = Path(".agent/skills/_manifest.jsonl")
 
 _SYMLINKS: tuple[tuple[str, str], ...] = (
     ("CLAUDE.md", "AGENTS.md"),
@@ -112,6 +114,7 @@ def seed_workspace(
     preferences_existed = _path_exists(root / PREFERENCES_FILENAME)
     env_existed = _path_exists(root / WORKSPACE_ENV_FILENAME)
     _copy_tree_skip_existing(template_src, root)
+    _refresh_legacy_skill_manifest(root=root, template_src=template_src)
     if not preferences_existed:
         _write_preferences(root, personalization)
     if not env_existed:
@@ -156,6 +159,60 @@ def _seed_directory_entry(entry: Path, target: Path) -> None:
 def _path_exists(path: Path) -> bool:
     """Return True for real paths and symlinks, including broken symlinks."""
     return os.path.lexists(path)
+
+
+def _refresh_legacy_skill_manifest(*, root: Path, template_src: Path) -> None:
+    """Replace old copied skill manifests with the Pawrrtal template manifest."""
+    source = template_src / SKILL_MANIFEST_RELATIVE
+    target = root / SKILL_MANIFEST_RELATIVE
+    if not source.is_file() or not target.is_file():
+        return
+    if _looks_like_legacy_skill_manifest(target):
+        shutil.copy2(source, target)
+
+
+def _looks_like_legacy_skill_manifest(path: Path) -> bool:
+    """Return True for old OpenClaw-style manifests copied into Pawrrtal."""
+    entries = _read_manifest_entries(path)
+    if not entries:
+        return False
+    if any(_has_nonempty_summary(entry) for entry in entries):
+        return False
+    return any(
+        isinstance(entry.get("triggers"), list)
+        or isinstance(entry.get("tools"), list)
+        or isinstance(entry.get("category"), str)
+        or isinstance(entry.get("location"), str)
+        for entry in entries
+    )
+
+
+def _read_manifest_entries(path: Path) -> list[dict[str, object]]:
+    """Read JSONL manifest entries without raising on malformed legacy files."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        log.warning("Could not read workspace skill manifest: %s", path)
+        return []
+
+    entries: list[dict[str, object]] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            entry = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(entry, dict):
+            entries.append(entry)
+    return entries
+
+
+def _has_nonempty_summary(entry: dict[str, object]) -> bool:
+    """Return whether a manifest entry has Pawrrtal display metadata."""
+    summary = entry.get("summary")
+    return isinstance(summary, str) and bool(summary.strip())
 
 
 def _write_preferences(

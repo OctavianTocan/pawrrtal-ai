@@ -123,7 +123,7 @@ target backend, bind the persona's Telegram account once, then use
 just paw verify all-providers --json | jq '.checks[] | select(.passed == false)'
 ```
 
-Selects one authenticated model per allowed host (`agy-api`,
+Selects one authenticated model per allowed host (`google-ai`,
 `gemini-cli`, `openai-codex`, `opencode-go` by default) and runs the
 same chat-roundtrip scenario against each. Use `--host <host>` to narrow
 the run and `--include-paid` when a live paid-model sweep is intentional.
@@ -131,12 +131,13 @@ the run and `--include-paid` when a live paid-model sweep is intentional.
 ### Benchmark providers and dogfood Telegram
 
 ```bash
-just paw lab bench model --model agy-api:google/gemini-3.5-flash-low --prompt "hello" --runs 3 --json
+just paw lab bench model --model google-ai:google/gemini-3.5-flash --prompt "hello" --runs 3 --json
 just paw lab bench providers --runs 1 --json
-just paw lab telegram chat --model agy-api:google/gemini-3.5-flash-low --turns /tmp/telegram-turns.txt --new --verbose 2 --json
-just paw lab telegram media --model agy-api:google/gemini-3.5-flash-low --text "describe and transcribe" --image /tmp/sample.jpg --voice-note /tmp/sample.ogg --voice-duration 4 --new --json
+just paw lab telegram chat --model google-ai:google/gemini-3.5-flash --turns /tmp/telegram-turns.txt --new --verbose 2 --json
+just paw lab telegram media --model google-ai:google/gemini-3.5-flash --text "describe and transcribe" --image /tmp/sample.jpg --voice-note /tmp/sample.ogg --voice-duration 4 --new --json
 just paw lab telegram providers --text "describe and transcribe" --image /tmp/sample.jpg --voice-note /tmp/sample.ogg --voice-duration 4 --verbose 2 --json
 just paw lab runs ls --json
+just paw lab runs review RUN_ID --question "What should feel cleaner before we ship this?"
 just paw lab flows show backend-cli-coverage
 just paw lab flows show telegram-polish-loop
 ```
@@ -156,6 +157,9 @@ selected Paw agent model receives the turn.
 from `/api/v1/models` and runs the same JPEG/voice-note media turn for
 each host, producing one matrix run log with per-provider timing and
 failure rows.
+Use `lab runs review` to turn any stored run into the polish packet we
+review together: prompt/control inputs, model, persisted transcript,
+timing, media summary, run path, and the exact taste question.
 Use `backend-cli-coverage` when checking whether a backend route family has
 an opinionated Paw command, a verify suite, a lab flow, or an explicit raw
 `paw api` fallback.

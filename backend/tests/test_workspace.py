@@ -119,6 +119,57 @@ class TestSeedWorkspace:
             assert (root / ".agent" / "skills" / name / "SKILL.md").exists()
         assert (root / ".agent" / "skills" / "_index.md").exists()
 
+    def test_replaces_legacy_skill_manifest_with_template(self, tmp_path: Path) -> None:
+        ws_id = uuid.uuid4()
+        root = tmp_path / str(ws_id)
+        skills_dir = root / ".agent" / "skills"
+        skills_dir.mkdir(parents=True)
+        (skills_dir / "_manifest.jsonl").write_text(
+            json.dumps(
+                {
+                    "name": "skillforge",
+                    "triggers": ["create skill"],
+                    "tools": ["bash"],
+                    "category": "meta",
+                }
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        user_skill = skills_dir / "custom-user-skill" / "SKILL.md"
+        user_skill.parent.mkdir()
+        user_skill.write_text("# Custom user skill\n", encoding="utf-8")
+
+        with _patch_workspace_base(tmp_path):
+            seed_workspace(ws_id)
+
+        manifest = (skills_dir / "_manifest.jsonl").read_text(encoding="utf-8")
+        assert "paw-bootstrap" in manifest
+        assert "skillforge" not in manifest
+        assert user_skill.read_text(encoding="utf-8") == "# Custom user skill\n"
+
+    def test_preserves_user_authored_skill_manifest(self, tmp_path: Path) -> None:
+        ws_id = uuid.uuid4()
+        root = tmp_path / str(ws_id)
+        skills_dir = root / ".agent" / "skills"
+        skills_dir.mkdir(parents=True)
+        user_manifest = (
+            json.dumps(
+                {
+                    "name": "custom-user-skill",
+                    "trigger": "custom work",
+                    "summary": "Keep this custom manifest.",
+                }
+            )
+            + "\n"
+        )
+        (skills_dir / "_manifest.jsonl").write_text(user_manifest, encoding="utf-8")
+
+        with _patch_workspace_base(tmp_path):
+            seed_workspace(ws_id)
+
+        assert (skills_dir / "_manifest.jsonl").read_text(encoding="utf-8") == user_manifest
+
     def test_seeds_root_heartbeat(self, tmp_path: Path) -> None:
         ws_id = uuid.uuid4()
         with _patch_workspace_base(tmp_path):
@@ -315,6 +366,36 @@ class TestWorkspaceService:
         assert ws.path == str(stable_root)
         assert user_file.read_text(encoding="utf-8") == "important user content"
         assert edited_agents.read_text(encoding="utf-8") == "hand-edited"
+
+    @pytest.mark.anyio
+    async def test_ensure_dev_admin_workspace_refreshes_legacy_manifest(
+        self, db_session: AsyncSession, test_user: User, tmp_path: Path
+    ) -> None:
+        with _patch_workspace_base(tmp_path):
+            ws = await ensure_dev_admin_workspace(test_user.id, db_session)
+            await db_session.commit()
+
+            manifest_path = Path(ws.path) / ".agent" / "skills" / "_manifest.jsonl"
+            manifest_path.write_text(
+                json.dumps(
+                    {
+                        "name": "skillforge",
+                        "triggers": ["create skill"],
+                        "tools": ["bash"],
+                        "category": "meta",
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            existing = await ensure_dev_admin_workspace(test_user.id, db_session)
+            await db_session.commit()
+
+        assert existing.id == ws.id
+        manifest = manifest_path.read_text(encoding="utf-8")
+        assert "paw-bootstrap" in manifest
+        assert "skillforge" not in manifest
 
     @pytest.mark.anyio
     async def test_ensure_dev_admin_workspace_is_idempotent(

@@ -180,6 +180,8 @@ async def ensure_dev_admin_workspace(
     """
     existing = await get_default_workspace(user_id, session)
     if existing is not None:
+        if existing.path is not None:
+            seed_workspace(existing.id, personalization, path=Path(existing.path))
         return existing
 
     stable_path = Path(settings.workspace_base_dir) / DEV_ADMIN_WORKSPACE_DIRNAME

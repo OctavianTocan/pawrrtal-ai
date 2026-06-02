@@ -3,7 +3,7 @@
 Three concerns are exercised:
 
   * Registration — the plugin lands in :func:`all_plugins` with a
-    single ``ntn`` tool factory.
+    single ``notion_cli`` tool factory.
   * ``call_ntn`` subprocess wrapping — token env injection, isolated
     ``HOME``, error surfacing.  Each test points ``NTN_BINARY`` at a
     small shell script written into the test tmpdir so we never need a
@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import os
 import stat
+import uuid
 from collections.abc import Generator, Sequence
 from pathlib import Path
 from typing import Any
@@ -104,13 +105,23 @@ def fake_ntn_binary(tmp_path: Path) -> Generator[Path]:
 
 
 class TestRegistration:
-    def test_plugin_is_registered_with_single_ntn_tool(self) -> None:
+    def test_plugin_is_registered_with_single_notion_cli_tool(self) -> None:
         ids = [p.id for p in all_plugins()]
         assert "notion" in ids
         # The registry is module-global and the plugin self-registers on
         # import; assert against the imported handle so an accidental
         # re-import wouldn't double-count.
         assert len(notion_plugin.tool_factories) == 1
+        tool = make_ntn_tool(
+            ToolContext(
+                workspace_id=uuid.uuid4(),
+                workspace_root=Path("/tmp"),
+                user_id=uuid.uuid4(),
+                send_fn=None,
+            )
+        )
+        assert tool.name == "notion_cli"
+        assert "$notion-cli" in tool.description
 
 
 class TestCallNtn:
@@ -268,7 +279,7 @@ class TestNtnTool:
             .all()
         )
         assert len(rows) == 1
-        assert rows[0].tool_name == "ntn"
+        assert rows[0].tool_name == "notion_cli"
         assert rows[0].operation == "cli"
         assert rows[0].status == STATUS_OK
 
