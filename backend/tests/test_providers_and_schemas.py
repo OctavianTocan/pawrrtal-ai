@@ -8,6 +8,7 @@ This module covers:
 - :func:`resolve_api_key` precedence (workspace override > settings fallback)
 """
 
+import importlib
 import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -21,7 +22,7 @@ from app.infrastructure import keys
 from app.infrastructure.config import settings
 from app.providers.base import StreamEvent
 from app.providers.claude import ClaudeLLM
-from app.providers.factory import close_openai_codex_provider_cache, resolve_llm
+from app.providers.factory import resolve_llm
 from app.providers.gemini import GeminiLLM
 from app.providers.litellm_provider import LiteLLMLLM
 from app.providers.model_id import Host, InvalidModelId, Vendor
@@ -129,15 +130,15 @@ async def test_resolve_llm_reuses_openai_codex_provider_per_workspace(
     tmp_path: Path,
 ) -> None:
     """Codex provider resolution keeps the app-server warm across turns."""
-    from app.providers import factory
+    factory = importlib.import_module("app.providers.factory")
 
-    await close_openai_codex_provider_cache()
+    await factory.close_openai_codex_provider_cache()
     _FakeCachedCodexProvider.closed = 0
     monkeypatch.setitem(factory.HOST_TO_PROVIDER, Host.openai_codex, _FakeCachedCodexProvider)
 
-    first = resolve_llm("openai-codex:openai/gpt-5.5", workspace_root=tmp_path)
-    second = resolve_llm("openai-codex:openai/gpt-5.5", workspace_root=tmp_path)
-    other_workspace = resolve_llm(
+    first = factory.resolve_llm("openai-codex:openai/gpt-5.5", workspace_root=tmp_path)
+    second = factory.resolve_llm("openai-codex:openai/gpt-5.5", workspace_root=tmp_path)
+    other_workspace = factory.resolve_llm(
         "openai-codex:openai/gpt-5.5",
         workspace_root=tmp_path / "other",
     )
@@ -145,7 +146,7 @@ async def test_resolve_llm_reuses_openai_codex_provider_per_workspace(
     assert first is second
     assert other_workspace is not first
 
-    await close_openai_codex_provider_cache()
+    await factory.close_openai_codex_provider_cache()
     assert _FakeCachedCodexProvider.closed == 2
 
 
