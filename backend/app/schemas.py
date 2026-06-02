@@ -9,7 +9,7 @@ from datetime import datetime
 from typing import Annotated, Any, Literal
 
 from fastapi_users import schemas
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
 
 from app.providers.base import ReasoningEffort
 from app.schema_model_id import CanonicalModelId, CanonicalModelIdForRead
@@ -326,11 +326,37 @@ class TelegramLinkCodeRead(BaseModel):
     deep_link: str | None = None
 
 
+class TelegramSimulateImage(BaseModel):
+    """Synthetic Telegram photo payload for the dev-only simulate route."""
+
+    data: str
+    media_type: Literal["image/jpeg"] = "image/jpeg"
+
+
+class TelegramSimulateVoiceNote(BaseModel):
+    """Synthetic Telegram voice-note payload for the dev-only simulate route."""
+
+    data: str
+    mime_type: Literal["audio/ogg", "audio/mpeg", "audio/mp4", "audio/webm", "audio/wav"] = (
+        "audio/ogg"
+    )
+    duration_seconds: int = Field(default=1, ge=0, le=3600)
+
+
 class TelegramSimulateRequest(BaseModel):
     """Payload for the dev-only Telegram simulation endpoint."""
 
-    text: str = Field(min_length=1, max_length=4096)
+    text: str | None = Field(default=None, max_length=4096)
     message_thread_id: int | None = None
+    image: TelegramSimulateImage | None = None
+    voice_note: TelegramSimulateVoiceNote | None = None
+
+    @model_validator(mode="after")
+    def require_actionable_payload(self) -> "TelegramSimulateRequest":
+        """Require text or media so empty synthetic updates are impossible."""
+        if (self.text or "").strip() or self.image is not None or self.voice_note is not None:
+            return self
+        raise ValueError("Provide text, image, or voice_note for Telegram simulation.")
 
 
 class TelegramSimulateResponse(BaseModel):

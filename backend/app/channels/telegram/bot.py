@@ -45,6 +45,7 @@ from app.channels.telegram.bot_runtime import (
     handle_lcm_command,
     handle_status_command,
     normalize_reasoning_and_notify,
+    prepare_telegram_media_context,
     resolve_provider_with_auto_clear,
     safe_edit_html,
     should_refresh_commands,
@@ -70,6 +71,8 @@ from .channel import SURFACE_TELEGRAM, make_telegram_sender, render_initial
 if TYPE_CHECKING:
     from aiogram import Bot, Dispatcher
     from aiogram.types import CallbackQuery, Message, ReplyParameters, Update
+
+    from app.channels.telegram._attachments import TelegramVoiceNote
 
 logger = logging.getLogger(__name__)
 
@@ -282,6 +285,7 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
     message: Message,
     context: TelegramTurnContext,
     images: list[dict[str, str]] | None = None,
+    voice_notes: list[TelegramVoiceNote] | None = None,
     text_annotations: list[str] | None = None,
 ) -> None:
     """Drive the LLM streaming pipeline for one Telegram turn.
@@ -297,20 +301,15 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
             ``chat.id``, ``bot``, and ``message_thread_id``).
         context: Resolved turn context from ``handle_plain_message``.
         images: Image inputs collected via :func:`collect_attachments`
-            (#305). Forwarded to ``ChatTurnInput.images`` so the
-            provider can pass them as multimodal content blocks.
+            (#305). Interpreted by a vision sub-agent before the main
+            provider runs.
+        voice_notes: Downloaded Telegram voice-note payloads. Transcribed
+            before the main provider runs.
         text_annotations: ``"User sent X."`` lines appended to the
             user message body so the agent has metadata for voice /
             document attachments we couldn't fully extract (#304, #305).
     """
     base_text = (message.text or message.caption or "").strip()
-    annotation_block = "\n".join(text_annotations or []).strip()
-    if base_text and annotation_block:
-        user_text = f"{base_text}\n\n{annotation_block}"
-    else:
-        # Either: text-only message, attachment-only message, or both
-        # — string concat falls through to whichever is non-empty.
-        user_text = base_text or annotation_block
     if message.bot is None:
         raise RuntimeError("Telegram message has no bot; refusing to stream.")
     thinking_msg = await message.answer(
@@ -322,6 +321,24 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
 
     async with async_session_maker() as ws_session:
         workspace = await get_default_workspace(context.pawrrtal_user_id, ws_session)
+    workspace_root = Path(workspace.path) if workspace is not None else None
+
+    prepared_annotations = await prepare_telegram_media_context(
+        images=images,
+        voice_notes=voice_notes or [],
+        text_annotations=text_annotations or [],
+        workspace_root=workspace_root,
+        conversation_id=context.conversation_id,
+        user_id=context.pawrrtal_user_id,
+        user_prompt=base_text,
+    )
+    annotation_block = "\n".join(prepared_annotations).strip()
+    if base_text and annotation_block:
+        user_text = f"{base_text}\n\n{annotation_block}"
+    else:
+        # Either: text-only message, attachment-only message, or both
+        # — string concat falls through to whichever is non-empty.
+        user_text = base_text or annotation_block or "[attachment-only message]"
 
     tg_sender = make_telegram_sender(
         message.bot,
@@ -344,7 +361,7 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
 
     provider, warning = await resolve_provider_with_auto_clear(
         context,
-        workspace_root=Path(workspace.path) if workspace is not None else None,
+        workspace_root=workspace_root,
     )
     if warning is not None:
         await message.answer(warning, reply_parameters=_reply_parameters(message.message_id))
@@ -382,7 +399,7 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
     codex_thread_state = await ensure_codex_thread_state(
         conversation_id=context.conversation_id,
         provider=provider,
-        workspace_root=Path(workspace.path) if workspace is not None else None,
+        workspace_root=workspace_root,
         model_id=context.model_id,
         tools=agent_tools,
         reasoning_effort=effective_effort,
@@ -416,12 +433,12 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
         provider=provider,
         channel=resolve_channel(SURFACE_TELEGRAM),
         channel_message=channel_message,
-        workspace_root=Path(workspace.path) if workspace is not None else None,
+        workspace_root=workspace_root,
         tools=agent_tools,
-        images=images,
+        images=None,
         permission_check=build_telegram_permission_check(
             context,
-            Path(workspace.path) if workspace is not None else None,
+            workspace_root,
         ),
         # Helper to let pre-turn hooks stream progress into the placeholder message
         draft_updater=_draft_updater,
@@ -753,6 +770,7 @@ def _register_telegram_message_handler(dispatcher: Dispatcher) -> None:
             message=message,
             context=result,
             images=attachments.images if attachments is not None else None,
+            voice_notes=attachments.voice_notes if attachments is not None else None,
             text_annotations=(attachments.text_annotations if attachments is not None else None),
         )
 

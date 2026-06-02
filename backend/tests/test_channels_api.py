@@ -8,8 +8,10 @@ by going through the framework-thin handlers in
 
 from __future__ import annotations
 
+import base64
 from collections.abc import AsyncGenerator
-from typing import Any
+from types import SimpleNamespace
+from typing import Any, cast
 
 import pytest
 from fastapi import FastAPI, HTTPException
@@ -22,7 +24,11 @@ from app.channels.crud import (
     issue_link_code,
     list_bindings,
 )
-from app.channels.router import _ensure_telegram_webhook_enabled, get_channels_router
+from app.channels.router import (
+    _build_simulated_update,
+    _ensure_telegram_webhook_enabled,
+    get_channels_router,
+)
 from app.channels.telegram.handlers import (
     PROVIDER,
     handle_plain_message,
@@ -32,6 +38,8 @@ from app.channels.telegram.sender import TelegramSender
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import User, get_async_session
+from app.models import ChannelBinding
+from app.schemas import TelegramSimulateRequest
 
 pytestmark = pytest.mark.anyio
 
@@ -247,6 +255,58 @@ async def test_simulate_feeds_synthetic_update_to_telegram_service(
     assert body["conversation_id"] is None
     assert service.updates[0].message.message_id == 0
     assert service.updates[0].message.text == "hello from paw"
+
+
+def test_build_simulated_update_supports_image_payload() -> None:
+    """The simulate route can inject a Telegram photo-shaped update."""
+    update = _build_simulated_update(
+        binding=_fake_binding(),
+        payload=TelegramSimulateRequest(
+            text="what is this?",
+            image={
+                "data": base64.b64encode(b"\xff\xd8fake-jpeg").decode("ascii"),
+                "media_type": "image/jpeg",
+            },
+        ),
+        update_id=1,
+        message_thread_id=None,
+    )
+    message = update.message
+    assert message is not None
+    assert message.caption == "what is this?"
+    assert message.photo is not None
+    assert message.photo[-1].file_id.startswith("pawrrtal-simulated-media:")
+
+
+def test_build_simulated_update_supports_voice_note_payload() -> None:
+    """The simulate route can inject a Telegram voice-note-shaped update."""
+    update = _build_simulated_update(
+        binding=_fake_binding(),
+        payload=TelegramSimulateRequest(
+            text="voice turn",
+            voice_note={
+                "data": base64.b64encode(b"OggS fake voice").decode("ascii"),
+                "mime_type": "audio/ogg",
+                "duration_seconds": 2,
+            },
+        ),
+        update_id=1,
+        message_thread_id=None,
+    )
+    message = update.message
+    assert message is not None
+    assert message.caption == "voice turn"
+    assert message.voice is not None
+    assert message.voice.duration == 2
+    assert message.voice.file_id.startswith("pawrrtal-simulated-media:")
+
+
+def _fake_binding() -> ChannelBinding:
+    """Return the minimal binding shape needed by the update builder."""
+    return cast(
+        ChannelBinding,
+        SimpleNamespace(external_chat_id="333", external_user_id="222", display_handle="bound"),
+    )
 
 
 async def test_redeem_via_start_handler_creates_binding(

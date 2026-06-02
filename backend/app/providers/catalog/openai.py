@@ -26,6 +26,7 @@ the cutoff so they cap at ``high``; the resolver maps ``extra-high``
 
 from __future__ import annotations
 
+from app.providers.base import ReasoningEffort
 from app.providers.model_id import Host, Vendor
 
 from .entries import ModelEntry
@@ -75,23 +76,89 @@ _OPENAI_O4_MINI_IN_USD = 1.10
 _OPENAI_O4_MINI_OUT_USD = 4.40
 
 
-OPENAI_ENTRIES: tuple[ModelEntry, ...] = (
+def _openai_codex_entry(
+    *,
+    model: str,
+    display_name: str,
+    short_name: str,
+    description: str,
+    in_usd: float,
+    out_usd: float,
+    supports_reasoning: tuple[ReasoningEffort, ...],
+) -> ModelEntry:
+    """Build a native Codex SDK catalog row."""
+    return ModelEntry(
+        host=Host.openai_codex,
+        vendor=Vendor.openai,
+        model=model,
+        display_name=display_name,
+        short_name=short_name,
+        description=description,
+        is_default=False,
+        cost_per_mtok_in_usd=in_usd,
+        cost_per_mtok_out_usd=out_usd,
+        supports_reasoning=supports_reasoning,
+    )
+
+
+_CODEX_FULL_REASONING: tuple[ReasoningEffort, ...] = (
+    "minimal",
+    "low",
+    "medium",
+    "high",
+    "extra-high",
+)
+
+
+OPENAI_CODEX_ENTRIES: tuple[ModelEntry, ...] = (
     # Native Codex SDK models (first-class provider via openai_codex host).
     # These only appear for users/workspaces that have Codex auth (see
     # host_authenticated in factory.py). Distinct from the litellm-routed
     # equivalents so users can choose the native thread/agent experience.
-    ModelEntry(
-        host=Host.openai_codex,
-        vendor=Vendor.openai,
+    _openai_codex_entry(
         model="gpt-5.5",
         display_name="GPT-5.5 (Codex SDK)",
         short_name="GPT-5.5 Codex",
-        description="OpenAI GPT-5.5 via the official Codex Python SDK (native threads, local app-server, full agentic capabilities)",
-        is_default=False,
-        cost_per_mtok_in_usd=5.00,
-        cost_per_mtok_out_usd=30.00,
-        supports_reasoning=("minimal", "low", "medium", "high", "extra-high"),
+        description=(
+            "OpenAI GPT-5.5 via the official Codex Python SDK "
+            "(native threads, local app-server, full agentic capabilities)"
+        ),
+        in_usd=_OPENAI_GPT_5_5_IN_USD,
+        out_usd=_OPENAI_GPT_5_5_OUT_USD,
+        supports_reasoning=_CODEX_FULL_REASONING,
     ),
+    _openai_codex_entry(
+        model="gpt-5.4",
+        display_name="GPT-5.4 (Codex SDK)",
+        short_name="GPT-5.4 Codex",
+        description="OpenAI GPT-5.4 via the official Codex Python SDK",
+        in_usd=_OPENAI_GPT_5_4_IN_USD,
+        out_usd=_OPENAI_GPT_5_4_OUT_USD,
+        supports_reasoning=_CODEX_FULL_REASONING,
+    ),
+    _openai_codex_entry(
+        model="gpt-5.4-mini",
+        display_name="GPT-5.4 mini (Codex SDK)",
+        short_name="GPT-5.4 mini Codex",
+        description="Lower-cost GPT-5.4 mini via the official Codex Python SDK",
+        in_usd=_OPENAI_GPT_5_4_MINI_IN_USD,
+        out_usd=_OPENAI_GPT_5_4_MINI_OUT_USD,
+        supports_reasoning=_CODEX_FULL_REASONING,
+    ),
+    _openai_codex_entry(
+        model="gpt-5.3-codex",
+        display_name="GPT-5.3 Codex (Codex SDK)",
+        short_name="GPT-5.3 Codex",
+        description="Code-tuned GPT-5.3 via the official Codex Python SDK",
+        in_usd=_OPENAI_GPT_5_3_CODEX_IN_USD,
+        out_usd=_OPENAI_GPT_5_3_CODEX_OUT_USD,
+        supports_reasoning=_CODEX_FULL_REASONING,
+    ),
+)
+
+
+OPENAI_ENTRIES: tuple[ModelEntry, ...] = (
+    *OPENAI_CODEX_ENTRIES,
     ModelEntry(
         host=Host.litellm,
         vendor=Vendor.openai,

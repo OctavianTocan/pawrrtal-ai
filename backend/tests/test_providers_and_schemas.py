@@ -372,10 +372,7 @@ def test_resolve_api_key_two_users_are_isolated(
     assert keys.resolve_api_key(ws_root_b, "EXA_API_KEY") == "gateway-exa"
 
 
-def test_resolve_llm_routes_agy_cli_via_host_table() -> None:
-    """``agy-cli:google/gemini-3.5-flash-high`` routes to AgyCliLLM."""
-    from app.providers.agy_cli.provider import AgyCliLLM
-
-    provider = resolve_llm("agy-cli:google/gemini-3.5-flash-high")
-    assert isinstance(provider, AgyCliLLM)
-    assert provider._model_id == "gemini-3.5-flash-high"
+def test_resolve_llm_rejects_agy_cli_as_model_path() -> None:
+    """``agy-cli`` remains a legacy host enum but is not a Paw model route."""
+    with pytest.raises(KeyError):
+        resolve_llm("agy-cli:google/gemini-3.5-flash-high")

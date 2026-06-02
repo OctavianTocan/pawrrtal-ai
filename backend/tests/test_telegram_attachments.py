@@ -101,26 +101,26 @@ async def test_voice_message_without_file_id_emits_metadata_annotation() -> None
     )
 
 
-async def test_voice_message_emits_metadata_annotation_only() -> None:
-    """Voice transcription was removed in the backend restructure.
-
-    Voice messages now reach the agent as a metadata-only annotation;
-    the four-backend transcriber abstraction (``app.integrations.voice``)
-    is gone. The model sees ``[User sent a voice message …]`` and can
-    ask the user to retype the relevant bits.
-    """
+async def test_voice_message_downloads_payload_for_pre_turn_transcription() -> None:
+    """Voice notes are downloaded so xAI STT can run before the agent turn."""
     raw = b"OggS\x00fake-voice"
     message = _make_message(
-        voice=SimpleNamespace(duration=4, file_id="voice-id", file_size=len(raw)),
+        voice=SimpleNamespace(
+            duration=4,
+            file_id="voice-id",
+            file_size=len(raw),
+            mime_type="audio/ogg",
+        ),
     )
     bot = _make_bot_with_photo(raw)
 
     attachments = await collect_attachments(message, bot)
-    assert any(
-        "voice message" in annotation.lower() and "4s" in annotation
-        for annotation in attachments.text_annotations
-    )
-    assert all("Transcription:" not in annotation for annotation in attachments.text_annotations)
+    assert len(attachments.voice_notes) == 1
+    note = attachments.voice_notes[0]
+    assert note.raw_bytes == raw
+    assert note.duration_seconds == 4
+    assert note.mime_type == "audio/ogg"
+    assert attachments.text_annotations == []
 
 
 async def test_document_message_without_file_id_falls_back_to_metadata() -> None:

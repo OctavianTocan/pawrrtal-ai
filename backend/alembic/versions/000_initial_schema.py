@@ -15,15 +15,15 @@ this revision as applied before running ``upgrade head``:
     alembic stamp 000_initial_schema
 """
 
-from typing import Sequence, Union
+from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
 
 revision: str = "000_initial_schema"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -31,9 +31,10 @@ def upgrade() -> None:
     # Alembic defaults to VARCHAR(32) for version_num, but several revision IDs
     # in this project exceed that limit. Expand it before any migrations write
     # their revision IDs into the table.
-    op.execute(
-        "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)"
-    )
+    if op.get_bind().dialect.name != "sqlite":
+        op.execute(
+            "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)"
+        )
 
     op.create_table(
         "user",

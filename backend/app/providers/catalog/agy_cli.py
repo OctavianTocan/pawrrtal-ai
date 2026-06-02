@@ -1,4 +1,4 @@
-"""Antigravity catalogue rows (direct API + ``agy`` CLI fallback)."""
+"""Antigravity catalogue rows for the direct API provider."""
 
 from __future__ import annotations
 
@@ -172,23 +172,5 @@ AGY_API_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="Gemini 3.1 Flash Lite",
         short_name="Gemini 3.1 Flash Lite",
         description="Lightweight Gemini 3.1 Flash model returned by Antigravity",
-    ),
-)
-
-
-AGY_CLI_ENTRIES: tuple[ModelEntry, ...] = (
-    ModelEntry(
-        host=Host.agy_cli,
-        vendor=Vendor.google,
-        model="gemini-3.5-flash-high",
-        display_name="Gemini 3.5 Flash High (Antigravity)",
-        short_name="Gemini 3.5 Flash AGY",
-        description=(
-            "Local Antigravity CLI agent using the signed-in Google account and currently "
-            "selected Antigravity Gemini 3.5 Flash model"
-        ),
-        is_default=False,
-        cost_per_mtok_in_usd=_AGY_IN_USD,
-        cost_per_mtok_out_usd=_AGY_OUT_USD,
     ),
 )

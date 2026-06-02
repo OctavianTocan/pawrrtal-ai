@@ -11,7 +11,6 @@
 const HOST_LABELS = {
 	'agent-sdk': 'Anthropic Agent SDK',
 	'agy-api': 'Antigravity API',
-	'agy-cli': 'Antigravity CLI',
 	'gemini-cli': 'Gemini CLI',
 	'google-ai': 'Gemini API',
 	litellm: 'LiteLLM',

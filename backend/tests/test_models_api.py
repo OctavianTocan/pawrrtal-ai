@@ -170,11 +170,13 @@ def test_host_authenticated_with_workspace_uses_xai_oauth_token(
         assert host_authenticated(Host.xai, workspace_root=workspace_root) is True
 
 
-def test_host_authenticated_probes_agy_cli_binary(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Antigravity catalog rows are visible when the ``agy`` binary is installed."""
+def test_host_authenticated_does_not_expose_agy_cli_models(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The raw Antigravity CLI adapter is no longer a selectable model host."""
     monkeypatch.setattr("app.providers.agy_cli.is_agy_cli_available", lambda: True)
 
-    assert host_authenticated(Host.agy_cli) is True
+    assert host_authenticated(Host.agy_cli) is False
 
 
 def test_host_authenticated_probes_agy_api_auth(monkeypatch: pytest.MonkeyPatch) -> None:

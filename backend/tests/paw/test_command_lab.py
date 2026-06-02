@@ -256,3 +256,90 @@ def test_lab_telegram_chat_posts_control_and_turn_messages(
 
     stored = json.loads(Path(payload["run_path"]).read_text(encoding="utf-8"))
     assert stored["run_id"] == payload["run_id"]
+
+
+def test_lab_telegram_media_posts_image_and_voice_payload(
+    runner: CliRunner,
+    seeded: PersonaState,
+    tmp_path: Path,
+) -> None:
+    """``paw lab telegram media`` makes image + voice-note tests one command."""
+    image_path = tmp_path / "sample.jpg"
+    voice_path = tmp_path / "sample.ogg"
+    image_path.write_bytes(b"\xff\xd8fake-jpeg")
+    voice_path.write_bytes(b"OggS fake voice")
+    responses = [
+        {"accepted": True, "update_id": 1, "chat_id": "333", "external_user_id": "222"},
+        {"accepted": True, "update_id": 2, "chat_id": "333", "external_user_id": "222"},
+        {
+            "accepted": True,
+            "update_id": 3,
+            "chat_id": "333",
+            "external_user_id": "222",
+            "conversation_id": CONV_ID,
+        },
+    ]
+    with respx.mock(base_url=MOCK_BACKEND) as router:
+        simulate = router.post("/api/v1/channels/telegram/simulate").mock(
+            side_effect=[httpx.Response(200, json=row) for row in responses],
+        )
+        result = runner.invoke(
+            app,
+            [
+                "lab",
+                "telegram",
+                "media",
+                "--model",
+                MODEL_ID,
+                "--text",
+                "describe and transcribe",
+                "--image",
+                str(image_path),
+                "--voice-note",
+                str(voice_path),
+                "--voice-duration",
+                "2",
+                "--new",
+                "--json",
+            ],
+        )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["kind"] == "telegram-media"
+    assert payload["summary"]["messages_sent"] == 3
+    assert payload["summary"]["conversation_id"] == CONV_ID
+    body = json.loads(simulate.calls[-1].request.content)
+    assert body["text"] == "describe and transcribe"
+    assert body["image"]["media_type"] == "image/jpeg"
+    assert body["voice_note"]["mime_type"] == "audio/ogg"
+    assert body["voice_note"]["duration_seconds"] == 2
+
+    stored = json.loads(Path(payload["run_path"]).read_text(encoding="utf-8"))
+    assert stored["run_id"] == payload["run_id"]
+
+
+def test_lab_telegram_media_rejects_non_jpeg_photo(
+    runner: CliRunner,
+    seeded: PersonaState,
+    tmp_path: Path,
+) -> None:
+    """Simulated Telegram photos stay aligned with the JPEG-only Bot API path."""
+    image_path = tmp_path / "sample.png"
+    image_path.write_bytes(b"not actually png")
+
+    result = runner.invoke(
+        app,
+        [
+            "lab",
+            "telegram",
+            "media",
+            "--model",
+            MODEL_ID,
+            "--image",
+            str(image_path),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 1

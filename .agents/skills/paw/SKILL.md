@@ -117,7 +117,7 @@ target backend, bind the persona's Telegram account once, then use
 just paw verify all-providers --json | jq '.checks[] | select(.passed == false)'
 ```
 
-Selects one authenticated model per allowed host (`agy-api`, `agy-cli`,
+Selects one authenticated model per allowed host (`agy-api`,
 `gemini-cli`, `openai-codex`, `opencode-go` by default) and runs the
 same chat-roundtrip scenario against each. Use `--host <host>` to narrow
 the run and `--include-paid` when a live paid-model sweep is intentional.
@@ -128,6 +128,7 @@ the run and `--include-paid` when a live paid-model sweep is intentional.
 just paw lab bench model --model agy-api:google/gemini-3.5-flash-low --prompt "hello" --runs 3 --json
 just paw lab bench providers --runs 1 --json
 just paw lab telegram chat --model agy-api:google/gemini-3.5-flash-low --turns /tmp/telegram-turns.txt --new --verbose 2 --json
+just paw lab telegram media --model agy-api:google/gemini-3.5-flash-low --text "describe and transcribe" --image /tmp/sample.jpg --voice-note /tmp/sample.ogg --voice-duration 4 --new --json
 just paw lab runs ls --json
 ```
 
@@ -138,6 +139,10 @@ thinking size, tool count, and final text size. `telegram chat` sends
 scripted messages through `/api/v1/channels/telegram/simulate`, so the
 visible Telegram conversation exercises the same dispatcher path as a
 real inbound update without measuring raw CLI startup overhead.
+`telegram media` sends one simulated Telegram media update with a JPEG
+photo, a voice note, or both. Use it for end-to-end checks that image
+interpretation and xAI voice transcription are happening before the
+selected Paw agent model receives the turn.
 
 ### Verify cost ledger + budget enforcement
 

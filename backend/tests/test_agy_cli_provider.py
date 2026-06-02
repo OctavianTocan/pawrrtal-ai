@@ -68,15 +68,10 @@ def test_catalog_lists_agy_api_models() -> None:
     ]
 
 
-def test_catalog_lists_agy_cli_model() -> None:
+def test_catalog_omits_agy_cli_model_path() -> None:
     entries = [entry for entry in MODEL_CATALOG if entry.host is Host.agy_cli]
 
-    assert [entry.model for entry in entries] == ["gemini-3.5-flash-high"]
-    assert entries[0].vendor is Vendor.google
-    assert entries[0].display_name == "Gemini 3.5 Flash High (Antigravity)"
-    assert entries[0].short_name == "Gemini 3.5 Flash AGY"
-    assert entries[0].cost_per_mtok_in_usd == 0.0
-    assert entries[0].cost_per_mtok_out_usd == 0.0
+    assert entries == []
 
 
 def test_build_agy_command_uses_absolute_workspace_and_log() -> None:
@@ -167,11 +162,9 @@ def test_classify_log_line_tool_confirmation() -> None:
     }
 
 
-def test_factory_routes_agy_cli_host_to_agy_cli_llm() -> None:
-    provider = resolve_llm("agy-cli:google/gemini-3.5-flash-high")
-
-    assert isinstance(provider, AgyCliLLM)
-    assert provider._model_id == "gemini-3.5-flash-high"
+def test_factory_rejects_agy_cli_host_as_model_path() -> None:
+    with pytest.raises(KeyError):
+        resolve_llm("agy-cli:google/gemini-3.5-flash-high")
 
 
 def test_factory_routes_agy_api_host_to_agy_api_llm() -> None:

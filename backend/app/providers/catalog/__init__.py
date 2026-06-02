@@ -13,7 +13,7 @@ from dataclasses import asdict
 
 from app.providers.model_id import ParsedModelId, UnknownModelId, parse_model_id
 
-from .agy_cli import AGY_API_ENTRIES, AGY_CLI_ENTRIES
+from .agy_cli import AGY_API_ENTRIES
 from .entries import (
     ANTHROPIC_ENTRIES,
     GOOGLE_ENTRIES,
@@ -40,7 +40,6 @@ MODEL_CATALOG: tuple[ModelEntry, ...] = (
     *GOOGLE_ENTRIES,
     *GEMINI_CLI_ENTRIES,
     *AGY_API_ENTRIES,
-    *AGY_CLI_ENTRIES,
     *XAI_ENTRIES,
     *OPENAI_ENTRIES,
     *OPENCODE_GO_ENTRIES,

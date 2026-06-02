@@ -50,10 +50,8 @@ class Settings(BaseSettings):
     # Leave empty to disable web search; the tool returns a clear
     # "not configured" error rather than crashing the turn.
     exa_api_key: str = ""
-    # API key for xAI (https://x.ai). Consumed by the LiteLLM provider
-    # for Grok chat models. The previous speech-to-text proxy that also
-    # consumed this key (the /api/v1/stt route) was removed during the
-    # backend restructure; this key is no longer wired into any voice path.
+    # API key for xAI (https://x.ai). Consumed by Grok chat models and
+    # Telegram voice-note transcription via xAI's REST STT endpoint.
     xai_api_key: str = ""
     # OAuth 2.0 client id for the xAI device-code flow (#372). Set
     # to the value xAI hands back from registering Pawrrtal as an
@@ -365,15 +363,16 @@ class Settings(BaseSettings):
     # in-flight reply (#357). Default off until the dispatcher has
     # baked in a deployment.
     telegram_chat_queue_enabled: bool = False
+    # Vision-capable model used to describe Telegram image attachments before
+    # the selected Paw agent model runs. The main model receives the resulting
+    # text annotation only, so image uploads work even when the selected model
+    # is text-only.
+    telegram_image_interpreter_model_id: str = "google-ai:google/gemini-3.5-flash"
 
-    # ── Voice transcription (removed) ────────────────────────────────────
-    # Voice transcription (the 4-backend transcriber, the /api/v1/stt
-    # route, the Telegram voice-attachment transcription) was removed
-    # during the backend restructure. These settings are kept as
-    # no-op placeholders so deployed environments don't fail to boot
-    # on the next pydantic-settings validation pass; they have no
-    # readers in the current codebase. Drop them once the next
-    # config-cleanup PR lands.
+    # ── Voice transcription ───────────────────────────────────────────────
+    # Telegram voice notes use xAI's REST STT endpoint with XAI_API_KEY.
+    # The remaining voice_* settings are legacy no-op placeholders kept so
+    # deployed environments do not fail on pydantic-settings validation.
     voice_provider: Literal["xai", "mistral", "openai", "local"] = "xai"
     voice_mistral_api_key: str = ""
     voice_openai_api_key: str = ""

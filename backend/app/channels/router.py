@@ -12,6 +12,8 @@ when those adapters land.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import secrets
 import time
 from typing import Any, Protocol, cast
@@ -124,15 +126,19 @@ def _parse_telegram_id(value: str | None, field_name: str) -> int:
 def _build_simulated_update(
     *,
     binding: ChannelBinding,
-    text: str,
+    payload: TelegramSimulateRequest,
     update_id: int,
     message_thread_id: int | None,
 ) -> Any:
     """Build an aiogram ``Update`` that matches Telegram's message shape."""
     from aiogram.types import Update  # noqa: PLC0415
 
+    from app.channels.telegram._attachments import register_simulated_download  # noqa: PLC0415
+
     chat_id = _parse_telegram_id(binding.external_chat_id, "chat id")
     external_user_id = _parse_telegram_id(binding.external_user_id, "external user id")
+    text = (payload.text or "").strip()
+    has_media = payload.image is not None or payload.voice_note is not None
     message: dict[str, Any] = {
         "message_id": 0,
         "date": int(time.time()),
@@ -145,13 +151,53 @@ def _build_simulated_update(
             "is_bot": False,
             "first_name": binding.display_handle or "Pawrrtal",
         },
-        "text": text,
     }
+    if text:
+        message["caption" if has_media else "text"] = text
     if binding.display_handle:
         message["from"]["username"] = binding.display_handle
     if message_thread_id is not None:
         message["message_thread_id"] = message_thread_id
+    if payload.image is not None:
+        raw = _decode_simulated_media(payload.image.data, field_name="image.data")
+        file_id = register_simulated_download(raw)
+        message["photo"] = [
+            {
+                "file_id": file_id,
+                "file_unique_id": file_id,
+                "width": 1024,
+                "height": 768,
+                "file_size": len(raw),
+            }
+        ]
+    if payload.voice_note is not None:
+        raw = _decode_simulated_media(payload.voice_note.data, field_name="voice_note.data")
+        file_id = register_simulated_download(raw)
+        message["voice"] = {
+            "file_id": file_id,
+            "file_unique_id": file_id,
+            "duration": payload.voice_note.duration_seconds,
+            "mime_type": payload.voice_note.mime_type,
+            "file_size": len(raw),
+        }
     return Update.model_validate({"update_id": update_id, "message": message})
+
+
+def _decode_simulated_media(data: str, *, field_name: str) -> bytes:
+    """Decode base64 media payloads for the dev-only simulation route."""
+    try:
+        raw = base64.b64decode(data, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{field_name} must be valid base64.",
+        ) from exc
+    if not raw:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"{field_name} cannot be empty.",
+        )
+    return raw
 
 
 async def _latest_telegram_conversation_id(
@@ -294,7 +340,7 @@ def get_channels_router() -> APIRouter:
         update_id = int(time.time() * 1000)
         update = _build_simulated_update(
             binding=binding,
-            text=payload.text,
+            payload=payload,
             update_id=update_id,
             message_thread_id=payload.message_thread_id,
         )
