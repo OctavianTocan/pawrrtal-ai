@@ -13,9 +13,9 @@ from app.agents.types import AgentTool
 from app.channels._turn_runtime_context import system_prompt_for_turn
 from app.channels.turn_runner import load_codex_thread_state, persist_codex_thread_id
 from app.providers.base import ReasoningEffort
+from app.providers.openai_codex.dynamic_tools import dynamic_tool_fingerprint
 from app.providers.openai_codex.prompting import (
     CODEX_DEVELOPER_INSTRUCTIONS,
-    CODEX_LIGHT_SYSTEM_PROMPT,
     should_use_lightweight_codex_prompt,
 )
 
@@ -82,22 +82,19 @@ async def ensure_codex_thread_state(
     codex_provider = cast(_OpenAICodexProviderLike, provider)
 
     lightweight_prompt = should_use_lightweight_codex_prompt(question)
-    system_prompt = (
-        CODEX_LIGHT_SYSTEM_PROMPT
-        if lightweight_prompt
-        else system_prompt_for_turn(
-            workspace_root,
-            model_id=model_id,
-            tools=tools,
-            extra_context=None,
-            reasoning_effort=reasoning_effort,
-        )
+    system_prompt = system_prompt_for_turn(
+        workspace_root,
+        model_id=model_id,
+        tools=tools,
+        extra_context=None,
+        reasoning_effort=reasoning_effort,
     )
     prompt_hash = codex_thread_prompt_hash(
         model_id=codex_provider.model_id,
         workspace_root=workspace_root,
         system_prompt=system_prompt,
         developer_instructions=CODEX_DEVELOPER_INSTRUCTIONS,
+        tool_fingerprint=dynamic_tool_fingerprint(tools),
     )
     existing = await load_codex_thread_state(conversation_id)
     if existing and existing[0] and existing[1] == prompt_hash:
@@ -125,6 +122,7 @@ def codex_thread_prompt_hash(
     workspace_root: Path | None,
     system_prompt: str | None,
     developer_instructions: str = "",
+    tool_fingerprint: str = "",
 ) -> str:
     """Return the fingerprint that decides whether a Codex thread is reusable."""
     digest = sha256()
@@ -135,6 +133,8 @@ def codex_thread_prompt_hash(
     digest.update((system_prompt or "").encode("utf-8"))
     digest.update(b"\0")
     digest.update(developer_instructions.encode("utf-8"))
+    digest.update(b"\0")
+    digest.update(tool_fingerprint.encode("utf-8"))
     return digest.hexdigest()
 
 
@@ -149,9 +149,9 @@ def _is_openai_codex_provider(provider: object) -> bool:
 
 __all__ = [
     "CODEX_DEVELOPER_INSTRUCTIONS",
-    "CODEX_LIGHT_SYSTEM_PROMPT",
     "CodexThreadState",
     "codex_thread_prompt_hash",
+    "dynamic_tool_fingerprint",
     "ensure_codex_thread_id",
     "ensure_codex_thread_state",
 ]

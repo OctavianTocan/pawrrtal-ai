@@ -48,7 +48,6 @@ from app.lcm import (
     schedule_lcm_compaction,
 )
 from app.models import Conversation
-from app.providers.openai_codex.prompting import CODEX_LIGHT_SYSTEM_PROMPT
 
 # Strong references to in-flight codex_thread_id persist tasks so they
 # survive (a) GC, and (b) cancellation of the streaming response.  The
@@ -198,6 +197,9 @@ class ChatTurnInput:
     # True for simple Codex chat turns that should not pay the full
     # workspace prompt / active-recall cost.
     codex_lightweight_prompt: bool = False
+    # Native Antigravity CLI conversation id used to resume ``agy --print``
+    # without replaying Pawrrtal history into a fresh CLI conversation.
+    agy_conversation_id: str | None = None
     # These are the pre-turn hooks that will be run before the turn is started. They come from the plugin registry (for now).
     pre_turn_hooks: list[PreTurnHook] | None = None
     # Optional callback for pre-turn hooks to stream draft status back to the channel.
@@ -319,17 +321,13 @@ async def run_turn(
     # tool inventory) appended on every turn so the model never has to
     # guess at its environment.  See issues #289, #291, #294, #309 and
     # ``app.channels._turn_runtime_context`` for the rationale.
-    system_prompt: str | None
-    if turn_input.codex_lightweight_prompt:
-        system_prompt = CODEX_LIGHT_SYSTEM_PROMPT
-    else:
-        system_prompt = system_prompt_for_turn(
-            turn_input.workspace_root,
-            model_id=model_id,
-            tools=turn_input.tools,
-            extra_context=pre_turn_added_context,
-            reasoning_effort=turn_input.reasoning_effort,
-        )
+    system_prompt: str | None = system_prompt_for_turn(
+        turn_input.workspace_root,
+        model_id=model_id,
+        tools=turn_input.tools,
+        extra_context=pre_turn_added_context,
+        reasoning_effort=turn_input.reasoning_effort,
+    )
 
     with turn_span(
         conversation_id=turn_input.conversation_id,
@@ -489,6 +487,9 @@ async def _guarded_stream(
         provider_history = []
     if turn_input.codex_thread_id is not None:
         extra_kwargs["codex_thread_id"] = turn_input.codex_thread_id
+    if turn_input.agy_conversation_id is not None:
+        extra_kwargs["agy_conversation_id"] = turn_input.agy_conversation_id
+        provider_history = []
     try:
         async for event in turn_input.provider.stream(
             turn_input.question,
@@ -511,26 +512,7 @@ async def _guarded_stream(
             # future hook stay behind the filter so /verbose still
             # gates what the channel renders.
             extras = list(_expand_hook_events(event, hooks))
-            # Handle Codex native provider internal signals (e.g. new thread created
-            # so we can persist the thread_id for resume on future turns).
-            if event.get("type") == "internal" and event.get("kind") == "codex_thread_created":
-                thread_id = event.get("thread_id")
-                if isinstance(thread_id, str) and thread_id:
-                    # Detached task so the UPDATE survives cancellation of
-                    # the streaming response (SIGTERM mid-stream, client
-                    # disconnect). We track a strong reference in
-                    # ``_PENDING_CODEX_PERSIST_TASKS`` so the GC can't
-                    # collect it and ``main.lifespan`` awaits the set on
-                    # shutdown before the event loop exits.
-                    persist_task = asyncio.create_task(
-                        persist_codex_thread_id(
-                            turn_input.conversation_id,
-                            thread_id,
-                            turn_input.codex_thread_prompt_hash,
-                        )
-                    )
-                    _register_codex_persist_task(persist_task)
-                # Do not forward this internal event to the UI.
+            if await _handle_internal_provider_event(event, turn_input):
                 continue
             if not _should_deliver_event(event, turn_input.verbose_level):
                 continue
@@ -557,6 +539,36 @@ async def _guarded_stream(
         counter.record(error_event)
         aggregator.apply(error_event)
         yield error_event
+
+
+async def _handle_internal_provider_event(
+    event: StreamEvent,
+    turn_input: ChatTurnInput,
+) -> bool:
+    """Handle provider-internal signals and return whether the event was consumed."""
+    if event.get("type") != "internal":
+        return False
+    kind = event.get("kind")
+    thread_id = event.get("thread_id")
+    if not isinstance(thread_id, str) or not thread_id:
+        return True
+    if kind == "codex_thread_created":
+        # Detached task so the UPDATE survives cancellation of the streaming
+        # response (SIGTERM mid-stream, client disconnect). We track a strong
+        # reference so GC cannot collect it and lifespan shutdown drains it.
+        persist_task = asyncio.create_task(
+            persist_codex_thread_id(
+                turn_input.conversation_id,
+                thread_id,
+                turn_input.codex_thread_prompt_hash,
+            )
+        )
+        _register_codex_persist_task(persist_task)
+        return True
+    if kind == "agy_conversation_created":
+        await persist_agy_conversation_id(turn_input.conversation_id, thread_id)
+        return True
+    return False
 
 
 def _request_id_from_extras(extras: dict[str, Any]) -> str:
@@ -854,4 +866,46 @@ async def load_codex_thread_state(
             return (row[0], row[1]) if row else None
     except sa_exc.OperationalError:
         logger.exception("codex: failed to load thread state for conversation %s", conversation_id)
+        return None
+
+
+async def persist_agy_conversation_id(
+    conversation_id: uuid.UUID,
+    agy_conversation_id: str,
+) -> None:
+    """Persist the native Antigravity conversation id for future ``--conversation`` turns."""
+    try:
+        async with async_session_maker() as session:
+            await session.execute(
+                update(Conversation)
+                .where(Conversation.id == conversation_id)
+                .values(agy_conversation_id=agy_conversation_id)
+            )
+            await session.commit()
+            logger.debug(
+                "agy: persisted conversation_id=%s for conversation=%s",
+                agy_conversation_id,
+                conversation_id,
+            )
+    except (sa_exc.OperationalError, sa_exc.IntegrityError):
+        logger.exception(
+            "agy: failed to persist native conversation id for conversation %s",
+            conversation_id,
+        )
+
+
+async def load_agy_conversation_id(conversation_id: uuid.UUID) -> str | None:
+    """Load the persisted Antigravity conversation id for resume support."""
+    try:
+        async with async_session_maker() as session:
+            result = await session.execute(
+                select(Conversation.agy_conversation_id).where(Conversation.id == conversation_id)
+            )
+            row = result.first()
+            return row[0] if row else None
+    except sa_exc.OperationalError:
+        logger.exception(
+            "agy: failed to load native conversation id for conversation %s",
+            conversation_id,
+        )
         return None

@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import re
 
-_CREATED_RE = re.compile(r"Created conversation (?P<id>[a-zA-Z0-9-]+)")
-_RESUMED_RE = re.compile(r"resuming conversation (?P<id>[a-zA-Z0-9-]+)")
+_CONVERSATION_ID_RE = (
+    r"(?P<id>[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})"
+)
+_CREATED_RE = re.compile(rf"Created conversation {_CONVERSATION_ID_RE}")
+_RESUMED_RE = re.compile(rf"Print mode: resuming conversation {_CONVERSATION_ID_RE}")
 
 
 def parse_conversation_id(log_text: str) -> str | None:

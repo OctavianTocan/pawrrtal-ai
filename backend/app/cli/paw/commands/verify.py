@@ -27,6 +27,7 @@ from app.cli.paw.config import PersonaState
 from app.cli.paw.errors import LocalError, VerificationFailed
 from app.cli.paw.http import PawClient
 from app.cli.paw.output import emit_human, emit_json
+from app.cli.paw.verify.all_providers import run_all_providers_scenario
 from app.cli.paw.verify.chat_roundtrip import run_chat_roundtrip_scenario
 from app.cli.paw.verify.codex import SCENARIO_HTTP_TIMEOUT_SECONDS, run_codex_scenario
 from app.cli.paw.verify.cost import run_cost_scenario
@@ -241,6 +242,41 @@ def verify_lcm(
         )
     )
     _emit_and_exit(result, json_out=json_out, label="lcm")
+
+
+@app.command("all-providers")
+def verify_all_providers(
+    profile: str = typer.Option("default", "--profile"),
+    include_host: list[str] = typer.Option(
+        [],
+        "--host",
+        help="Provider host to include. Repeatable. Default: subscription/OAuth allowlist.",
+    ),
+    include_paid: bool = typer.Option(
+        False,
+        "--include-paid",
+        help="Include every authenticated catalog host, including paid API-key providers.",
+    ),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Run chat-roundtrip once for one model per selected provider host.
+
+    This suite is intentionally explicit and is not part of ``verify all``:
+    it can spend live provider quota across multiple hosts.
+    """
+    state = _load_state(profile)
+    result = asyncio.run(
+        _run_one(
+            state,
+            lambda client: run_all_providers_scenario(
+                state,
+                client,
+                include_hosts=set(include_host),
+                include_paid=include_paid,
+            ),
+        )
+    )
+    _emit_and_exit(result, json_out=json_out, label="all-providers")
 
 
 @app.command("all")

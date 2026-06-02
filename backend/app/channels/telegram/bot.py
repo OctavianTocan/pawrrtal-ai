@@ -80,7 +80,7 @@ from app.channels.telegram.status import (
     handle_lcm_command,
     handle_status_command,
 )
-from app.channels.turn_runner import ChatTurnInput, run_turn
+from app.channels.turn_runner import ChatTurnInput, load_agy_conversation_id, run_turn
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
 
@@ -286,8 +286,10 @@ async def _maintain_typing_indicator(
         return
 
 
-def _reply_parameters(message_id: int) -> ReplyParameters:
+def _reply_parameters(message_id: int) -> ReplyParameters | None:
     """Build aiogram reply parameters without importing aiogram at module load."""
+    if message_id <= 0:
+        return None
     from aiogram.types import ReplyParameters  # noqa: PLC0415
 
     return ReplyParameters(message_id=message_id)
@@ -405,6 +407,7 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
         reasoning_effort=effective_effort,
         question=user_text,
     )
+    agy_conversation_id = await load_agy_conversation_id(context.conversation_id)
 
     has_active_recall = False
 
@@ -454,6 +457,7 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
         codex_thread_id=codex_thread_state.thread_id,
         codex_thread_prompt_hash=codex_thread_state.prompt_hash,
         codex_lightweight_prompt=codex_thread_state.lightweight_prompt,
+        agy_conversation_id=agy_conversation_id,
     )
 
     async def _do_stream() -> None:

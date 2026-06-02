@@ -482,6 +482,82 @@ async def test_stream_resumes_existing_thread_when_thread_id_provided(monkeypatc
     ]
 
 
+def test_thread_start_payload_includes_pawrrtal_dynamic_tools() -> None:
+    """Codex thread creation must expose Pawrrtal tools, not silently drop them."""
+    from app.agents.types import AgentTool
+    from app.providers.openai_codex.dynamic_tools import thread_start_payload
+
+    async def execute(_call_id: str, **_kwargs: Any) -> str:
+        return "ok"
+
+    payload = thread_start_payload(
+        model_id="gpt-5.5",
+        workspace_root="/tmp/workspace",
+        system_prompt="system",
+        developer_instructions="developer",
+        tools=[
+            AgentTool(
+                name="read_file",
+                description="Read a workspace file.",
+                parameters={
+                    "type": "object",
+                    "properties": {"path": {"type": "string"}},
+                    "required": ["path"],
+                },
+                execute=execute,
+            )
+        ],
+    )
+
+    assert payload["dynamicTools"] == [
+        {
+            "namespace": "pawrrtal",
+            "name": "read_file",
+            "description": "Read a workspace file.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {"path": {"type": "string"}},
+                "required": ["path"],
+            },
+            "deferLoading": False,
+        }
+    ]
+
+
+def test_dynamic_tool_bridge_executes_pawrrtal_tool_for_codex_callback() -> None:
+    """The SDK's sync callback path must execute the async AgentTool safely."""
+    from app.agents.types import AgentTool
+    from app.providers.openai_codex.dynamic_tools import CodexDynamicToolBridge
+
+    async def execute(call_id: str, *, path: str) -> str:
+        return f"{call_id}:{path}"
+
+    bridge = CodexDynamicToolBridge()
+    tool = AgentTool(
+        name="read_file",
+        description="Read a workspace file.",
+        parameters={"type": "object", "properties": {"path": {"type": "string"}}},
+        execute=execute,
+    )
+    with bridge.activate(thread_id="thr_1", tools=[tool]):
+        result = bridge.handle_request(
+            "item/tool/call",
+            {
+                "threadId": "thr_1",
+                "turnId": "turn_1",
+                "callId": "call_1",
+                "namespace": "pawrrtal",
+                "tool": "read_file",
+                "arguments": {"path": "README.md"},
+            },
+        )
+
+    assert result == {
+        "contentItems": [{"type": "inputText", "text": "call_1:README.md"}],
+        "success": True,
+    }
+
+
 @pytest.mark.anyio
 async def test_stream_heartbeat_does_not_cancel_silent_codex_stream(monkeypatch):
     """A quiet Codex stream should keep waiting after heartbeat messages."""
@@ -500,7 +576,10 @@ async def test_stream_heartbeat_does_not_cancel_silent_codex_stream(monkeypatch)
         self._codex = fake_codex
         return self._codex
 
-    monkeypatch.setattr(provider_mod, "_CODEX_SILENCE_HEARTBEAT_SECONDS", 0.001)
+    monkeypatch.setattr(
+        "app.providers.openai_codex.turn_stream._CODEX_SILENCE_HEARTBEAT_SECONDS",
+        0.001,
+    )
     monkeypatch.setattr(provider_mod.OpenAICodexProvider, "_ensure_codex", _fake_ensure_codex)
 
     provider = provider_mod.OpenAICodexProvider("gpt-5.5")
@@ -805,8 +884,9 @@ async def test_ensure_codex_thread_returns_existing_id(monkeypatch):
     expected_hash = threads_mod.codex_thread_prompt_hash(
         model_id="gpt-5.5",
         workspace_root=None,
-        system_prompt=threads_mod.CODEX_LIGHT_SYSTEM_PROMPT,
+        system_prompt=None,
         developer_instructions=threads_mod.CODEX_DEVELOPER_INSTRUCTIONS,
+        tool_fingerprint=threads_mod.dynamic_tool_fingerprint([]),
     )
 
     async def fake_load(_conversation_id):
@@ -861,8 +941,9 @@ async def test_ensure_codex_thread_returns_missing_state_without_precreate(monke
     assert state.prompt_hash == threads_mod.codex_thread_prompt_hash(
         model_id="gpt-5.5",
         workspace_root=None,
-        system_prompt=threads_mod.CODEX_LIGHT_SYSTEM_PROMPT,
+        system_prompt=None,
         developer_instructions=threads_mod.CODEX_DEVELOPER_INSTRUCTIONS,
+        tool_fingerprint=threads_mod.dynamic_tool_fingerprint([]),
     )
 
 

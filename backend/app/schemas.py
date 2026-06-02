@@ -290,6 +290,7 @@ class ChatMessageRead(BaseModel):
     timeline: list[dict[str, Any]] | None = None
     thinking_duration_seconds: int | None = None
     assistant_status: Literal["streaming", "complete", "failed"] | None = None
+    duration_ms: int | None = None
 
 
 # --- Channel schemas ---------------------------------------------------------
@@ -323,6 +324,23 @@ class TelegramLinkCodeRead(BaseModel):
     expires_at: datetime
     bot_username: str | None = None
     deep_link: str | None = None
+
+
+class TelegramSimulateRequest(BaseModel):
+    """Payload for the dev-only Telegram simulation endpoint."""
+
+    text: str = Field(min_length=1, max_length=4096)
+    message_thread_id: int | None = None
+
+
+class TelegramSimulateResponse(BaseModel):
+    """Response from a synthetic Telegram update injection."""
+
+    accepted: bool
+    update_id: int
+    chat_id: str
+    external_user_id: str
+    conversation_id: uuid.UUID | None = None
 
 
 # --- Workspace schemas --------------------------------------------------------

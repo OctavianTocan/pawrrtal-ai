@@ -45,10 +45,20 @@ def telegram_configured(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 async def channels_client(
-    db_session: AsyncSession,
-    test_user: User,
+    channels_app: FastAPI,
 ) -> AsyncGenerator[AsyncClient]:
     """Provide a focused client for the channels router."""
+    transport = ASGITransport(app=channels_app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as test_client:
+        yield test_client
+
+
+@pytest.fixture
+async def channels_app(
+    db_session: AsyncSession,
+    test_user: User,
+) -> AsyncGenerator[FastAPI]:
+    """Provide a focused app for the channels router."""
     app = FastAPI()
 
     async def override_session() -> AsyncGenerator[AsyncSession]:
@@ -57,12 +67,19 @@ async def channels_client(
     app.dependency_overrides[get_async_session] = override_session
     app.dependency_overrides[get_allowed_user] = lambda: test_user
     app.include_router(get_channels_router())
-
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://testserver") as test_client:
-        yield test_client
+    yield app
 
     app.dependency_overrides.clear()
+
+
+class _FakeTelegramService:
+    """Capture synthetic updates fed through the route."""
+
+    def __init__(self) -> None:
+        self.updates: list[Any] = []
+
+    async def feed_webhook_update(self, update: Any) -> None:
+        self.updates.append(update)
 
 
 async def test_link_returns_503_when_telegram_unconfigured(
@@ -167,6 +184,69 @@ async def test_webhook_accepts_matching_secret(
     monkeypatch.setattr(settings, "telegram_webhook_secret", "expected-secret")
 
     _ensure_telegram_webhook_enabled(object(), "expected-secret")
+
+
+async def test_simulate_requires_dev_gate(
+    channels_client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Synthetic Telegram updates stay hidden unless explicitly enabled."""
+    monkeypatch.setattr(settings, "telegram_simulate_enabled", False)
+
+    response = await channels_client.post(
+        "/api/v1/channels/telegram/simulate",
+        json={"text": "hello"},
+    )
+
+    assert response.status_code == 404
+
+
+async def test_simulate_requires_existing_binding(
+    channels_app: FastAPI,
+    channels_client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Simulation targets the authenticated user's bound Telegram chat."""
+    monkeypatch.setattr(settings, "telegram_simulate_enabled", True)
+    channels_app.state.telegram_service = _FakeTelegramService()
+
+    response = await channels_client.post(
+        "/api/v1/channels/telegram/simulate",
+        json={"text": "hello"},
+    )
+
+    assert response.status_code == 404
+    assert "binding" in response.json()["detail"].lower()
+
+
+async def test_simulate_feeds_synthetic_update_to_telegram_service(
+    channels_app: FastAPI,
+    channels_client: AsyncClient,
+    db_session: AsyncSession,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The simulate route feeds aiogram updates through the real dispatcher hook."""
+    monkeypatch.setattr(settings, "telegram_simulate_enabled", True)
+    service = _FakeTelegramService()
+    channels_app.state.telegram_service = service
+    code, _ = await issue_link_code(user_id=test_user.id, provider=PROVIDER, session=db_session)
+    sender = TelegramSender(user_id=222, chat_id=333, username="bound", full_name="Bound User")
+    await handle_start_command(sender=sender, payload=code, session=db_session)
+
+    response = await channels_client.post(
+        "/api/v1/channels/telegram/simulate",
+        json={"text": "hello from paw"},
+    )
+
+    assert response.status_code == 200
+    body: dict[str, Any] = response.json()
+    assert body["accepted"] is True
+    assert body["chat_id"] == "333"
+    assert body["external_user_id"] == "222"
+    assert body["conversation_id"] is None
+    assert service.updates[0].message.message_id == 0
+    assert service.updates[0].message.text == "hello from paw"
 
 
 async def test_redeem_via_start_handler_creates_binding(

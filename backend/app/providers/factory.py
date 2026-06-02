@@ -19,6 +19,7 @@ from pathlib import Path
 
 from app.infrastructure.config import settings as settings  # noqa: PLC0414
 
+from .agy_api import AgyApiLLM
 from .agy_cli import AgyCliLLM
 from .base import AILLM
 from .claude import ClaudeLLM, ClaudeLLMConfig
@@ -51,6 +52,7 @@ def _load_openai_codex_provider_cls() -> type[AILLM]:
 
 HOST_TO_PROVIDER: dict[Host, type[AILLM] | None] = {
     Host.agent_sdk: ClaudeLLM,
+    Host.agy_api: AgyApiLLM,
     Host.agy_cli: AgyCliLLM,
     Host.gemini_cli: GeminiCliLLM,
     Host.google_ai: GeminiLLM,
@@ -69,8 +71,10 @@ this table must always agree.
 # Host → (workspace env-key, settings attribute) used by the picker
 # filter (issue #370). The env-key path is what most providers invoke
 # at request time via :func:`app.infrastructure.keys.resolve_api_key`.
-# xAI is the exception: workspace OAuth credentials also authenticate
-# the host, so :func:`host_authenticated` handles that branch directly.
+# Local CLI hosts and xAI are exceptions: CLI hosts authenticate by
+# binary availability, and xAI workspace OAuth credentials also
+# authenticate the host. :func:`host_authenticated` handles those
+# branches directly.
 # The settings attribute is the fallback when there is no workspace
 # context (system callers).
 #
@@ -108,6 +112,10 @@ def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> boo
     Mapping:
 
     * ``agent_sdk`` (Claude): non-empty ``CLAUDE_CODE_OAUTH_TOKEN``.
+    * ``agy_api``: local ``agy`` OAuth token + project cache are present.
+    * ``agy_cli``: the ``agy`` binary is on ``PATH`` (probed via
+      :func:`is_agy_cli_available`). Workspace overrides don't apply
+      — the binary is a process-level dependency.
     * ``gemini_cli``: the ``gemini`` binary is on ``PATH`` (probed
       via :func:`is_gemini_cli_available`). Workspace overrides don't
       apply — the binary is a process-level dependency.
@@ -122,12 +130,8 @@ def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> boo
     Add a new entry to :data:`_HOST_ENV_KEY` when introducing a new
     :class:`Host`.
     """
-    if host is Host.gemini_cli:
-        # Local import: ``gemini_cli`` imports the agent loop which
-        # would re-enter the factory module on a top-level import.
-        from .gemini_cli import is_gemini_cli_available  # noqa: PLC0415
-
-        return is_gemini_cli_available()
+    if host in (Host.agy_api, Host.agy_cli, Host.gemini_cli):
+        return _local_cli_host_authenticated(host)
     keys = _HOST_AUTH_KEYS.get(host)
     if keys is None:
         return False
@@ -153,6 +157,23 @@ def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> boo
         return bool(resolve_api_key(workspace_root, env_key))
     # No workspace context — gate on the gateway-global setting only.
     return bool(getattr(settings, settings_attr))
+
+
+def _local_cli_host_authenticated(host: Host) -> bool:
+    """Return whether a local CLI host has its binary available."""
+    if host is Host.agy_api:
+        from .agy_api import has_agy_api_auth  # noqa: PLC0415
+
+        return has_agy_api_auth()
+    if host is Host.agy_cli:
+        from .agy_cli import is_agy_cli_available  # noqa: PLC0415
+
+        return is_agy_cli_available()
+    # Local import: ``gemini_cli`` imports the agent loop which would
+    # re-enter the factory module on a top-level import.
+    from .gemini_cli import is_gemini_cli_available  # noqa: PLC0415
+
+    return is_gemini_cli_available()
 
 
 def _xai_workspace_authenticated(workspace_root: Path, env_key: str) -> bool:
@@ -238,7 +259,7 @@ def resolve_llm(
         return _build_opencode_go(parsed, workspace_root)
     if parsed.host is Host.openai_codex:
         return _resolve_cached_openai_codex_provider(provider_cls, parsed, workspace_root)
-    if provider_cls in {AgyCliLLM, GeminiLLM, GeminiCliLLM, XaiLLM}:
+    if provider_cls in {AgyApiLLM, AgyCliLLM, GeminiLLM, GeminiCliLLM, XaiLLM}:
         return provider_cls(parsed.model, workspace_root=workspace_root)  # type: ignore[call-arg]
     raise KeyError(f"no provider class registered for host {parsed.host!r}")
 

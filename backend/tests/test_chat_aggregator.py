@@ -27,6 +27,16 @@ def test_consecutive_thinking_events_coalesce_in_timeline() -> None:
     assert agg.timeline == [{"kind": "thinking", "text": "Let me think..."}]
 
 
+def test_fast_thinking_persists_positive_duration() -> None:
+    """A fast thinking-only block still rehydrates with a positive duration."""
+    agg = ChatTurnAggregator()
+    agg.apply({"type": "thinking", "content": "I have a plan."})
+
+    snapshot = agg.to_persisted_shape(status="complete")
+
+    assert snapshot["thinking_duration_seconds"] == 1
+
+
 def test_tool_break_starts_new_thinking_entry() -> None:
     """A tool_use between thinking events breaks the merge."""
     agg = ChatTurnAggregator()

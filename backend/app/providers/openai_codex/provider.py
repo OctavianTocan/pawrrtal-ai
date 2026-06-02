@@ -15,12 +15,10 @@ resulting notifications back to native `StreamEvent` records.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
 import uuid
 from collections.abc import AsyncIterator
-from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -32,11 +30,15 @@ from app.providers.base import (
     StreamEvent,
 )
 from app.providers.openai_codex.auth import build_app_server_config
-from app.providers.openai_codex.events import (
-    map_codex_notification_to_stream_events,
+from app.providers.openai_codex.dynamic_tools import (
+    CodexDynamicToolBridge,
+    start_codex_thread,
+    thread_start_payload,
 )
 from app.providers.openai_codex.inputs import build_codex_run_input
 from app.providers.openai_codex.prompting import CODEX_DEVELOPER_INSTRUCTIONS
+from app.providers.openai_codex.telemetry import log_codex_phase
+from app.providers.openai_codex.turn_stream import stream_codex_turn
 
 # Make sure the vendored SDK is on sys.path before we statically import from
 # it. ``_vendor.ensure_openai_codex_available`` injects the vendored source
@@ -55,54 +57,10 @@ except RuntimeError as exc:
 # shim returns ``Any`` to keep the package import cheap, which defeats type
 # checking inside this module. The shim still serves the public Pawrrtal
 # surface (``from app.providers.openai_codex import OpenAICodexProvider``).
-from openai_codex import ApprovalMode, AppServerConfig, AsyncCodex, TextInput
+from openai_codex import AppServerConfig, AsyncCodex, TextInput
 from openai_codex.generated.v2_all import ReasoningEffort as CodexReasoningEffort
-from openai_codex.generated.v2_all import SandboxMode
 
 logger = logging.getLogger(__name__)
-
-_CODEX_SILENCE_HEARTBEAT_SECONDS = 5.0
-
-_DENY_ALL_DECISION: dict[str, str] = {"decision": "deny"}
-
-
-def _elapsed_ms(started_at: float) -> float:
-    """Return elapsed monotonic time in milliseconds."""
-    return (time.perf_counter() - started_at) * 1000.0
-
-
-def _log_codex_phase(
-    conversation_id: uuid.UUID,
-    phase: str,
-    started_at: float,
-    **fields: object,
-) -> None:
-    """Log one timed Codex provider phase."""
-    suffix = " ".join(f"{key}={value}" for key, value in fields.items())
-    message = "CODEX_PROVIDER_PHASE conversation_id=%s phase=%s duration_ms=%.1f"
-    if suffix:
-        message = f"{message} {suffix}"
-    logger.info(message, conversation_id, phase, _elapsed_ms(started_at))
-
-
-def _deny_all_approval_handler(method: str, params: dict[str, Any] | None) -> dict[str, Any]:
-    """Reject every escalation request.
-
-    The SDK's default (vendor/codex/sdk/python/src/openai_codex/client.py:597)
-    accepts shell exec and file writes. Pawrrtal turns must not let the
-    spawned codex app-server modify the workspace silently. Per-tool
-    approvals are handled by the chat router's tool composition (see
-    .claude/rules/architecture/no-tools-in-providers.md). Once the tool
-    bridge lands (bean pawrrtal-roi0), this handler should be replaced
-    with one that consults the agent loop.
-    """
-    if method in (
-        "item/commandExecution/requestApproval",
-        "item/fileChange/requestApproval",
-    ):
-        return _DENY_ALL_DECISION
-    return {}
-
 
 _DEFAULT_REASONING_SUMMARY: Any | None = None
 
@@ -182,6 +140,7 @@ class OpenAICodexProvider:
         self._workspace_root = workspace_root
         self._codex_bin = codex_bin
         self._codex: AsyncCodex | None = None
+        self._dynamic_tool_bridge = CodexDynamicToolBridge()
 
     @property
     def model_id(self) -> str:
@@ -246,7 +205,7 @@ class OpenAICodexProvider:
                 "— falling back to SDK default which AUTO-ACCEPTS shell + file changes."
             )
             return
-        sync._approval_handler = _deny_all_approval_handler
+        sync._approval_handler = self._dynamic_tool_bridge.handle_request
 
     async def _start_thread(
         self,
@@ -255,18 +214,19 @@ class OpenAICodexProvider:
         system_prompt: str | None,
         conversation_id: uuid.UUID,
         phase: str,
+        tools: list[AgentTool] | None = None,
     ) -> tuple[Any, str | None]:
         """Start a Codex thread and return its SDK id when present."""
         phase_started_at = time.perf_counter()
-        thread = await codex.thread_start(
-            model=self._model_id,
-            cwd=str(self._workspace_root) if self._workspace_root else None,
-            base_instructions=system_prompt,
+        payload = thread_start_payload(
+            model_id=self._model_id,
+            workspace_root=str(self._workspace_root) if self._workspace_root else None,
+            system_prompt=system_prompt,
             developer_instructions=CODEX_DEVELOPER_INSTRUCTIONS,
-            approval_mode=ApprovalMode.deny_all,
-            sandbox=SandboxMode.read_only,
+            tools=tools,
         )
-        _log_codex_phase(conversation_id, phase, phase_started_at)
+        thread = await start_codex_thread(codex, payload)
+        log_codex_phase(conversation_id, phase, phase_started_at)
         new_thread_id = getattr(thread, "id", None)
         return thread, new_thread_id if isinstance(new_thread_id, str) and new_thread_id else None
 
@@ -275,10 +235,10 @@ class OpenAICodexProvider:
         was_cached = self._codex is not None
         provider_started_at = time.perf_counter()
         codex = await self._ensure_codex()
-        _log_codex_phase(conversation_id, "ensure_client", provider_started_at, cached=was_cached)
+        log_codex_phase(conversation_id, "ensure_client", provider_started_at, cached=was_cached)
         phase_started_at = time.perf_counter()
         await codex._ensure_initialized()
-        _log_codex_phase(conversation_id, "ensure_initialized", phase_started_at)
+        log_codex_phase(conversation_id, "ensure_initialized", phase_started_at)
         return codex
 
     async def stream(
@@ -297,13 +257,6 @@ class OpenAICodexProvider:
         **kwargs: Any,
     ) -> AsyncIterator[StreamEvent]:
         """Drive a Codex turn and emit native Pawrrtal StreamEvents."""
-        if tools:
-            logger.debug(
-                "openai_codex provider: tools provided but not yet wired for model=%s "
-                "(text-only path for v1)",
-                self._model_id,
-            )
-
         yield {
             "type": "thinking",
             "content": "Starting Codex",
@@ -338,7 +291,7 @@ class OpenAICodexProvider:
                 try:
                     phase_started_at = time.perf_counter()
                     thread = await codex.thread_resume(codex_thread_id)
-                    _log_codex_phase(
+                    log_codex_phase(
                         conversation_id,
                         "thread_resume",
                         phase_started_at,
@@ -364,6 +317,7 @@ class OpenAICodexProvider:
                         system_prompt=system_prompt,
                         conversation_id=conversation_id,
                         phase="thread_start_after_missing",
+                        tools=tools,
                     )
                     if new_thread_id:
                         yield {
@@ -385,6 +339,7 @@ class OpenAICodexProvider:
                     system_prompt=system_prompt,
                     conversation_id=conversation_id,
                     phase="thread_start",
+                    tools=tools,
                 )
                 # Signal to the caller that a new thread was created so it can be
                 # persisted against the conversation for future resume. The
@@ -409,7 +364,7 @@ class OpenAICodexProvider:
             per_turn_context=per_turn_context,
             images=images,
         )
-        _log_codex_phase(
+        log_codex_phase(
             conversation_id,
             "build_input",
             phase_started_at,
@@ -420,43 +375,22 @@ class OpenAICodexProvider:
 
         effort = _map_pawrrtal_reasoning_to_codex(reasoning_effort)
 
+        thread_id = getattr(thread, "id", None)
+        active_thread_id = thread_id if isinstance(thread_id, str) else codex_thread_id
+
         try:
-            yield {
-                "type": "thinking",
-                "content": "Sending the turn to Codex",
-                "summary": True,
-                "block_index": 3,
-                "transient": True,
-                "stage": "sending",
-            }
-            phase_started_at = time.perf_counter()
-            handle = await thread.turn(
-                run_input,
+            async for event in stream_codex_turn(
+                bridge=self._dynamic_tool_bridge,
+                thread=thread,
+                run_input=run_input,
                 effort=effort,
                 summary=_get_default_reasoning_summary(),
-            )
-            _log_codex_phase(
-                conversation_id,
-                "turn_submit",
-                phase_started_at,
-                resumed=bool(codex_thread_id),
-            )
-
-            # The high-level async handle exposes a stream of Notification objects.
-            # We consume it directly.
-            phase_started_at = time.perf_counter()
-            saw_event = False
-            async for event in _stream_codex_notifications(handle):
-                if not saw_event:
-                    saw_event = True
-                    _log_codex_phase(
-                        conversation_id,
-                        "first_stream_event",
-                        phase_started_at,
-                        event_type=event.get("type"),
-                    )
+                conversation_id=conversation_id,
+                codex_thread_id=codex_thread_id,
+                active_thread_id=active_thread_id,
+                tools=tools,
+            ):
                 yield event
-
         except Exception as exc:
             logger.exception("openai_codex: turn streaming failed")
             yield {"type": "error", "content": f"Codex turn failed: {exc}"}
@@ -473,44 +407,3 @@ CodexLLM = OpenAICodexProvider
 def _is_missing_codex_rollout_error(exc: Exception) -> bool:
     """Return True when the SDK cannot resume an empty/precreated thread."""
     return "no rollout found for thread id" in str(exc).lower()
-
-
-async def _stream_codex_notifications(handle: Any) -> AsyncIterator[StreamEvent]:
-    """Yield mapped Codex events while emitting silence heartbeats."""
-    notification_stream = handle.stream().__aiter__()
-    wait_started_at = time.monotonic()
-    next_notification = asyncio.create_task(notification_stream.__anext__())
-    try:
-        while True:
-            done, _pending = await asyncio.wait(
-                {next_notification},
-                timeout=_CODEX_SILENCE_HEARTBEAT_SECONDS,
-            )
-            if not done:
-                elapsed = round(time.monotonic() - wait_started_at)
-                yield {
-                    "type": "thinking",
-                    "content": f"Codex is still working ({elapsed}s)",
-                    "summary": True,
-                    "block_index": 4 + elapsed,
-                    "transient": True,
-                    "stage": "waiting",
-                }
-                continue
-            try:
-                notification = next_notification.result()
-            except StopAsyncIteration:
-                break
-            next_notification = asyncio.create_task(notification_stream.__anext__())
-            for event in _mapped_notification_events(notification):
-                yield event
-    finally:
-        if not next_notification.done():
-            next_notification.cancel()
-            with suppress(asyncio.CancelledError):
-                await next_notification
-
-
-def _mapped_notification_events(notification: Any) -> list[StreamEvent]:
-    """Return truthy mapped stream events for one Codex notification."""
-    return [event for event in map_codex_notification_to_stream_events(notification) if event]

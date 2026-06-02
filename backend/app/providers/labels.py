@@ -13,6 +13,7 @@ from app.providers.model_id import Host, Vendor
 
 HOST_LABELS: dict[Host, str] = {
     Host.agent_sdk: "Anthropic Agent SDK",
+    Host.agy_api: "Antigravity API",
     Host.agy_cli: "Antigravity CLI",
     Host.gemini_cli: "Gemini CLI",
     Host.google_ai: "Gemini API",

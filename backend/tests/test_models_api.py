@@ -168,3 +168,17 @@ def test_host_authenticated_with_workspace_uses_xai_oauth_token(
         patch("app.infrastructure.keys.resolve_api_key", return_value=None),
     ):
         assert host_authenticated(Host.xai, workspace_root=workspace_root) is True
+
+
+def test_host_authenticated_probes_agy_cli_binary(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Antigravity catalog rows are visible when the ``agy`` binary is installed."""
+    monkeypatch.setattr("app.providers.agy_cli.is_agy_cli_available", lambda: True)
+
+    assert host_authenticated(Host.agy_cli) is True
+
+
+def test_host_authenticated_probes_agy_api_auth(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Direct Antigravity API rows are visible when local agy auth is usable."""
+    monkeypatch.setattr("app.providers.agy_api.has_agy_api_auth", lambda: True)
+
+    assert host_authenticated(Host.agy_api) is True

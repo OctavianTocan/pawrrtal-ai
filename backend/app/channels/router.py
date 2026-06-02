@@ -13,21 +13,30 @@ when those adapters land.
 from __future__ import annotations
 
 import secrets
+import time
 from typing import Any, Protocol, cast
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.channels.crud import (
     delete_binding,
+    get_binding,
     issue_link_code,
     list_bindings,
 )
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import User, get_async_session
-from app.schemas import ChannelBindingRead, TelegramLinkCodeRead
+from app.models import ChannelBinding, Conversation
+from app.schemas import (
+    ChannelBindingRead,
+    TelegramLinkCodeRead,
+    TelegramSimulateRequest,
+    TelegramSimulateResponse,
+)
 
 _TELEGRAM = "telegram"
 
@@ -80,6 +89,93 @@ def _ensure_telegram_webhook_enabled(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Bad webhook secret.",
         )
+
+
+def _ensure_telegram_simulation_enabled(service: object | None) -> None:
+    """Reject synthetic updates unless the dev-only gate is explicitly enabled."""
+    if not settings.telegram_simulate_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Telegram simulation is not enabled on this deployment.",
+        )
+    if service is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Telegram service is not running on this deployment.",
+        )
+
+
+def _parse_telegram_id(value: str | None, field_name: str) -> int:
+    """Parse a stored Telegram identifier into the numeric Bot API shape."""
+    if value is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Telegram binding has no {field_name}.",
+        )
+    try:
+        return int(value)
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Telegram binding has non-numeric {field_name}.",
+        ) from exc
+
+
+def _build_simulated_update(
+    *,
+    binding: ChannelBinding,
+    text: str,
+    update_id: int,
+    message_thread_id: int | None,
+) -> Any:
+    """Build an aiogram ``Update`` that matches Telegram's message shape."""
+    from aiogram.types import Update  # noqa: PLC0415
+
+    chat_id = _parse_telegram_id(binding.external_chat_id, "chat id")
+    external_user_id = _parse_telegram_id(binding.external_user_id, "external user id")
+    message: dict[str, Any] = {
+        "message_id": 0,
+        "date": int(time.time()),
+        "chat": {
+            "id": chat_id,
+            "type": "private" if chat_id == external_user_id else "supergroup",
+        },
+        "from": {
+            "id": external_user_id,
+            "is_bot": False,
+            "first_name": binding.display_handle or "Pawrrtal",
+        },
+        "text": text,
+    }
+    if binding.display_handle:
+        message["from"]["username"] = binding.display_handle
+    if message_thread_id is not None:
+        message["message_thread_id"] = message_thread_id
+    return Update.model_validate({"update_id": update_id, "message": message})
+
+
+async def _latest_telegram_conversation_id(
+    *,
+    user_id: Any,
+    message_thread_id: int | None,
+    session: AsyncSession,
+) -> Any | None:
+    """Return the newest Telegram conversation id for this user/thread, if any."""
+    stmt = (
+        select(Conversation.id)
+        .where(
+            Conversation.user_id == user_id,
+            Conversation.origin_channel == _TELEGRAM,
+        )
+        .order_by(Conversation.updated_at.desc())
+        .limit(1)
+    )
+    if message_thread_id is None:
+        stmt = stmt.where(Conversation.telegram_thread_id.is_(None))
+    else:
+        stmt = stmt.where(Conversation.telegram_thread_id == message_thread_id)
+    result = await session.execute(stmt)
+    return result.scalar_one_or_none()
 
 
 def get_channels_router() -> APIRouter:
@@ -169,5 +265,52 @@ def get_channels_router() -> APIRouter:
         update = Update.model_validate(body)
         webhook_service = cast("_TelegramWebhookService", service)
         await webhook_service.feed_webhook_update(update)
+
+    @router.post(
+        "/telegram/simulate",
+        response_model=TelegramSimulateResponse,
+        include_in_schema=False,
+    )
+    async def simulate_telegram(
+        payload: TelegramSimulateRequest,
+        request: Request,
+        user: User = Depends(get_allowed_user),
+        session: AsyncSession = Depends(get_async_session),
+    ) -> TelegramSimulateResponse:
+        """Feed a synthetic Telegram message through the live bot dispatcher.
+
+        This route exists for local dogfood and agent-operated tests only.
+        It is hidden and gated by ``TELEGRAM_SIMULATE_ENABLED`` so production
+        deployments do not expose a message-injection surface by accident.
+        """
+        service = getattr(request.app.state, "telegram_service", None)
+        _ensure_telegram_simulation_enabled(service)
+        binding = await get_binding(user_id=user.id, provider=_TELEGRAM, session=session)
+        if binding is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No Telegram binding exists for this user.",
+            )
+        update_id = int(time.time() * 1000)
+        update = _build_simulated_update(
+            binding=binding,
+            text=payload.text,
+            update_id=update_id,
+            message_thread_id=payload.message_thread_id,
+        )
+        webhook_service = cast("_TelegramWebhookService", service)
+        await webhook_service.feed_webhook_update(update)
+        conversation_id = await _latest_telegram_conversation_id(
+            user_id=user.id,
+            message_thread_id=payload.message_thread_id,
+            session=session,
+        )
+        return TelegramSimulateResponse(
+            accepted=True,
+            update_id=update_id,
+            chat_id=binding.external_chat_id or "",
+            external_user_id=binding.external_user_id,
+            conversation_id=conversation_id,
+        )
 
     return router

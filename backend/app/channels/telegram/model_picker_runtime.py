@@ -322,7 +322,9 @@ def _callback_message(callback: CallbackQuery) -> Message | None:
     return message  # type: ignore[return-value]
 
 
-def _reply_parameters(message_id: int) -> ReplyParameters:
+def _reply_parameters(message_id: int) -> ReplyParameters | None:
+    if message_id <= 0:
+        return None
     from aiogram.types import ReplyParameters  # noqa: PLC0415
 
     return ReplyParameters(message_id=message_id)

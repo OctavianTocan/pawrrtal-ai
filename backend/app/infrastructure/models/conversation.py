@@ -79,6 +79,8 @@ class Conversation(Base):
     # SHA-256 fingerprint of the prompt/model used to create codex_thread_id.
     # A mismatch means prompt shape changed and the native thread must restart.
     codex_thread_prompt_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # Antigravity CLI native conversation ID for ``agy --conversation`` resume support.
+    agy_conversation_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     # Lifecycle marker for the auto-title feature:
     # NULL = not yet titled, "auto" = generated, "user" = user-edited.
     title_set_by: Mapped[str | None] = mapped_column(String(16), nullable=True)

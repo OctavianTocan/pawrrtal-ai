@@ -8,6 +8,7 @@ from uuid import uuid4
 
 import pytest
 
+from app.providers.agy_api.provider import AgyApiLLM
 from app.providers.agy_cli.command import AGY_BINARY_NAME, build_agy_command
 from app.providers.agy_cli.logs import classify_log_line
 from app.providers.agy_cli.output import (
@@ -33,12 +34,47 @@ def test_parse_model_id_accepts_agy_cli_host() -> None:
     assert parsed.id == "agy-cli:google/gemini-3.5-flash-high"
 
 
+def test_parse_model_id_accepts_agy_api_host() -> None:
+    parsed = parse_model_id("agy-api:anthropic/claude-sonnet-4-6")
+
+    assert parsed.host is Host.agy_api
+    assert parsed.vendor is Vendor.anthropic
+    assert parsed.model == "claude-sonnet-4-6"
+    assert parsed.id == "agy-api:anthropic/claude-sonnet-4-6"
+
+
+def test_catalog_lists_agy_api_models() -> None:
+    entries = [entry for entry in MODEL_CATALOG if entry.host is Host.agy_api]
+
+    assert [entry.id for entry in entries] == [
+        "agy-api:google/gemini-2.5-flash-thinking",
+        "agy-api:google/gemini-3.5-flash-extra-low",
+        "agy-api:google/gemini-3.5-flash-low",
+        "agy-api:google/gemini-2.5-pro",
+        "agy-api:google/gemini-3.1-pro-low",
+        "agy-api:openai/gpt-oss-120b-medium",
+        "agy-api:anthropic/claude-sonnet-4-6",
+        "agy-api:anthropic/claude-opus-4-6-thinking",
+        "agy-api:google/gemini-pro-agent",
+        "agy-api:google/gemini-3-flash-agent",
+        "agy-api:google/gemini-3.1-flash-image",
+        "agy-api:google/gemini-3-flash",
+        "agy-api:google/gemini-3.1-pro-high",
+        "agy-api:google/gemini-2.5-flash",
+        "agy-api:google/gemini-2.5-flash-lite",
+        "agy-api:google/tab_jump_flash_lite_preview",
+        "agy-api:google/tab_flash_lite_preview",
+        "agy-api:google/gemini-3.1-flash-lite",
+    ]
+
+
 def test_catalog_lists_agy_cli_model() -> None:
     entries = [entry for entry in MODEL_CATALOG if entry.host is Host.agy_cli]
 
     assert [entry.model for entry in entries] == ["gemini-3.5-flash-high"]
     assert entries[0].vendor is Vendor.google
     assert entries[0].display_name == "Gemini 3.5 Flash High (Antigravity)"
+    assert entries[0].short_name == "Gemini 3.5 Flash AGY"
     assert entries[0].cost_per_mtok_in_usd == 0.0
     assert entries[0].cost_per_mtok_out_usd == 0.0
 
@@ -89,6 +125,8 @@ def test_build_framed_prompt_wraps_history_and_question() -> None:
     assert "What next?" in prompt
     assert AGY_FINAL_OPEN in prompt
     assert AGY_FINAL_CLOSE in prompt
+    assert "Answer directly without using tools" in prompt
+    assert "You may use tools" not in prompt
 
 
 def test_timeout_output_detection_matches_agy_print_timeout() -> None:
@@ -97,11 +135,14 @@ def test_timeout_output_detection_matches_agy_print_timeout() -> None:
 
 
 def test_parse_conversation_id_prefers_created_then_resumed() -> None:
-    created = "I server.go:747] Created conversation 1234-abcd\n"
-    resumed = "I printmode.go:125] Print mode: resuming conversation 9999-zzzz\n"
+    created = "I server.go:747] Created conversation 12345678-1234-4234-9234-123456789abc\n"
+    resumed = (
+        "I common.go:262] project: resuming conversation belonging to project ID: abc\n"
+        "I printmode.go:125] Print mode: resuming conversation 99999999-9999-4999-9999-999999999999\n"
+    )
 
-    assert parse_conversation_id(created) == "1234-abcd"
-    assert parse_conversation_id(resumed) == "9999-zzzz"
+    assert parse_conversation_id(created) == "12345678-1234-4234-9234-123456789abc"
+    assert parse_conversation_id(resumed) == "99999999-9999-4999-9999-999999999999"
 
 
 def test_classify_log_line_model_selection() -> None:
@@ -133,6 +174,13 @@ def test_factory_routes_agy_cli_host_to_agy_cli_llm() -> None:
     assert provider._model_id == "gemini-3.5-flash-high"
 
 
+def test_factory_routes_agy_api_host_to_agy_api_llm() -> None:
+    provider = resolve_llm("agy-api:google/gemini-3.5-flash-low")
+
+    assert isinstance(provider, AgyApiLLM)
+    assert provider._model_id == "gemini-3.5-flash-low"
+
+
 class FakeProcess:
     def __init__(self, stdout: bytes, returncode: int = 0) -> None:
         self._stdout = stdout
@@ -160,7 +208,9 @@ async def test_agy_provider_yields_last_framed_answer(
     log_file = tmp_path / "agy.log"
 
     async def fake_spawn(*_args: object, **_kwargs: object) -> FakeProcess:
-        log_file.write_text("I server.go:747] Created conversation conv-1\n")
+        log_file.write_text(
+            "I server.go:747] Created conversation 11111111-1111-4111-9111-111111111111\n"
+        )
         return FakeProcess(
             b"<pawrrtal_final>old</pawrrtal_final>\n<pawrrtal_final>new</pawrrtal_final>\n"
         )
@@ -169,7 +219,7 @@ async def test_agy_provider_yields_last_framed_answer(
     monkeypatch.setattr("app.providers.agy_cli.provider._make_log_file", lambda _cid: log_file)
     monkeypatch.setattr(asyncio, "create_subprocess_exec", fake_spawn)
 
-    provider = AgyCliLLM("gemini-3.5-flash-high", workspace_root=tmp_path)
+    provider = AgyCliLLM("gemini-3.5-flash-high", workspace_root=None)
     events = [
         event
         async for event in provider.stream(
@@ -179,7 +229,15 @@ async def test_agy_provider_yields_last_framed_answer(
         )
     ]
 
-    assert events == [{"type": "delta", "content": "new"}]
+    assert events == [
+        {
+            "type": "internal",
+            "kind": "agy_conversation_created",
+            "provider": "agy_cli",
+            "thread_id": "11111111-1111-4111-9111-111111111111",
+        },
+        {"type": "delta", "content": "new"},
+    ]
 
 
 @pytest.mark.anyio

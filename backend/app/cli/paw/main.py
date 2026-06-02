@@ -15,6 +15,7 @@ from app.cli.paw.commands import dev as dev_cmd
 from app.cli.paw.commands import doctor as doctor_cmd
 from app.cli.paw.commands import fanout as fanout_cmd
 from app.cli.paw.commands import jobs as jobs_cmd
+from app.cli.paw.commands import lab as lab_cmd
 from app.cli.paw.commands import lcm as lcm_cmd
 from app.cli.paw.commands import login as login_cmd
 from app.cli.paw.commands import mcp as mcp_cmd
@@ -150,6 +151,12 @@ app.add_typer(
     lcm_cmd.app,
     name="lcm",
     help="LCM observability — pre-turn context inspection.",
+)
+
+app.add_typer(
+    lab_cmd.app,
+    name="lab",
+    help="Exploratory benchmarks, run logs, and flow checklists.",
 )
 
 app.add_typer(

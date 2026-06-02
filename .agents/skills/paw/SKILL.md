@@ -27,6 +27,7 @@ just smoke-dev                                 # preflight + start + status + st
 just paw login --dev-admin                     # seed the dev persona (cookie + workspace)
 just paw verify codex --json                   # end-to-end Codex proof
 just paw verify all --json                     # every shippable suite
+just paw lab flows ls --json                   # discover manual/live flow checklists
 ```
 
 `paw` lives at `backend/app/cli/paw/`. `just paw <args>` forwards to `cd backend && uv run paw <args>`.
@@ -56,7 +57,8 @@ Every row reflects a shipped subcommand. Source: `backend/app/cli/paw/commands/`
 | mirror           | `--upstream URL COMMAND…`                                      | local vs remote SSE diff                  |
 | env              | `check`                                                        | local environment preflight               |
 | project          | `up`, `down`, `status`, `logs`, `service ...` plus root `run`/`stop` aliases | local full-stack lifecycle (frontend + backend; pid file at `<PAW_CONFIG_DIR>/<profile>/project.json`) |
-| verify           | `codex`, `chat-roundtrip`, `model-switch`, `telegram`, `cost`, `lcm`, `all` | end-to-end                   |
+| verify           | `codex`, `chat-roundtrip`, `model-switch`, `telegram`, `all-providers`, `cost`, `lcm`, `all` | end-to-end                   |
+| lab              | `bench model`, `bench providers`, `runs ls/show/export`, `flows ls/show`, `telegram chat` | exploratory benchmarks + dogfood |
 | doctor           | (no verb)                                                      | local + ping `/api/v1/health` + models   |
 | dev              | `up`, `down`, `status`                                         | local backend lifecycle (pid file at `<PAW_CONFIG_DIR>/<profile>/dev.json`) |
 
@@ -105,10 +107,37 @@ just paw verify telegram --json | jq '.checks[] | select(.passed == false)'
 
 Lists channels → issues a one-time link code (asserts shape + future
 expiry) → re-lists → unlinks → asserts the Telegram binding is gone.
-The bot-side redemption (user pasting the code into the bot) is **not**
-covered today because no simulate endpoint exists; the scenario emits a
-stable `simulate_redemption_endpoint_unavailable` check so the gap is
-greppable.
+For bot-side dogfood, enable `TELEGRAM_SIMULATE_ENABLED=true` on the
+target backend, bind the persona's Telegram account once, then use
+`paw lab telegram chat`.
+
+### Verify every available provider host
+
+```bash
+just paw verify all-providers --json | jq '.checks[] | select(.passed == false)'
+```
+
+Selects one authenticated model per allowed host (`agy-api`, `agy-cli`,
+`gemini-cli`, `openai-codex`, `opencode-go` by default) and runs the
+same chat-roundtrip scenario against each. Use `--host <host>` to narrow
+the run and `--include-paid` when a live paid-model sweep is intentional.
+
+### Benchmark providers and dogfood Telegram
+
+```bash
+just paw lab bench model --model agy-api:google/gemini-3.5-flash-low --prompt "hello" --runs 3 --json
+just paw lab bench providers --runs 1 --json
+just paw lab telegram chat --model agy-api:google/gemini-3.5-flash-low --turns /tmp/telegram-turns.txt --new --verbose 2 --json
+just paw lab runs ls --json
+```
+
+Lab commands write profile-scoped JSON run logs under
+`<PAW_CONFIG_DIR>/<profile>/lab/runs/`. `bench model` captures TTFT,
+client duration, persisted backend duration, event counts, token usage,
+thinking size, tool count, and final text size. `telegram chat` sends
+scripted messages through `/api/v1/channels/telegram/simulate`, so the
+visible Telegram conversation exercises the same dispatcher path as a
+real inbound update without measuring raw CLI startup overhead.
 
 ### Verify cost ledger + budget enforcement
 

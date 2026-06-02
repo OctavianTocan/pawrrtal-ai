@@ -202,6 +202,19 @@ class ChatTurnAggregator:
         elapsed = time.monotonic() - self.started_at_monotonic
         return max(0, round(elapsed))
 
+    def persisted_thinking_duration_seconds(self) -> int | None:
+        """Return the duration value persisted for the assistant turn.
+
+        Fast single-block thinking can complete in less than half a
+        second, which rounds to ``0``.  Persist ``1`` in that case so a
+        turn that visibly streamed thinking does not rehydrate as if no
+        thinking duration was recorded.
+        """
+        duration = self.duration_seconds()
+        if self.thinking and duration <= 0:
+            return 1
+        return duration or None
+
     def to_persisted_shape(self, *, status: str) -> dict[str, Any]:
         """Snapshot in the shape ``finalize_assistant_message`` expects."""
         # Use error_text as the rendered content on failed turns so the UI gets
@@ -215,6 +228,6 @@ class ChatTurnAggregator:
             "thinking": self.thinking or None,
             "tool_calls": [call.to_dict() for call in self.tool_calls] or None,
             "timeline": list(self.timeline) or None,
-            "thinking_duration_seconds": self.duration_seconds() or None,
+            "thinking_duration_seconds": self.persisted_thinking_duration_seconds(),
             "assistant_status": status,
         }

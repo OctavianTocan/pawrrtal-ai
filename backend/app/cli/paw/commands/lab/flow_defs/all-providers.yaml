@@ -1,0 +1,9 @@
+id: all-providers
+title: Smoke every authenticated provider
+description: Run the same chat roundtrip invariant against one catalog model per provider host.
+commands:
+  - paw verify all-providers --json
+  - paw lab bench providers --runs 1 --json
+checks:
+  - Each selected provider creates a conversation, streams text, persists an assistant row, and cleans up.
+  - Failures name the model and provider host that broke.

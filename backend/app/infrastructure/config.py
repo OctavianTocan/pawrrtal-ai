@@ -206,6 +206,7 @@ class Settings(BaseSettings):
     # `X-Telegram-Bot-Api-Secret-Token` header on every webhook delivery
     # so the receiving FastAPI route can drop forgeries.
     telegram_webhook_secret: str = ""
+    telegram_simulate_enabled: bool = False
 
     # When set, inbound Telegram messages from this numeric user_id are
     # auto-linked to the seeded dev-admin user (``ADMIN_EMAIL``) without
@@ -348,7 +349,7 @@ class Settings(BaseSettings):
     # Default verbose level for new Telegram conversations.
     # 0 = quiet, 1 = normal (tool names live), 2 = detailed (+ thinking).
     telegram_verbose_default: Literal[0, 1, 2] = 1
-    telegram_typing_indicator_enabled: bool = False
+    telegram_typing_indicator_enabled: bool = True
     # How often the persistent typing indicator is refreshed. Telegram
     # auto-clears typing after ~5 s so the refresh must be faster.
     telegram_typing_refresh_seconds: float = 2.5

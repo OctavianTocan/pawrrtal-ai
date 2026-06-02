@@ -26,7 +26,9 @@ def build_framed_prompt(
     framing = (
         "Return your final user-visible answer inside exactly one "
         f"{AGY_FINAL_OPEN}...{AGY_FINAL_CLOSE} block. "
-        "You may use tools before that, but do not put progress text inside the block.\n\n"
+        "Answer directly without using tools unless the user explicitly asks you to inspect, "
+        "modify, or execute something in the workspace. Do not put progress text inside the "
+        "block.\n\n"
     )
     return framing + prefix + question
 

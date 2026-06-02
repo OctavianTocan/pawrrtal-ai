@@ -10,19 +10,27 @@
 /** Map from host wire-slug to user-facing display string. Mirrors backend `app.core.providers.labels.HOST_LABELS`. */
 const HOST_LABELS = {
 	'agent-sdk': 'Anthropic Agent SDK',
+	'agy-api': 'Antigravity API',
+	'agy-cli': 'Antigravity CLI',
+	'gemini-cli': 'Gemini CLI',
 	'google-ai': 'Gemini API',
 	litellm: 'LiteLLM',
 	'opencode-go': 'OpenCode Go',
+	'openai-codex': 'Codex SDK',
 	xai: 'xAI',
 } as const satisfies Record<string, string>;
 
 /** Map from vendor wire-slug to user-facing display string. Mirrors backend `app.core.providers.labels.VENDOR_LABELS`. */
 const VENDOR_LABELS = {
+	alibaba: 'Alibaba',
 	anthropic: 'Anthropic',
+	deepseek: 'DeepSeek',
 	google: 'Google',
+	minimax: 'MiniMax',
 	moonshot: 'Moonshot',
 	openai: 'OpenAI',
 	xai: 'xAI',
+	xiaomi: 'Xiaomi',
 	zai: 'Z.AI',
 } as const satisfies Record<string, string>;
 

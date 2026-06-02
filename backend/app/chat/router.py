@@ -22,7 +22,7 @@ from app.agents.tools import build_agent_tools
 # pull all three names from the same package to keep chat.py's
 # fan-out under sentrux's ``no_god_files`` budget.
 from app.channels import ChannelMessage, resolve_channel, surface_from_header
-from app.channels.turn_runner import ChatTurnInput, EventHook, run_turn
+from app.channels.turn_runner import ChatTurnInput, EventHook, load_agy_conversation_id, run_turn
 from app.chat.cost_budget import enforce_cost_budget
 from app.chat.events import publish_turn_started
 from app.chat.permissions import (
@@ -413,6 +413,7 @@ def get_chat_router() -> APIRouter:
             reasoning_effort=effective_reasoning_effort,
             question=request.question,
         )
+        agy_conversation_id = await load_agy_conversation_id(request.conversation_id)
 
         # ``db_session`` is intentionally left at its ``None`` default so the
         # turn runner opens its own ``async_session_maker()`` session inside
@@ -450,6 +451,7 @@ def get_chat_router() -> APIRouter:
             codex_thread_id=codex_thread_state.thread_id,
             codex_thread_prompt_hash=codex_thread_state.prompt_hash,
             codex_lightweight_prompt=codex_thread_state.lightweight_prompt,
+            agy_conversation_id=agy_conversation_id,
         )
         hooks: list[EventHook] = [_artifact_hook, _drain_send_queue]
 

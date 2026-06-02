@@ -17,6 +17,7 @@ from app.infrastructure.middleware.rate_limit import ChatRateLimitMiddleware
 from app.infrastructure.router_registry import register_routers
 
 # Import lifecycle modules for decorator side effects.
+from app.infrastructure.shutdown import agy_api_client as _agy_api_client
 from app.infrastructure.shutdown import codex_persist_drain as _codex_persist_drain
 from app.infrastructure.shutdown import codex_provider_cache as _codex_provider_cache
 from app.infrastructure.shutdown import tracing as _shutdown_tracing
@@ -44,6 +45,7 @@ _LIFECYCLE_MODULES = (
     _telegram_lifespan,
     _codex_persist_drain,
     _codex_provider_cache,
+    _agy_api_client,
     _shutdown_tracing,
 )
 

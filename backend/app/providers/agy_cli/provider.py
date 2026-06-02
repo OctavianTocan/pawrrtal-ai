@@ -21,8 +21,6 @@ import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
 
-import anyio
-
 from app.agents.types import AgentTool, PermissionCheckFn
 from app.providers._stream_logging import log_provider_stream_event
 from app.providers.base import ReasoningEffort, StreamEvent
@@ -54,6 +52,7 @@ class AgyCliLLM:
         reasoning_effort: ReasoningEffort | None = None,
         permission_check: PermissionCheckFn | None = None,
         images: list[dict[str, str]] | None = None,
+        agy_conversation_id: str | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Stream one Antigravity CLI turn."""
         del user_id
@@ -74,7 +73,7 @@ class AgyCliLLM:
             yield _error_event("Antigravity agy CLI binary not found on PATH.")
             return
 
-        workspace_roots = await _workspace_roots(self._workspace_root)
+        workspace_roots = _workspace_roots(self._workspace_root)
         log_file = _make_log_file(conversation_id)
         prompt = build_framed_prompt(
             question=question,
@@ -86,7 +85,8 @@ class AgyCliLLM:
             log_file=log_file,
             prompt=prompt,
             timeout=DEFAULT_PRINT_TIMEOUT,
-            conversation_id=self._session_by_conversation.get(conversation_id),
+            conversation_id=agy_conversation_id
+            or self._session_by_conversation.get(conversation_id),
         )
 
         proc = await _spawn(command, cwd=workspace_roots[0] if workspace_roots else None)
@@ -103,7 +103,7 @@ class AgyCliLLM:
             )
             raise
 
-        self._remember_session(conversation_id, log_file)
+        remembered_id = self._remember_session(conversation_id, log_file)
         _log_agy_events(log_file, conversation_id, self._model_id)
 
         if is_timeout_output(stdout):
@@ -116,23 +116,31 @@ class AgyCliLLM:
             yield _error_event("Antigravity CLI returned an unframed response.")
             return
 
+        if remembered_id and remembered_id != agy_conversation_id:
+            yield StreamEvent(
+                type="internal",
+                kind="agy_conversation_created",
+                provider="agy_cli",
+                thread_id=remembered_id,
+            )
         yield StreamEvent(type="delta", content=answer)
 
-    def _remember_session(self, conversation_id: uuid.UUID, log_file: Path) -> None:
+    def _remember_session(self, conversation_id: uuid.UUID, log_file: Path) -> str | None:
         try:
             log_text = log_file.read_text(encoding="utf-8")
         except OSError as exc:
             logger.warning("AGY_CLI_LOG_READ_FAILED path=%s reason=%s", log_file, exc)
-            return
+            return None
         agy_conversation_id = parse_conversation_id(log_text)
         if agy_conversation_id:
             self._session_by_conversation[conversation_id] = agy_conversation_id
+        return agy_conversation_id
 
 
-async def _workspace_roots(workspace_root: Path | None) -> list[Path]:
+def _workspace_roots(workspace_root: Path | None) -> list[Path]:
     if workspace_root is None:
         return []
-    return [Path(str(await anyio.Path(workspace_root).resolve()))]
+    return [workspace_root.resolve()]
 
 
 def _make_log_file(conversation_id: uuid.UUID) -> Path:

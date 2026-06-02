@@ -46,15 +46,9 @@ Default behavior:
 - Keep short conversational replies short.
 """.strip()
 
-CODEX_LIGHT_SYSTEM_PROMPT = """
-You are Pawrrtal's Codex-backed chat assistant. Reply directly and briefly.
-Do not inspect files, run commands, or discuss internal execution unless the
-user explicitly asks for project, code, debugging, or workspace work.
-""".strip()
-
 
 def should_use_lightweight_codex_prompt(question: str) -> bool:
-    """Return True when a Codex turn should avoid full workspace context."""
+    """Return True when a Codex turn can use lower reasoning effort."""
     normalized = " ".join(question.lower().split())
     if not normalized:
         return True

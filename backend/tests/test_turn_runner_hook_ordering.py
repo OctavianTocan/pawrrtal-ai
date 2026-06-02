@@ -80,6 +80,17 @@ def _make_codex_turn_input(provider: _ScriptedProvider) -> ChatTurnInput:
     )
 
 
+def _make_agy_turn_input(provider: _ScriptedProvider) -> ChatTurnInput:
+    """Build a turn input that simulates a native resumed Antigravity conversation."""
+    turn_input = _make_turn_input(provider, verbose_level=2)
+    return ChatTurnInput(
+        **{
+            **turn_input.__dict__,
+            "agy_conversation_id": "agy_existing",
+        }
+    )
+
+
 class _Counter:
     """Stand-in for the private ``_EventCounter`` used by ``_guarded_stream``."""
 
@@ -181,6 +192,78 @@ async def test_resumed_codex_thread_does_not_replay_pawrrtal_history() -> None:
 
 
 @pytest.mark.anyio
+async def test_resumed_agy_conversation_does_not_replay_pawrrtal_history() -> None:
+    """Native Antigravity conversations own continuity, so app history is skipped."""
+    provider = _ScriptedProvider([{"type": "delta", "content": "ok"}])
+    turn_input = _make_agy_turn_input(provider)
+    aggregator = ChatTurnAggregator()
+    counter = _Counter()
+    history = [{"role": "user", "content": "old"}]
+
+    delivered = [
+        e
+        async for e in _guarded_stream(
+            turn_input=turn_input,
+            history=history,
+            system_prompt=None,
+            per_turn_context=None,
+            aggregator=aggregator,
+            counter=counter,  # type: ignore[arg-type]
+            hooks=[],
+        )
+    ]
+
+    assert delivered == [{"type": "delta", "content": "ok"}]
+    assert provider.stream_kwargs["history"] == []
+    assert provider.stream_kwargs["agy_conversation_id"] == "agy_existing"
+
+
+@pytest.mark.anyio
+async def test_agy_internal_conversation_id_is_persisted(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The first Antigravity turn persists its native id for later resumes."""
+    provider = _ScriptedProvider(
+        [
+            {
+                "type": "internal",
+                "kind": "agy_conversation_created",
+                "thread_id": "agy_new",
+            },
+            {"type": "delta", "content": "ok"},
+        ]
+    )
+    turn_input = _make_turn_input(provider, verbose_level=2)
+    aggregator = ChatTurnAggregator()
+    counter = _Counter()
+    persisted: list[tuple[Any, str]] = []
+
+    async def fake_persist(conversation_id: Any, agy_conversation_id: str) -> None:
+        persisted.append((conversation_id, agy_conversation_id))
+
+    monkeypatch.setattr(
+        "app.channels.turn_runner.persist_agy_conversation_id",
+        fake_persist,
+    )
+
+    delivered = [
+        e
+        async for e in _guarded_stream(
+            turn_input=turn_input,
+            history=[],
+            system_prompt=None,
+            per_turn_context=None,
+            aggregator=aggregator,
+            counter=counter,  # type: ignore[arg-type]
+            hooks=[],
+        )
+    ]
+
+    assert delivered == [{"type": "delta", "content": "ok"}]
+    assert persisted == [(turn_input.conversation_id, "agy_new")]
+
+
+@pytest.mark.anyio
 async def test_transient_progress_is_delivered_but_not_persisted() -> None:
     """Transient progress is UI chrome, not assistant thinking history."""
     provider = _ScriptedProvider(
@@ -276,7 +359,14 @@ async def test_lightweight_codex_turn_still_runs_pre_turn_hooks(
         question="hi",
         provider=provider,
         channel=_PassthroughChannel(),
-        channel_message=MagicMock(),
+        channel_message={
+            "conversation_id": MagicMock(),
+            "metadata": {},
+            "model_id": "openai-codex:openai/gpt-5.5",
+            "surface": "telegram",
+            "text": "hi",
+            "user_id": MagicMock(),
+        },
         workspace_root=None,
         tools=[],
         pre_turn_hooks=[recall_hook],
@@ -288,4 +378,6 @@ async def test_lightweight_codex_turn_still_runs_pre_turn_hooks(
 
     assert hook_called is True
     assert provider.stream_kwargs["per_turn_context"] == "# PRE-TURN CONTEXT\n\nmemory"
+    assert "memory" in provider.stream_kwargs["system_prompt"]
+    assert "## Tools available this turn" in provider.stream_kwargs["system_prompt"]
     assert provider.stream_kwargs["reasoning_effort"] == "low"

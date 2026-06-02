@@ -44,7 +44,15 @@ def _serialize_chat_message(row: ChatMessage) -> ChatMessageRead:
         timeline=row.timeline,
         thinking_duration_seconds=row.thinking_duration_seconds,
         assistant_status=status_value,
+        duration_ms=_message_duration_ms(row),
     )
+
+
+def _message_duration_ms(row: ChatMessage) -> int | None:
+    """Best-effort persisted assistant turn duration from row timestamps."""
+    if row.role != "assistant" or row.created_at is None or row.updated_at is None:
+        return None
+    return max(0, round((row.updated_at - row.created_at).total_seconds() * 1000))
 
 
 GENERATED_TITLE_REJECTION_PHRASES = (
