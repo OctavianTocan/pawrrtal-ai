@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -68,7 +68,7 @@ async def test_returns_nothing_to_compact_when_compactor_returns_false() -> None
         ),
         patch(
             "app.channels.telegram.compact_command.resolve_effective_model_id",
-            AsyncMock(return_value="agent-sdk:anthropic/claude-sonnet-4-6"),
+            Mock(return_value="agent-sdk:anthropic/claude-sonnet-4-6"),
         ),
         patch(
             "app.channels.telegram.compact_command.compact_leaf_if_needed",
@@ -114,7 +114,7 @@ async def test_returns_compacted_message_on_success() -> None:
         ),
         patch(
             "app.channels.telegram.compact_command.resolve_effective_model_id",
-            AsyncMock(return_value="agent-sdk:anthropic/claude-sonnet-4-6"),
+            Mock(return_value="agent-sdk:anthropic/claude-sonnet-4-6"),
         ),
         patch(
             "app.channels.telegram.compact_command.compact_leaf_if_needed",

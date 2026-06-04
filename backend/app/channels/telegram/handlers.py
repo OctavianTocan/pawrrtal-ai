@@ -266,11 +266,7 @@ async def handle_plain_message(
         session=session,
         thread_id=sender.thread_id,
     )
-    model_id = await resolve_effective_model_id(
-        session=session,
-        user_id=pawrrtal_user_id,
-        conversation_model_id=conversation.model_id,
-    )
+    model_id = resolve_effective_model_id(conversation_model_id=conversation.model_id)
 
     logger.info(
         "TELEGRAM_TURN user_id=%s conversation_id=%s model=%s thread_id=%s text_len=%d",

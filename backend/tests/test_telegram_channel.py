@@ -728,8 +728,8 @@ class TestHandlePlainMessage:
             ),
             patch(
                 "app.channels.telegram.handlers.resolve_effective_model_id",
-                new=AsyncMock(
-                    side_effect=lambda *, session, user_id, conversation_model_id: (
+                new=MagicMock(
+                    side_effect=lambda *, conversation_model_id: (
                         conversation_model_id or "agent-sdk:anthropic/claude-sonnet-4-6"
                     )
                 ),
@@ -764,8 +764,8 @@ class TestHandlePlainMessage:
             ),
             patch(
                 "app.channels.telegram.handlers.resolve_effective_model_id",
-                new=AsyncMock(
-                    side_effect=lambda *, session, user_id, conversation_model_id: (
+                new=MagicMock(
+                    side_effect=lambda *, conversation_model_id: (
                         conversation_model_id or "agent-sdk:anthropic/claude-sonnet-4-6"
                     )
                 ),
@@ -776,13 +776,12 @@ class TestHandlePlainMessage:
         assert isinstance(result, TelegramTurnContext)
         assert result.model_id == "anthropic/claude-opus-4-5"
 
-    async def test_bound_user_falls_back_to_user_default_model(self) -> None:
-        """Without a conversation override, the user's persisted default wins.
+    async def test_bound_user_falls_back_to_resolved_model(self) -> None:
+        """Without a conversation override, the resolver's fallback propagates.
 
-        The catalog default is the last-resort fallback; whenever the user
-        has pinned a default via ``/model ... default`` or the picker's
-        "Set as default" button, that ID should propagate into the turn
-        context.
+        The catalog default is the last-resort fallback; whatever
+        ``resolve_effective_model_id`` returns for a conversation with no
+        override must propagate into the turn context.
         """
         pawrrtal_uid = uuid.uuid4()
         sender = TelegramSender(user_id=99, chat_id=99, username="t", full_name="T")
@@ -803,7 +802,7 @@ class TestHandlePlainMessage:
             ),
             patch(
                 "app.channels.telegram.handlers.resolve_effective_model_id",
-                new=AsyncMock(return_value="agent-sdk:anthropic/claude-opus-4-5"),
+                new=MagicMock(return_value="agent-sdk:anthropic/claude-opus-4-5"),
             ),
         ):
             result = await handle_plain_message(sender=sender, text="hey", session=session)
@@ -1044,210 +1043,6 @@ class TestHandleModelCommand:
         assert "✅" in reply
         update_mock.assert_called_once()
         assert update_mock.call_args.kwargs["model_id"] == canonical_id
-
-    async def test_trailing_default_keyword_persists_user_default(self) -> None:
-        """``/model <id> default`` switches the chat AND pins the user default."""
-        pawrrtal_uid = uuid.uuid4()
-        sender = TelegramSender(user_id=6, chat_id=6, username="t", full_name="T")
-        session = AsyncMock()
-        fake_conv = AsyncMock()
-        fake_conv.id = uuid.uuid4()
-        fake_conv.model_id = None
-
-        update_mock = AsyncMock(return_value=True)
-        set_default_mock = AsyncMock(return_value=None)
-        with (
-            patch(
-                "app.channels.telegram.model_command.resolve_or_autolink_telegram_user",
-                new=AsyncMock(return_value=pawrrtal_uid),
-            ),
-            patch(
-                "app.channels.telegram.model_command.get_or_create_telegram_conversation_full",
-                new=AsyncMock(return_value=fake_conv),
-            ),
-            patch(
-                "app.channels.telegram.model_command.update_conversation_model",
-                new=update_mock,
-            ),
-            patch(
-                "app.channels.telegram.model_command.set_user_default_model_id",
-                new=set_default_mock,
-            ),
-        ):
-            reply = await handle_model_command(
-                sender=sender,
-                model_arg="anthropic/claude-sonnet-4-6 default",
-                session=session,
-            )
-
-        canonical_id = "agent-sdk:anthropic/claude-sonnet-4-6"
-        assert "✅" in reply
-        assert "⭐" in reply
-        assert canonical_id in reply
-        # The success-suffix copy is part of the contract — a regression
-        # that drops the descriptive text shouldn't pass on emoji alone.
-        assert "default for future conversations" in reply
-        update_mock.assert_called_once()
-        assert update_mock.call_args.kwargs["model_id"] == canonical_id
-        set_default_mock.assert_called_once()
-        assert set_default_mock.call_args.kwargs["model_id"] == canonical_id
-        assert set_default_mock.call_args.kwargs["user_id"] == pawrrtal_uid
-
-    async def test_leading_default_keyword_also_works(self) -> None:
-        """``/model default <id>`` is equivalent to the trailing form."""
-        pawrrtal_uid = uuid.uuid4()
-        sender = TelegramSender(user_id=7, chat_id=7, username="t", full_name="T")
-        session = AsyncMock()
-        fake_conv = AsyncMock()
-        fake_conv.id = uuid.uuid4()
-        fake_conv.model_id = None
-
-        update_mock = AsyncMock(return_value=True)
-        set_default_mock = AsyncMock(return_value=None)
-        with (
-            patch(
-                "app.channels.telegram.model_command.resolve_or_autolink_telegram_user",
-                new=AsyncMock(return_value=pawrrtal_uid),
-            ),
-            patch(
-                "app.channels.telegram.model_command.get_or_create_telegram_conversation_full",
-                new=AsyncMock(return_value=fake_conv),
-            ),
-            patch(
-                "app.channels.telegram.model_command.update_conversation_model",
-                new=update_mock,
-            ),
-            patch(
-                "app.channels.telegram.model_command.set_user_default_model_id",
-                new=set_default_mock,
-            ),
-        ):
-            reply = await handle_model_command(
-                sender=sender,
-                model_arg="default anthropic/claude-sonnet-4-6",
-                session=session,
-            )
-
-        canonical_id = "agent-sdk:anthropic/claude-sonnet-4-6"
-        assert "⭐" in reply
-        assert canonical_id in reply
-        set_default_mock.assert_called_once()
-        # Pin the contract: leading keyword form must persist the canonical
-        # ID, not the literal "default" word from the input.
-        assert set_default_mock.call_args.kwargs["model_id"] == canonical_id
-
-    async def test_bare_default_keyword_promotes_current_conversation_model(self) -> None:
-        """``/model default`` promotes the conversation's existing model_id."""
-        pawrrtal_uid = uuid.uuid4()
-        sender = TelegramSender(user_id=8, chat_id=8, username="t", full_name="T")
-        session = AsyncMock()
-        fake_conv = AsyncMock()
-        fake_conv.id = uuid.uuid4()
-        fake_conv.model_id = "agent-sdk:anthropic/claude-sonnet-4-6"
-
-        update_mock = AsyncMock(return_value=True)
-        set_default_mock = AsyncMock(return_value=None)
-        with (
-            patch(
-                "app.channels.telegram.model_command.resolve_or_autolink_telegram_user",
-                new=AsyncMock(return_value=pawrrtal_uid),
-            ),
-            patch(
-                "app.channels.telegram.model_command.get_or_create_telegram_conversation_full",
-                new=AsyncMock(return_value=fake_conv),
-            ),
-            patch(
-                "app.channels.telegram.model_command.update_conversation_model",
-                new=update_mock,
-            ),
-            patch(
-                "app.channels.telegram.model_command.set_user_default_model_id",
-                new=set_default_mock,
-            ),
-        ):
-            reply = await handle_model_command(
-                sender=sender,
-                model_arg="default",
-                session=session,
-            )
-
-        assert "⭐" in reply
-        assert "agent-sdk:anthropic/claude-sonnet-4-6" in reply
-        update_mock.assert_not_called()  # No conversation-model write
-        set_default_mock.assert_called_once()
-        assert (
-            set_default_mock.call_args.kwargs["model_id"] == "agent-sdk:anthropic/claude-sonnet-4-6"
-        )
-
-    async def test_bare_default_with_stale_current_model_refuses(self) -> None:
-        """If the conversation's stored model is no longer in the catalog the
-        promotion is refused, so a stale ID can't silently become the user's
-        default and poison every future conversation.
-        """
-        pawrrtal_uid = uuid.uuid4()
-        sender = TelegramSender(user_id=10, chat_id=10, username="t", full_name="T")
-        session = AsyncMock()
-        fake_conv = AsyncMock()
-        fake_conv.id = uuid.uuid4()
-        fake_conv.model_id = "agent-sdk:anthropic/this-model-was-removed"
-
-        set_default_mock = AsyncMock(return_value=None)
-        with (
-            patch(
-                "app.channels.telegram.model_command.resolve_or_autolink_telegram_user",
-                new=AsyncMock(return_value=pawrrtal_uid),
-            ),
-            patch(
-                "app.channels.telegram.model_command.get_or_create_telegram_conversation_full",
-                new=AsyncMock(return_value=fake_conv),
-            ),
-            patch(
-                "app.channels.telegram.model_command.set_user_default_model_id",
-                new=set_default_mock,
-            ),
-        ):
-            reply = await handle_model_command(
-                sender=sender,
-                model_arg="default",
-                session=session,
-            )
-
-        assert "no longer in the catalog" in reply
-        # Stale ID must not have been written as the user's default.
-        set_default_mock.assert_not_called()
-
-    async def test_bare_default_without_current_model_returns_hint(self) -> None:
-        """``/model default`` with no conversation model returns an explanation."""
-        pawrrtal_uid = uuid.uuid4()
-        sender = TelegramSender(user_id=9, chat_id=9, username="t", full_name="T")
-        session = AsyncMock()
-        fake_conv = AsyncMock()
-        fake_conv.id = uuid.uuid4()
-        fake_conv.model_id = None
-
-        set_default_mock = AsyncMock(return_value=None)
-        with (
-            patch(
-                "app.channels.telegram.model_command.resolve_or_autolink_telegram_user",
-                new=AsyncMock(return_value=pawrrtal_uid),
-            ),
-            patch(
-                "app.channels.telegram.model_command.get_or_create_telegram_conversation_full",
-                new=AsyncMock(return_value=fake_conv),
-            ),
-            patch(
-                "app.channels.telegram.model_command.set_user_default_model_id",
-                new=set_default_mock,
-            ),
-        ):
-            reply = await handle_model_command(
-                sender=sender,
-                model_arg="default",
-                session=session,
-            )
-
-        assert "no current model" in reply.lower() or "switch" in reply.lower()
-        set_default_mock.assert_not_called()
 
 
 # ---------------------------------------------------------------------------
