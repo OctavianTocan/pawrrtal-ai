@@ -15,6 +15,9 @@ export const BROWSER_API_BASE_URL =
 /** @deprecated Use BROWSER_API_BASE_URL for browser code and server-api.ts for RSC fetches. */
 export const API_BASE_URL = BROWSER_API_BASE_URL;
 
+const LOCAL_BACKEND_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1']);
+const TAILSCALE_HOST_SUFFIX = '.ts.net';
+
 /**
  * Backend API key for the X-Pawrrtal-Key header.
  *
@@ -45,10 +48,10 @@ function readStoredBackendConfig(): BackendConfig | null {
 			return null;
 		}
 		const parsed = JSON.parse(raw) as Partial<BackendConfig>;
-		return {
+		return coerceBrowserReachableBackendConfig({
 			url: parsed.url ?? '',
 			apiKey: parsed.apiKey ?? '',
-		};
+		});
 	} catch {
 		return null;
 	}
@@ -56,7 +59,7 @@ function readStoredBackendConfig(): BackendConfig | null {
 
 function normalizeBackendConfigUrl(url: string): string {
 	if (!url.trim()) {
-		return BROWSER_API_BASE_URL;
+		return resolveDefaultBrowserApiBaseUrl();
 	}
 	try {
 		const parsed = new URL(url);
@@ -66,9 +69,54 @@ function normalizeBackendConfigUrl(url: string): string {
 	}
 }
 
+function isTailscaleBrowserOrigin(): boolean {
+	if (typeof window === 'undefined') {
+		return false;
+	}
+	return window.location.hostname.endsWith(TAILSCALE_HOST_SUFFIX);
+}
+
+function isLocalBackendUrl(url: string): boolean {
+	try {
+		return LOCAL_BACKEND_HOSTNAMES.has(new URL(url).hostname);
+	} catch {
+		return false;
+	}
+}
+
+function resolveDefaultBrowserApiBaseUrl(): string {
+	if (isTailscaleBrowserOrigin() && isLocalBackendUrl(BROWSER_API_BASE_URL)) {
+		return '';
+	}
+	return BROWSER_API_BASE_URL;
+}
+
+function browserOrigin(): string {
+	if (typeof window === 'undefined') {
+		return '';
+	}
+	return window.location.origin;
+}
+
+function coerceBrowserReachableBackendConfig(config: BackendConfig): BackendConfig {
+	if (isTailscaleBrowserOrigin() && isLocalBackendUrl(config.url) && !config.apiKey) {
+		return { ...config, url: browserOrigin() };
+	}
+	return config;
+}
+
+/** Browser-reachable backend URL to persist when the user chooses hosted Pawrrtal. */
+export function getHostedBackendConfigUrl(): string {
+	const defaultUrl = resolveDefaultBrowserApiBaseUrl();
+	if (!defaultUrl) {
+		return browserOrigin();
+	}
+	return coerceBrowserReachableBackendConfig({ url: defaultUrl, apiKey: '' }).url;
+}
+
 function readBackendConfig(): BackendConfig {
 	const buildTimeKey = process.env.NEXT_PUBLIC_BACKEND_API_KEY ?? '';
-	const defaults: BackendConfig = { url: BROWSER_API_BASE_URL, apiKey: buildTimeKey };
+	const defaults: BackendConfig = { url: resolveDefaultBrowserApiBaseUrl(), apiKey: buildTimeKey };
 	const stored = readStoredBackendConfig();
 	if (stored) {
 		return stored;
@@ -113,7 +161,11 @@ function emitBackendConfigChange(): void {
 /** Persist a new backend config (URL + API key) to localStorage. */
 export function saveBackendConfig(config: BackendConfig): void {
 	try {
-		window.localStorage.setItem(BACKEND_CONFIG_STORAGE_KEY, JSON.stringify(config));
+		const browserReachableConfig = coerceBrowserReachableBackendConfig(config);
+		window.localStorage.setItem(
+			BACKEND_CONFIG_STORAGE_KEY,
+			JSON.stringify(browserReachableConfig)
+		);
 		emitBackendConfigChange();
 	} catch {
 		/* quota / private browsing — ignore */

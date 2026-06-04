@@ -124,7 +124,7 @@ export function OnboardingModal({
 		<Dialog open={open} onOpenChange={handleOpenChange}>
 			<DialogContent
 				showCloseButton={false}
-				className="top-0 left-0 h-[100dvh] max-h-none w-screen max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-background p-0 text-foreground shadow-none ring-0 sm:max-w-none sm:p-0 [&>button]:top-6 [&>button]:right-6 [&>button]:z-30 [&>button]:rounded-control [&>button]:bg-foreground/[0.035] [&>button]:text-muted-foreground [&>button]:ring-1 [&>button]:ring-border [&>button]:hover:bg-foreground/[0.07] [&>button]:hover:text-foreground"
+				className="top-0 left-0 h-[100dvh] max-h-none w-screen max-w-none translate-x-0 translate-y-0 overflow-y-auto overscroll-contain rounded-none border-0 bg-background p-0 text-foreground shadow-none ring-0 sm:max-w-none sm:p-0 [&>button]:top-6 [&>button]:right-6 [&>button]:z-30 [&>button]:rounded-control [&>button]:bg-foreground/[0.035] [&>button]:text-muted-foreground [&>button]:ring-1 [&>button]:ring-border [&>button]:hover:bg-foreground/[0.07] [&>button]:hover:text-foreground"
 			>
 				{/*
           Radix requires DialogTitle inside DialogContent. Do not set aria-labelledby / id with
@@ -133,7 +133,7 @@ export function OnboardingModal({
         */}
 				<DialogTitle className="sr-only">{accessibleTitle}</DialogTitle>
 				<OnboardingBackdrop />
-				<div className="relative z-10 grid min-h-[100dvh] place-items-center px-5 py-20 sm:px-8">
+				<div className="relative z-10 flex min-h-full items-start justify-center px-4 py-8 sm:items-center sm:px-8 sm:py-20">
 					{step === 'welcome' ? (
 						<OnboardingWelcomeStep
 							onContinue={() => dispatch({ type: 'set-step', step: 'create' })}

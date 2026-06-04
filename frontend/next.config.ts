@@ -14,12 +14,16 @@ import path from 'node:path';
 import { createMDX } from 'fumadocs-mdx/next';
 import type { NextConfig } from 'next';
 
-const allowedDevOrigins = process.env.NEXT_ALLOWED_DEV_ORIGINS?.split(',')
+const DEFAULT_ALLOWED_DEV_ORIGINS = ['openclaw-vps.tailb0501a.ts.net', '*.tailb0501a.ts.net'];
+
+const configuredAllowedDevOrigins = process.env.NEXT_ALLOWED_DEV_ORIGINS?.split(',')
 	.map((origin) => origin.trim())
 	.filter(Boolean);
 
+const allowedDevOrigins = [...DEFAULT_ALLOWED_DEV_ORIGINS, ...(configuredAllowedDevOrigins ?? [])];
+
 const nextConfig: NextConfig = {
-	...(allowedDevOrigins?.length ? { allowedDevOrigins } : {}),
+	allowedDevOrigins,
 	turbopack: {
 		root: path.resolve(__dirname, '../'),
 	},

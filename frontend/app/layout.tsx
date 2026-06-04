@@ -52,6 +52,14 @@ export const metadata: Metadata = {
 };
 
 /**
+ * Agentation is an interactive inspection layer that intentionally blocks page
+ * interactions while active. Keep it opt-in so normal dev sessions, including
+ * Tailscale-served login flows, remain usable.
+ */
+const enableAgentation =
+	process.env.NODE_ENV === 'development' && process.env.ENABLE_AGENTATION === 'true';
+
+/**
  * Root layout for all routes: `Providers` + blocking theme script on `<html>`.
  */
 export default function RootLayout({
@@ -89,7 +97,7 @@ export default function RootLayout({
 				    on 2026-05-08. */}
 				<Script src="/theme-detection.js" strategy="beforeInteractive" />
 				{/* React Grab */}
-				{process.env.NODE_ENV === 'development' && (
+				{enableAgentation && (
 					<Script
 						src="//unpkg.com/react-grab/dist/index.global.js"
 						crossOrigin="anonymous"
@@ -122,7 +130,7 @@ export default function RootLayout({
 					}}
 				>
 					<Providers>{children}</Providers>
-					{process.env.NODE_ENV === 'development' && <Agentation />}
+					{enableAgentation && <Agentation />}
 				</RootProvider>
 			</body>
 		</html>

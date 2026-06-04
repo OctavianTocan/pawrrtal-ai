@@ -12,6 +12,7 @@ import {
 	PromptInputSubmit,
 } from '@/components/ai-elements/prompt-input';
 import { Button } from '@/components/ui/button';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { cn } from '@/lib/utils';
 import {
@@ -119,12 +120,21 @@ const EMPTY_COMPOSER_PLACEHOLDERS = [
 	'Attach files with +',
 	'Use Auto-review to let Pawrrtal inspect changes',
 ] as const;
+const MOBILE_EMPTY_COMPOSER_PLACEHOLDERS = [
+	'Ask Pawrrtal anything. @ to mention context',
+	'Type @ to mention files, folders, or skills',
+	'Attach files with +',
+	'Use Auto-review to inspect changes',
+] as const;
 const DEFAULT_EMPTY_COMPOSER_PLACEHOLDER = 'Ask Pawrrtal anything. @ to mention context';
 /** Milliseconds between rotating empty-composer placeholder tips. */
 const PLACEHOLDER_ROTATION_INTERVAL_MS = 5200;
 
-function useRotatingPlaceholder(hasContent: boolean): string {
+function useRotatingPlaceholder(hasContent: boolean, isMobile: boolean): string {
 	const [placeholderIndex, setPlaceholderIndex] = useState(0);
+	const placeholders = isMobile
+		? MOBILE_EMPTY_COMPOSER_PLACEHOLDERS
+		: EMPTY_COMPOSER_PLACEHOLDERS;
 
 	// Reset inline during render when content appears, instead of via effect.
 	if (hasContent && placeholderIndex !== 0) {
@@ -135,17 +145,19 @@ function useRotatingPlaceholder(hasContent: boolean): string {
 		if (hasContent) return;
 
 		const intervalId = window.setInterval(() => {
-			setPlaceholderIndex((index) => (index + 1) % EMPTY_COMPOSER_PLACEHOLDERS.length);
+			setPlaceholderIndex((index) => (index + 1) % placeholders.length);
 		}, PLACEHOLDER_ROTATION_INTERVAL_MS);
 
 		return () => window.clearInterval(intervalId);
-	}, [hasContent]);
+	}, [hasContent, placeholders.length]);
 
 	if (hasContent) {
 		return DEFAULT_EMPTY_COMPOSER_PLACEHOLDER;
 	}
 
-	return EMPTY_COMPOSER_PLACEHOLDERS[placeholderIndex] ?? DEFAULT_EMPTY_COMPOSER_PLACEHOLDER;
+	return (
+		placeholders[placeholderIndex % placeholders.length] ?? DEFAULT_EMPTY_COMPOSER_PLACEHOLDER
+	);
 }
 
 /**
@@ -272,6 +284,7 @@ export function ChatComposer({
 	placeholderOverride,
 }: ChatComposerProps): React.JSX.Element {
 	const voice = useVoiceTranscribe();
+	const isMobile = useIsMobile();
 	const isRecording = voice.status === 'recording' || voice.status === 'requesting-permission';
 	const isTranscribing = voice.status === 'transcribing';
 	const [recordingSeconds, setRecordingSeconds] = useState(0);
@@ -279,7 +292,7 @@ export function ChatComposer({
 	const [isPlanTagVisible, setIsPlanTagVisible] = usePlanModeVisible();
 	const isSubmitBlockedResolved = isSubmitBlocked ?? false;
 	const hasContent = message.content.trim().length > 0;
-	const rotatingPlaceholder = useRotatingPlaceholder(hasContent);
+	const rotatingPlaceholder = useRotatingPlaceholder(hasContent, isMobile);
 	// `placeholderOverride` (e.g. "Ask a follow up") wins over the rotating
 	// landing tips so an active conversation gets a stable label.
 	const placeholder = placeholderOverride ?? rotatingPlaceholder;
@@ -414,11 +427,11 @@ export function ChatComposer({
 				</PromptInputFooter>
 			</PromptInput>
 			{isSubmitBlockedResolved && blockedMessage ? (
-				<div className="mt-2 flex items-center justify-between gap-3 rounded-sm border border-info/30 bg-info/[0.08] px-2.5 py-1.5 text-[12px] text-foreground/85">
+				<div className="mt-2 flex flex-col items-stretch gap-2 rounded-sm border border-info/30 bg-info/[0.08] px-2.5 py-1.5 text-[12px] text-foreground/85 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
 					<p className="leading-snug">{blockedMessage}</p>
 					{onOpenOnboarding ? (
 						<Button
-							className="h-6 cursor-pointer rounded-full px-3 text-[12px] font-medium"
+							className="h-7 cursor-pointer rounded-full px-3 text-[12px] font-medium sm:h-6"
 							onClick={onOpenOnboarding}
 							size="sm"
 							type="button"
