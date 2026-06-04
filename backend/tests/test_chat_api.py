@@ -8,7 +8,6 @@ from httpx import AsyncClient
 
 from app.agents.types import AgentSafetyConfig
 from app.models import Workspace  # used via fixture type hint
-from app.providers.catalog import default_model
 from app.providers.gemini import GeminiLLM
 from tests.agent_harness import ScriptedStreamFn, echo_tool, text_turn, tool_call_turn
 
@@ -59,9 +58,15 @@ async def test_chat_returns_412_when_user_has_no_workspace(
     conversation_id = uuid4()
     await client.post(f"/api/v1/conversations/{conversation_id}", json={"title": "NoWS"})
 
+    # Supply a model so the request clears the model_id requirement (422)
+    # and actually reaches the workspace precondition check (412).
     response = await client.post(
         "/api/v1/chat/",
-        json={"question": "hello", "conversation_id": str(conversation_id)},
+        json={
+            "question": "hello",
+            "conversation_id": str(conversation_id),
+            "model_id": "agent-sdk:anthropic/claude-opus-4-7",
+        },
     )
 
     assert response.status_code == 412
@@ -84,7 +89,11 @@ async def test_chat_streams_provider_events(
 
     response = await client.post(
         "/api/v1/chat/",
-        json={"question": "hello", "conversation_id": str(conversation_id)},
+        json={
+            "question": "hello",
+            "conversation_id": str(conversation_id),
+            "model_id": "agent-sdk:anthropic/claude-opus-4-7",
+        },
     )
 
     assert response.status_code == 200
@@ -140,6 +149,7 @@ async def test_chat_forwards_reasoning_effort(
         json={
             "question": "hello",
             "conversation_id": str(conversation_id),
+            "model_id": "agent-sdk:anthropic/claude-opus-4-7",
             "reasoning_effort": "extra-high",
         },
     )
@@ -181,42 +191,31 @@ async def test_chat_persists_requested_model_id(
 
 
 @pytest.mark.anyio
-async def test_chat_falls_back_to_catalog_default_when_no_model_id_given(
+async def test_chat_422_when_no_model_id_given(
     client: AsyncClient,
-    monkeypatch: pytest.MonkeyPatch,
     seeded_default_workspace: Workspace,
 ) -> None:
-    """When neither the request nor the conversation supplies a ``model_id``,
-    the chat handler resolves to ``catalog.default_model().id``.
+    """A model_id is now required — no catalog-default fallback.
 
-    The catalog is the only place that names "the default model"; this
-    guards against a regression where a hardcoded ``_DEFAULT_MODEL``
-    constant in the router silently overrides the catalog.
+    When neither the request body nor the conversation row supplies a
+    ``model_id``, the chat handler rejects the turn with 422 rather than
+    silently resolving the catalog default.  This guards the new contract
+    where "the default model" is no longer chosen implicitly on the API
+    path; the caller must name a model.
     """
+    # Create the conversation without a ``model_id`` so the row has none.
     conversation_id = uuid4()
-    await client.post(f"/api/v1/conversations/{conversation_id}", json={"title": "Default"})
-
-    captured: dict[str, object] = {}
-
-    def _capturing_resolve_llm(model_id: object, **_kwargs: object) -> FakeProvider:
-        captured["model_id"] = model_id
-        return FakeProvider([{"type": "delta", "content": "ok"}])
-
-    monkeypatch.setattr("app.chat.router.resolve_llm", _capturing_resolve_llm)
+    await client.post(f"/api/v1/conversations/{conversation_id}", json={"title": "NoModel"})
 
     # No model_id in the body, and the conversation row has none either,
-    # so the handler must fall through to the catalog default.
+    # so the handler must refuse with 422.
     response = await client.post(
         "/api/v1/chat/",
         json={"question": "hello", "conversation_id": str(conversation_id)},
     )
-    conversation_response = await client.get(f"/api/v1/conversations/{conversation_id}")
 
-    assert response.status_code == 200
-    # The resolver received the catalog default's canonical wire form.
-    assert captured["model_id"] == default_model().id
-    # The conversation persisted that same value.
-    assert conversation_response.json()["model_id"] == default_model().id
+    assert response.status_code == 422
+    assert "model_id is required" in response.json()["detail"]
 
 
 @pytest.mark.anyio
@@ -251,7 +250,11 @@ async def test_chat_stream_converts_provider_exception_to_error_event(
 
     response = await client.post(
         "/api/v1/chat/",
-        json={"question": "hello", "conversation_id": str(conversation_id)},
+        json={
+            "question": "hello",
+            "conversation_id": str(conversation_id),
+            "model_id": "agent-sdk:anthropic/claude-opus-4-7",
+        },
     )
 
     assert response.status_code == 200
@@ -300,7 +303,11 @@ async def test_chat_multi_turn_tool_call_flows_through_full_http_path(
 
     response = await client.post(
         "/api/v1/chat/",
-        json={"question": "echo test", "conversation_id": str(conversation_id)},
+        json={
+            "question": "echo test",
+            "conversation_id": str(conversation_id),
+            "model_id": "agent-sdk:anthropic/claude-opus-4-7",
+        },
     )
 
     assert response.status_code == 200
@@ -368,7 +375,11 @@ async def test_chat_safety_layer_fires_and_surfaces_agent_terminated(
 
     response = await client.post(
         "/api/v1/chat/",
-        json={"question": "go", "conversation_id": str(conversation_id)},
+        json={
+            "question": "go",
+            "conversation_id": str(conversation_id),
+            "model_id": "agent-sdk:anthropic/claude-opus-4-7",
+        },
     )
 
     assert response.status_code == 200

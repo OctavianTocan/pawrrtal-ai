@@ -36,7 +36,7 @@ from app.conversations.crud import (
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.database.legacy import User, get_async_session
 from app.infrastructure.middleware.logging import get_request_id
-from app.providers import StreamEvent, default_model, resolve_llm
+from app.providers import StreamEvent, resolve_llm
 from app.schemas import ChatRequest
 from app.tools.artifact_agent import (
     ARTIFACT_TOOL_NAME,
@@ -261,11 +261,16 @@ def get_chat_router() -> APIRouter:
             )
             raise HTTPException(status_code=404, detail="Conversation not found")
 
-        # Resolve model: request overrides stored model, stored model overrides
-        # catalog default.  Request and stored values are already canonical
-        # (validated by Pydantic at the API boundary); ``default_model().id``
-        # is the canonical wire form of the catalog default.
-        model_id = request.model_id or conversation.model_id or default_model().id
+        # Resolve model: the request overrides the conversation's stored
+        # model. Both are already canonical (validated by Pydantic at the API
+        # boundary). There is no default fallback — a model must be supplied
+        # by the request or already pinned on the conversation.
+        model_id = request.model_id or conversation.model_id
+        if not model_id:
+            raise HTTPException(
+                status_code=422,
+                detail="model_id is required: no model on the request or the conversation",
+            )
 
         # Apply the model switch (if any) and re-normalize the stored
         # reasoning_effort against the current model in a *single*
