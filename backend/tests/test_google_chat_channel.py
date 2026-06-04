@@ -118,6 +118,66 @@ def test_event_extractors_read_message_fields() -> None:
     assert sender_display(event) == "Tavi"
 
 
+def _addon_event(*, text: str = "hello", sender: str = DEV_ADMIN_SENDER) -> dict[str, Any]:
+    """Build a Google Workspace add-on ``MESSAGE`` event (the modern shape).
+
+    Add-on Chat apps wrap the message under ``chat.messagePayload`` and omit
+    the classic top-level ``type``/``message``/``space`` keys. This mirrors a
+    real DM event captured from a live add-on Chat app.
+    """
+    sender_obj = {"name": sender, "displayName": "Tavi", "type": "HUMAN"}
+    return {
+        "commonEventObject": {"userLocale": "en", "hostApp": "CHAT"},
+        "chat": {
+            "user": sender_obj,
+            "messagePayload": {
+                "space": {"name": _SPACE, "type": "DM"},
+                "message": {
+                    "name": f"{_SPACE}/messages/MMMM",
+                    "text": text,
+                    "sender": sender_obj,
+                    "thread": {"name": _THREAD},
+                },
+            },
+        },
+    }
+
+
+def test_addon_event_type_is_message() -> None:
+    # No top-level ``type``; the presence of ``messagePayload`` implies MESSAGE.
+    assert event_type(_addon_event()) == "MESSAGE"
+
+
+def test_addon_event_extractors_read_message_fields() -> None:
+    event = _addon_event(text="add-on hi")
+    assert message_text(event) == "add-on hi"
+    assert space_name(event) == _SPACE
+    assert thread_name(event) == _THREAD
+    assert sender_name(event) == DEV_ADMIN_SENDER
+    assert sender_display(event) == "Tavi"
+
+
+def test_decode_pubsub_message_decodes_addon_event() -> None:
+    ack_id, event = decode_pubsub_message(_pubsub_envelope(_addon_event()))
+    assert ack_id == "ack-1"
+    assert event is not None
+    assert event_type(event) == "MESSAGE"
+    assert message_text(event) == "hello"
+
+
+def test_decode_pubsub_message_handles_url_safe_base64() -> None:
+    # Live add-on payloads arrive URL-safe-encoded; the decoder must fall back
+    # from the standard alphabet to the URL-safe one. The ">>>>" run forces
+    # bytes that differ between the two alphabets so this genuinely exercises it.
+    event = _addon_event(text="payload >>>>>>>> marker")
+    url_safe = base64.urlsafe_b64encode(json.dumps(event).encode("utf-8")).decode("ascii")
+    assert ("-" in url_safe) or ("_" in url_safe)
+    ack_id, decoded = decode_pubsub_message({"ackId": "ack-u", "message": {"data": url_safe}})
+    assert ack_id == "ack-u"
+    assert decoded is not None
+    assert message_text(decoded) == "payload >>>>>>>> marker"
+
+
 # ---------------------------------------------------------------------------
 # channel — delivery (single final patch)
 # ---------------------------------------------------------------------------

@@ -34,22 +34,61 @@ def decode_pubsub_message(received: dict[str, Any]) -> tuple[str | None, dict[st
     data_b64 = envelope.get("data") if isinstance(envelope, dict) else None
     if not isinstance(data_b64, str) or not data_b64:
         return ack_id, None
-    try:
-        raw = base64.b64decode(data_b64)
-        event = json.loads(raw)
-    except (binascii.Error, ValueError, json.JSONDecodeError):
+    event = _b64_to_json(data_b64)
+    if event is None:
         logger.warning("GOOGLE_CHAT_BAD_EVENT_PAYLOAD ack_id=%s", ack_id)
-        return ack_id, None
-    return ack_id, event if isinstance(event, dict) else None
+    return ack_id, event
+
+
+def _b64_to_json(data_b64: str) -> dict[str, Any] | None:
+    """Decode a base64 Chat event payload to a JSON object.
+
+    Pub/Sub delivers the event as standard base64, but Google Workspace
+    add-on events have been observed URL-safe-encoded — so both alphabets
+    are tried. Returns ``None`` when neither yields a JSON object.
+    """
+    padded = data_b64 + "=" * (-len(data_b64) % 4)
+    for decoder in (base64.b64decode, base64.urlsafe_b64decode):
+        try:
+            event = json.loads(decoder(padded))
+        except (binascii.Error, ValueError, json.JSONDecodeError):
+            continue
+        if isinstance(event, dict):
+            return event
+    return None
 
 
 def event_type(event: dict[str, Any]) -> str:
-    """Return the event ``type`` (e.g. ``"MESSAGE"``), or an empty string."""
-    return str(event.get("type") or "")
+    """Return the event ``type`` (e.g. ``"MESSAGE"``), or an empty string.
+
+    Classic Chat Pub/Sub events carry an explicit ``type``. Google Workspace
+    add-on events don't — the type is implied by which ``chat.*Payload`` is
+    present, so a ``messagePayload`` maps to ``MESSAGE``.
+    """
+    explicit = event.get("type")
+    if explicit:
+        return str(explicit)
+    if _addon_payload(event).get("message"):
+        return MESSAGE_EVENT_TYPE
+    return ""
+
+
+def _addon_payload(event: dict[str, Any]) -> dict[str, Any]:
+    """Return the add-on ``chat.messagePayload`` dict, or ``{}``.
+
+    Google Chat apps built as Google Workspace add-ons wrap the event as
+    ``{"commonEventObject": ..., "chat": {"messagePayload": {...}}}`` rather
+    than the classic flat ``{"type", "message", "space"}`` shape.
+    """
+    chat = event.get("chat")
+    payload = chat.get("messagePayload") if isinstance(chat, dict) else None
+    return payload if isinstance(payload, dict) else {}
 
 
 def _message(event: dict[str, Any]) -> dict[str, Any]:
-    message = event.get("message")
+    # Add-on events nest the message under ``chat.messagePayload``; classic
+    # events put it at the top level.
+    message = _addon_payload(event).get("message") or event.get("message")
     return message if isinstance(message, dict) else {}
 
 
@@ -64,10 +103,15 @@ def message_text(event: dict[str, Any]) -> str:
 
 
 def space_name(event: dict[str, Any]) -> str:
-    """Return the ``spaces/{id}`` resource name the message belongs to."""
-    space = event.get("space")
-    name = space.get("name") if isinstance(space, dict) else None
-    return str(name or "")
+    """Return the ``spaces/{id}`` resource name the message belongs to.
+
+    Classic events carry a top-level ``space``; add-on events nest it under
+    the message payload.
+    """
+    for space in (event.get("space"), _addon_payload(event).get("space")):
+        if isinstance(space, dict) and space.get("name"):
+            return str(space["name"])
+    return ""
 
 
 def thread_name(event: dict[str, Any]) -> str | None:
