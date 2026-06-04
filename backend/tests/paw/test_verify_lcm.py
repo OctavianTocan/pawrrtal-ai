@@ -63,7 +63,7 @@ def stable_uuid(monkeypatch: pytest.MonkeyPatch) -> str:
 def _models_payload() -> dict[str, Any]:
     return {
         "models": [
-            {"model_id": DEFAULT_MODEL, "id": DEFAULT_MODEL, "is_default": True},
+            {"model_id": DEFAULT_MODEL, "id": DEFAULT_MODEL},
         ]
     }
 

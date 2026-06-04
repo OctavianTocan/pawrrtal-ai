@@ -75,8 +75,8 @@ def stable_uuid(monkeypatch: pytest.MonkeyPatch) -> str:
 def _models_payload() -> dict[str, Any]:
     return {
         "models": [
-            {"model_id": DEFAULT_MODEL, "id": DEFAULT_MODEL, "is_default": True},
-            {"model_id": "agent-sdk:anthropic/claude-opus-4-7", "is_default": False},
+            {"model_id": DEFAULT_MODEL, "id": DEFAULT_MODEL},
+            {"model_id": "agent-sdk:anthropic/claude-opus-4-7"},
         ]
     }
 
@@ -222,16 +222,12 @@ def test_assistant_status_not_complete_fails(
     assert "assistant_status_complete" in _check_names(payload)
 
 
-def test_no_default_model_in_catalog_fails_resolution(
+def test_empty_catalog_fails_resolution(
     runner: CliRunner, seeded: PersonaState, stable_uuid: str
 ) -> None:
-    """Catalog without ``is_default`` and no ``--model`` trips ``model_resolved``."""
+    """An empty catalog and no ``--model`` trips ``model_resolved``."""
     with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
-        r.get("/api/v1/models").mock(
-            return_value=httpx.Response(
-                200, json={"models": [{"model_id": DEFAULT_MODEL, "is_default": False}]}
-            )
-        )
+        r.get("/api/v1/models").mock(return_value=httpx.Response(200, json={"models": []}))
         result = runner.invoke(app, ["verify", "chat-roundtrip", "--json"])
 
     assert result.exit_code == 6, result.stdout
@@ -242,13 +238,11 @@ def test_no_default_model_in_catalog_fails_resolution(
 def test_model_override_skips_catalog_default(
     runner: CliRunner, seeded: PersonaState, stable_uuid: str
 ) -> None:
-    """``--model`` short-circuits the default lookup."""
+    """``--model`` short-circuits the catalog lookup."""
     with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
-        # Catalog has no is_default; --model should still succeed.
+        # --model is passed, so the catalog is never fetched.
         r.get("/api/v1/models").mock(
-            return_value=httpx.Response(
-                200, json={"models": [{"model_id": DEFAULT_MODEL, "is_default": False}]}
-            )
+            return_value=httpx.Response(200, json={"models": [{"model_id": DEFAULT_MODEL}]})
         )
         r.post(f"/api/v1/conversations/{stable_uuid}").mock(
             return_value=httpx.Response(200, json={"id": stable_uuid, "title": "x"})

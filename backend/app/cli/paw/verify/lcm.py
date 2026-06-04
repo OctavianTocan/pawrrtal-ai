@@ -233,7 +233,7 @@ async def run_lcm_scenario(
     r = ScenarioResult(name="lcm")
     del state  # PersonaState carried by ``client``; kept for runner parity.
 
-    model_id = await helpers.resolve_default_model(client, r, model)
+    model_id = await helpers.resolve_model(client, r, model)
     if model_id is None:
         return r
 

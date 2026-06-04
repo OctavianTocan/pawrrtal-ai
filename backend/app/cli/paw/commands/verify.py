@@ -108,7 +108,7 @@ def verify_chat_roundtrip(
     model: str | None = typer.Option(
         None,
         "--model",
-        help="Override the model id (defaults to catalog `is_default`).",
+        help="Override the model id (defaults to the first catalog model).",
     ),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
@@ -141,12 +141,12 @@ def verify_model_switch(
     from_model: str | None = typer.Option(
         None,
         "--from",
-        help="Starting model id (defaults to catalog `is_default`).",
+        help="Starting model id (defaults to the first catalog model).",
     ),
     to_model: str | None = typer.Option(
         None,
         "--to",
-        help="Model id to switch to (defaults to first non-default catalog entry).",
+        help="Model id to switch to (defaults to the next distinct catalog model).",
     ),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
@@ -227,7 +227,7 @@ def verify_cost(
     model: str | None = typer.Option(
         None,
         "--model",
-        help="Override the model id (defaults to catalog `is_default`).",
+        help="Override the model id (defaults to the first catalog model).",
     ),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
@@ -260,7 +260,7 @@ def verify_lcm(
     model: str | None = typer.Option(
         None,
         "--model",
-        help="Override the model id (defaults to catalog `is_default`).",
+        help="Override the model id (defaults to the first catalog model).",
     ),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
