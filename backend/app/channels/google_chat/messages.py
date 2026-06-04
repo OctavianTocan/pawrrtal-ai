@@ -188,12 +188,15 @@ def attachments_of(event: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def format_for_chat(text: str) -> str:
-    """Format agent markdown for Google Chat.
+    """Convert agent Markdown to Google Chat's text-formatting syntax.
 
-    Google Chat renders a subset of markdown (``*bold*``, ``_italic_``,
-    inline ``code`` and fenced blocks, bullet lists) natively, so v1
-    sends the agent's text through unchanged. A richer markdown→Chat
-    converter (mirroring Telegram's ``html.py``) is the natural next
-    step if formatting fidelity becomes an issue.
+    The agent emits CommonMark, but Chat's ``text`` field renders a
+    different lightweight syntax (``*bold*``, ``_italic_``, ``<url|label>``)
+    and shows Markdown constructs like ``**bold**`` / ``# headings`` /
+    ``[text](url)`` literally. Delegates to
+    :func:`app.channels.google_chat.formatting.md_to_chat`.
     """
-    return text
+    # Lazy import: markdown-it is heavy and only needed while delivering.
+    from .formatting import md_to_chat  # noqa: PLC0415
+
+    return md_to_chat(text)
