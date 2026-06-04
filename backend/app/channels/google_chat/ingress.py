@@ -39,6 +39,7 @@ from .auth import has_google_chat_auth
 from .channel import INITIAL_PLACEHOLDER_TEXT, SURFACE_GOOGLE_CHAT
 from .client import acknowledge, close_google_chat_client, create_message, pull_messages
 from .conversation import get_or_create_google_chat_conversation
+from .delivery import DEFAULT_VERBOSE_LEVEL
 from .dev_admin import resolve_or_autolink_google_chat_user
 from .messages import (
     MESSAGE_EVENT_TYPE,
@@ -174,6 +175,7 @@ class _TurnTarget:
     workspace_root: Path
     workspace_id: uuid.UUID
     model_id: str
+    verbose_level: int
 
 
 async def _resolve_turn_target(event: dict[str, Any]) -> _TurnTarget | None:
@@ -207,6 +209,11 @@ async def _resolve_turn_target(event: dict[str, Any]) -> _TurnTarget | None:
             workspace_root=Path(workspace.path),
             workspace_id=workspace.id,
             model_id=conversation.model_id or default_model().id,
+            verbose_level=(
+                conversation.verbose_level
+                if conversation.verbose_level is not None
+                else DEFAULT_VERBOSE_LEVEL
+            ),
         )
 
 
@@ -275,6 +282,7 @@ async def _handle_message_event(event: dict[str, Any]) -> None:
             "space_name": space,
             "thread_name": thread,
             "message_name": message_name,
+            "verbose_level": target.verbose_level,
         },
     }
     turn_input = ChatTurnInput(
