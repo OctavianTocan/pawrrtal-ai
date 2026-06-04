@@ -21,7 +21,6 @@ function makeModel(overrides: Partial<ChatModelOption> = {}): ChatModelOption {
 		display_name: overrides.display_name ?? 'Claude Sonnet 4.6',
 		short_name: overrides.short_name ?? 'Sonnet 4.6',
 		description: overrides.description ?? 'Balanced reasoning model.',
-		is_default: overrides.is_default ?? false,
 	};
 }
 
@@ -31,7 +30,7 @@ describe('useChatModels', (): void => {
 		vi.stubGlobal('fetch', vi.fn());
 	});
 
-	it('returns the catalog and the default entry on the happy path', async (): Promise<void> => {
+	it('returns the catalog and the FIRST entry as the default on the happy path', async (): Promise<void> => {
 		const sonnet = makeModel({ id: 'agent-sdk:anthropic/claude-sonnet-4-6' });
 		const gemini = makeModel({
 			id: 'google-ai:google/gemini-3-flash-preview',
@@ -40,7 +39,6 @@ describe('useChatModels', (): void => {
 			model: 'gemini-3-flash-preview',
 			display_name: 'Gemini 3 Flash',
 			short_name: 'Gemini 3',
-			is_default: true,
 		});
 		vi.mocked(fetch).mockResolvedValue(Response.json({ models: [sonnet, gemini] }));
 
@@ -53,14 +51,22 @@ describe('useChatModels', (): void => {
 		});
 
 		expect(result.current.models).toEqual([sonnet, gemini]);
-		expect(result.current.default).toEqual(gemini);
+		// Default is the FIRST catalog entry, not a server-declared default.
+		expect(result.current.default).toEqual(sonnet);
 		expect(result.current.error).toBeNull();
 	});
 
-	it('returns null default when the catalog has no entry marked is_default', async (): Promise<void> => {
-		vi.mocked(fetch).mockResolvedValue(
-			Response.json({ models: [makeModel({ is_default: false })] })
-		);
+	it('defaults to the first entry regardless of catalog order', async (): Promise<void> => {
+		const gemini = makeModel({
+			id: 'google-ai:google/gemini-3-flash-preview',
+			host: 'google-ai',
+			vendor: 'google',
+			model: 'gemini-3-flash-preview',
+			display_name: 'Gemini 3 Flash',
+			short_name: 'Gemini 3',
+		});
+		const sonnet = makeModel({ id: 'agent-sdk:anthropic/claude-sonnet-4-6' });
+		vi.mocked(fetch).mockResolvedValue(Response.json({ models: [gemini, sonnet] }));
 
 		const { result } = renderHook(() => useChatModels(), {
 			wrapper: createQueryClientWrapper(createTestQueryClient()),
@@ -70,7 +76,7 @@ describe('useChatModels', (): void => {
 			expect(result.current.isLoading).toBe(false);
 		});
 
-		expect(result.current.default).toBeNull();
+		expect(result.current.default).toEqual(gemini);
 	});
 
 	it('returns null default when the models array is empty', async (): Promise<void> => {
@@ -89,7 +95,7 @@ describe('useChatModels', (): void => {
 	});
 
 	it('surfaces Zod validation failure as the hook error', async (): Promise<void> => {
-		// `is_default` is required by the schema; omit it to trigger a parse failure.
+		// `short_name` is required by the schema; omit it to trigger a parse failure.
 		vi.mocked(fetch).mockResolvedValue(
 			Response.json({
 				models: [
@@ -99,9 +105,8 @@ describe('useChatModels', (): void => {
 						vendor: 'anthropic',
 						model: 'claude-sonnet-4-6',
 						display_name: 'Claude Sonnet 4.6',
-						short_name: 'Sonnet 4.6',
 						description: 'Balanced reasoning model.',
-						// is_default intentionally missing
+						// short_name intentionally missing
 					},
 				],
 			})

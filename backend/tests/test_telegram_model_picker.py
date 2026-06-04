@@ -27,7 +27,7 @@ from app.channels.telegram.model_picker import (
 )
 from app.channels.telegram.sender import TelegramSender
 from app.infrastructure.config import settings
-from app.providers.catalog import MODEL_CATALOG, default_model
+from app.providers.catalog import MODEL_CATALOG, first_catalog_model
 from app.providers.model_id import Host
 
 
@@ -115,7 +115,7 @@ def test_vendor_keyboard_back_button_returns_to_host_screen() -> None:
 
 
 def test_model_keyboard_marks_current_and_resolves_selection() -> None:
-    current = default_model()
+    current = first_catalog_model()
     rows = build_models_keyboard(
         host=current.host.value,
         vendor=current.vendor.value,
@@ -214,9 +214,9 @@ def test_host_keyboard_hides_unauthenticated_providers(
 
 
 def test_host_picker_text_displays_known_model_name() -> None:
-    text = format_host_picker_text(default_model().id)
-    assert default_model().display_name in text
-    assert default_model().id not in text
+    text = format_host_picker_text(first_catalog_model().id)
+    assert first_catalog_model().display_name in text
+    assert first_catalog_model().id not in text
 
 
 def test_vendor_picker_text_includes_host_label() -> None:
@@ -275,9 +275,9 @@ async def test_get_model_picker_state_reads_conversation_override() -> None:
 
 @pytest.mark.anyio
 async def test_get_model_picker_state_falls_back_to_catalog_default() -> None:
-    """When the conversation has no override, the catalog default surfaces."""
+    """When the conversation has no override, the positional fallback surfaces."""
     sender = TelegramSender(user_id=3, chat_id=3, username=None, full_name=None)
-    fallback = default_model().id
+    fallback = first_catalog_model().id
     conversation = SimpleNamespace(model_id=None)
 
     with (

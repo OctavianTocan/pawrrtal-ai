@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from .base import AILLM, ReasoningEffort, StreamEvent
 
 if TYPE_CHECKING:
-    from .catalog import default_model, first_catalog_model
+    from .catalog import first_catalog_model
     from .claude import ClaudeLLM, ClaudeLLMConfig
     from .factory import resolve_llm
     from .gemini_cli import GeminiCliLLM, is_gemini_cli_available
@@ -21,7 +21,6 @@ __all__ = [
     "ReasoningEffort",
     "StreamEvent",
     "XaiLLM",
-    "default_model",
     "first_catalog_model",
     "is_gemini_cli_available",
     "resolve_llm",
@@ -35,10 +34,6 @@ def __getattr__(name: str) -> object:
     modules. The CLI and schemas use the base types frequently, and eager
     imports used to leak LiteLLM warnings into unrelated JSON commands.
     """
-    if name == "default_model":
-        from .catalog import default_model  # noqa: PLC0415
-
-        return default_model
     if name == "first_catalog_model":
         from .catalog import first_catalog_model  # noqa: PLC0415
 

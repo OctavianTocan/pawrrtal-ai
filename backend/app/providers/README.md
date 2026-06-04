@@ -52,7 +52,6 @@ The model catalog in [catalog.py](file:///Volumes/WorkDriveExternal/Projects/Per
 Every model is registered as a `ModelEntry` dataclass carrying:
 * Core identity: `host`, `vendor`, and `model`.
 * UI metadata: `display_name`, `short_name`, and `description`.
-* Default flag: `is_default` (enforced at import time to ensure exactly one exists).
 * Pricing rates: `cost_per_mtok_in_usd` and `cost_per_mtok_out_usd`.
 
 ### B. Request Revalidation with ETag
