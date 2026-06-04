@@ -33,7 +33,7 @@ from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
 from app.models import Conversation
 from app.providers.base import AILLM
-from app.providers.catalog import default_model
+from app.providers.catalog import first_catalog_model
 from app.providers.factory import resolve_llm
 from app.providers.model_id import InvalidModelId, UnknownModelId
 from app.workspace.crud import get_default_workspace
@@ -319,7 +319,7 @@ async def _resolve_turn_target(event: dict[str, Any]) -> _TurnTarget | None:
             conversation_id=conversation.id,
             workspace_root=Path(workspace.path),
             workspace_id=workspace.id,
-            model_id=conversation.model_id or default_model().id,
+            model_id=conversation.model_id or first_catalog_model().id,
             verbose_level=(
                 conversation.verbose_level
                 if conversation.verbose_level is not None
@@ -329,17 +329,17 @@ async def _resolve_turn_target(event: dict[str, Any]) -> _TurnTarget | None:
 
 
 def _resolve_provider(model_id: str, workspace_root: Path) -> tuple[AILLM, str]:
-    """Resolve a provider, falling back to the catalog default on a bad id.
+    """Resolve a provider, falling back to the first catalog entry on a bad id.
 
     Returns ``(provider, effective_model_id)`` so the channel envelope and
-    cost ledger record the model actually used. The catalog default is a
+    cost ledger record the model actually used. The first catalog entry is a
     tool-forwarding model, so this also keeps the channel off the
     tool-dropping CLI hosts by default.
     """
     try:
         return resolve_llm(model_id, workspace_root=workspace_root), model_id
     except (InvalidModelId, UnknownModelId) as exc:
-        fallback = default_model().id
+        fallback = first_catalog_model().id
         logger.warning(
             "GOOGLE_CHAT_MODEL_FALLBACK model=%s fallback=%s reason=%s",
             model_id,

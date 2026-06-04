@@ -11,7 +11,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.infrastructure.config import settings
-from app.providers.catalog import default_model
+from app.providers.catalog import first_catalog_model
 from app.schemas import ChatRequest, ConversationRead
 
 
@@ -34,7 +34,7 @@ def _read_row(model_id: str | None) -> dict[str, object]:
 
 
 def test_canonical_value_passes_through_unchanged() -> None:
-    canonical = default_model().id
+    canonical = first_catalog_model().id
     read = ConversationRead.model_validate(_read_row(canonical))
     assert read.model_id == canonical
 
@@ -51,7 +51,7 @@ def test_permissive_mode_falls_back_to_default(
     monkeypatch.setattr(settings, "strict_conversation_read_validation", False)
     with caplog.at_level(logging.WARNING, logger="app.schemas"):
         read = ConversationRead.model_validate(_read_row("gemini-3-flash-preview"))
-    assert read.model_id == default_model().id
+    assert read.model_id == first_catalog_model().id
     assert any("CONVERSATION_READ_FALLBACK" in r.message for r in caplog.records)
 
 

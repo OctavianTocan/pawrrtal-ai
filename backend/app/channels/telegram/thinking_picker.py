@@ -30,8 +30,8 @@ from app.providers.catalog import (
     CATALOG_ETAG,
     MODEL_CATALOG,
     ModelEntry,
-    default_model,
     find,
+    first_catalog_model,
 )
 from app.providers.model_id import InvalidModelId, parse_model_id
 
@@ -137,7 +137,7 @@ async def get_thinking_picker_state(
     )
 
     model_id = resolve_effective_model_id(conversation_model_id=conversation.model_id)
-    entry = _resolve_entry(model_id) or default_model()
+    entry = _resolve_entry(model_id) or first_catalog_model()
     return ThinkingPickerState(
         model_entry=entry,
         current_effort=conversation.reasoning_effort,

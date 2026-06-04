@@ -33,7 +33,7 @@ from app.infrastructure.event_bus.types import (
     ScheduledEvent,
     WebhookEvent,
 )
-from app.providers import default_model, resolve_llm
+from app.providers import first_catalog_model, resolve_llm
 
 logger = logging.getLogger(__name__)
 
@@ -429,7 +429,7 @@ async def _run_agent_turn(*, prompt: str, user_id: uuid.UUID) -> str:
     # per-user key resolution upstream. Kept for call-site symmetry.
     _ = user_id
     provider = resolve_llm(
-        default_model().id,
+        first_catalog_model().id,
         workspace_root=workspace_root,
     )
 

@@ -8,7 +8,7 @@ from google import genai
 from google.genai import types
 
 from app.infrastructure.config import settings
-from app.providers.catalog import default_model
+from app.providers.catalog import first_catalog_model
 
 
 @cache
@@ -25,10 +25,10 @@ async def generate_text_once(prompt: str, model_id: str | None = None) -> str:
 
     ``model_id`` is the **bare** Gemini slug (e.g.
     ``"gemini-3-flash-preview"``) — the Gemini SDK rejects host-prefixed
-    canonical IDs.  When ``None``, falls back to the catalog default's
-    bare slug so changes to the catalog default propagate uniformly.
+    canonical IDs.  When ``None``, falls back to the first catalog
+    entry's bare slug so changes to the catalog propagate uniformly.
     """
-    resolved_model_id = model_id if model_id is not None else default_model().model
+    resolved_model_id = model_id if model_id is not None else first_catalog_model().model
     client = _get_client()
     # Annotate as the published union so the literal isn't inferred as
     # ``list[Content]`` (which the SDK's overloaded ``contents=`` param
