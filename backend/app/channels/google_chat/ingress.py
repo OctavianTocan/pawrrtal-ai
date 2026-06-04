@@ -24,11 +24,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.agents.tools import build_agent_tools
 from app.channels.base import ChannelMessage
 from app.channels.turn_runner import ChatTurnInput, run_turn
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
+from app.models import Conversation
 from app.providers.base import AILLM
 from app.providers.catalog import default_model
 from app.providers.factory import resolve_llm
@@ -146,7 +149,16 @@ async def _pull_loop(stop_event: asyncio.Event) -> None:
 
 
 async def _pull_once() -> bool:
-    """Run one pull/process/ack cycle. Returns whether work was done."""
+    """Run one pull → ack → process cycle. Returns whether work was done.
+
+    Messages are acknowledged *before* their turns run. A real ``run_turn``
+    routinely exceeds Pub/Sub's ~10s ack deadline and the channel does no
+    lease extension, so acking *after* processing lets Pub/Sub redeliver the
+    message mid-turn — producing a duplicate turn, duplicate persisted
+    messages, double cost, and two replies. Acking first is at-most-once,
+    which matches the loop's existing "ack even on failure" intent
+    (``_maybe_handle`` swallows and logs its own errors).
+    """
     received = await pull_messages(
         project_id=google_chat_settings.google_chat_project_id,
         subscription_id=google_chat_settings.google_chat_subscription_id,
@@ -155,16 +167,19 @@ async def _pull_once() -> bool:
     if not received:
         return False
     ack_ids: list[str] = []
+    events: list[dict[str, Any] | None] = []
     for item in received:
         ack_id, event = decode_pubsub_message(item)
         if ack_id:
             ack_ids.append(ack_id)
-        await _maybe_handle(event)
+        events.append(event)
     await acknowledge(
         project_id=google_chat_settings.google_chat_project_id,
         subscription_id=google_chat_settings.google_chat_subscription_id,
         ack_ids=ack_ids,
     )
+    for event in events:
+        await _maybe_handle(event)
     return True
 
 
@@ -189,6 +204,35 @@ async def _maybe_handle(event: dict[str, Any] | None) -> None:
         logger.exception("GOOGLE_CHAT_HANDLE_ERR space=%s", space_name(event))
 
 
+@dataclass
+class _ResolvedSender:
+    """The bound Pawrrtal user + their Google Chat conversation."""
+
+    user_id: uuid.UUID
+    conversation: Conversation
+
+
+async def _resolve_sender(event: dict[str, Any], session: AsyncSession) -> _ResolvedSender | None:
+    """Resolve the inbound sender to a bound user + conversation, or ``None``.
+
+    Single-sources the dev-admin auto-link + unbound-sender policy shared by
+    the command, card-click, and message-turn paths: an unbound sender is
+    logged once here and the caller skips. ``space_name`` / ``sender_*`` read
+    the message, command, and card-click event shapes alike.
+    """
+    user_id = await resolve_or_autolink_google_chat_user(
+        session=session,
+        external_user_id=sender_name(event),
+        space_name=space_name(event),
+        display=sender_display(event),
+    )
+    if user_id is None:
+        logger.info("GOOGLE_CHAT_UNBOUND_SENDER sender=%s", sender_name(event))
+        return None
+    conversation = await get_or_create_google_chat_conversation(user_id=user_id, session=session)
+    return _ResolvedSender(user_id=user_id, conversation=conversation)
+
+
 async def _handle_command_event(event: dict[str, Any], parsed: tuple[str, str]) -> None:
     """Resolve identity, then post a picker card (no-arg picker) or a text reply."""
     command, args = parsed
@@ -198,25 +242,16 @@ async def _handle_command_event(event: dict[str, Any], parsed: tuple[str, str]) 
     card: list[dict[str, Any]] | None = None
     reply: str | None = None
     async with async_session_maker() as session:
-        user_id = await resolve_or_autolink_google_chat_user(
-            session=session,
-            external_user_id=sender_name(event),
-            space_name=space,
-            display=sender_display(event),
-        )
-        if user_id is None:
-            logger.info("GOOGLE_CHAT_UNBOUND_SENDER sender=%s", sender_name(event))
+        resolved = await _resolve_sender(event, session)
+        if resolved is None:
             return
-        conversation = await get_or_create_google_chat_conversation(
-            user_id=user_id, session=session
-        )
-        card = picker_card_for(command, conversation) if not args else None
+        card = picker_card_for(command, resolved.conversation) if not args else None
         if card is None:
             reply = await dispatch_command(
                 command=command,
                 ctx=CommandContext(
-                    user_id=user_id,
-                    conversation=conversation,
+                    user_id=resolved.user_id,
+                    conversation=resolved.conversation,
                     args=args,
                     sender_resource=sender_name(event),
                     sender_email=sender_email(event),
@@ -237,23 +272,14 @@ async def _handle_card_click(event: dict[str, Any]) -> None:
         return
     cards: list[dict[str, Any]] | None = None
     async with async_session_maker() as session:
-        user_id = await resolve_or_autolink_google_chat_user(
-            session=session,
-            external_user_id=sender_name(event),
-            space_name=space_name(event),
-            display=sender_display(event),
-        )
-        if user_id is None:
-            logger.info("GOOGLE_CHAT_UNBOUND_SENDER sender=%s", sender_name(event))
+        resolved = await _resolve_sender(event, session)
+        if resolved is None:
             return
-        conversation = await get_or_create_google_chat_conversation(
-            user_id=user_id, session=session
-        )
         cards = await apply_card_click(
             function=invoked_function(event),
             params=invoked_parameters(event),
-            user_id=user_id,
-            conversation=conversation,
+            user_id=resolved.user_id,
+            conversation=resolved.conversation,
             session=session,
         )
     if cards is not None:
@@ -279,26 +305,17 @@ async def _resolve_turn_target(event: dict[str, Any]) -> _TurnTarget | None:
     dev-admin) or has no workspace yet — both are logged and skipped.
     """
     async with async_session_maker() as session:
-        user_id = await resolve_or_autolink_google_chat_user(
-            session=session,
-            external_user_id=sender_name(event),
-            space_name=space_name(event),
-            display=sender_display(event),
-        )
-        if user_id is None:
-            logger.info("GOOGLE_CHAT_UNBOUND_SENDER sender=%s", sender_name(event))
+        resolved = await _resolve_sender(event, session)
+        if resolved is None:
             return None
-        workspace = await get_default_workspace(user_id, session)
+        workspace = await get_default_workspace(resolved.user_id, session)
         if workspace is None:
-            logger.warning("GOOGLE_CHAT_NO_WORKSPACE user_id=%s", user_id)
+            logger.warning("GOOGLE_CHAT_NO_WORKSPACE user_id=%s", resolved.user_id)
             return None
-        conversation = await get_or_create_google_chat_conversation(
-            user_id=user_id,
-            session=session,
-        )
+        conversation = resolved.conversation
         # Read the plain column values while the row is still attached.
         return _TurnTarget(
-            user_id=user_id,
+            user_id=resolved.user_id,
             conversation_id=conversation.id,
             workspace_root=Path(workspace.path),
             workspace_id=workspace.id,

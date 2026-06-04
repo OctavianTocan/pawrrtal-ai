@@ -867,6 +867,41 @@ async def test_apply_card_click_set_model_persists(command_ctx: CommandContext) 
 
 
 # ---------------------------------------------------------------------------
+# ingress — pull loop + click-space resolution
+# ---------------------------------------------------------------------------
+
+
+def test_space_name_resolved_from_button_click() -> None:
+    # A card click carries its space under buttonClickedPayload, not messagePayload.
+    event = _click_event(function="gchat_set_verbose", value="2")
+    assert space_name(event) == _SPACE
+
+
+async def test_pull_once_acks_before_handling(monkeypatch: pytest.MonkeyPatch) -> None:
+    # H1 regression guard: messages must be acked BEFORE their (potentially
+    # slow) turns run, or Pub/Sub redelivers mid-turn → duplicate replies.
+    import app.channels.google_chat.ingress as ingress_module
+
+    order: list[str] = []
+
+    async def _fake_pull(**_kwargs: Any) -> list[dict[str, Any]]:
+        return [_pubsub_envelope(_addon_event())]
+
+    async def _fake_ack(**_kwargs: Any) -> None:
+        order.append("ack")
+
+    async def _fake_handle(_event: dict[str, Any] | None) -> None:
+        order.append("handle")
+
+    monkeypatch.setattr(ingress_module, "pull_messages", _fake_pull)
+    monkeypatch.setattr(ingress_module, "acknowledge", _fake_ack)
+    monkeypatch.setattr(ingress_module, "_maybe_handle", _fake_handle)
+
+    assert await ingress_module._pull_once() is True
+    assert order == ["ack", "handle"]
+
+
+# ---------------------------------------------------------------------------
 # dev_admin — single-user auto-link
 # ---------------------------------------------------------------------------
 

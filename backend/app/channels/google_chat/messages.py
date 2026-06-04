@@ -48,7 +48,7 @@ def _b64_to_json(data_b64: str) -> dict[str, Any] | None:
     are tried. Returns ``None`` when neither yields a JSON object.
     """
     padded = data_b64 + "=" * (-len(data_b64) % 4)
-    for decoder in (base64.b64decode, base64.urlsafe_b64decode):
+    for decoder in (_strict_b64decode, base64.urlsafe_b64decode):
         try:
             event = json.loads(decoder(padded))
         except (binascii.Error, ValueError, json.JSONDecodeError):
@@ -56,6 +56,16 @@ def _b64_to_json(data_b64: str) -> dict[str, Any] | None:
         if isinstance(event, dict):
             return event
     return None
+
+
+def _strict_b64decode(data: str) -> bytes:
+    """Standard base64 decode that *rejects* URL-safe chars (``validate=True``).
+
+    Strictness is deliberate: a URL-safe payload (containing ``-``/``_``) then
+    raises here and falls through to the URL-safe decoder, instead of being
+    silently mis-decoded into bytes that merely happen to fail ``json.loads``.
+    """
+    return base64.b64decode(data, validate=True)
 
 
 def event_type(event: dict[str, Any]) -> str:
@@ -96,6 +106,18 @@ def _chat_user(event: dict[str, Any]) -> dict[str, Any]:
     return user if isinstance(user, dict) else {}
 
 
+def _button_clicked_payload(event: dict[str, Any]) -> dict[str, Any]:
+    """Return the add-on ``chat.buttonClickedPayload`` dict, or ``{}``.
+
+    Card-button clicks arrive under this key (not ``messagePayload`` /
+    ``appCommandPayload``); it carries the clicked card's ``message`` and the
+    ``space`` the click happened in.
+    """
+    chat = event.get("chat")
+    payload = chat.get("buttonClickedPayload") if isinstance(chat, dict) else None
+    return payload if isinstance(payload, dict) else {}
+
+
 def _message(event: dict[str, Any]) -> dict[str, Any]:
     # Add-on events nest the message under ``chat.messagePayload``; classic
     # events put it at the top level.
@@ -114,12 +136,19 @@ def message_text(event: dict[str, Any]) -> str:
 
 
 def space_name(event: dict[str, Any]) -> str:
-    """Return the ``spaces/{id}`` resource name the message belongs to.
+    """Return the ``spaces/{id}`` resource name the event belongs to.
 
-    Classic events carry a top-level ``space``; add-on events nest it under
-    the message payload.
+    Classic events carry a top-level ``space``; add-on message/command events
+    nest it under the payload; card-button clicks carry it under
+    ``buttonClickedPayload`` — all three are checked so a click resolves its
+    space too.
     """
-    for space in (event.get("space"), _addon_payload(event).get("space")):
+    candidates = (
+        event.get("space"),
+        _addon_payload(event).get("space"),
+        _button_clicked_payload(event).get("space"),
+    )
+    for space in candidates:
         if isinstance(space, dict) and space.get("name"):
             return str(space["name"])
     return ""
@@ -205,9 +234,7 @@ def clicked_message_name(event: dict[str, Any]) -> str:
     Lives at ``chat.buttonClickedPayload.message.name``; it's the resource a
     Pub/Sub app patches to reflect the click.
     """
-    chat = event.get("chat")
-    payload = chat.get("buttonClickedPayload") if isinstance(chat, dict) else None
-    message = payload.get("message") if isinstance(payload, dict) else None
+    message = _button_clicked_payload(event).get("message")
     name = message.get("name") if isinstance(message, dict) else None
     return str(name or "")
 
