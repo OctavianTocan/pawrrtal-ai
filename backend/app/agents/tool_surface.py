@@ -37,7 +37,6 @@ from app.plugins.adapters.tools import build_snapshot_agent_tools
 from app.plugins.errors import PluginError
 from app.plugins.host import get_plugin_host
 from app.plugins.tool_context import ToolContext
-from app.providers.catalog import first_authenticated_catalog_model
 from app.tools.lcm_agents import (
     make_lcm_describe_tool,
     make_lcm_expand_query_tool,
@@ -102,7 +101,8 @@ def build_agent_tools(
             their queries.  Omitted in non-chat call sites.
         model_id: Active model id — used by ``lcm_expand_query`` to
             pick which provider to send the focused recall prompt to.
-            Falls back to a sane default when not supplied.
+            When omitted, ``lcm_expand_query`` is not exposed because it
+            needs a concrete model for its LLM sub-call.
         external_mcp_configs: Optional list of user-configured external
             MCP server entries (``{"name", "config"}``). Each entry's
             tools are discovered and appended as cross-provider
@@ -152,17 +152,16 @@ def build_agent_tools(
         tools.append(make_lcm_search_tool(conversation_id=conversation_id))
         tools.append(make_lcm_list_summaries_tool(conversation_id=conversation_id))
         tools.append(make_lcm_describe_tool(conversation_id=conversation_id))
-        if user_id is not None:
-            expand_model_id = model_id or first_authenticated_catalog_model(workspace_root).id
+        if user_id is not None and model_id:
             # The lcm_expand_query tool needs a concrete model to run its
-            # sub-query. Channel callers normally pass a resolved model_id, but
-            # webhook/Telegram paths can still build tools before that happens;
-            # use the workspace-authenticated catalog head for those cases.
+            # sub-query, so it's only added when the turn carries a resolved
+            # model. There is no default fallback — the chat router requires a
+            # model and the channels resolve one before building tools.
             tools.append(
                 make_lcm_expand_query_tool(
                     conversation_id=conversation_id,
                     user_id=user_id,
-                    model_id=expand_model_id,
+                    model_id=model_id,
                 )
             )
 
