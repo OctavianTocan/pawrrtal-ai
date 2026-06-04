@@ -14,6 +14,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import get_args
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,12 +24,15 @@ from app.channels.crud import (
     update_conversation_reasoning_effort,
     update_conversation_verbose_level,
 )
+from app.infrastructure.keys import load_workspace_env, save_workspace_env
 from app.models import Conversation
 from app.providers.base import ReasoningEffort
 from app.providers.catalog import default_model
+from app.workspace.crud import get_default_workspace
 
 from .conversation import start_new_google_chat_conversation
 from .delivery import DEFAULT_VERBOSE_LEVEL
+from .lcm_commands import lcm_status_text, run_compaction
 
 # Reasoning levels the model layer understands, plus "none" to clear the
 # override. Sourced from the real ``ReasoningEffort`` literal so this never
@@ -49,9 +53,21 @@ COMMAND_MENU: tuple[tuple[str, str], ...] = (
     ("model", "Show or set the model for this conversation"),
     ("thinking", "Show or set reasoning effort (none|low|medium|high)"),
     ("verbose", "Set detail level: 0 quiet, 1 tools, 2 thinking"),
+    ("config", "Toggle workspace features (active recall, search)"),
     ("status", "Show model, verbosity, and reasoning for this conversation"),
     ("whoami", "Show your Chat identity and Pawrrtal binding"),
+    ("lcm", "Show long-context-memory status"),
+    ("compact", "Force a memory-compaction pass now"),
+    ("stop", "How to interrupt a run on this channel"),
 )
+
+# /config workspace toggles: name → (env key, label, default-on).
+_CONFIG_TOGGLES: dict[str, tuple[str, str, bool]] = {
+    "active_recall": ("ACTIVE_RECALL_ENABLED", "Active Recall", True),
+    "search_workspace": ("ACTIVE_RECALL_SEARCH_WORKSPACE", "Search Workspace", False),
+}
+# "/config <toggle> <on|off>" → exactly two space-separated args.
+_CONFIG_TOGGLE_ARGS = 2
 
 
 @dataclass
@@ -157,6 +173,67 @@ async def _cmd_verbose(ctx: CommandContext) -> str:
     return f"✅ Verbosity set to {level} ({_VERBOSE_LABELS[level]})."
 
 
+async def _cmd_config(ctx: CommandContext) -> str:
+    workspace = await get_default_workspace(ctx.user_id, ctx.session)
+    if workspace is None:
+        return "No workspace yet — send a message first to set one up."
+    root = Path(workspace.path)
+    env = load_workspace_env(root)
+    if not ctx.args:
+        return config_status_text(env)
+    return apply_config_toggle(root, env, ctx.args)
+
+
+async def _cmd_lcm(ctx: CommandContext) -> str:
+    return await lcm_status_text(conversation_id=ctx.conversation.id, session=ctx.session)
+
+
+async def _cmd_compact(ctx: CommandContext) -> str:
+    model_id = ctx.conversation.model_id or default_model().id
+    return await run_compaction(
+        conversation_id=ctx.conversation.id, user_id=ctx.user_id, model_id=model_id
+    )
+
+
+async def _cmd_stop(ctx: CommandContext) -> str:
+    # The pull loop processes one message at a time, so there's no concurrent
+    # run a separate /stop could cancel — be honest rather than pretend.
+    return (
+        "Pawrrtal handles one message at a time on Google Chat, so there's no "
+        "separate run to stop. Use /new to start a fresh conversation."
+    )
+
+
+def config_status_text(env: dict[str, str]) -> str:
+    """Render the current workspace toggle states from a decoded env dict."""
+    lines = ["*Workspace config*"]
+    for name, (key, label, default) in _CONFIG_TOGGLES.items():
+        on = _env_bool(env.get(key), default)
+        lines.append(f"• {label}: {'on' if on else 'off'}  — `/config {name} on|off`")
+    return "\n".join(lines)
+
+
+def apply_config_toggle(root: Path, env: dict[str, str], args: str) -> str:
+    """Parse ``<toggle> <on|off>``, persist it to the workspace env, and confirm."""
+    parts = args.split()
+    if len(parts) != _CONFIG_TOGGLE_ARGS or parts[1].lower() not in {"on", "off"}:
+        return "Usage: `/config <active_recall|search_workspace> <on|off>`"
+    name, state = parts[0].lower(), parts[1].lower()
+    toggle = _CONFIG_TOGGLES.get(name)
+    if toggle is None:
+        return f"Unknown toggle '{name}'. Choose: {', '.join(_CONFIG_TOGGLES)}."
+    key, label, _default = toggle
+    env[key] = "true" if state == "on" else "false"
+    save_workspace_env(root, env)
+    return f"✅ {label} set to {state}."
+
+
+def _env_bool(value: str | None, default: bool) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() == "true"
+
+
 _HANDLERS: dict[str, Callable[[CommandContext], Awaitable[str]]] = {
     "help": _cmd_help,
     "new": _cmd_new,
@@ -165,4 +242,8 @@ _HANDLERS: dict[str, Callable[[CommandContext], Awaitable[str]]] = {
     "model": _cmd_model,
     "thinking": _cmd_thinking,
     "verbose": _cmd_verbose,
+    "config": _cmd_config,
+    "lcm": _cmd_lcm,
+    "compact": _cmd_compact,
+    "stop": _cmd_stop,
 }

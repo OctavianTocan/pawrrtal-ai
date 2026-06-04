@@ -35,9 +35,12 @@ from app.channels.google_chat import attachments as attachments_module
 from app.channels.google_chat import delivery as delivery_module
 from app.channels.google_chat.attachments import collect_attachments
 from app.channels.google_chat.cards import (
+    FN_MODEL_HOST,
+    FN_SET_MODEL,
     FN_SET_THINKING,
     FN_SET_VERBOSE,
     apply_card_click,
+    model_host_card,
     picker_card_for,
     thinking_picker_card,
     verbose_picker_card,
@@ -50,6 +53,8 @@ from app.channels.google_chat.channel import (
 from app.channels.google_chat.commands import (
     COMMAND_MENU,
     CommandContext,
+    apply_config_toggle,
+    config_status_text,
     dispatch_command,
 )
 from app.channels.google_chat.conversation import get_or_create_google_chat_conversation
@@ -59,6 +64,7 @@ from app.channels.google_chat.dev_admin import (
     resolve_or_autolink_google_chat_user,
 )
 from app.channels.google_chat.formatting import md_to_chat
+from app.channels.google_chat.lcm_commands import lcm_status_text, run_compaction
 from app.channels.google_chat.messages import (
     attachments_of,
     clicked_message_name,
@@ -753,6 +759,111 @@ async def test_apply_card_click_unknown_function_returns_none(command_ctx: Comma
         session=command_ctx.session,
     )
     assert cards is None
+
+
+# ---------------------------------------------------------------------------
+# commands — parity (config / lcm / compact / stop) + model picker
+# ---------------------------------------------------------------------------
+
+
+async def test_command_stop_explains_pull_model(command_ctx: CommandContext) -> None:
+    reply = await dispatch_command(command="stop", ctx=command_ctx)
+    assert "one message at a time" in reply.lower()
+
+
+async def test_command_config_without_workspace(command_ctx: CommandContext) -> None:
+    # The fixture user has no workspace, so /config reports that cleanly.
+    reply = await dispatch_command(command="config", ctx=command_ctx)
+    assert "workspace" in reply.lower()
+
+
+def test_config_status_text_shows_defaults() -> None:
+    text = config_status_text({})
+    assert "Active Recall: on" in text
+    assert "Search Workspace: off" in text
+
+
+def test_config_toggle_round_trip(tmp_path: Path) -> None:
+    reply = apply_config_toggle(tmp_path, {}, "active_recall off")
+    assert "Active Recall set to off" in reply
+    from app.infrastructure.keys import load_workspace_env
+
+    assert load_workspace_env(tmp_path).get("ACTIVE_RECALL_ENABLED") == "false"
+
+
+def test_config_toggle_rejects_bad_args(tmp_path: Path) -> None:
+    assert "Usage" in apply_config_toggle(tmp_path, {}, "active_recall maybe")
+
+
+async def test_lcm_status_disabled(
+    monkeypatch: pytest.MonkeyPatch, command_ctx: CommandContext
+) -> None:
+    monkeypatch.setattr(settings, "lcm_enabled", False)
+    text = await lcm_status_text(
+        conversation_id=command_ctx.conversation.id, session=command_ctx.session
+    )
+    assert "disabled" in text.lower()
+
+
+async def test_lcm_status_enabled_empty_conversation(
+    monkeypatch: pytest.MonkeyPatch, command_ctx: CommandContext
+) -> None:
+    monkeypatch.setattr(settings, "lcm_enabled", True)
+    text = await lcm_status_text(
+        conversation_id=command_ctx.conversation.id, session=command_ctx.session
+    )
+    assert "LCM status" in text
+    assert "0 messages" in text
+
+
+async def test_run_compaction_disabled(
+    monkeypatch: pytest.MonkeyPatch, command_ctx: CommandContext
+) -> None:
+    monkeypatch.setattr(settings, "lcm_enabled", False)
+    text = await run_compaction(
+        conversation_id=command_ctx.conversation.id, user_id=command_ctx.user_id, model_id="x"
+    )
+    assert "disabled" in text.lower()
+
+
+def test_model_host_card_targets_host_handler() -> None:
+    buttons = _picker_buttons(model_host_card(None))
+    assert buttons
+    assert all(b["onClick"]["action"]["function"] == FN_MODEL_HOST for b in buttons)
+
+
+async def test_picker_card_for_model(command_ctx: CommandContext) -> None:
+    assert picker_card_for("model", command_ctx.conversation) is not None
+
+
+async def test_apply_card_click_model_host_drills_down(command_ctx: CommandContext) -> None:
+    from app.providers.catalog import MODEL_CATALOG
+
+    host = MODEL_CATALOG[0].id.split(":", 1)[0]
+    cards = await apply_card_click(
+        function=FN_MODEL_HOST,
+        params={"host": host},
+        user_id=command_ctx.user_id,
+        conversation=command_ctx.conversation,
+        session=command_ctx.session,
+    )
+    assert cards is not None
+    assert all(b["onClick"]["action"]["function"] == FN_SET_MODEL for b in _picker_buttons(cards))
+
+
+async def test_apply_card_click_set_model_persists(command_ctx: CommandContext) -> None:
+    from app.providers.catalog import MODEL_CATALOG
+
+    model_id = MODEL_CATALOG[0].id
+    cards = await apply_card_click(
+        function=FN_SET_MODEL,
+        params={"value": model_id},
+        user_id=command_ctx.user_id,
+        conversation=command_ctx.conversation,
+        session=command_ctx.session,
+    )
+    assert cards is not None
+    assert command_ctx.conversation.model_id == model_id
 
 
 # ---------------------------------------------------------------------------
