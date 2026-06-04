@@ -28,6 +28,7 @@ from app.cli.paw.commands.verify_lazy import (
     run_chat_roundtrip_scenario,
     run_codex_scenario,
     run_cost_scenario,
+    run_google_chat_scenario,
     run_lcm_scenario,
     run_model_switch_scenario,
     run_telegram_scenario,
@@ -50,7 +51,15 @@ from app.cli.paw.verify.scenarios import ScenarioResult
 # ``cost`` because it depends on chat completing (same as ``cost``) but
 # only asserts on the read-only LCM debug endpoint — running last keeps
 # the chat-dependent suites grouped together.
-DEFAULT_SUITES = ("codex", "chat-roundtrip", "model-switch", "telegram", "cost", "lcm")
+DEFAULT_SUITES = (
+    "codex",
+    "chat-roundtrip",
+    "model-switch",
+    "telegram",
+    "google-chat",
+    "cost",
+    "lcm",
+)
 SCENARIO_HTTP_TIMEOUT_SECONDS = 120.0
 
 app = typer.Typer(
@@ -187,6 +196,29 @@ def verify_telegram(
     state = _load_state(profile)
     result = asyncio.run(_run_one(state, lambda client: run_telegram_scenario(state, client)))
     _emit_and_exit(result, json_out=json_out, label="telegram")
+
+
+@app.command("google-chat")
+def verify_google_chat(
+    profile: str = typer.Option("default", "--profile"),
+    json_out: bool = typer.Option(False, "--json"),
+) -> None:
+    """Verify the Google Chat channel's formatting, command parsing, and registration.
+
+    The channel has no HTTP surface (Pub/Sub in, Chat REST out), so after a
+    backend health ping this asserts the channel's pure logic — Markdown→Chat
+    formatting (the markup-leak guard), slash-command parsing of the add-on
+    event shape, inbound field extraction — plus registration. The full live
+    Pub/Sub→Chat round-trip is bot-covered; see the
+    ``live_pubsub_roundtrip_bot_covered`` marker check.
+
+    Examples:
+      paw verify google-chat
+      paw verify google-chat --json | jq '.checks[] | select(.passed == false)'
+    """
+    state = _load_state(profile)
+    result = asyncio.run(_run_one(state, lambda client: run_google_chat_scenario(state, client)))
+    _emit_and_exit(result, json_out=json_out, label="google-chat")
 
 
 @app.command("cost")
@@ -360,22 +392,22 @@ SuiteRunner = Callable[[PawClient], Awaitable[ScenarioResult]]
 
 def _suite_runner(state: PersonaState, name: str) -> SuiteRunner:
     """Return the async runner for a named suite. Raises on unknown names."""
-    if name == "codex":
-        return lambda client: run_codex_scenario(state, client)
-    if name == "chat-roundtrip":
-        return lambda client: run_chat_roundtrip_scenario(state, client)
-    if name == "model-switch":
-        return lambda client: run_model_switch_scenario(state, client)
-    if name == "telegram":
-        return lambda client: run_telegram_scenario(state, client)
-    if name == "cost":
-        return lambda client: run_cost_scenario(state, client)
-    if name == "lcm":
-        return lambda client: run_lcm_scenario(state, client)
-    raise LocalError(
-        f"Unknown suite: {name}",
-        hint=f"Valid suites: {', '.join(DEFAULT_SUITES)}",
-    )
+    runners: dict[str, SuiteRunner] = {
+        "codex": lambda client: run_codex_scenario(state, client),
+        "chat-roundtrip": lambda client: run_chat_roundtrip_scenario(state, client),
+        "model-switch": lambda client: run_model_switch_scenario(state, client),
+        "telegram": lambda client: run_telegram_scenario(state, client),
+        "google-chat": lambda client: run_google_chat_scenario(state, client),
+        "cost": lambda client: run_cost_scenario(state, client),
+        "lcm": lambda client: run_lcm_scenario(state, client),
+    }
+    runner = runners.get(name)
+    if runner is None:
+        raise LocalError(
+            f"Unknown suite: {name}",
+            hint=f"Valid suites: {', '.join(DEFAULT_SUITES)}",
+        )
+    return runner
 
 
 async def _run_many(state: PersonaState, suites: tuple[str, ...]) -> list[ScenarioResult]:
