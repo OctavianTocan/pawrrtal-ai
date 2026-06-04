@@ -175,6 +175,18 @@ def parse_command(event: dict[str, Any]) -> tuple[str, str] | None:
     return command, args
 
 
+def attachments_of(event: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return the inbound message's attachments (``message.attachment[]``).
+
+    The add-on field name is the singular, repeated ``attachment`` (not
+    ``attachments``); non-dict entries are dropped defensively.
+    """
+    raw = _message(event).get("attachment")
+    if not isinstance(raw, list):
+        return []
+    return [item for item in raw if isinstance(item, dict)]
+
+
 def format_for_chat(text: str) -> str:
     """Format agent markdown for Google Chat.
 

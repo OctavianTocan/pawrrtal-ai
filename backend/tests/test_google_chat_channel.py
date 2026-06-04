@@ -31,7 +31,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.channels.base import ChannelMessage
 from app.channels.crud import get_user_id_for_external
+from app.channels.google_chat import attachments as attachments_module
 from app.channels.google_chat import delivery as delivery_module
+from app.channels.google_chat.attachments import collect_attachments
 from app.channels.google_chat.channel import (
     INITIAL_PLACEHOLDER_TEXT,
     SURFACE_GOOGLE_CHAT,
@@ -49,6 +51,7 @@ from app.channels.google_chat.dev_admin import (
     resolve_or_autolink_google_chat_user,
 )
 from app.channels.google_chat.messages import (
+    attachments_of,
     decode_pubsub_message,
     event_type,
     message_text,
@@ -487,6 +490,103 @@ async def test_command_new_creates_fresh_conversation(
     )
     # The fixture conversation plus the freshly started one.
     assert len(rows) >= 2
+
+
+# ---------------------------------------------------------------------------
+# attachments — media ingestion
+# ---------------------------------------------------------------------------
+
+
+def _event_with_attachment(att: dict[str, Any]) -> dict[str, Any]:
+    event = _addon_event()
+    event["chat"]["messagePayload"]["message"]["attachment"] = [att]
+    return event
+
+
+def test_attachments_of_reads_repeated_field() -> None:
+    att = {"contentName": "a.png", "contentType": "image/png"}
+    assert attachments_of(_event_with_attachment(att)) == [att]
+
+
+async def test_collect_image_becomes_base64(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        attachments_module, "download_attachment", AsyncMock(return_value=b"\x89PNGdata")
+    )
+    event = _event_with_attachment(
+        {
+            "contentName": "shot.png",
+            "contentType": "image/png",
+            "source": "UPLOADED_CONTENT",
+            "attachmentDataRef": {"resourceName": "spaces/A/messages/M/attachments/1"},
+        }
+    )
+    out = await collect_attachments(event)
+    assert len(out.images) == 1
+    assert out.images[0]["media_type"] == "image/png"
+    assert out.images[0]["data"]
+
+
+async def test_collect_audio_is_annotation_only(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(attachments_module, "download_attachment", AsyncMock(return_value=b"audio"))
+    event = _event_with_attachment(
+        {
+            "contentName": "voice.ogg",
+            "contentType": "audio/ogg",
+            "source": "UPLOADED_CONTENT",
+            "attachmentDataRef": {"resourceName": "spaces/A/messages/M/attachments/2"},
+        }
+    )
+    out = await collect_attachments(event)
+    assert out.images == []
+    assert any("voice/audio" in note for note in out.annotations)
+
+
+async def test_collect_drive_file_is_annotation(monkeypatch: pytest.MonkeyPatch) -> None:
+    download_spy = AsyncMock(return_value=b"x")
+    monkeypatch.setattr(attachments_module, "download_attachment", download_spy)
+    event = _event_with_attachment(
+        {
+            "contentName": "doc.gdoc",
+            "contentType": "application/vnd.google-apps.document",
+            "source": "DRIVE_FILE",
+            "driveDataRef": {"driveFileId": "abc"},
+        }
+    )
+    out = await collect_attachments(event)
+    assert any("Drive file" in note for note in out.annotations)
+    download_spy.assert_not_awaited()
+
+
+async def test_collect_document_inlines_markdown(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        attachments_module, "download_attachment", AsyncMock(return_value=b"%PDF...")
+    )
+
+    async def _fake_extract(raw_bytes: bytes, *, file_name: str) -> str:
+        return "# Heading\nbody text"
+
+    monkeypatch.setattr(attachments_module, "_extract_markdown", _fake_extract)
+    event = _event_with_attachment(
+        {
+            "contentName": "report.pdf",
+            "contentType": "application/pdf",
+            "source": "UPLOADED_CONTENT",
+            "attachmentDataRef": {"resourceName": "spaces/A/messages/M/attachments/3"},
+        }
+    )
+    out = await collect_attachments(event)
+    assert out.images == []
+    assert any("Extracted Markdown" in note and "Heading" in note for note in out.annotations)
+
+
+async def test_collect_missing_resource_annotates(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(attachments_module, "download_attachment", AsyncMock(return_value=b"x"))
+    event = _event_with_attachment(
+        {"contentName": "weird", "contentType": "image/png", "source": "UPLOADED_CONTENT"}
+    )
+    out = await collect_attachments(event)
+    assert out.images == []
+    assert any("no downloadable reference" in note for note in out.annotations)
 
 
 # ---------------------------------------------------------------------------

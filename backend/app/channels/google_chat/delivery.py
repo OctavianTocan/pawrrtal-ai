@@ -26,6 +26,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass, field
+from typing import ClassVar
 
 from app.providers.base import StreamEvent
 
@@ -93,24 +94,34 @@ class StreamingDelivery:
             return
         await update_message(message_name=self.message_name, text=rendered)
 
+    # Event type → method name. A flat dispatch table keeps ``_accumulate``
+    # both shallow (no elif ladder) and single-return, satisfying the
+    # nesting and return-count budgets at once.
+    _EVENT_HANDLERS: ClassVar[dict[str, str]] = {
+        "delta": "_on_delta",
+        "thinking": "_accumulate_thinking",
+        "tool_use": "_start_tool",
+        "tool_result": "_finish_tool",
+        "error": "_on_error",
+        "agent_terminated": "_on_terminated",
+    }
+
     def _accumulate(self, event: StreamEvent) -> bool:
         """Update state for one event; return whether a re-render is worthwhile."""
-        etype = event.get("type")
-        if etype == "delta":
-            self._answer += event.get("content") or ""
-        elif etype == "thinking":
-            self._accumulate_thinking(event)
-        elif etype == "tool_use":
-            self._start_tool(event)
-        elif etype == "tool_result":
-            self._finish_tool(event)
-        elif etype == "error":
-            self._error_text = str(event.get("content") or "Something went wrong.")
-        elif etype == "agent_terminated":
-            self._terminated_text = str(event.get("content") or "")
-        else:
+        method = self._EVENT_HANDLERS.get(str(event.get("type") or ""))
+        if method is None:
             return False
+        getattr(self, method)(event)
         return True
+
+    def _on_delta(self, event: StreamEvent) -> None:
+        self._answer += event.get("content") or ""
+
+    def _on_error(self, event: StreamEvent) -> None:
+        self._error_text = str(event.get("content") or "Something went wrong.")
+
+    def _on_terminated(self, event: StreamEvent) -> None:
+        self._terminated_text = str(event.get("content") or "")
 
     def _accumulate_thinking(self, event: StreamEvent) -> None:
         block = event.get("block_index")

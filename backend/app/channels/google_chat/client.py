@@ -167,3 +167,24 @@ async def update_message(*, message_name: str, text: str) -> bool:
         logger.warning("GOOGLE_CHAT_UPDATE_ERR %s", _short_error(response))
         return False
     return True
+
+
+async def download_attachment(*, resource_name: str, max_bytes: int) -> bytes | None:
+    """Download an ``UPLOADED_CONTENT`` attachment's bytes via the media endpoint.
+
+    Hits ``GET /v1/media/{resourceName}?alt=media`` with the app's bearer
+    token (``chat.bot`` scope). Returns ``None`` on HTTP failure or when the
+    payload exceeds ``max_bytes`` — so an oversized upload (Chat allows up to
+    200 MB) can't blow the memory budget. ``DRIVE_FILE`` attachments are not
+    served here; the caller annotates those instead.
+    """
+    url = f"{_CHAT_BASE_URL}/media/{resource_name}"
+    response = await _client().get(url, headers=await _headers(), params={"alt": "media"})
+    if response.status_code >= _HTTP_BAD_REQUEST:
+        logger.warning("GOOGLE_CHAT_MEDIA_ERR %s", _short_error(response))
+        return None
+    data = response.content
+    if len(data) > max_bytes:
+        logger.warning("GOOGLE_CHAT_MEDIA_TOO_LARGE bytes=%d cap=%d", len(data), max_bytes)
+        return None
+    return data

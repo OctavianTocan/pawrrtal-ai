@@ -35,6 +35,7 @@ from app.providers.factory import resolve_llm
 from app.providers.model_id import InvalidModelId, UnknownModelId
 from app.workspace.crud import get_default_workspace
 
+from .attachments import collect_attachments
 from .auth import has_google_chat_auth
 from .channel import INITIAL_PLACEHOLDER_TEXT, SURFACE_GOOGLE_CHAT
 from .client import acknowledge, close_google_chat_client, create_message, pull_messages
@@ -44,6 +45,7 @@ from .delivery import DEFAULT_VERBOSE_LEVEL
 from .dev_admin import resolve_or_autolink_google_chat_user
 from .messages import (
     MESSAGE_EVENT_TYPE,
+    attachments_of,
     decode_pubsub_message,
     event_type,
     message_text,
@@ -279,10 +281,11 @@ def _resolve_provider(model_id: str, workspace_root: Path) -> tuple[AILLM, str]:
 
 
 async def _handle_message_event(event: dict[str, Any]) -> None:
-    """Drive one full Chat turn: resolve → placeholder → run_turn."""
+    """Drive one full Chat turn: resolve → placeholder → attachments → run_turn."""
     text = message_text(event)
     space = space_name(event)
-    if not text.strip() or not space:
+    has_attachments = bool(attachments_of(event))
+    if not space or (not text.strip() and not has_attachments):
         return
 
     target = await _resolve_turn_target(event)
@@ -312,10 +315,13 @@ async def _handle_message_event(event: dict[str, Any]) -> None:
     # Local import breaks the registry ↔ google_chat package import cycle.
     from app.channels.registry import resolve_channel  # noqa: PLC0415
 
+    attachments = await collect_attachments(event)
+    question = _build_question(text, attachments.annotations)
+
     channel_message: ChannelMessage = {
         "user_id": target.user_id,
         "conversation_id": target.conversation_id,
-        "text": text,
+        "text": text or "(attachment)",
         "surface": SURFACE_GOOGLE_CHAT,
         "model_id": effective_model_id,
         "metadata": {
@@ -328,13 +334,27 @@ async def _handle_message_event(event: dict[str, Any]) -> None:
     turn_input = ChatTurnInput(
         conversation_id=target.conversation_id,
         user_id=target.user_id,
-        question=text,
+        question=question,
         provider=provider,
         channel=resolve_channel(SURFACE_GOOGLE_CHAT),
         channel_message=channel_message,
         workspace_root=target.workspace_root,
         tools=agent_tools,
+        images=attachments.images or None,
         log_tag="GOOGLE_CHAT",
     )
     async for _ in run_turn(turn_input):
         pass
+
+
+def _build_question(text: str, annotations: list[str]) -> str:
+    """Combine the user's text with attachment annotations for the agent.
+
+    When the message is attachment-only (no text), a short default prompt
+    stands in so the agent has something to act on alongside the image or
+    document context.
+    """
+    base = text.strip() or "Please respond to the attached file(s)."
+    if not annotations:
+        return base
+    return base + "\n\n" + "\n".join(annotations)
