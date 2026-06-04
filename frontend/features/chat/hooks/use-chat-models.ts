@@ -6,8 +6,7 @@ import { API_ENDPOINTS, getBackendConfigFingerprint } from '@/lib/api';
 
 /**
  * Query key used by {@link useChatModels} and any cache mutator that
- * needs to invalidate the catalog (e.g. an admin tool flipping a
- * `is_default` flag).
+ * needs to invalidate the catalog.
  */
 const CHAT_MODELS_QUERY_KEY = 'models' as const;
 
@@ -27,15 +26,18 @@ export interface ChatModelOption {
 	short_name: string;
 	/** Marketing-style description rendered under the model name. */
 	description: string;
-	/** True for exactly one entry — the catalog's default selection. */
-	is_default: boolean;
 }
 
 /** Return shape for {@link useChatModels}. */
 export interface UseChatModelsResult {
 	/** Catalog entries; empty array while the request is in flight. */
 	models: readonly ChatModelOption[];
-	/** The entry with `is_default: true`; `null` while loading or if the catalog has no default. */
+	/**
+	 * The first catalog entry — the pre-selected model for a fresh session.
+	 * `null` while loading or when the catalog is empty. The product chose
+	 * "first in list" over a server-declared default, so this is simply
+	 * `models[0]`.
+	 */
 	default: ChatModelOption | null;
 	/** True until the first response (success or error) lands. */
 	isLoading: boolean;
@@ -43,8 +45,6 @@ export interface UseChatModelsResult {
 	isError: boolean;
 	/** True when at least one valid model row is available. */
 	hasCatalog: boolean;
-	/** True when the valid catalog includes a server-declared default model. */
-	hasDefaultModel: boolean;
 	/** Stable identifier for the backend target used by this catalog request. */
 	backendConfigFingerprint: string;
 	/** Latest fetch / validation error, or `null` when healthy. */
@@ -64,7 +64,6 @@ const ModelOptionSchema = z.object({
 	display_name: z.string(),
 	short_name: z.string(),
 	description: z.string(),
-	is_default: z.boolean(),
 });
 
 /** Zod schema for the `GET /api/v1/models` response envelope. */
@@ -101,8 +100,8 @@ function parseCatalogModel(entry: unknown, index: number): ChatModelOption | nul
  * there, mirroring the boundary-validation pattern from
  * `frontend/hooks/get-conversations.ts`.
  *
- * @returns Catalog data, the default entry, loading flag, and the
- *   latest error (or `null` while healthy).
+ * @returns Catalog data, the first entry (the fresh-session default),
+ *   loading flag, and the latest error (or `null` while healthy).
  */
 export function useChatModels(): UseChatModelsResult {
 	const authedFetch = useAuthedFetch();
@@ -134,18 +133,16 @@ export function useChatModels(): UseChatModelsResult {
 	});
 
 	const models = query.data?.models ?? [];
-	const defaultEntry = useMemo<ChatModelOption | null>(
-		() => models.find((model) => model.is_default) ?? null,
-		[models]
-	);
+	// Product decision: pre-select the FIRST catalog entry, not a
+	// server-declared default. `null` while the catalog is empty/loading.
+	const firstModel = useMemo<ChatModelOption | null>(() => models[0] ?? null, [models]);
 
 	return {
 		models,
-		default: defaultEntry,
+		default: firstModel,
 		isLoading: query.isLoading,
 		isError: query.isError,
 		hasCatalog: models.length > 0,
-		hasDefaultModel: defaultEntry !== null,
 		backendConfigFingerprint,
 		error: query.error ?? null,
 	};

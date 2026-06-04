@@ -28,7 +28,6 @@ __all__ = [
     "CATALOG_ETAG",
     "MODEL_CATALOG",
     "ModelEntry",
-    "default_model",
     "find",
     "first_catalog_model",
     "is_known",
@@ -47,13 +46,6 @@ MODEL_CATALOG: tuple[ModelEntry, ...] = (
 )
 
 
-# Module-import-time invariant: exactly one default.
-# Explicit raise (not ``assert``) so ``python -O`` cannot strip it.
-_default_count = sum(1 for e in MODEL_CATALOG if e.is_default)
-if _default_count != 1:
-    raise ValueError(f"MODEL_CATALOG must have exactly one default; found {_default_count}")
-
-
 def _hash_catalog(catalog: tuple[ModelEntry, ...]) -> str:
     """Stable hash of the catalog used as the HTTP ``ETag`` value."""
     payload = json.dumps(
@@ -68,16 +60,6 @@ CATALOG_ETAG: str = _hash_catalog(MODEL_CATALOG)
 """Catalog hash, computed once at import. Exposed via the ``ETag``
 response header so clients can revalidate cheaply with
 `If-None-Match`."""
-
-
-def default_model() -> ModelEntry:
-    """Return the entry marked ``is_default=True``.
-
-    Returns:
-        The single default entry. The module-import-time invariant
-        guarantees exactly one exists.
-    """
-    return next(e for e in MODEL_CATALOG if e.is_default)
 
 
 def first_catalog_model() -> ModelEntry:

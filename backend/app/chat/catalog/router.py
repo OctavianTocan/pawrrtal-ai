@@ -60,7 +60,6 @@ class ModelOption(BaseModel):
     display_name: str
     short_name: str
     description: str
-    is_default: bool
 
 
 class ModelsResponse(BaseModel):
@@ -78,7 +77,6 @@ def _to_option(entry: ModelEntry) -> ModelOption:
         display_name=entry.display_name,
         short_name=entry.short_name,
         description=entry.description,
-        is_default=entry.is_default,
     )
 
 

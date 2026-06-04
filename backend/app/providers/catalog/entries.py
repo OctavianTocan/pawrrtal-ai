@@ -51,7 +51,6 @@ class ModelEntry:
     display_name: str
     short_name: str
     description: str
-    is_default: bool
     cost_per_mtok_in_usd: float = 0.0
     cost_per_mtok_out_usd: float = 0.0
     # Reasoning-effort levels the provider actually honours for this
@@ -114,7 +113,6 @@ ANTHROPIC_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="Claude Opus 4.7",
         short_name="Claude Opus 4.7",
         description="Most capable for ambitious work",
-        is_default=False,
         cost_per_mtok_in_usd=_CLAUDE_OPUS_4_7_IN_USD,
         cost_per_mtok_out_usd=_CLAUDE_OPUS_4_7_OUT_USD,
         supports_reasoning=("low", "medium", "high"),
@@ -126,7 +124,6 @@ ANTHROPIC_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="Claude Sonnet 4.6",
         short_name="Claude Sonnet 4.6",
         description="Balanced for everyday tasks",
-        is_default=False,
         cost_per_mtok_in_usd=_CLAUDE_SONNET_4_6_IN_USD,
         cost_per_mtok_out_usd=_CLAUDE_SONNET_4_6_OUT_USD,
         supports_reasoning=("low", "medium", "high"),
@@ -138,7 +135,6 @@ ANTHROPIC_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="Claude Haiku 4.5",
         short_name="Claude Haiku 4.5",
         description="Fastest for quick answers",
-        is_default=False,
         cost_per_mtok_in_usd=_CLAUDE_HAIKU_4_5_IN_USD,
         cost_per_mtok_out_usd=_CLAUDE_HAIKU_4_5_OUT_USD,
     ),
@@ -157,7 +153,6 @@ GOOGLE_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="Gemini 3 Flash Preview",
         short_name="Gemini 3 Flash",
         description="Google's frontier multimodal",
-        is_default=True,
         cost_per_mtok_in_usd=_GEMINI_3_FLASH_IN_USD,
         cost_per_mtok_out_usd=_GEMINI_3_FLASH_OUT_USD,
         # Gemini 3 Flash accepts all four thinking levels per the
@@ -172,7 +167,6 @@ GOOGLE_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="Gemini 3.5 Flash",
         short_name="Gemini 3.5 Flash",
         description="Stable frontier Gemini Flash",
-        is_default=False,
         cost_per_mtok_in_usd=_GEMINI_3_5_FLASH_IN_USD,
         cost_per_mtok_out_usd=_GEMINI_3_5_FLASH_OUT_USD,
         supports_reasoning=("minimal", "low", "medium", "high"),
@@ -184,7 +178,6 @@ GOOGLE_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="Gemini 3.1 Pro Preview",
         short_name="Gemini 3.1 Pro",
         description="Most capable Gemini for complex tasks",
-        is_default=False,
         cost_per_mtok_in_usd=_GEMINI_3_1_PRO_IN_USD,
         cost_per_mtok_out_usd=_GEMINI_3_1_PRO_OUT_USD,
         # 3.1 Pro doesn't accept ``minimal`` (per the Gemini 3
@@ -198,7 +191,6 @@ GOOGLE_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="Gemini 3.1 Flash Lite",
         short_name="Gemini Flash Lite",
         description="Stable cost-efficient Gemini",
-        is_default=False,
         cost_per_mtok_in_usd=_GEMINI_3_1_FLASH_LITE_IN_USD,
         cost_per_mtok_out_usd=_GEMINI_3_1_FLASH_LITE_OUT_USD,
         # Flash-Lite defaults to ``minimal`` upstream; surface the full
@@ -212,7 +204,6 @@ GOOGLE_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="Gemini 3.1 Flash Lite Preview",
         short_name="Gemini Flash Lite (preview)",
         description="Preview build of Flash Lite",
-        is_default=False,
         cost_per_mtok_in_usd=_GEMINI_3_1_FLASH_LITE_IN_USD,
         cost_per_mtok_out_usd=_GEMINI_3_1_FLASH_LITE_OUT_USD,
         supports_reasoning=("minimal", "low", "medium", "high"),
@@ -232,7 +223,6 @@ XAI_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="Grok 4.3",
         short_name="Grok 4.3",
         description="xAI's frontier 1M-context model",
-        is_default=False,
         cost_per_mtok_in_usd=_GROK_4_3_IN_USD,
         cost_per_mtok_out_usd=_GROK_4_3_OUT_USD,
         # xAI added a "no thinking" tier to Grok 4.3 (issue #373).
