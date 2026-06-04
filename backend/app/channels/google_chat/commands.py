@@ -27,7 +27,7 @@ from app.channels.crud import (
 from app.infrastructure.keys import load_workspace_env, save_workspace_env
 from app.models import Conversation
 from app.providers.base import ReasoningEffort
-from app.providers.catalog import default_model
+from app.providers.catalog import first_catalog_model
 from app.workspace.crud import get_default_workspace
 
 from .conversation import start_new_google_chat_conversation
@@ -116,7 +116,7 @@ async def _cmd_whoami(ctx: CommandContext) -> str:
 
 async def _cmd_status(ctx: CommandContext) -> str:
     conv = ctx.conversation
-    model = conv.model_id or f"{default_model().id} (default)"
+    model = conv.model_id or f"{first_catalog_model().id} (default)"
     verbose = _verbose_of(conv)
     reasoning = conv.reasoning_effort or "provider default"
     return (
@@ -129,7 +129,7 @@ async def _cmd_status(ctx: CommandContext) -> str:
 
 async def _cmd_model(ctx: CommandContext) -> str:
     if not ctx.args:
-        current = ctx.conversation.model_id or f"{default_model().id} (default)"
+        current = ctx.conversation.model_id or f"{first_catalog_model().id} (default)"
         return f"Current model: {current}\nSet one with `/model <id>`."
     model_id = ctx.args.strip()
     await update_conversation_model(
@@ -189,7 +189,7 @@ async def _cmd_lcm(ctx: CommandContext) -> str:
 
 
 async def _cmd_compact(ctx: CommandContext) -> str:
-    model_id = ctx.conversation.model_id or default_model().id
+    model_id = ctx.conversation.model_id or first_catalog_model().id
     return await run_compaction(
         conversation_id=ctx.conversation.id, user_id=ctx.user_id, model_id=model_id
     )

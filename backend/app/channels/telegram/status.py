@@ -39,7 +39,7 @@ from app.channels.telegram.lcm_status import (
 from app.channels.telegram.model_defaults import resolve_effective_model_id
 from app.conversations.crud import ConversationStatus, get_conversation_status
 from app.infrastructure.config import settings
-from app.providers.catalog import default_model, find
+from app.providers.catalog import find, first_catalog_model
 from app.providers.model_id import InvalidModelId, parse_model_id
 
 
@@ -149,7 +149,7 @@ def _format_model_display(model_id: str | None) -> tuple[str, str, str]:
     with a warning suffix so the status reply still renders without
     crashing.
     """
-    canonical = model_id or default_model().id
+    canonical = model_id or first_catalog_model().id
     try:
         parsed = parse_model_id(canonical)
         entry = find(parsed)
@@ -184,7 +184,7 @@ def _resolve_reasoning_label(
     """
     if reasoning_effort:
         return reasoning_effort
-    canonical = model_id or default_model().id
+    canonical = model_id or first_catalog_model().id
     try:
         parsed = parse_model_id(canonical)
         entry = find(parsed)

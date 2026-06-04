@@ -8,7 +8,7 @@ from typing import Annotated
 from pydantic import AfterValidator
 
 from app.infrastructure.config import settings
-from app.providers.catalog import default_model
+from app.providers.catalog import first_catalog_model
 from app.providers.model_id import InvalidModelId, parse_model_id
 
 logger = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ def _canonicalise_model_id_for_read(raw: str | None) -> str | None:
             raw,
             exc,
         )
-        return default_model().id
+        return first_catalog_model().id
 
 
 CanonicalModelId = Annotated[str | None, AfterValidator(_canonicalise_model_id)]

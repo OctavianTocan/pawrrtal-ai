@@ -225,7 +225,7 @@ class Settings(BaseSettings):
 
     # When True, ConversationRead 422s on a non-canonical stored
     # model_id. When False (operator escape hatch), the bad value falls
-    # back to ``catalog.default_model().id`` and the row is logged.
+    # back to ``catalog.first_catalog_model().id`` and the row is logged.
     strict_conversation_read_validation: bool = True
 
     # Demo-mode toggle.  When true, the backend refuses to start the

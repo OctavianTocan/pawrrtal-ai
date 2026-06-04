@@ -307,7 +307,7 @@ async def update_conversation_model(
         model_id: Canonical model identifier string
             (e.g. ``"agent-sdk:anthropic/claude-sonnet-4-6"``).  Pass
             ``None`` to clear the override so the next turn falls back to
-            ``catalog.default_model()``.
+            ``catalog.first_catalog_model()``.
         session: Async database session.
 
     Returns:

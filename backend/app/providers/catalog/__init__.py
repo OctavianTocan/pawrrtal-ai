@@ -30,6 +30,7 @@ __all__ = [
     "ModelEntry",
     "default_model",
     "find",
+    "first_catalog_model",
     "is_known",
     "require_known",
 ]
@@ -77,6 +78,20 @@ def default_model() -> ModelEntry:
         guarantees exactly one exists.
     """
     return next(e for e in MODEL_CATALOG if e.is_default)
+
+
+def first_catalog_model() -> ModelEntry:
+    """Return the positional first entry, ``MODEL_CATALOG[0]``.
+
+    Used as the fallback wherever a model is needed but none was
+    supplied. There is no curated default — this is purely the first
+    row of the catalog tuple, so the value tracks whatever ordering the
+    catalog composition (``MODEL_CATALOG``) declares.
+
+    Returns:
+        The first :class:`ModelEntry` in :data:`MODEL_CATALOG`.
+    """
+    return MODEL_CATALOG[0]
 
 
 def find(parsed: ParsedModelId) -> ModelEntry | None:

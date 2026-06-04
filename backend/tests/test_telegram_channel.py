@@ -53,7 +53,7 @@ from app.channels.telegram.status import (
 )
 from app.conversations.crud import ConversationStatus
 from app.providers.base import StreamEvent
-from app.providers.catalog import default_model
+from app.providers.catalog import first_catalog_model
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -1110,10 +1110,10 @@ class TestResolveProviderWithAutoClear:
         ):
             provider, warning = await _resolve_provider_with_auto_clear(context)
 
-        # Warning was produced and mentions the bad ID + the default.
+        # Warning was produced and mentions the bad ID + the fallback.
         assert warning is not None
         assert "agent-sdk:anthropic/claude-nonexistent" in warning
-        assert default_model().id in warning
+        assert first_catalog_model().id in warning
 
         # Stored model_id was cleared to NULL.
         update_mock.assert_awaited_once()
@@ -1121,23 +1121,23 @@ class TestResolveProviderWithAutoClear:
         assert update_mock.await_args.kwargs["model_id"] is None
         assert update_mock.await_args.kwargs["conversation_id"] == context.conversation_id
 
-        # resolve_llm was called *once* — only for the catalog default fallback.
+        # resolve_llm was called *once* — only for the catalog fallback.
         # (For the unknown path ``require_known()`` raises first, so
         # ``resolve_llm`` is only invoked for the fallback.)
         assert resolve_mock.call_count == 1
         fallback_call = resolve_mock.call_args
-        assert fallback_call.args[0] == default_model().id
+        assert fallback_call.args[0] == first_catalog_model().id
         assert provider is fake_default_provider
 
     async def test_following_turn_uses_catalog_default_after_clear(self) -> None:
         """After the auto-clear, a turn with ``model_id=None`` resolves cleanly.
 
         ``handle_plain_message`` reads ``conversation.model_id`` and falls
-        back to ``default_model().id`` when it is ``NULL``.  Here we
+        back to ``first_catalog_model().id`` when it is ``NULL``.  Here we
         simulate that follow-up turn: the resolved context carries the
-        catalog default directly, and the helper neither warns nor clears.
+        first catalog entry directly, and the helper neither warns nor clears.
         """
-        context = self._make_context(default_model().id)
+        context = self._make_context(first_catalog_model().id)
 
         fake_default_provider = MagicMock(name="default_provider")
         update_mock = AsyncMock(return_value=True)
@@ -1161,7 +1161,7 @@ class TestResolveProviderWithAutoClear:
 
         # resolve_llm was called exactly once with the stored canonical ID.
         assert resolve_mock.call_count == 1
-        assert resolve_mock.call_args.args[0] == default_model().id
+        assert resolve_mock.call_args.args[0] == first_catalog_model().id
         assert provider is fake_default_provider
 
 
@@ -1257,7 +1257,7 @@ class TestRenderStatusMessage:
 
         return ConversationStatus(
             conversation_id=uuid.uuid4(),
-            model_id=default_model().id,
+            model_id=first_catalog_model().id,
             verbose_level=1,
             reasoning_effort=None,
             started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),
@@ -1299,7 +1299,7 @@ class TestRenderStatusMessage:
 
         status = ConversationStatus(
             conversation_id=uuid.uuid4(),
-            model_id=default_model().id,
+            model_id=first_catalog_model().id,
             verbose_level=1,
             reasoning_effort=None,
             started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),
@@ -1331,7 +1331,7 @@ class TestRenderStatusMessage:
 
         status = ConversationStatus(
             conversation_id=uuid.uuid4(),
-            model_id=default_model().id,
+            model_id=first_catalog_model().id,
             verbose_level=1,
             reasoning_effort=None,
             started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),
@@ -1393,7 +1393,7 @@ class TestRenderStatusMessage:
 
         status = ConversationStatus(
             conversation_id=uuid.uuid4(),
-            model_id=default_model().id,
+            model_id=first_catalog_model().id,
             verbose_level=1,
             reasoning_effort=None,
             started_at=_dt(2026, 5, 17, 18, 0),  # tz-naive, matches DB
@@ -1459,7 +1459,7 @@ class TestHandleStatusCommand:
 
         fake_status = ConversationStatus(
             conversation_id=conv_id,
-            model_id=default_model().id,
+            model_id=first_catalog_model().id,
             verbose_level=2,
             reasoning_effort=None,
             started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),

@@ -225,9 +225,9 @@ def resolve_llm(
     else:
         # Local import: avoid a hard import cycle (catalog imports model_id;
         # factory uses catalog only for the default fallback).
-        from .catalog import default_model  # noqa: PLC0415 — see comment above
+        from .catalog import first_catalog_model  # noqa: PLC0415 — see comment above
 
-        raw = model_id if model_id is not None else default_model().id
+        raw = model_id if model_id is not None else first_catalog_model().id
         parsed = parse_model_id(raw)
 
     provider_cls = HOST_TO_PROVIDER[parsed.host]
@@ -294,7 +294,7 @@ def _build_opencode_go(parsed: ParsedModelId, workspace_root: Path | None) -> Op
     in the catalog.
     """
     # Local import: prevents the import cycle catalog→model_id→factory
-    # by matching the pattern already used for ``default_model``.
+    # by matching the pattern already used for ``first_catalog_model``.
     from .catalog import find  # noqa: PLC0415
 
     entry = find(parsed)
