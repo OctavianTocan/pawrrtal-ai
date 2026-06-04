@@ -175,6 +175,43 @@ def parse_command(event: dict[str, Any]) -> tuple[str, str] | None:
     return command, args
 
 
+def invoked_function(event: dict[str, Any]) -> str:
+    """Return the card-button action function name, or ``""`` for non-clicks.
+
+    On a button click the add-on event carries the ``onClick.action.function``
+    value at ``commonEventObject.invokedFunction`` (Chat-apps-only field).
+    """
+    common = event.get("commonEventObject")
+    fn = common.get("invokedFunction") if isinstance(common, dict) else None
+    return str(fn or "")
+
+
+def invoked_parameters(event: dict[str, Any]) -> dict[str, str]:
+    """Return the clicked button's action parameters as a flat ``{key: value}`` map.
+
+    Note Chat delivers click parameters as a map here, even though they're
+    *sent* as a list of ``{key, value}`` objects in the card.
+    """
+    common = event.get("commonEventObject")
+    params = common.get("parameters") if isinstance(common, dict) else None
+    if not isinstance(params, dict):
+        return {}
+    return {str(key): str(value) for key, value in params.items()}
+
+
+def clicked_message_name(event: dict[str, Any]) -> str:
+    """Return the ``spaces/*/messages/*`` name of the card the button is on.
+
+    Lives at ``chat.buttonClickedPayload.message.name``; it's the resource a
+    Pub/Sub app patches to reflect the click.
+    """
+    chat = event.get("chat")
+    payload = chat.get("buttonClickedPayload") if isinstance(chat, dict) else None
+    message = payload.get("message") if isinstance(payload, dict) else None
+    name = message.get("name") if isinstance(message, dict) else None
+    return str(name or "")
+
+
 def attachments_of(event: dict[str, Any]) -> list[dict[str, Any]]:
     """Return the inbound message's attachments (``message.attachment[]``).
 

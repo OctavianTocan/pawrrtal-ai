@@ -37,8 +37,16 @@ from app.workspace.crud import get_default_workspace
 
 from .attachments import collect_attachments
 from .auth import has_google_chat_auth
+from .cards import apply_card_click, picker_card_for
 from .channel import INITIAL_PLACEHOLDER_TEXT, SURFACE_GOOGLE_CHAT
-from .client import acknowledge, close_google_chat_client, create_message, pull_messages
+from .client import (
+    acknowledge,
+    close_google_chat_client,
+    create_card_message,
+    create_message,
+    pull_messages,
+    update_card_message,
+)
 from .commands import CommandContext, dispatch_command
 from .conversation import get_or_create_google_chat_conversation
 from .delivery import DEFAULT_VERBOSE_LEVEL
@@ -46,8 +54,11 @@ from .dev_admin import resolve_or_autolink_google_chat_user
 from .messages import (
     MESSAGE_EVENT_TYPE,
     attachments_of,
+    clicked_message_name,
     decode_pubsub_message,
     event_type,
+    invoked_function,
+    invoked_parameters,
     message_text,
     parse_command,
     sender_display,
@@ -158,7 +169,7 @@ async def _pull_once() -> bool:
 
 
 async def _maybe_handle(event: dict[str, Any] | None) -> None:
-    """Route a slash command or a MESSAGE turn; ignore everything else.
+    """Route a card click, slash command, or MESSAGE turn; ignore the rest.
 
     One bad event never breaks the pull loop — it is still acknowledged by
     the caller and the error is logged here.
@@ -166,6 +177,9 @@ async def _maybe_handle(event: dict[str, Any] | None) -> None:
     if event is None:
         return
     try:
+        if invoked_function(event):
+            await _handle_card_click(event)
+            return
         command = parse_command(event)
         if command is not None:
             await _handle_command_event(event, command)
@@ -176,11 +190,13 @@ async def _maybe_handle(event: dict[str, Any] | None) -> None:
 
 
 async def _handle_command_event(event: dict[str, Any], parsed: tuple[str, str]) -> None:
-    """Resolve identity, run a slash command, and post its reply."""
+    """Resolve identity, then post a picker card (no-arg picker) or a text reply."""
     command, args = parsed
     space = space_name(event)
     if not space:
         return
+    card: list[dict[str, Any]] | None = None
+    reply: str | None = None
     async with async_session_maker() as session:
         user_id = await resolve_or_autolink_google_chat_user(
             session=session,
@@ -194,18 +210,54 @@ async def _handle_command_event(event: dict[str, Any], parsed: tuple[str, str]) 
         conversation = await get_or_create_google_chat_conversation(
             user_id=user_id, session=session
         )
-        reply = await dispatch_command(
-            command=command,
-            ctx=CommandContext(
-                user_id=user_id,
-                conversation=conversation,
-                args=args,
-                sender_resource=sender_name(event),
-                sender_email=sender_email(event),
-                session=session,
-            ),
+        card = picker_card_for(command, conversation) if not args else None
+        if card is None:
+            reply = await dispatch_command(
+                command=command,
+                ctx=CommandContext(
+                    user_id=user_id,
+                    conversation=conversation,
+                    args=args,
+                    sender_resource=sender_name(event),
+                    sender_email=sender_email(event),
+                    session=session,
+                ),
+            )
+    thread = thread_name(event)
+    if card is not None:
+        await create_card_message(space_name=space, cards=card, thread_name=thread)
+    elif reply is not None:
+        await create_message(space_name=space, text=reply, thread_name=thread)
+
+
+async def _handle_card_click(event: dict[str, Any]) -> None:
+    """Apply a picker button click and patch the card message in place."""
+    message_name = clicked_message_name(event)
+    if not message_name:
+        return
+    cards: list[dict[str, Any]] | None = None
+    async with async_session_maker() as session:
+        user_id = await resolve_or_autolink_google_chat_user(
+            session=session,
+            external_user_id=sender_name(event),
+            space_name=space_name(event),
+            display=sender_display(event),
         )
-    await create_message(space_name=space, text=reply, thread_name=thread_name(event))
+        if user_id is None:
+            logger.info("GOOGLE_CHAT_UNBOUND_SENDER sender=%s", sender_name(event))
+            return
+        conversation = await get_or_create_google_chat_conversation(
+            user_id=user_id, session=session
+        )
+        cards = await apply_card_click(
+            function=invoked_function(event),
+            params=invoked_parameters(event),
+            user_id=user_id,
+            conversation=conversation,
+            session=session,
+        )
+    if cards is not None:
+        await update_card_message(message_name=message_name, cards=cards)
 
 
 @dataclass

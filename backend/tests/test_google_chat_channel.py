@@ -34,6 +34,14 @@ from app.channels.crud import get_user_id_for_external
 from app.channels.google_chat import attachments as attachments_module
 from app.channels.google_chat import delivery as delivery_module
 from app.channels.google_chat.attachments import collect_attachments
+from app.channels.google_chat.cards import (
+    FN_SET_THINKING,
+    FN_SET_VERBOSE,
+    apply_card_click,
+    picker_card_for,
+    thinking_picker_card,
+    verbose_picker_card,
+)
 from app.channels.google_chat.channel import (
     INITIAL_PLACEHOLDER_TEXT,
     SURFACE_GOOGLE_CHAT,
@@ -53,8 +61,11 @@ from app.channels.google_chat.dev_admin import (
 from app.channels.google_chat.formatting import md_to_chat
 from app.channels.google_chat.messages import (
     attachments_of,
+    clicked_message_name,
     decode_pubsub_message,
     event_type,
+    invoked_function,
+    invoked_parameters,
     message_text,
     parse_command,
     sender_display,
@@ -641,6 +652,107 @@ async def test_collect_missing_resource_annotates(monkeypatch: pytest.MonkeyPatc
     out = await collect_attachments(event)
     assert out.images == []
     assert any("no downloadable reference" in note for note in out.annotations)
+
+
+# ---------------------------------------------------------------------------
+# cards — interactive pickers (button clicks)
+# ---------------------------------------------------------------------------
+
+
+def _click_event(*, function: str, value: str) -> dict[str, Any]:
+    """Build an add-on card-button-click event."""
+    return {
+        "commonEventObject": {
+            "hostApp": "CHAT",
+            "invokedFunction": function,
+            "parameters": {"value": value},
+        },
+        "chat": {
+            "user": {"name": DEV_ADMIN_SENDER, "displayName": "Tavi"},
+            "buttonClickedPayload": {
+                "message": {"name": f"{_SPACE}/messages/CARD"},
+                "space": {"name": _SPACE},
+            },
+        },
+    }
+
+
+def _picker_buttons(card: list[dict[str, Any]]) -> list[Any]:
+    """Pull the buttonList buttons out of a picker card."""
+    buttons = card[0]["card"]["sections"][0]["widgets"][1]["buttonList"]["buttons"]
+    assert isinstance(buttons, list)
+    return buttons
+
+
+def test_invoked_function_reads_click() -> None:
+    event = _click_event(function="gchat_set_verbose", value="2")
+    assert invoked_function(event) == "gchat_set_verbose"
+    assert invoked_parameters(event) == {"value": "2"}
+    assert clicked_message_name(event) == f"{_SPACE}/messages/CARD"
+
+
+def test_invoked_function_empty_for_plain_message() -> None:
+    assert invoked_function(_addon_event()) == ""
+
+
+def test_thinking_picker_card_marks_current_and_targets_handler() -> None:
+    buttons = _picker_buttons(thinking_picker_card("high"))
+    assert any(b["text"] == "✓ high" for b in buttons)
+    assert all(b["onClick"]["action"]["function"] == FN_SET_THINKING for b in buttons)
+
+
+def test_verbose_picker_card_marks_current_and_targets_handler() -> None:
+    buttons = _picker_buttons(verbose_picker_card(1))
+    assert any(b["text"].startswith("✓") for b in buttons)
+    assert all(b["onClick"]["action"]["function"] == FN_SET_VERBOSE for b in buttons)
+
+
+async def test_picker_card_for_picker_vs_non_picker(command_ctx: CommandContext) -> None:
+    assert picker_card_for("thinking", command_ctx.conversation) is not None
+    assert picker_card_for("verbose", command_ctx.conversation) is not None
+    assert picker_card_for("status", command_ctx.conversation) is None
+
+
+async def test_apply_card_click_sets_verbose(command_ctx: CommandContext) -> None:
+    cards = await apply_card_click(
+        function=FN_SET_VERBOSE,
+        params={"value": "2"},
+        user_id=command_ctx.user_id,
+        conversation=command_ctx.conversation,
+        session=command_ctx.session,
+    )
+    assert cards is not None
+    assert command_ctx.conversation.verbose_level == 2
+
+
+async def test_apply_card_click_sets_then_clears_thinking(command_ctx: CommandContext) -> None:
+    await apply_card_click(
+        function=FN_SET_THINKING,
+        params={"value": "high"},
+        user_id=command_ctx.user_id,
+        conversation=command_ctx.conversation,
+        session=command_ctx.session,
+    )
+    assert command_ctx.conversation.reasoning_effort == "high"
+    await apply_card_click(
+        function=FN_SET_THINKING,
+        params={"value": "off"},
+        user_id=command_ctx.user_id,
+        conversation=command_ctx.conversation,
+        session=command_ctx.session,
+    )
+    assert command_ctx.conversation.reasoning_effort is None
+
+
+async def test_apply_card_click_unknown_function_returns_none(command_ctx: CommandContext) -> None:
+    cards = await apply_card_click(
+        function="not_a_handler",
+        params={},
+        user_id=command_ctx.user_id,
+        conversation=command_ctx.conversation,
+        session=command_ctx.session,
+    )
+    assert cards is None
 
 
 # ---------------------------------------------------------------------------

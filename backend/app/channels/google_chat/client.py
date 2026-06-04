@@ -169,6 +169,46 @@ async def update_message(*, message_name: str, text: str) -> bool:
     return True
 
 
+async def create_card_message(
+    *,
+    space_name: str,
+    cards: list[dict[str, Any]],
+    thread_name: str | None = None,
+) -> str | None:
+    """Post a message containing ``cardsV2`` cards; return its resource name.
+
+    Used by the interactive pickers. Returns ``None`` on failure so the
+    caller can fall back to a text reply.
+    """
+    url = f"{_CHAT_BASE_URL}/{space_name}/messages"
+    body: dict[str, Any] = {"cardsV2": cards}
+    params: dict[str, str] = {}
+    if thread_name:
+        body["thread"] = {"name": thread_name}
+        params["messageReplyOption"] = _REPLY_OPTION
+    response = await _client().post(url, headers=await _headers(), params=params, json=body)
+    if response.status_code >= _HTTP_BAD_REQUEST:
+        logger.warning("GOOGLE_CHAT_CARD_CREATE_ERR %s", _short_error(response))
+        return None
+    name = response.json().get("name")
+    return str(name) if name else None
+
+
+async def update_card_message(*, message_name: str, cards: list[dict[str, Any]]) -> bool:
+    """Patch a message's ``cardsV2`` in place (used to reflect a button click)."""
+    url = f"{_CHAT_BASE_URL}/{message_name}"
+    response = await _client().patch(
+        url,
+        headers=await _headers(),
+        params={"updateMask": "cardsV2"},
+        json={"cardsV2": cards},
+    )
+    if response.status_code >= _HTTP_BAD_REQUEST:
+        logger.warning("GOOGLE_CHAT_CARD_UPDATE_ERR %s", _short_error(response))
+        return False
+    return True
+
+
 async def download_attachment(*, resource_name: str, max_bytes: int) -> bytes | None:
     """Download an ``UPLOADED_CONTENT`` attachment's bytes via the media endpoint.
 
