@@ -10,8 +10,6 @@ import { API_ENDPOINTS } from '@/lib/api';
  */
 const CHAT_MODELS_QUERY_KEY = 'models' as const;
 
-const HOSTS_SKIPPED_FOR_AUTOMATIC_DEFAULT = new Set(['openai-codex']);
-
 /** One entry from `GET /api/v1/models`. */
 export interface ChatModelOption {
 	/** Canonical wire form: `host:vendor/model` (e.g. `agent-sdk:anthropic/claude-sonnet-4-6`). */
@@ -35,9 +33,10 @@ export interface UseChatModelsResult {
 	/** Catalog entries; empty array while the request is in flight. */
 	models: readonly ChatModelOption[];
 	/**
-	 * The pre-selected model for a fresh session. Avoids CLI/SDK-only hosts
-	 * when another authenticated model exists, because those hosts may need
-	 * local login state the web user has not configured.
+	 * The first catalog entry — the pre-selected model for a fresh session.
+	 * `null` while loading or when the catalog is empty. The product chose
+	 * "first in list" over a server-declared default, so this is simply
+	 * `models[0]`.
 	 */
 	default: ChatModelOption | null;
 	/** True until the first response (success or error) lands. */
@@ -85,14 +84,6 @@ function parseCatalogModel(entry: unknown, index: number): ChatModelOption | nul
 	return null;
 }
 
-function canAutoSelectModel(model: ChatModelOption): boolean {
-	return !HOSTS_SKIPPED_FOR_AUTOMATIC_DEFAULT.has(model.host);
-}
-
-function selectDefaultModel(models: readonly ChatModelOption[]): ChatModelOption | null {
-	return models.find(canAutoSelectModel) ?? models[0] ?? null;
-}
-
 /**
  * Fetches the backend model catalog via TanStack Query.
  *
@@ -107,8 +98,8 @@ function selectDefaultModel(models: readonly ChatModelOption[]): ChatModelOption
  * there, mirroring the boundary-validation pattern from
  * `frontend/hooks/get-conversations.ts`.
  *
- * @returns Catalog data, the fresh-session default, loading flag, and the
- *   latest error (or `null` while healthy).
+ * @returns Catalog data, the first entry (the fresh-session default),
+ *   loading flag, and the latest error (or `null` while healthy).
  */
 export function useChatModels(): UseChatModelsResult {
 	const authedFetch = useAuthedFetch();
@@ -139,14 +130,13 @@ export function useChatModels(): UseChatModelsResult {
 	});
 
 	const models = query.data?.models ?? [];
-	const defaultModel = useMemo<ChatModelOption | null>(
-		() => selectDefaultModel(models),
-		[models]
-	);
+	// Product decision: pre-select the FIRST catalog entry, not a
+	// server-declared default. `null` while the catalog is empty/loading.
+	const firstModel = useMemo<ChatModelOption | null>(() => models[0] ?? null, [models]);
 
 	return {
 		models,
-		default: defaultModel,
+		default: firstModel,
 		isLoading: query.isLoading,
 		isError: query.isError,
 		hasCatalog: models.length > 0,
