@@ -29,6 +29,7 @@ from app.channels.crud import (
 from app.models import Conversation
 from app.providers.base import ReasoningEffort
 from app.providers.catalog import MODEL_CATALOG
+from app.providers.model_id import parse_model_id
 
 from .delivery import DEFAULT_VERBOSE_LEVEL
 
@@ -102,7 +103,7 @@ async def apply_card_click(
         await update_conversation_model(
             conversation_id=conversation.id, model_id=value, session=session
         )
-        return model_list_card(_host_of(value), value)
+        return model_list_card(parse_model_id(value).host.value, value)
     return None
 
 
@@ -132,7 +133,7 @@ def verbose_picker_card(current: int) -> list[dict[str, Any]]:
 
 def model_host_card(current_id: str | None) -> list[dict[str, Any]]:
     """Build the first-level model picker — one button per host."""
-    hosts = sorted({_host_of(entry.id) for entry in MODEL_CATALOG})
+    hosts = sorted({entry.host.value for entry in MODEL_CATALOG})
     buttons = [
         _action_button(
             label=host, function=FN_MODEL_HOST, value=host, selected=False, param_key=_PARAM_HOST
@@ -145,7 +146,7 @@ def model_host_card(current_id: str | None) -> list[dict[str, Any]]:
 
 def model_list_card(host: str, current_id: str | None) -> list[dict[str, Any]]:
     """Build the second-level model picker — models for *host* (capped)."""
-    entries = [entry for entry in MODEL_CATALOG if _host_of(entry.id) == host]
+    entries = [entry for entry in MODEL_CATALOG if entry.host.value == host]
     buttons = [
         _action_button(
             label=entry.short_name,
@@ -160,11 +161,6 @@ def model_list_card(host: str, current_id: str | None) -> list[dict[str, Any]]:
     if overflow > 0:
         subtitle += f"\n(+{overflow} more — use /model &lt;id&gt;)"
     return _picker_card("model-picker", "Model", subtitle, buttons)
-
-
-def _host_of(model_id: str) -> str:
-    """Return the host slug of a model id (the part before ``:``)."""
-    return model_id.split(":", 1)[0]
 
 
 def _coerce_verbose(value: str) -> int:

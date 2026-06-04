@@ -11,7 +11,6 @@ text the ingress posts back as a Chat message.
 from __future__ import annotations
 
 import uuid
-from typing import Any
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
@@ -33,10 +32,11 @@ async def lcm_status_text(*, conversation_id: uuid.UUID, session: AsyncSession) 
     """Return a compact LCM-status block for *conversation_id*."""
     if not settings.lcm_enabled:
         return _LCM_DISABLED
-    items = await _count(session, LCMContextItem, conversation_id)
-    messages = await _count(session, LCMContextItem, conversation_id, kind=_MESSAGE_KIND)
-    summaries = await _count(session, LCMContextItem, conversation_id, kind=_SUMMARY_KIND)
-    summary_nodes = await _count(session, LCMSummary, conversation_id)
+    by_kind = await _count_context_items_by_kind(session, conversation_id)
+    messages = by_kind.get(_MESSAGE_KIND, 0)
+    summaries = by_kind.get(_SUMMARY_KIND, 0)
+    items = sum(by_kind.values())  # total of all kinds, robust to a future 3rd kind
+    summary_nodes = await _count_summary_nodes(session, conversation_id)
     return (
         "🧠 *LCM status*\n"
         f"• Context items: {items} ({messages} messages, {summaries} compacted)\n"
@@ -65,16 +65,21 @@ async def run_compaction(*, conversation_id: uuid.UUID, user_id: uuid.UUID, mode
     return f"🧠 *Compact*\n💤 Nothing to compact yet (need more than {settings.lcm_fresh_tail_count} items)."
 
 
-async def _count(
-    session: AsyncSession,
-    model: Any,
-    conversation_id: uuid.UUID,
-    *,
-    kind: str | None = None,
-) -> int:
-    """Count rows of *model* for the conversation, optionally filtered by item kind."""
-    stmt = select(func.count()).select_from(model).where(model.conversation_id == conversation_id)
-    if kind is not None:
-        stmt = stmt.where(model.item_kind == kind)
+async def _count_context_items_by_kind(
+    session: AsyncSession, conversation_id: uuid.UUID
+) -> dict[str, int]:
+    """Return ``{item_kind: count}`` for the conversation's context items (one query)."""
+    stmt = (
+        select(LCMContextItem.item_kind, func.count())
+        .where(LCMContextItem.conversation_id == conversation_id)
+        .group_by(LCMContextItem.item_kind)
+    )
+    rows = await session.execute(stmt)
+    return {str(kind): int(count) for kind, count in rows.all()}
+
+
+async def _count_summary_nodes(session: AsyncSession, conversation_id: uuid.UUID) -> int:
+    """Count the conversation's LCM summary nodes (full history, all depths)."""
+    stmt = select(func.count()).where(LCMSummary.conversation_id == conversation_id)
     result = await session.execute(stmt)
     return int(result.scalar_one() or 0)
