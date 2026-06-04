@@ -17,9 +17,8 @@ from app.channels.telegram.model_auth import is_host_authenticated
 from app.channels.telegram.model_defaults import resolve_effective_model_id
 from app.providers.catalog import CATALOG_ETAG, MODEL_CATALOG, ModelEntry
 from app.providers.labels import host_label_from_slug, vendor_label_from_slug
-from app.workspace.preferences_crud import get_user_default_model_id
 
-ModelCallbackAction = Literal["providers", "vendors", "list", "select", "set_default"]
+ModelCallbackAction = Literal["providers", "vendors", "list", "select"]
 
 PROVIDER = "telegram"
 MODEL_CALLBACK_PREFIX = "mdl:"
@@ -31,14 +30,9 @@ _CALLBACK_MIN_PARTS = 2  # mdl:<tag>...
 _CALLBACK_VENDOR_PARTS = 3  # mdl:v:<host>
 _CALLBACK_LIST_PARTS = 5  # mdl:l:<host>:<vendor>:<page>
 _CALLBACK_SELECT_PARTS = 4  # mdl:s:<token>:<index>
-_CALLBACK_DEFAULT_PARTS = 4  # mdl:d:<token>:<index>
 
 _PICKER_NOT_BOUND_MESSAGE = "Connect your account first before changing models."
 _PICKER_STALE_MESSAGE = "That model picker is out of date. Send /model again."
-_DEFAULT_BUTTON_TEXT = "⭐ Set as my default"
-_DEFAULT_ALREADY_SET_TEXT = "⭐ Already your default"
-# Inert callback used by the post-default badge so a second tap is a no-op.
-NOOP_CALLBACK = "mdl:noop"
 
 
 class TelegramSenderLike(Protocol):
@@ -68,9 +62,6 @@ class ModelPickerState:
     """Current catalog state for one Telegram conversation."""
 
     current_model_id: str
-    # Persisted per-user default (or ``None``) — drives whether the
-    # picker offers "set as default" affordances after a selection.
-    user_default_model_id: str | None = None
 
 
 @dataclass(frozen=True)
@@ -90,7 +81,7 @@ async def get_model_picker_state(
     sender: TelegramSenderLike,
     session: AsyncSession,
 ) -> ModelPickerState | None:
-    """Resolve the current model + user default for a Telegram sender.
+    """Resolve the current effective model for a Telegram sender.
 
     Returns ``None`` when the Telegram sender is not bound to a user.
     """
@@ -107,19 +98,8 @@ async def get_model_picker_state(
         session=session,
         thread_id=sender.thread_id,
     )
-    current_model_id = await resolve_effective_model_id(
-        session=session,
-        user_id=pawrrtal_user_id,
-        conversation_model_id=conversation.model_id,
-    )
-    user_default = await get_user_default_model_id(
-        session=session,
-        user_id=pawrrtal_user_id,
-    )
-    return ModelPickerState(
-        current_model_id=current_model_id,
-        user_default_model_id=user_default,
-    )
+    current_model_id = resolve_effective_model_id(conversation_model_id=conversation.model_id)
+    return ModelPickerState(current_model_id=current_model_id)
 
 
 def build_host_keyboard() -> list[list[ModelButton]]:
@@ -209,24 +189,14 @@ def has_vendor_in_host(*, host: str, vendor: str) -> bool:
     return vendor in _host_to_vendors().get(host, {})
 
 
-def format_host_picker_text(
-    current_model_id: str,
-    user_default_model_id: str | None = None,
-) -> str:
-    """Render the host picker message in Telegram HTML.
-
-    Surfaces a second "Default: …" line when the user has pinned a
-    default that differs from the conversation's current model.
-    """
+def format_host_picker_text(current_model_id: str) -> str:
+    """Render the host picker message in Telegram HTML."""
     current = _display_name_for_model(current_model_id)
     lines = [
         "Choose a provider for this Telegram conversation.",
         "",
         f"Current: <b>{escape(current)}</b>",
     ]
-    if user_default_model_id and user_default_model_id != current_model_id:
-        default_name = _display_name_for_model(user_default_model_id)
-        lines.append(f"Default: <b>{escape(default_name)}</b> ⭐")
     return "\n".join(lines)
 
 
@@ -269,43 +239,21 @@ def _parse_prefixed_callback(parts: list[str]) -> ModelCallback | None:
         return _parse_list_callback(parts)
     if len(parts) == _CALLBACK_SELECT_PARTS and tag == "s":
         return _parse_indexed_callback(parts, "select")
-    if len(parts) == _CALLBACK_DEFAULT_PARTS and tag == "d":
-        return _parse_indexed_callback(parts, "set_default")
     return None
 
 
 def resolve_model_selection(callback: ModelCallback) -> ModelEntry | None:
-    """Resolve a ``select`` / ``set_default`` callback to a catalog entry.
+    """Resolve a ``select`` callback to a catalog entry.
 
     Returns ``None`` for stale catalog tokens or out-of-range indexes.
     """
-    if callback.action not in ("select", "set_default"):
+    if callback.action != "select":
         return None
     if callback.catalog_token != _CATALOG_TOKEN:
         return None
     if callback.index is None or callback.index < 0 or callback.index >= len(MODEL_CATALOG):
         return None
     return MODEL_CATALOG[callback.index]
-
-
-def build_set_default_keyboard(*, model_id: str) -> list[list[ModelButton]] | None:
-    """Build the "⭐ Set as my default" row, or ``None`` for stale catalog."""
-    entry = _entry_by_id(model_id)
-    if entry is None:
-        return None
-    return [
-        [
-            ModelButton(
-                text=_DEFAULT_BUTTON_TEXT,
-                callback_data=_set_default_callback(_catalog_index(entry)),
-            )
-        ]
-    ]
-
-
-def build_default_already_set_keyboard() -> list[list[ModelButton]]:
-    """Build the inert "⭐ Already your default" confirmation row."""
-    return [[ModelButton(text=_DEFAULT_ALREADY_SET_TEXT, callback_data=NOOP_CALLBACK)]]
 
 
 def picker_not_bound_message() -> str:
@@ -372,10 +320,6 @@ def _list_callback(*, host: str, vendor: str, page: int) -> str:
 
 def _select_callback(index: int) -> str:
     return f"mdl:s:{_CATALOG_TOKEN}:{index}"
-
-
-def _set_default_callback(index: int) -> str:
-    return f"mdl:d:{_CATALOG_TOKEN}:{index}"
 
 
 def _entry_by_id(model_id: str) -> ModelEntry | None:
@@ -460,15 +404,12 @@ def _pagination_rows(
 
 __all__ = [
     "MODEL_CALLBACK_PREFIX",
-    "NOOP_CALLBACK",
     "ModelButton",
     "ModelCallback",
     "ModelPickerState",
     "TelegramSenderLike",
-    "build_default_already_set_keyboard",
     "build_host_keyboard",
     "build_models_keyboard",
-    "build_set_default_keyboard",
     "build_vendor_keyboard",
     "format_host_picker_text",
     "format_models_picker_text",

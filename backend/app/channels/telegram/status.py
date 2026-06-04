@@ -325,11 +325,7 @@ async def handle_status_command(
         # unlikely but render the gateway-only view rather than crashing.
         return _STATUS_NO_CONVERSATION_MESSAGE.format(uptime=_format_duration(bot_uptime_seconds))
 
-    effective_model_id = await resolve_effective_model_id(
-        session=session,
-        user_id=pawrrtal_user_id,
-        conversation_model_id=status.model_id,
-    )
+    effective_model_id = resolve_effective_model_id(conversation_model_id=status.model_id)
     return _render_status_message(
         bot_uptime_seconds=bot_uptime_seconds,
         status=status,

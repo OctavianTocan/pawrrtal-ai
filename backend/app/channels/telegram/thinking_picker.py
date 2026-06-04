@@ -136,11 +136,7 @@ async def get_thinking_picker_state(
         thread_id=sender.thread_id,
     )
 
-    model_id = await resolve_effective_model_id(
-        session=session,
-        user_id=pawrrtal_user_id,
-        conversation_model_id=conversation.model_id,
-    )
+    model_id = resolve_effective_model_id(conversation_model_id=conversation.model_id)
     entry = _resolve_entry(model_id) or default_model()
     return ThinkingPickerState(
         model_entry=entry,
