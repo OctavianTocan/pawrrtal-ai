@@ -57,8 +57,8 @@ def stable_uuid(monkeypatch: pytest.MonkeyPatch) -> str:
 def _models_payload() -> dict[str, Any]:
     return {
         "models": [
-            {"model_id": MODEL_FROM, "is_default": True},
-            {"model_id": MODEL_TO, "is_default": False},
+            {"model_id": MODEL_FROM},
+            {"model_id": MODEL_TO},
         ]
     }
 
@@ -182,9 +182,7 @@ def test_no_second_model_in_catalog_fails_resolution(
     """A catalog with only one entry trips ``to_model_resolved``."""
     with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
         r.get("/api/v1/models").mock(
-            return_value=httpx.Response(
-                200, json={"models": [{"model_id": MODEL_FROM, "is_default": True}]}
-            )
+            return_value=httpx.Response(200, json={"models": [{"model_id": MODEL_FROM}]})
         )
         result = runner.invoke(app, ["verify", "model-switch", "--json"])
 

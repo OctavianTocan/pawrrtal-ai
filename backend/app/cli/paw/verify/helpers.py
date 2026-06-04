@@ -33,10 +33,10 @@ def extract_models(payload: Any) -> list[dict[str, Any]]:
     return []
 
 
-def find_default_model(models: list[dict[str, Any]]) -> dict[str, Any] | None:
-    """Return the first catalog entry flagged ``is_default``."""
+def first_model(models: list[dict[str, Any]]) -> dict[str, Any] | None:
+    """Return the first catalog entry (positional; the API is ordered)."""
     for m in models:
-        if isinstance(m, dict) and m.get("is_default") is True:
+        if isinstance(m, dict):
             return m
     return None
 
@@ -51,32 +51,32 @@ def find_model(models: list[dict[str, Any]], model_id: str) -> dict[str, Any] | 
     return None
 
 
-async def resolve_default_model(
+async def resolve_model(
     client: PawClient,
     r: ScenarioResult,
     override: str | None,
     *,
     check_name: str = "model_resolved",
 ) -> str | None:
-    """Resolve a model id from ``--model`` override or the catalog default.
+    """Resolve a model id from ``--model`` override or the first catalog model.
 
-    Returns ``None`` and adds a failing ``check_name`` row when neither
-    is available so the caller can short-circuit cleanly.
+    Returns ``None`` and adds a failing ``check_name`` row when the catalog
+    is empty so the caller can short-circuit cleanly.
     """
     if override is not None:
         r.add(check_name, True, detail=f"override={override}")
         return override
     catalog = (await client.request("GET", "/api/v1/models")).json()
     models = extract_models(catalog)
-    default = find_default_model(models)
-    if default is None:
+    first = first_model(models)
+    if first is None:
         r.add(
             check_name,
             False,
-            detail="no catalog entry has is_default=true; pass --model to override",
+            detail="catalog is empty; pass --model to override",
         )
         return None
-    model_id = default.get("model_id") or default.get("id")
+    model_id = first.get("model_id") or first.get("id")
     r.add(check_name, bool(model_id), detail=f"default={model_id}")
     return model_id if isinstance(model_id, str) else None
 

@@ -10,8 +10,8 @@ asserts the canonical ``model_id`` matches ``M2`` (migration 012's
 contract) and that the ``reasoning_effort`` CHECK constraint
 (migration 020) was honoured.
 
-The two models default to the catalog's ``is_default`` entry and the
-first non-default entry; ``--from`` / ``--to`` overrides both.
+The two models default to the first catalog entry and the next
+distinct entry; ``--from`` / ``--to`` overrides both.
 """
 
 from __future__ import annotations
@@ -57,15 +57,15 @@ async def _resolve_models(
     models = helpers.extract_models(catalog)
     r.artifacts["catalog_count"] = len(models)
 
-    default = helpers.find_default_model(models)
-    default_id = default.get("model_id") or default.get("id") if default else None
+    first = helpers.first_model(models)
+    first_id = first.get("model_id") or first.get("id") if first else None
 
-    from_id = from_override or (default_id if isinstance(default_id, str) else None)
+    from_id = from_override or (first_id if isinstance(first_id, str) else None)
     if from_id is None:
         r.add(
             "from_model_resolved",
             False,
-            detail="no catalog entry has is_default=true; pass --from to override",
+            detail="catalog is empty; pass --from to override",
         )
         return None
     r.add("from_model_resolved", True, detail=f"from={from_id}")
