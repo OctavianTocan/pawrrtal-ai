@@ -53,6 +53,30 @@ async def get_or_create_google_chat_conversation(
     if existing is not None:
         return existing
 
+    return await _insert_new_conversation(user_id=user_id, session=session)
+
+
+async def start_new_google_chat_conversation(
+    *,
+    user_id: uuid.UUID,
+    session: AsyncSession,
+) -> Conversation:
+    """Create and return a fresh Google Chat conversation for *user_id*.
+
+    Backs the ``/new`` command: a brand-new row has the most-recent
+    ``updated_at``, so :func:`get_or_create_google_chat_conversation`
+    returns it on the next turn — starting a clean thread without touching
+    the prior history.
+    """
+    return await _insert_new_conversation(user_id=user_id, session=session)
+
+
+async def _insert_new_conversation(
+    *,
+    user_id: uuid.UUID,
+    session: AsyncSession,
+) -> Conversation:
+    """Insert, commit, and return a fresh Google Chat conversation row."""
     conversation = Conversation(
         id=uuid.uuid4(),
         user_id=user_id,

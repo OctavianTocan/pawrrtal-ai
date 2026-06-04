@@ -38,6 +38,7 @@ from app.workspace.crud import get_default_workspace
 from .auth import has_google_chat_auth
 from .channel import INITIAL_PLACEHOLDER_TEXT, SURFACE_GOOGLE_CHAT
 from .client import acknowledge, close_google_chat_client, create_message, pull_messages
+from .commands import CommandContext, dispatch_command
 from .conversation import get_or_create_google_chat_conversation
 from .delivery import DEFAULT_VERBOSE_LEVEL
 from .dev_admin import resolve_or_autolink_google_chat_user
@@ -46,7 +47,9 @@ from .messages import (
     decode_pubsub_message,
     event_type,
     message_text,
+    parse_command,
     sender_display,
+    sender_email,
     sender_name,
     space_name,
     thread_name,
@@ -153,17 +156,54 @@ async def _pull_once() -> bool:
 
 
 async def _maybe_handle(event: dict[str, Any] | None) -> None:
-    """Run a turn for MESSAGE events; ignore everything else.
+    """Route a slash command or a MESSAGE turn; ignore everything else.
 
-    One bad message never breaks the pull loop — the event is still
-    acknowledged by the caller and the error is logged here.
+    One bad event never breaks the pull loop — it is still acknowledged by
+    the caller and the error is logged here.
     """
-    if event is None or event_type(event) != MESSAGE_EVENT_TYPE:
+    if event is None:
         return
     try:
-        await _handle_message_event(event)
+        command = parse_command(event)
+        if command is not None:
+            await _handle_command_event(event, command)
+        elif event_type(event) == MESSAGE_EVENT_TYPE:
+            await _handle_message_event(event)
     except Exception:
         logger.exception("GOOGLE_CHAT_HANDLE_ERR space=%s", space_name(event))
+
+
+async def _handle_command_event(event: dict[str, Any], parsed: tuple[str, str]) -> None:
+    """Resolve identity, run a slash command, and post its reply."""
+    command, args = parsed
+    space = space_name(event)
+    if not space:
+        return
+    async with async_session_maker() as session:
+        user_id = await resolve_or_autolink_google_chat_user(
+            session=session,
+            external_user_id=sender_name(event),
+            space_name=space,
+            display=sender_display(event),
+        )
+        if user_id is None:
+            logger.info("GOOGLE_CHAT_UNBOUND_SENDER sender=%s", sender_name(event))
+            return
+        conversation = await get_or_create_google_chat_conversation(
+            user_id=user_id, session=session
+        )
+        reply = await dispatch_command(
+            command=command,
+            ctx=CommandContext(
+                user_id=user_id,
+                conversation=conversation,
+                args=args,
+                sender_resource=sender_name(event),
+                sender_email=sender_email(event),
+                session=session,
+            ),
+        )
+    await create_message(space_name=space, text=reply, thread_name=thread_name(event))
 
 
 @dataclass

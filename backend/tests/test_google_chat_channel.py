@@ -37,6 +37,11 @@ from app.channels.google_chat.channel import (
     SURFACE_GOOGLE_CHAT,
     GoogleChatChannel,
 )
+from app.channels.google_chat.commands import (
+    COMMAND_MENU,
+    CommandContext,
+    dispatch_command,
+)
 from app.channels.google_chat.conversation import get_or_create_google_chat_conversation
 from app.channels.google_chat.delivery import StreamingDelivery
 from app.channels.google_chat.dev_admin import (
@@ -47,6 +52,7 @@ from app.channels.google_chat.messages import (
     decode_pubsub_message,
     event_type,
     message_text,
+    parse_command,
     sender_display,
     sender_name,
     space_name,
@@ -334,6 +340,153 @@ async def test_streaming_marks_failed_tool(monkeypatch: pytest.MonkeyPatch) -> N
     out = delivery.render(streaming=False)
     assert "broken_tool" in out
     assert "⚠️" in out
+
+
+# ---------------------------------------------------------------------------
+# commands — parse + dispatch
+# ---------------------------------------------------------------------------
+
+
+def _addon_command_event(*, command_text: str, argument_text: str | None = None) -> dict[str, Any]:
+    """Build an add-on slash-command event (``chat.appCommandPayload``)."""
+    message: dict[str, Any] = {"name": f"{_SPACE}/messages/CMD", "text": command_text}
+    if argument_text is not None:
+        message["argumentText"] = argument_text
+    return {
+        "commonEventObject": {"hostApp": "CHAT"},
+        "chat": {
+            "user": {"name": DEV_ADMIN_SENDER, "displayName": "Tavi"},
+            "appCommandPayload": {"space": {"name": _SPACE}, "message": message},
+        },
+    }
+
+
+def test_parse_command_from_plain_text() -> None:
+    assert parse_command(_chat_event(text="/verbose 2")) == ("verbose", "2")
+
+
+def test_parse_command_ignores_normal_message() -> None:
+    assert parse_command(_chat_event(text="hello there")) is None
+
+
+def test_parse_command_from_app_command_payload() -> None:
+    event = _addon_command_event(command_text="/model gpt", argument_text="gpt")
+    assert parse_command(event) == ("model", "gpt")
+
+
+def test_parse_command_no_args() -> None:
+    assert parse_command(_chat_event(text="/status")) == ("status", "")
+
+
+@pytest.fixture
+async def command_ctx(db_session: AsyncSession) -> CommandContext:
+    """A CommandContext backed by a real user + google_chat conversation."""
+    user = User(
+        id=uuid4(),
+        email=f"cmd-{uuid4()}@pawrrtal.dev",
+        hashed_password="x",
+        is_active=True,
+        is_superuser=False,
+        is_verified=True,
+    )
+    db_session.add(user)
+    await db_session.commit()
+    conversation = Conversation(
+        id=uuid4(),
+        user_id=user.id,
+        title="Google Chat",
+        origin_channel="google_chat",
+        created_at=datetime.now(),
+        updated_at=datetime.now(),
+    )
+    db_session.add(conversation)
+    await db_session.commit()
+    await db_session.refresh(conversation)
+    return CommandContext(
+        user_id=user.id,
+        conversation=conversation,
+        args="",
+        sender_resource=DEV_ADMIN_SENDER,
+        sender_email="cmd@pawrrtal.dev",
+        session=db_session,
+    )
+
+
+async def test_command_help_lists_menu(command_ctx: CommandContext) -> None:
+    reply = await dispatch_command(command="help", ctx=command_ctx)
+    for name, _desc in COMMAND_MENU:
+        assert f"/{name}" in reply
+
+
+async def test_command_unknown(command_ctx: CommandContext) -> None:
+    reply = await dispatch_command(command="frobnicate", ctx=command_ctx)
+    assert "Unknown command" in reply
+
+
+async def test_command_verbose_persists(command_ctx: CommandContext) -> None:
+    command_ctx.args = "2"
+    reply = await dispatch_command(command="verbose", ctx=command_ctx)
+    assert "2" in reply
+    assert command_ctx.conversation.verbose_level == 2
+
+
+async def test_command_verbose_rejects_bad_value(command_ctx: CommandContext) -> None:
+    command_ctx.args = "9"
+    reply = await dispatch_command(command="verbose", ctx=command_ctx)
+    assert "must be" in reply.lower()
+    assert command_ctx.conversation.verbose_level is None
+
+
+async def test_command_model_persists(command_ctx: CommandContext) -> None:
+    command_ctx.args = "openai-codex:openai/gpt-5.5"
+    reply = await dispatch_command(command="model", ctx=command_ctx)
+    assert "openai-codex:openai/gpt-5.5" in reply
+    assert command_ctx.conversation.model_id == "openai-codex:openai/gpt-5.5"
+
+
+async def test_command_thinking_none_clears(command_ctx: CommandContext) -> None:
+    command_ctx.conversation.reasoning_effort = "high"
+    command_ctx.args = "none"
+    await dispatch_command(command="thinking", ctx=command_ctx)
+    assert command_ctx.conversation.reasoning_effort is None
+
+
+async def test_command_thinking_rejects_bad_value(command_ctx: CommandContext) -> None:
+    command_ctx.args = "ludicrous"
+    reply = await dispatch_command(command="thinking", ctx=command_ctx)
+    assert "Unknown level" in reply
+
+
+async def test_command_status_reports_fields(command_ctx: CommandContext) -> None:
+    reply = await dispatch_command(command="status", ctx=command_ctx)
+    assert "Model" in reply
+    assert "Verbosity" in reply
+
+
+async def test_command_whoami_shows_identity(command_ctx: CommandContext) -> None:
+    reply = await dispatch_command(command="whoami", ctx=command_ctx)
+    assert DEV_ADMIN_SENDER in reply
+    assert str(command_ctx.user_id) in reply
+
+
+async def test_command_new_creates_fresh_conversation(
+    command_ctx: CommandContext, db_session: AsyncSession
+) -> None:
+    await dispatch_command(command="new", ctx=command_ctx)
+    rows = (
+        (
+            await db_session.execute(
+                select(Conversation).where(
+                    Conversation.user_id == command_ctx.user_id,
+                    Conversation.origin_channel == "google_chat",
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    # The fixture conversation plus the freshly started one.
+    assert len(rows) >= 2
 
 
 # ---------------------------------------------------------------------------

@@ -74,15 +74,26 @@ def event_type(event: dict[str, Any]) -> str:
 
 
 def _addon_payload(event: dict[str, Any]) -> dict[str, Any]:
-    """Return the add-on ``chat.messagePayload`` dict, or ``{}``.
+    """Return the add-on message/command payload dict, or ``{}``.
 
     Google Chat apps built as Google Workspace add-ons wrap the event as
     ``{"commonEventObject": ..., "chat": {"messagePayload": {...}}}`` rather
-    than the classic flat ``{"type", "message", "space"}`` shape.
+    than the classic flat ``{"type", "message", "space"}`` shape. Configured
+    slash commands instead arrive under ``chat.appCommandPayload`` — which
+    carries the same ``message``/``space`` shape — so both are accepted here.
     """
     chat = event.get("chat")
-    payload = chat.get("messagePayload") if isinstance(chat, dict) else None
+    if not isinstance(chat, dict):
+        return {}
+    payload = chat.get("messagePayload") or chat.get("appCommandPayload")
     return payload if isinstance(payload, dict) else {}
+
+
+def _chat_user(event: dict[str, Any]) -> dict[str, Any]:
+    """Return the add-on ``chat.user`` dict (the human who acted), or ``{}``."""
+    chat = event.get("chat")
+    user = chat.get("user") if isinstance(chat, dict) else None
+    return user if isinstance(user, dict) else {}
 
 
 def _message(event: dict[str, Any]) -> dict[str, Any]:
@@ -122,14 +133,46 @@ def thread_name(event: dict[str, Any]) -> str | None:
 
 
 def sender_name(event: dict[str, Any]) -> str:
-    """Return the sender's ``users/{id}`` resource name (stable identity)."""
-    return str(_sender(event).get("name") or "")
+    """Return the sender's ``users/{id}`` resource name (stable identity).
+
+    Command events may omit ``message.sender`` but always carry
+    ``chat.user``, so that is the fallback.
+    """
+    name = _sender(event).get("name") or _chat_user(event).get("name")
+    return str(name or "")
 
 
 def sender_display(event: dict[str, Any]) -> str | None:
     """Return the sender's display name, if Chat supplied one."""
-    display = _sender(event).get("displayName")
+    display = _sender(event).get("displayName") or _chat_user(event).get("displayName")
     return str(display) if display else None
+
+
+def sender_email(event: dict[str, Any]) -> str | None:
+    """Return the sender's email, if Chat supplied one (used by ``/whoami``)."""
+    email = _sender(event).get("email") or _chat_user(event).get("email")
+    return str(email) if email else None
+
+
+def parse_command(event: dict[str, Any]) -> tuple[str, str] | None:
+    """Return ``(command, args)`` when the event is a slash command, else ``None``.
+
+    Handles both configured slash commands (delivered under
+    ``chat.appCommandPayload``, with the command and args available on the
+    payload's ``message``) and plain ``/cmd ...`` text typed before any
+    Console command config exists. Both expose the text via
+    :func:`message_text`; ``argumentText`` (mentions stripped) is preferred
+    for the argument string when Chat supplies it.
+    """
+    text = message_text(event).strip()
+    if not text.startswith("/"):
+        return None
+    head, _, rest = text[1:].partition(" ")
+    command = head.strip().lower()
+    if not command:
+        return None
+    args = str(_message(event).get("argumentText") or rest).strip()
+    return command, args
 
 
 def format_for_chat(text: str) -> str:
