@@ -57,10 +57,10 @@ This is a public repo wired to a self-hosted runner pool on Octavian's VPS. CI i
       github.event.pull_request.head.repo.full_name == github.repository)
   ```
 
-- **Default runner is self-hosted:** `runs-on: [self-hosted, openclaw-mini, pawrrtal]`. The runner pool is `openclaw-vps-NN` registered out of `/srv/github-runners/<repo>/actions-runner/` as the `gha` system user. Use `ubuntu-latest` only when there's a real reason (macOS/Windows/GPU/untrusted external code already gated separately).
+- **Default runner is self-hosted:** `runs-on: [self-hosted, openclaw-mini, pawrrtal]`. The runner pool is repo-scoped and ephemeral, launched only when needed from `/srv/github-runners/pawrrtal-ephemeral/` with per-runner system users. Do not install persistent GitHub Actions runner services for this public repo. Use `ubuntu-latest` only when there's a real reason (macOS/Windows/GPU/untrusted external code already gated separately).
 - **Documented exception:** `rebase.yml` uses `pull_request_target` and never runs PR code; it relies on `author_association` instead of the actor gate. See `.claude/rules/github-actions/safe-pull-request-target.md`.
 - **Repo-level Actions settings** (must be set in the GitHub UI; the standard CI tokens don't have Actions admin scope): require approval for first-time contributor workflows, default workflow permissions = read.
-- **Layout / install / removal:** `frontend/content/docs/handbook/ci/self-hosted-runner.md`. Use `scripts/install-self-hosted-runner.sh` to add another runner; the script auto-picks the next `openclaw-vps-NN` slot.
+- **Layout / launch / cleanup:** `frontend/content/docs/handbook/ci/self-hosted-runner.md`. Use `scripts/ephemeral-self-hosted-runners.sh start --count <N> --tag <name>` to launch a bounded temporary batch, then `scripts/ephemeral-self-hosted-runners.sh cleanup --count <N> --tag <name>` after the jobs drain.
 
 New CI surfaces (backend pytest, frontend vitest, Maestro E2E, etc.) belong on the self-hosted runner with the actor gate. If you find yourself thinking "just this once on `ubuntu-latest` without the gate," don't.
 

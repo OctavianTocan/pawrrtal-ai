@@ -243,10 +243,11 @@ skip-magic-trailing-comma = false
 testpaths = ["tests"]
 norecursedirs = ["vendor", ".venv", "node_modules", "__pycache__", "*.egg-info"]
 filterwarnings = [
-    # google-genai 2.3.x subclasses aiohttp.ClientSession internally at import
-    # time. This is a dependency warning, not Pawrrtal behavior; keep the filter
-    # narrow so new first-party deprecations still surface.
-    "ignore:Inheritance class AiohttpClientSession from ClientSession is discouraged:DeprecationWarning:google\\.genai\\._api_client",
+    # google-genai defines an aiohttp.ClientSession subclass at import time.
+    # aiohttp emits this deprecation from aiohttp.client before Pawrrtal code
+    # can influence the SDK internals; keep the filter exact so first-party
+    # warnings still surface.
+    "ignore:Inheritance class AiohttpClientSession from ClientSession is discouraged:DeprecationWarning",
 ]
 
 # --- mypy: static type checker ---------------------------------------------

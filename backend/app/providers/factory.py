@@ -22,7 +22,6 @@ from app.infrastructure.config import settings as settings  # noqa: PLC0414
 from .agy_api import AgyApiLLM
 from .base import AILLM
 from .claude import ClaudeLLM, ClaudeLLMConfig
-from .gemini import GeminiLLM
 from .gemini_cli import GeminiCliLLM
 from .litellm_provider import LiteLLMLLM
 from .model_id import Host, ParsedModelId, parse_model_id
@@ -49,12 +48,19 @@ def _load_openai_codex_provider_cls() -> type[AILLM]:
     return OpenAICodexProvider  # type: ignore[no-any-return]
 
 
+def _load_gemini_provider_cls() -> type[AILLM]:
+    """Resolve the native Gemini provider class lazily."""
+    from .gemini import GeminiLLM  # noqa: PLC0415
+
+    return GeminiLLM
+
+
 HOST_TO_PROVIDER: dict[Host, type[AILLM] | None] = {
     Host.agent_sdk: ClaudeLLM,
     Host.agy_api: AgyApiLLM,
     Host.agy_cli: None,
     Host.gemini_cli: GeminiCliLLM,
-    Host.google_ai: GeminiLLM,
+    Host.google_ai: None,  # resolved lazily in resolve_llm
     Host.litellm: LiteLLMLLM,
     Host.opencode_go: OpencodeGoLLM,
     Host.xai: XaiLLM,
@@ -231,6 +237,8 @@ def resolve_llm(
         parsed = parse_model_id(raw)
 
     provider_cls = HOST_TO_PROVIDER[parsed.host]
+    if parsed.host is Host.google_ai and provider_cls is None:
+        provider_cls = _load_gemini_provider_cls()
     if parsed.host is Host.openai_codex and provider_cls is None:
         provider_cls = _load_openai_codex_provider_cls()
     if provider_cls is None:
@@ -251,7 +259,7 @@ def resolve_llm(
         return _build_opencode_go(parsed, workspace_root)
     if parsed.host is Host.openai_codex:
         return _resolve_cached_openai_codex_provider(provider_cls, parsed, workspace_root)
-    if provider_cls in {AgyApiLLM, GeminiLLM, GeminiCliLLM, XaiLLM}:
+    if parsed.host is Host.google_ai or provider_cls in {AgyApiLLM, GeminiCliLLM, XaiLLM}:
         return provider_cls(parsed.model, workspace_root=workspace_root)  # type: ignore[call-arg]
     raise KeyError(f"no provider class registered for host {parsed.host!r}")
 

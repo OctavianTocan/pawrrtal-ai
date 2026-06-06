@@ -8,9 +8,6 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, cast
 
-from google import genai as genai  # noqa: PLC0414
-from google.genai import types as gtypes
-
 from app.agents import (
     DEFAULT_AGENT_SYSTEM_PROMPT as _FALLBACK_SYSTEM_PROMPT,
 )
@@ -47,6 +44,7 @@ from .messages import (
     split_chunk_text,
     tool_calls_from_chunk,
 )
+from .sdk import genai, gtypes
 from .thinking import compose_thinking_config
 from .usage import (
     GeminiUsageAccumulator,

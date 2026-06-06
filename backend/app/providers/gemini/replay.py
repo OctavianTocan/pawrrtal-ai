@@ -21,9 +21,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from google.genai import types as gtypes
-
 from app.agents.types import AgentMessage
+from app.providers.gemini.sdk import gtypes
 
 
 def replay_content_for(msg: AgentMessage) -> gtypes.Content | None:

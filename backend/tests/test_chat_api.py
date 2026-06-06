@@ -8,7 +8,6 @@ from httpx import AsyncClient
 
 from app.agents.types import AgentSafetyConfig
 from app.models import Workspace  # used via fixture type hint
-from app.providers.gemini import GeminiLLM
 from tests.agent_harness import ScriptedStreamFn, echo_tool, text_turn, tool_call_turn
 
 
@@ -279,6 +278,8 @@ async def test_chat_multi_turn_tool_call_flows_through_full_http_path(
     Only the LLM is replaced.  Every other component (HTTP routing,
     agent_loop, tool execution, SSE serialization) runs as in production.
     """
+    from app.providers.gemini import GeminiLLM
+
     echo = echo_tool()
     script = ScriptedStreamFn(
         [
@@ -343,6 +344,8 @@ async def test_chat_safety_layer_fires_and_surfaces_agent_terminated(
     If the safety layer were disconnected, the loop would consume all 10
     turns and no ``agent_terminated`` frame would appear.
     """
+    from app.providers.gemini import GeminiLLM
+
     # 10 tool-call turns — runaway loop the safety must stop.
     turns = [tool_call_turn("ping", {}, turn_id=f"tc-{i}") for i in range(10)]
     script = ScriptedStreamFn(turns)

@@ -19,9 +19,8 @@ want deeper reasoning opt in via ``/thinking``.
 
 from __future__ import annotations
 
-from google.genai import types as gtypes
-
 from app.providers.base import ReasoningEffort
+from app.providers.gemini.sdk import gtypes
 
 # Map Pawrrtal's five-level ``ReasoningEffort`` literal onto Gemini 3's
 # four-level ``thinking_level`` enum. ``extra-high`` saturates at

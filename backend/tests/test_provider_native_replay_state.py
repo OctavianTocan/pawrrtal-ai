@@ -13,7 +13,6 @@ from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
-from google.genai import types as gtypes
 
 from app.agents.loop import agent_loop
 from app.agents.types import (
@@ -30,6 +29,8 @@ from app.agents.types import (
     UserMessage,
 )
 from app.providers.gemini import provider as gemini_provider
+from app.providers.gemini import sdk as gemini_sdk
+from app.providers.gemini.sdk import gtypes
 
 
 async def _execute_noop(tool_call_id: str, **kwargs: object) -> str:
@@ -170,7 +171,7 @@ async def test_gemini_stream_done_preserves_native_model_content(
             self.api_key = api_key
             self.aio = SimpleNamespace(models=CapturingModels())
 
-    monkeypatch.setattr(gemini_provider.genai, "Client", CapturingClient)
+    monkeypatch.setattr(gemini_sdk.genai, "Client", CapturingClient)
     monkeypatch.setattr(gemini_provider, "resolve_gemini_api_key", lambda _user_id: "test-key")
     stream_fn = gemini_provider.make_gemini_stream_fn(
         "gemini-test",

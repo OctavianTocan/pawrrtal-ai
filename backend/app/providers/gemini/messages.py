@@ -18,8 +18,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from google.genai import types as gtypes
-
 from app.agents.types import (
     AgentMessage,
     AgentTool,
@@ -37,6 +35,7 @@ from app.infrastructure.config import settings
 from app.infrastructure.keys import resolve_api_key
 
 from .replay import function_call_content_for, replay_content_for
+from .sdk import gtypes
 
 logger = logging.getLogger(__name__)
 
