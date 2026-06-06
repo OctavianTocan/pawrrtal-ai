@@ -69,6 +69,18 @@ def run_migrations_online() -> None:
                 text("SELECT pg_advisory_lock(:lock_id)"),
                 {"lock_id": ALEMBIC_MIGRATION_LOCK_ID},
             )
+            # Under SQLAlchemy 2.0 that ``execute`` auto-began a transaction
+            # that Alembic's own ``context.begin_transaction()`` does not own.
+            # Left open, it is rolled back when this ``with`` block closes the
+            # connection — silently discarding ALL migration DDL while
+            # ``alembic upgrade head`` still prints a clean run and exits 0
+            # (a latent production/Railway failure: zero tables created on a
+            # fresh database). Commit now to close that auto-begun transaction
+            # so Alembic's transaction owns and COMMITs the schema changes.
+            # ``pg_advisory_lock`` is session-scoped (not transaction-scoped),
+            # so committing does NOT release the lock — it persists until
+            # ``pg_advisory_unlock`` / session end below.
+            connection.commit()
         try:
             # render_as_batch=True is required for safe ALTER TABLE operations on SQLite.
             # Without it, adding columns (common during development) can fail or corrupt
@@ -88,6 +100,11 @@ def run_migrations_online() -> None:
                     text("SELECT pg_advisory_unlock(:lock_id)"),
                     {"lock_id": ALEMBIC_MIGRATION_LOCK_ID},
                 )
+                # Same auto-begin caveat as the lock above: close the
+                # transaction this ``execute`` opened so we don't leave a
+                # dangling open transaction when the connection closes.
+                # ``pg_advisory_unlock`` already took effect at statement time.
+                connection.commit()
 
 
 if context.is_offline_mode():
