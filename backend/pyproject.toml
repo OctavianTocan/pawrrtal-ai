@@ -242,6 +242,12 @@ skip-magic-trailing-comma = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 norecursedirs = ["vendor", ".venv", "node_modules", "__pycache__", "*.egg-info"]
+filterwarnings = [
+    # google-genai 2.3.x subclasses aiohttp.ClientSession internally at import
+    # time. This is a dependency warning, not Pawrrtal behavior; keep the filter
+    # narrow so new first-party deprecations still surface.
+    "ignore:Inheritance class AiohttpClientSession from ClientSession is discouraged:DeprecationWarning:google\\.genai\\._api_client",
+]
 
 # --- mypy: static type checker ---------------------------------------------
 # Strict-ish defaults. Project rule forbids cast(Any, ...), so we want mypy
