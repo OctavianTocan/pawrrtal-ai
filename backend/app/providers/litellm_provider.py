@@ -59,7 +59,7 @@ from app.agents import (
     agent_loop,
 )
 from app.agents.safety_factory import safety_from_settings
-from app.agents.types import PermissionCheckFn, TextContent
+from app.agents.types import TextContent
 from app.infrastructure.config import settings
 
 from ._stream_logging import log_provider_stream_event
@@ -392,7 +392,6 @@ class LiteLLMLLM:
         tools: list[AgentTool] | None = None,
         system_prompt: str | None = None,
         reasoning_effort: ReasoningEffort | None = None,
-        permission_check: PermissionCheckFn | None = None,
         images: list[dict[str, str]] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Run the agent loop and translate AgentEvents → StreamEvents.
@@ -414,8 +413,6 @@ class LiteLLMLLM:
                 levels mapped onto OpenAI's six-level enum, with
                 ``extra-high`` → ``xhigh``).  Non-reasoning models
                 ignore the kwarg.
-            permission_check: Forwarded to the loop's
-                ``AgentLoopConfig``.  Inert in v1 because no tools fire.
             images: Multimodal inputs.  Accepted for protocol parity
                 and ignored; the LiteLLM image flow lands with the tool
                 bridge.
@@ -444,7 +441,6 @@ class LiteLLMLLM:
         config = AgentLoopConfig(
             convert_to_llm=identity_convert,
             safety=safety_from_settings(settings),
-            permission_check=permission_check,
         )
 
         stream_fn = self._stream_fn or make_litellm_stream_fn(

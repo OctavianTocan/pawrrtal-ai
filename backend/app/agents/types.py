@@ -239,7 +239,7 @@ class ToolCallEndEvent(TypedDict):
 
 
 class ToolResultEvent(TypedDict):
-    """Result of executing one tool call (or a permission denial / tool error)."""
+    """Result of executing one tool call (or a tool error)."""
 
     type: Literal["tool_result"]
     tool_call_id: str
@@ -416,58 +416,6 @@ class AgentSafetyConfig:
         )
 
 
-# ---------------------------------------------------------------------------
-# Permission gate (PR 03)
-#
-# The agent loop calls ``permission_check`` (when configured) before
-# every tool ``execute``.  A ``deny`` short-circuits the call and emits
-# a ``tool_result`` event with ``is_error=True``.  The optional
-# ``permission_audit_sink`` lets the chat router persist a
-# ``security_violation`` audit row without coupling the loop to the
-# governance module.
-#
-# ``PermissionCheckFn`` itself lives in
-# ``app.governance.permissions``.  We only declare the typing
-# aliases here so ``AgentLoopConfig`` can reference them without a
-# circular import.
-# ---------------------------------------------------------------------------
-
-
-class PermissionCheckResult(TypedDict):
-    """Loop-side projection of :class:`governance.PermissionDecision`.
-
-    The loop only needs three fields; importing the full dataclass
-    would pull the governance package into ``agent_loop`` and
-    re-introduce the circular dependency we deliberately avoid.
-    """
-
-    allow: bool
-    reason: str | None
-    violation_type: str | None
-
-
-PermissionCheckFn = Callable[
-    [str, dict[str, Any]],
-    Coroutine[Any, Any, PermissionCheckResult],
-]
-"""Async predicate ``(tool_name, arguments) -> PermissionCheckResult``.
-
-Bound by the chat router with the per-request ``PermissionContext``
-already captured in the closure.  The loop is provider-neutral by
-construction, so the signature is minimal.
-"""
-
-
-PermissionAuditSinkFn = Callable[
-    [str, dict[str, Any], PermissionCheckResult],
-    Coroutine[Any, Any, None],
-]
-"""Optional sink called after every denial so the chat router can
-persist a ``security_violation`` audit row.  Errors raised by the
-sink are swallowed by the loop — audit failures must never break a
-turn."""
-
-
 @dataclass
 class AgentLoopConfig:
     """Configuration for a single agent_loop invocation.
@@ -481,20 +429,9 @@ class AgentLoopConfig:
     safety: hard limits on iterations, wall-clock, retries, etc.  See
         :class:`AgentSafetyConfig`.  Defaults are conservative and
         appropriate for the chat path.
-    permission_check: optional async permission gate called before every
-        tool execution.  Returning ``allow=False`` skips the tool call
-        and surfaces a ``tool_result`` event with ``is_error=True``.
-        ``None`` (default) keeps the previous behaviour: every tool
-        call dispatches to ``tool.execute`` directly.
-    permission_audit_sink: optional async callback fired after every
-        denial.  Receives ``(tool_name, arguments, decision)``.  Errors
-        raised by the sink are swallowed; a failed audit must never
-        break the turn.
     """
 
     convert_to_llm: Callable[[list[AgentMessage]], list[AgentMessage]]
     transform_context: TransformContextFn | None = None
     should_stop_after_turn: ShouldStopFn | None = None
     safety: AgentSafetyConfig = field(default_factory=AgentSafetyConfig)
-    permission_check: PermissionCheckFn | None = None
-    permission_audit_sink: PermissionAuditSinkFn | None = None

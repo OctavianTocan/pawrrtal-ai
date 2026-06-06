@@ -24,9 +24,9 @@ What we read
    paths; full SKILL.md bodies remain available through the workspace
    skill tools and can be restored with ``WORKSPACE_SKILL_PROMPT_MODE=full``.
 3. **Permissions** — ``.agent/protocols/permissions.md`` is appended
-   to the prompt for conversational guidance. The mechanical allow/deny
-   gate currently returns "no opinion" (permissive default); a
-   Markdown→allowlist parser is future work.
+   to the prompt for conversational guidance only. There is no
+   mechanical allow/deny gate; the agent honours the file's guidance
+   conversationally.
 
 Writes
 ------
@@ -38,15 +38,14 @@ Failure mode
 ------------
 Every individual file load tolerates a missing file → ``None``.  An
 empty workspace yields a default-shaped :class:`WorkspaceContext` with
-no system prompt and no allowlist (i.e. the historical "trust
-everything" behaviour).  Callers can always check ``ctx.is_empty`` to
-decide whether to short-circuit.
+no system prompt.  Callers can always check ``ctx.is_empty`` to decide
+whether to short-circuit.
 """
 
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 from app.infrastructure.config import settings
@@ -93,36 +92,17 @@ class SkillDef:
 
 
 @dataclass(frozen=True)
-class SettingsPermissions:
-    """Permission allow/deny lists pulled from the workspace.
-
-    The current loader reads ``.agent/protocols/permissions.md`` for
-    context only and returns an empty :class:`SettingsPermissions`
-    (no mechanical opinion). A Markdown→tool-allowlist parser is
-    future work; until then the agent honours permissions
-    conversationally via AGENTS.md's reference to the file.
-    """
-
-    allow: frozenset[str] = field(default_factory=frozenset)
-    deny: frozenset[str] = field(default_factory=frozenset)
-    default_mode: str | None = None
-
-
-@dataclass(frozen=True)
 class WorkspaceContext:
-    """Single struct every provider + permission gate consumes.
+    """Single struct every provider consumes.
 
     Built fresh per chat request via :func:`load_workspace_context`.
-    The cross-provider permission gate consults ``enabled_tools``;
-    providers consume ``system_prompt`` (Claude additionally enables
+    Providers consume ``system_prompt`` (Claude additionally enables
     ``setting_sources=['project']`` so the SDK reads the same files
     natively — defence in depth).
     """
 
     system_prompt: str | None
-    enabled_tools: frozenset[str] | None
     skills: tuple[SkillDef, ...]
-    permissions: SettingsPermissions
     loaded_from: tuple[Path, ...]
 
     @property
@@ -132,13 +112,7 @@ class WorkspaceContext:
         A caller seeing ``is_empty`` can fall back to whatever default
         the provider had before workspace context existed.
         """
-        return (
-            self.system_prompt is None
-            and self.enabled_tools is None
-            and not self.skills
-            and not self.permissions.allow
-            and not self.permissions.deny
-        )
+        return self.system_prompt is None and not self.skills
 
 
 def load_workspace_context(root: Path) -> WorkspaceContext:
@@ -172,33 +146,28 @@ def load_workspace_context(root: Path) -> WorkspaceContext:
             loaded.append(skills_index_path)
 
     skills = _load_skills(root, loaded)
-    permissions, permissions_text = _load_permissions(root, loaded)
+    permissions_text = _load_permissions(root, loaded)
 
     system_prompt = _assemble_system_prompt(
         base_prompt=base_prompt,
         permissions_text=permissions_text,
         skills=skills,
     )
-    enabled_tools = _resolve_enabled_tools(permissions)
 
     if loaded:
         logger.debug(
             "WORKSPACE_CONTEXT_LOADED root=%s files=%s skills=%d skill_prompt_mode=%s "
-            "prompt_chars=%d allow=%d deny=%d",
+            "prompt_chars=%d",
             root,
             [str(p.relative_to(root)) for p in loaded],
             len(skills),
             _skill_prompt_mode(),
             len(system_prompt or ""),
-            len(permissions.allow),
-            len(permissions.deny),
         )
 
     return WorkspaceContext(
         system_prompt=system_prompt,
-        enabled_tools=enabled_tools,
         skills=tuple(skills),
-        permissions=permissions,
         loaded_from=tuple(loaded),
     )
 
@@ -207,9 +176,7 @@ def _empty_context() -> WorkspaceContext:
     """Default-shaped context — used when the loader is disabled."""
     return WorkspaceContext(
         system_prompt=None,
-        enabled_tools=None,
         skills=(),
-        permissions=SettingsPermissions(),
         loaded_from=(),
     )
 
@@ -261,21 +228,20 @@ def _extract_description(body: str) -> str | None:
     return None
 
 
-def _load_permissions(root: Path, loaded: list[Path]) -> tuple[SettingsPermissions, str | None]:
-    """Read ``.agent/protocols/permissions.md`` for context.
+def _load_permissions(root: Path, loaded: list[Path]) -> str | None:
+    """Read ``.agent/protocols/permissions.md`` for prompt context.
 
-    Returns the default-shaped :class:`SettingsPermissions` (empty
-    allow/deny) when the file is missing. When present and readable,
-    the file is recorded in ``loaded`` and appended to the prompt, but
-    no Markdown→tool-allowlist parser is implemented yet — the
-    mechanical gate stays permissive.
+    Returns ``None`` when the file is missing. When present and
+    readable, the file is recorded in ``loaded`` and appended to the
+    prompt for conversational guidance only — there is no mechanical
+    allow/deny gate.
     """
     settings_path = root / settings.workspace_settings_filename
     text = read_capped_utf8(settings_path, max_bytes=_MAX_BYTES)
     if text is None:
-        return SettingsPermissions(), None
+        return None
     loaded.append(settings_path)
-    return SettingsPermissions(), f"## Workspace Permissions\n\n{text}"
+    return f"## Workspace Permissions\n\n{text}"
 
 
 def _assemble_system_prompt(
@@ -338,25 +304,3 @@ def _relative_skill_path(skill: SkillDef) -> str:
     except ValueError:
         return skill.path.name
     return "/".join(parts[idx:])
-
-
-def _resolve_enabled_tools(perms: SettingsPermissions) -> frozenset[str] | None:
-    """Compute the tool allowlist the cross-provider gate consults.
-
-    Returns:
-        ``None`` when the workspace has no opinion (empty allow/deny)
-        — the gate falls through to "permissive". Otherwise an
-        explicit allowlist (allow minus deny) the gate enforces.
-    """
-    if not perms.allow and not perms.deny:
-        return None
-    if not perms.allow:
-        # Pure-deny semantics: every known tool is allowed except
-        # the explicit deny list.  We can't materialise "every known
-        # tool" here without the chat router's tool list, so return
-        # ``None`` and let the gate enforce the deny list separately
-        # (PR 06 follow-on; for now deny-only workspaces accept
-        # everything).
-        return None
-    allowed = perms.allow - perms.deny
-    return frozenset(allowed)

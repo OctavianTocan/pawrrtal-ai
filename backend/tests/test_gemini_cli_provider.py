@@ -444,13 +444,11 @@ def test_stream_event_for_update_unknown_variant_returns_none() -> None:
 def _make_client(
     *,
     workspace_root: Path | None = None,
-    permission_check: Any = None,
 ) -> tuple[PawrrtalAcpClient, asyncio.Queue[StreamEvent | None]]:
     queue: asyncio.Queue[StreamEvent | None] = asyncio.Queue()
     client = PawrrtalAcpClient(
         event_queue=queue,
         workspace_root=workspace_root,
-        permission_check=permission_check,
     )
     return client, queue
 
@@ -483,30 +481,13 @@ async def test_session_update_drops_empty_chunks() -> None:
 
 
 @pytest.mark.anyio
-async def test_request_permission_auto_approves_allow_once_when_no_closure() -> None:
+async def test_request_permission_auto_approves_allow_once() -> None:
     client, queue = _make_client()
     options = [PermissionOption(option_id="1", name="Once", kind="allow_once")]
     tool_call = ToolCallUpdate(tool_call_id="tc", title="Bash", raw_input={"cmd": "ls"})
     resp = await client.request_permission(options=options, session_id="s1", tool_call=tool_call)
     assert resp.outcome.option_id == "1"
     assert queue.empty()  # no error event when auto-approving
-
-
-@pytest.mark.anyio
-async def test_request_permission_pushes_error_event_on_denial() -> None:
-    async def deny(_name: str, _args: dict[str, Any]) -> dict[str, Any]:
-        return {"allow": False, "reason": "blocked by policy", "violation_type": "tool_blocked"}
-
-    client, queue = _make_client(permission_check=deny)
-    options = [PermissionOption(option_id="1", name="Once", kind="allow_once")]
-    tool_call = ToolCallUpdate(tool_call_id="tc", title="Bash", raw_input={"cmd": "rm -rf"})
-    resp = await client.request_permission(options=options, session_id="s1", tool_call=tool_call)
-    assert resp.outcome.outcome == "cancelled"
-    event = queue.get_nowait()
-    assert event is not None
-    assert event["type"] == "error"
-    assert "Bash" in event["content"]
-    assert "blocked by policy" in event["content"]
 
 
 @pytest.mark.anyio
@@ -519,21 +500,6 @@ async def test_request_permission_pushes_error_event_when_no_allow_offered() -> 
     event = queue.get_nowait()
     assert event is not None
     assert event["type"] == "error"
-
-
-@pytest.mark.anyio
-async def test_request_permission_forwards_tool_name_and_arguments_to_closure() -> None:
-    captured: list[tuple[str, dict[str, Any]]] = []
-
-    async def allow(name: str, args: dict[str, Any]) -> dict[str, Any]:
-        captured.append((name, args))
-        return {"allow": True, "reason": None, "violation_type": None}
-
-    client, _queue = _make_client(permission_check=allow)
-    options = [PermissionOption(option_id="1", name="Once", kind="allow_once")]
-    tool_call = ToolCallUpdate(tool_call_id="tc", title="Bash", raw_input={"cmd": "ls"})
-    await client.request_permission(options=options, session_id="s1", tool_call=tool_call)
-    assert captured == [("Bash", {"cmd": "ls"})]
 
 
 # ---------------------------------------------------------------------------

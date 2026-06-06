@@ -30,9 +30,8 @@ Security
 ~~~~~~~~
 
 * External MCP tools execute network requests on behalf of the user.
-  The chat router is responsible for gating them through
-  ``permission_check`` if/when a policy applies. By default the loop
-  treats them like every other ``AgentTool``.
+  The loop treats them like every other ``AgentTool``; there is no
+  separate permission gate today.
 * Bearer headers in the config blob live in the database and are
   never echoed to the model — only the resolved request reaches the
   remote server. The agent sees the **tool name + description** the

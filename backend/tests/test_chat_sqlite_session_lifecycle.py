@@ -40,7 +40,6 @@ class _FakeProvider:
         tools: object = None,
         system_prompt: object = None,
         reasoning_effort: object = None,
-        permission_check: object = None,
         images: object = None,
     ) -> AsyncIterator[dict[str, str]]:
         """Emit one text delta so ``_finalize_turn`` has something to persist."""

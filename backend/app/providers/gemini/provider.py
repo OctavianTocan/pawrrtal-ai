@@ -29,7 +29,6 @@ from app.agents import (
 )
 from app.agents.safety_factory import safety_from_settings
 from app.agents.types import (
-    PermissionCheckFn,
     TextContent,
 )
 from app.governance.cost_tracker import compute_cost_usd
@@ -246,7 +245,6 @@ class GeminiLLM:
         tools: list[AgentTool] | None = None,
         system_prompt: str | None = None,
         reasoning_effort: ReasoningEffort | None = None,
-        permission_check: PermissionCheckFn | None = None,
         images: list[dict[str, str]] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Run the agent loop and translate AgentEvents → StreamEvents for the frontend.
@@ -265,10 +263,6 @@ class GeminiLLM:
                 bare unit test or direct script call still works.
             reasoning_effort: Accepted for protocol parity. Gemini Flash
                 ignores this UI knob for now.
-            permission_check: Optional cross-provider ``can_use_tool`` gate
-                (PR 03b).  Threaded straight into ``AgentLoopConfig`` so the
-                loop's tool dispatch consults it before every tool execution.
-                ``None`` (the default) preserves the previous behaviour.
             images: Optional multimodal image inputs (PR 05 protocol
                 parity).  Accepted for ``AILLM`` protocol parity with
                 Claude; the Gemini-side wiring lands in PR 09 alongside
@@ -310,7 +304,6 @@ class GeminiLLM:
         config = AgentLoopConfig(
             convert_to_llm=identity_convert,
             safety=safety_from_settings(settings),
-            permission_check=permission_check,
         )
 
         # In production ``_stream_fn`` is ``None`` and we build a fresh

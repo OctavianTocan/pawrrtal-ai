@@ -83,7 +83,6 @@ from app.agents import (
 )
 from app.agents.safety_factory import safety_from_settings
 from app.agents.types import (
-    PermissionCheckFn,
     TextContent,
 )
 from app.infrastructure.config import settings
@@ -312,7 +311,6 @@ class XaiLLM:
         tools: list[AgentTool] | None = None,
         system_prompt: str | None = None,
         reasoning_effort: ReasoningEffort | None = None,
-        permission_check: PermissionCheckFn | None = None,
         images: list[dict[str, str]] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Run the agent loop and translate AgentEvents → StreamEvents.
@@ -337,10 +335,6 @@ class XaiLLM:
                 The model's chain-of-thought streams back as
                 ``reasoning_content`` deltas and surfaces as
                 :class:`StreamEvent` ``thinking`` events for the UI.
-            permission_check: Optional cross-provider permission gate
-                (PR 03b).  Threaded straight into
-                :class:`AgentLoopConfig` so denial flows through the
-                same code path Gemini and Claude use.
             images: Optional multimodal image inputs.  Accepted for
                 protocol parity; not yet bridged to xai-sdk's
                 :func:`xai_sdk.chat.image` content type (a non-empty
@@ -371,7 +365,6 @@ class XaiLLM:
         config = AgentLoopConfig(
             convert_to_llm=identity_convert,
             safety=safety_from_settings(settings),
-            permission_check=permission_check,
         )
 
         # One accumulator per ``stream()`` call, shared across every

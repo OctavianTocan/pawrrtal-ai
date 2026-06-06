@@ -38,7 +38,6 @@ class FakeProvider:
         tools: object = None,
         system_prompt: object = None,
         reasoning_effort: object = None,
-        permission_check: object = None,
         images: object = None,
     ) -> AsyncIterator[dict[str, str]]:
         self.last_kwargs = {
@@ -49,7 +48,6 @@ class FakeProvider:
             "tools": tools,
             "system_prompt": system_prompt,
             "reasoning_effort": reasoning_effort,
-            "permission_check": permission_check,
             "images": images,
         }
         for event in self.events:
@@ -220,7 +218,6 @@ async def test_autocomplete_returns_empty_on_timeout(
             tools: object = None,
             system_prompt: object = None,
             reasoning_effort: object = None,
-            permission_check: object = None,
             images: object = None,
         ) -> AsyncIterator[dict[str, str]]:
             # Sleep well past the timeout so ``asyncio.wait_for`` fires.

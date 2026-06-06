@@ -281,8 +281,9 @@ class Settings(BaseSettings):
     # is the strongest containment for the agent's filesystem reach.
     claude_sandbox_enabled: bool = False
     # When True, Bash invocations are auto-allowed inside the sandbox.
-    # Pairs with the can_use_tool gate (PR 03) so we never auto-allow
-    # commands that escape the workspace.
+    # The Claude SDK's macOS Seatbelt sandbox is the containment layer;
+    # ``claude_sandbox_excluded_commands`` still carves out commands that
+    # should never be auto-allowed (e.g. ``sudo,ssh``).
     claude_sandbox_auto_allow_bash: bool = True
     # Comma-separated bash commands the SDK should exclude from the
     # sandbox auto-allow list (e.g. ``sudo,ssh``). Parsed lazily so the

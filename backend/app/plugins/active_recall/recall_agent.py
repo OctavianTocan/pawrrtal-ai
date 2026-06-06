@@ -10,12 +10,8 @@ from pathlib import Path
 from typing import Any
 
 from app.agents.plugins.types import PreTurnHookContext
-from app.agents.types import AgentTool, PermissionCheckResult
+from app.agents.types import AgentTool
 from app.channels.telegram.html import md_to_telegram_html
-from app.governance.permissions import (
-    PermissionContext,
-    build_default_permission_check,
-)
 from app.infrastructure.config import settings
 from app.infrastructure.keys import resolve_api_key
 from app.providers._errors import ProviderError
@@ -230,22 +226,6 @@ async def _run_recall_stream(
             ]
         )
 
-    permission_context = PermissionContext(
-        user_id=str(ctx.user_id),
-        workspace_root=ctx.workspace_root,
-        conversation_id=str(ctx.conversation_id),
-        surface="active_recall",
-    )
-    gate = build_default_permission_check()
-
-    async def permission_check(tool_name: str, arguments: dict[str, Any]) -> PermissionCheckResult:
-        decision = await gate(tool_name, arguments, permission_context)
-        return PermissionCheckResult(
-            allow=decision.allow,
-            reason=decision.reason,
-            violation_type=decision.violation_type,
-        )
-
     stream = provider.stream(
         question=_build_recall_question(ctx.question),
         conversation_id=uuid.uuid4(),
@@ -253,7 +233,6 @@ async def _run_recall_stream(
         history=None,
         tools=lcm_tools,
         system_prompt=system_prompt or SYSTEM_PROMPT,
-        permission_check=permission_check,
     )
     return await _collect_stream_telemetry(stream, draft_updater=ctx.draft_updater)
 

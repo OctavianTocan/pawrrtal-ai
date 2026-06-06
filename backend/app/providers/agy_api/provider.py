@@ -21,7 +21,7 @@ from app.agents import (
     agent_loop,
 )
 from app.agents.safety_factory import safety_from_settings
-from app.agents.types import LLMEvent, PermissionCheckFn, TextContent
+from app.agents.types import LLMEvent, TextContent
 from app.infrastructure.config import settings
 from app.providers._stream_logging import log_provider_stream_event
 from app.providers.base import ReasoningEffort, StreamEvent
@@ -95,7 +95,6 @@ class AgyApiLLM:
         tools: list[AgentTool] | None = None,
         system_prompt: str | None = None,
         reasoning_effort: ReasoningEffort | None = None,
-        permission_check: PermissionCheckFn | None = None,
         images: list[dict[str, str]] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Stream one direct Antigravity API turn."""
@@ -111,7 +110,6 @@ class AgyApiLLM:
         config = AgentLoopConfig(
             convert_to_llm=identity_convert,
             safety=safety_from_settings(settings),
-            permission_check=permission_check,
         )
         usage = AgyApiUsageAccumulator()
 

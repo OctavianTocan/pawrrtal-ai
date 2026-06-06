@@ -55,10 +55,8 @@ _BYTES_PER_KIB = 1024
 # ``.env``, SSH key, or private cert — those are credentials that
 # should never be in a prompt or a chat-message persistence row.
 #
-# The permission gate (``governance.permissions``) consults these
-# lists on every file-shaped tool call; workspaces that legitimately
-# need access to a forbidden filename can opt in via the
-# ``WorkspaceContext`` allowlist (PR 06).
+# ``list_dir`` consults these lists to hide forbidden files from the
+# directory listing it returns to the model.
 # ---------------------------------------------------------------------------
 
 FORBIDDEN_FILENAMES: frozenset[str] = frozenset(
@@ -121,32 +119,6 @@ def matches_forbidden_filename(path: str) -> bool:
     if basename in {entry.lower() for entry in FORBIDDEN_FILENAMES}:
         return True
     return any(pattern.match(basename) for pattern in DANGEROUS_FILE_PATTERN_REGEXES)
-
-
-def is_path_within_workspace(path: str, workspace_root: Path) -> bool:
-    """Resolve ``path`` against ``workspace_root`` and confirm containment.
-
-    Mirrors what :func:`_resolve_safe` does but returns a bool instead
-    of raising so the permission gate can short-circuit cleanly.
-    Treats relative paths as relative to ``workspace_root``; absolute
-    paths are resolved as-is and then containment-checked.
-    """
-    if not path:
-        # Empty path == workspace root, which is in-bounds.
-        return True
-    root_resolved = workspace_root.resolve()
-    candidate = Path(path)
-    try:
-        if candidate.is_absolute():
-            resolved = candidate.resolve()
-        else:
-            resolved = (root_resolved / path.lstrip("/")).resolve()
-    except (OSError, ValueError):
-        return False
-    # Path-aware containment via ``is_relative_to`` (Python 3.9+) — a
-    # plain ``str.startswith`` accepts sibling-directory prefixes
-    # (``/data/workspaces/abc`` vs ``/data/workspaces/abcdef``).
-    return resolved == root_resolved or resolved.is_relative_to(root_resolved)
 
 
 def _resolve_safe(root: Path, rel_path: str) -> Path:

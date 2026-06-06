@@ -28,7 +28,6 @@ class FakeProvider:
         tools: object = None,
         system_prompt: object = None,
         reasoning_effort: object = None,
-        permission_check: object = None,
         images: object = None,
     ) -> AsyncIterator[dict[str, str]]:
         for event in self.events:
@@ -113,7 +112,6 @@ async def test_chat_forwards_reasoning_effort(
             tools: object = None,
             system_prompt: object = None,
             reasoning_effort: object = None,
-            permission_check: object = None,
             images: object = None,
         ) -> AsyncIterator[dict[str, str]]:
             captured["reasoning_effort"] = reasoning_effort
@@ -125,7 +123,6 @@ async def test_chat_forwards_reasoning_effort(
                 tools=tools,
                 system_prompt=system_prompt,
                 reasoning_effort=reasoning_effort,
-                permission_check=permission_check,
                 images=images,
             ):
                 yield event
@@ -239,7 +236,6 @@ async def test_chat_stream_converts_provider_exception_to_error_event(
             tools: object = None,
             system_prompt: object = None,
             reasoning_effort: object = None,
-            permission_check: object = None,
             images: object = None,
         ) -> AsyncIterator[dict[str, str]]:
             raise RuntimeError("provider failed")

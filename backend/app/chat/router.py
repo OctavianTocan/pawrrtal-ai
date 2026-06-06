@@ -24,7 +24,6 @@ from app.agents.tools import build_agent_tools
 from app.channels import ChannelMessage, resolve_channel, surface_from_header
 from app.channels.turn_runner import ChatTurnInput, EventHook, load_agy_conversation_id, run_turn
 from app.chat import (
-    build_chat_permission_check,
     enforce_cost_budget,
     load_external_mcp_configs,
     publish_turn_started,
@@ -375,20 +374,6 @@ def get_chat_router() -> APIRouter:
             "model_id": model_id,
             "metadata": {},
         }
-        # Build the per-request permission gate (PR 03b + PR 06).  The
-        # helper bundles workspace-context loading, ``PermissionContext``
-        # construction, and the cross-provider closure that adapts
-        # ``(tool_name, arguments)`` so the context never leaks into the
-        # agent loop. Both providers consume the same closure — Claude
-        # via the SDK's ``can_use_tool`` hook, Gemini via
-        # ``AgentLoopConfig.permission_check``.
-        permission_check_for_request = build_chat_permission_check(
-            user_id=user.id,
-            workspace_root=root,
-            conversation_id=request.conversation_id,
-            surface=surface,
-        )
-
         # PR 09: forward multimodal image inputs from the request body to
         # the provider via ChatTurnInput.images.  Each provider bridges
         # these into its native content-block shape — Claude as
@@ -438,7 +423,6 @@ def get_chat_router() -> APIRouter:
             # from the shared backstop: per-turn override wins,
             # otherwise the conversation's normalized stored effort.
             reasoning_effort=effective_reasoning_effort,
-            permission_check=permission_check_for_request,
             images=image_inputs,
             history_window=_HISTORY_WINDOW,
             log_tag="CHAT",

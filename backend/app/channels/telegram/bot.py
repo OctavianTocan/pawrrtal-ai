@@ -53,7 +53,6 @@ from app.channels.telegram.bot_runtime import (
 from app.channels.telegram.handlers import (
     TelegramSender,
     TelegramTurnContext,
-    build_telegram_permission_check,
     collect_attachments,
     handle_new_command,
     handle_plain_message,
@@ -437,10 +436,6 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
         workspace_root=workspace_root,
         tools=agent_tools,
         images=None,
-        permission_check=build_telegram_permission_check(
-            context,
-            workspace_root,
-        ),
         # Helper to let pre-turn hooks stream progress into the placeholder message
         draft_updater=_draft_updater,
         on_pre_turn_finished=_on_pre_turn_finished,
