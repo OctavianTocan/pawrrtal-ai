@@ -207,6 +207,12 @@ ignore = [
     "S607",  # `uv` resolved from PATH is intentional; the whole point is to
              # exercise the same entry the developer would type by hand
 ]
+"tests/test_alembic_postgres_upgrade.py" = [
+    "S603",  # spawns the real `alembic` CLI (via sys.executable -m) on purpose:
+             # the advisory-lock DDL-rollback bug only reproduces through a real
+             # env.py connection lifecycle, not an in-process call. URL is built
+             # from a test-controlled scratch DB name, not external input.
+]
 
 [tool.ruff.lint.mccabe]
 # Cap cyclomatic complexity. Functions above this should be split.
