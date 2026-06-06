@@ -96,6 +96,7 @@ Architectural drift is gated by [sentrux](https://github.com/sentrux/sentrux) v0
 ## Commit & Pull Request Guidelines
 
 - Use `$pr-to-branch` skill for PR creation and analysis when available.
+- Commit often in small logical increments while working on larger changes. Each commit should tell the story of what changed and why, not only name the files touched. Prefer messages that explain the user-visible or architectural intent, such as `feat(plugins): add manifest validation before runtime loading`, over vague snapshots like `update plugins`.
 - Create commits with clear, action-oriented messages (e.g., `feat(sidebar): add rename functionality`).
 - Group related changes; avoid bundling unrelated refactors.
 - PRs should be small, review-friendly slices (e.g., "Sidebar Craft Parity Round 2"). Do not bundle massive rewrites with unrelated visual tweaks.
