@@ -120,6 +120,7 @@ download_runner() {
     local path="${cache_dir}/${tarball}"
     local url="https://github.com/actions/runner/releases/download/v${version}/${tarball}"
 
+    install -d -m 0755 "$RUNNER_BASE"
     install -d -m 0700 "$cache_dir"
     if [[ ! -f "$path" ]]; then
         info "downloading ${tarball}"
@@ -238,7 +239,9 @@ start_runners() {
     version="$(latest_runner_version)"
     tarball="$(download_runner "$version" "$arch")"
 
-    install -d -m 0700 "$RUNNER_BASE/runs/$RUN_TAG"
+    install -d -m 0755 "$RUNNER_BASE"
+    install -d -m 0755 "$RUNNER_BASE/runs"
+    install -d -m 0755 "$RUNNER_BASE/runs/$RUN_TAG"
     for index in $(seq 1 "$RUNNER_COUNT"); do
         local name user dir unit
         name="$(runner_name "$index")"
