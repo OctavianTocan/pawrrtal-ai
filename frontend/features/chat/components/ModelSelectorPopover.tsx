@@ -291,15 +291,15 @@ export function ModelSelectorPopover({
 								<Button
 									aria-label="Select model and reasoning"
 									className={cn(
-										'h-7 gap-1 rounded-[7px] border-0 bg-transparent px-2 text-[12px] font-normal text-muted-foreground hover:bg-foreground/[0.1] hover:text-foreground',
+										'h-7 max-w-[8.75rem] gap-1 rounded-[7px] border-0 bg-transparent px-2 text-[12px] font-normal text-muted-foreground hover:bg-foreground/[0.1] hover:text-foreground sm:max-w-none',
 										menuOpen && 'bg-foreground/[0.08]'
 									)}
 									size="xs"
 									type="button"
 									variant="ghost"
 								>
-									<span className="text-foreground">{triggerLabel}</span>
-									<span>{reasoningLabel}</span>
+									<span className="truncate text-foreground">{triggerLabel}</span>
+									<span className="hidden sm:inline">{reasoningLabel}</span>
 									<ChevronDownIcon aria-hidden="true" className="size-3" />
 								</Button>
 							}

@@ -33,7 +33,6 @@ const FIXTURE_MODELS: ChatModelOption[] = [
 		display_name: 'Claude Sonnet 4.6',
 		short_name: 'Claude Sonnet 4.6',
 		description: 'Balanced for everyday tasks',
-		is_default: false,
 	},
 	{
 		id: 'agent-sdk:anthropic/claude-opus-4-7',
@@ -43,7 +42,6 @@ const FIXTURE_MODELS: ChatModelOption[] = [
 		display_name: 'Claude Opus 4.7',
 		short_name: 'Claude Opus 4.7',
 		description: 'Most capable for ambitious work',
-		is_default: false,
 	},
 	{
 		id: 'google-ai:google/gemini-3-flash-preview',
@@ -53,7 +51,6 @@ const FIXTURE_MODELS: ChatModelOption[] = [
 		display_name: 'Gemini 3 Flash Preview',
 		short_name: 'Gemini 3 Flash',
 		description: "Google's frontier multimodal",
-		is_default: true,
 	},
 	{
 		id: 'google-ai:google/gemini-3.1-flash-lite-preview',
@@ -63,7 +60,6 @@ const FIXTURE_MODELS: ChatModelOption[] = [
 		display_name: 'Gemini 3.1 Flash Lite Preview',
 		short_name: 'Gemini 3.1 Flash Lite',
 		description: "Google's fast preview model",
-		is_default: false,
 	},
 	{
 		id: 'opencode-go:zai/glm-5.1',
@@ -73,7 +69,6 @@ const FIXTURE_MODELS: ChatModelOption[] = [
 		display_name: 'GLM-5.1',
 		short_name: 'GLM-5.1',
 		description: 'Open coding model via OpenCode Go',
-		is_default: false,
 	},
 	{
 		id: 'opencode-go:moonshot/kimi-k2.6',
@@ -83,7 +78,6 @@ const FIXTURE_MODELS: ChatModelOption[] = [
 		display_name: 'Kimi K2.6',
 		short_name: 'Kimi K2.6',
 		description: 'Long-context coding model via OpenCode Go',
-		is_default: false,
 	},
 ];
 

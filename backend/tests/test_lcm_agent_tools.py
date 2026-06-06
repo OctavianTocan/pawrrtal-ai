@@ -98,12 +98,36 @@ def test_expand_query_tool_present_when_user_id_provided(
     monkeypatch.setattr(_cfg.settings, "lcm_enabled", True)
     monkeypatch.setattr(_cfg.settings, "exa_api_key", None)
 
+    # lcm_expand_query needs a concrete ``model_id`` to run its LLM sub-call,
+    # so the tool is only appended when both ``user_id`` and ``model_id`` are
+    # present.
+    tools = build_agent_tools(
+        workspace_root=tmp_path,
+        conversation_id=uuid.uuid4(),
+        user_id=uuid.uuid4(),
+        model_id="agent-sdk:anthropic/claude-opus-4-7",
+    )
+    assert "lcm_expand_query" in [t.name for t in tools]
+
+
+def test_expand_query_tool_absent_without_model_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.agents.tools import build_agent_tools
+    from app.infrastructure import config as _cfg
+
+    monkeypatch.setattr(_cfg.settings, "lcm_enabled", True)
+    monkeypatch.setattr(_cfg.settings, "exa_api_key", None)
+
+    # user_id provided but model_id omitted → expand_query should NOT be
+    # present. The tool needs a concrete model for its LLM sub-call, so the
+    # "no model → no expand tool" contract holds even with a user_id.
     tools = build_agent_tools(
         workspace_root=tmp_path,
         conversation_id=uuid.uuid4(),
         user_id=uuid.uuid4(),
     )
-    assert "lcm_expand_query" in [t.name for t in tools]
+    assert "lcm_expand_query" not in [t.name for t in tools]
 
 
 def test_expand_query_tool_absent_without_user_id(

@@ -300,6 +300,17 @@ disallow_untyped_defs = false  # test fixtures are fine without explicit types
 module = ["sqlalchemy_utils.*", "mcp.*", "markitdown.*", "xai_sdk.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# google-auth ships ``py.typed`` but its service_account credential
+# constructors are still untyped (``from_service_account_file`` returns
+# ``Any``), so strict-mode ``disallow_untyped_calls`` / ``warn_return_any``
+# fire at the call site. This module is the single, narrow boundary that
+# touches google-auth; relax those two checks here only, rather than
+# scatter inline ignores. Everything else in the module stays strict.
+module = "app.channels.google_chat.auth"
+disallow_untyped_calls = false
+warn_return_any = false
+
 
 # --- bandit: security scanner ------------------------------------------------
 # Catches hardcoded secrets, weak crypto, shell injection, unsafe deserialization.

@@ -37,7 +37,6 @@ def _entry(in_rate: float, out_rate: float) -> ModelEntry:
         display_name="Test",
         short_name="Test",
         description="x",
-        is_default=False,
         cost_per_mtok_in_usd=in_rate,
         cost_per_mtok_out_usd=out_rate,
     )

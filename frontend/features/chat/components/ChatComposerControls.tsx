@@ -227,7 +227,7 @@ export function AutoReviewSelector(): React.JSX.Element {
 										aria-hidden="true"
 										className={cn('size-3.5', activeMeta.iconClass)}
 									/>
-									{activeMeta.label}
+									<span className="hidden sm:inline">{activeMeta.label}</span>
 									<ChevronDownIcon aria-hidden="true" className="size-3" />
 								</Button>
 							}

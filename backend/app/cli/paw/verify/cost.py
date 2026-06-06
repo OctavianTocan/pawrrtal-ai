@@ -183,7 +183,7 @@ async def run_cost_scenario(
     r = ScenarioResult(name="cost")
     del state  # PersonaState carried by ``client``; kept for runner parity.
 
-    model_id = await helpers.resolve_default_model(client, r, model_override)
+    model_id = await helpers.resolve_model(client, r, model_override)
     if model_id is None:
         return r
 

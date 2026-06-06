@@ -173,8 +173,8 @@ function LandingState({
 }): React.JSX.Element {
 	return (
 		<div className="relative mx-auto flex size-full max-w-[60rem] min-w-0 flex-col">
-			<div className="flex min-h-0 flex-1 flex-col items-center pt-[24vh]">
-				<h1 className="mb-10 text-center text-[28px] font-medium tracking-normal text-balance text-foreground sm:text-[30px]">
+			<div className="flex min-h-0 flex-1 flex-col items-center pt-[12vh] sm:pt-[24vh]">
+				<h1 className="mb-6 text-center text-[24px] font-medium tracking-normal text-balance text-foreground sm:mb-10 sm:text-[30px]">
 					What should we build in Pawrrtal?
 				</h1>
 				<div className="relative flex w-full max-w-[48.75rem] flex-col">
@@ -412,7 +412,7 @@ function ChatView({
 	// variable resolves live so the AppearanceProvider can re-tint per theme.
 	return (
 		<div
-			className="relative z-10 flex h-[calc(100svh-3rem)] min-h-0 w-full overflow-hidden rounded-surface-lg px-4 shadow-panel-floating"
+			className="relative z-10 flex h-[calc(100svh-3rem)] min-h-0 w-full overflow-hidden rounded-surface-lg px-2 shadow-panel-floating sm:px-4"
 			style={{ backgroundColor: 'var(--background-elevated)' }}
 		>
 			<WhimsyOverlay />

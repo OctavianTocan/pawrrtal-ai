@@ -18,7 +18,7 @@ from app.channels.telegram.thinking_picker import (
     parse_thinking_callback_data,
     resolve_select,
 )
-from app.providers.catalog import MODEL_CATALOG, ModelEntry, default_model, find
+from app.providers.catalog import MODEL_CATALOG, ModelEntry, find, first_catalog_model
 from app.providers.model_id import Host, parse_model_id
 
 
@@ -371,11 +371,11 @@ def test_resolve_select_rejects_effort_outside_catalog_tuple() -> None:
 
 
 def test_default_model_resolution_via_catalog() -> None:
-    """The picker resolves the catalog default when conversation.model_id is NULL."""
-    default = default_model()
-    parsed = parse_model_id(default.id)
+    """The picker resolves the positional fallback when conversation.model_id is NULL."""
+    fallback = first_catalog_model()
+    parsed = parse_model_id(fallback.id)
     entry = find(parsed)
-    assert entry is default
+    assert entry is fallback
 
 
 @pytest.mark.parametrize(

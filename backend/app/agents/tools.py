@@ -38,7 +38,6 @@ from app.agents.plugins import (
 from app.agents.types import AgentTool
 from app.infrastructure.config import settings
 from app.infrastructure.keys import resolve_api_key
-from app.providers.catalog import default_model
 from app.tools.artifact_agent import make_artifact_tool
 from app.tools.exa_search_agent import make_exa_search_tool
 from app.tools.image_gen_agent import make_image_gen_tool
@@ -268,18 +267,16 @@ def build_agent_tools(
         tools.append(make_lcm_search_tool(conversation_id=conversation_id))
         tools.append(make_lcm_list_summaries_tool(conversation_id=conversation_id))
         tools.append(make_lcm_describe_tool(conversation_id=conversation_id))
-        if user_id is not None:
-            # When the caller didn't pin a model, fall back to the
-            # catalog's canonical default rather than a hardcoded
-            # preview ID — hardcoded preview IDs drift the moment the
-            # catalog moves (see commit 08318a1 for the analogous fix in
-            # ``app.cli.commit``).
-            expand_model_id = model_id or default_model().id
+        if user_id is not None and model_id:
+            # The lcm_expand_query tool needs a concrete model to run its
+            # sub-query, so it's only added when the turn carries a resolved
+            # model. There is no default fallback — the chat router requires a
+            # model and the channels resolve one before building tools.
             tools.append(
                 make_lcm_expand_query_tool(
                     conversation_id=conversation_id,
                     user_id=user_id,
-                    model_id=expand_model_id,
+                    model_id=model_id,
                 )
             )
 

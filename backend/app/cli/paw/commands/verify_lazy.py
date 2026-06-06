@@ -63,6 +63,13 @@ async def run_telegram_scenario(state: PersonaState, client: PawClient) -> Scena
     return await run(state, client)
 
 
+async def run_google_chat_scenario(state: PersonaState, client: PawClient) -> ScenarioResult:
+    """Import and run the Google Chat scenario lazily."""
+    from app.cli.paw.verify.google_chat import run_google_chat_scenario as run  # noqa: PLC0415
+
+    return await run(state, client)
+
+
 async def run_cost_scenario(
     state: PersonaState,
     client: PawClient,

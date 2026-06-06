@@ -49,38 +49,25 @@ const ERROR_PANEL_PATTERNS = [
 /** Phrases the chat shows when the Exa web-search tool fired. */
 const SEARCH_INDICATOR_PATTERNS = [/searched the web/i, /searching the web/i, /exa_search/i];
 
-/**
- * localStorage key the ChatComposer reads to pre-select a model on
- * mount (`features/chat/constants.ts` → `CHAT_STORAGE_KEYS.selectedModelId`).
- * Setting it via `addInitScript` BEFORE navigation lets the test
- * land on `/` already wired to Claude, bypassing the LLM-driven
- * model-selector click dance entirely.
- */
-const CHAT_SELECTED_MODEL_KEY = 'chat-composer:selected-model-id';
-const CLAUDE_MODEL_ID = 'claude-sonnet-4-6';
-
 test.describe('tools — web search', () => {
 	test('Claude model uses the Exa web search tool without an error_max_turns panel', async ({
 		stagehand,
 		navigateToApp,
 	}) => {
-		// Pre-select Claude via the chat composer's persisted model
-		// key. Saves us from a flaky LLM-driven model-selector click
-		// dance and removes one source of cost/flake.
-		await stagehand.context.addInitScript(
-			({ key, model }: { key: string; model: string }) => {
-				try {
-					window.localStorage.setItem(key, model);
-				} catch {
-					/* private browsing — fall through; spec will fail loudly later */
-				}
-			},
-			{ key: CHAT_SELECTED_MODEL_KEY, model: CLAUDE_MODEL_ID }
-		);
-
 		await navigateToApp('/');
 		const page = stagehand.context.pages()[0];
 		if (page === undefined) throw new Error('No active Stagehand page');
+
+		// Pick Claude through the model selector UI. The model picker now
+		// defaults to the FIRST catalog entry (no persisted "last used"),
+		// so we can't pre-seed the selection via localStorage anymore — we
+		// drive the composer's "Select model and reasoning" dropdown and
+		// choose Claude Sonnet directly. `act` (LLM-driven) handles the
+		// nested host → vendor → model menu without us hard-coding its
+		// internal selectors.
+		await stagehand.act('Open the model selector in the chat composer');
+		await stagehand.act('Select the Claude Sonnet model');
+		await page.waitForTimeout(300);
 
 		// Send a question that REQUIRES web search to answer well —
 		// "current weather in Tokyo" would also work but is geography-

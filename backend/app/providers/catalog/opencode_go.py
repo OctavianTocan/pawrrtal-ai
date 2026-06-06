@@ -29,7 +29,6 @@ OPENCODE_GO_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="GLM-5.1",
         short_name="GLM-5.1",
         description="Z.ai's open coding model",
-        is_default=False,
     ),
     ModelEntry(
         host=Host.opencode_go,
@@ -38,7 +37,6 @@ OPENCODE_GO_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="GLM-5",
         short_name="GLM-5",
         description="Previous-generation GLM",
-        is_default=False,
     ),
     ModelEntry(
         host=Host.opencode_go,
@@ -47,7 +45,6 @@ OPENCODE_GO_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="Kimi K2.6",
         short_name="Kimi K2.6",
         description="Long-context coding model",
-        is_default=False,
     ),
     ModelEntry(
         host=Host.opencode_go,
@@ -56,7 +53,6 @@ OPENCODE_GO_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="Kimi K2.5",
         short_name="Kimi K2.5",
         description="Previous-generation Kimi",
-        is_default=False,
     ),
     ModelEntry(
         host=Host.opencode_go,
@@ -65,7 +61,6 @@ OPENCODE_GO_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="MiMo V2.5 Pro",
         short_name="MiMo V2.5 Pro",
         description="Xiaomi's flagship MiMo coding model",
-        is_default=False,
     ),
     ModelEntry(
         host=Host.opencode_go,
@@ -74,7 +69,6 @@ OPENCODE_GO_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="MiMo V2.5",
         short_name="MiMo V2.5",
         description="Xiaomi MiMo coding model",
-        is_default=False,
     ),
     ModelEntry(
         host=Host.opencode_go,
@@ -83,7 +77,6 @@ OPENCODE_GO_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="Qwen3.6 Plus",
         short_name="Qwen3.6 Plus",
         description="Alibaba's frontier Qwen coding model",
-        is_default=False,
     ),
     ModelEntry(
         host=Host.opencode_go,
@@ -92,7 +85,6 @@ OPENCODE_GO_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="Qwen3.5 Plus",
         short_name="Qwen3.5 Plus",
         description="Previous-generation Qwen Plus",
-        is_default=False,
     ),
     ModelEntry(
         host=Host.opencode_go,
@@ -101,7 +93,6 @@ OPENCODE_GO_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="MiniMax M2.7",
         short_name="MiniMax M2.7",
         description="MiniMax's frontier model",
-        is_default=False,
     ),
     ModelEntry(
         host=Host.opencode_go,
@@ -110,7 +101,6 @@ OPENCODE_GO_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="MiniMax M2.5",
         short_name="MiniMax M2.5",
         description="Previous-generation MiniMax",
-        is_default=False,
     ),
     ModelEntry(
         host=Host.opencode_go,
@@ -119,7 +109,6 @@ OPENCODE_GO_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="DeepSeek V4 Pro",
         short_name="DeepSeek V4 Pro",
         description="DeepSeek's flagship V4",
-        is_default=False,
     ),
     ModelEntry(
         host=Host.opencode_go,
@@ -128,6 +117,5 @@ OPENCODE_GO_ENTRIES: tuple[ModelEntry, ...] = (
         display_name="DeepSeek V4 Flash",
         short_name="DeepSeek V4 Flash",
         description="Lightweight DeepSeek V4",
-        is_default=False,
     ),
 )
