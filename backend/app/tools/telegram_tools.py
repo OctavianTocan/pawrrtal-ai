@@ -151,7 +151,7 @@ def make_telegram_capability_tools(send_fn: SendFn) -> list[AgentTool]:
             allowed_exts=_IMAGE_EXTS,
             send_fn=send_fn,
             icon="🖼",
-            label="Send image",
+            label="Send Image",
         ),
         _build_specialized_send_tool(
             name="send_voice_to_user",
@@ -163,7 +163,7 @@ def make_telegram_capability_tools(send_fn: SendFn) -> list[AgentTool]:
             allowed_exts=_VOICE_EXTS,
             send_fn=send_fn,
             icon="🎙",
-            label="Send voice",
+            label="Send Voice",
         ),
         _build_specialized_send_tool(
             name="send_document_to_user",
@@ -174,6 +174,6 @@ def make_telegram_capability_tools(send_fn: SendFn) -> list[AgentTool]:
             allowed_exts=_DOCUMENT_EXTS,
             send_fn=send_fn,
             icon="📎",
-            label="Send document",
+            label="Send Document",
         ),
     ]

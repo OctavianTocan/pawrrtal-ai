@@ -177,7 +177,7 @@ def make_image_gen_tool(
         execute=_execute,
         display=make_tool_display(
             icon="🎨",
-            label="Generate image",
+            label="Generate Image",
             present=lambda args: (
                 f"🎨 Generating image {summarize_title(args.get('filename'), '')}".rstrip()
             ),

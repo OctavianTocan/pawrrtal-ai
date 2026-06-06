@@ -68,9 +68,9 @@ def make_lcm_list_summaries_tool(*, conversation_id: uuid.UUID) -> AgentTool:
         execute=_execute,
         display=make_tool_display(
             icon="🧠",
-            label="List memory summaries",
+            label="List Memory Summaries",
             present=lambda _args: "🧠 Listing memory summaries",
-            compact=lambda _args: "List memory summaries",
+            compact=lambda _args: "List Memory Summaries",
         ),
     )
 
@@ -135,8 +135,8 @@ def make_lcm_describe_tool(*, conversation_id: uuid.UUID) -> AgentTool:
         execute=_execute,
         display=make_tool_display(
             icon="🧠",
-            label="Read memory summary",
+            label="Read Memory Summary",
             present=lambda _args: "🧠 Reading memory summary",
-            compact=lambda _args: "Read memory summary",
+            compact=lambda _args: "Read Memory Summary",
         ),
     )

@@ -264,7 +264,7 @@ def make_report_issue_tool(*, workspace_root: Path) -> AgentTool:
         execute=execute,
         display=make_tool_display(
             icon="🐛",
-            label="Report issue",
+            label="Report Issue",
             present=_report_issue_present,
             compact=_report_issue_compact,
         ),

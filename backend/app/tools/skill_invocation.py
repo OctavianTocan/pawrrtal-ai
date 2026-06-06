@@ -117,7 +117,7 @@ def make_list_skills_tool(*, workspace_root: Path) -> AgentTool:
         execute=execute,
         display=make_tool_display(
             icon="📚",
-            label="List skills",
+            label="List Skills",
             present=lambda _args: "📚 Listing workspace skills",
             compact=lambda _args: "list_skills()",
         ),
@@ -183,7 +183,7 @@ def make_read_skill_tool(*, workspace_root: Path) -> AgentTool:
         execute=execute,
         display=make_tool_display(
             icon="📖",
-            label="Read skill",
+            label="Read Skill",
             present=lambda args: f"📖 Reading skill: {args.get('name') or '(missing)'}",
             compact=lambda args: f"read_skill({args.get('name') or ''})",
         ),
@@ -278,7 +278,7 @@ def make_invoke_skill_tool(*, workspace_root: Path) -> AgentTool:
         execute=execute,
         display=make_tool_display(
             icon="✨",
-            label="Invoke skill",
+            label="Invoke Skill",
             present=lambda args: f"✨ Invoking skill: {args.get('name') or '(missing)'}",
             compact=lambda args: f"invoke_skill({args.get('name') or ''})",
         ),

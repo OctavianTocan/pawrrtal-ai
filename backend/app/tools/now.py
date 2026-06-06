@@ -146,7 +146,7 @@ def make_now_tool(*, default_timezone: str = "UTC") -> AgentTool:
         execute=execute,
         display=make_tool_display(
             icon="🕒",
-            label="Check the time",
+            label="Check the Time",
             present=lambda args: (
                 f"🕒 Checking the time ({args.get('tz')})"
                 if args.get("tz")

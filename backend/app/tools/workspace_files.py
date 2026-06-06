@@ -355,9 +355,9 @@ def make_read_file_tool(workspace_root: Path) -> AgentTool:
         path_required=True,
         display=make_tool_display(
             icon="📖",
-            label="Read file",
+            label="Read File",
             present=lambda args: f"📖 Reading {summarize_path(args.get('path'))}",
-            compact=lambda args: f"Read file -> {summarize_path(args.get('path'))}",
+            compact=lambda args: f"Read File -> {summarize_path(args.get('path'))}",
         ),
     )
 
@@ -392,9 +392,9 @@ def make_write_file_tool(workspace_root: Path) -> AgentTool:
         path_required=True,
         display=make_tool_display(
             icon="✍️",
-            label="Write file",
+            label="Write File",
             present=lambda args: f"✍️ Writing {summarize_path(args.get('path'))}",
-            compact=lambda args: f"Write file -> {summarize_path(args.get('path'))}",
+            compact=lambda args: f"Write File -> {summarize_path(args.get('path'))}",
         ),
     )
 
@@ -430,9 +430,9 @@ def make_list_dir_tool(workspace_root: Path) -> AgentTool:
         path_required=False,
         display=make_tool_display(
             icon="📁",
-            label="List folder",
+            label="List Folder",
             present=lambda args: f"📁 Inspecting {summarize_path(args.get('path'))}",
-            compact=lambda args: f"List folder -> {summarize_path(args.get('path'))}",
+            compact=lambda args: f"List Folder -> {summarize_path(args.get('path'))}",
         ),
     )
 

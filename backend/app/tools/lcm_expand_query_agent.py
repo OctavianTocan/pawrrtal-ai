@@ -94,7 +94,7 @@ def make_lcm_expand_query_tool(
         execute=_execute,
         display=make_tool_display(
             icon="🧠",
-            label="Expand memory query",
+            label="Expand Memory Query",
             present=lambda args: (
                 f"🧠 Expanding memory query for {summarize_query(args.get('prompt'))}"
             ),

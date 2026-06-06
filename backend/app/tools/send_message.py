@@ -204,7 +204,7 @@ def make_send_message_tool(
         execute=execute,
         display=make_tool_display(
             icon="💬",
-            label="Send message",
+            label="Send Message",
             present=_send_message_present,
             compact=_send_message_compact,
         ),
