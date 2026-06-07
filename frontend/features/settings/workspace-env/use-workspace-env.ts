@@ -93,14 +93,14 @@ export function extractApiErrorMessage(error: unknown, fallback: string): string
 }
 
 /**
- * Internal helper: fetch the current user's default workspace ID.
+ * Fetch the current user's default workspace ID.
  *
  * Mirrors the pattern in `useWorkspaceTree` — pull the workspace list,
  * prefer the row flagged `is_default`, fall back to the first entry.
  * Cached separately under the `workspaces` query key so adding/removing
  * workspaces only triggers one refetch.
  */
-function useDefaultWorkspaceId(): string | null {
+export function useDefaultWorkspaceId(): string | null {
 	const authedFetch = useAuthedFetch();
 	const workspacesQuery = useQuery<WorkspaceSummary[]>({
 		queryKey: ['workspaces'],

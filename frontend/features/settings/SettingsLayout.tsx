@@ -13,6 +13,7 @@ import { GeneralSection } from './sections/GeneralSection';
 import { IntegrationsSection } from './sections/IntegrationsSection';
 import { PersonalizationSection } from './sections/PersonalizationSection';
 import { PlaceholderSection } from './sections/PlaceholderSection';
+import { PluginsSection } from './sections/PluginsSection';
 import { UsageSection } from './sections/UsageSection';
 import { WorkspacesSection } from './sections/WorkspacesSection';
 
@@ -27,6 +28,7 @@ function ActiveSettingsSection({ activeId }: { activeId: SettingsSectionId }): R
 	if (activeId === 'appearance') return <AppearanceSection />;
 	if (activeId === 'personalization') return <PersonalizationSection />;
 	if (activeId === 'integrations') return <IntegrationsSection />;
+	if (activeId === 'plugins') return <PluginsSection />;
 	if (activeId === 'channels') return <ChannelsSection />;
 	if (activeId === 'archived-chats') return <ArchivedChatsSection />;
 	if (activeId === 'usage') return <UsageSection />;
