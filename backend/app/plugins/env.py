@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
 
-from app.infrastructure.keys import load_workspace_env
+from app.infrastructure.keys import load_workspace_env, resolve_gateway_env_value
 from app.plugins.contributions import EnvVarSpec
 from app.plugins.discovery import default_plugin_roots, discover_plugins
 from app.plugins.manifest import PluginManifest
@@ -128,7 +127,7 @@ def _workspace_value(workspace_root: Path | None, spec: EnvVarSpec) -> str | Non
 def _gateway_value(spec: EnvVarSpec) -> str | None:
     """Return a gateway/process value when the spec permits it."""
     if spec.scope == "gateway" or spec.gateway_fallback:
-        return os.environ.get(spec.name) or None
+        return resolve_gateway_env_value(spec.name)
     return None
 
 

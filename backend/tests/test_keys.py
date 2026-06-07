@@ -92,6 +92,25 @@ def test_resolve_api_key_falls_back_to_settings(
     assert keys.resolve_api_key(workspace_root, "EXA_API_KEY") == "from-settings"
 
 
+def test_resolve_gateway_env_value_prefers_settings_for_mapped_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Plugin gateway checks use the live settings object for built-in keys."""
+    monkeypatch.setattr(settings, "exa_api_key", "from-settings")
+    monkeypatch.setenv("EXA_API_KEY", "from-process")
+
+    assert keys.resolve_gateway_env_value("EXA_API_KEY") == "from-settings"
+
+
+def test_resolve_gateway_env_value_reads_process_env_for_custom_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Custom plugin keys without Settings fields still work from process env."""
+    monkeypatch.setenv("SNAPSHOT_API_KEY", "from-process")
+
+    assert keys.resolve_gateway_env_value("SNAPSHOT_API_KEY") == "from-process"
+
+
 def test_resolve_github_issues_repo_supports_workspace_override(
     tmp_workspace_base: Path,
     monkeypatch: pytest.MonkeyPatch,

@@ -5,6 +5,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
+from app.infrastructure.config import settings
 from app.infrastructure.keys import save_workspace_env
 from app.plugins.capability_catalog import CapabilitySearch
 from app.plugins.discovery import PluginRoot, discover_plugins
@@ -20,6 +23,8 @@ def _write_tool_plugin(
     *,
     enabled_by_default: bool = True,
     required_env: bool = False,
+    env_name: str = "SNAPSHOT_API_KEY",
+    gateway_fallback: bool = False,
     depends_on: tuple[str, ...] = (),
 ) -> None:
     """Write a plugin with one CLI tool capability."""
@@ -49,13 +54,13 @@ def _write_tool_plugin(
     if required_env:
         payload["env"] = [
             {
-                "name": "SNAPSHOT_API_KEY",
+                "name": env_name,
                 "required": True,
                 "scope": "workspace",
                 "overridable": True,
-                "gateway_fallback": False,
+                "gateway_fallback": gateway_fallback,
                 "secret": True,
-                "label": "Snapshot API Key",
+                "label": env_name.replace("_", " ").title(),
             }
         ]
     (plugin_dir / "plugin.json").write_text(json.dumps(payload), encoding="utf-8")
@@ -146,6 +151,30 @@ def test_workspace_env_configures_required_plugin(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     _write_tool_plugin(root, "search_pack", "web_search", required_env=True)
     save_workspace_env(workspace, {"SNAPSHOT_API_KEY": "configured"})
+    discovered = discover_plugins((PluginRoot("bundled", root),))
+
+    snapshot = build_registry_snapshot(discovered, workspace_root=workspace)
+
+    assert snapshot.outcomes[0].status == "active"
+    assert snapshot.capabilities[0].state == "enabled"
+
+
+def test_gateway_settings_configures_required_plugin_env(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    root = tmp_path / "plugins"
+    workspace = tmp_path / "workspace"
+    monkeypatch.delenv("EXA_API_KEY", raising=False)
+    monkeypatch.setattr(settings, "exa_api_key", "from-settings")
+    _write_tool_plugin(
+        root,
+        "search_pack",
+        "web_search",
+        required_env=True,
+        env_name="EXA_API_KEY",
+        gateway_fallback=True,
+    )
     discovered = discover_plugins((PluginRoot("bundled", root),))
 
     snapshot = build_registry_snapshot(discovered, workspace_root=workspace)

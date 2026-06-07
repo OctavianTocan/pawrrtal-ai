@@ -11,6 +11,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 
 from app.agents.tool_surface import build_agent_tools
+from app.infrastructure.config import settings
 from app.infrastructure.keys import save_workspace_env
 from app.plugins.adapters.tools import build_snapshot_agent_tools
 from app.plugins.discovery import PluginRoot, discover_plugins
@@ -230,6 +231,7 @@ def test_bundled_exa_search_requires_configuration_when_enabled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.delenv("EXA_API_KEY", raising=False)
+    monkeypatch.setattr(settings, "exa_api_key", "")
     save_plugin_state(
         plugin_state_path(plugin_id="exa_search", scope="workspace", workspace_root=tmp_path),
         PluginState(enabled=True),
