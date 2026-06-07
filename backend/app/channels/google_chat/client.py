@@ -159,12 +159,16 @@ async def update_message(*, message_name: str, text: str) -> bool:
     so a transient patch error can't crash the turn.
     """
     url = f"{_CHAT_BASE_URL}/{message_name}"
-    response = await _client().patch(
-        url,
-        headers=await _headers(),
-        params={"updateMask": "text"},
-        json={"text": text},
-    )
+    try:
+        response = await _client().patch(
+            url,
+            headers=await _headers(),
+            params={"updateMask": "text"},
+            json={"text": text},
+        )
+    except httpx.HTTPError:
+        logger.exception("GOOGLE_CHAT_UPDATE_TRANSPORT_ERR message_name=%s", message_name)
+        return False
     if response.status_code >= _HTTP_BAD_REQUEST:
         logger.warning("GOOGLE_CHAT_UPDATE_ERR %s", _short_error(response))
         return False

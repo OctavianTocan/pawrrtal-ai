@@ -37,6 +37,7 @@ from app.providers.base import AILLM, ReasoningEffort
 from app.providers.catalog import first_authenticated_catalog_model
 from app.providers.factory import resolve_llm
 from app.providers.model_id import InvalidModelId, UnknownModelId
+from app.providers.reasoning import resolve_reasoning_effort
 from app.workspace.crud import get_default_workspace
 
 from .attachments import collect_attachments
@@ -274,6 +275,7 @@ async def _handle_command_event(event: dict[str, Any], parsed: tuple[str, str]) 
                     sender_resource=sender_name(event),
                     sender_email=sender_email(event),
                     session=session,
+                    workspace_root=workspace_root,
                 ),
             )
     thread = thread_name(event)
@@ -408,6 +410,10 @@ async def _handle_message_event(event: dict[str, Any]) -> None:
 
     attachments = await collect_attachments(event)
     question = _build_question(text, attachments.annotations)
+    reasoning_effort = resolve_reasoning_effort(
+        model_id=effective_model_id,
+        stored_effort=target.reasoning_effort,
+    ).effective
 
     channel_message: ChannelMessage = {
         "user_id": target.user_id,
@@ -433,7 +439,7 @@ async def _handle_message_event(event: dict[str, Any]) -> None:
         tools=agent_tools,
         images=attachments.images or None,
         verbose_level=target.verbose_level,
-        reasoning_effort=target.reasoning_effort,
+        reasoning_effort=reasoning_effort,
         pre_turn_hooks=build_pre_turn_hooks(),
         log_tag="GOOGLE_CHAT",
     )

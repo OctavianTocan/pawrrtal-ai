@@ -42,6 +42,104 @@ async def test_collect_image_becomes_base64(monkeypatch: pytest.MonkeyPatch) -> 
     assert out.images[0]["data"]
 
 
+async def test_collect_unsupported_image_mime_annotates(monkeypatch: pytest.MonkeyPatch) -> None:
+    download_spy = AsyncMock(return_value=b"heic")
+    monkeypatch.setattr(attachments_module, "download_attachment", download_spy)
+    event = event_with_attachment(
+        {
+            "contentName": "phone.heic",
+            "contentType": "image/heic",
+            "source": "UPLOADED_CONTENT",
+            "attachmentDataRef": {"resourceName": "spaces/A/messages/M/attachments/1"},
+        }
+    )
+
+    out = await collect_attachments(event)
+
+    assert out.images == []
+    assert any("unsupported image" in note for note in out.annotations)
+    download_spy.assert_not_awaited()
+
+
+async def test_collect_total_download_budget_skips_later_files(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _fake_download(*_args: object, max_bytes: int, **_kwargs: object) -> bytes:
+        return b"x" * max_bytes
+
+    monkeypatch.setattr(attachments_module, "_MAX_TOTAL_DOWNLOAD_BYTES", 3)
+    monkeypatch.setattr(attachments_module, "download_attachment", _fake_download)
+    event = event_with_attachment(
+        {
+            "contentName": "first.png",
+            "contentType": "image/png",
+            "source": "UPLOADED_CONTENT",
+            "attachmentDataRef": {"resourceName": "spaces/A/messages/M/attachments/1"},
+        }
+    )
+    event["chat"]["messagePayload"]["message"]["attachment"].append(
+        {
+            "contentName": "second.png",
+            "contentType": "image/png",
+            "source": "UPLOADED_CONTENT",
+            "attachmentDataRef": {"resourceName": "spaces/A/messages/M/attachments/2"},
+        }
+    )
+
+    out = await collect_attachments(event)
+
+    assert len(out.images) == 1
+    assert any("processing limits" in note for note in out.annotations)
+
+
+async def test_collect_attachment_failure_becomes_annotation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _raise_download(*_args: object, **_kwargs: object) -> bytes:
+        raise RuntimeError("download timeout")
+
+    monkeypatch.setattr(attachments_module, "download_attachment", _raise_download)
+    event = event_with_attachment(
+        {
+            "contentName": "shot.png",
+            "contentType": "image/png",
+            "source": "UPLOADED_CONTENT",
+            "attachmentDataRef": {"resourceName": "spaces/A/messages/M/attachments/1"},
+        }
+    )
+
+    out = await collect_attachments(event)
+
+    assert out.images == []
+    assert any("could not process" in note for note in out.annotations)
+
+
+async def test_collect_attachment_count_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(attachments_module, "download_attachment", AsyncMock(return_value=b"x"))
+    event = event_with_attachment(
+        {
+            "contentName": "one.ogg",
+            "contentType": "audio/ogg",
+            "source": "UPLOADED_CONTENT",
+            "attachmentDataRef": {"resourceName": "spaces/A/messages/M/attachments/1"},
+        }
+    )
+    event["chat"]["messagePayload"]["message"]["attachment"] = [
+        {
+            "contentName": f"{index}.ogg",
+            "contentType": "audio/ogg",
+            "source": "UPLOADED_CONTENT",
+            "attachmentDataRef": {"resourceName": f"spaces/A/messages/M/attachments/{index}"},
+        }
+        for index in range(5)
+    ]
+
+    out = await collect_attachments(event)
+
+    assert sum("voice/audio" in note for note in out.annotations) == 4
+    assert any("Skipped 1 additional" in note for note in out.annotations)
+
+
 async def test_collect_audio_is_annotation_only(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(attachments_module, "download_attachment", AsyncMock(return_value=b"audio"))
     event = event_with_attachment(

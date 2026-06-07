@@ -261,11 +261,30 @@ start_runners() {
 }
 
 status_runners() {
-    for index in $(seq 1 "$RUNNER_COUNT"); do
+    local indexes
+    indexes="$(runner_indexes_for_tag)"
+    if [[ -z "$indexes" ]]; then
+        indexes="$(seq 1 "$RUNNER_COUNT")"
+    fi
+    for index in $indexes; do
         local unit
         unit="$(unit_name "$index")"
         systemctl status "$unit.service" --no-pager --lines=3 || true
     done
+}
+
+runner_indexes_for_tag() {
+    local tag_dir="${RUNNER_BASE}/runs/${RUN_TAG}"
+    [[ -d "$tag_dir" ]] || return 0
+    local dir base index
+    for dir in "$tag_dir"/pawrrtal-gha-"$RUN_TAG"-*; do
+        [[ -d "$dir" ]] || continue
+        base="${dir##*-}"
+        index="${base#0}"
+        [[ -n "$index" ]] || index=0
+        [[ "$index" =~ ^[1-9][0-9]*$ ]] || continue
+        echo "$index"
+    done | sort -n
 }
 
 stop_unit() {
@@ -287,7 +306,12 @@ remove_runner_config() {
 }
 
 cleanup_runners() {
-    for index in $(seq 1 "$RUNNER_COUNT"); do
+    local indexes
+    indexes="$(runner_indexes_for_tag)"
+    if [[ -z "$indexes" ]]; then
+        indexes="$(seq 1 "$RUNNER_COUNT")"
+    fi
+    for index in $indexes; do
         local name user dir unit
         name="$(runner_name "$index")"
         user="$(runner_user "$index")"
@@ -330,4 +354,6 @@ main() {
     esac
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi

@@ -268,12 +268,15 @@ async def _send_turn(
         assert conversation_id is not None  # narrowed by branches above
 
         # 2. Stream the chat turn.
+        model_id = model
+        if create_new and model_id is None:
+            model_id = await _first_available_model_id(client)
         chat_body: dict[str, Any] = {
             "question": text,
             "conversation_id": conversation_id,
         }
-        if model is not None:
-            chat_body["model_id"] = model
+        if model_id is not None:
+            chat_body["model_id"] = model_id
         if reasoning_effort is not None:
             chat_body["reasoning_effort"] = reasoning_effort
 
@@ -319,6 +322,24 @@ async def _send_turn(
     if error_payload is not None:
         output["error"] = error_payload
     return output
+
+
+async def _first_available_model_id(client: PawClient) -> str:
+    """Return the first authenticated model from the backend catalog."""
+    resp = await client.request("GET", "/api/v1/models", expect=(200,))
+    body = resp.json()
+    models = body.get("models") if isinstance(body, dict) else None
+    if not isinstance(models, list):
+        raise LocalError("Could not resolve a model for the new conversation.")
+    for row in models:
+        if isinstance(row, dict):
+            model_id = row.get("model_id") or row.get("id")
+            if isinstance(model_id, str) and model_id:
+                return model_id
+    raise LocalError(
+        "No authenticated models are available.",
+        hint="Pass --model after configuring a provider, or run `paw models ls`.",
+    )
 
 
 # --------------------------------------------------------------------------- #

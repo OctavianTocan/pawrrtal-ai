@@ -20,6 +20,23 @@ logger = logging.getLogger(__name__)
 # REMOVED_FROM_SPACE and others are decoded but ignored by the ingress.
 MESSAGE_EVENT_TYPE = "MESSAGE"
 
+_CONFIGURED_COMMANDS: tuple[str, ...] = (
+    "help",
+    "new",
+    "model",
+    "thinking",
+    "verbose",
+    "config",
+    "status",
+    "whoami",
+    "lcm",
+    "compact",
+    "stop",
+)
+_APP_COMMAND_ID_TO_NAME: dict[str, str] = {
+    str(index): name for index, name in enumerate(_CONFIGURED_COMMANDS, start=1)
+}
+
 
 def decode_pubsub_message(received: dict[str, Any]) -> tuple[str | None, dict[str, Any] | None]:
     """Return ``(ack_id, chat_event)`` for one ``receivedMessages`` entry.
@@ -96,6 +113,13 @@ def _addon_payload(event: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(chat, dict):
         return {}
     payload = chat.get("messagePayload") or chat.get("appCommandPayload")
+    return payload if isinstance(payload, dict) else {}
+
+
+def _app_command_payload(event: dict[str, Any]) -> dict[str, Any]:
+    """Return the configured slash-command payload dict, or ``{}``."""
+    chat = event.get("chat")
+    payload = chat.get("appCommandPayload") if isinstance(chat, dict) else None
     return payload if isinstance(payload, dict) else {}
 
 
@@ -193,6 +217,10 @@ def parse_command(event: dict[str, Any]) -> tuple[str, str] | None:
     :func:`message_text`; ``argumentText`` (mentions stripped) is preferred
     for the argument string when Chat supplies it.
     """
+    app_command = _parse_app_command(event)
+    if app_command is not None:
+        return app_command
+
     text = message_text(event).strip()
     if not text.startswith("/"):
         return None
@@ -202,6 +230,44 @@ def parse_command(event: dict[str, Any]) -> tuple[str, str] | None:
         return None
     args = str(_message(event).get("argumentText") or rest).strip()
     return command, args
+
+
+def _parse_app_command(event: dict[str, Any]) -> tuple[str, str] | None:
+    """Parse configured Chat app commands that may omit slash text."""
+    payload = _app_command_payload(event)
+    if not payload:
+        return None
+    message = payload.get("message")
+    message_dict = message if isinstance(message, dict) else {}
+    command = _command_from_app_metadata(payload.get("appCommandMetadata"))
+    if command is None:
+        text = str(message_dict.get("text") or "").strip()
+        if text.startswith("/"):
+            command = text[1:].partition(" ")[0].strip().lower()
+    if command not in _CONFIGURED_COMMANDS:
+        return None
+    args = str(message_dict.get("argumentText") or "").strip()
+    if not args:
+        text = str(message_dict.get("text") or "").strip()
+        if text.startswith("/"):
+            args = text[1:].partition(" ")[2].strip()
+    return command, args
+
+
+def _command_from_app_metadata(raw_metadata: Any) -> str | None:
+    """Resolve configured-command metadata to a command name."""
+    if not isinstance(raw_metadata, dict):
+        return None
+    command_id = raw_metadata.get("appCommandId")
+    if command_id is not None:
+        mapped = _APP_COMMAND_ID_TO_NAME.get(str(command_id))
+        if mapped is not None:
+            return mapped
+    for key in ("commandName", "appCommandName", "name"):
+        value = raw_metadata.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip().removeprefix("/").lower()
+    return None
 
 
 def invoked_function(event: dict[str, Any]) -> str:

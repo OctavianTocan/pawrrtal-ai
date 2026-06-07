@@ -128,3 +128,47 @@ async def test_message_turn_forwards_google_chat_overrides_and_hooks(
     assert turn_input.verbose_level == 2
     assert turn_input.reasoning_effort == "high"
     assert turn_input.pre_turn_hooks == [_fake_hook]
+
+
+async def test_message_turn_clears_unsupported_reasoning(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    import app.channels.google_chat.ingress as ingress_module
+
+    captured: dict[str, Any] = {}
+    target = ingress_module._TurnTarget(
+        user_id=uuid4(),
+        conversation_id=uuid4(),
+        workspace_root=tmp_path,
+        workspace_id=uuid4(),
+        model_id="litellm:openai/gpt-4o",
+        verbose_level=1,
+        reasoning_effort="high",
+    )
+
+    async def _fake_resolve_target(_event: dict[str, Any]) -> object:
+        return target
+
+    async def _fake_create_message(**_kwargs: Any) -> str:
+        return f"{SPACE}/messages/PLACEHOLDER"
+
+    async def _fake_collect(_event: dict[str, Any]) -> GoogleChatAttachments:
+        return GoogleChatAttachments()
+
+    async def _fake_run_turn(turn_input: object) -> AsyncIterator[bytes]:
+        captured["turn_input"] = turn_input
+        yield b""
+
+    monkeypatch.setattr(ingress_module, "_resolve_turn_target", _fake_resolve_target)
+    monkeypatch.setattr(
+        ingress_module, "_resolve_provider", lambda *_args: (object(), target.model_id)
+    )
+    monkeypatch.setattr(ingress_module, "build_agent_tools", lambda **_kwargs: [])
+    monkeypatch.setattr(ingress_module, "create_message", _fake_create_message)
+    monkeypatch.setattr(ingress_module, "collect_attachments", _fake_collect)
+    monkeypatch.setattr(ingress_module, "run_turn", _fake_run_turn)
+
+    await ingress_module._handle_message_event(addon_event(text="hello"))
+
+    assert captured["turn_input"].reasoning_effort is None

@@ -20,6 +20,15 @@ class _FakePostClient:
         return self.response
 
 
+class _FailingPatchClient:
+    async def patch(self, *_args: Any, **_kwargs: Any) -> httpx.Response:
+        raise httpx.ConnectError("temporary network failure")
+
+
+def _failing_patch_client() -> _FailingPatchClient:
+    return _FailingPatchClient()
+
+
 class _FakeStream:
     def __init__(self, response: httpx.Response) -> None:
         self.response = response
@@ -53,6 +62,20 @@ async def test_acknowledge_returns_false_on_api_failure(
         subscription_id="s",
         ack_ids=["ack-1"],
     )
+
+    assert ok is False
+
+
+async def test_update_message_returns_false_on_transport_failure(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _fake_headers() -> dict[str, str]:
+        return {"Authorization": "Bearer test"}
+
+    monkeypatch.setattr(client_module, "_headers", _fake_headers)
+    monkeypatch.setattr(client_module, "_client", _failing_patch_client)
+
+    ok = await client_module.update_message(message_name="spaces/A/messages/M", text="done")
 
     assert ok is False
 
