@@ -266,7 +266,6 @@ start_runner_unit() {
         --property "ProtectKernelModules=yes" \
         --property "ProtectKernelTunables=yes" \
         --property "ProtectProc=invisible" \
-        --property "ProcSubset=pid" \
         --property "ReadWritePaths=${dir}" \
         --property "CapabilityBoundingSet=" \
         --property "LockPersonality=yes" \

@@ -29,3 +29,20 @@ def test_runner_index_discovery_uses_existing_tag_directories(tmp_path: Path) ->
     )
 
     assert result.stdout.splitlines() == ["1", "2", "5"]
+
+
+def test_runner_launcher_defaults_are_volume_backed_and_hardened() -> None:
+    """Runner launcher defaults must stay ephemeral, bounded, and off root disk."""
+    repo_root = Path(__file__).resolve().parents[2]
+    script_text = (repo_root / "scripts" / "ephemeral-self-hosted-runners.sh").read_text()
+
+    assert "/mnt/HC_Volume_105512717/github-runners/pawrrtal-ephemeral" in script_text
+    assert "--ephemeral" in script_text
+    assert 'RUNNER_COUNT="${RUNNER_COUNT:-2}"' in script_text
+    assert "((RUNNER_COUNT <= 4))" in script_text
+    assert 'MEMORY_MAX="${MEMORY_MAX:-8G}"' in script_text
+    assert 'CPU_QUOTA="${CPU_QUOTA:-200%}"' in script_text
+    assert '--property "NoNewPrivileges=yes"' in script_text
+    assert '--property "ProtectSystem=strict"' in script_text
+    assert '--property "CapabilityBoundingSet="' in script_text
+    assert "ProcSubset=pid" not in script_text
