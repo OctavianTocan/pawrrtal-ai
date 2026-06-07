@@ -119,7 +119,10 @@ def test_plugins_reload_returns_workspace_snapshot(
     assert result.exit_code == 0, result.stdout
     payload = json.loads(result.stdout)
     assert payload["workspace_key"] == str(tmp_path.resolve())
-    assert payload["plugins"][0]["status"] == "active"
+    local_search = next(
+        plugin for plugin in payload["plugins"] if plugin["plugin_id"] == "local_search"
+    )
+    assert local_search["status"] == "active"
 
 
 def test_plugins_enable_activates_workspace_plugin(
@@ -139,7 +142,9 @@ def test_plugins_enable_activates_workspace_plugin(
         app,
         ["plugins", "list", "--workspace-root", str(tmp_path), "--json"],
     )
-    assert json.loads(listed.stdout)[0]["status"] == "active"
+    rows = json.loads(listed.stdout)
+    local_search = next(row for row in rows if row["plugin_id"] == "local_search")
+    assert local_search["status"] == "active"
 
 
 def test_plugins_disable_requires_confirmation(

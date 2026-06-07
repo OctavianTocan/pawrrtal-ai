@@ -119,6 +119,12 @@ The provider receives `TurnContextProviderContext` and returns either a short
 context string or `None`. The turn orchestrator owns prompt assembly and wraps
 all provider output under `# TURN CONTEXT`.
 
+`backend/plugins/core_channels/plugin.json` is the bundled channel example. A
+`channel` capability maps a surface name (`web`, `electron`, `telegram`,
+`google_chat`) to a trusted factory that returns a `Channel` adapter. The
+channel registry composes those capabilities through the plugin host and keeps
+only `web` as a kernel fallback.
+
 ## Enablement And Hot Reload
 
 Enablement lives outside the manifest:
