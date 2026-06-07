@@ -10,6 +10,7 @@ from pydantic import AfterValidator
 from app.infrastructure.config import settings
 from app.providers.catalog import first_catalog_model
 from app.providers.model_id import InvalidModelId, parse_model_id
+from app.providers.plugin_provider import parse_plugin_model_id
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,10 @@ def _canonicalise_model_id(raw: str | None) -> str | None:
     try:
         return parse_model_id(raw).id
     except InvalidModelId as exc:
-        raise ValueError(str(exc)) from exc
+        try:
+            return parse_plugin_model_id(raw).id
+        except InvalidModelId:
+            raise ValueError(str(exc)) from exc
 
 
 def _canonicalise_model_id_for_read(raw: str | None) -> str | None:
@@ -31,6 +35,10 @@ def _canonicalise_model_id_for_read(raw: str | None) -> str | None:
     try:
         return parse_model_id(raw).id
     except InvalidModelId as exc:
+        try:
+            return parse_plugin_model_id(raw).id
+        except InvalidModelId:
+            pass
         if settings.strict_conversation_read_validation:
             raise ValueError(str(exc)) from exc
         logger.warning(

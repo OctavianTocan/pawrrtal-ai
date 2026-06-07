@@ -125,6 +125,17 @@ all provider output under `# TURN CONTEXT`.
 channel registry composes those capabilities through the plugin host and keeps
 only `web` as a kernel fallback.
 
+Provider plugins use `provider` capabilities. Their model IDs are dynamic and
+do not need a `Host` or `Vendor` enum entry. The canonical shape is:
+
+```text
+plugin_id:vendor/model
+```
+
+The provider entrypoint is a trusted factory that receives
+`ProviderFactoryContext` and returns an `AILLM`. Active provider-plugin models
+are appended to `/api/v1/models` and can be selected by the normal chat API.
+
 ## Enablement And Hot Reload
 
 Enablement lives outside the manifest:
