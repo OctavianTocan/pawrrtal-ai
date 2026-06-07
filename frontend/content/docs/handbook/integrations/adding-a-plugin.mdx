@@ -5,6 +5,14 @@ description: How to add a manifest-backed plugin to Pawrrtal.
 
 # Adding a Plugin
 
+Use the Paw CLI when creating a workspace CLI plugin:
+
+```bash
+paw plugins scaffold local_search --tool-name search_notes --workspace-root ~/paw --json
+paw plugins validate ~/paw/.agent/plugins/local_search --json
+paw plugins reload --workspace-root ~/paw --json
+```
+
 Plugins are manifest-backed bundles discovered from three roots:
 
 ```text

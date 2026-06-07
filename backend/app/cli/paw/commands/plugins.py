@@ -7,6 +7,7 @@ from typing import Any
 
 import typer
 
+from app.cli.paw.commands.plugins_scaffold import scaffold_plugin
 from app.cli.paw.errors import LocalError
 from app.cli.paw.output import emit_human, emit_json, emit_plain_rows, require_one_output_mode
 from app.plugins.capability_catalog import CapabilitySearch
@@ -28,6 +29,7 @@ slots_app = typer.Typer(help="List and set capability slot preferences.", no_arg
 
 app.add_typer(capabilities_app, name="capabilities", help="Search and describe capabilities.")
 app.add_typer(slots_app, name="slots", help="List and prefer slot candidates.")
+app.command("scaffold")(scaffold_plugin)
 
 
 @app.command("spec")
