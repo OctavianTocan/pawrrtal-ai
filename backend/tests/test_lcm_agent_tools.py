@@ -23,7 +23,7 @@ import pytest
 def test_lcm_grep_tool_present_when_lcm_enabled(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from app.agents.tools import build_agent_tools
+    from app.agents.tool_surface import build_agent_tools
     from app.infrastructure import config as _cfg
 
     monkeypatch.setattr(_cfg.settings, "lcm_enabled", True)
@@ -36,7 +36,7 @@ def test_lcm_grep_tool_present_when_lcm_enabled(
 def test_lcm_grep_tool_absent_when_lcm_disabled(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from app.agents.tools import build_agent_tools
+    from app.agents.tool_surface import build_agent_tools
     from app.infrastructure import config as _cfg
 
     monkeypatch.setattr(_cfg.settings, "lcm_enabled", False)
@@ -49,7 +49,7 @@ def test_lcm_grep_tool_absent_when_lcm_disabled(
 def test_lcm_grep_tool_absent_when_no_conversation_id(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from app.agents.tools import build_agent_tools
+    from app.agents.tool_surface import build_agent_tools
     from app.infrastructure import config as _cfg
 
     monkeypatch.setattr(_cfg.settings, "lcm_enabled", True)
@@ -62,7 +62,7 @@ def test_lcm_grep_tool_absent_when_no_conversation_id(
 def test_describe_tools_present_when_lcm_enabled(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from app.agents.tools import build_agent_tools
+    from app.agents.tool_surface import build_agent_tools
     from app.infrastructure import config as _cfg
 
     monkeypatch.setattr(_cfg.settings, "lcm_enabled", True)
@@ -77,7 +77,7 @@ def test_describe_tools_present_when_lcm_enabled(
 def test_describe_tools_absent_when_lcm_disabled(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from app.agents.tools import build_agent_tools
+    from app.agents.tool_surface import build_agent_tools
     from app.infrastructure import config as _cfg
 
     monkeypatch.setattr(_cfg.settings, "lcm_enabled", False)
@@ -92,7 +92,7 @@ def test_describe_tools_absent_when_lcm_disabled(
 def test_expand_query_tool_present_when_user_id_provided(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from app.agents.tools import build_agent_tools
+    from app.agents.tool_surface import build_agent_tools
     from app.infrastructure import config as _cfg
 
     monkeypatch.setattr(_cfg.settings, "lcm_enabled", True)
@@ -112,7 +112,7 @@ def test_expand_query_tool_present_when_user_id_provided(
 def test_expand_query_tool_uses_authenticated_fallback_without_model_id(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from app.agents.tools import build_agent_tools
+    from app.agents.tool_surface import build_agent_tools
     from app.infrastructure import config as _cfg
 
     monkeypatch.setattr(_cfg.settings, "lcm_enabled", True)
@@ -132,7 +132,7 @@ def test_expand_query_tool_uses_authenticated_fallback_without_model_id(
 def test_expand_query_tool_absent_without_user_id(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from app.agents.tools import build_agent_tools
+    from app.agents.tool_surface import build_agent_tools
     from app.infrastructure import config as _cfg
 
     monkeypatch.setattr(_cfg.settings, "lcm_enabled", True)
@@ -151,7 +151,7 @@ def test_expand_query_tool_absent_without_user_id(
 def test_expand_query_tool_absent_when_lcm_disabled(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from app.agents.tools import build_agent_tools
+    from app.agents.tool_surface import build_agent_tools
     from app.infrastructure import config as _cfg
 
     monkeypatch.setattr(_cfg.settings, "lcm_enabled", False)

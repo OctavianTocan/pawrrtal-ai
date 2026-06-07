@@ -61,14 +61,14 @@ async def db_session(
 ) -> AsyncGenerator[AsyncSession]:
     """Provide an isolated in-memory SQLite database session.
 
-    Also rebinds ``app.channels.turn_runner.async_session_maker`` to this
-    in-memory engine so background helpers in the chat turn runner
-    (``_turn_session``, ``load_codex_thread_id``, ``persist_codex_thread_id``)
-    see the same tables the request session sees. Required because the chat
-    router intentionally does NOT pass the request-scoped session into
+    Also rebinds turn-orchestrator session makers to this in-memory engine
+    so background helpers in the chat turn runner (``_turn_session``,
+    ``load_codex_thread_id``, ``persist_codex_thread_id``) see the same
+    tables the request session sees. Required because the chat router
+    intentionally does NOT pass the request-scoped session into
     ``ChatTurnInput`` — see ``tests/test_chat_sqlite_session_lifecycle.py``
-    and the comment in ``app/api/chat.py`` for the SQLite/aiosqlite lifecycle
-    rationale.
+    and the comment in ``app/api/chat.py`` for the SQLite/aiosqlite
+    lifecycle rationale.
     """
     engine = create_async_engine(
         "sqlite+aiosqlite:///:memory:",
@@ -85,7 +85,16 @@ async def db_session(
     # connection out from under it (a SQLite/aiosqlite-specific failure
     # mode). In tests, point those calls at the in-memory engine so the
     # runner sees the same tables and seeded rows as the request session.
-    monkeypatch.setattr("app.channels.turn_runner.async_session_maker", session_maker, raising=True)
+    monkeypatch.setattr(
+        "app.channels.turn_orchestrator.history.async_session_maker",
+        session_maker,
+        raising=True,
+    )
+    monkeypatch.setattr(
+        "app.channels.turn_orchestrator.state.async_session_maker",
+        session_maker,
+        raising=True,
+    )
     async with session_maker() as session:
         session.add(test_user)
         await session.commit()

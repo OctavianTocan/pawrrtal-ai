@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from pathlib import Path
 
 from fastapi import Depends, Request, Response, status
@@ -15,6 +17,7 @@ from app.infrastructure.database.legacy import User, get_async_session
 from app.providers.catalog import CATALOG_ETAG, MODEL_CATALOG, ModelEntry
 from app.providers.factory import host_authenticated
 from app.providers.model_id import Host
+from app.providers.plugin_provider import PluginModelEntry, provider_model_entries
 from app.workspace.crud import get_default_workspace
 
 
@@ -47,7 +50,7 @@ def _etag_for(workspace_root: Path | None) -> str:
     A stale module-level ETag would cause ``If-None-Match`` to return
     304 with the old filtered list (issue #370 review feedback).
     """
-    return f'"{CATALOG_ETAG}-{_auth_fingerprint(workspace_root)}"'
+    return f'"{CATALOG_ETAG}-{_auth_fingerprint(workspace_root)}-{_plugin_fingerprint(workspace_root)}"'
 
 
 class ModelOption(BaseModel):
@@ -74,6 +77,18 @@ def _to_option(entry: ModelEntry) -> ModelOption:
         host=entry.host.value,
         vendor=entry.vendor.value,
         model=entry.model,
+        display_name=entry.display_name,
+        short_name=entry.short_name,
+        description=entry.description,
+    )
+
+
+def _plugin_to_option(entry: PluginModelEntry) -> ModelOption:
+    return ModelOption(
+        id=entry.id,
+        host=entry.parsed.host,
+        vendor=entry.parsed.vendor,
+        model=entry.parsed.model,
         display_name=entry.display_name,
         short_name=entry.short_name,
         description=entry.description,
@@ -124,7 +139,13 @@ def get_models_router() -> APIRouter:
         authed_entries = [
             e for e in MODEL_CATALOG if host_authenticated(e.host, workspace_root=workspace_root)
         ]
-        body = ModelsResponse(models=[_to_option(e) for e in authed_entries])
+        plugin_entries = provider_model_entries(workspace_root=workspace_root)
+        body = ModelsResponse(
+            models=[
+                *[_to_option(e) for e in authed_entries],
+                *[_plugin_to_option(e) for e in plugin_entries],
+            ]
+        )
         return JSONResponse(
             content=body.model_dump(),
             headers={
@@ -134,3 +155,10 @@ def get_models_router() -> APIRouter:
         )
 
     return router
+
+
+def _plugin_fingerprint(workspace_root: Path | None) -> str:
+    """Return a stable fingerprint for active provider plugin models."""
+    entries = provider_model_entries(workspace_root=workspace_root)
+    payload = json.dumps([entry.id for entry in entries], separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]

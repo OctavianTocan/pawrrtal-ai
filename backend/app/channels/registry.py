@@ -1,8 +1,8 @@
-"""Channel registry — maps surface names to Channel implementations.
+"""Channel registry — maps surface names to active Channel implementations.
 
-The registry is a lightweight lookup table.  It is intentionally not a
-global singleton that auto-discovers implementations; channels are registered
-explicitly so the set of active channels is always visible in one place.
+Channels are declared as plugin capabilities and composed through the plugin
+host. The kernel keeps only a web SSE fallback so unknown or disabled surfaces
+still have a safe response path.
 
 Usage
 -----
@@ -12,34 +12,31 @@ Usage
 
     channel = resolve_channel("web")      # SSEChannel(surface="web")
     channel = resolve_channel("electron") # SSEChannel(surface="electron")
-    channel = resolve_channel("telegram") # TelegramChannel (future)
+    channel = resolve_channel("telegram") # TelegramChannel when enabled
 
 Extending
 ---------
-When a new channel adapter is added, import it here and register it via
-``_REGISTRY``.  No other file needs to change.
+Add a trusted ``channel`` capability to a bundled or global plugin manifest.
 """
 
 from __future__ import annotations
 
+from app.plugins.adapters.channels import build_channel_registry
+
 from .base import Channel
-from .google_chat import SURFACE_GOOGLE_CHAT, GoogleChatChannel
-from .sse import SURFACE_ELECTRON, SURFACE_WEB, SSEChannel
-from .telegram import SURFACE_TELEGRAM, TelegramChannel
+from .sse import SURFACE_WEB, SSEChannel
 
-# ---------------------------------------------------------------------------
-# Registry — explicit mapping of surface name → Channel instance.
-#
-# Channels are stateless singletons: they hold no per-request state, so one
-# instance per surface is safe and cheap.
-# ---------------------------------------------------------------------------
 
-_REGISTRY: dict[str, Channel] = {
-    SURFACE_WEB: SSEChannel(surface=SURFACE_WEB),
-    SURFACE_ELECTRON: SSEChannel(surface=SURFACE_ELECTRON),
-    SURFACE_TELEGRAM: TelegramChannel(),
-    SURFACE_GOOGLE_CHAT: GoogleChatChannel(),
-}
+def _fallback_registry() -> dict[str, Channel]:
+    """Return kernel-owned fallback channels."""
+    return {SURFACE_WEB: SSEChannel(surface=SURFACE_WEB)}
+
+
+def _registry() -> dict[str, Channel]:
+    """Return active plugin channels plus the mandatory web fallback."""
+    registry = _fallback_registry()
+    registry.update(build_channel_registry())
+    return registry
 
 
 def resolve_channel(surface: str) -> Channel:
@@ -55,9 +52,10 @@ def resolve_channel(surface: str) -> Channel:
     Returns:
         The registered ``Channel`` instance.
     """
-    return _REGISTRY.get(surface, _REGISTRY[SURFACE_WEB])
+    registry = _registry()
+    return registry.get(surface, registry[SURFACE_WEB])
 
 
 def registered_surfaces() -> list[str]:
     """Return the list of registered surface names (for introspection/tests)."""
-    return list(_REGISTRY.keys())
+    return list(_registry().keys())

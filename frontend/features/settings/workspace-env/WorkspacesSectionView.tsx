@@ -18,11 +18,11 @@ import type { WorkspaceEnvKey } from './use-workspace-env';
 
 /**
  * Display metadata for one overridable workspace env key. The `key` field
- * matches the backend `OVERRIDABLE_KEYS` allowlist; the rest is purely
- * UI-facing (label, help text, link to obtain a key, placeholder).
+ * matches the backend workspace env allowlist; the rest is UI-facing metadata
+ * from either the built-in frontend copy table or plugin manifests.
  */
 export interface WorkspaceEnvKeyMeta {
-	/** Backend key name. Must be one of `WORKSPACE_ENV_KEY_IDS`. */
+	/** Backend key name. Built-in and plugin-declared keys are both allowed. */
 	key: WorkspaceEnvKey;
 	/** User-facing label for the input row. */
 	label: string;

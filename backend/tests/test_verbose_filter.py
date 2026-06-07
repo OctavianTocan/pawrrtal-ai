@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import pytest
 
-from app.channels.turn_runner import _should_deliver_event
+from app.channels.turn_orchestrator import _should_deliver_event
 from app.chat.aggregator import (
     VERBOSE_DETAILED,
     VERBOSE_NORMAL,

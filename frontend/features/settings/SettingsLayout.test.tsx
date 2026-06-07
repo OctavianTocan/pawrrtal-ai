@@ -25,6 +25,13 @@ vi.mock('@/hooks/use-authed-fetch', () => ({
 
 import { SettingsLayout } from './SettingsLayout';
 
+vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(
+	() =>
+		({
+			fillStyle: '#000000',
+		}) as CanvasRenderingContext2D
+);
+
 /** Wrap each render in a fresh QueryClient so cache state never leaks. */
 function renderWithQuery(ui: React.ReactElement): ReturnType<typeof render> {
 	const client = new QueryClient({
@@ -44,6 +51,7 @@ describe('SettingsLayout', () => {
 		expect(getByRole('button', { name: 'Appearance' })).toBeTruthy();
 		expect(getByRole('button', { name: 'Personalization' })).toBeTruthy();
 		expect(getByRole('button', { name: 'Integrations' })).toBeTruthy();
+		expect(getByRole('button', { name: 'Plugins' })).toBeTruthy();
 		expect(getByRole('button', { name: 'Usage' })).toBeTruthy();
 	});
 

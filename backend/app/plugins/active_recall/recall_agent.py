@@ -9,11 +9,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from app.agents.plugins.types import PreTurnHookContext
 from app.agents.types import AgentTool
 from app.channels.telegram.html import md_to_telegram_html
 from app.infrastructure.config import settings
 from app.infrastructure.keys import resolve_api_key
+from app.plugins.adapters.turn_context import TurnContextProviderContext
 from app.providers._errors import ProviderError
 from app.providers.factory import resolve_llm
 from app.tools.errors import ToolError
@@ -74,7 +74,7 @@ def _resolve_active_recall_timeout_s(workspace_root: Path) -> float:
 
 
 SYSTEM_PROMPT = """
-You are the Active Recall Agent running as a pre-turn hook for a personal AI assistant.
+You are the Active Recall Agent running as a turn context provider for a personal AI assistant.
 Your job is to search the conversation history and workspace memory for context relevant to the user's question before the main agent runs.
 
 Instructions:
@@ -208,12 +208,12 @@ async def _collect_stream_telemetry(  # noqa: C901 — narrow per-event dispatch
 
 
 async def _run_recall_stream(
-    ctx: PreTurnHookContext,
+    ctx: TurnContextProviderContext,
     model_id: str,
     system_prompt: str,
     search_workspace: bool,
 ) -> tuple[str, list[str], int, int, float, str | None]:
-    provider = resolve_llm(model_id)
+    provider = resolve_llm(model_id, workspace_root=ctx.workspace_root)
     lcm_tools: list[AgentTool] = [
         make_lcm_grep_tool(conversation_id=ctx.conversation_id),
         make_lcm_search_tool(conversation_id=ctx.conversation_id),
@@ -237,7 +237,7 @@ async def _run_recall_stream(
     return await _collect_stream_telemetry(stream, draft_updater=ctx.draft_updater)
 
 
-async def run_active_recall(ctx: PreTurnHookContext) -> str | None:
+async def run_active_recall(ctx: TurnContextProviderContext) -> str | None:
     """Search LCM for context relevant to the user's question before the main agent turn."""
     # Resolve ACTIVE_RECALL_ENABLED
     val_enabled = resolve_api_key(ctx.workspace_root, "ACTIVE_RECALL_ENABLED")

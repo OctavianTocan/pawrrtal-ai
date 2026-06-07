@@ -1,0 +1,72 @@
+{
+	"schema_version": 1,
+	"id": "notion",
+	"name": "Notion",
+	"description": "Run Notion workspace operations through the ntn CLI.",
+	"version": "1.0.0",
+	"enabled_by_default": false,
+	"permissions": ["subprocess", "secrets"],
+	"capabilities": [
+		{
+			"type": "cli_tool",
+			"id": "notion_cli",
+			"tool_name": "notion_cli",
+			"title": "Notion CLI",
+			"description": "Run ntn with a safe argument list against the connected Notion workspace.",
+			"intents": ["notion.workspace"],
+			"slots": ["workspace_knowledge"],
+			"exposure": "direct_and_catalog",
+			"permissions": ["secrets"],
+			"entrypoint": ["ntn"],
+			"cwd": "workspace",
+			"timeout_seconds": 30,
+			"output_cap_bytes": 32000,
+			"args_schema": {
+				"type": "object",
+				"properties": {
+					"args": {
+						"type": "array",
+						"items": { "type": "string" },
+						"description": "Arguments passed to ntn after the executable name."
+					},
+					"stdin": {
+						"type": "string",
+						"description": "Optional stdin payload for ntn commands that read from stdin."
+					}
+				},
+				"required": ["args"],
+				"additionalProperties": false
+			}
+		},
+		{
+			"type": "settings",
+			"id": "notion_settings",
+			"title": "Notion Settings",
+			"description": "Workspace-scoped Notion credential metadata.",
+			"env": [
+				{
+					"name": "NOTION_API_KEY",
+					"inject_as": "NOTION_API_TOKEN",
+					"required": true,
+					"scope": "workspace",
+					"overridable": true,
+					"gateway_fallback": false,
+					"secret": true,
+					"label": "Notion API Key",
+					"description": "Token used by the Notion CLI.",
+					"help_url": "https://www.notion.so/profile/integrations"
+				}
+			]
+		}
+	],
+	"validation": {
+		"commands": [
+			{
+				"name": "notion_auth",
+				"entrypoint": ["ntn", "api", "v1/users/me"],
+				"timeout_seconds": 30,
+				"inject_env": ["NOTION_API_KEY"]
+			}
+		]
+	}
+}

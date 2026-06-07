@@ -1,0 +1,45 @@
+{
+	"schema_version": 1,
+	"id": "image_generation",
+	"name": "Image Generation",
+	"description": "Generate workspace image files through the OpenAI Codex image tool.",
+	"version": "1.0.0",
+	"enabled_by_default": false,
+	"permissions": ["network", "filesystem_write", "costly", "secrets"],
+	"capabilities": [
+		{
+			"type": "python_tool",
+			"id": "generate_image",
+			"tool_name": "generate_image",
+			"title": "Generate Image",
+			"description": "Generate a PNG image from a text prompt and save it into the workspace.",
+			"tags": ["image", "generation", "codex"],
+			"intents": ["image.generate", "asset.create"],
+			"slots": ["image_generation", "assets"],
+			"exposure": "direct_and_catalog",
+			"permissions": ["network", "filesystem_write", "costly"],
+			"risk": "costly",
+			"entrypoint": "app.plugins.image_generation.tools:make_image_gen_tool"
+		},
+		{
+			"type": "settings",
+			"id": "image_generation_settings",
+			"title": "Image Generation Settings",
+			"description": "Workspace-scoped OpenAI Codex image-generation credential metadata.",
+			"permissions": ["secrets"],
+			"env": [
+				{
+					"name": "OPENAI_CODEX_OAUTH_TOKEN",
+					"required": true,
+					"scope": "workspace",
+					"overridable": true,
+					"gateway_fallback": false,
+					"secret": true,
+					"label": "OpenAI Codex OAuth Token",
+					"description": "Token used by Codex-backed image generation.",
+					"help_url": "https://chatgpt.com/codex"
+				}
+			]
+		}
+	]
+}

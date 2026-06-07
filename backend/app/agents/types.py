@@ -164,12 +164,12 @@ LLMEvent = LLMTextDeltaEvent | LLMThinkingDeltaEvent | LLMToolCallEvent | LLMDon
 
 
 # ---------------------------------------------------------------------------
-# Agent-level events (what agent_loop() yields to callers)
+# Agent-level events (what run_model_tool_loop() yields to callers)
 # ---------------------------------------------------------------------------
 
 
 class AgentStartEvent(TypedDict):
-    """First event of any ``agent_loop`` invocation."""
+    """First event of any ``run_model_tool_loop`` invocation."""
 
     type: Literal["agent_start"]
 
@@ -317,6 +317,8 @@ class AgentTool:
     parameters: dict[str, Any]  # JSON schema object
     execute: Callable[..., Coroutine[Any, Any, str]]
     display: ToolDisplay | None = None
+    permissions: tuple[str, ...] = field(default_factory=tuple)
+    requires_confirmation: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -377,13 +379,13 @@ class AgentSafetyConfig:
     """
 
     #: Hard cap on assistant turns (LLM→tool→LLM round-trips) per
-    #: ``agent_loop`` invocation.  ``None`` disables.  Default 25 covers
+    #: ``run_model_tool_loop`` invocation.  ``None`` disables.  Default 25 covers
     #: deep research / refactor turns; runaway tool-call loops trip well
     #: before this.
     max_iterations: int | None = 25
 
     #: Wall-clock budget for the whole loop, in seconds.  Counted from
-    #: the moment ``agent_loop`` is entered.  ``None`` disables.
+    #: the moment ``run_model_tool_loop`` is entered.  ``None`` disables.
     #: Default 300s (5 min) is generous for chat turns and matches the
     #: 600s cap minus headroom for streaming / network jitter.
     max_wall_clock_seconds: float | None = 300.0
@@ -424,7 +426,7 @@ class AgentSafetyConfig:
 
 @dataclass
 class AgentLoopConfig:
-    """Configuration for a single agent_loop invocation.
+    """Configuration for a single run_model_tool_loop invocation.
 
     convert_to_llm: required — filters/converts AgentMessage[] to the
         subset the LLM provider understands (strips UI-only messages).

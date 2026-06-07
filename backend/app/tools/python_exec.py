@@ -39,9 +39,9 @@ What the tool does *not* provide:
     ``fs.write``.
   * Hard kill on runaway.  See "wall-clock timeout" above.
 
-Composition: gated by ``settings.virtual_python_enabled`` (default
-``False``).  Wired in :func:`app.agents.tools.build_agent_tools`
-between ``markitdown_convert`` and ``send_message``.
+Composition: exposed only through the disabled-by-default bundled
+``python_shell`` plugin. The plugin factory binds timeout and output caps from
+settings, then delegates execution to this module.
 """
 
 from __future__ import annotations
@@ -324,7 +324,7 @@ def _scrub_nul(text: str) -> str:
     """Replace embedded NULs so Postgres ``text`` columns accept the result.
 
     The agent loop persists every tool result (see
-    ``app/core/agent_loop/loop.py``'s ``ToolResultMessage`` write
+    ``app/core/run_model_tool_loop/loop.py``'s ``ToolResultMessage`` write
     path); NULs in JSON survive transport but Postgres rejects them.
     """
     return text.replace("\x00", r"\x00")
@@ -349,7 +349,7 @@ def _exec_sync(code: str, fs: WorkspaceFS, cap_bytes: int) -> str:
             # The ruff (noqa: S102) and bandit (nosec B102) suppressions on
             # the next line acknowledge that exec() is the documented
             # entire purpose of this tool — see the module docstring and the
-            # ``virtual_python_enabled`` settings gate.
+            # disabled-by-default ``python_shell`` plugin gate.
             exec(compiled, globals_ns)  # noqa: S102  # nosec B102
         except SystemExit as exit_exc:
             buf.write(f"\n[SystemExit: {exit_exc.code}]\n")

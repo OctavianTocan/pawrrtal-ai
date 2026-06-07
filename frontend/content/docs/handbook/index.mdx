@@ -62,7 +62,7 @@ backend/
     api/                 FastAPI routes (one file per domain)
     channels/            web SSE + Telegram adapters
     core/
-      agent_loop/        provider-agnostic loop + StreamFn seam
+      run_model_tool_loop/        provider-agnostic loop + StreamFn seam
       providers/         claude_provider, gemini_provider
       tools/             AgentTool factories
     integrations/        plugins, including notion/
@@ -95,6 +95,6 @@ DESIGN.md                canonical design tokens (mirrors globals.css)
 - **No `any`, no `@ts-nocheck`, no Tailwind literal colours.** Use
   the design tokens.
 - **Agent-loop tests use `ScriptedStreamFn`**, not patched
-  `agent_loop`. See `backend/tests/agent_harness.py` and the
+  `run_model_tool_loop`. See `backend/tests/agent_loop_harness.py` and the
   testing rules.
 - **Conventional Commits.** PRs land small and reviewable.

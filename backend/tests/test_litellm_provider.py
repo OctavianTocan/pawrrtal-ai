@@ -1,6 +1,6 @@
-"""Tests for LiteLLMLLM's StreamFn wiring into agent_loop.
+"""Tests for LiteLLMLLM's StreamFn wiring into run_model_tool_loop.
 
-Uses ``ScriptedStreamFn`` from ``tests.agent_harness`` — no real
+Uses ``ScriptedStreamFn`` from ``tests.agent_loop_harness`` — no real
 LiteLLM / OpenAI / xAI API calls are made.  These tests exercise the
 provider's translation layer (AgentEvent → StreamEvent) and confirm
 that history and prompts flow through the loop.  The text-only-v1
@@ -58,14 +58,14 @@ from app.providers.litellm_provider import (
     open_litellm_stream,
 )
 from app.providers.model_id import Vendor
-from tests.agent_harness import ScriptedStreamFn, text_turn
+from tests.agent_loop_harness import ScriptedStreamFn, text_turn
 
 
 @pytest.mark.anyio
 async def test_litellm_provider_yields_delta_events_from_loop(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """LiteLLMLLM.stream() translates agent_loop text_deltas to StreamEvent deltas."""
+    """LiteLLMLLM.stream() translates run_model_tool_loop text_deltas to StreamEvent deltas."""
     provider = LiteLLMLLM("gpt-4o", Vendor.openai)
     monkeypatch.setattr(provider, "_stream_fn", ScriptedStreamFn([text_turn("hello")]))
 

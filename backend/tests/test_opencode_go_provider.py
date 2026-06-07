@@ -36,7 +36,7 @@ from app.providers.opencode_go.provider import (
     OpencodeGoLLM,
     OpencodeGoLLMConfig,
 )
-from tests.agent_harness import (
+from tests.agent_loop_harness import (
     ScriptedStreamFn,
     text_turn,
     thinking_then_text_turn,
@@ -325,7 +325,7 @@ def _set_opencode_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
 async def test_provider_yields_delta_events_from_loop(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``OpencodeGoLLM.stream`` translates agent_loop text deltas to ``delta`` SSE events."""
+    """``OpencodeGoLLM.stream`` translates run_model_tool_loop text deltas to ``delta`` SSE events."""
     provider = _make_provider()
     script = ScriptedStreamFn([text_turn("hello world")])
     monkeypatch.setattr(provider, "_stream_fn", script)

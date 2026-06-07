@@ -8,13 +8,13 @@ description: ADR — instrument the agent loop and turn runner with Traceloop-sh
 - **Date:** 2026-05-16
 - **Owners:** OctavianTocan
 - **Tracking:** Workshop integration (this PR); follow-up bean for the
-  `/setup-agent-replay` scaffold against `channels/turn_runner.run_turn`
+  `/setup-agent-replay` scaffold against `channels/turn_orchestrator.run_turn`
   (TBD).
 
 <Callout type="info" title="Status: Accepted">
 Add `app/core/observability/workshop.py` (Workshop-compatible OTel
-spans), wire it into `channels/turn_runner.run_turn` and
-`agent_loop._execute_and_log_tool_call`. Local dev points
+spans), wire it into `channels/turn_orchestrator.run_turn` and
+`run_model_tool_loop._execute_and_log_tool_call`. Local dev points
 `OTEL_EXPORTER_OTLP_ENDPOINT` at `http://localhost:5899` to render
 traces in the Workshop UI; the same spans route to Grafana / Honeycomb /
 SigNoz in deployed environments.
@@ -34,14 +34,14 @@ Pawrrtal already has the OTel SDK + OTLP/HTTP exporter wired in
 The chat pipeline has three architectural seams that Workshop's three
 span types map onto cleanly:
 
-1. **Turn root** — `channels/turn_runner.run_turn` is the single
+1. **Turn root** — `channels/turn_orchestrator.run_turn` is the single
    per-turn entry point shared by all surfaces (HTTP `/api/chat`,
    Telegram, voice).
-2. **LLM call** — same site; `turn_runner` already provides an
+2. **LLM call** — same site; `turn_orchestrator` already provides an
    `EventHook = Callable[[StreamEvent], list[StreamEvent]]` seam so a
    read-only sidecar consumer can observe the provider stream without
    changing the channel deliverer.
-3. **Tool execution** — `agent_loop._execute_and_log_tool_call` is the
+3. **Tool execution** — `run_model_tool_loop._execute_and_log_tool_call` is the
    single dispatch site for every tool the agent calls (enforced by
    `scripts/check-no-tools-in-providers.py`).
 
@@ -82,11 +82,11 @@ Reference: `workshop/src/spans/adapters/traceloop.ts`.
 - `backend/app/core/observability/workshop.py` — public context
   managers (`turn_span`, `llm_span`, `tool_span`) + `workshop_event_hook`
   that mirrors `StreamEvent`s onto a recorder via a flat dispatch table.
-- `backend/app/channels/turn_runner.py` — `run_turn` opens
+- `backend/app/channels/turn_orchestrator.py` — `run_turn` opens
   `turn_span` + `llm_span`, registers `workshop_event_hook` ahead of
   the caller's hooks, stamps usage / stop-reason on the LLM span at
   finalisation.
-- `backend/app/core/agent_loop/loop.py` —
+- `backend/app/core/run_model_tool_loop/loop.py` —
   `_execute_and_log_tool_call` wraps the dispatch in `tool_span`. The
   existing `TOOL_CALL_START` / `TOOL_CALL_RESULT` log lines stay
   side-by-side with the span.
@@ -115,8 +115,8 @@ without OTel pay nothing.
    chat pipeline's existing seams (router → channel → loop). No
    touching the providers — that surface stays restricted, and the
    `no-tools-in-providers` rule keeps the tool span centralised in
-   `agent_loop`.
-3. **`EventHook` is the right seam.** `turn_runner` already designed
+   `run_model_tool_loop`.
+3. **`EventHook` is the right seam.** `turn_orchestrator` already designed
    for non-destructive sidecar emission via
    `EventHook = Callable[[StreamEvent], list[StreamEvent]]`. The
    workshop hook returns `[]` so the chat aggregator + channel

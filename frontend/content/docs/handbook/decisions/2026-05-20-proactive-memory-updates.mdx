@@ -130,7 +130,7 @@ Embeddings use the same provider as the LCM pipeline today
    Settings knobs: `memories_enabled`, `memories_dedupe_threshold`,
    `memories_classifier_model`.
 2. **Post-turn classifier hook** — register a new event hook in
-   `turn_runner.py`; on `TurnCompletedEvent` enqueue a background classifier
+   `turn_orchestrator.py`; on `TurnCompletedEvent` enqueue a background classifier
    task per the LCM `background.py` pattern.
 3. **`memory_query` tool** — `make_memory_query_tool(user_id)`,
    appended in `build_agent_tools` next to the LCM family.

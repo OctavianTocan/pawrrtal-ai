@@ -1,172 +1,274 @@
 ---
 title: Adding a Plugin
-description: How to add a tools-only integration to Pawrrtal via the plugin registry.
+description: How to add a manifest-backed plugin to Pawrrtal.
 ---
 
 # Adding a Plugin
 
-> This page documents the current static plugin registry. The replacement plan
-> is the [Capability Plugin Platform Implementation Plan](./capability-plugin-platform-implementation).
+Use the Paw CLI when creating a workspace CLI plugin:
 
-Plugins are additive integrations that contribute agent tools at runtime.
-The Notion plugin
-(`backend/app/plugins/notion/`) is the canonical example; this page
-captures the moving parts so the next integration is mechanical.
-
-The design rationale is in
-[`2026-05-15-plugin-system-and-notion-integration.mdx`](../decisions/2026-05-15-plugin-system-and-notion-integration).
-Read that first if you're new to the codebase — this page focuses on the
-how, not the why.
-
-## The shape
-
-A plugin is a Python package under
-`backend/app/plugins/<plugin_id>/`. The package exports a single
-`Plugin` object built from
-[`app.core.plugins.types`](../../../../../backend/app/core/plugins/types.py):
-
-```python
-# backend/app/plugins/my_plugin/plugin.py
-from app.core.plugins import EnvKeySpec, Plugin, register_plugin
-from app.plugins.my_plugin.tools import factories
-
-my_plugin = Plugin(
-    id="my_plugin",
-    name="My Plugin",
-    description="One-sentence summary.",
-    env_keys=(
-        EnvKeySpec(
-            name="MY_API_KEY",
-            label="My API Key",
-            help_url="https://example.com/get-a-key",
-            required=True,
-        ),
-    ),
-    tool_factories=factories,
-)
-
-register_plugin(my_plugin)
+```bash
+paw plugins scaffold local_search --tool-name search_notes --workspace-root ~/paw --json
+paw plugins validate ~/paw/.agent/plugins/local_search --json
+paw plugins reload --workspace-root ~/paw --json
 ```
 
-Importing the plugin package runs `register_plugin(...)` as a side
-effect. Make `backend/app/plugins/__init__.py` import your
-subpackage so the side effect fires at app startup.
+Plugins are manifest-backed bundles discovered from three roots:
 
-## Tool factories
-
-Each entry in `tool_factories` is a function that takes a
-[`ToolContext`](../../../../../backend/app/core/plugins/types.py) and
-returns an
-[`AgentTool`](../../../../../backend/app/core/agent_loop/types.py).
-`ToolContext` carries the active workspace ID, workspace root, user
-ID, and (optionally) the channel send callback. Use it for env-key
-resolution and per-call audit logging.
-
-```python
-# backend/app/plugins/my_plugin/tools/__init__.py
-from app.plugins.my_plugin.tools.search import make_search_tool
-
-factories = (make_search_tool,)
+```text
+backend/plugins/<plugin_id>/                 # bundled with Pawrrtal
+$PAWRRTAL_HOME/plugins/<plugin_id>/          # global extra plugins
+<workspace>/.agent/plugins/<plugin_id>/      # workspace plugins
 ```
 
-A tool factory looks like this:
+Every plugin has a `plugin.json`. The runtime loads manifests through
+`app.plugins`, persists enablement in `.agent/plugin-state/*.json` for a
+workspace, and hot-reloads the next time tools or turn context providers are
+composed.
 
-```python
-def make_search_tool(ctx: ToolContext) -> AgentTool:
-    async def execute(_tool_call_id: str, **kwargs: object) -> str:
-        # 1. Resolve the workspace's API key.
-        token = resolve_api_key(ctx.workspace_id, "MY_API_KEY")
-        if token is None:
-            return json.dumps({"error": "My Plugin is not configured."})
+## Minimal CLI Tool Plugin
 
-        # 2. Do the actual work.
-        result = await my_search(token=token, query=str(kwargs["query"]))
+Workspace plugins can contribute CLI tools to the capability catalog. They are
+not exposed for direct model invocation until Pawrrtal has a subprocess sandbox
+for user-authored workspace code. Put this in
+`<workspace>/.agent/plugins/example_cli/plugin.json`:
 
-        # 3. Return JSON for the agent to consume.
-        return json.dumps(result)
-
-    return AgentTool(
-        name="my_search",
-        description="Search My Plugin.",
-        parameters={
-            "type": "object",
-            "properties": {"query": {"type": "string"}},
-            "required": ["query"],
+```json
+{
+  "schema_version": 1,
+  "id": "example_cli",
+  "name": "Example CLI",
+  "description": "Run a workspace-local command as an agent tool.",
+  "version": "1.0.0",
+  "permissions": ["subprocess"],
+  "capabilities": [
+    {
+      "type": "cli_tool",
+      "id": "example_echo",
+      "tool_name": "example_echo",
+      "title": "Example Echo",
+      "description": "Echo arguments through a workspace CLI command.",
+      "exposure": "catalog",
+      "entrypoint": ["python3", "-c", "import json, sys; print(json.dumps(sys.argv[1:]))"],
+      "cwd": "workspace",
+      "args_schema": {
+        "type": "object",
+        "properties": {
+          "args": {
+            "type": "array",
+            "items": {"type": "string"}
+          }
         },
-        execute=execute,
-    )
+        "required": [],
+        "additionalProperties": false
+      }
+    }
+  ]
+}
 ```
 
-## Activation gating
+`exposure: "catalog"` keeps the tool searchable without adding it to the
+model's direct tool list. Direct CLI exposure is only allowed from trusted
+bundled or global plugin roots, where the operator has reviewed the plugin code
+and accepted the host-level subprocess risk.
 
-By default, a plugin's tools only reach the agent when every
-`required=True` env key in `env_keys` resolves to a non-empty value for
-the active workspace. This is what makes a not-configured plugin
-invisible to the LLM.
+## Env Settings
 
-If you need a custom predicate (e.g. "activate only when the workspace
-has both an API key *and* a saved profile"), pass `is_activated` on
-the `Plugin` object:
+Declare env keys in a `settings` capability. Workspace and user-workspace keys
+with `overridable: true` are automatically accepted by the workspace env API, so
+new plugins do not need frontend/backend allowlist edits.
+
+```json
+{
+  "type": "settings",
+  "id": "example_settings",
+  "title": "Example Settings",
+  "description": "Workspace-scoped Example service credentials.",
+  "env": [
+    {
+      "name": "EXAMPLE_API_KEY",
+      "required": true,
+      "scope": "workspace",
+      "overridable": true,
+      "gateway_fallback": false,
+      "secret": true,
+      "label": "Example API Key",
+      "description": "Token used by the Example CLI."
+    }
+  ]
+}
+```
+
+Required env keys gate plugin activation. A plugin with missing required env is
+inspectable, but its direct capabilities are not exposed until configured.
+Optional env keys still appear in workspace settings but do not block
+activation. The bundled `github_issues` plugin uses this shape:
+`GITHUB_TOKEN` is required to expose `report_issue`, while
+`GITHUB_ISSUES_REPO` can override the gateway default per workspace.
+
+## Bundled Python Tools
+
+`python_tool` capabilities are bundled-only. They import first-party Python
+factories and receive `ToolContext`, so they must live in `backend/plugins` and
+point at code under `backend/app/plugins`. Workspace plugins should use
+catalog-only `cli_tool` capabilities unless the host grows a narrower trust
+boundary for them. Global plugins are host-trusted and may expose direct CLI
+tools when the operator intentionally installs them.
+
+The bundled Tasks plugin is the template:
+
+```json
+{
+  "type": "python_tool",
+  "id": "add_task",
+  "tool_name": "add_task",
+  "title": "Add Task",
+  "description": "Append a new task to the workspace TASKS.md file.",
+  "slots": ["tasks"],
+  "exposure": "direct_and_catalog",
+  "permissions": ["filesystem_write"],
+  "entrypoint": "app.plugins.tasks.tools:make_add_task_tool"
+}
+```
+
+The factory signature is:
 
 ```python
-my_plugin = Plugin(
-    id="my_plugin",
-    ...,
-    is_activated=lambda ctx: my_check(ctx),
-)
+def make_add_task_tool(ctx: ToolContext) -> AgentTool: ...
 ```
 
-## Env keys + Settings UI
+`ToolContext` carries the active `workspace_id`, `workspace_root`, `user_id`,
+and optional turn metadata such as `conversation_id`, `model_id`, and
+`send_fn`. Use those fields instead of importing request/session state inside a
+plugin factory.
 
-Adding `EnvKeySpec(name="MY_API_KEY", ...)` is not enough on its own
-(yet — auto-rendering from the registry is a v1.1 follow-up). Three
-parallel places need the key today:
+The returned `AgentTool.name` must match `tool_name`; mismatches are logged and
+omitted from the direct tool list.
 
-1. **Backend allowlist** —
-   `backend/app/core/keys.py:OVERRIDABLE_KEYS`. Without this the PUT
-   endpoint rejects the key with 400.
-2. **Frontend mirror** —
-   `frontend/features/settings/workspace-env/use-workspace-env.ts:WORKSPACE_ENV_KEY_IDS`.
-   Drives the type union of valid keys.
-3. **Settings row** —
-   `frontend/features/settings/sections/WorkspacesSection.tsx:KEY_METAS`.
-   Provides the label, description, placeholder, and help URL the user
-   sees.
+High-risk tools should be off by default. The bundled `python_shell` plugin
+declares the `python` tool as a `python_tool`, sets `enabled_by_default: false`,
+and relies on workspace plugin state for explicit opt-in. Its timeout and output
+cap remain host settings because they protect the FastAPI worker, not a single
+workspace.
 
-Forgetting any of the three produces a silent failure: the user sets
-the value, the backend rejects (or never reads) it, and the plugin
-gates out at activation time with no UI clue.
+The bundled `reminders` plugin is the scheduler-backed Python-tool template. It
+keeps `reminder_schedule`, `reminder_list`, and `reminder_cancel` out of the
+kernel tool builder while still preserving the active conversation id when a
+reminder should target the current chat.
 
-## Audit logging
+The bundled `github_issues` plugin is the env-gated integration template. It
+declares `report_issue` as a `python_tool` and contributes settings metadata so
+each workspace can bring its own GitHub token and issue target.
 
-Notion's plugin runs every tool call through
-[`with_audit`](../../../../../backend/app/plugins/notion/audit.py)
-to write a row to a dedicated `*_operation_logs` table.  This is
-optional but recommended for any plugin where "what did this
-workspace do recently?" is a useful question (Notion, Slack, Linear).
-The same workspace-scoped + soft-FK + indexed
-`(workspace_id, tool_name, created_at)` shape works for most.
+The bundled `document_conversion` plugin is the local-file adapter template. It
+declares `convert_to_markdown` as a `python_tool`, keeps MarkItDown scoped to
+the workspace root, and requires only `filesystem_read`.
 
-## Testing
+The bundled `image_generation` plugin is the opt-in costly tool template. It is
+disabled by default, requires `OPENAI_CODEX_OAUTH_TOKEN`, and only exposes
+`generate_image` after the workspace enables the plugin and configures the
+credential.
 
-Plugins follow the project-wide
-[ScriptedStreamFn pattern](../../../.claude/rules/testing/agent-loop-testing-philosophy.md)
-for full agent-loop scenarios.  Unit tests for individual tool
-factories monkeypatch the network seam (subprocess / HTTP client) and
-call `tool.execute()` directly.  See
-`backend/tests/test_notion_plugin.py` for a complete example covering
-registration, the subprocess wrapper, success path, error path, and
-the audit-log shape.
+The bundled `exa_search` plugin is the first web-search slot implementation. It
+is disabled by default, requires `EXA_API_KEY`, and declares `web_search` as a
+non-exclusive slot so other search providers can be installed beside it.
 
-## Checklist
+The bundled `artifacts` plugin is the presentation-tool template. It receives
+the active turn surface through `ToolContext.surface`, so web/electron can
+advertise interactive widgets while Telegram stays on the read-only catalog.
 
-When you're done, the following should all be true:
+The bundled `time_tools` plugin is the pure utility template. It contributes
+`now` without permissions or env keys, proving small always-safe tools can still
+be discoverable and disableable.
 
-- `app.core.plugins.all_plugins()` includes your plugin id.
-- Your env key appears in `OVERRIDABLE_KEYS` + the frontend list +
-  the settings KEY_METAS array.
-- The plugin's tools appear in the chat agent's tool list *only when*
-  the workspace has the env key set (verified with a logged-in user
-  who configures the key in Settings → Workspace).
-- A pytest covers registration, one happy-path tool call, and one
-  error-path tool call.
+## Trusted Runtime Capabilities
+
+Runtime capabilities such as `turn_context_provider`, `provider`, `channel`,
+`router`, and `scheduler` are trusted adapters. They are allowed from bundled
+and global plugin roots, not workspace roots.
+
+Active Recall is the first bundled `turn_context_provider`:
+
+```json
+{
+  "type": "turn_context_provider",
+  "id": "active_recall",
+  "title": "Active Recall",
+  "description": "Find relevant prior context before the main model answers the user.",
+  "slots": ["turn_context"],
+  "entrypoint": "app.plugins.active_recall.recall_agent:run_active_recall",
+  "order": 100,
+  "budget": {
+    "timeout_seconds": 10,
+    "failure_mode": "omit"
+  }
+}
+```
+
+The provider receives `TurnContextProviderContext` and returns either a short
+context string or `None`. The turn orchestrator owns prompt assembly and wraps
+all provider output under `# TURN CONTEXT`.
+
+`backend/plugins/core_channels/plugin.json` is the bundled channel example. A
+`channel` capability maps a surface name (`web`, `electron`, `telegram`,
+`google_chat`) to a trusted factory that returns a `Channel` adapter. The
+channel registry composes those capabilities through the plugin host and keeps
+only `web` as a kernel fallback.
+
+Provider plugins use `provider` capabilities. Their model IDs are dynamic and
+do not need a `Host` or `Vendor` enum entry. The canonical shape is:
+
+```text
+plugin_id:vendor/model
+```
+
+The provider entrypoint is a trusted factory that receives
+`ProviderFactoryContext` and returns an `AILLM`. Active provider-plugin models
+are appended to `/api/v1/models` and can be selected by the normal chat API.
+
+## Enablement And Hot Reload
+
+Enablement lives outside the manifest:
+
+```text
+<workspace>/.agent/plugin-state/<plugin_id>.json
+```
+
+Missing state defaults to enabled only for bundled plugins with
+`enabled_by_default: true`. Workspace and global plugins must be explicitly
+enabled by plugin state or the Paw CLI. The host reloads from disk when composing
+plugin tools or turn context providers, so adding, removing, enabling, disabling,
+or editing a plugin is visible on the next turn.
+
+## Agent Discovery
+
+Every agent turn gets a core `search_plugin_capabilities` tool. Use it before
+assuming which optional plugin, provider, channel, or slot candidate exists:
+
+```json
+{
+  "slot": "web_search",
+  "include_unavailable": true
+}
+```
+
+The tool returns capability rows with composite keys (`plugin_id/capability_id`),
+types, slots, state, plugin load status, missing env names, and whether a row is
+preferred for the requested slot. This is intentionally separate from direct
+tool invocation: users can install several candidates for a slot and the agent
+can inspect all of them.
+
+## Tests
+
+Use these focused tests as examples:
+
+- `backend/tests/test_plugin_tools.py` covers catalog-only workspace CLI plugins, hot reload, bundled Python tools, env-gated issue reporting, reminder context, and the non-bundled Python trust boundary.
+- `backend/tests/test_plugin_catalog_tool.py` covers the agent-facing capability search tool.
+- `backend/tests/test_turn_context_plugins.py` covers Active Recall as a manifest-backed context provider.
+- `backend/tests/test_workspace_env_api.py` covers plugin-declared workspace env overrides.
+
+At minimum, verify:
+
+```bash
+cd backend && uv run pytest tests/test_plugin_tools.py tests/test_plugin_catalog_tool.py tests/test_turn_context_plugins.py tests/test_workspace_env_api.py
+```

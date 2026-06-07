@@ -1,7 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import type { ComponentType, JSX, SVGProps } from 'react';
+import type * as React from 'react';
+import type { ComponentType, SVGProps } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -46,7 +47,7 @@ function modelsDevLogoUrl(vendor: string): string {
  * @returns A React component that renders the vendor's logo.
  */
 function createModelsDevLogo(vendor: string): ComponentType<SVGProps<SVGSVGElement>> {
-	function ModelsDevLogo({ className }: SVGProps<SVGSVGElement>): JSX.Element {
+	function ModelsDevLogo({ className }: SVGProps<SVGSVGElement>): React.ReactNode {
 		return (
 			<Image
 				alt={`${vendor} logo`}

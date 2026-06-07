@@ -20,6 +20,7 @@ _ROUTER_FACTORIES: tuple[tuple[str, str], ...] = (
     ("app.channels.router", "get_channels_router"),
     ("app.workspace.router", "get_workspace_router"),
     ("app.workspace.env.router", "get_workspace_env_router"),
+    ("app.workspace.plugins.router", "get_workspace_plugins_router"),
     ("app.governance.audit.router", "get_audit_router"),
     ("app.governance.cost.router", "get_cost_router"),
     ("app.conversations.exports.router", "get_exports_router"),

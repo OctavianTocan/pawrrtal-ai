@@ -1,8 +1,8 @@
 """Safety-layer tests for the agent loop.
 
-These tests use the shared ``agent_harness`` primitives and run through the
+These tests use the shared ``agent_loop_harness`` primitives and run through the
 **real** agent loop, safety layer, and tool-execution code.  Only the
-``StreamFn`` seam is replaced — see ``agent_harness.py`` for the full pattern.
+``StreamFn`` seam is replaced — see ``agent_loop_harness.py`` for the full pattern.
 
 Exception: ``test_max_wall_clock_terminates_long_running_loop`` keeps a bespoke
 ``slow_stream`` because wall-clock tests require real ``asyncio.sleep`` delays
@@ -22,9 +22,10 @@ from app.agents import (
     AgentSafetyConfig,
     AgentTool,
     UserMessage,
-    agent_loop,
+    run_model_tool_loop,
 )
-from tests.agent_harness import (
+from app.agents.permissions import default_tool_permission_check
+from tests.agent_loop_harness import (
     ScriptedStreamFn,
     echo_tool,
     error_turn,
@@ -113,7 +114,7 @@ async def test_max_wall_clock_terminates_long_running_loop():
             max_consecutive_tool_errors=None,
         ),
     )
-    events = [ev async for ev in agent_loop([_user("go")], ctx, cfg, slow_stream)]
+    events = [ev async for ev in run_model_tool_loop([_user("go")], ctx, cfg, slow_stream)]
     terminated = [e for e in events if e["type"] == "agent_terminated"]
     assert len(terminated) == 1
     assert terminated[0]["reason"] == "max_wall_clock"
@@ -201,13 +202,47 @@ async def test_permission_hook_blocks_tool_before_execute() -> None:
     )
     script = ScriptedStreamFn([tool_call_turn("read_file", {"path": ".env"})])
 
-    events = [ev async for ev in agent_loop([_user("go")], ctx, cfg, script)]
+    events = [ev async for ev in run_model_tool_loop([_user("go")], ctx, cfg, script)]
 
     assert executed is False
     results = [e for e in events if e["type"] == "tool_result"]
     assert results[0]["is_error"] is True
     assert results[0]["content"].startswith("[permission_denied]")
     assert "denied by test policy" in results[0]["content"]
+
+
+@pytest.mark.anyio
+async def test_default_permission_hook_blocks_confirmation_required_tool() -> None:
+    """Confirmation-required tools fail closed until an approval flow exists."""
+    executed = False
+
+    async def _execute(_tool_call_id: str, **_kwargs: object) -> str:
+        nonlocal executed
+        executed = True
+        return "leaked"
+
+    tool = AgentTool(
+        name="python",
+        description="run code",
+        parameters={"type": "object"},
+        execute=_execute,
+        requires_confirmation=True,
+    )
+    ctx = AgentContext(system_prompt="", messages=[], tools=[tool])
+    cfg = AgentLoopConfig(
+        convert_to_llm=identity_convert,
+        permission_check=default_tool_permission_check,
+        safety=AgentSafetyConfig.disabled(),
+    )
+    script = ScriptedStreamFn([tool_call_turn("python", {"code": "print('hi')"})])
+
+    events = [ev async for ev in run_model_tool_loop([_user("go")], ctx, cfg, script)]
+
+    assert executed is False
+    results = [e for e in events if e["type"] == "tool_result"]
+    assert results[0]["is_error"] is True
+    assert results[0]["content"].startswith("[permission_denied]")
+    assert "requires confirmation" in results[0]["content"]
 
 
 @pytest.mark.anyio

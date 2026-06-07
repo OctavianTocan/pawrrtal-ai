@@ -24,7 +24,7 @@ from .base import AILLM
 from .claude import ClaudeLLM, ClaudeLLMConfig
 from .gemini_cli import GeminiCliLLM
 from .litellm_provider import LiteLLMLLM
-from .model_id import Host, ParsedModelId, parse_model_id
+from .model_id import Host, InvalidModelId, ParsedModelId, parse_model_id
 from .opencode_go import OpencodeGoLLM, OpencodeGoLLMConfig
 from .xai import XaiLLM
 
@@ -235,7 +235,15 @@ def resolve_llm(
         from .catalog import first_catalog_model  # noqa: PLC0415 — see comment above
 
         raw = model_id if model_id is not None else first_catalog_model().id
-        parsed = parse_model_id(raw)
+        try:
+            parsed = parse_model_id(raw)
+        except InvalidModelId as exc:
+            from .plugin_provider import resolve_plugin_llm  # noqa: PLC0415
+
+            try:
+                return resolve_plugin_llm(raw, workspace_root=workspace_root)
+            except InvalidModelId:
+                raise exc from None
 
     provider_cls = HOST_TO_PROVIDER[parsed.host]
     if parsed.host is Host.google_ai and provider_cls is None:

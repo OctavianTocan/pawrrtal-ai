@@ -18,7 +18,7 @@ The core philosophy of the loop is **strict separation of concerns**:
 AI models in Pawrrtal implement the `AILLM` protocol defined in [base.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/providers/base.py). The connection between this high-level protocol and the execution engine is bridged through the `StreamFn` signature.
 
 ### A. The `StreamFn` Seam
-The agent loop abstracts model execution using the `StreamFn` contract defined in [types.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/agent_loop/types.py):
+The agent loop abstracts model execution using the `StreamFn` contract defined in [types.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/run_model_tool_loop/types.py):
 ```python
 StreamFn = Callable[
     [list[AgentMessage], list[AgentTool]],
@@ -36,7 +36,7 @@ Providers do not reuse a single static function for model calls. Instead, when `
 By default, LLM SDKs try to automatically run function calls they emit and return the result. In Pawrrtal, we explicitly disable this (e.g. `automatic_function_calling=False` on Gemini).
 * Disabling this forces the model to emit a raw JSON function call block.
 * The provider yields this block as a `LLMToolCallEvent`.
-* The `agent_loop` captures the event, executes the tool, and feeds the `ToolResultMessage` back to the model in the next turn.
+* The `run_model_tool_loop` captures the event, executes the tool, and feeds the `ToolResultMessage` back to the model in the next turn.
 
 ### D. Opaque State Propagation (`provider_state`)
 Some model providers require proprietary state to resume multi-turn conversations safely (for example, Gemini-3 / Vertex requires replaying the raw `model_content` parts and `thought_signature` bytes from the model's function-calling response, otherwise the next tool result request is rejected).
@@ -51,7 +51,7 @@ The two primary provider integrations handle history, tools, and credentials dif
 
 | Feature | Gemini Provider ([gemini_provider.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/providers/gemini_provider.py)) | Claude Provider ([claude_provider.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/providers/claude_provider.py)) |
 | :--- | :--- | :--- |
-| **Loop Integration** | Directly invokes `agent_loop(...)` passing a `make_gemini_stream_fn` closure. | Orchestrates a CLI/SDK subprocess and streams its raw JSON events directly. |
+| **Loop Integration** | Directly invokes `run_model_tool_loop(...)` passing a `make_gemini_stream_fn` closure. | Orchestrates a CLI/SDK subprocess and streams its raw JSON events directly. |
 | **Tool Translation** | Maps `AgentTool` parameters directly to Gemini's `FunctionDeclaration` list. | Maps `AgentTool` instances to a local, in-process MCP server that the Claude subprocess queries. |
 | **History Continuity** | Relies on the chat-history list passed into `contents` on each API call. | Uses native Claude transcript continuity via `resume=str(conversation_id)`. |
 | **Credentials** | Resolves per-workspace keys via `resolve_api_key` for the Client. | Forwards OAuth tokens via `ClaudeAgentOptions.env` to the subprocess. |
@@ -60,7 +60,7 @@ The two primary provider integrations handle history, tools, and credentials dif
 
 ## 3. Key Data Types
 
-All data structures are defined in [backend/app/core/agent_loop/types.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/agent_loop/types.py).
+All data structures are defined in [backend/app/core/run_model_tool_loop/types.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/run_model_tool_loop/types.py).
 
 ### A. `AgentContext`
 The state container initialized by the caller. Holds the conversation system configuration.
@@ -101,7 +101,7 @@ The agent loop works as an event-driven generator. Below is the step-by-step lif
 
 ```
              +---------------------------+
-             |  Caller calls agent_loop  |
+             |  Caller calls run_model_tool_loop  |
              +-------------+-------------+
                            |
                            v
@@ -258,7 +258,7 @@ stream_fn = provider.stream
 Assemble the base configuration, conversation history, and start the generator.
 
 ```python
-from app.agents.loop import agent_loop
+from app.agents.model_tool_loop import run_model_tool_loop
 from app.agents.types import AgentContext, UserMessage
 
 # 1. Define the system instructions and initial history
@@ -273,7 +273,7 @@ user_prompt = UserMessage(role="user", content="What is the weather in San Franc
 
 # 3. Launch the execution generator
 # We pass the new prompt alongside the context and config
-loop_generator = agent_loop(
+loop_generator = run_model_tool_loop(
     prompts=[user_prompt],
     context=context,
     config=loop_config,
@@ -329,7 +329,7 @@ async def execute_agent():
 
 ## 6. Modules in this Package
 
-* **[loop.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/agent_loop/loop.py)**: The central controller and executor. Manages turns, schedules tool calls, runs permissions checks, handles retry policies, and executes safety caps.
-* **[types.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/agent_loop/types.py)**: The type definitions and contracts for context, configs, events, and message envelopes.
-* **[safety_factory.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/agent_loop/safety_factory.py)**: A helper module to extract and build `AgentSafetyConfig` limits from settings or workspace overrides.
-* **[display.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/agent_loop/display.py)**: Handles mapping internal tool parameters to human-readable labels and descriptions for user-facing streams.
+* **[loop.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/run_model_tool_loop/loop.py)**: The central controller and executor. Manages turns, schedules tool calls, runs permissions checks, handles retry policies, and executes safety caps.
+* **[types.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/run_model_tool_loop/types.py)**: The type definitions and contracts for context, configs, events, and message envelopes.
+* **[safety_factory.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/run_model_tool_loop/safety_factory.py)**: A helper module to extract and build `AgentSafetyConfig` limits from settings or workspace overrides.
+* **[display.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/run_model_tool_loop/display.py)**: Handles mapping internal tool parameters to human-readable labels and descriptions for user-facing streams.

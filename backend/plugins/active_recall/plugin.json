@@ -1,0 +1,87 @@
+{
+	"schema_version": 1,
+	"id": "active_recall",
+	"name": "Active Recall",
+	"description": "Search remembered conversation and workspace context before each assistant turn.",
+	"version": "1.0.0",
+	"enabled_by_default": true,
+	"permissions": ["network", "filesystem_read", "external_read", "costly"],
+	"capabilities": [
+		{
+			"type": "turn_context_provider",
+			"id": "active_recall",
+			"title": "Active Recall",
+			"description": "Find relevant prior context before the main model answers the user.",
+			"tags": ["memory", "context"],
+			"intents": ["memory.recall", "conversation.context"],
+			"slots": ["turn_context"],
+			"exposure": "catalog",
+			"permissions": ["network", "filesystem_read", "external_read", "costly"],
+			"risk": "external_read",
+			"entrypoint": "app.plugins.active_recall.recall_agent:run_active_recall",
+			"order": 100,
+			"budget": {
+				"timeout_seconds": 10,
+				"failure_mode": "omit"
+			}
+		},
+		{
+			"type": "settings",
+			"id": "active_recall_settings",
+			"title": "Active Recall Settings",
+			"description": "Workspace controls for the Active Recall context provider.",
+			"env": [
+				{
+					"name": "ACTIVE_RECALL_ENABLED",
+					"required": false,
+					"scope": "workspace",
+					"overridable": true,
+					"gateway_fallback": true,
+					"secret": false,
+					"label": "Active Recall Enabled",
+					"description": "Whether Active Recall runs before assistant turns in this workspace."
+				},
+				{
+					"name": "ACTIVE_RECALL_MODEL",
+					"required": false,
+					"scope": "workspace",
+					"overridable": true,
+					"gateway_fallback": true,
+					"secret": false,
+					"label": "Active Recall Model",
+					"description": "Model used by the Active Recall sub-agent."
+				},
+				{
+					"name": "ACTIVE_RECALL_SEARCH_WORKSPACE",
+					"required": false,
+					"scope": "workspace",
+					"overridable": true,
+					"gateway_fallback": true,
+					"secret": false,
+					"label": "Search Workspace Files",
+					"description": "Whether Active Recall can search workspace files for context."
+				},
+				{
+					"name": "ACTIVE_RECALL_TIMEOUT_S",
+					"required": false,
+					"scope": "workspace",
+					"overridable": true,
+					"gateway_fallback": true,
+					"secret": false,
+					"label": "Active Recall Timeout",
+					"description": "Maximum seconds spent by the Active Recall sub-agent."
+				},
+				{
+					"name": "ACTIVE_RECALL_SYSTEM_PROMPT",
+					"required": false,
+					"scope": "workspace",
+					"overridable": true,
+					"gateway_fallback": true,
+					"secret": false,
+					"label": "Active Recall System Prompt",
+					"description": "Optional replacement prompt for the Active Recall sub-agent."
+				}
+			]
+		}
+	]
+}

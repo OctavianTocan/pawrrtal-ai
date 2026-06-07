@@ -22,7 +22,7 @@ from app.agents import (
     LLMTextDeltaEvent,
     StreamFn,
     UserMessage,
-    agent_loop,
+    run_model_tool_loop,
 )
 from app.agents.permissions import default_tool_permission_check
 from app.agents.safety_factory import safety_from_settings
@@ -116,7 +116,7 @@ def make_gemini_stream_fn(
             ``thinking_level``.
         usage_sink: Optional mutable :class:`GeminiUsageAccumulator` the
             StreamFn writes per-request token counts into. Shared across
-            every agent_loop iteration for a single ``GeminiLLM.stream``
+            every run_model_tool_loop iteration for a single ``GeminiLLM.stream``
             call so multi-turn tool-using conversations sum their
             spend correctly. ``None`` skips usage capture — useful for
             unit tests and utility callers that don't talk to the cost
@@ -127,7 +127,7 @@ def make_gemini_stream_fn(
 
     Returns:
         An async generator factory that yields ``LLMEvent``s. The generator
-        is provider-specific; the calling ``agent_loop()`` is not.
+        is provider-specific; the calling ``run_model_tool_loop()`` is not.
     """
 
     async def stream_fn(
@@ -147,7 +147,7 @@ def make_gemini_stream_fn(
             tools=gemini_tools or None,
             # TODO(pawrrtal-1qlk): Set automatic_function_calling disable=True
             # so google-genai only emits function_call parts and Pawrrtal's
-            # provider-agnostic agent_loop remains the sole tool executor.
+            # provider-agnostic run_model_tool_loop remains the sole tool executor.
             # Docs: https://github.com/googleapis/python-genai/blob/main/README.md
             # Ask the model to emit reasoning chunks alongside the answer
             # when it supports it (gemini-2.5-pro / -flash, gemini-3-*
@@ -206,7 +206,7 @@ def make_gemini_stream_fn(
 
 
 class GeminiLLM:
-    """AILLM backed by the agent_loop + a Gemini StreamFn.
+    """AILLM backed by the run_model_tool_loop + a Gemini StreamFn.
 
     History is supplied by the caller (read from our Message table in
     chat.py).  Tools are injected per-request via the AgentContext.
@@ -323,7 +323,7 @@ class GeminiLLM:
         )
 
         try:
-            async for event in agent_loop([prompt], context, config, stream_fn):
+            async for event in run_model_tool_loop([prompt], context, config, stream_fn):
                 stream_event = agent_event_to_stream_event(event)
                 if stream_event is not None:
                     log_provider_stream_event(

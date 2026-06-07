@@ -36,6 +36,7 @@ suffix rather than deleted, so the move is reversible.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import time
 import uuid
@@ -67,6 +68,7 @@ OVERRIDABLE_KEYS: frozenset[str] = frozenset(
         "NOTION_API_KEY",
         "OPENCODE_API_KEY",
         "GITHUB_TOKEN",
+        "GITHUB_ISSUES_REPO",
         # Active Recall plugin (see backend/app/plugins/active_recall/)
         "ACTIVE_RECALL_ENABLED",
         "ACTIVE_RECALL_MODEL",
@@ -88,10 +90,34 @@ _SETTINGS_ATTR_MAP: dict[str, str] = {
     "OPENAI_API_KEY": "openai_api_key",
     "OPENCODE_API_KEY": "opencode_api_key",
     "GITHUB_TOKEN": "github_token",
+    "GITHUB_ISSUES_REPO": "github_issues_repo",
     # OPENAI_CODEX_OAUTH_TOKEN intentionally absent — workspace-only, no
     # global settings fallback.  resolve_api_key() returns None for keys
     # missing from this map after the workspace lookup fails.
 }
+
+
+def resolve_gateway_env_value(workspace_key: str) -> str | None:
+    """Resolve a plugin gateway value for a workspace-facing env key.
+
+    Typed settings are the canonical runtime view for built-in env keys. Raw
+    ``os.environ`` remains the fallback for custom plugin keys that do not have
+    a dedicated ``Settings`` field.
+    """
+    settings_value = _settings_value_for_workspace_key(workspace_key)
+    if settings_value:
+        return settings_value
+    return os.environ.get(workspace_key) or None
+
+
+def _settings_value_for_workspace_key(workspace_key: str) -> str | None:
+    """Resolve only the typed settings fallback for a workspace env key."""
+    settings_attr = _SETTINGS_ATTR_MAP.get(workspace_key)
+    if settings_attr is not None:
+        value = getattr(settings, settings_attr, None)
+        if value:
+            return str(value)
+    return None
 
 
 # Workspace .env files do not allow newline characters in values: we serialise
@@ -248,11 +274,7 @@ def resolve_api_key(workspace_root: Path, workspace_key: str) -> str | None:
     override = workspace.get(workspace_key)
     if override:
         return override
-    settings_attr = _SETTINGS_ATTR_MAP.get(workspace_key)
-    if settings_attr is None:
-        return None
-    value = getattr(settings, settings_attr, None)
-    return value or None
+    return _settings_value_for_workspace_key(workspace_key)
 
 
 # ---------------------------------------------------------------------------

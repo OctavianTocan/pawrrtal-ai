@@ -11,6 +11,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
+import {
+	WORKSPACE_ENV_KEY_IDS,
+	type WorkspaceEnvKey,
+} from '@/features/settings/workspace-env/use-workspace-env';
 import { type WorkspaceEnvKeyMeta, WorkspacesSectionView } from './WorkspacesSectionView';
 
 const KEY_METAS: readonly WorkspaceEnvKeyMeta[] = [
@@ -30,24 +34,18 @@ const KEY_METAS: readonly WorkspaceEnvKeyMeta[] = [
 	},
 ];
 
-const EMPTY_VALUES = {
-	GEMINI_API_KEY: '',
-	CLAUDE_CODE_OAUTH_TOKEN: '',
-	EXA_API_KEY: '',
-	XAI_API_KEY: '',
-	OPENAI_API_KEY: '',
-	NOTION_API_KEY: '',
-	OPENCODE_API_KEY: '',
-	ACTIVE_RECALL_ENABLED: '',
-	ACTIVE_RECALL_MODEL: '',
-	ACTIVE_RECALL_SEARCH_WORKSPACE: '',
-	ACTIVE_RECALL_SYSTEM_PROMPT: '',
-} as const;
+function emptyValues(): Record<WorkspaceEnvKey, string> {
+	const values = {} as Record<WorkspaceEnvKey, string>;
+	for (const key of WORKSPACE_ENV_KEY_IDS) {
+		values[key] = '';
+	}
+	return values;
+}
 
 describe('WorkspacesSectionView', () => {
 	const baseProps = {
 		keyMetas: KEY_METAS,
-		values: EMPTY_VALUES,
+		values: emptyValues(),
 		state: {
 			showTokens: {},
 			isLoading: false,

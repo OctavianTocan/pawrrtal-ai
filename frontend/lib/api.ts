@@ -405,6 +405,22 @@ export const API_ENDPOINTS = {
 		 * @param key - Override key (one of `WORKSPACE_ENV_KEY_IDS`)
 		 */
 		envKey: (id: string, key: string) => `/api/v1/workspaces/${id}/env/${key}`,
+		/** Plugin snapshot and enablement for a workspace. */
+		plugins: (id: string) => `/api/v1/workspaces/${id}/plugins`,
+		/**
+		 * Enable or disable one plugin for a workspace.
+		 * @param id       - Workspace UUID
+		 * @param pluginId - Plugin id
+		 */
+		plugin: (id: string, pluginId: string) =>
+			`/api/v1/workspaces/${id}/plugins/${encodeURIComponent(pluginId)}`,
+		/**
+		 * Set the preferred capability for a plugin slot.
+		 * @param id     - Workspace UUID
+		 * @param slotId - Slot id
+		 */
+		pluginSlot: (id: string, slotId: string) =>
+			`/api/v1/workspaces/${id}/plugins/slots/${encodeURIComponent(slotId)}`,
 		/** Read onboarding readiness (default workspace existence + metadata). */
 		onboardingStatus: '/api/v1/workspaces/onboarding-status',
 	},

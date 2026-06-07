@@ -8,14 +8,14 @@ RED phase: all tests fail until loop.py and types.py are implemented.
 
 .. note::
 
-    **Legacy suite — prefer ``agent_harness`` for new tests.**
+    **Legacy suite — prefer ``agent_loop_harness`` for new tests.**
 
     These tests were written before ``ScriptedStreamFn`` existed and use the
     bespoke ``make_mock_stream`` helper, which operates on ``AssistantMessage``
     objects rather than ``LLMEvent`` sequences.  They are kept as-is for
     regression coverage.  Any *new* test of agent-loop behaviour, safety,
     tool dispatch, or context accumulation must use the shared primitives in
-    ``backend/tests/agent_harness.py`` (see AGENTS.md §Agent-Loop Testing
+    ``backend/tests/agent_loop_harness.py`` (see AGENTS.md §Agent-Loop Testing
     Philosophy).
 """
 
@@ -26,7 +26,7 @@ from typing import Any
 
 import pytest
 
-from app.agents.loop import agent_loop
+from app.agents.model_tool_loop import run_model_tool_loop
 from app.agents.types import (
     AgentContext,
     AgentEvent,
@@ -132,7 +132,7 @@ async def test_agent_loop_emits_full_event_sequence_for_simple_turn() -> None:
     events: list[AgentEvent] = []
     returned_messages: list[AgentMessage] = []
 
-    async for event in agent_loop([prompt], context, config, stream_fn):
+    async for event in run_model_tool_loop([prompt], context, config, stream_fn):
         events.append(event)
         if event["type"] == "agent_end":
             returned_messages = event["messages"]
@@ -166,7 +166,7 @@ async def test_agent_loop_streams_text_deltas() -> None:
     stream_fn = make_mock_stream(make_assistant_message([make_text_content("Hello world")]))
 
     events: list[AgentEvent] = [
-        event async for event in agent_loop([prompt], context, config, stream_fn)
+        event async for event in run_model_tool_loop([prompt], context, config, stream_fn)
     ]
 
     text_deltas = [e for e in events if e["type"] == "text_delta"]
@@ -210,7 +210,7 @@ async def test_agent_loop_applies_transform_context_before_convert() -> None:
         transform_context=prune_to_last_two,
     )
 
-    async for _ in agent_loop([prompt], context, config, recording_stream_fn):
+    async for _ in run_model_tool_loop([prompt], context, config, recording_stream_fn):
         pass
 
     # After pruning, LLM should only see the 2 most recent messages + the new prompt
@@ -261,7 +261,7 @@ async def test_agent_loop_executes_tool_calls_and_loops() -> None:
     events: list[AgentEvent] = []
     returned_messages: list[AgentMessage] = []
 
-    async for event in agent_loop([prompt], context, config, stream_fn):
+    async for event in run_model_tool_loop([prompt], context, config, stream_fn):
         events.append(event)
         if event["type"] == "agent_end":
             returned_messages = event["messages"]
@@ -304,7 +304,7 @@ async def test_agent_loop_respects_should_stop_after_turn() -> None:
     )
 
     events: list[AgentEvent] = [
-        event async for event in agent_loop([prompt], context, config, stream_fn)
+        event async for event in run_model_tool_loop([prompt], context, config, stream_fn)
     ]
 
     turn_starts = [e for e in events if e["type"] == "turn_start"]
@@ -337,7 +337,7 @@ async def test_agent_loop_includes_existing_context_messages() -> None:
         yield LLMTextDeltaEvent(type="text_delta", text="6")
         yield LLMDoneEvent(type="done", stop_reason="stop", content=msg["content"])
 
-    async for _ in agent_loop([prompt], context, config, recording_stream_fn):
+    async for _ in run_model_tool_loop([prompt], context, config, recording_stream_fn):
         pass
 
     # LLM should have received: 2 prior messages + new prompt = 3 total

@@ -2,12 +2,14 @@
 
 from __future__ import annotations
 
+import uuid
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from app.agents.tools import build_agent_tools
+from app.agents.tool_surface import build_agent_tools
+from app.plugins.state import PluginState, plugin_state_path, save_plugin_state
 
 
 @pytest.fixture
@@ -51,8 +53,8 @@ class TestBuildAgentToolsWithSendFn:
         names = [t.name for t in tools]
         assert "send_message" in names
 
-    def test_send_message_is_last_tool(self, tmp_workspace: Path) -> None:
-        """send_message appended after workspace + artifact tools."""
+    def test_send_message_is_last_tool_without_plugins(self, tmp_workspace: Path) -> None:
+        """send_message is last when no workspace plugin context is supplied."""
         send_fn = _make_send_fn()
         with patch("app.infrastructure.keys.resolve_api_key", return_value=None):
             tools = build_agent_tools(workspace_root=tmp_workspace, send_fn=send_fn)
@@ -60,50 +62,65 @@ class TestBuildAgentToolsWithSendFn:
         assert tools[-1].name == "send_message"
 
     def test_other_tools_still_present_with_send_fn(self, tmp_workspace: Path) -> None:
-        """Workspace and artifact tools survive alongside send_message."""
+        """Workspace tools survive alongside send_message."""
         send_fn = _make_send_fn()
         with patch("app.infrastructure.keys.resolve_api_key", return_value=None):
             tools = build_agent_tools(workspace_root=tmp_workspace, send_fn=send_fn)
 
         names = [t.name for t in tools]
-        assert "render_artifact" in names
         # At least one workspace tool (read_file / write_file / list_files)
         assert any(n in names for n in ("read_file", "write_file", "list_files"))
 
 
-class TestVirtualPythonGate:
-    """``python`` tool only appears when ``virtual_python_enabled`` is True."""
+class TestPythonShellPlugin:
+    """``python`` tool only appears when the ``python_shell`` plugin is enabled."""
 
     def test_python_absent_by_default(self, tmp_workspace: Path) -> None:
-        # Force the gate to its schema default (False) so the test passes
-        # regardless of any local .env override.
-        with (
-            patch("app.infrastructure.keys.resolve_api_key", return_value=None),
-            patch("app.agents.tools.settings.virtual_python_enabled", False),
-        ):
-            tools = build_agent_tools(workspace_root=tmp_workspace)
+        with patch("app.infrastructure.keys.resolve_api_key", return_value=None):
+            tools = build_agent_tools(
+                workspace_root=tmp_workspace,
+                user_id=uuid.uuid4(),
+                workspace_id=uuid.uuid4(),
+            )
 
         names = [t.name for t in tools]
         assert "python" not in names
 
     def test_python_present_when_enabled(self, tmp_workspace: Path) -> None:
-        with (
-            patch("app.infrastructure.keys.resolve_api_key", return_value=None),
-            patch("app.agents.tools.settings.virtual_python_enabled", True),
-        ):
-            tools = build_agent_tools(workspace_root=tmp_workspace)
+        _enable_python_shell(tmp_workspace)
+        with patch("app.infrastructure.keys.resolve_api_key", return_value=None):
+            tools = build_agent_tools(
+                workspace_root=tmp_workspace,
+                user_id=uuid.uuid4(),
+                workspace_id=uuid.uuid4(),
+            )
 
         names = [t.name for t in tools]
         assert "python" in names
 
-    def test_python_appears_before_send_message(self, tmp_workspace: Path) -> None:
-        """Stable ordering: ``python`` sits between ``markitdown`` and ``send_message``."""
+    def test_python_appears_after_send_message(self, tmp_workspace: Path) -> None:
+        """Stable ordering: plugin tools sit after the core channel tools."""
         send_fn = _make_send_fn()
-        with (
-            patch("app.infrastructure.keys.resolve_api_key", return_value=None),
-            patch("app.agents.tools.settings.virtual_python_enabled", True),
-        ):
-            tools = build_agent_tools(workspace_root=tmp_workspace, send_fn=send_fn)
+        _enable_python_shell(tmp_workspace)
+        with patch("app.infrastructure.keys.resolve_api_key", return_value=None):
+            tools = build_agent_tools(
+                workspace_root=tmp_workspace,
+                user_id=uuid.uuid4(),
+                workspace_id=uuid.uuid4(),
+                send_fn=send_fn,
+            )
 
         names = [t.name for t in tools]
-        assert names.index("python") < names.index("send_message")
+        assert names.index("send_message") < names.index("python")
+
+
+def _enable_python_shell(workspace_root: Path) -> None:
+    """Enable the bundled Python Shell plugin for one test workspace."""
+    save_plugin_state(
+        plugin_state_path(
+            plugin_id="python_shell",
+            scope="workspace",
+            workspace_root=workspace_root,
+        ),
+        PluginState(enabled=True),
+    )

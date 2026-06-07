@@ -32,7 +32,7 @@ class GeminiUsageAccumulator:
 
     Mutable on purpose: the StreamFn closure owns one and writes into
     it from inside the stream; the surrounding ``GeminiLLM.stream``
-    reads the totals after :func:`agent_loop` returns and emits the
+    reads the totals after :func:`run_model_tool_loop` returns and emits the
     terminal ``StreamEvent(type="usage")``.
     """
 

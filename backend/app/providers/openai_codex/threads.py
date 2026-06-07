@@ -11,7 +11,7 @@ from typing import Protocol, cast
 
 from app.agents.types import AgentTool
 from app.channels._turn_runtime_context import system_prompt_for_turn
-from app.channels.turn_runner import load_codex_thread_state, persist_codex_thread_id
+from app.channels.turn_orchestrator import load_codex_thread_state, persist_codex_thread_id
 from app.providers.base import ReasoningEffort
 from app.providers.openai_codex.dynamic_tools import dynamic_tool_fingerprint
 from app.providers.openai_codex.prompting import (

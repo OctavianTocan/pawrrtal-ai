@@ -23,12 +23,12 @@ import json
 from typing import Any
 
 from app.agents.display import ToolDisplay
-from app.agents.plugins.types import ToolContext
 from app.agents.types import AgentTool
 from app.infrastructure.keys import resolve_api_key
 from app.plugins.notion.audit import with_audit
 from app.plugins.notion.display import _format_ntn_display
 from app.plugins.notion.ntn_client import NtnError, call_ntn
+from app.plugins.tool_context import ToolContext
 
 NOTION_API_KEY_NAME = "NOTION_API_KEY"
 

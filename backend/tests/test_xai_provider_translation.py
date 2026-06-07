@@ -660,11 +660,11 @@ async def test_stream_fn_surfaces_upstream_error_as_done_event(
 async def test_xai_provider_emits_terminal_usage_stream_event(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """``XaiLLM.stream`` emits ``StreamEvent(type="usage", ...)`` after agent_loop.
+    """``XaiLLM.stream`` emits ``StreamEvent(type="usage", ...)`` after run_model_tool_loop.
 
     The chat aggregator folds this into the cost ledger via
     :func:`record_turn_cost_if_enabled`, same shape as Claude's
-    ``_build_usage_event``.  Real ``agent_loop`` runs end-to-end with
+    ``_build_usage_event``.  Real ``run_model_tool_loop`` runs end-to-end with
     a fake :class:`AsyncClient` so the actual usage-capture code path
     is exercised, not a patched factory.
     """
@@ -705,7 +705,7 @@ async def test_xai_provider_skips_usage_event_when_no_chunk_reported(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """When no turn reported usage, no usage event fires — no spurious zeros."""
-    from tests.agent_harness import ScriptedStreamFn, text_turn
+    from tests.agent_loop_harness import ScriptedStreamFn, text_turn
 
     provider = XaiLLM("grok-4.3")
     monkeypatch.setattr(provider, "_stream_fn", ScriptedStreamFn([text_turn("hi")]))

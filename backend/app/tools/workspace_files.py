@@ -17,7 +17,7 @@ Usage::
     from app.tools.workspace_files import make_workspace_tools
 
     tools = make_workspace_tools(Path("/data/workspaces/<uuid>"))
-    # Pass ``tools`` into AgentContext.tools before calling agent_loop().
+    # Pass ``tools`` into AgentContext.tools before calling run_model_tool_loop().
 """
 
 from __future__ import annotations
@@ -447,7 +447,7 @@ def make_workspace_tools(workspace_root: Path) -> list[AgentTool]:
 
     All paths are resolved relative to *workspace_root* and path traversal
     is blocked.  Pass the returned list into ``AgentContext.tools`` before
-    calling ``agent_loop()``.
+    calling ``run_model_tool_loop()``.
 
     Args:
         workspace_root: Absolute path to the workspace directory.  Must

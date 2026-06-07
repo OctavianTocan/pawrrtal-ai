@@ -116,7 +116,7 @@ provider:
    workspace ID.
 3. `LiteLLMLLM.stream(...)` assembles an `AgentContext`, builds a
    `StreamFn` via `make_litellm_stream_fn(...)` (unless a test has
-   monkeypatched `_stream_fn`), and runs the shared `agent_loop`.
+   monkeypatched `_stream_fn`), and runs the shared `run_model_tool_loop`.
 4. The StreamFn resolves the API key, formats the model string as
    `openai/<model>` for `litellm.acompletion(...)`, and yields
    `LLMTextDeltaEvent` per chunk plus a final `LLMDoneEvent`.

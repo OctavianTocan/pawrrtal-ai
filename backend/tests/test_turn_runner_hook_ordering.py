@@ -20,8 +20,9 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.channels.base import ChannelMessage
-from app.channels.turn_runner import ChatTurnInput, _guarded_stream, run_turn
+from app.channels.turn_orchestrator import ChatTurnInput, _guarded_stream, run_turn
 from app.chat.aggregator import ChatTurnAggregator
+from app.plugins.adapters.turn_context import TurnContextProviderAdapter
 from app.providers.base import StreamEvent
 
 
@@ -177,7 +178,7 @@ async def test_resumed_codex_thread_does_not_replay_pawrrtal_history() -> None:
             turn_input=turn_input,
             history=history,
             system_prompt=None,
-            per_turn_context="# PRE-TURN CONTEXT\n\nmemory",
+            per_turn_context="# TURN CONTEXT\n\nmemory",
             aggregator=aggregator,
             counter=counter,  # type: ignore[arg-type]
             hooks=[],
@@ -187,7 +188,7 @@ async def test_resumed_codex_thread_does_not_replay_pawrrtal_history() -> None:
     assert delivered == [{"type": "delta", "content": "ok"}]
     assert provider.stream_kwargs["history"] == []
     assert provider.stream_kwargs["codex_thread_id"] == "thr_existing"
-    assert provider.stream_kwargs["per_turn_context"] == "# PRE-TURN CONTEXT\n\nmemory"
+    assert provider.stream_kwargs["per_turn_context"] == "# TURN CONTEXT\n\nmemory"
 
 
 @pytest.mark.anyio
@@ -241,7 +242,7 @@ async def test_agy_internal_conversation_id_is_persisted(
         persisted.append((conversation_id, agy_conversation_id))
 
     monkeypatch.setattr(
-        "app.channels.turn_runner.persist_agy_conversation_id",
+        "app.channels.turn_orchestrator.runner.persist_agy_conversation_id",
         fake_persist,
     )
 
@@ -326,7 +327,7 @@ async def test_non_codex_turn_replays_pawrrtal_history() -> None:
 
 
 @pytest.mark.anyio
-async def test_lightweight_codex_turn_still_runs_pre_turn_hooks(
+async def test_lightweight_codex_turn_still_runs_turn_context_providers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Active Recall must stay visible even when Codex uses compact prompting."""
@@ -349,8 +350,10 @@ async def test_lightweight_codex_turn_still_runs_pre_turn_hooks(
     async def no_finalize(**_kwargs: Any) -> None:
         return None
 
-    monkeypatch.setattr("app.channels.turn_runner._load_history_and_persist", no_persist)
-    monkeypatch.setattr("app.channels.turn_runner._finalize_turn", no_finalize)
+    monkeypatch.setattr(
+        "app.channels.turn_orchestrator.runner._load_history_and_persist", no_persist
+    )
+    monkeypatch.setattr("app.channels.turn_orchestrator.runner._finalize_turn", no_finalize)
 
     turn_input = ChatTurnInput(
         conversation_id=MagicMock(),
@@ -368,7 +371,16 @@ async def test_lightweight_codex_turn_still_runs_pre_turn_hooks(
         },
         workspace_root=None,
         tools=[],
-        pre_turn_hooks=[recall_hook],
+        turn_context_providers=[
+            TurnContextProviderAdapter(
+                plugin_id="active_recall",
+                capability_id="active_recall",
+                title="Active Recall",
+                order=100,
+                timeout_seconds=10,
+                provider=recall_hook,
+            )
+        ],
         codex_thread_prompt_hash="hash",
         codex_lightweight_prompt=True,
     )
@@ -376,7 +388,7 @@ async def test_lightweight_codex_turn_still_runs_pre_turn_hooks(
     _ = [chunk async for chunk in run_turn(turn_input)]
 
     assert hook_called is True
-    assert provider.stream_kwargs["per_turn_context"] == "# PRE-TURN CONTEXT\n\nmemory"
+    assert provider.stream_kwargs["per_turn_context"] == "# TURN CONTEXT\n\nmemory"
     assert "memory" in provider.stream_kwargs["system_prompt"]
     assert "## Tools available this turn" in provider.stream_kwargs["system_prompt"]
     assert provider.stream_kwargs["reasoning_effort"] == "low"

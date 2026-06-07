@@ -22,7 +22,7 @@ import pytest
 from app.agents.types import AgentTool
 from app.tools.errors import ToolErrorCode
 from app.tools.python_exec import make_virtual_python_tool
-from tests.agent_harness import (
+from tests.agent_loop_harness import (
     ScriptedStreamFn,
     run_scenario,
     text_turn,

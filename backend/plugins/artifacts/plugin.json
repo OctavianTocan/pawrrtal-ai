@@ -1,0 +1,25 @@
+{
+	"schema_version": 1,
+	"id": "artifacts",
+	"name": "Artifacts",
+	"description": "Render structured chat artifacts as an optional presentation capability.",
+	"version": "1.0.0",
+	"enabled_by_default": true,
+	"permissions": [],
+	"capabilities": [
+		{
+			"type": "python_tool",
+			"id": "render_artifact",
+			"tool_name": "render_artifact",
+			"title": "Render Artifact",
+			"description": "Render a structured chat artifact for richer comparisons, dashboards, or forms.",
+			"tags": ["artifact", "presentation", "ui"],
+			"intents": ["artifact.render", "presentation.structure"],
+			"slots": ["artifacts", "presentation"],
+			"exposure": "direct_and_catalog",
+			"permissions": [],
+			"risk": "local_read",
+			"entrypoint": "app.plugins.artifacts.tools:make_artifact_tool"
+		}
+	]
+}

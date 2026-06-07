@@ -479,7 +479,7 @@ class ClaudeLLM:
         # *host repo's* files instead of the user workspace.
         #
         # We do not lose the workspace ``CLAUDE.md`` by doing this:
-        # ``channels.turn_runner._workspace_system_prompt`` already
+        # ``channels.turn_orchestrator._workspace_system_prompt`` already
         # injects it via ``system_prompt=`` from the user's actual
         # workspace root, which is the only directory we should be
         # reading. The previous ``["project"]`` branch was reading

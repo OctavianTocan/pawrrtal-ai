@@ -73,10 +73,10 @@ async def test_chat_router_does_not_pass_request_session_into_turn_input(
 
     captured: dict[str, Any] = {}
 
-    # The chat router imports ``ChatTurnInput`` from ``app.channels.turn_runner``.
+    # The chat router imports ``ChatTurnInput`` from ``app.channels.turn_orchestrator``.
     # Patch the symbol the router actually resolves so we observe the real
     # construction call, not a stand-in.
-    from app.channels.turn_runner import ChatTurnInput as _OriginalChatTurnInput
+    from app.channels.turn_orchestrator import ChatTurnInput as _OriginalChatTurnInput
 
     def _capturing_chat_turn_input(**kwargs: Any) -> _OriginalChatTurnInput:
         """Capture kwargs then delegate to the real dataclass constructor."""
@@ -161,7 +161,7 @@ async def test_sse_done_frame_waits_for_turn_finalization() -> None:
     an immediate messages refetch can observe the assistant row as still
     ``streaming`` even though the visible response completed.
     """
-    from app.channels.turn_runner import _finalizing_stream
+    from app.channels.turn_orchestrator import _finalizing_stream
 
     finalized = False
 
@@ -217,11 +217,11 @@ async def test_finalize_turn_leaves_message_complete_on_cost_write_failure(
         """Synthetic cost-write failure that should be swallowed."""
         raise IntegrityError("synthetic", params=None, orig=Exception("boom"))
 
-    # Patch where the symbol is looked up — ``turn_runner`` imported it
+    # Patch where the symbol is looked up — ``turn_orchestrator`` imported it
     # at module load, so patching ``app.channels._turn_cost`` would miss
     # the in-scope reference.
     monkeypatch.setattr(
-        "app.channels.turn_runner.record_turn_cost_if_enabled",
+        "app.channels.turn_orchestrator.finalize.record_turn_cost_if_enabled",
         _explode,
     )
 

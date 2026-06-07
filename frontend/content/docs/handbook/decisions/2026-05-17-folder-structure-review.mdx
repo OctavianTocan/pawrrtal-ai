@@ -41,7 +41,7 @@ without a follow-up ADR.
 |---|---|---|
 | `api/` | **Keep** | One file per domain (chat, conversations, channels, …). |
 | `crud/` | **Keep** | Pure SQLAlchemy helpers, no API plumbing. |
-| `channels/` | **Keep** | One file per surface (SSE, Telegram); the `_turn_*` helper modules keep `turn_runner.py` under sentrux's fan-out budget. |
+| `channels/` | **Keep** | One file per surface (SSE, Telegram); the `_turn_*` helper modules keep `turn_orchestrator.py` under sentrux's fan-out budget. |
 | `core/` | **Keep but watch** | Broad: governance, tools, providers, lcm, observability, plugins. Sub-grouping would aid discovery but every existing sub-folder earns its keep. Re-evaluate if `core/` directly contains >25 files. |
 | `core/tools/` | **Keep** | Provider-agnostic per `.claude/rules/architecture/no-tools-in-providers.md`. |
 | `core/providers/` | **Keep** | Two provider implementations + shared catalog. |

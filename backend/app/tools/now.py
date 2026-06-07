@@ -24,45 +24,12 @@ from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.agents.types import AgentTool
-from app.tools.cron_tools import (
-    make_reminder_cancel_tool as make_reminder_cancel_tool,  # noqa: PLC0414
-)
-from app.tools.cron_tools import (
-    make_reminder_list_tool as make_reminder_list_tool,  # noqa: PLC0414
-)
-
-# Re-export the TASKS.md tools (#311 v1) through this module so
-# ``agent_tools.py`` can import them off ``now`` and stay under
-# sentrux's ``no_god_files`` fan-out ceiling. The aggregation is
-# purely organisational; the implementations live in ``tasks_md.py``.
-from app.tools.cron_tools import (
-    make_reminder_schedule_tool as make_reminder_schedule_tool,  # noqa: PLC0414
-)
 from app.tools.display import make_tool_display
 
 # Re-exports below keep agent_tools fan-out under sentrux's no_god_files budget.
 from app.tools.external_mcp import (
     build_external_mcp_tools as build_external_mcp_tools,  # noqa: PLC0414
 )
-
-# Re-export for agent_tools — alphabetically after tasks_md.
-from app.tools.report_issue import (
-    make_report_issue_tool as make_report_issue_tool,  # noqa: PLC0414
-)
-from app.tools.skill_invocation import (
-    make_invoke_skill_tool as make_invoke_skill_tool,  # noqa: PLC0414
-)
-from app.tools.skill_invocation import (
-    make_list_skills_tool as make_list_skills_tool,  # noqa: PLC0414
-)
-from app.tools.skill_invocation import (
-    make_read_skill_tool as make_read_skill_tool,  # noqa: PLC0414
-)
-from app.tools.tasks_md import make_add_task_tool as make_add_task_tool  # noqa: PLC0414
-from app.tools.tasks_md import (
-    make_complete_task_tool as make_complete_task_tool,  # noqa: PLC0414
-)
-from app.tools.tasks_md import make_list_tasks_tool as make_list_tasks_tool  # noqa: PLC0414
 
 log = logging.getLogger(__name__)
 

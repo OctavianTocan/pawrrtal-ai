@@ -1,0 +1,46 @@
+{
+	"schema_version": 1,
+	"id": "core_channels",
+	"name": "Core Channels",
+	"description": "Bundled web, Electron, Telegram, and Google Chat channel adapters.",
+	"version": "1.0.0",
+	"enabled_by_default": true,
+	"capabilities": [
+		{
+			"type": "channel",
+			"id": "web",
+			"title": "Web Channel",
+			"description": "Server-Sent Events channel used by the browser web application.",
+			"slots": ["chat_surface"],
+			"surface": "web",
+			"entrypoint": "app.channels.plugin_adapters:make_sse_channel"
+		},
+		{
+			"type": "channel",
+			"id": "electron",
+			"title": "Electron Channel",
+			"description": "Server-Sent Events channel used by the Electron desktop shell.",
+			"slots": ["chat_surface"],
+			"surface": "electron",
+			"entrypoint": "app.channels.plugin_adapters:make_sse_channel"
+		},
+		{
+			"type": "channel",
+			"id": "telegram",
+			"title": "Telegram Channel",
+			"description": "Telegram Bot API channel for linked Telegram conversations.",
+			"slots": ["chat_surface"],
+			"surface": "telegram",
+			"entrypoint": "app.channels.plugin_adapters:make_telegram_channel"
+		},
+		{
+			"type": "channel",
+			"id": "google_chat",
+			"title": "Google Chat Channel",
+			"description": "Google Chat channel for linked Google Workspace conversations.",
+			"slots": ["chat_surface"],
+			"surface": "google_chat",
+			"entrypoint": "app.channels.plugin_adapters:make_google_chat_channel"
+		}
+	]
+}

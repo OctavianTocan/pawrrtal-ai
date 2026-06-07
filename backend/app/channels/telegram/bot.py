@@ -32,8 +32,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-from app.agents.hooks import build_pre_turn_hooks
-from app.agents.tools import build_agent_tools
+from app.agents.tool_surface import build_agent_tools
 from app.channels.base import ChannelMessage
 from app.channels.telegram.bot_runtime import (
     COMMAND_REFRESH_COOLDOWN_SECONDS,
@@ -61,9 +60,10 @@ from app.channels.telegram.handlers import (
     handle_verbose_command,
     handle_whoami_command,
 )
-from app.channels.turn_runner import ChatTurnInput, load_agy_conversation_id, run_turn
+from app.channels.turn_orchestrator import ChatTurnInput, load_agy_conversation_id, run_turn
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
+from app.plugins.adapters.turn_context import build_turn_context_providers
 
 from .channel import SURFACE_TELEGRAM, make_telegram_sender, render_initial
 
@@ -353,11 +353,17 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
             workspace_id=workspace.id,
             send_fn=tg_sender,
             surface="telegram",
+            conversation_id=context.conversation_id,
+            model_id=context.model_id,
         )
         if workspace is not None
         else []
     )
-    pre_turn_hooks = build_pre_turn_hooks()
+    turn_context_providers = (
+        build_turn_context_providers(workspace_root=workspace_root)
+        if workspace_root is not None
+        else []
+    )
 
     provider, warning = await resolve_provider_with_auto_clear(
         context,
@@ -415,7 +421,7 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
         if message.bot:
             await safe_edit_html(message.bot, message.chat.id, thinking_msg.message_id, html)
 
-    async def _on_pre_turn_finished() -> None:
+    async def _on_turn_context_finished() -> None:
         if has_active_recall:
             nonlocal thinking_msg
             # Spawn a new placeholder so the active recall message stays in the chat history
@@ -436,9 +442,9 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
         workspace_root=workspace_root,
         tools=agent_tools,
         images=None,
-        # Helper to let pre-turn hooks stream progress into the placeholder message
+        # Helper to let context providers stream progress into the placeholder message.
         draft_updater=_draft_updater,
-        on_pre_turn_finished=_on_pre_turn_finished,
+        on_turn_context_finished=_on_turn_context_finished,
         log_tag="TELEGRAM",
         log_extras={"chat_id": message.chat.id},
         verbose_level=(
@@ -446,7 +452,7 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
             if context.verbose_level is not None
             else settings.telegram_verbose_default
         ),
-        pre_turn_hooks=pre_turn_hooks,
+        turn_context_providers=turn_context_providers,
         reasoning_effort=effective_effort,
         codex_thread_id=codex_thread_state.thread_id,
         codex_thread_prompt_hash=codex_thread_state.prompt_hash,

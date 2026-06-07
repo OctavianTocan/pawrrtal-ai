@@ -1,7 +1,7 @@
-import type { JSX } from 'react';
+import type * as React from 'react';
 
 /** Monochrome Apple logo, sized via Tailwind (defaults to inherit text color). */
-export function AppleIcon({ className }: { className?: string }): JSX.Element {
+export function AppleIcon({ className }: { className?: string }): React.ReactNode {
 	return (
 		<svg
 			aria-hidden="true"

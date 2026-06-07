@@ -26,13 +26,13 @@ from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.hooks import build_pre_turn_hooks
-from app.agents.tools import build_agent_tools
+from app.agents.tool_surface import build_agent_tools
 from app.channels.base import ChannelMessage
-from app.channels.turn_runner import ChatTurnInput, run_turn
+from app.channels.turn_orchestrator import ChatTurnInput, run_turn
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
 from app.models import Conversation
+from app.plugins.adapters.turn_context import build_turn_context_providers
 from app.providers.base import AILLM, ReasoningEffort
 from app.providers.catalog import first_authenticated_catalog_model
 from app.providers.factory import resolve_llm
@@ -458,7 +458,7 @@ async def _handle_message_event(event: dict[str, Any]) -> None:
         images=attachments.images or None,
         verbose_level=target.verbose_level,
         reasoning_effort=reasoning_effort,
-        pre_turn_hooks=build_pre_turn_hooks(),
+        turn_context_providers=build_turn_context_providers(workspace_root=target.workspace_root),
         log_tag="GOOGLE_CHAT",
     )
     async for _ in run_turn(turn_input):
