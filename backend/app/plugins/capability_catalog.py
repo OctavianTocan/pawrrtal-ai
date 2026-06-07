@@ -71,7 +71,8 @@ class CapabilityRecord:
             requires_confirmation=capability.requires_confirmation,
             input_schema=_input_schema(capability),
             examples=capability.examples,
-            invokable=capability.type in {"cli_tool", "python_tool"},
+            invokable=capability.type in {"cli_tool", "python_tool"}
+            and capability.exposure in {"direct", "direct_and_catalog"},
         )
 
     def to_wire(self, *, preferred: bool = False) -> dict[str, object]:

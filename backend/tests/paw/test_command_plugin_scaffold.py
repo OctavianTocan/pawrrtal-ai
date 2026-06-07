@@ -60,6 +60,8 @@ def test_plugins_scaffold_creates_enabled_workspace_cli_plugin(
     rows = json.loads(search.stdout)
     assert rows[0]["key"] == "local_notes/search_notes"
     assert rows[0]["state"] == "enabled"
+    assert rows[0]["exposure"] == "catalog"
+    assert rows[0]["invokable"] is False
 
 
 def test_plugins_scaffold_refuses_existing_plugin_dir(

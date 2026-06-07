@@ -28,7 +28,9 @@ composed.
 
 ## Minimal CLI Tool Plugin
 
-Workspace plugins can safely contribute CLI tools. Put this in
+Workspace plugins can contribute CLI tools to the capability catalog. They are
+not exposed for direct model invocation until Pawrrtal has a subprocess sandbox
+for user-authored workspace code. Put this in
 `<workspace>/.agent/plugins/example_cli/plugin.json`:
 
 ```json
@@ -46,7 +48,7 @@ Workspace plugins can safely contribute CLI tools. Put this in
       "tool_name": "example_echo",
       "title": "Example Echo",
       "description": "Echo arguments through a workspace CLI command.",
-      "exposure": "direct_and_catalog",
+      "exposure": "catalog",
       "entrypoint": ["python3", "-c", "import json, sys; print(json.dumps(sys.argv[1:]))"],
       "cwd": "workspace",
       "args_schema": {
@@ -65,9 +67,10 @@ Workspace plugins can safely contribute CLI tools. Put this in
 }
 ```
 
-`exposure: "direct_and_catalog"` makes the tool available to the agent and
-searchable in the plugin capability catalog. `exposure: "catalog"` keeps it
-searchable without adding it to the model's direct tool list.
+`exposure: "catalog"` keeps the tool searchable without adding it to the
+model's direct tool list. Direct CLI exposure is only allowed from trusted
+bundled or global plugin roots, where the operator has reviewed the plugin code
+and accepted the host-level subprocess risk.
 
 ## Env Settings
 
@@ -107,8 +110,10 @@ activation. The bundled `github_issues` plugin uses this shape:
 
 `python_tool` capabilities are bundled-only. They import first-party Python
 factories and receive `ToolContext`, so they must live in `backend/plugins` and
-point at code under `backend/app/plugins`. Workspace and global plugins should
-use `cli_tool` unless the host grows a narrower trust boundary for them.
+point at code under `backend/app/plugins`. Workspace plugins should use
+catalog-only `cli_tool` capabilities unless the host grows a narrower trust
+boundary for them. Global plugins are host-trusted and may expose direct CLI
+tools when the operator intentionally installs them.
 
 The bundled Tasks plugin is the template:
 
@@ -257,8 +262,7 @@ can inspect all of them.
 
 Use these focused tests as examples:
 
-- `backend/tests/test_plugin_tools.py` covers direct CLI tool exposure and hot reload.
-- `backend/tests/test_plugin_tools.py` covers bundled Python tools, env-gated issue reporting, reminder context, and the non-bundled Python trust boundary.
+- `backend/tests/test_plugin_tools.py` covers catalog-only workspace CLI plugins, hot reload, bundled Python tools, env-gated issue reporting, reminder context, and the non-bundled Python trust boundary.
 - `backend/tests/test_plugin_catalog_tool.py` covers the agent-facing capability search tool.
 - `backend/tests/test_turn_context_plugins.py` covers Active Recall as a manifest-backed context provider.
 - `backend/tests/test_workspace_env_api.py` covers plugin-declared workspace env overrides.

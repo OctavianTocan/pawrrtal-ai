@@ -17,6 +17,7 @@ from app.plugins.discovery import PluginRoot, discover_plugins
 from app.plugins.registry import build_registry_snapshot
 from app.plugins.state import PluginState, plugin_state_path, save_plugin_state
 from app.plugins.tool_context import ToolContext
+from app.tools.plugin_catalog import make_search_plugin_capabilities_tool
 
 
 def _write_cli_plugin(
@@ -24,7 +25,7 @@ def _write_cli_plugin(
     *,
     plugin_id: str = "echo_plugin",
     capability_id: str = "echo_tool",
-    exposure: str = "direct_and_catalog",
+    exposure: str = "catalog",
     enabled: bool = True,
 ) -> None:
     """Write a workspace CLI plugin and matching state."""
@@ -106,21 +107,25 @@ def _tool_names(workspace_root: Path) -> set[str]:
     }
 
 
-def test_direct_workspace_cli_plugin_is_exposed_and_runs(tmp_path: Path) -> None:
+def _search_capabilities(workspace_root: Path, **kwargs: object) -> dict[str, object]:
+    """Return parsed plugin capability-search payload for one workspace."""
+    tool = make_search_plugin_capabilities_tool(workspace_root=workspace_root)
+    payload = json.loads(asyncio.run(tool.execute("call-1", **kwargs)))
+    assert isinstance(payload, dict)
+    return payload
+
+
+def test_workspace_cli_plugin_is_catalog_only(tmp_path: Path) -> None:
     _write_cli_plugin(tmp_path)
-    tools = build_agent_tools(
-        workspace_root=tmp_path,
-        user_id=uuid.uuid4(),
-        workspace_id=uuid.uuid4(),
-    )
-    tool = next(tool for tool in tools if tool.name == "echo_tool")
 
-    result = asyncio.run(tool.execute("call-1", args=["hello"]))
+    payload = _search_capabilities(tmp_path, plugin_id="echo_plugin")
+    rows = payload["capabilities"]
 
-    envelope = json.loads(result)
-    stdout = json.loads(envelope["data"]["stdout"])
-    assert envelope["success"] is True
-    assert stdout["args"] == ["hello"]
+    assert "echo_tool" not in _tool_names(tmp_path)
+    assert isinstance(rows, list)
+    assert rows[0]["key"] == "echo_plugin/echo_tool"
+    assert rows[0]["state"] == "enabled"
+    assert rows[0]["invokable"] is False
 
 
 def test_catalog_only_cli_plugin_is_not_exposed_directly(tmp_path: Path) -> None:
@@ -135,12 +140,16 @@ def test_disabled_cli_plugin_is_not_exposed(tmp_path: Path) -> None:
     assert "echo_tool" not in _tool_names(tmp_path)
 
 
-def test_workspace_plugin_hot_reload_appears_on_next_tool_build(tmp_path: Path) -> None:
+def test_workspace_plugin_hot_reload_appears_in_catalog(tmp_path: Path) -> None:
     assert "echo_tool" not in _tool_names(tmp_path)
 
     _write_cli_plugin(tmp_path)
 
-    assert "echo_tool" in _tool_names(tmp_path)
+    payload = _search_capabilities(tmp_path, plugin_id="echo_plugin")
+    rows = payload["capabilities"]
+
+    assert isinstance(rows, list)
+    assert rows[0]["key"] == "echo_plugin/echo_tool"
 
 
 def test_bundled_notion_manifest_exposes_tool_when_enabled_and_configured(

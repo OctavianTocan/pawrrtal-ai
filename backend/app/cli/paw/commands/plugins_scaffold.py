@@ -106,7 +106,7 @@ def _manifest(*, plugin_id: str, capability_id: str) -> dict[str, object]:
                 "tool_name": capability_id,
                 "title": title,
                 "description": f"Run the {title} workspace CLI scaffold.",
-                "exposure": "direct_and_catalog",
+                "exposure": "catalog",
                 "permissions": ["subprocess"],
                 "entrypoint": ["python3", f"{capability_id}.py"],
                 "cwd": "plugin",

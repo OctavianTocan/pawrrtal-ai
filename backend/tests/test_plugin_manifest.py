@@ -45,7 +45,7 @@ def _valid_manifest() -> dict[str, object]:
                 "intents": ["web.search"],
                 "slots": ["web_search"],
                 "priority": 10,
-                "exposure": "direct_and_catalog",
+                "exposure": "catalog",
                 "permissions": ["secrets"],
                 "entrypoint": ["search-agent", "--json"],
                 "args_schema": {"type": "object"},
@@ -160,6 +160,15 @@ def test_workspace_manifest_rejects_python_adapters() -> None:
     ]
 
     with pytest.raises(PluginManifestError, match="cannot contribute"):
+        validate_plugin_manifest(raw, source_type="workspace")
+
+
+def test_workspace_manifest_rejects_direct_cli_tool_exposure() -> None:
+    raw = _valid_manifest()
+    capabilities = cast(list[dict[str, object]], raw["capabilities"])
+    capabilities[0]["exposure"] = "direct_and_catalog"
+
+    with pytest.raises(PluginManifestError, match="cannot expose CLI tools directly"):
         validate_plugin_manifest(raw, source_type="workspace")
 
 

@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from app.plugins.contributions import (
     Capability,
+    CliToolCapability,
     DependencySpec,
     EnvVarSpec,
     Permission,
@@ -136,4 +137,9 @@ def _reject_untrusted_workspace_manifest(manifest: PluginManifest) -> None:
         if capability_requires_trusted_python(capability):
             raise PluginManifestError(
                 f"Workspace plugin {manifest.id!r} cannot use Python adapters yet."
+            )
+        if isinstance(capability, CliToolCapability) and capability.exposure != "catalog":
+            raise PluginManifestError(
+                f"Workspace plugin {manifest.id!r} cannot expose CLI tools directly "
+                "until a subprocess sandbox is available; use exposure='catalog'."
             )
