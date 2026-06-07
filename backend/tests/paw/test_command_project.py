@@ -13,12 +13,13 @@ import httpx
 import pytest
 from typer.testing import CliRunner
 
+import app.cli.paw.commands.project.cloudflared as cloudflared_module
 import app.cli.paw.commands.project.service as service_module
 from app.cli.paw import config as paw_config
 from app.cli.paw.commands.project import cli as project_module
-from app.cli.paw.commands.project import service_tailscale
 from app.cli.paw.commands.project.preflight import PreflightCheck
 from app.cli.paw.commands.project.state import PROJECT_STATE_SCHEMA_VERSION, repo_root
+from app.cli.paw.errors import LocalError
 from app.cli.paw.main import app
 
 
@@ -414,6 +415,7 @@ def test_project_service_install_preserves_explicit_dev_database_url(
     unit = unit_path.read_text()
     assert 'Environment="DATABASE_URL="' in unit
     assert 'Environment="PAWRRTAL_DEV_DATABASE_URL=postgresql://u:p@localhost:5432/app"' in unit
+    assert 'Environment="BACKEND_INTERNAL_URL=http://127.0.0.1:8000"' in unit
 
 
 def test_project_service_install_can_enable_linger(
@@ -426,200 +428,272 @@ def test_project_service_install_can_enable_linger(
     assert ["loginctl", "enable-linger", "octavian"] in fake_systemd
 
 
-def test_project_service_install_tailscale_profile_configures_owned_routes(
+@pytest.fixture
+def fake_cloudflared(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[list[str]]:
+    """Capture cloudflared/systemctl calls and isolate tunnel credentials."""
+    calls: list[list[str]] = []
+    home = tmp_path / "home"
+    credentials_dir = home / ".cloudflared"
+    credentials_dir.mkdir(parents=True)
+    (credentials_dir / "tunnel-uuid.json").write_text('{"secret":"super-secret"}')
+    monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setattr(cloudflared_module, "_require_binary", lambda name: f"/fake/bin/{name}")
+    monkeypatch.setattr(cloudflared_module, "_probe_origin", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(
+        cloudflared_module,
+        "_public_access_probe",
+        lambda hostname: cloudflared_module.PublicAccessProbe(
+            url=f"https://{hostname}/",
+            status_code=302,
+            location="/cdn-cgi/access/login",
+            access_required=True,
+        ),
+    )
+
+    def fake_run(args: list[str], **_: Any) -> subprocess.CompletedProcess[str]:
+        calls.append(args)
+        stdout = "ok\n"
+        if args == ["cloudflared", "tunnel", "list", "--output", "json"]:
+            stdout = '[{"name":"pawrrtal","id":"tunnel-uuid"}]\n'
+        if args == ["cloudflared", "--version"]:
+            stdout = "cloudflared version 2026.6.0\n"
+        if args[:2] == ["systemctl", "is-active"]:
+            stdout = "active\n"
+        if args[:2] == ["systemctl", "is-enabled"]:
+            stdout = "enabled\n"
+        return subprocess.CompletedProcess(args=args, returncode=0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(cloudflared_module, "_run", fake_run)
+    return calls
+
+
+def test_project_cloudflared_install_writes_ingress_and_starts_service(
     runner: CliRunner,
-    fake_systemd: list[list[str]],
+    fake_cloudflared: list[list[str]],
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The Tailscale profile writes profile env and applies owned Serve routes."""
-
-    def fake_tailscale_json(*args: str) -> dict[str, Any]:
-        if args == ("status", "--json"):
-            return {"Self": {"DNSName": "pawrrtal.example.ts.net."}}
-        return {}
-
-    monkeypatch.setattr(service_module, "_tailscale_json", fake_tailscale_json)
+    """``paw project cloudflared install`` writes the fixed Cloudflared ingress."""
+    config_path = tmp_path / "cloudflared" / "config.yml"
 
     result = runner.invoke(
         app,
         [
             "project",
-            "service",
+            "cloudflared",
             "install",
-            "--profile",
-            "tailscale",
-            "--tailscale-host",
-            "pawrrtal.example.ts.net",
-            "--tailscale-port",
-            "7447",
+            "--hostname",
+            "pawrrtal.example.com",
+            "--config-path",
+            str(config_path),
         ],
     )
 
     assert result.exit_code == 0, result.stdout
-    unit_path = tmp_path / "xdg" / "systemd" / "user" / "pawrrtal-dev-tailscale.service"
-    unit = unit_path.read_text()
-    assert 'Environment="NEXT_PUBLIC_BROWSER_API_BASE="' in unit
-    assert 'Environment="BACKEND_INTERNAL_URL=http://127.0.0.1:8000"' in unit
-    assert 'Environment="NEXT_ALLOWED_DEV_ORIGINS=pawrrtal.example.ts.net,127.0.0.1"' in unit
-    assert (
-        'Environment="GOOGLE_OAUTH_REDIRECT_URI=https://pawrrtal.example.ts.net:7447/api/v1/auth/oauth/google/callback"'
-        in unit
-    )
-    assert (
-        'Environment="APPLE_OAUTH_REDIRECT_URI=https://pawrrtal.example.ts.net:7447/api/v1/auth/oauth/apple/callback"'
-        in unit
-    )
+    config = config_path.read_text()
+    assert "tunnel: tunnel-uuid" in config
+    assert f"credentials-file: {config_path.parent}/tunnel-uuid.json" in config
+    assert "metrics: 127.0.0.1:20241" in config
+    assert "path: ^/api/v1/.*" in config
+    assert "path: ^/auth/.*" in config
+    assert "path: ^/users/.*" in config
+    assert "service: http://127.0.0.1:8000" in config
+    assert "service: http://127.0.0.1:53001" in config
+    assert "super-secret" not in result.stdout
     assert [
-        "tailscale",
-        "serve",
-        "--bg",
-        "--yes",
-        "--https",
-        "7447",
-        "--set-path",
-        "/",
-        "http://localhost:53001",
-    ] in fake_systemd
-    assert [
-        "tailscale",
-        "serve",
-        "--bg",
-        "--yes",
-        "--https",
-        "7447",
-        "--set-path",
-        "/api/v1/",
-        "http://127.0.0.1:8000/api/v1/",
-    ] in fake_systemd
-    state_path = paw_config.profile_dir("tailscale") / "project-service.json"
-    state = json.loads(state_path.read_text())
-    assert state["public_url"] == "https://pawrrtal.example.ts.net:7447/"
-
-
-def test_project_service_install_tailscale_refuses_existing_unowned_serve_config(
-    runner: CliRunner,
-    fake_systemd: list[list[str]],
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """Existing unowned Tailscale Serve config is a hard stop."""
-
-    def fake_tailscale_json(*args: str) -> dict[str, Any]:
-        if args == ("status", "--json"):
-            return {"Self": {"DNSName": "pawrrtal.example.ts.net."}}
-        if args == ("serve", "status", "--json"):
-            return {
-                "Web": {
-                    "pawrrtal.example.ts.net:443": {"Handlers": {"/": {"Proxy": "http://other"}}}
-                }
-            }
-        return {}
-
-    monkeypatch.setattr(service_module, "_tailscale_json", fake_tailscale_json)
-
-    result = runner.invoke(
-        app,
-        [
-            "project",
-            "service",
-            "install",
-            "--profile",
-            "tailscale",
-            "--tailscale-host",
-            "pawrrtal.example.ts.net",
-        ],
+        "cloudflared",
+        "--config",
+        str(config_path),
+        "tunnel",
+        "ingress",
+        "validate",
+    ] in fake_cloudflared
+    assert ["cloudflared", "tunnel", "route", "dns", "pawrrtal", "pawrrtal.example.com"] in (
+        fake_cloudflared
     )
+    assert ["cloudflared", "--config", str(config_path), "service", "install"] in (fake_cloudflared)
+    assert ["systemctl", "enable", "--now", "cloudflared"] in fake_cloudflared
+    state = json.loads((paw_config.profile_dir("cloudflared") / "project-service.json").read_text())
+    assert state["public_url"] == "https://pawrrtal.example.com/"
+    assert state["credentials_file"].endswith("tunnel-uuid.json")
 
-    assert result.exit_code == 1
-    assert not any(call[:3] == ["tailscale", "serve", "--bg"] for call in fake_systemd)
 
-
-def test_project_service_install_tailscale_rejects_other_node_host(
+def test_project_cloudflared_install_requires_cloudflared(
     runner: CliRunner,
-    fake_systemd: list[list[str]],
     monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The Tailscale profile only installs for the current node's MagicDNS host."""
-
-    def fake_tailscale_json(*args: str) -> dict[str, Any]:
-        if args == ("status", "--json"):
-            return {"Self": {"DNSName": "openclaw-vps.example.ts.net."}}
-        return {}
-
-    monkeypatch.setattr(service_module, "_tailscale_json", fake_tailscale_json)
-
-    result = runner.invoke(
-        app,
-        [
-            "project",
-            "service",
-            "install",
-            "--profile",
-            "tailscale",
-            "--tailscale-host",
-            "pawrrtal.example.ts.net",
-        ],
-    )
-
-    assert result.exit_code == 1
-    assert isinstance(result.exception, SystemExit)
-    assert not any(call[:3] == ["tailscale", "serve", "--bg"] for call in fake_systemd)
-
-
-def test_project_service_uninstall_tailscale_removes_owned_paths_only(
-    runner: CliRunner,
-    fake_systemd: list[list[str]],
     tmp_path: Path,
 ) -> None:
-    """Tailscale uninstall removes only after Pawrrtal state says it owns the profile."""
-    unit_dir = tmp_path / "xdg" / "systemd" / "user"
-    unit_dir.mkdir(parents=True)
-    unit_path = unit_dir / "pawrrtal-dev-tailscale.service"
-    unit_path.write_text("[Unit]\nDescription=old\n")
-    state_dir = paw_config.profile_dir("tailscale")
-    state_dir.mkdir(parents=True, exist_ok=True)
-    (state_dir / "project-service.json").write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "profile": "tailscale",
-                "service_name": "pawrrtal-dev-tailscale.service",
-                "installed_at": "2026-05-30T00:00:00+00:00",
-                "tailscale_host": "pawrrtal.example.ts.net",
-                "tailscale_port": 7447,
-                "public_url": "https://pawrrtal.example.ts.net:7447/",
-                "routes": [list(route) for route in service_tailscale.TAILSCALE_ROUTES],
-            }
-        )
+    """Install fails before writing config when ``cloudflared`` is absent."""
+
+    def missing_binary(_name: str) -> str:
+        raise LocalError("missing")
+
+    monkeypatch.setattr(cloudflared_module, "_require_binary", missing_binary)
+    config_path = tmp_path / "cloudflared" / "config.yml"
+
+    result = runner.invoke(
+        app,
+        [
+            "project",
+            "cloudflared",
+            "install",
+            "--hostname",
+            "pawrrtal.example.com",
+            "--config-path",
+            str(config_path),
+        ],
     )
 
-    result = runner.invoke(app, ["project", "service", "uninstall", "--profile", "tailscale"])
-
-    assert result.exit_code == 0, result.stdout
-    assert not unit_path.exists()
-    assert not (state_dir / "project-service.json").exists()
-    assert ["tailscale", "serve", "reset"] not in fake_systemd
-    assert ["tailscale", "serve", "--https", "7447", "--set-path", "/", "off"] in fake_systemd
-    assert [
-        "tailscale",
-        "serve",
-        "--https",
-        "7447",
-        "--set-path",
-        "/api/v1/",
-        "off",
-    ] in fake_systemd
+    assert result.exit_code == 1
+    assert not config_path.exists()
 
 
-def test_project_service_commands_reject_unknown_profile(
+def test_project_cloudflared_install_rejects_non_loopback_origins(
     runner: CliRunner,
-    fake_systemd: list[list[str]],
+    fake_cloudflared: list[list[str]],
+    tmp_path: Path,
 ) -> None:
-    """Every service verb rejects profile typos instead of falling back to local."""
-    result = runner.invoke(app, ["project", "service", "status", "--profile", "tailcale"])
+    """The Cloudflared profile refuses to publish non-loopback local origins."""
+    result = runner.invoke(
+        app,
+        [
+            "project",
+            "cloudflared",
+            "install",
+            "--hostname",
+            "pawrrtal.example.com",
+            "--frontend-origin",
+            "http://192.168.1.2:53001",
+            "--config-path",
+            str(tmp_path / "cloudflared" / "config.yml"),
+        ],
+    )
 
     assert result.exit_code == 1
-    assert fake_systemd == []
+    assert fake_cloudflared == []
+
+
+def test_project_cloudflared_install_refuses_invalid_ingress(
+    runner: CliRunner,
+    fake_cloudflared: list[list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Install stops when Cloudflared rejects the generated ingress config."""
+
+    def fail_validate(_config_path: Path) -> None:
+        raise LocalError("invalid ingress")
+
+    monkeypatch.setattr(cloudflared_module, "_validate_ingress", fail_validate)
+
+    result = runner.invoke(
+        app,
+        [
+            "project",
+            "cloudflared",
+            "install",
+            "--hostname",
+            "pawrrtal.example.com",
+            "--config-path",
+            str(tmp_path / "cloudflared" / "config.yml"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert ["cloudflared", "tunnel", "route", "dns", "pawrrtal", "pawrrtal.example.com"] not in (
+        fake_cloudflared
+    )
+
+
+def test_project_cloudflared_verify_requires_access_challenge(
+    runner: CliRunner,
+    fake_cloudflared: list[list[str]],
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Public verification fails when the hostname serves the app directly."""
+    monkeypatch.setattr(
+        cloudflared_module,
+        "_public_access_probe",
+        lambda hostname: cloudflared_module.PublicAccessProbe(
+            url=f"https://{hostname}/",
+            status_code=200,
+            location="",
+            access_required=False,
+        ),
+    )
+
+    result = runner.invoke(
+        app,
+        [
+            "project",
+            "cloudflared",
+            "verify",
+            "--hostname",
+            "pawrrtal.example.com",
+            "--config-path",
+            str(tmp_path / "cloudflared" / "config.yml"),
+        ],
+    )
+
+    assert result.exit_code == 1
+    assert ["cloudflared", "tunnel", "info", "pawrrtal"] in fake_cloudflared
+
+
+def test_project_cloudflared_verify_reports_access_json(
+    runner: CliRunner,
+    fake_cloudflared: list[list[str]],
+    tmp_path: Path,
+) -> None:
+    """Verify emits a stable JSON payload when Access protects the hostname."""
+    result = runner.invoke(
+        app,
+        [
+            "project",
+            "cloudflared",
+            "verify",
+            "--hostname",
+            "pawrrtal.example.com",
+            "--config-path",
+            str(tmp_path / "cloudflared" / "config.yml"),
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout.strip().splitlines()[-1])
+    assert payload["ok"] is True
+    assert payload["hostname"] == "pawrrtal.example.com"
+    assert payload["access_required"] is True
+    assert payload["public_status"] == 302
+
+
+def test_project_cloudflared_status_hides_credentials(
+    runner: CliRunner,
+    fake_cloudflared: list[list[str]],
+    tmp_path: Path,
+) -> None:
+    """Status reports operational metadata without printing credentials."""
+    config_path = tmp_path / "cloudflared" / "config.yml"
+    runner.invoke(
+        app,
+        [
+            "project",
+            "cloudflared",
+            "install",
+            "--hostname",
+            "pawrrtal.example.com",
+            "--config-path",
+            str(config_path),
+        ],
+    )
+
+    result = runner.invoke(app, ["project", "cloudflared", "status", "--json"])
+
+    assert result.exit_code == 0, result.stdout
+    assert "super-secret" not in result.stdout
+    payload = json.loads(result.stdout.strip().splitlines()[-1])
+    assert payload["hostname"] == "pawrrtal.example.com"
+    assert payload["service_active"] == "active"
 
 
 def test_project_service_uninstall_disables_and_removes_unit(

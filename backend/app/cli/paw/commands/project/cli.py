@@ -20,6 +20,7 @@ import httpx
 import typer
 
 from app.cli.paw.commands.dev.process import process_create_time
+from app.cli.paw.commands.project.cloudflared import app as cloudflared_app
 from app.cli.paw.commands.project.preflight import (
     emit_preflight,
     exit_if_preflight_failed,
@@ -51,6 +52,7 @@ from app.cli.paw.output import emit_human, emit_json, emit_plain_rows, require_o
 
 app = typer.Typer(no_args_is_help=True)
 env_app = typer.Typer(no_args_is_help=True)
+app.add_typer(cloudflared_app, name="cloudflared", help="Install/manage Cloudflared.")
 app.add_typer(service_app, name="service", help="Install/manage the user systemd dev service.")
 
 
