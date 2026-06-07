@@ -110,14 +110,14 @@ def test_project_up_starts_full_stack_and_writes_state(
     result = runner.invoke(app, ["project", "up"])
     assert result.exit_code == 0, result.stdout
     assert "project up" in result.stdout
-    assert "http://localhost:53001" in result.stdout
+    assert "http://localhost:3000" in result.stdout
     assert "http://127.0.0.1:8000" in result.stdout
 
     assert len(fake_project_spawn) == 1
     state_path = paw_config.profile_dir("default") / "project.json"
     state = json.loads(state_path.read_text())
     assert state["pid"] == 23456
-    assert state["frontend_url"] == "http://localhost:53001"
+    assert state["frontend_url"] == "http://localhost:3000"
     assert state["backend_url"] == "http://127.0.0.1:8000"
     assert state["schema_version"] == PROJECT_STATE_SCHEMA_VERSION
     assert state["log_path"].endswith("project.log")
@@ -497,7 +497,7 @@ def test_project_cloudflared_install_writes_ingress_and_starts_service(
     assert "path: ^/auth/.*" in config
     assert "path: ^/users/.*" in config
     assert "service: http://127.0.0.1:8000" in config
-    assert "service: http://127.0.0.1:53001" in config
+    assert "service: http://127.0.0.1:3000" in config
     assert "super-secret" not in result.stdout
     assert [
         "cloudflared",
@@ -562,7 +562,7 @@ def test_project_cloudflared_install_rejects_non_loopback_origins(
             "--hostname",
             "pawrrtal.example.com",
             "--frontend-origin",
-            "http://192.168.1.2:53001",
+            "http://192.168.1.2:3000",
             "--config-path",
             str(tmp_path / "cloudflared" / "config.yml"),
         ],

@@ -30,7 +30,7 @@
   - Database schema retrievals via raw API (`ntn api v1/databases/<id>` → `🗂️ Reading Notion database schema <id_truncated>...` / `Read Notion database schema <id_truncated>`)
 - **Truncation of page and database UUIDs.** Display labels for database queries and schema reads now truncate UUIDs to their first 8 characters to keep user-facing text clean.
 - **Tightened `ntn` tool arguments validation.** The `ntn` tool now rejects non-string arguments explicitly, and its description has been clarified to ensure the agent uses correct formatting.
-- **Frontend dev port swap:** Swapped the frontend dev port from 3001 to 53001.
+- **Frontend dev port swap:** Swapped the frontend dev port from 3001 to 3000.
 - **Workspace template refactored.** Replaced vendor/submodule approach with `backend/templates/workspace/` seed tree. `seed_workspace` now copies from the template directory (skip-existing). New layout: `SOUL.md`, `AGENTS.md`, `USER.md`, `PREFERENCES.md`, `HEARTBEAT.md`, `.agent/` tree (#423).
 - **Dynamic user identity on web.** Sidebar footer and settings page now show live authenticated user data instead of hardcoded placeholder. `useCurrentUser` hook, `getInitials` utility, auto-saving profile edits, `window.location.replace` on onboarding completion (#452).
 - **Playwright E2E fixture refactor.** Decoupled dev-login from workspace provisioning; explicit `authenticatedPageWithWorkspace` and `authenticatedPageWithWorkspaceAndChat` fixtures (#334).

@@ -1,9 +1,8 @@
 /**
  * Dev orchestrator: runs the Next.js frontend and FastAPI backend side-by-side
  * on plain localhost. Frontend / backend ports come from `scripts/dev-ports.ts`,
- * the single source of truth shared with the Electrobun shell and the
- * frontend's package.json `dev` script. No proxies, no HTTPS, no special
- * routing — just the two processes.
+ * the single source of truth shared with the frontend's package.json `dev`
+ * script. No proxies, no HTTPS, no special routing — just the two processes.
  */
 import { type ChildProcess, spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';

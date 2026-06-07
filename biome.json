@@ -172,12 +172,7 @@
 			}
 		},
 		{
-			"includes": [
-				"frontend/e2e/**",
-				"frontend/scripts/**",
-				"scripts/**",
-				"electrobun/scripts/**"
-			],
+			"includes": ["frontend/e2e/**", "frontend/scripts/**", "scripts/**"],
 			"linter": {
 				"rules": {
 					"suspicious": {

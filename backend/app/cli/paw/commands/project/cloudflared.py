@@ -31,7 +31,7 @@ CLOUDFLARED_SERVICE = "cloudflared"
 DEFAULT_TUNNEL_NAME = "pawrrtal"
 DEFAULT_CONFIG_PATH = Path("/etc/cloudflared/config.yml")
 DEFAULT_METRICS_ADDRESS = "127.0.0.1:20241"
-DEFAULT_TUNNEL_FRONTEND_ORIGIN = "http://127.0.0.1:53001"
+DEFAULT_TUNNEL_FRONTEND_ORIGIN = "http://127.0.0.1:3000"
 CLOUDFLARED_STATE_SCHEMA_VERSION = 1
 HOSTNAME_RE = re.compile(
     r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$"

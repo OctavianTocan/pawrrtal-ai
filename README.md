@@ -208,7 +208,6 @@ Placeholder settings sections currently listed in the nav but not fully wired:
 ### Desktop shells
 
 - **Electron**: Native desktop shell with preload/IPC and macOS-aware window chrome.
-- **Electrobun**: Bun + system webview shell for a smaller desktop runtime.
 - **Portable frontend contract**: Desktop-only IPC goes through `frontend/lib/desktop.ts` with web fallbacks so the React app stays portable.
 
 ---
@@ -224,7 +223,7 @@ Placeholder settings sections currently listed in the nav but not fully wired:
 | Channels    | aiogram (Telegram polling or webhook), SSE (web/electron) |
 | Voice        | Metadata annotations only; STT removed |
 | Encryption  | Fernet (workspace `.env`) |
-| Desktop     | Electron, Electrobun |
+| Desktop     | Electron |
 | Toolchain   | Bun, uv, Biome, Ruff, mypy strict, Bandit, just, Lefthook |
 | Arch gates  | Sentrux, import-linter, dependency-cruiser, custom repo checks |
 
@@ -264,7 +263,7 @@ just dev
 bun run dev
 ```
 
-The dev orchestrator clears stale ports, removes the Next.js dev lock, and launches Next.js on `:53001` plus FastAPI on `:8000` with hot reload. Local dev uses plain `localhost`.
+The dev orchestrator clears stale ports, removes the Next.js dev lock, and launches Next.js on `:3000` plus FastAPI on `:8000` with hot reload. Local dev uses plain `localhost`.
 It also pins `UV_CACHE_DIR` and `XDG_CACHE_HOME` under `.cache/` so `uv` does not try to write to a read-only home cache.
 
 The same full-stack lifecycle is available through the project CLI:
@@ -355,7 +354,7 @@ OPENAI_CODEX_OAUTH_TOKEN=        # workspace-only by default
 NOTION_API_KEY=                  # workspace-only plugin key
 
 # CORS / cookies
-CORS_ORIGINS=["http://localhost:53001"]
+CORS_ORIGINS=["http://localhost:3000"]
 CORS_ORIGIN_REGEX=^https:\/\/.*\.vercel\.app$
 COOKIE_DOMAIN=
 COOKIE_SAMESITE=lax
@@ -416,7 +415,7 @@ APPLE_OAUTH_TEAM_ID=
 APPLE_OAUTH_KEY_ID=
 APPLE_OAUTH_PRIVATE_KEY=
 APPLE_OAUTH_REDIRECT_URI=
-OAUTH_POST_LOGIN_REDIRECT=http://localhost:53001/
+OAUTH_POST_LOGIN_REDIRECT=http://localhost:3000/
 
 # Voice / audio metadata only; STT removed
 VOICE_PROVIDER=xai
@@ -467,7 +466,7 @@ Provider and integration keys can be stored per workspace in the encrypted `.env
 ### Request to response, web chat turn
 
 ```
-Browser ─SSE─▶ Next.js (:53001) ─fetch─▶ FastAPI /api/v1/chat
+Browser ─SSE─▶ Next.js (:3000) ─fetch─▶ FastAPI /api/v1/chat
                                               │
                        ┌──────────────────────┼──────────────────────┐
                        ▼                      ▼                      ▼
@@ -522,7 +521,6 @@ pawrrtal/
 │  ├─ lib/                          # api.ts, desktop.ts, types.ts, ai-utils, ...
 │  └─ content/docs/handbook/        # In-app handbook
 ├─ electron/
-├─ electrobun/
 ├─ docs/
 ├─ scripts/
 ├─ docker-compose.{yml,dev,demo}.yml
@@ -640,10 +638,6 @@ just sentrux          # Sentrux quality + rule check
 just arch-be          # import-linter (backend layers)
 just arch-fe          # dependency-cruiser (frontend layers)
 just arch             # all three
-
-# Desktop
-just electrobun-dev   # Run desktop shell against just dev
-just electrobun-dist  # Build a packaged shell
 
 # Git
 just commit           # Conventional-commit assistant

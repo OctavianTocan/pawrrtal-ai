@@ -10,14 +10,14 @@ This is the canonical deployment shape for a private Pawrrtal VPS:
 ```text
 Browser -> https://<pawrrtal-hostname>
 Cloudflare Access -> Cloudflared named tunnel
-Cloudflared -> 127.0.0.1:53001 for frontend pages
+Cloudflared -> 127.0.0.1:3000 for frontend pages
 Cloudflared -> 127.0.0.1:8000 for /api/v1, /auth, /users
 ```
 
 Local development stays plain localhost:
 
 ```text
-Frontend: http://localhost:53001
+Frontend: http://localhost:3000
 Backend:  http://127.0.0.1:8000
 ```
 
@@ -126,7 +126,7 @@ just paw project service install --linger
 just paw project service status
 ```
 
-The service runs `dev.ts`, which starts Next.js on `127.0.0.1:53001`
+The service runs `dev.ts`, which starts Next.js on `127.0.0.1:3000`
 and FastAPI on `127.0.0.1:8000`. It does not expose a public port.
 
 ## Cloudflared Install
@@ -175,7 +175,7 @@ ingress:
     path: ^/users/.*
     service: http://127.0.0.1:8000
   - hostname: <pawrrtal-hostname>
-    service: http://127.0.0.1:53001
+    service: http://127.0.0.1:3000
   - service: http_status:404
 ```
 
@@ -257,7 +257,7 @@ Run:
 
 ```bash
 just paw project status
-curl http://localhost:53001/
+curl http://localhost:3000/
 curl http://127.0.0.1:8000/api/v1/health
 ```
 
@@ -280,7 +280,7 @@ was added in front of the tunnel.
 
 ## Checklist
 
-- [ ] Local frontend healthy on `http://localhost:53001`.
+- [ ] Local frontend healthy on `http://localhost:3000`.
 - [ ] Local backend healthy on `http://127.0.0.1:8000/api/v1/health`.
 - [ ] Cloudflare Access self-hosted app protects the public hostname.
 - [ ] Email allow policy includes every intended user.

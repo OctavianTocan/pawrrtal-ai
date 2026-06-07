@@ -3,7 +3,7 @@
 ``paw dev`` intentionally manages only the FastAPI backend. This module
 wraps the root ``dev.ts`` orchestrator so an operator can start, stop,
 inspect, and find logs for the full local app from the CLI: Next.js on
-``localhost:53001`` and FastAPI on ``127.0.0.1:8000``.
+``localhost:3000`` and FastAPI on ``127.0.0.1:8000``.
 """
 
 from __future__ import annotations

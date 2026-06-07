@@ -154,32 +154,6 @@ e2e:
     cd frontend && bunx --bun playwright install --with-deps chromium
     cd frontend && bunx --bun playwright test
 
-# --- Electrobun desktop shell -----------------------------------------------
-
-# One-command dev: build the Electrobun shell then launch it.
-# Spawns the root dev orchestrator (Next.js + FastAPI) automatically —
-# no separate terminal needed.
-electrobun-dev:
-    cd electrobun && bun run start
-
-# Build the Electrobun shell (type-check + bundle) without launching.
-electrobun-build:
-    cd electrobun && bun run build:dev
-
-# Build the Next.js standalone bundle the production app spawns at runtime.
-electrobun-frontend-build:
-    cd frontend && bun run build
-
-# Full production-style run (no external dev server):
-# build the FE standalone, build the shell, launch against the bundled server.
-electrobun-prod: electrobun-frontend-build
-    cd electrobun && bun run build && electrobun dev
-
-# Package the desktop .app via electrobun build --env=stable.
-# Outputs to electrobun/dist/.
-electrobun-dist: electrobun-frontend-build
-    cd electrobun && bun run build
-
 # --- Stagehand E2E (LLM-driven, lives under frontend/e2e/stagehand) --------
 
 # Run the Stagehand AI-driven end-to-end suite. Requires `just dev` already

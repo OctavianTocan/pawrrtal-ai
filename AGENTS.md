@@ -180,10 +180,10 @@ The curated reading list for the highest-signal rules in this stack lives at [`d
 
 ## Learned Workspace Facts
 
-- Local dev runs on plain localhost: Next.js on `http://localhost:53001`, FastAPI on `http://localhost:8000`. `dev.ts` (run via `just dev` or `bun run dev`) starts both side-by-side. No HTTPS, no proxy, no special hostnames.
-- Frontend → backend cookie auth works because both run on the same host (`localhost`); cookies ignore ports, so `Set-Cookie` from `:8000` is visible to fetches from `:53001` with `credentials: 'include'`. Use `COOKIE_SAMESITE=lax` and `COOKIE_SECURE=false` in dev.
+- Local dev runs on plain localhost: Next.js on `http://localhost:3000`, FastAPI on `http://localhost:8000`. `dev.ts` (run via `just dev` or `bun run dev`) starts both side-by-side. No HTTPS, no proxy, no special hostnames.
+- Frontend → backend cookie auth works because both run on the same host (`localhost`); cookies ignore ports, so `Set-Cookie` from `:8000` is visible to fetches from `:3000` with `credentials: 'include'`. Use `COOKIE_SAMESITE=lax` and `COOKIE_SECURE=false` in dev.
 - Post-login navigation in `LoginForm` must use `window.location.replace('/')` (full-page navigation), not `router.push`. Client-side navigation keeps React in the same turn so authed queries (`NavChats`, etc.) can fire before the browser commits the `Set-Cookie` response, causing a 401 → redirect-to-login race. This is especially visible on Safari and when onboarding UI adds heavier post-login hydration.
-- In staging/production the public app is one Cloudflared hostname protected by Cloudflare Access. Browser code calls same-origin `/api/v1`, `/auth`, and `/users`; Cloudflared routes those paths to FastAPI on `127.0.0.1:8000` and all other paths to Next.js on `127.0.0.1:53001`. Do not reintroduce `api.*` browser routing or frontend backend URL selection.
+- In staging/production the public app is one Cloudflared hostname protected by Cloudflare Access. Browser code calls same-origin `/api/v1`, `/auth`, and `/users`; Cloudflared routes those paths to FastAPI on `127.0.0.1:8000` and all other paths to Next.js on `127.0.0.1:3000`. Do not reintroduce `api.*` browser routing or frontend backend URL selection.
 - Canonical application font stack (with fallbacks): `Google Sans Flex`, `Google Sans`, `Helvetica Neue`, `sans-serif`; keep `DESIGN.md` and `frontend/app/globals.css` aligned when this changes.
 - The deployed FastAPI backend for remote usage is hosted on Railway; local development still targets plain `localhost` per the ports above unless you intentionally run against that remote URL.
 - Custom React hooks use consistent `use-*` naming for modules and exports (for example `use-login-mutations.ts`).

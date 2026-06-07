@@ -65,7 +65,7 @@ bun install          # or npm install
 bun dev              # or npm run dev
 ```
 
-The project dev server starts at **http://localhost:53001** and uses same-origin
+The project dev server starts at **http://localhost:3000** and uses same-origin
 browser API paths. Next.js rewrites `/api/v1`, `/auth`, and `/users` to
 `BACKEND_INTERNAL_URL`, which defaults to **http://127.0.0.1:8000**.
 
