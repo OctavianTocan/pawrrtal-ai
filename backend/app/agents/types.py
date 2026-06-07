@@ -317,6 +317,8 @@ class AgentTool:
     parameters: dict[str, Any]  # JSON schema object
     execute: Callable[..., Coroutine[Any, Any, str]]
     display: ToolDisplay | None = None
+    permissions: tuple[str, ...] = field(default_factory=tuple)
+    requires_confirmation: bool = False
 
 
 # ---------------------------------------------------------------------------

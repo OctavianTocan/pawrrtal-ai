@@ -113,6 +113,32 @@ async def test_wrapped_tool_marks_is_error_when_execute_raises() -> None:
     assert "boom" in result["content"][0]["text"]
 
 
+@pytest.mark.anyio
+async def test_wrapped_tool_blocks_confirmation_required_tool() -> None:
+    executed = False
+
+    async def _execute(_call_id: str, **_kwargs: Any) -> str:
+        nonlocal executed
+        executed = True
+        return "leaked"
+
+    tool = AgentTool(
+        name="python",
+        description="run trusted Python code",
+        parameters={"type": "object", "properties": {"code": {"type": "string"}}},
+        execute=_execute,
+        requires_confirmation=True,
+    )
+
+    sdk_tool = bridge._wrap(tool)
+    result = await sdk_tool.handler({"code": "print('hi')"})
+
+    assert executed is False
+    assert result["is_error"] is True
+    assert result["content"][0]["text"].startswith("[permission_denied]")
+    assert "requires confirmation" in result["content"][0]["text"]
+
+
 def test_provider_options_mount_server_and_whitelist_for_agent_tools() -> None:
     """``ClaudeLLM._build_options`` must propagate AgentTools to the SDK."""
     provider = ClaudeLLM(

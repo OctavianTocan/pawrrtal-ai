@@ -558,6 +558,46 @@ def test_dynamic_tool_bridge_executes_pawrrtal_tool_for_codex_callback() -> None
     }
 
 
+def test_dynamic_tool_bridge_blocks_confirmation_required_tool() -> None:
+    """Codex dynamic tools must enforce AgentTool confirmation metadata."""
+    from app.agents.types import AgentTool
+    from app.providers.openai_codex.dynamic_tools import CodexDynamicToolBridge
+
+    executed = False
+
+    async def execute(_call_id: str, *, code: str) -> str:
+        nonlocal executed
+        executed = True
+        return code
+
+    bridge = CodexDynamicToolBridge()
+    tool = AgentTool(
+        name="python",
+        description="Run trusted Python code.",
+        parameters={"type": "object", "properties": {"code": {"type": "string"}}},
+        execute=execute,
+        requires_confirmation=True,
+    )
+    with bridge.activate(thread_id="thr_1", tools=[tool]):
+        result = bridge.handle_request(
+            "item/tool/call",
+            {
+                "threadId": "thr_1",
+                "turnId": "turn_1",
+                "callId": "call_1",
+                "namespace": "pawrrtal",
+                "tool": "python",
+                "arguments": {"code": "print('hi')"},
+            },
+        )
+
+    assert executed is False
+    assert result["success"] is False
+    text = result["contentItems"][0]["text"]
+    assert text.startswith("[permission_denied]")
+    assert "requires confirmation" in text
+
+
 @pytest.mark.anyio
 async def test_stream_heartbeat_does_not_cancel_silent_codex_stream(monkeypatch):
     """A quiet Codex stream should keep waiting after heartbeat messages."""

@@ -7,9 +7,9 @@ import logging
 import time
 from typing import Any
 
+from app.agents.permissions import render_permission_denied
 from app.agents.types import AgentLoopConfig, AgentTool
 from app.infrastructure.observability.workshop import tool_span
-from app.tools.errors import ToolError, ToolErrorCode
 
 _log = logging.getLogger(__name__)
 
@@ -170,4 +170,4 @@ async def _tool_permission_denial(
 
 def _permission_error(message: str) -> str:
     """Render a permission denial with the stable tool-error code."""
-    return ToolError(ToolErrorCode.PERMISSION_DENIED, message).render()
+    return render_permission_denied(message)

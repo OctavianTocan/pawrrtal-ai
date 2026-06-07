@@ -44,6 +44,7 @@ from claude_agent_sdk import (
 )
 from claude_agent_sdk.types import ToolPermissionContext
 
+from app.agents.permissions import default_tool_permission_check, render_permission_denied
 from app.agents.types import AgentTool
 
 logger = logging.getLogger(__name__)
@@ -79,6 +80,12 @@ def _wrap(agent_tool: AgentTool) -> Any:
 
     @tool(agent_tool.name, agent_tool.description, agent_tool.parameters)
     async def _handler(args: dict[str, Any]) -> dict[str, Any]:
+        denial = default_tool_permission_check(agent_tool, "", args)
+        if denial is not None:
+            return {
+                "content": [{"type": "text", "text": render_permission_denied(denial)}],
+                "is_error": True,
+            }
         try:
             text = await agent_tool.execute("", **args)
         except Exception as exc:

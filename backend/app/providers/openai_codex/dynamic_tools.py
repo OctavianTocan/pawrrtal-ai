@@ -13,6 +13,7 @@ from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any
 
+from app.agents.permissions import default_tool_permission_check, render_permission_denied
 from app.agents.types import AgentTool
 
 logger = logging.getLogger(__name__)
@@ -76,6 +77,9 @@ class CodexDynamicToolBridge:
         arguments = params.get("arguments")
         if not isinstance(arguments, dict):
             return _tool_response("Tool arguments must be a JSON object.", False)
+        denial = default_tool_permission_check(tool, call_id, arguments)
+        if denial is not None:
+            return _tool_response(render_permission_denied(denial), False)
         started_at = time.monotonic()
         try:
             result = asyncio.run(_execute_tool(tool, call_id, arguments))

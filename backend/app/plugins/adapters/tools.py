@@ -6,12 +6,18 @@ import importlib
 import json
 import logging
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, cast
 
 from app.agents.types import AgentTool
 from app.plugins.cli_runner import CliRunRequest, CliRunResult, run_cli_plugin
-from app.plugins.contributions import Capability, CliToolCapability, PythonToolCapability
+from app.plugins.contributions import (
+    Capability,
+    CliToolCapability,
+    PythonToolCapability,
+    capability_declared_permissions,
+)
 from app.plugins.discovery import DiscoveredPlugin
 from app.plugins.env import resolve_plugin_env
 from app.plugins.errors import PluginRuntimeError
@@ -127,6 +133,8 @@ def _build_cli_agent_tool(
         description=capability.description,
         parameters=capability.args_schema or _default_parameters(),
         execute=execute,
+        permissions=tuple(capability_declared_permissions(capability)),
+        requires_confirmation=capability.requires_confirmation,
     )
 
 
@@ -166,7 +174,11 @@ def _build_python_agent_tool(
             capability.id,
         )
         return None
-    return tool
+    return replace(
+        tool,
+        permissions=tuple(capability_declared_permissions(capability)),
+        requires_confirmation=capability.requires_confirmation,
+    )
 
 
 def load_python_tool_factory(entrypoint: str) -> PythonToolFactory:

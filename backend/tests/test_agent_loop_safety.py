@@ -24,6 +24,7 @@ from app.agents import (
     UserMessage,
     run_model_tool_loop,
 )
+from app.agents.permissions import default_tool_permission_check
 from tests.agent_loop_harness import (
     ScriptedStreamFn,
     echo_tool,
@@ -208,6 +209,40 @@ async def test_permission_hook_blocks_tool_before_execute() -> None:
     assert results[0]["is_error"] is True
     assert results[0]["content"].startswith("[permission_denied]")
     assert "denied by test policy" in results[0]["content"]
+
+
+@pytest.mark.anyio
+async def test_default_permission_hook_blocks_confirmation_required_tool() -> None:
+    """Confirmation-required tools fail closed until an approval flow exists."""
+    executed = False
+
+    async def _execute(_tool_call_id: str, **_kwargs: object) -> str:
+        nonlocal executed
+        executed = True
+        return "leaked"
+
+    tool = AgentTool(
+        name="python",
+        description="run code",
+        parameters={"type": "object"},
+        execute=_execute,
+        requires_confirmation=True,
+    )
+    ctx = AgentContext(system_prompt="", messages=[], tools=[tool])
+    cfg = AgentLoopConfig(
+        convert_to_llm=identity_convert,
+        permission_check=default_tool_permission_check,
+        safety=AgentSafetyConfig.disabled(),
+    )
+    script = ScriptedStreamFn([tool_call_turn("python", {"code": "print('hi')"})])
+
+    events = [ev async for ev in run_model_tool_loop([_user("go")], ctx, cfg, script)]
+
+    assert executed is False
+    results = [e for e in events if e["type"] == "tool_result"]
+    assert results[0]["is_error"] is True
+    assert results[0]["content"].startswith("[permission_denied]")
+    assert "requires confirmation" in results[0]["content"]
 
 
 @pytest.mark.anyio

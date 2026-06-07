@@ -191,6 +191,23 @@ def test_bundled_github_issues_plugin_can_be_disabled(tmp_path: Path) -> None:
     assert "report_issue" not in _tool_names(tmp_path)
 
 
+def test_bundled_python_shell_carries_confirmation_metadata(tmp_path: Path) -> None:
+    save_plugin_state(
+        plugin_state_path(plugin_id="python_shell", scope="workspace", workspace_root=tmp_path),
+        PluginState(enabled=True),
+    )
+
+    tools = build_agent_tools(
+        workspace_root=tmp_path,
+        user_id=uuid.uuid4(),
+        workspace_id=uuid.uuid4(),
+    )
+    tool = next(item for item in tools if item.name == "python")
+
+    assert tool.requires_confirmation is True
+    assert tool.permissions == ("filesystem_read", "filesystem_write", "destructive")
+
+
 def test_bundled_image_generation_manifest_is_disabled_by_default(tmp_path: Path) -> None:
     save_workspace_env(tmp_path, {"OPENAI_CODEX_OAUTH_TOKEN": "secret"})
 
