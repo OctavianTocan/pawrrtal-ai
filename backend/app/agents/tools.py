@@ -26,6 +26,7 @@ to ``await`` for no benefit.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from pathlib import Path
 from typing import Any
@@ -38,6 +39,9 @@ from app.agents.plugins import (
 from app.agents.types import AgentTool
 from app.infrastructure.config import settings
 from app.infrastructure.keys import resolve_api_key
+from app.plugins.adapters.tools import build_snapshot_agent_tools
+from app.plugins.errors import PluginError
+from app.plugins.host import get_plugin_host
 from app.providers.catalog import first_authenticated_catalog_model
 from app.tools.artifact_agent import make_artifact_tool
 from app.tools.exa_search_agent import make_exa_search_tool
@@ -67,6 +71,8 @@ from app.tools.now import (
 from app.tools.python_exec import make_virtual_python_tool
 from app.tools.send_message import SendFn, make_send_message_tool
 from app.tools.workspace_files import make_workspace_tools
+
+log = logging.getLogger(__name__)
 
 
 def build_agent_tools(
@@ -327,9 +333,20 @@ def _build_plugin_tools(
         send_fn=send_fn,
     )
     out: list[AgentTool] = []
+    out.extend(_build_manifest_plugin_tools(workspace_root=workspace_root))
     for plugin in all_plugins():
         predicate = plugin.is_activated or is_activated_by_env_keys(plugin)
         if not predicate(ctx):
             continue
         out.extend(factory(ctx) for factory in plugin.tool_factories)
     return out
+
+
+def _build_manifest_plugin_tools(*, workspace_root: Path) -> list[AgentTool]:
+    """Build dynamic manifest-backed plugin tools for one workspace."""
+    try:
+        _previous, snapshot = get_plugin_host().reload(workspace_root=workspace_root)
+    except PluginError as exc:
+        log.warning("manifest plugin reload failed during tool composition: %s", exc)
+        return []
+    return build_snapshot_agent_tools(snapshot=snapshot, workspace_root=workspace_root)
