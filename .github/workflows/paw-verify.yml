@@ -126,7 +126,7 @@ jobs:
           GOOGLE_API_KEY: paw-e2e-not-a-key
           # Required by Settings.workspace_encryption_key (no default).
           WORKSPACE_ENCRYPTION_KEY: 'zG9KQK6sH0xLm4LJ4n8C9aD2vF3gN5pT7rE1yU8xKqM='
-          CORS_ORIGINS: '["http://localhost:53001"]'
+          CORS_ORIGINS: '["http://localhost:3000"]'
           DATABASE_URL: 'sqlite+aiosqlite:///:memory:'
           ADMIN_EMAIL: paw-e2e-admin@example.com
           ADMIN_PASSWORD: paw-e2e-admin-password

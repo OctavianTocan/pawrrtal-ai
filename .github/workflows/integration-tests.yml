@@ -107,6 +107,6 @@ jobs:
           GOOGLE_API_KEY: ci-not-a-key
           # Required by Settings.workspace_encryption_key (no default).
           WORKSPACE_ENCRYPTION_KEY: 'zG9KQK6sH0xLm4LJ4n8C9aD2vF3gN5pT7rE1yU8xKqM='
-          CORS_ORIGINS: '["http://localhost:53001"]'
+          CORS_ORIGINS: '["http://localhost:3000"]'
           DATABASE_URL: 'sqlite+aiosqlite:///:memory:'
         run: uv run pytest tests/integration/ -v --tb=short

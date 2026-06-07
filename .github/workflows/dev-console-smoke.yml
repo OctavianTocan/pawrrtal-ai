@@ -112,7 +112,7 @@ jobs:
           AUTH_SECRET: e2e-not-a-secret
           GOOGLE_API_KEY: e2e-not-a-key
           WORKSPACE_ENCRYPTION_KEY: 'zG9KQK6sH0xLm4LJ4n8C9aD2vF3gN5pT7rE1yU8xKqM='
-          CORS_ORIGINS: '["http://localhost:53001"]'
+          CORS_ORIGINS: '["http://localhost:3000"]'
           DATABASE_URL: 'sqlite+aiosqlite:///./e2e.db'
           ADMIN_EMAIL: e2e-admin@example.com
           ADMIN_PASSWORD: e2e-admin-password
@@ -136,7 +136,7 @@ jobs:
         env:
           E2E_API_URL: http://localhost:8000
           NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
-        # `bun run dev` invokes `next dev --port 53001` per
+        # `bun run dev` invokes `next dev --port 3000` per
         # package.json.  Production build is INTENTIONALLY skipped
         # here — the Stagehand workflow exercises that path; this
         # smoke needs dev-mode warnings to surface React 19
@@ -145,7 +145,7 @@ jobs:
           bun run dev > /tmp/dev-server.log 2>&1 &
           echo $! > /tmp/frontend.pid
           for i in $(seq 1 90); do
-            if curl -sSf http://localhost:53001 > /dev/null 2>&1; then
+            if curl -sSf http://localhost:3000 > /dev/null 2>&1; then
               echo "Dev server ready after ${i}s"
               exit 0
             fi
@@ -157,7 +157,7 @@ jobs:
 
       - name: Run dev-console smoke
         env:
-          DEV_URL: http://localhost:53001
+          DEV_URL: http://localhost:3000
         run: node scripts/dev-console-smoke.mjs
 
       - name: Upload dev-server log
