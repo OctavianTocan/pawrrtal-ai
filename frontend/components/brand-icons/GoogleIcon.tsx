@@ -1,7 +1,7 @@
-import type { JSX } from 'react';
+import type * as React from 'react';
 
 /** Multi-color Google "G" logo. */
-export function GoogleIcon({ className }: { className?: string }): JSX.Element {
+export function GoogleIcon({ className }: { className?: string }): React.ReactNode {
 	return (
 		<svg
 			aria-hidden="true"

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { WorkspaceEnvResponse } from '../workspace-env/use-workspace-env';
-import { workspaceEnvKeyMetasForResponse } from './WorkspacesSection';
+import { workspaceEnvKeyMetasForResponse } from '../workspace-env/workspace-env-metadata';
 
 describe('workspaceEnvKeyMetasForResponse', () => {
 	it('includes plugin-declared env metadata after built-in keys', () => {

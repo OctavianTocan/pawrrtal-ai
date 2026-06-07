@@ -1,7 +1,7 @@
 'use client';
 
 import { ChatPromptSuggestions } from '@octavian-tocan/react-chat-composer';
-import type { JSX } from 'react';
+import type * as React from 'react';
 import { useEffect } from 'react';
 import { useStickToBottomContext } from 'use-stick-to-bottom';
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
@@ -84,7 +84,7 @@ type ChatProps = {
  * Invisible anchor component that scrolls the conversation to the bottom
  * whenever `track` changes (i.e. when new messages are added).
  */
-function ChatScrollAnchor({ track: _track }: { track: number }): JSX.Element | null {
+function ChatScrollAnchor({ track: _track }: { track: number }): React.ReactNode {
 	const { scrollToBottom } = useStickToBottomContext();
 	useEffect(() => {
 		scrollToBottom();
@@ -100,7 +100,7 @@ function ChatScrollAnchor({ track: _track }: { track: number }): JSX.Element | n
  * z-index paints after static children, so the content wrappers below need
  * `relative` to appear above it.
  */
-function WhimsyOverlay(): JSX.Element | null {
+function WhimsyOverlay(): React.ReactNode {
 	const whimsy = useWhimsyTile();
 	if (!whimsy.cssUrl) return null;
 	return (
@@ -170,7 +170,7 @@ function LandingState({
 	onOpenOnboarding,
 }: ComposerRowProps & {
 	onSelectSuggestion: (prompt: string) => void;
-}): JSX.Element {
+}): React.ReactNode {
 	return (
 		<div className="relative mx-auto flex size-full max-w-[60rem] min-w-0 flex-col">
 			<div className="flex min-h-0 flex-1 flex-col items-center pt-[12vh] sm:pt-[24vh]">
@@ -231,7 +231,7 @@ function ConversationRow({
 	copiedMessageId?: string | null;
 	onCopy?: (id: string, text: string) => void;
 	onRegenerate?: (assistantIndex: number) => void;
-}): JSX.Element {
+}): React.ReactNode {
 	if (chatMessage.role === 'assistant') {
 		const messageId = `assistant-${index}`;
 		const isCurrentlyRegenerating = regeneratingIndex === index;
@@ -295,7 +295,7 @@ function ActiveConversationState({
 	copiedMessageId?: string | null;
 	onCopy?: (id: string, text: string) => void;
 	onRegenerate?: (assistantIndex: number) => void;
-}): JSX.Element {
+}): React.ReactNode {
 	return (
 		<div className="relative flex size-full min-w-0 flex-col">
 			<Conversation className="scrollbar-hide min-h-0 flex-1 overflow-y-auto" resize="smooth">
@@ -388,7 +388,7 @@ function ChatView({
 	isComposerBlocked,
 	composerBlockedMessage,
 	onOpenOnboarding,
-}: ChatProps): JSX.Element {
+}: ChatProps): React.ReactNode {
 	const rowProps = {
 		composerText,
 		isLoading,
