@@ -77,6 +77,10 @@ def _stub_all_passing(monkeypatch: pytest.MonkeyPatch) -> None:
         lambda *a, **kw: _ok("telegram"),
     )
     monkeypatch.setattr(
+        "app.cli.paw.commands.verify.run_google_chat_scenario",
+        lambda *a, **kw: _ok("google-chat"),
+    )
+    monkeypatch.setattr(
         "app.cli.paw.commands.verify.run_cost_scenario",
         lambda *a, **kw: _ok("cost"),
     )
@@ -115,6 +119,10 @@ def _stub_one_failing(monkeypatch: pytest.MonkeyPatch, failing_suite: str) -> No
     monkeypatch.setattr(
         "app.cli.paw.commands.verify.run_telegram_scenario",
         _runner_for("telegram"),
+    )
+    monkeypatch.setattr(
+        "app.cli.paw.commands.verify.run_google_chat_scenario",
+        _runner_for("google-chat"),
     )
     monkeypatch.setattr(
         "app.cli.paw.commands.verify.run_cost_scenario",
@@ -160,6 +168,7 @@ def test_verify_all_runs_default_suites_and_returns_aggregated_json(
         "chat-roundtrip",
         "model-switch",
         "telegram",
+        "google-chat",
         "cost",
         "lcm",
     ]
@@ -184,6 +193,7 @@ def test_verify_all_exit_6_when_any_suite_fails(
         "chat-roundtrip": False,
         "model-switch": True,
         "telegram": True,
+        "google-chat": True,
         "cost": True,
         "lcm": True,
     }
@@ -223,6 +233,7 @@ def test_exclude_drops_named_suites(
         "chat-roundtrip",
         "model-switch",
         "telegram",
+        "google-chat",
         "cost",
         "lcm",
     ]
@@ -281,7 +292,7 @@ def test_all_filtered_out_is_local_error(
             "verify",
             "all",
             "--exclude",
-            "codex,chat-roundtrip,model-switch,telegram,cost,lcm",
+            "codex,chat-roundtrip,model-switch,telegram,google-chat,cost,lcm",
             "--json",
         ],
     )

@@ -1,0 +1,590 @@
+---
+title: Capability Plugin Platform
+description: ADR plan — replace static tools, turn context providers, turn observers, providers, agent runtime adapters, channels, migration providers, routers, and settings with a manifest-backed plugin host that the Paw and users can create, validate, hot-reload, and operate.
+date: 2026-06-06
+status: Proposed
+supersedes: 2026-05-15-plugin-system-and-notion-integration
+---
+
+# Capability Plugin Platform
+
+**Status:** Proposed — 2026-06-06.
+**Supersedes:** [Plugin system and Notion integration](./2026-05-15-plugin-system-and-notion-integration).
+**Implementation plan:** [Capability Plugin Platform Implementation Plan](../integrations/capability-plugin-platform-implementation).
+
+## Context
+
+The current plugin system is too shallow. Its interface says "plugin", but the implementation is really an import-time Python registry with `tool_factories` and a vague `pre_turn_hooks` seam. Channels, providers, routers, model catalog entries, lifecycle tasks, and settings are also static tables spread through core modules. That worked for the first wave, but it makes new capability types awkward:
+
+- Notion is already a CLI-backed integration, but it is expressed as bespoke Python plugin code.
+- Workspace-authored plugins need manifest discovery and validation, not import-time Python packages.
+- Channels are already protocol adapters, but they are imported through a fixed registry.
+- Providers are already dispatch adapters, but the provider factory, host/vendor enums, auth checks, labels, and model catalog are static core code.
+- Future capability types should share activation, validation, state, audit, hot reload, and management behavior.
+- The Paw needs a skill and CLI workflow that can teach it to make a plugin, validate it, reload it, and make it available without a backend restart when the adapter type permits it.
+
+The V2 decision is therefore a replacement, not a compatibility layer. Existing plugin, channel, provider, router, startup, and settings code should be migrated behind capability interfaces or deleted as part of this work.
+
+## Decision
+
+Replace `app.agents.plugins` with a deeper plugin host under `app.plugins`. A plugin is a manifest-backed package with one or more typed contributions. A contribution may be a capability, which the Paw/user can search, select, invoke, or slot, or an adapter, which satisfies a kernel runtime interface. The host owns discovery, validation, activation, runtime state, audit, hot reload, and adapter creation.
+
+The new split is:
+
+| Layer | Owns |
+|---|---|
+| Kernel | Auth, users, workspaces, conversations/messages, turn orchestration, persistence, audit/cost ledger, plugin host, contribution registry, and capability catalog routing. |
+| Plugins | Tools, CLIs, skills, agent profiles, turn context providers, turn observers, providers, model catalog entries, agent runtime adapters, channels, ingress routes, settings/env keys, schedulers, lifecycle tasks, and integration-specific storage. |
+
+V1 contribution types:
+
+| Contribution | Source | Purpose |
+|---|---|---|
+| `cli_tool` | Repo or workspace | Expose one bounded `<id>_cli` `AgentTool` with `args` and optional `stdin`. |
+| `python_tool` | Repo only | Import a first-party Python factory by dotted path and expose an `AgentTool`. |
+| `turn_context_provider` | Repo only | Produce typed context before the main turn; the kernel owns ordering, budgets, and prompt assembly. |
+| `turn_observer` | Repo only | Observe a completed turn for memory writes, analytics, dreaming, or other side effects that must not change the already-running turn. |
+| `provider` | Repo first, workspace later | Register an `AILLM` implementation, model catalog rows, auth checks, labels, cache hooks, and shutdown hooks. |
+| `agent_runtime` | Repo first, workspace later | Register a session-owning agent backend such as Codex/Pi-style SDK integration with tool-event, compaction, and native thread adapters. This is an adapter, not a generic capability. |
+| `channel` | Repo first, workspace later | Register a `Channel`, ingress routers, lifespan tasks, user binding flows, delivery formatting, and channel command handlers. |
+| `migration_provider` | Repo first, workspace later | Register `detect`, `plan`, and `apply` flows for importing state from Notion, Hermes, Claude, or older Pawrrtal layouts. |
+| `router` | Repo only | Register FastAPI routers by explicit prefix and tags. |
+| `settings` | Repo or workspace | Declare env keys, secret metadata, setup help, validation, and UI grouping. |
+| `skill` | Repo or workspace | Add Paw-readable instructions for using, repairing, or authoring the plugin. |
+| `agent_profile` | Repo or workspace | Register a Claude Code-style named agent definition with instructions, tool limits, model/runtime preferences, selection metadata, and optional memory policy. |
+| `scheduler` | Repo only | Register plugin-owned scheduled jobs through the kernel scheduler. |
+
+Plugin sources:
+
+| Source | Path | Trust model |
+|---|---|---|
+| Repo plugins | `backend/plugins/<id>/plugin.json` | First-party, CI-validated, may use Python adapters. |
+| Workspace plugins | `.agent/plugins/<id>/plugin.json` | User/Paw-authored, CLI-only in v1, must validate before activation. |
+
+`build_agent_tools()` remains the single tool-composition module. It asks the plugin host for active tool adapters and appends them after core tools and before external MCP tools. The old `build_pre_turn_hooks()` seam is retired; the turn runner asks the plugin host for active `turn_context_provider` and `turn_observer` adapters through typed lifecycle composition.
+
+Provider resolution, channel resolution, agent runtime resolution, router registration, model catalog assembly, startup/shutdown lifespans, and settings/env metadata must read from the same active contribution snapshot. Core code should not import individual provider, channel, or agent-runtime implementations directly after migration.
+
+Subagents are not plugin implementations. They are delegated jobs created by the
+kernel from an `agent_profile` and executed through an `agent_runtime` adapter.
+Plugins may ship profile definitions, but the job lifecycle, permission policy,
+event stream, cancellation, and persistence live in Pawrrtal's runtime layer.
+
+The kernel always exposes a small capability catalog to the Paw: search enabled
+capabilities, describe one capability's schema/permissions, and optionally
+invoke a selected capability through the plugin host. This lets the Paw discover
+runtime-created plugins without preloading every possible plugin tool into every
+model turn.
+
+Validation against Codex, OpenClaw, Pi, Hermes, and Claude Code adds five constraints to the
+decision:
+
+- Discovery/config validation must work from manifest metadata without
+  executing runtime plugin code.
+- Runtime loading produces structured load outcomes, not a boolean.
+- Runtime-created or high-cardinality tools can be searchable/deferred instead
+  of directly injected into every turn.
+- Channels should use one shared core message tool with plugin-owned action
+  discovery, and session-owning agent SDKs should be `agent_runtime`
+  adapters rather than provider-specific core branches.
+- Claude Code-style subagents are profile definitions plus runtime-managed
+  delegated jobs. Pawrrtal should mirror that boundary instead of treating
+  subagents as a plugin type.
+
+## Manifest Interface
+
+The manifest interface is the test surface.
+
+```json
+{
+  "schema_version": 1,
+  "id": "notion",
+  "name": "Notion",
+  "description": "Run Notion workspace operations through the official ntn CLI.",
+  "overrides": null,
+  "env": [
+    {
+      "name": "NOTION_API_KEY",
+      "inject_as": "NOTION_API_TOKEN",
+      "required": true,
+      "scope": "workspace",
+      "overridable": true,
+      "gateway_fallback": false,
+      "label": "Notion API Key",
+      "help_url": "https://www.notion.so/profile/integrations"
+    }
+  ],
+  "capabilities": [
+    {
+      "type": "cli_tool",
+      "tool_name": "notion_cli",
+      "entrypoint": ["ntn"],
+      "cwd": "plugin",
+      "timeout_seconds": 30,
+      "output_cap_bytes": 32000,
+      "description": "Run ntn with an argument list. Pass each CLI token as a separate args item."
+    }
+  ],
+  "validation": {
+    "commands": [
+      {
+        "name": "auth",
+        "args": ["api", "v1/users/me"],
+        "timeout_seconds": 30
+      }
+    ]
+  }
+}
+```
+
+Rules:
+
+- `id` is a stable lowercase machine identifier.
+- Workspace plugins may override repo plugins only when `overrides` names the repo plugin id.
+- Accidental duplicate ids fail validation.
+- A plugin with multiple tool adapters must keep every exposed tool name unique.
+- Workspace manifests may not use `python_tool`, `turn_context_provider`, or
+  `turn_observer` in v1.
+- Provider ids, channel ids, tool names, router prefixes, env keys, and scheduled job ids must be globally unique after overrides are resolved.
+- A plugin may declare dependencies on other plugins by id and minimum schema version.
+- Capability ids are stable user-facing contracts and must not change without a migration.
+- Capability metadata may declare `intents` and `slots`, such as
+  `web.search`, `image.generate`, or `notion.workspace`. Slots are not singleton
+  by default; multiple enabled capabilities can satisfy the same slot.
+- Exclusive slots are allowed only when a slot explicitly declares exclusive
+  mode. Web Search is a multi-slot by default: users can enable several
+  providers, prefer one, or let the Paw choose when the tradeoff is low-risk.
+- Plugin-declared env keys are dynamically overridable per workspace. The old
+  static `OVERRIDABLE_KEYS` allowlist is replaced by active plugin settings
+  metadata so new plugin secrets do not require core/backend/frontend mirror
+  edits.
+- Env resolution order is workspace override, optional gateway fallback, then
+  missing. Gateway fallback is allowed only when the env spec declares it.
+
+Provider plugin manifests contribute model rows directly:
+
+```json
+{
+  "type": "provider",
+  "id": "openai_codex",
+  "entrypoint": "app.plugins.providers.openai_codex:create_provider",
+  "auth": {
+    "checks": ["OPENAI_CODEX_OAUTH_TOKEN", "codex_auth_file"]
+  },
+  "models": [
+    {
+      "id": "openai-codex:openai/gpt-5.5-codex",
+      "name": "GPT-5.5 Codex",
+      "reasoning": ["minimal", "low", "medium", "high"],
+      "default": true
+    }
+  ]
+}
+```
+
+If a provider delegates to a runtime that owns sessions, native thread ids,
+tool events, compaction, or delegated agent jobs, that runtime is represented by
+a separate `agent_runtime` adapter. Provider code may depend on a runtime
+adapter, but core provider dispatch must not contain Codex/Pi-specific protocol
+branches.
+
+Channel plugin manifests contribute transport and lifecycle behavior:
+
+```json
+{
+  "type": "channel",
+  "id": "telegram",
+  "surface": "telegram",
+  "entrypoint": "app.plugins.channels.telegram:create_channel",
+  "routers": [
+    {
+      "entrypoint": "app.plugins.channels.telegram.router:get_router",
+      "prefix": "/api/v1/channels/telegram",
+      "tags": ["channels", "telegram"]
+    }
+  ],
+  "lifespan": {
+    "startup": "app.plugins.channels.telegram.lifespan:start",
+    "shutdown": "app.plugins.channels.telegram.lifespan:stop"
+  }
+}
+```
+
+Channel plugins also describe channel-owned message actions behind the shared
+core message tool. Core owns prompt wiring and generic dispatch; the channel
+plugin owns action discovery, schema fragments, native send/edit/react/poll
+execution, session grammar, threading, approvals, and media-source parameter
+declarations.
+
+Migration providers contribute import workflows:
+
+```json
+{
+  "type": "migration_provider",
+  "id": "hermes_import",
+  "provider": "hermes",
+  "entrypoint": "app.plugins.migrations.hermes:create_provider"
+}
+```
+
+Migration providers expose `detect`, `plan`, and `apply`; plans are itemized,
+conflict-aware, report-producing, and secrets require explicit consent.
+
+## Runtime State
+
+Workspace plugin definitions live under `.agent/plugins/<id>/plugin.json`.
+Workspace plugin state lives separately at `.agent/plugin-state/<id>.json`.
+Writes are atomic and protected by a lock file. State is intentionally outside
+the plugin definition directory so replacing, regenerating, or deleting a
+workspace plugin bundle does not silently delete enablement, validation,
+doctor, or slot-preference history.
+
+```json
+{
+  "enabled": true,
+  "validated_fingerprint": "sha256...",
+  "validated_at": "2026-06-06T18:00:00Z",
+  "last_validation": {
+    "passed": true,
+    "checks": []
+  },
+  "failure_reason": null
+}
+```
+
+A workspace plugin is active only when:
+
+1. It is enabled.
+2. Its current fingerprint matches `validated_fingerprint`.
+3. Its manifest and adapter entries still pass structural validation.
+4. Its required env keys resolve for the active workspace.
+
+Changed plugin files invalidate activation until validation passes again.
+
+Plugin activation is workspace-sensitive: the same plugin may be active in one
+user-owned workspace and misconfigured in another when their env overrides
+differ. In v1, Pawrrtal workspaces are owned by one user, so per-workspace
+secrets are the per-user override surface. If shared workspaces are added later,
+the same manifest interface reserves `scope: "user_workspace"` for per-user
+values inside a shared workspace.
+
+Plugin state has a required plugin-level enabled/disabled switch. Capability
+state may additionally disable one capability within an enabled plugin.
+Workspace slot preferences order candidates for role-like tasks such as Web
+Search, but preferences do not disable non-preferred candidates.
+
+## Runtime Creation and Hot Reload
+
+Runtime-created plugins are a first-class workflow, not a developer-only scaffold.
+
+The plugin host watches `.agent/plugins/**` in development and supports an explicit reload API in every environment:
+
+- `POST /api/v1/plugins/reload`
+- `POST /api/v1/plugins/{id}/reload`
+- `paw plugins reload`
+- `paw plugins watch`
+
+Hot reload rules:
+
+- Manifest, settings, skill, and CLI-tool changes can reload without restarting the backend.
+- Tool and turn-lifecycle indexes are rebuilt per turn from the active registry snapshot, so newly enabled tools and turn context providers become available on the next chat turn.
+- Provider catalog changes update the model catalog ETag and invalidate model-picker caches.
+- Channel enablement, settings/env, message action metadata, schema fragments,
+  and lifecycle config reload for future channel work through a new registry
+  snapshot.
+- Channel polling/webhook client changes use a lifecycle restart boundary:
+  start the new instance, publish the snapshot after startup succeeds, then
+  stop the old instance.
+- Channel FastAPI route shape changes, new HTTP methods, new top-level
+  prefixes, or removed routes require process restart. Reloadable ingress must
+  use the stable dispatch route.
+- Python entrypoint changes for repo plugins can be re-imported in development, but production treats Python code changes as requiring process restart.
+- Workspace-authored plugins are CLI-only at first so user-created plugins can hot-reload safely without arbitrary Python import behavior.
+
+The host maintains immutable registry snapshots. A chat turn, provider stream, channel delivery loop, or scheduled job keeps the snapshot it started with. Reload creates a new snapshot for future work and never mutates objects that are already in use.
+
+Validation is part of reload:
+
+1. Discover changed plugin files.
+2. Parse and validate manifests.
+3. Run declared doctor checks.
+4. Build a candidate registry snapshot.
+5. Reject the entire changed plugin if any of its capabilities fail validation.
+6. Atomically publish the new snapshot.
+7. Emit an audit event with old/new fingerprints.
+
+## CLI Runtime Contract
+
+CLI plugins must follow the agent-friendly CLI contract.
+
+- Execute argv lists only; never use a shell.
+- Put data on stdout and progress/errors on stderr.
+- Support `--json` for structured output when the underlying plugin CLI owns that mode.
+- Never prompt in non-TTY execution.
+- Use `--yes` or `--dry-run` for destructive paths.
+
+The host enforces:
+
+- `shell=False`.
+- Isolated temporary `HOME`.
+- Scrubbed environment with only declared env keys injected.
+- Declared env keys are resolved for the active workspace before injection;
+  undeclared process env vars never leak into plugin subprocesses.
+- `NO_COLOR=1`.
+- Bounded timeout and output caps.
+- Process-group cleanup on timeout.
+- CWD limited to the plugin directory or workspace root.
+- Rejection of symlinked entrypoints, path traversal, absolute workspace entrypoints, unsupported interpreters, huge manifests, invalid ids, and invalid adapter names.
+
+Tool calls return a JSON envelope:
+
+```json
+{
+  "stdout": "...",
+  "stderr": "...",
+  "returncode": 0
+}
+```
+
+Failures include `error`, `stderr`, and `returncode` when available.
+
+## Notion Migration
+
+Notion becomes the first repo plugin under `backend/plugins/notion/plugin.json`.
+
+Delete the bespoke static plugin registration:
+
+- `backend/app/plugins/notion/plugin.py`
+- `backend/app/plugins/notion/tool.py`
+- Notion-specific imports from `backend/app/plugins/__init__.py`
+
+Keep or move only the pieces that still earn their interface:
+
+- The hardened `ntn` subprocess behavior moves into the generic CLI plugin runner.
+- Notion display/audit behavior becomes generic plugin execution display/audit where possible.
+- Notion no longer owns a separate `AgentTool` factory.
+
+The Notion plugin declares one `cli_tool` adapter named `notion_cli`. It injects `NOTION_API_KEY` as `NOTION_API_TOKEN`, validates with `ntn api v1/users/me`, and exposes the official `ntn` CLI as the contract.
+
+No backward compatibility is preserved for the old Python plugin API.
+
+## Management Surfaces
+
+Add authenticated backend APIs for plugin management:
+
+- list plugins
+- show plugin
+- validate plugin
+- enable plugin
+- disable plugin
+- run plugin
+- reload plugin
+- watch plugin events
+- explain plugin capability graph
+- generate plugin spec
+
+Add `paw plugins` commands:
+
+```bash
+paw plugins list
+paw plugins ls
+paw plugins show notion
+paw plugins spec draft my-tool --type cli-tool
+paw plugins new my-tool --template cli-tool --from-spec /tmp/my-tool.json
+paw plugins validate my-tool --enable
+paw plugins enable my-tool
+paw plugins disable my-tool
+paw plugins reload my-tool
+paw plugins watch
+paw plugins graph
+paw plugins capabilities search --slot web_search
+paw plugins slots prefer web_search exa_search/web_search
+paw plugins migrations plan hermes --from ~/.hermes
+paw plugins proof collect --slice slice-06 --plugin notion --out /tmp/plugin-proof.json
+paw plugins proof check --changed-from origin/development
+paw plugins run notion notion_cli -- args...
+```
+
+CLI requirements:
+
+- Default human output.
+- `--json` for machine-readable output.
+- `--plain` for list-like commands.
+- Data on stdout, progress/errors on stderr.
+- Missing inputs fail with `error:` and `hint:`.
+- Non-TTY invocations never prompt.
+- Plugin-platform PRs must produce a `paw plugins proof collect` artifact, and
+  CI runs `paw plugins proof check --changed-from origin/development` for
+  plugin-platform paths.
+
+Add Paw-facing tools:
+
+- `capabilities_search`
+- `capability_describe`
+- `capability_invoke`
+- `list_plugins`
+- `validate_plugin`
+- `set_plugin_status`
+- `reload_plugin`
+- `doctor_plugin`
+- `draft_plugin_spec`
+- `explain_plugin_graph`
+
+The Paw can write a workspace plugin, call `validate_plugin(enable_on_pass=true)`, and tell the user the tool will be available on the next chat turn.
+
+`capabilities_search` returns only effectively enabled capabilities by default.
+Disabled, failed, or misconfigured capabilities are visible only in diagnostic
+mode so the Paw does not accidentally use something the user turned off.
+For role-like needs such as Web Search, the registry returns all enabled
+capabilities matching the slot, sorted by workspace preference, health, and
+manifest priority. The platform does not enforce one global Web Search plugin;
+users can enable several, set a preferred one, or let the Paw choose per task.
+
+The Paw CLI must become part of the development process, not only a user-facing management surface:
+
+- Every plugin implementation task starts by generating or updating a machine-readable spec with `paw plugins spec draft`.
+- Scaffolded files come from `paw plugins new`, not copied by hand.
+- Validation happens through `paw plugins validate --json` before code review.
+- Hot reload is proved through `paw plugins reload --json` or `paw plugins watch` during development.
+- Capability graphs from `paw plugins graph --json` are used to catch accidental core coupling and duplicate capability ids.
+- Plugin doctor output is treated as a local gate for provider/channel/tool readiness.
+- PR descriptions for plugin work include the relevant Paw CLI commands and their summarized output.
+
+## Workspace Authoring Skill
+
+Seed `.agent/skills/plugin-author/SKILL.md` and manifest/index entries.
+
+The skill teaches the Paw to:
+
+1. Clarify the plugin goal and expected CLI behavior.
+2. Create `.agent/plugins/<id>/`.
+3. Write `plugin.json`.
+4. Write the CLI implementation.
+5. Add validation commands.
+6. Follow the CLI-for-agents contract.
+7. Generate or update the plugin spec with `paw plugins spec draft`.
+8. Validate with `enable_on_pass=true`.
+9. Reload the plugin.
+10. Explain which capabilities appear on the next turn and which require restart.
+
+Workspace seeding must merge missing default skill entries without overwriting user-authored skills.
+
+## Provider Plugin Migration
+
+Providers become plugin capabilities instead of branches in `providers/factory.py`.
+
+Migration rules:
+
+- Replace `Host` and `Vendor` enums with validated string ids from the active provider catalog.
+- Move model catalog rows, labels, default model selection, auth metadata, reasoning support, cost metadata, and provider setup help into provider manifests.
+- Move provider env keys into provider manifests, and resolve them through the
+  per-workspace override path before falling back to gateway settings.
+- Replace `HOST_TO_PROVIDER`, `_HOST_AUTH_KEYS`, provider labels, and static catalog tuple composition with provider contribution indexes.
+- Provider plugins construct `AILLM` instances through a small kernel-owned `ProviderFactoryContext`.
+- Provider lifecycle hooks close caches and background clients through plugin shutdown hooks.
+- The model picker reads the active catalog snapshot and annotates each row with plugin id, auth state, configuration state, and doctor status.
+
+Reference migrations:
+
+- OpenAI Codex is the reference advanced provider plugin because it exercises threads, dynamic tools, artifacts, cache cleanup, and SDK discovery.
+- Gemini CLI is the reference local CLI-backed provider because it exercises binary discovery and non-secret setup validation.
+- xAI is the reference OAuth/API-key provider because it exercises workspace credential resolution.
+
+## Channel Plugin Migration
+
+Channels become plugin capabilities instead of entries in `channels/registry.py`.
+
+Migration rules:
+
+- A channel plugin declares one or more surfaces, such as `web`, `electron`, `telegram`, or `google_chat`.
+- The kernel asks the active registry for `resolve_channel(surface)` and never imports concrete channel packages.
+- Channel plugins own their ingress routers, delivery adapters, formatting, command handlers, user-binding flows, lifespan tasks, and channel-specific settings.
+- Channel plugin secrets and config keys are declared in channel manifests and
+  can be overridden per user-owned workspace the same way provider and tool
+  plugin keys can.
+- Channel-specific conversation metadata must move behind a generic `channel_bindings` or `conversation_channel_state` table instead of adding new hardcoded columns for each channel.
+- Channel delivery receives only normalized `ChannelMessage`, `StreamEvent`, and plugin context objects. It may not inspect provider internals.
+- Channel startup is conditional on plugin enablement and doctor success.
+- Web and Electron are bundled default channel plugins because Pawrrtal needs a first usable local surface.
+
+Hot reload for channels:
+
+- Delivery/formatting/command handler changes reload for future messages when they are CLI/config/manifest based.
+- Enabled/disabled channel state updates the registry snapshot immediately.
+- Ingress route shape changes require restart unless the route was mounted through a stable plugin dispatch router.
+- Polling/webhook clients restart on plugin reload through channel lifecycle hooks.
+
+Reference migrations:
+
+- Telegram is the reference rich channel plugin because it exercises binding, commands, delivery edits, queueing, and lifespan.
+- Google Chat is the reference enterprise channel plugin because it exercises service accounts, Pub/Sub ingress, cards, and admin auto-linking.
+- Web/Electron are reference built-in channel plugins because they prove core surfaces can still use the same plugin contract.
+
+## Implementation Sequence
+
+0. Rename and decompose the current agent-loop modules so the plugin migration
+   starts from clear kernel/contribution/capability language.
+1. Add the plugin host module and manifest/state types.
+2. Add the CLI runner and validation engine.
+3. Add registry snapshots, reload APIs, and development file watching.
+4. Add `paw plugins spec/new/validate/reload/watch/graph/doctor` and require these commands in the implementation loop.
+5. Replace tool and turn-lifecycle composition to read adapters from the plugin host.
+6. Migrate `active_recall` to a repo `turn_context_provider` plugin.
+7. Migrate `openai_codex_image_gen` to a repo `python_tool` plugin or delete it if it duplicates the existing image tool.
+8. Migrate Notion to `backend/plugins/notion/plugin.json` and delete the old Notion Python plugin files.
+9. Migrate provider catalog, provider factory, provider labels, and provider auth checks into provider plugins.
+10. Extract session-owning provider runtimes into `agent_runtime` adapters where needed.
+11. Add `agent_profile` contributions and delegated agent jobs on top of runtime adapters.
+12. Migrate channel registry, channel routers, channel lifespans, and channel settings into channel plugins.
+13. Add migration provider support for detect/plan/apply flows.
+14. Replace static router registration with kernel routers plus plugin router contributions.
+15. Add backend plugin management APIs and frontend plugin settings surfaces.
+16. Add the workspace `plugin-author` skill.
+17. Update docs and supersede the old plugin ADR.
+
+## Tests
+
+Required tests:
+
+- Manifest parsing, adapter validation, duplicate/override rules, state locking, and fingerprint invalidation.
+- CLI runner hardening: env scrub, cwd containment, symlink rejection, timeout, output caps, process cleanup, and JSON envelopes.
+- Notion migration: `notion_cli` is produced from `backend/plugins/notion/plugin.json`.
+- Tool ordering: core tools, plugin tools, external MCP tools.
+- Turn context ordering: `active_recall` still runs through the plugin host, but
+  the kernel owns prompt assembly and context budgeting.
+- `paw plugins` output modes, exit codes, non-TTY behavior, and stdout/stderr cleanliness.
+- Malicious fixture coverage for traversal, symlinked entrypoints, env leakage attempts, huge output, concurrent enable/disable, and validation races.
+- Provider bridge checks proving plugin tools are valid for Claude, Codex dynamic tools, and Gemini.
+- Agent runtime checks proving Codex-style session/thread/tool-event behavior is behind a runtime adapter.
+- End-to-end smoke: create a workspace plugin, validate-enable it, start a new chat turn, and call `<id>_cli`.
+- Provider migration: active provider plugins build the catalog, authenticate correctly, resolve models, stream responses, and close lifecycle caches.
+- Channel migration: active channel plugins register surfaces, deliver normalized stream events, run lifecycle hooks, and disappear cleanly when disabled.
+- Channel message-tool tests proving channel actions are discovered through the shared message boundary.
+- Migration provider tests proving detect/plan/apply/report/secret-consent behavior.
+- Hot reload: changed manifests invalidate old fingerprints, publish new registry snapshots, preserve in-flight turns, and expose new tools on the next turn.
+- Paw CLI development workflow: `spec`, `new`, `validate`, `reload`, `watch`, `graph`, and `doctor` produce stable JSON and enforce stdout/stderr cleanliness.
+
+Run gates:
+
+```bash
+cd backend && uv run pytest tests/test_plugin_host.py tests/test_plugin_cli_runner.py tests/test_notion_plugin.py tests/paw/test_command_plugins.py
+cd backend && uv run pytest tests/test_provider_plugins.py tests/test_channel_plugins.py tests/test_plugin_reload.py
+cd backend && uv run ruff check .
+cd backend && uv run ruff format --check .
+cd backend && uv run mypy app/plugins app/agents/tools.py app/agents/hooks.py app/providers app/channels
+node scripts/check-file-lines.mjs
+just check
+```
+
+## Consequences
+
+This is a larger change than layering dynamic CLI plugins beside the old registry, but it has better locality. The plugin host becomes the module with the plugin interface; callers no longer need to know whether a capability came from static Python, a repo manifest, or a workspace-authored CLI.
+
+The main risks are subprocess execution from workspace-authored plugins and runtime reload of channel/provider surfaces. V1 accepts the trusted self-hosted model but still applies strict validation, fingerprint gating, environment isolation, process cleanup, immutable registry snapshots, and conservative restart boundaries for Python route/lifespan changes.
+
+## Out of Scope
+
+- Settings UI plugin marketplace.
+- Workspace-authored Python plugins.
+- Remote plugin installation.
+- Compatibility with the old Python plugin API.

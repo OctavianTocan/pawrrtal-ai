@@ -154,7 +154,7 @@ async def run_chat_roundtrip_scenario(
     """
     r = ScenarioResult(name="chat-roundtrip")
 
-    model_id = await helpers.resolve_default_model(client, r, model_override)
+    model_id = await helpers.resolve_model(client, r, model_override)
     if model_id is None:
         return r
 

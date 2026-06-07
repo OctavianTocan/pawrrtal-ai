@@ -28,7 +28,6 @@ def _agy_api_entry(
         display_name=display_name,
         short_name=short_name,
         description=description,
-        is_default=False,
         cost_per_mtok_in_usd=_AGY_IN_USD,
         cost_per_mtok_out_usd=_AGY_OUT_USD,
         supports_reasoning=supports_reasoning,

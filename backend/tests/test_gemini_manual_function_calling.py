@@ -11,7 +11,6 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 import pytest
-from google.genai import types as gtypes
 
 from app.agents.types import (
     AgentMessage,
@@ -26,6 +25,8 @@ from app.agents.types import (
     UserMessage,
 )
 from app.providers.gemini import provider as gemini_provider
+from app.providers.gemini import sdk as gemini_sdk
+from app.providers.gemini.sdk import gtypes
 
 
 async def _execute_noop(tool_call_id: str, **kwargs: object) -> str:
@@ -197,7 +198,7 @@ async def test_stream_config_disables_sdk_automatic_function_calling(
             self.api_key = api_key
             self.aio = SimpleNamespace(models=captured_models)
 
-    monkeypatch.setattr(gemini_provider.genai, "Client", CapturingClient)
+    monkeypatch.setattr(gemini_sdk.genai, "Client", CapturingClient)
     monkeypatch.setattr(gemini_provider, "resolve_gemini_api_key", lambda _user_id: "test-key")
 
     stream_fn = gemini_provider.make_gemini_stream_fn(
@@ -242,7 +243,7 @@ async def test_stream_threads_system_prompt_into_gemini_config(
             self.api_key = api_key
             self.aio = SimpleNamespace(models=captured_models)
 
-    monkeypatch.setattr(gemini_provider.genai, "Client", CapturingClient)
+    monkeypatch.setattr(gemini_sdk.genai, "Client", CapturingClient)
     monkeypatch.setattr(gemini_provider, "resolve_gemini_api_key", lambda _user_id: "test-key")
 
     workspace_prompt = "You are PAWRRTAL, the assistant for octavian's workspace."

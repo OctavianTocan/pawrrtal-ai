@@ -116,7 +116,7 @@ def test_persisted_shape_complete_keeps_streamed_content() -> None:
             "tool_use_id": "t1",
             "name": "web_search",
             "input": {},
-            "display": {"compact": "Search web"},
+            "display": {"compact": "Search Web"},
         }
     )
     agg.apply({"type": "tool_result", "tool_use_id": "t1", "content": "ok"})
@@ -127,5 +127,5 @@ def test_persisted_shape_complete_keeps_streamed_content() -> None:
     assert snapshot["assistant_status"] == "complete"
     assert snapshot["tool_calls"] is not None
     assert snapshot["tool_calls"][0]["status"] == "completed"
-    assert snapshot["tool_calls"][0]["display"] == {"compact": "Search web"}
+    assert snapshot["tool_calls"][0]["display"] == {"compact": "Search Web"}
     assert snapshot["timeline"] is not None

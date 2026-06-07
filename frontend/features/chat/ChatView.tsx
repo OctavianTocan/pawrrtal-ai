@@ -1,7 +1,7 @@
 'use client';
 
 import { ChatPromptSuggestions } from '@octavian-tocan/react-chat-composer';
-import type * as React from 'react';
+import type { JSX } from 'react';
 import { useEffect } from 'react';
 import { useStickToBottomContext } from 'use-stick-to-bottom';
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
@@ -84,7 +84,7 @@ type ChatProps = {
  * Invisible anchor component that scrolls the conversation to the bottom
  * whenever `track` changes (i.e. when new messages are added).
  */
-function ChatScrollAnchor({ track: _track }: { track: number }): React.JSX.Element | null {
+function ChatScrollAnchor({ track: _track }: { track: number }): JSX.Element | null {
 	const { scrollToBottom } = useStickToBottomContext();
 	useEffect(() => {
 		scrollToBottom();
@@ -100,7 +100,7 @@ function ChatScrollAnchor({ track: _track }: { track: number }): React.JSX.Eleme
  * z-index paints after static children, so the content wrappers below need
  * `relative` to appear above it.
  */
-function WhimsyOverlay(): React.JSX.Element | null {
+function WhimsyOverlay(): JSX.Element | null {
 	const whimsy = useWhimsyTile();
 	if (!whimsy.cssUrl) return null;
 	return (
@@ -170,11 +170,11 @@ function LandingState({
 	onOpenOnboarding,
 }: ComposerRowProps & {
 	onSelectSuggestion: (prompt: string) => void;
-}): React.JSX.Element {
+}): JSX.Element {
 	return (
 		<div className="relative mx-auto flex size-full max-w-[60rem] min-w-0 flex-col">
-			<div className="flex min-h-0 flex-1 flex-col items-center pt-[24vh]">
-				<h1 className="mb-10 text-center text-[28px] font-medium tracking-normal text-balance text-foreground sm:text-[30px]">
+			<div className="flex min-h-0 flex-1 flex-col items-center pt-[12vh] sm:pt-[24vh]">
+				<h1 className="mb-6 text-center text-[24px] font-medium tracking-normal text-balance text-foreground sm:mb-10 sm:text-[30px]">
 					What should we build in Pawrrtal?
 				</h1>
 				<div className="relative flex w-full max-w-[48.75rem] flex-col">
@@ -231,7 +231,7 @@ function ConversationRow({
 	copiedMessageId?: string | null;
 	onCopy?: (id: string, text: string) => void;
 	onRegenerate?: (assistantIndex: number) => void;
-}): React.JSX.Element {
+}): JSX.Element {
 	if (chatMessage.role === 'assistant') {
 		const messageId = `assistant-${index}`;
 		const isCurrentlyRegenerating = regeneratingIndex === index;
@@ -295,7 +295,7 @@ function ActiveConversationState({
 	copiedMessageId?: string | null;
 	onCopy?: (id: string, text: string) => void;
 	onRegenerate?: (assistantIndex: number) => void;
-}): React.JSX.Element {
+}): JSX.Element {
 	return (
 		<div className="relative flex size-full min-w-0 flex-col">
 			<Conversation className="scrollbar-hide min-h-0 flex-1 overflow-y-auto" resize="smooth">
@@ -388,7 +388,7 @@ function ChatView({
 	isComposerBlocked,
 	composerBlockedMessage,
 	onOpenOnboarding,
-}: ChatProps): React.JSX.Element {
+}: ChatProps): JSX.Element {
 	const rowProps = {
 		composerText,
 		isLoading,
@@ -412,7 +412,7 @@ function ChatView({
 	// variable resolves live so the AppearanceProvider can re-tint per theme.
 	return (
 		<div
-			className="relative z-10 flex h-[calc(100svh-3rem)] min-h-0 w-full overflow-hidden rounded-surface-lg px-4 shadow-panel-floating"
+			className="relative z-10 flex h-[calc(100svh-3rem)] min-h-0 w-full overflow-hidden rounded-surface-lg px-2 shadow-panel-floating sm:px-4"
 			style={{ backgroundColor: 'var(--background-elevated)' }}
 		>
 			<WhimsyOverlay />

@@ -30,9 +30,8 @@ Security
 ~~~~~~~~
 
 * External MCP tools execute network requests on behalf of the user.
-  The chat router is responsible for gating them through
-  ``permission_check`` if/when a policy applies. By default the loop
-  treats them like every other ``AgentTool``.
+  The loop treats them like every other ``AgentTool``; there is no
+  separate permission gate today.
 * Bearer headers in the config blob live in the database and are
   never echoed to the model — only the resolved request reaches the
   remote server. The agent sees the **tool name + description** the
@@ -53,6 +52,7 @@ from typing import Any, Literal
 
 import httpx
 
+from app.agents.display import friendly_tool_name
 from app.agents.types import AgentTool
 from app.tools.display import make_tool_display
 from app.tools.errors import ToolError, ToolErrorCode
@@ -237,6 +237,17 @@ async def _list_tools_async(
     return [t for t in tools if isinstance(t, dict)]
 
 
+def _humanize_mcp_label(server_name: str, tool_name: str) -> str:
+    """Render a Title Case display name for an external MCP tool.
+
+    The raw ``server`` / ``tool`` identifiers are snake_case machine names
+    (e.g. ``notion`` / ``create_page``) and must never be surfaced to a user.
+    Produce a human ``Notion · Create Page`` instead. The internal
+    ``qualified`` tool id (used in the model's tool schema) stays snake_case.
+    """
+    return f"{friendly_tool_name(server_name)} · {friendly_tool_name(tool_name)}"
+
+
 def _wrap_remote_tool(
     *,
     server_name: str,
@@ -259,6 +270,7 @@ def _wrap_remote_tool(
     if not tool_name:
         return None
     qualified = f"mcp_{_sanitize(server_name)}_{_sanitize(tool_name)}"
+    display_label = _humanize_mcp_label(server_name, tool_name)
 
     async def execute(tool_call_id: str, **kwargs: Any) -> str:
         del tool_call_id  # unused — remote server doesn't need it
@@ -277,9 +289,9 @@ def _wrap_remote_tool(
         execute=execute,
         display=make_tool_display(
             icon="🔌",
-            label=f"{server_name}.{tool_name}",
-            present=lambda _args: f"🔌 Calling {server_name}.{tool_name}",
-            compact=lambda _args: f"{server_name}.{tool_name}(...)",
+            label=display_label,
+            present=lambda _args: f"🔌 Calling {display_label}",
+            compact=lambda _args: display_label,
         ),
     )
 

@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
 from pathlib import Path
 from uuid import uuid4
 
 import pytest
 
-from app.agents.types import AgentTool
-from app.providers.agy_api.auth import AgyApiAuth, AgyApiAuthError, load_agy_api_auth
+from app.agents.types import AgentTool, LLMEvent
+from app.providers.agy_api.auth import (
+    AgyApiAuth,
+    AgyApiAuthError,
+    ensure_agy_api_auth,
+    load_agy_api_auth,
+)
 from app.providers.agy_api.client import (
     _client,
     _event_from_sse_line,
@@ -104,6 +110,57 @@ def test_load_agy_api_auth_rejects_expired_access_token_without_rewriting_file(
     assert stored["token"]["access_token"] == "expired-access"
     assert stored["token"]["refresh_token"] == "refresh"
     assert stored["token"]["expiry"] == "2000-01-01T00:00:00Z"
+
+
+@pytest.mark.anyio
+async def test_ensure_agy_api_auth_refreshes_expired_token_once(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    token_path = tmp_path / "token.json"
+    projects_path = tmp_path / "projects.json"
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    token_path.write_text(
+        json.dumps(
+            {
+                "auth_method": "consumer",
+                "token": {
+                    "access_token": "expired-access",
+                    "refresh_token": "refresh",
+                    "token_type": "Bearer",
+                    "expiry": "2000-01-01T00:00:00Z",
+                },
+            }
+        )
+    )
+    projects_path.write_text(json.dumps({str(workspace): "project-1"}))
+    refresh_calls: list[Path | None] = []
+
+    async def refresh_probe(workspace_root: Path | None) -> None:
+        refresh_calls.append(workspace_root)
+        token_path.write_text(
+            json.dumps(
+                {
+                    "auth_method": "consumer",
+                    "token": {
+                        "access_token": "fresh-access",
+                        "refresh_token": "refresh",
+                        "token_type": "Bearer",
+                        "expiry": "2999-01-01T00:00:00Z",
+                    },
+                }
+            )
+        )
+
+    monkeypatch.setattr("app.providers.agy_api.auth._TOKEN_PATH", token_path)
+    monkeypatch.setattr("app.providers.agy_api.auth._PROJECTS_PATH", projects_path)
+    monkeypatch.setattr("app.providers.agy_api.auth._run_agy_refresh_probe", refresh_probe)
+
+    auth = await ensure_agy_api_auth(workspace)
+
+    assert auth == AgyApiAuth(access_token="fresh-access", project_id="project-1")
+    assert refresh_calls == [workspace]
 
 
 def test_build_generate_body_uses_gemini_style_history() -> None:
@@ -274,7 +331,7 @@ async def test_agy_api_client_reuses_warm_http_client() -> None:
 @pytest.mark.anyio
 async def test_agy_api_provider_surfaces_auth_error(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
-        "app.providers.agy_api.provider.load_agy_api_auth",
+        "app.providers.agy_api.provider.ensure_agy_api_auth",
         lambda _workspace_root: (_ for _ in ()).throw(AgyApiAuthError("no token")),
     )
     provider = AgyApiLLM("gemini-3.5-flash", workspace_root=None)
@@ -289,6 +346,42 @@ async def test_agy_api_provider_surfaces_auth_error(monkeypatch: pytest.MonkeyPa
     ]
 
     assert events == [{"type": "error", "content": "Antigravity API auth unavailable: no token"}]
+
+
+@pytest.mark.anyio
+async def test_agy_api_provider_uses_refreshing_auth_on_send(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    provider = AgyApiLLM("gemini-test", workspace_root=workspace)
+    script = ScriptedStreamFn([text_turn("answer")])
+    ensure_calls: list[Path | None] = []
+
+    async def ensure_auth(workspace_root: Path | None) -> AgyApiAuth:
+        ensure_calls.append(workspace_root)
+        return AgyApiAuth(access_token="fresh-access", project_id="project-1")
+
+    async def fake_stream_llm_events(**kwargs: object) -> AsyncIterator[LLMEvent]:
+        assert kwargs["auth"] == AgyApiAuth(access_token="fresh-access", project_id="project-1")
+        async for event in script([], []):
+            yield event
+
+    monkeypatch.setattr("app.providers.agy_api.provider.ensure_agy_api_auth", ensure_auth)
+    monkeypatch.setattr("app.providers.agy_api.provider.stream_llm_events", fake_stream_llm_events)
+
+    events: list[StreamEvent] = [
+        event
+        async for event in provider.stream(
+            "hello",
+            conversation_id=uuid4(),
+            user_id=uuid4(),
+        )
+    ]
+
+    assert ensure_calls == [workspace]
+    assert any(e["type"] == "delta" and e.get("content") == "answer" for e in events)
 
 
 @pytest.mark.anyio

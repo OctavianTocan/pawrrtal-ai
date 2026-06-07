@@ -16,12 +16,9 @@ existing seams:
 
 * ``session_update`` notifications → :class:`StreamEvent` on the queue
   (consumed by the chat aggregator + SSE encoder).
-* ``request_permission`` requests → optional cross-provider
-  :data:`PermissionCheckFn` (the same closure Claude consumes via
-  ``can_use_tool`` and our internal Gemini SDK provider consumes via
-  ``AgentLoopConfig.permission_check``). When no closure is supplied,
-  we auto-approve — the user explicitly opted into a local CLI
-  backend, so the default is "trust it".
+* ``request_permission`` requests → auto-approved via
+  :func:`pick_allow_option` — the user explicitly opted into a local
+  CLI backend, so the default is "trust it".
 * ``fs/read_text_file`` / ``fs/write_text_file`` → scoped to
   ``workspace_root``. Paths outside the workspace are rejected with
   ``RequestError.invalid_params`` so the model self-corrects rather
@@ -66,7 +63,6 @@ from acp.schema import (
     WriteTextFileResponse,
 )
 
-from app.agents.types import PermissionCheckFn
 from app.providers.base import StreamEvent
 from app.providers.gemini_cli.events import (
     _log_session_update,
@@ -134,7 +130,6 @@ class PawrrtalAcpClient:
         *,
         event_queue: asyncio.Queue[StreamEvent | None],
         workspace_root: Path | None,
-        permission_check: PermissionCheckFn | None,
         display_by_name: dict[str, Any] | None = None,
     ) -> None:
         """Construct the client.
@@ -148,16 +143,10 @@ class PawrrtalAcpClient:
                 not have filesystem capability declared in
                 ``initialize``; this is asserted as a defence-in-depth
                 check at request time.
-            permission_check: Optional cross-provider permission gate.
-                When supplied, ``request_permission`` consults it before
-                approving any tool. When ``None``, every permission is
-                auto-approved (the user opted into a local CLI agent —
-                the trust model is "you trust your local agent").
             display_by_name: Optional display mapping for tools.
         """
         self._event_queue = event_queue
         self._workspace_root = workspace_root
-        self._permission_check = permission_check
         self._display_by_name = display_by_name
 
     async def session_update(
@@ -189,14 +178,14 @@ class PawrrtalAcpClient:
         tool_call: ToolCallUpdate,
         **kwargs: Any,
     ) -> RequestPermissionResponse:
-        """Approve or deny a tool-call permission request.
+        """Auto-approve a tool-call permission request.
 
-        When a Pawrrtal :data:`PermissionCheckFn` is bound, its decision
-        wins; on denial we also push a ``StreamEvent(type="error")`` so
-        the user sees *why* the chat stopped producing output instead of
-        staring at a frozen partial response. When no closure is bound,
-        we auto-approve via :func:`pick_allow_option`; when the spec
-        offers no allow options we deny.
+        Every request is auto-approved via :func:`pick_allow_option`
+        (the user opted into a local CLI agent — the trust model is
+        "you trust your local agent"). When the spec offers no allow
+        options we deny and surface a ``StreamEvent(type="error")`` so
+        the user sees *why* the chat stopped producing output instead
+        of staring at a frozen partial response.
         """
         tool_name = tool_call.title or "<unknown>"
         logger.info(
@@ -206,23 +195,6 @@ class PawrrtalAcpClient:
             tool_name,
             [option.kind for option in options],
         )
-        if self._permission_check is not None:
-            arguments = tool_call.raw_input if isinstance(tool_call.raw_input, dict) else {}
-            decision = await self._permission_check(tool_name, arguments)
-            if not decision["allow"]:
-                reason = decision["reason"] or "denied by Pawrrtal policy"
-                logger.info(
-                    "GEMINI_CLI_PERMISSION_DENIED tool=%s reason=%s",
-                    tool_name,
-                    reason,
-                )
-                await self._event_queue.put(
-                    StreamEvent(
-                        type="error",
-                        content=f"Tool '{tool_name}' was denied: {reason}",
-                    ),
-                )
-                return RequestPermissionResponse(outcome=DeniedOutcome(outcome=_DENY_OUTCOME))
         option = pick_allow_option(options)
         if option is None:
             logger.warning(

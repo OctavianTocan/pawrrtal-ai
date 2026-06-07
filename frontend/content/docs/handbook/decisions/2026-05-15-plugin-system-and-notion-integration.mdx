@@ -1,6 +1,7 @@
 ---
 title: Plugin system for Pawrrtal and Notion as the first plugin
-description: ADR — formalize a Python-native, tools-only plugin registry; migrate workspace env to workspace_id keying; ship a Notion plugin that wraps the official `ntn` CLI.
+description: Superseded ADR — the Python-native plugin registry and Notion wrapper are replaced by Plugin System V2.
+status: Superseded
 ---
 
 # ADR: Plugin system and Notion integration
@@ -10,8 +11,8 @@ description: ADR — formalize a Python-native, tools-only plugin registry; migr
 - **Tracking:** beans TBD
 - **Reference:** [openclaw-notion](https://github.com/OctavianTocan/openclaw-notion) (read for shape, not portability — Pawrrtal does not host OpenClaw plugins)
 
-<Callout type="info" title="Status: Proposed">
-Add a thin Python plugin registry in `backend/app/integrations/`, migrate workspace `.env` to per-workspace keying, and ship a Notion plugin that subprocesses the official `ntn` CLI with per-call `NOTION_API_TOKEN` injection. 18-tool parity with openclaw-notion.
+<Callout type="warning" title="Status: Superseded">
+This ADR is superseded by [Plugin System V2](./2026-06-06-plugin-system-v2). The V2 plan removes the Python-only plugin registry, migrates Notion into the manifest-backed plugin host, and does not preserve backward compatibility with the old plugin API.
 </Callout>
 
 ## Context

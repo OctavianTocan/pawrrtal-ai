@@ -23,6 +23,7 @@ When a new channel adapter is added, import it here and register it via
 from __future__ import annotations
 
 from .base import Channel
+from .google_chat import SURFACE_GOOGLE_CHAT, GoogleChatChannel
 from .sse import SURFACE_ELECTRON, SURFACE_WEB, SSEChannel
 from .telegram import SURFACE_TELEGRAM, TelegramChannel
 
@@ -37,6 +38,7 @@ _REGISTRY: dict[str, Channel] = {
     SURFACE_WEB: SSEChannel(surface=SURFACE_WEB),
     SURFACE_ELECTRON: SSEChannel(surface=SURFACE_ELECTRON),
     SURFACE_TELEGRAM: TelegramChannel(),
+    SURFACE_GOOGLE_CHAT: GoogleChatChannel(),
 }
 
 

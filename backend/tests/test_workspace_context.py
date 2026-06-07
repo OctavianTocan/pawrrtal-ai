@@ -12,10 +12,7 @@ from pathlib import Path
 
 import pytest
 
-from app.governance.workspace_context import (
-    SettingsPermissions,
-    load_workspace_context,
-)
+from app.governance.workspace_context import load_workspace_context
 from app.infrastructure.config import settings
 from app.workspace.persona_bootstrap import IDENTITY_BEGIN, IDENTITY_END
 
@@ -42,7 +39,6 @@ class TestEmptyWorkspace:
         ctx = load_workspace_context(tmp_path)
         assert ctx.is_empty
         assert ctx.system_prompt is None
-        assert ctx.enabled_tools is None
         assert ctx.skills == ()
         assert ctx.loaded_from == ()
 
@@ -61,7 +57,6 @@ class TestPromptAssembly:
         _write(tmp_path / "AGENTS.md", "operating rules")
         ctx = load_workspace_context(tmp_path)
         assert ctx.system_prompt == "operating rules"
-        assert ctx.enabled_tools is None
 
     def test_skills_index_appended_after_agents(self, tmp_path: Path) -> None:
         _write(tmp_path / "AGENTS.md", "operating rules")
@@ -203,14 +198,13 @@ class TestSkillsCatalogue:
 class TestPermissions:
     """The Markdown permissions file is appended as conversational context.
 
-    A future PR will land a Markdown→allowlist parser; until then the
-    mechanical gate stays permissive.
+    There is no mechanical allow/deny gate; the agent honours the file's
+    guidance conversationally.
     """
 
     def test_no_permissions_file(self, tmp_path: Path) -> None:
         ctx = load_workspace_context(tmp_path)
-        assert ctx.permissions == SettingsPermissions()
-        assert ctx.enabled_tools is None
+        assert ctx.is_empty
 
     def test_permissions_md_present_is_recorded_but_does_not_gate(self, tmp_path: Path) -> None:
         _write(
@@ -218,11 +212,8 @@ class TestPermissions:
             "# Permissions\n\n## Never allowed\n- Bash(rm -rf /)\n",
         )
         ctx = load_workspace_context(tmp_path)
-        # Permissions stay empty (no Markdown parser yet), but the
-        # content is still included in the prompt for the agent to honor
-        # conversationally.
-        assert ctx.permissions == SettingsPermissions()
-        assert ctx.enabled_tools is None
+        # The content is included in the prompt for the agent to honor
+        # conversationally — there is no mechanical gate.
         assert ctx.system_prompt == (
             "## Workspace Permissions\n\n# Permissions\n\n## Never allowed\n- Bash(rm -rf /)"
         )

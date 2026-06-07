@@ -1,13 +1,15 @@
 """Local Antigravity auth/cache helpers.
 
 This module intentionally never logs token values. The direct API path
-reuses the token file written by ``agy`` and treats refresh/login as the
-CLI's job until we have explicit approval to own that OAuth flow.
+reuses the token file written by ``agy`` and refreshes expired tokens by
+asking the CLI to run one bounded non-interactive probe.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -15,10 +17,19 @@ from pathlib import Path
 _AGY_CONFIG_DIR = Path.home() / ".gemini" / "antigravity-cli"
 _TOKEN_PATH = _AGY_CONFIG_DIR / "antigravity-oauth-token"
 _PROJECTS_PATH = _AGY_CONFIG_DIR / "cache" / "projects.json"
+_AGY_REFRESH_PROMPT = "Refresh Antigravity authentication if needed, then reply OK."
+_AGY_REFRESH_PRINT_TIMEOUT = "30s"
+_AGY_REFRESH_PROCESS_TIMEOUT_SECONDS = 45.0
+
+logger = logging.getLogger(__name__)
 
 
 class AgyApiAuthError(RuntimeError):
     """Raised when local ``agy`` auth/cache state is not usable."""
+
+
+class AgyApiTokenExpiredError(AgyApiAuthError):
+    """Raised when local ``agy`` access token exists but is expired."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -32,26 +43,37 @@ class AgyApiAuth:
 def has_agy_api_auth(workspace_root: Path | None = None) -> bool:
     """Return whether local Antigravity auth exists for this workspace."""
     try:
-        load_agy_api_auth(workspace_root)
+        token_body = _load_token_body()
+        _load_project_id(workspace_root)
+        return _has_usable_or_refreshable_token(token_body)
     except AgyApiAuthError:
         return False
-    return True
+
+
+_refresh_lock = asyncio.Lock()
+
+
+async def ensure_agy_api_auth(workspace_root: Path | None = None) -> AgyApiAuth:
+    """Load AGY auth, refreshing once through the CLI when the token expired."""
+    try:
+        return load_agy_api_auth(workspace_root)
+    except AgyApiTokenExpiredError:
+        pass
+
+    async with _refresh_lock:
+        try:
+            return load_agy_api_auth(workspace_root)
+        except AgyApiTokenExpiredError:
+            await _run_agy_refresh_probe(workspace_root)
+        return load_agy_api_auth(workspace_root)
 
 
 def load_agy_api_auth(workspace_root: Path | None = None) -> AgyApiAuth:
     """Load a non-expired ``agy`` token and cached project id."""
-    raw_token = _load_json(_TOKEN_PATH, "Antigravity OAuth token")
-    if not isinstance(raw_token, dict):
-        raise AgyApiAuthError("Antigravity token file is malformed.")
-    token: dict[str, object] = dict(raw_token)
-    raw_token_body = token.get("token")
-    if not isinstance(raw_token_body, dict):
-        raise AgyApiAuthError("Antigravity token file is malformed.")
-    token_body: dict[str, object] = dict(raw_token_body)
+    token_body = _load_token_body()
 
-    expiry = token_body.get("expiry")
-    if isinstance(expiry, str) and _is_expired(expiry):
-        raise AgyApiAuthError(
+    if _token_expired(token_body):
+        raise AgyApiTokenExpiredError(
             "Antigravity access token is expired; run agy once in this workspace "
             "so the CLI refreshes its token."
         )
@@ -66,6 +88,35 @@ def load_agy_api_auth(workspace_root: Path | None = None) -> AgyApiAuth:
     )
 
 
+def _load_token_body() -> dict[str, object]:
+    """Load the nested OAuth token body written by the ``agy`` CLI."""
+    raw_token = _load_json(_TOKEN_PATH, "Antigravity OAuth token")
+    if not isinstance(raw_token, dict):
+        raise AgyApiAuthError("Antigravity token file is malformed.")
+    token: dict[str, object] = dict(raw_token)
+    raw_token_body = token.get("token")
+    if not isinstance(raw_token_body, dict):
+        raise AgyApiAuthError("Antigravity token file is malformed.")
+    return dict(raw_token_body)
+
+
+def _has_usable_or_refreshable_token(token_body: dict[str, object]) -> bool:
+    """Return whether the picker should show AGY API models."""
+    if _token_expired(token_body):
+        return _has_non_empty_string(token_body, "refresh_token")
+    return _has_non_empty_string(token_body, "access_token")
+
+
+def _token_expired(token_body: dict[str, object]) -> bool:
+    expiry = token_body.get("expiry")
+    return isinstance(expiry, str) and _is_expired(expiry)
+
+
+def _has_non_empty_string(values: dict[str, object], key: str) -> bool:
+    value = values.get(key)
+    return isinstance(value, str) and bool(value.strip())
+
+
 def _load_project_id(workspace_root: Path | None) -> str:
     projects = _load_json(_PROJECTS_PATH, "Antigravity project cache")
     if not isinstance(projects, dict) or not projects:
@@ -78,6 +129,38 @@ def _load_project_id(workspace_root: Path | None) -> str:
     if first_project:
         return first_project
     raise AgyApiAuthError("Antigravity project cache has no project id.")
+
+
+async def _run_agy_refresh_probe(workspace_root: Path | None) -> None:
+    command = [
+        "agy",
+        "--print-timeout",
+        _AGY_REFRESH_PRINT_TIMEOUT,
+        "--print",
+        _AGY_REFRESH_PROMPT,
+    ]
+    cwd = str(workspace_root) if workspace_root is not None else None
+    logger.info("AGY_API_AUTH_REFRESH_START workspace_root=%s", workspace_root)
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *command,
+            cwd=cwd,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
+        )
+    except OSError as exc:
+        raise AgyApiAuthError("Antigravity CLI refresh failed to start.") from exc
+
+    try:
+        await asyncio.wait_for(proc.communicate(), timeout=_AGY_REFRESH_PROCESS_TIMEOUT_SECONDS)
+    except TimeoutError as exc:
+        proc.kill()
+        await proc.wait()
+        raise AgyApiAuthError("Antigravity CLI refresh timed out.") from exc
+
+    if proc.returncode != 0:
+        raise AgyApiAuthError("Antigravity CLI refresh failed.")
+    logger.info("AGY_API_AUTH_REFRESH_DONE workspace_root=%s", workspace_root)
 
 
 def _load_json(path: Path, label: str) -> object:

@@ -60,7 +60,6 @@ def _make_turn_input(provider: _ScriptedProvider, *, verbose_level: int) -> Chat
         workspace_root=None,
         tools=[],
         images=None,
-        permission_check=None,
         log_tag="TEST",
         log_extras={},
         verbose_level=verbose_level,

@@ -39,7 +39,7 @@ def test_workspace_read_file_display_includes_path(tmp_path: Path) -> None:
 
     assert payload["icon"] == "📖"
     assert payload["present"] == "📖 Reading AGENTS.md"
-    assert payload["compact"] == "Read file -> AGENTS.md"
+    assert payload["compact"] == "Read File -> AGENTS.md"
 
 
 def test_summarize_path_keeps_tail_for_long_paths() -> None:

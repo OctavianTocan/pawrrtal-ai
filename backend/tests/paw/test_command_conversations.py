@@ -113,6 +113,11 @@ def test_send_new_streams_sse_and_fetches_codex_thread_id(
         b"data: [DONE]\n\n"
     )
     with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
+        models_route = r.get("/api/v1/models").mock(
+            return_value=httpx.Response(
+                200, json={"models": [{"model_id": "litellm:openai/gpt-4o-mini"}]}
+            )
+        )
         create_route = r.post(f"/api/v1/conversations/{stable_uuid}").mock(
             return_value=httpx.Response(200, json=_conversation_payload(stable_uuid))
         )
@@ -135,14 +140,114 @@ def test_send_new_streams_sse_and_fetches_codex_thread_id(
         )
 
     assert result.exit_code == 0, result.stdout
+    assert models_route.called, "new conversations need an explicit chat model"
     assert create_route.called, "must create the conversation row before chat"
     assert chat_route.called
+    assert json.loads(chat_route.calls.last.request.content)["model_id"] == (
+        "litellm:openai/gpt-4o-mini"
+    )
     out = json.loads(result.stdout)
     assert out["conversation_id"] == stable_uuid
     assert out["codex_thread_id"] == "thread-abc"
     assert out["final_text"] == "Hi there"
     assert out["events"]["delta"] == 2
     assert out["events"]["usage"] == 1
+
+
+def test_send_new_with_model_skips_catalog_lookup(
+    runner: CliRunner, seeded: PersonaState, stable_uuid: str
+) -> None:
+    """An explicit --model is forwarded without fetching the catalog."""
+    sse_body = b'data: {"type": "delta", "content": "Hi"}\n\ndata: [DONE]\n\n'
+    explicit_model = "agent-sdk:anthropic/claude-opus-4-7"
+    with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
+        models_route = r.get("/api/v1/models").mock(
+            return_value=httpx.Response(500, json={"detail": "should not be called"})
+        )
+        r.post(f"/api/v1/conversations/{stable_uuid}").mock(
+            return_value=httpx.Response(200, json=_conversation_payload(stable_uuid))
+        )
+        chat_route = r.post("/api/v1/chat/").mock(
+            return_value=httpx.Response(
+                200,
+                headers={"content-type": "text/event-stream"},
+                content=sse_body,
+            )
+        )
+        r.get(f"/api/v1/conversations/{stable_uuid}").mock(
+            return_value=httpx.Response(200, json=_conversation_payload(stable_uuid))
+        )
+        result = runner.invoke(
+            app,
+            ["conversations", "send", "hi", "--new", "--model", explicit_model, "--json"],
+        )
+
+    assert result.exit_code == 0, result.stdout
+    assert not models_route.called
+    assert json.loads(chat_route.calls.last.request.content)["model_id"] == explicit_model
+
+
+def test_send_existing_unpinned_conversation_resolves_model(
+    runner: CliRunner, seeded: PersonaState
+) -> None:
+    """Existing conversations with no pinned model still send an explicit chat model."""
+    sse_body = b'data: {"type": "delta", "content": "Hi"}\n\ndata: [DONE]\n\n'
+    model_id = "litellm:openai/gpt-4o-mini"
+    with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
+        r.get(f"/api/v1/conversations/{FIXED_UUID}").mock(
+            side_effect=[
+                httpx.Response(200, json=_conversation_payload(FIXED_UUID, model_id=None)),
+                httpx.Response(200, json=_conversation_payload(FIXED_UUID, model_id=model_id)),
+            ]
+        )
+        models_route = r.get("/api/v1/models").mock(
+            return_value=httpx.Response(200, json={"models": [{"model_id": model_id}]})
+        )
+        chat_route = r.post("/api/v1/chat/").mock(
+            return_value=httpx.Response(
+                200,
+                headers={"content-type": "text/event-stream"},
+                content=sse_body,
+            )
+        )
+        result = runner.invoke(
+            app,
+            ["conversations", "send", "hi", "--conversation", FIXED_UUID, "--json"],
+        )
+
+    assert result.exit_code == 0, result.stdout
+    assert models_route.called
+    assert chat_route.called
+    assert json.loads(chat_route.calls.last.request.content)["model_id"] == model_id
+
+
+def test_send_existing_pinned_conversation_skips_catalog_lookup(
+    runner: CliRunner, seeded: PersonaState
+) -> None:
+    """Existing conversations with a pinned model let the backend use that model."""
+    sse_body = b'data: {"type": "delta", "content": "Hi"}\n\ndata: [DONE]\n\n'
+    with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
+        r.get(f"/api/v1/conversations/{FIXED_UUID}").mock(
+            return_value=httpx.Response(200, json=_conversation_payload(FIXED_UUID))
+        )
+        models_route = r.get("/api/v1/models").mock(
+            return_value=httpx.Response(500, json={"detail": "should not be called"})
+        )
+        chat_route = r.post("/api/v1/chat/").mock(
+            return_value=httpx.Response(
+                200,
+                headers={"content-type": "text/event-stream"},
+                content=sse_body,
+            )
+        )
+        result = runner.invoke(
+            app,
+            ["conversations", "send", "hi", "--conversation", FIXED_UUID, "--json"],
+        )
+
+    assert result.exit_code == 0, result.stdout
+    assert not models_route.called
+    assert "model_id" not in json.loads(chat_route.calls.last.request.content)
 
 
 def test_ls_renders_json_list(runner: CliRunner, seeded: PersonaState) -> None:

@@ -33,7 +33,7 @@ from app.infrastructure.event_bus.types import (
     ScheduledEvent,
     WebhookEvent,
 )
-from app.providers import default_model, resolve_llm
+from app.providers import first_catalog_model, resolve_llm
 
 logger = logging.getLogger(__name__)
 
@@ -369,10 +369,6 @@ async def _run_agent_turn(*, prompt: str, user_id: uuid.UUID) -> str:
     # All imports are lazy so the bus module can be loaded without
     # pulling in the chat router's heavy dependency tree.
     from app.agents.tools import build_agent_tools  # noqa: PLC0415
-    from app.governance.permissions import (  # noqa: PLC0415
-        PermissionContext,
-        build_default_permission_check,
-    )
     from app.governance.workspace_context import (  # noqa: PLC0415
         load_workspace_context,
     )
@@ -384,7 +380,6 @@ async def _run_agent_turn(*, prompt: str, user_id: uuid.UUID) -> str:
     workspace_root: Path | None = Path(workspace.path) if workspace is not None else None
     workspace_ctx = load_workspace_context(workspace_root) if workspace_root is not None else None
     system_prompt = workspace_ctx.system_prompt if workspace_ctx is not None else None
-    enabled_tools = workspace_ctx.enabled_tools if workspace_ctx is not None else None
 
     agent_tools = (
         build_agent_tools(
@@ -397,39 +392,11 @@ async def _run_agent_turn(*, prompt: str, user_id: uuid.UUID) -> str:
         else []
     )
 
-    from app.agents.types import (  # noqa: PLC0415
-        PermissionCheckFn,
-        PermissionCheckResult,
-    )
-
-    permission_check_fn: PermissionCheckFn | None = None
-    if workspace_root is not None:
-        permission_context = PermissionContext(
-            user_id=str(user_id),
-            workspace_root=workspace_root,
-            conversation_id=str(uuid.uuid4()),
-            surface="webhook",
-            enabled_tools=enabled_tools,
-        )
-        gate = build_default_permission_check()
-
-        async def permission_check_for_handler(
-            tool_name: str, arguments: dict[str, Any]
-        ) -> PermissionCheckResult:
-            decision = await gate(tool_name, arguments, permission_context)
-            return PermissionCheckResult(
-                allow=decision.allow,
-                reason=decision.reason,
-                violation_type=decision.violation_type,
-            )
-
-        permission_check_fn = permission_check_for_handler
-
     # resolve_llm does not accept user_id; workspace_root carries the
     # per-user key resolution upstream. Kept for call-site symmetry.
     _ = user_id
     provider = resolve_llm(
-        default_model().id,
+        first_catalog_model().id,
         workspace_root=workspace_root,
     )
 
@@ -442,7 +409,6 @@ async def _run_agent_turn(*, prompt: str, user_id: uuid.UUID) -> str:
             history=[],
             tools=agent_tools or None,
             system_prompt=system_prompt,
-            permission_check=permission_check_fn,
         )
         if stream_event.get("type") == "delta"
     ]

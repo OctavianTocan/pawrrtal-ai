@@ -225,7 +225,7 @@ class Settings(BaseSettings):
 
     # When True, ConversationRead 422s on a non-canonical stored
     # model_id. When False (operator escape hatch), the bad value falls
-    # back to ``catalog.default_model().id`` and the row is logged.
+    # back to ``catalog.first_catalog_model().id`` and the row is logged.
     strict_conversation_read_validation: bool = True
 
     # Demo-mode toggle.  When true, the backend refuses to start the
@@ -281,8 +281,9 @@ class Settings(BaseSettings):
     # is the strongest containment for the agent's filesystem reach.
     claude_sandbox_enabled: bool = False
     # When True, Bash invocations are auto-allowed inside the sandbox.
-    # Pairs with the can_use_tool gate (PR 03) so we never auto-allow
-    # commands that escape the workspace.
+    # The Claude SDK's macOS Seatbelt sandbox is the containment layer;
+    # ``claude_sandbox_excluded_commands`` still carves out commands that
+    # should never be auto-allowed (e.g. ``sudo,ssh``).
     claude_sandbox_auto_allow_bash: bool = True
     # Comma-separated bash commands the SDK should exclude from the
     # sandbox auto-allow list (e.g. ``sudo,ssh``). Parsed lazily so the

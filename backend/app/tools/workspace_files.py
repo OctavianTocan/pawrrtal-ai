@@ -55,10 +55,8 @@ _BYTES_PER_KIB = 1024
 # ``.env``, SSH key, or private cert — those are credentials that
 # should never be in a prompt or a chat-message persistence row.
 #
-# The permission gate (``governance.permissions``) consults these
-# lists on every file-shaped tool call; workspaces that legitimately
-# need access to a forbidden filename can opt in via the
-# ``WorkspaceContext`` allowlist (PR 06).
+# ``list_dir`` consults these lists to hide forbidden files from the
+# directory listing it returns to the model.
 # ---------------------------------------------------------------------------
 
 FORBIDDEN_FILENAMES: frozenset[str] = frozenset(
@@ -121,32 +119,6 @@ def matches_forbidden_filename(path: str) -> bool:
     if basename in {entry.lower() for entry in FORBIDDEN_FILENAMES}:
         return True
     return any(pattern.match(basename) for pattern in DANGEROUS_FILE_PATTERN_REGEXES)
-
-
-def is_path_within_workspace(path: str, workspace_root: Path) -> bool:
-    """Resolve ``path`` against ``workspace_root`` and confirm containment.
-
-    Mirrors what :func:`_resolve_safe` does but returns a bool instead
-    of raising so the permission gate can short-circuit cleanly.
-    Treats relative paths as relative to ``workspace_root``; absolute
-    paths are resolved as-is and then containment-checked.
-    """
-    if not path:
-        # Empty path == workspace root, which is in-bounds.
-        return True
-    root_resolved = workspace_root.resolve()
-    candidate = Path(path)
-    try:
-        if candidate.is_absolute():
-            resolved = candidate.resolve()
-        else:
-            resolved = (root_resolved / path.lstrip("/")).resolve()
-    except (OSError, ValueError):
-        return False
-    # Path-aware containment via ``is_relative_to`` (Python 3.9+) — a
-    # plain ``str.startswith`` accepts sibling-directory prefixes
-    # (``/data/workspaces/abc`` vs ``/data/workspaces/abcdef``).
-    return resolved == root_resolved or resolved.is_relative_to(root_resolved)
 
 
 def _resolve_safe(root: Path, rel_path: str) -> Path:
@@ -215,6 +187,11 @@ def _wrap_workspace_tool(
             ).render()
         try:
             target = _resolve_safe(root, raw_path or "")
+            if raw_path and matches_forbidden_filename(str(raw_path)):
+                raise ToolError(
+                    ToolErrorCode.PERMISSION_DENIED,
+                    f"Path '{raw_path}' is blocked because it looks like a credential or sensitive config file.",
+                )
             return await body(target=target, raw_path=raw_path or "", **kwargs)
         except ToolError as err:
             return err.render()
@@ -383,9 +360,9 @@ def make_read_file_tool(workspace_root: Path) -> AgentTool:
         path_required=True,
         display=make_tool_display(
             icon="📖",
-            label="Read file",
+            label="Read File",
             present=lambda args: f"📖 Reading {summarize_path(args.get('path'))}",
-            compact=lambda args: f"Read file -> {summarize_path(args.get('path'))}",
+            compact=lambda args: f"Read File -> {summarize_path(args.get('path'))}",
         ),
     )
 
@@ -420,9 +397,9 @@ def make_write_file_tool(workspace_root: Path) -> AgentTool:
         path_required=True,
         display=make_tool_display(
             icon="✍️",
-            label="Write file",
+            label="Write File",
             present=lambda args: f"✍️ Writing {summarize_path(args.get('path'))}",
-            compact=lambda args: f"Write file -> {summarize_path(args.get('path'))}",
+            compact=lambda args: f"Write File -> {summarize_path(args.get('path'))}",
         ),
     )
 
@@ -458,9 +435,9 @@ def make_list_dir_tool(workspace_root: Path) -> AgentTool:
         path_required=False,
         display=make_tool_display(
             icon="📁",
-            label="List folder",
+            label="List Folder",
             present=lambda args: f"📁 Inspecting {summarize_path(args.get('path'))}",
-            compact=lambda args: f"List folder -> {summarize_path(args.get('path'))}",
+            compact=lambda args: f"List Folder -> {summarize_path(args.get('path'))}",
         ),
     )
 

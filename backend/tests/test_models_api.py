@@ -41,7 +41,7 @@ async def test_models_endpoint_returns_authenticated_catalog(client: AsyncClient
     # also a valid state, so we only assert shape when there's content.
     if body["models"]:
         first = body["models"][0]
-        for key in ("id", "host", "vendor", "model", "display_name", "is_default"):
+        for key in ("id", "host", "vendor", "model", "display_name"):
             assert key in first
 
 
@@ -104,23 +104,6 @@ async def test_models_endpoint_etag_includes_auth_fingerprint(client: AsyncClien
     assert response.headers["etag"].endswith('"')
 
 
-@pytest.mark.anyio
-async def test_default_entry_present_when_default_host_authenticated(
-    client: AsyncClient,
-) -> None:
-    """The catalog default survives the filter when its host is authenticated.
-
-    Pytest's environment sets ``GOOGLE_API_KEY`` (required to boot the
-    settings), and the canonical default in the catalog is a Gemini
-    model, so the default row should always be in the filtered list
-    under the test fixtures. If the default ever moves to an
-    unauthenticated host, this test will surface that drift.
-    """
-    response = await client.get("/api/v1/models")
-    defaults = [m for m in response.json()["models"] if m["is_default"]]
-    assert len(defaults) == 1
-
-
 def test_host_authenticated_with_workspace_uses_workspace_key(
     tmp_path: object, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -179,8 +162,21 @@ def test_host_authenticated_does_not_expose_agy_cli_models(
     assert host_authenticated(Host.agy_cli) is False
 
 
-def test_host_authenticated_probes_agy_api_auth(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_host_authenticated_probes_agy_api_auth(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: object,
+) -> None:
     """Direct Antigravity API rows are visible when local agy auth is usable."""
-    monkeypatch.setattr("app.providers.agy_api.has_agy_api_auth", lambda: True)
+    from pathlib import Path
 
-    assert host_authenticated(Host.agy_api) is True
+    workspace_root = Path(str(tmp_path))
+    seen_workspace_roots: list[Path | None] = []
+
+    def has_auth(workspace_root: Path | None = None) -> bool:
+        seen_workspace_roots.append(workspace_root)
+        return True
+
+    monkeypatch.setattr("app.providers.agy_api.has_agy_api_auth", has_auth)
+
+    assert host_authenticated(Host.agy_api, workspace_root=workspace_root) is True
+    assert seen_workspace_roots == [workspace_root]

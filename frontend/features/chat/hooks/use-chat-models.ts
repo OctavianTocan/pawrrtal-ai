@@ -6,10 +6,11 @@ import { API_ENDPOINTS, getBackendConfigFingerprint } from '@/lib/api';
 
 /**
  * Query key used by {@link useChatModels} and any cache mutator that
- * needs to invalidate the catalog (e.g. an admin tool flipping a
- * `is_default` flag).
+ * needs to invalidate the catalog.
  */
 const CHAT_MODELS_QUERY_KEY = 'models' as const;
+
+const HOSTS_SKIPPED_FOR_AUTOMATIC_DEFAULT = new Set(['openai-codex']);
 
 /** One entry from `GET /api/v1/models`. */
 export interface ChatModelOption {
@@ -27,15 +28,17 @@ export interface ChatModelOption {
 	short_name: string;
 	/** Marketing-style description rendered under the model name. */
 	description: string;
-	/** True for exactly one entry — the catalog's default selection. */
-	is_default: boolean;
 }
 
 /** Return shape for {@link useChatModels}. */
 export interface UseChatModelsResult {
 	/** Catalog entries; empty array while the request is in flight. */
 	models: readonly ChatModelOption[];
-	/** The entry with `is_default: true`; `null` while loading or if the catalog has no default. */
+	/**
+	 * The pre-selected model for a fresh session. Avoids CLI/SDK-only hosts
+	 * when another authenticated model exists, because those hosts may need
+	 * local login state the web user has not configured.
+	 */
 	default: ChatModelOption | null;
 	/** True until the first response (success or error) lands. */
 	isLoading: boolean;
@@ -43,8 +46,6 @@ export interface UseChatModelsResult {
 	isError: boolean;
 	/** True when at least one valid model row is available. */
 	hasCatalog: boolean;
-	/** True when the valid catalog includes a server-declared default model. */
-	hasDefaultModel: boolean;
 	/** Stable identifier for the backend target used by this catalog request. */
 	backendConfigFingerprint: string;
 	/** Latest fetch / validation error, or `null` when healthy. */
@@ -64,7 +65,6 @@ const ModelOptionSchema = z.object({
 	display_name: z.string(),
 	short_name: z.string(),
 	description: z.string(),
-	is_default: z.boolean(),
 });
 
 /** Zod schema for the `GET /api/v1/models` response envelope. */
@@ -87,6 +87,14 @@ function parseCatalogModel(entry: unknown, index: number): ChatModelOption | nul
 	return null;
 }
 
+function canAutoSelectModel(model: ChatModelOption): boolean {
+	return !HOSTS_SKIPPED_FOR_AUTOMATIC_DEFAULT.has(model.host);
+}
+
+function selectDefaultModel(models: readonly ChatModelOption[]): ChatModelOption | null {
+	return models.find(canAutoSelectModel) ?? models[0] ?? null;
+}
+
 /**
  * Fetches the backend model catalog via TanStack Query.
  *
@@ -101,7 +109,7 @@ function parseCatalogModel(entry: unknown, index: number): ChatModelOption | nul
  * there, mirroring the boundary-validation pattern from
  * `frontend/hooks/get-conversations.ts`.
  *
- * @returns Catalog data, the default entry, loading flag, and the
+ * @returns Catalog data, the fresh-session default, loading flag, and the
  *   latest error (or `null` while healthy).
  */
 export function useChatModels(): UseChatModelsResult {
@@ -134,18 +142,17 @@ export function useChatModels(): UseChatModelsResult {
 	});
 
 	const models = query.data?.models ?? [];
-	const defaultEntry = useMemo<ChatModelOption | null>(
-		() => models.find((model) => model.is_default) ?? null,
+	const defaultModel = useMemo<ChatModelOption | null>(
+		() => selectDefaultModel(models),
 		[models]
 	);
 
 	return {
 		models,
-		default: defaultEntry,
+		default: defaultModel,
 		isLoading: query.isLoading,
 		isError: query.isError,
 		hasCatalog: models.length > 0,
-		hasDefaultModel: defaultEntry !== null,
 		backendConfigFingerprint,
 		error: query.error ?? null,
 	};

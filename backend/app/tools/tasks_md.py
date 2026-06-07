@@ -162,7 +162,7 @@ def make_add_task_tool(*, workspace_root: Path) -> AgentTool:
         execute=execute,
         display=make_tool_display(
             icon="📝",
-            label="Add task",
+            label="Add Task",
             present=lambda args: (
                 f"📝 Adding task: {str(args.get('description') or '').strip()[:60] or '(empty)'}"
             ),
@@ -216,7 +216,7 @@ def make_list_tasks_tool(*, workspace_root: Path) -> AgentTool:
         execute=execute,
         display=make_tool_display(
             icon="📋",
-            label="List tasks",
+            label="List Tasks",
             present=lambda args: (
                 "📋 Listing tasks (incl. done)"
                 if args.get("include_done")
@@ -288,7 +288,7 @@ def make_complete_task_tool(*, workspace_root: Path) -> AgentTool:
         execute=execute,
         display=make_tool_display(
             icon="✅",
-            label="Complete task",
+            label="Complete Task",
             present=lambda args: (
                 f"✅ Completing task: {str(args.get('description') or '')[:60] or '(empty)'}"
             ),

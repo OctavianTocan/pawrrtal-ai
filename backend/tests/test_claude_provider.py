@@ -279,18 +279,18 @@ class TestEventsFromMessage:
         )
         display = make_tool_display(
             icon="📖",
-            label="Read file",
+            label="Read File",
             present=lambda args: f"📖 Reading {args['path']}",
-            compact=lambda args: f"Read file -> {args['path']}",
+            compact=lambda args: f"Read File -> {args['path']}",
         )
 
         events = list(_events_from_message(message, {"mcp__pawrrtal__read_file": display}))
 
         assert events[0]["display"] == {
             "icon": "📖",
-            "label": "Read file",
+            "label": "Read File",
             "present": "📖 Reading AGENTS.md",
-            "compact": "Read file -> AGENTS.md",
+            "compact": "Read File -> AGENTS.md",
         }
 
     def test_assistant_tool_result_block_yields_tool_result(self) -> None:

@@ -95,7 +95,7 @@ def make_lcm_grep_tool(*, conversation_id: uuid.UUID) -> AgentTool:
         execute=_execute,
         display=make_tool_display(
             icon="🧠",
-            label="Search chat history",
+            label="Search Chat History",
             present=lambda args: (
                 f"🧠 Searching chat history for {summarize_query(args.get('query'))}"
             ),

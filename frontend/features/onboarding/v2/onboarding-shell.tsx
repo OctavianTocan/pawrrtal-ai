@@ -43,9 +43,9 @@ export function OnboardingShell({
 		<div
 			className={cn('mx-auto flex w-full max-w-[37rem] flex-col text-foreground', className)}
 		>
-			<section className="popover-styled onboarding-panel flex w-full select-none flex-col gap-7 rounded-surface-lg border border-border bg-background/95 px-7 py-8 shadow-modal-small sm:px-8 sm:py-9">
+			<section className="popover-styled onboarding-panel flex w-full select-none flex-col gap-5 rounded-surface-lg border border-border bg-background/95 px-5 py-6 shadow-modal-small sm:gap-7 sm:px-8 sm:py-9">
 				<header className="flex flex-col items-center gap-2 text-center">
-					<h2 className="text-balance text-2xl font-semibold tracking-tight sm:text-[1.65rem]">
+					<h2 className="text-balance text-[1.35rem] leading-tight font-semibold tracking-tight sm:text-[1.65rem]">
 						{title}
 					</h2>
 					{subtitle ? (

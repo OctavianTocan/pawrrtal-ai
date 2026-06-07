@@ -8,9 +8,6 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Any, cast
 
-from google import genai as genai  # noqa: PLC0414
-from google.genai import types as gtypes
-
 from app.agents import (
     DEFAULT_AGENT_SYSTEM_PROMPT as _FALLBACK_SYSTEM_PROMPT,
 )
@@ -27,9 +24,9 @@ from app.agents import (
     UserMessage,
     agent_loop,
 )
+from app.agents.permissions import default_tool_permission_check
 from app.agents.safety_factory import safety_from_settings
 from app.agents.types import (
-    PermissionCheckFn,
     TextContent,
 )
 from app.governance.cost_tracker import compute_cost_usd
@@ -48,6 +45,7 @@ from .messages import (
     split_chunk_text,
     tool_calls_from_chunk,
 )
+from .sdk import genai, gtypes
 from .thinking import compose_thinking_config
 from .usage import (
     GeminiUsageAccumulator,
@@ -246,7 +244,6 @@ class GeminiLLM:
         tools: list[AgentTool] | None = None,
         system_prompt: str | None = None,
         reasoning_effort: ReasoningEffort | None = None,
-        permission_check: PermissionCheckFn | None = None,
         images: list[dict[str, str]] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Run the agent loop and translate AgentEvents → StreamEvents for the frontend.
@@ -265,10 +262,6 @@ class GeminiLLM:
                 bare unit test or direct script call still works.
             reasoning_effort: Accepted for protocol parity. Gemini Flash
                 ignores this UI knob for now.
-            permission_check: Optional cross-provider ``can_use_tool`` gate
-                (PR 03b).  Threaded straight into ``AgentLoopConfig`` so the
-                loop's tool dispatch consults it before every tool execution.
-                ``None`` (the default) preserves the previous behaviour.
             images: Optional multimodal image inputs (PR 05 protocol
                 parity).  Accepted for ``AILLM`` protocol parity with
                 Claude; the Gemini-side wiring lands in PR 09 alongside
@@ -309,8 +302,8 @@ class GeminiLLM:
         # for the interactive chat path; raise them for long-running automations.
         config = AgentLoopConfig(
             convert_to_llm=identity_convert,
+            permission_check=default_tool_permission_check,
             safety=safety_from_settings(settings),
-            permission_check=permission_check,
         )
 
         # In production ``_stream_fn`` is ``None`` and we build a fresh

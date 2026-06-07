@@ -20,7 +20,7 @@ import {
 } from './constants';
 import { type ChatModelOption, useChatModels } from './hooks/use-chat-models';
 import { useChatTurnController } from './hooks/use-chat-turn-controller';
-import { isCanonicalModelId } from './lib/is-canonical-model-id';
+import { resolveSelectedModelId } from './lib/model-selection';
 
 /** Runtime guard for persisted reasoning levels. */
 function isChatReasoningLevel(value: unknown): value is ChatReasoningLevel {
@@ -29,48 +29,13 @@ function isChatReasoningLevel(value: unknown): value is ChatReasoningLevel {
 	);
 }
 
-/**
- * Placeholder used while the persisted model ID is hydrating from
- * `localStorage` and/or the catalog request is in flight.
- *
- * `usePersistedState` requires a literal default, but we don't know the
- * catalog default until `useChatModels` resolves. The empty string never
- * passes {@link isCanonicalModelId}, so {@link resolveSelectedModelId}
- * always replaces it with the live catalog default on the first render
- * the catalog is available.
- */
-const PENDING_MODEL_ID = '';
-
-/**
- * Resolve the model ID to render: prefer the persisted value if it is both
- * canonically shaped AND present in the live catalog; otherwise fall back
- * to the catalog's `is_default` entry.
- *
- * Stale legacy IDs (e.g. `'gpt-5.5'` left over from an older build) fail
- * the canonical regex up-front, so this function never has to know about
- * legacy slugs explicitly.
- */
-function resolveSelectedModelId(
-	persistedId: string,
-	models: readonly ChatModelOption[],
-	defaultEntry: ChatModelOption | null
-): string {
-	if (
-		isCanonicalModelId(persistedId) &&
-		models.some((model): boolean => model.id === persistedId)
-	) {
-		return persistedId;
-	}
-	return defaultEntry?.id ?? '';
-}
-
 /** Return shape for {@link useSelectedChatModel}. */
 interface UseSelectedChatModelResult {
 	/** Live model catalog from `GET /api/v1/models`. */
 	models: readonly ChatModelOption[];
 	/** Currently selected canonical model ID — empty string while the catalog loads. */
 	selectedModelId: string;
-	/** Selects a catalog model immediately and then persists it. */
+	/** Selects a catalog model for the rest of this session (in React state, not persisted). */
 	selectModel: (modelId: string) => void;
 	/** True until the first catalog response lands. */
 	isCatalogLoading: boolean;
@@ -78,8 +43,6 @@ interface UseSelectedChatModelResult {
 	isCatalogError: boolean;
 	/** True when at least one valid catalog entry is available. */
 	hasCatalog: boolean;
-	/** True when the catalog includes a default model. */
-	hasDefaultModel: boolean;
 	/** Backend target used for this catalog request. */
 	backendConfigFingerprint: string;
 }
@@ -93,49 +56,49 @@ interface UseSelectedReasoningResult {
 }
 
 /**
- * Hoists the catalog fetch + persisted-selection resolution so
- * {@link ChatContainer} stays under the project's per-function line budget.
+ * Hoists the catalog fetch + in-session selection so {@link ChatContainer}
+ * stays under the project's per-function line budget.
  *
- * Storage value: canonical model ID (`host:vendor/model`) or `''` while
- * we're waiting for the catalog to seed the default. The validator
- * rejects any string that doesn't match the canonical shape, so
- * legacy slugs left in `localStorage` (e.g. `'gpt-5.5'`) silently fall
- * back to the catalog default on first read.
+ * There is no `localStorage` persistence. Fresh sessions start on the
+ * catalog's first model (`useChatModels().default`), while existing
+ * conversations seed from the model stored on the conversation row.
+ * The user's mid-session choice lives in React state (`userChoice`).
  */
-function useSelectedChatModel(): UseSelectedChatModelResult {
+function useSelectedChatModel(
+	initialModelId: string | null | undefined
+): UseSelectedChatModelResult {
 	const {
 		models,
 		default: defaultModel,
 		isLoading: isCatalogLoading,
 		isError: isCatalogError,
 		hasCatalog,
-		hasDefaultModel,
 		backendConfigFingerprint,
 	} = useChatModels();
 
-	const [persistedModelId, setPersistedModelId] = usePersistedState<string>({
-		storageKey: CHAT_STORAGE_KEYS.selectedModelId,
-		defaultValue: PENDING_MODEL_ID,
-		validate: isCanonicalModelId,
-	});
+	// `null` means "no explicit choice yet" — derive the effective selection
+	// from the catalog's first entry. Once the user picks a model it lives
+	// here for the rest of the session (not persisted across reloads).
+	const [userChoice, setUserChoice] = useState<string | null>(null);
 
-	// Derive during render: `usePersistedState` is backed by
-	// `useSyncExternalStore` so the next render sees the updated value
-	// synchronously after `setPersistedModelId`. The old "immediate" copy
-	// + useEffect sync was redundant (and tripped react-doctor's
-	// `no-derived-state-effect` rule).
 	const selectedModelId = useMemo(
-		() => resolveSelectedModelId(persistedModelId, models, defaultModel),
-		[persistedModelId, models, defaultModel]
+		() =>
+			resolveSelectedModelId({
+				userChoice,
+				initialModelId,
+				models,
+				defaultEntry: defaultModel,
+			}),
+		[userChoice, initialModelId, models, defaultModel]
 	);
 
 	const selectModel = useCallback(
 		(modelId: string): void => {
 			const modelExists = models.some((model): boolean => model.id === modelId);
 			if (!modelExists) return;
-			setPersistedModelId(modelId);
+			setUserChoice(modelId);
 		},
-		[models, setPersistedModelId]
+		[models]
 	);
 
 	return {
@@ -145,7 +108,6 @@ function useSelectedChatModel(): UseSelectedChatModelResult {
 		isCatalogLoading,
 		isCatalogError,
 		hasCatalog,
-		hasDefaultModel,
 		backendConfigFingerprint,
 	};
 }
@@ -201,7 +163,6 @@ interface ComposerBlockReason {
 	backendConfigFingerprint: string;
 	hasBackendConfig: boolean;
 	hasCatalog: boolean;
-	hasDefaultModel: boolean;
 	hasWorkspaceReady: boolean;
 	isCatalogError: boolean;
 	isCatalogLoading: boolean;
@@ -213,7 +174,6 @@ function buildComposerBlockedMessage({
 	backendConfigFingerprint,
 	hasBackendConfig,
 	hasCatalog,
-	hasDefaultModel,
 	hasWorkspaceReady,
 	isCatalogError,
 	isCatalogLoading,
@@ -231,9 +191,6 @@ function buildComposerBlockedMessage({
 		return `Model catalog unavailable from ${backendConfigFingerprint}. Check backend connection.`;
 	}
 	if (!hasCatalog) return 'No models are available from the connected backend.';
-	if (!hasDefaultModel && isModelUnavailable) {
-		return 'Model catalog has no default. Select a model before sending.';
-	}
 	if (isModelUnavailable) return 'Select a model before sending.';
 	return undefined;
 }
@@ -246,6 +203,8 @@ interface ChatContainerProps {
 	conversationId: string;
 	/** Pre-fetched messages to hydrate the chat on load (e.g. when opening an existing conversation). */
 	initialChatHistory?: Array<ChatMessage>;
+	/** Stored model id for an existing conversation. New conversations leave this unset. */
+	initialModelId?: string | null;
 }
 
 interface ComposerGateArgs {
@@ -279,7 +238,6 @@ function useComposerGate({
 		backendConfigFingerprint: model.backendConfigFingerprint,
 		hasBackendConfig,
 		hasCatalog: model.hasCatalog,
-		hasDefaultModel: model.hasDefaultModel,
 		hasWorkspaceReady,
 		isCatalogError: model.isCatalogError,
 		isCatalogLoading: model.isCatalogLoading,
@@ -304,8 +262,8 @@ function useComposerGate({
  * - Fires LLM title generation (via {@link useGenerateConversationTitle}).
  * - Streams assistant responses and accumulates chat history (via {@link useChatTurns}).
  * - Keeps the browser URL and the Next.js router in sync.
- * - Fetches the live model catalog (via {@link useChatModels}) and resolves
- *   the persisted selection against it.
+ * - Fetches the live model catalog (via {@link useChatModels}) and tracks the
+ *   in-session model selection (seeded from the conversation row when present).
  *
  * Render logic is delegated to the presentational {@link ChatView}. The
  * composer's textarea value lives here as a plain controlled string —
@@ -317,13 +275,14 @@ function useComposerGate({
 export default function ChatContainer({
 	conversationId,
 	initialChatHistory,
+	initialModelId,
 }: ChatContainerProps): React.JSX.Element | null {
 	const {
 		hasBackendConfig,
 		hasWorkspaceReady,
 		isLoading: isOnboardingReadinessLoading,
 	} = useOnboardingReadiness();
-	const model = useSelectedChatModel();
+	const model = useSelectedChatModel(initialModelId);
 	const reasoning = useSelectedReasoning();
 	const [composerText, setComposerText] = useState('');
 	const chat = useChatTurnController({

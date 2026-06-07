@@ -112,7 +112,7 @@ async def await_pending_codex_persist_tasks(
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
-    from app.agents.types import AgentTool, PermissionCheckFn
+    from app.agents.types import AgentTool
     from app.channels.base import Channel, ChannelMessage
     from app.providers.base import AILLM, ReasoningEffort, StreamEvent
 
@@ -154,7 +154,6 @@ class ChatTurnInput:
         workspace_root: The workspace root path.
         tools: The workspace-scoped agent tools.
         reasoning_effort: The reasoning effort.
-        permission_check: The permission check function.
         images: The multimodal image inputs.
         history_window: The history window.
         log_tag: The log tag.
@@ -173,12 +172,6 @@ class ChatTurnInput:
     workspace_root: Path | None = None
     tools: list[AgentTool] | None = None
     reasoning_effort: ReasoningEffort | None = None
-    # PR 03b — cross-provider can_use_tool gate.  ``None`` (the
-    # default) means no permission check; when supplied, the provider
-    # plumbs it into AgentLoopConfig (Gemini) or
-    # ClaudeAgentOptions.can_use_tool (Claude) so the same policy
-    # applies regardless of model.
-    permission_check: PermissionCheckFn | None = None
     # PR 09 — multimodal image inputs forwarded to the provider.  Each
     # entry is ``{"data": <base64>, "media_type": "image/<mime>"}`` —
     # the same wire shape ``ChatRequest.images`` carries on the API
@@ -499,7 +492,6 @@ async def _guarded_stream(
             tools=turn_input.tools or None,
             system_prompt=system_prompt,
             reasoning_effort=_provider_reasoning_effort(turn_input),
-            permission_check=turn_input.permission_check,
             images=turn_input.images,
             **extra_kwargs,
         ):

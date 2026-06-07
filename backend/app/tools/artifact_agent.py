@@ -169,7 +169,7 @@ def make_artifact_tool(*, surface: str | None = None) -> AgentTool:
         execute=_execute,
         display=make_tool_display(
             icon="🧩",
-            label="Render artifact",
+            label="Render Artifact",
             present=lambda args: (
                 f"🧩 Rendering artifact {summarize_title(args.get('title'), 'preview')}"
             ),

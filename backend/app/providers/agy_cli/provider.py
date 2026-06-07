@@ -21,7 +21,7 @@ import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
 
-from app.agents.types import AgentTool, PermissionCheckFn
+from app.agents.types import AgentTool
 from app.providers._stream_logging import log_provider_stream_event
 from app.providers.base import ReasoningEffort, StreamEvent
 
@@ -50,7 +50,6 @@ class AgyCliLLM:
         tools: list[AgentTool] | None = None,
         system_prompt: str | None = None,
         reasoning_effort: ReasoningEffort | None = None,
-        permission_check: PermissionCheckFn | None = None,
         images: list[dict[str, str]] | None = None,
         agy_conversation_id: str | None = None,
     ) -> AsyncIterator[StreamEvent]:
@@ -62,12 +61,6 @@ class AgyCliLLM:
             logger.debug("AGY_CLI_REASONING_EFFORT_IGNORED value=%s", reasoning_effort)
         if images:
             logger.debug("AGY_CLI_IMAGES_IGNORED count=%d", len(images))
-        if permission_check is not None:
-            logger.warning(
-                "AGY_CLI_PERMISSION_CHECK_UNSUPPORTED conversation_id=%s model=%s",
-                conversation_id,
-                self._model_id,
-            )
 
         if not is_agy_cli_available():
             yield _error_event("Antigravity agy CLI binary not found on PATH.")

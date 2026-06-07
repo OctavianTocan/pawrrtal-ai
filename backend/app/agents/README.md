@@ -36,7 +36,7 @@ Providers do not reuse a single static function for model calls. Instead, when `
 By default, LLM SDKs try to automatically run function calls they emit and return the result. In Pawrrtal, we explicitly disable this (e.g. `automatic_function_calling=False` on Gemini).
 * Disabling this forces the model to emit a raw JSON function call block.
 * The provider yields this block as a `LLMToolCallEvent`.
-* The `agent_loop` captures the event, runs it through the configured `permission_check` security policy, executes the tool, and feeds the `ToolResultMessage` back to the model in the next turn.
+* The `agent_loop` captures the event, executes the tool, and feeds the `ToolResultMessage` back to the model in the next turn.
 
 ### D. Opaque State Propagation (`provider_state`)
 Some model providers require proprietary state to resume multi-turn conversations safely (for example, Gemini-3 / Vertex requires replaying the raw `model_content` parts and `thought_signature` bytes from the model's function-calling response, otherwise the next tool result request is rejected).
@@ -81,14 +81,11 @@ class AgentLoopConfig:
     transform_context: TransformContextFn | None = None
     should_stop_after_turn: ShouldStopFn | None = None
     safety: AgentSafetyConfig = field(default_factory=AgentSafetyConfig)
-    permission_check: PermissionCheckFn | None = None
-    permission_audit_sink: PermissionAuditSinkFn | None = None
 ```
 > [!NOTE]
 > * `convert_to_llm`: Pre-processes messages before they are handed to the provider (e.g. filtering out UI-specific messages).
 > * `transform_context`: An optional async function to trim/summarize history before each LLM call (e.g. for context windows).
 > * `safety`: Holds limit configurations (max turns, wall-clock timeout).
-> * `permission_check`: The security hook called before executing any tool to grant or deny access.
 
 ### C. `AgentMessage`
 Unified message wrapper format. It can be one of:
@@ -231,24 +228,10 @@ safety_config = AgentSafetyConfig(
     max_consecutive_tool_errors=2      # Terminate if model retries broken args
 )
 
-# 2. Build the permission policy callback
-async def my_permission_check(tool_name: str, arguments: dict) -> dict:
-    """Async guard invoked before executing any tool."""
-    # Allow read-only operations automatically
-    if tool_name == "get_weather":
-        return {"allow": True}
-
-    # Deny other operations or request approval
-    return {
-        "allow": False,
-        "reason": f"Tool '{tool_name}' requires explicit operator permissions."
-    }
-
-# 3. Assemble the loop config
+# 2. Assemble the loop config
 loop_config = AgentLoopConfig(
     convert_to_llm=lambda msgs: msgs,   # Identity converter (no modification)
-    safety=safety_config,
-    permission_check=my_permission_check
+    safety=safety_config
 )
 ```
 

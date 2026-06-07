@@ -52,9 +52,9 @@ from app.agents import (
     UserMessage,
     agent_loop,
 )
+from app.agents.permissions import default_tool_permission_check
 from app.agents.safety_factory import safety_from_settings
 from app.agents.types import (
-    PermissionCheckFn,
     TextContent,
 )
 from app.infrastructure.config import settings
@@ -236,7 +236,6 @@ class OpencodeGoLLM:
         tools: list[AgentTool] | None = None,
         system_prompt: str | None = None,
         reasoning_effort: ReasoningEffort | None = None,
-        permission_check: PermissionCheckFn | None = None,
         images: list[dict[str, str]] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Run the agent loop and translate AgentEvents → StreamEvents.
@@ -257,9 +256,6 @@ class OpencodeGoLLM:
             reasoning_effort: Accepted for protocol parity. The
                 gateway exposes interleaved reasoning unconditionally,
                 so we don't translate this knob to a request parameter.
-            permission_check: Optional cross-provider permission gate;
-                threaded into ``AgentLoopConfig`` so the same denial
-                surface fires regardless of model.
             images: Accepted for ``AILLM`` protocol parity. GLM-5.1
                 advertises text-only inputs (``modalities.input =
                 ["text"]``); Kimi K2.6 accepts images but the chat
@@ -308,8 +304,8 @@ class OpencodeGoLLM:
         prompt = UserMessage(role="user", content=question)
         config = AgentLoopConfig(
             convert_to_llm=identity_convert,
+            permission_check=default_tool_permission_check,
             safety=safety_from_settings(settings),
-            permission_check=permission_check,
         )
 
         stream_fn = self._stream_fn or make_opencode_go_stream_fn(

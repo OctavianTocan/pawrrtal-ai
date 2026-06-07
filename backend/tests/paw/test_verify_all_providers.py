@@ -56,19 +56,16 @@ def _catalog() -> dict[str, Any]:
                 "model_id": "agy-api:google/gemini-3.5-flash-low",
                 "id": "agy-api:google/gemini-3.5-flash-low",
                 "host": "agy-api",
-                "is_default": False,
             },
             {
                 "model_id": "openai-codex:openai/gpt-5.5",
                 "id": "openai-codex:openai/gpt-5.5",
                 "host": "openai-codex",
-                "is_default": False,
             },
             {
                 "model_id": "litellm:openai/gpt-4o-mini",
                 "id": "litellm:openai/gpt-4o-mini",
                 "host": "litellm",
-                "is_default": True,
             },
         ]
     }

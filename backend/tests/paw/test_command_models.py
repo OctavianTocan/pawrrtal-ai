@@ -45,7 +45,6 @@ def _model_option(model_id: str, **overrides: Any) -> dict[str, Any]:
         "display_name": model_id.upper(),
         "short_name": model_id,
         "description": "test model",
-        "is_default": False,
     }
     base.update(overrides)
     return base

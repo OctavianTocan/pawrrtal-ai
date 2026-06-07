@@ -57,10 +57,10 @@ This is a public repo wired to a self-hosted runner pool on Octavian's VPS. CI i
       github.event.pull_request.head.repo.full_name == github.repository)
   ```
 
-- **Default runner is self-hosted:** `runs-on: [self-hosted, openclaw-mini, pawrrtal]`. The runner pool is `openclaw-vps-NN` registered out of `/srv/github-runners/<repo>/actions-runner/` as the `gha` system user. Use `ubuntu-latest` only when there's a real reason (macOS/Windows/GPU/untrusted external code already gated separately).
+- **Default runner is self-hosted:** `runs-on: [self-hosted, openclaw-mini, pawrrtal]`. The runner pool is repo-scoped and ephemeral, launched only when needed from `/mnt/HC_Volume_105512717/github-runners/pawrrtal-ephemeral/` with per-runner system users. Keep runner workdirs on the large mounted volume, not the VPS root disk. Do not install persistent GitHub Actions runner services for this public repo. Use `ubuntu-latest` only when there's a real reason (macOS/Windows/GPU/untrusted external code already gated separately).
 - **Documented exception:** `rebase.yml` uses `pull_request_target` and never runs PR code; it relies on `author_association` instead of the actor gate. See `.claude/rules/github-actions/safe-pull-request-target.md`.
 - **Repo-level Actions settings** (must be set in the GitHub UI; the standard CI tokens don't have Actions admin scope): require approval for first-time contributor workflows, default workflow permissions = read.
-- **Layout / install / removal:** `frontend/content/docs/handbook/ci/self-hosted-runner.md`. Use `scripts/install-self-hosted-runner.sh` to add another runner; the script auto-picks the next `openclaw-vps-NN` slot.
+- **Layout / launch / cleanup:** `frontend/content/docs/handbook/ci/self-hosted-runner.md`. Use `scripts/ephemeral-self-hosted-runners.sh start --count <N> --tag <name>` to launch a bounded temporary batch, then `scripts/ephemeral-self-hosted-runners.sh cleanup --count <N> --tag <name>` after the jobs drain. Default to one or two runners when the VPS is already busy; do not start a max-size batch just to shorten a queue.
 
 New CI surfaces (backend pytest, frontend vitest, Maestro E2E, etc.) belong on the self-hosted runner with the actor gate. If you find yourself thinking "just this once on `ubuntu-latest` without the gate," don't.
 
@@ -82,6 +82,7 @@ Architectural drift is gated by [sentrux](https://github.com/sentrux/sentrux) v0
 - Prefer explicit inheritance/composition or helper composition so TypeScript can typecheck.
 - Keep files concise; extract helpers instead of "V2" copies. Aim to keep files under ~700 LOC. Split/refactor when it improves clarity or testability.
 - **Written English**: Use American spelling and grammar in code, comments, docs, and UI strings (e.g. "color" not "colour", "behavior" not "behaviour", "analyze" not "analyse").
+- **User-facing text**: Every string a user reads (tool/action display names, command labels, buttons, status lines, error messages, cards, notices) follows the `user-facing-text` skill — `.claude/skills/user-facing-text/SKILL.md`. In particular, user-facing tool/action **names** are Title Case with spaces (`Tool Name`), never `tool_name` or `Tool name`, and must read identically across Telegram, Google Chat, and Web.
 - **Preserve Documentation**: NEVER remove existing docstrings, JSDoc comments, or explanatory comments when modifying code. Only remove documentation if the code it documents is being deleted, or update it if your changes make it inaccurate. See `.claude/rules/clean-code/preserve-documentation.md` for detailed rules.
 - **Icons + SVGs live in their own files**: Never inline SVG markup or icon definitions inside a component file. Every glyph, logo, status icon, or decorative SVG must live in a dedicated file (e.g. `frontend/features/nav-chats/components/ConversationIndicators.tsx` for the row-status glyphs, `frontend/features/onboarding/OnboardingBackdrop.tsx` for the backdrop). Components import + render the icon, never define it. This keeps feature files focused, lets tree-shaking work, and stops icon swaps from re-flowing unrelated code. Lucide / Tabler imports already follow the rule because they're external packages.
 - **File-line budget**: 500 lines hard ceiling for any `.ts`/`.tsx`/`.py` source file. `node scripts/check-file-lines.mjs` enforces it; CI fails on overflow. Split into smaller modules rather than asking for an exemption.
@@ -95,6 +96,7 @@ Architectural drift is gated by [sentrux](https://github.com/sentrux/sentrux) v0
 ## Commit & Pull Request Guidelines
 
 - Use `$pr-to-branch` skill for PR creation and analysis when available.
+- Commit often in small logical increments while working on larger changes. Each commit should tell the story of what changed and why, not only name the files touched. Prefer messages that explain the user-visible or architectural intent, such as `feat(plugins): add manifest validation before runtime loading`, over vague snapshots like `update plugins`.
 - Create commits with clear, action-oriented messages (e.g., `feat(sidebar): add rename functionality`).
 - Group related changes; avoid bundling unrelated refactors.
 - PRs should be small, review-friendly slices (e.g., "Sidebar Craft Parity Round 2"). Do not bundle massive rewrites with unrelated visual tweaks.

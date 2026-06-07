@@ -113,8 +113,8 @@ def make_exa_search_tool(*, workspace_root: Path | None = None) -> AgentTool:
         execute=_execute,
         display=make_tool_display(
             icon="🌐",
-            label="Search web",
+            label="Search Web",
             present=lambda args: f"🌐 Searching the web for {summarize_query(args.get('query'))}",
-            compact=lambda args: f"Search web -> {summarize_query(args.get('query'))}",
+            compact=lambda args: f"Search Web -> {summarize_query(args.get('query'))}",
         ),
     )

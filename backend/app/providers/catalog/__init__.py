@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import asdict
+from pathlib import Path
 
 from app.providers.model_id import ParsedModelId, UnknownModelId, parse_model_id
 
@@ -28,8 +29,9 @@ __all__ = [
     "CATALOG_ETAG",
     "MODEL_CATALOG",
     "ModelEntry",
-    "default_model",
     "find",
+    "first_authenticated_catalog_model",
+    "first_catalog_model",
     "is_known",
     "require_known",
 ]
@@ -44,13 +46,6 @@ MODEL_CATALOG: tuple[ModelEntry, ...] = (
     *OPENAI_ENTRIES,
     *OPENCODE_GO_ENTRIES,
 )
-
-
-# Module-import-time invariant: exactly one default.
-# Explicit raise (not ``assert``) so ``python -O`` cannot strip it.
-_default_count = sum(1 for e in MODEL_CATALOG if e.is_default)
-if _default_count != 1:
-    raise ValueError(f"MODEL_CATALOG must have exactly one default; found {_default_count}")
 
 
 def _hash_catalog(catalog: tuple[ModelEntry, ...]) -> str:
@@ -69,14 +64,33 @@ response header so clients can revalidate cheaply with
 `If-None-Match`."""
 
 
-def default_model() -> ModelEntry:
-    """Return the entry marked ``is_default=True``.
+def first_catalog_model() -> ModelEntry:
+    """Return the positional first entry, ``MODEL_CATALOG[0]``.
+
+    Used as the fallback wherever a model is needed but none was
+    supplied. There is no curated default — this is purely the first
+    row of the catalog tuple, so the value tracks whatever ordering the
+    catalog composition (``MODEL_CATALOG``) declares.
 
     Returns:
-        The single default entry. The module-import-time invariant
-        guarantees exactly one exists.
+        The first :class:`ModelEntry` in :data:`MODEL_CATALOG`.
     """
-    return next(e for e in MODEL_CATALOG if e.is_default)
+    return MODEL_CATALOG[0]
+
+
+def first_authenticated_catalog_model(workspace_root: Path | None = None) -> ModelEntry:
+    """Return the first catalog entry whose host is authenticated.
+
+    Falls back to :func:`first_catalog_model` when no host currently passes
+    the auth gate so callers can still surface a deterministic provider error
+    instead of crashing before the turn starts.
+    """
+    from app.providers.factory import host_authenticated  # noqa: PLC0415
+
+    for entry in MODEL_CATALOG:
+        if host_authenticated(entry.host, workspace_root=workspace_root):
+            return entry
+    return first_catalog_model()
 
 
 def find(parsed: ParsedModelId) -> ModelEntry | None:

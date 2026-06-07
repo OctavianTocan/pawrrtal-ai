@@ -31,8 +31,15 @@ function renderStep(overrides: Partial<Parameters<typeof StepServer>[0]> = {}) {
 // ---------------------------------------------------------------------------
 
 describe('StepServer', () => {
+	const originalLocation = window.location;
+
 	beforeEach(() => {
 		window.localStorage.clear();
+		vi.unstubAllEnvs();
+		Object.defineProperty(window, 'location', {
+			configurable: true,
+			value: originalLocation,
+		});
 	});
 
 	describe('initial render', () => {
@@ -80,6 +87,21 @@ describe('StepServer', () => {
 			expect(onPatch).toHaveBeenCalledWith({ remoteServerUrl: '' });
 			expect(onContinue).toHaveBeenCalled();
 			expect(window.localStorage.getItem('pawrrtal:backend-config')).toBeTruthy();
+		});
+
+		it('persists the Tailscale origin for hosted mode instead of localhost', () => {
+			Object.defineProperty(window, 'location', {
+				configurable: true,
+				value: new URL('https://openclaw-vps.tailb0501a.ts.net:7447/'),
+			});
+			const { onContinue } = renderStep();
+
+			fireEvent.click(screen.getByRole('button', { name: /Continue/i }));
+
+			expect(onContinue).toHaveBeenCalled();
+			expect(window.localStorage.getItem('pawrrtal:backend-config')).toBe(
+				JSON.stringify({ url: 'https://openclaw-vps.tailb0501a.ts.net:7447', apiKey: '' })
+			);
 		});
 
 		it('is disabled when self-hosted mode has an empty URL', () => {

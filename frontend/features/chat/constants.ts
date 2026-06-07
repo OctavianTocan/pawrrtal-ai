@@ -31,8 +31,6 @@ export type ChatReasoningLevel = (typeof CHAT_REASONING_LEVELS)[number];
  * the full set of persisted keys is visible at a glance.
  */
 export const CHAT_STORAGE_KEYS = {
-	/** User's most recently selected chat model. */
-	selectedModelId: 'chat-composer:selected-model-id',
 	/** User's most recently selected reasoning level. */
 	selectedReasoning: 'chat-composer:selected-reasoning-level',
 	/** Whether the Plan-mode toggle is currently visible in the toolbar. */
@@ -49,10 +47,12 @@ export type ChatStorageKey = (typeof CHAT_STORAGE_KEYS)[keyof typeof CHAT_STORAG
 /**
  * Default reasoning level used when nothing is persisted yet.
  *
- * The default model is now sourced from the backend catalog
- * (`GET /api/v1/models` returns one entry with `is_default: true`), so
- * there is no `DEFAULT_CHAT_MODEL_ID` constant here — see
- * `frontend/features/chat/hooks/use-chat-models.ts`.
+ * Fresh conversations start with the FIRST entry the backend catalog returns
+ * (`GET /api/v1/models`). Existing conversations seed from their stored
+ * `model_id`. Neither case uses localStorage, so there is no
+ * `DEFAULT_CHAT_MODEL_ID` constant or `selectedModelId` storage key here —
+ * see `frontend/features/chat/hooks/use-chat-models.ts` and
+ * `ChatContainer`'s `useSelectedChatModel`.
  */
 export const DEFAULT_REASONING_LEVEL: ChatReasoningLevel = 'medium';
 

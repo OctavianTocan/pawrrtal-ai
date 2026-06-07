@@ -38,7 +38,7 @@ from app.agents.plugins import (
 from app.agents.types import AgentTool
 from app.infrastructure.config import settings
 from app.infrastructure.keys import resolve_api_key
-from app.providers.catalog import default_model
+from app.providers.catalog import first_authenticated_catalog_model
 from app.tools.artifact_agent import make_artifact_tool
 from app.tools.exa_search_agent import make_exa_search_tool
 from app.tools.image_gen_agent import make_image_gen_tool
@@ -269,12 +269,11 @@ def build_agent_tools(
         tools.append(make_lcm_list_summaries_tool(conversation_id=conversation_id))
         tools.append(make_lcm_describe_tool(conversation_id=conversation_id))
         if user_id is not None:
-            # When the caller didn't pin a model, fall back to the
-            # catalog's canonical default rather than a hardcoded
-            # preview ID — hardcoded preview IDs drift the moment the
-            # catalog moves (see commit 08318a1 for the analogous fix in
-            # ``app.cli.commit``).
-            expand_model_id = model_id or default_model().id
+            expand_model_id = model_id or first_authenticated_catalog_model(workspace_root).id
+            # The lcm_expand_query tool needs a concrete model to run its
+            # sub-query. Channel callers normally pass a resolved model_id, but
+            # webhook/Telegram paths can still build tools before that happens;
+            # use the workspace-authenticated catalog head for those cases.
             tools.append(
                 make_lcm_expand_query_tool(
                     conversation_id=conversation_id,

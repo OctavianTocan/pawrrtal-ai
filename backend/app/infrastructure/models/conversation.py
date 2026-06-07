@@ -7,7 +7,17 @@ from datetime import datetime
 from enum import Enum
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, CheckConstraint, DateTime, ForeignKey, Integer, String, Uuid
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Uuid,
+)
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import Text
 
@@ -43,6 +53,12 @@ class Conversation(Base):
             "reasoning_effort IN (" + ", ".join(f"'{v}'" for v in _REASONING_EFFORT_VALUES) + ")",
             name="ck_conversations_reasoning_effort_values",
         ),
+        Index(
+            "ix_conversations_channel_scope",
+            "user_id",
+            "origin_channel",
+            "channel_thread_key",
+        ),
     )
 
     id: Mapped[uuid.UUID] = mapped_column(Uuid, primary_key=True, default=uuid.uuid4)
@@ -71,6 +87,8 @@ class Conversation(Base):
     )
     # Channel that created this conversation (e.g. "telegram", "web").
     origin_channel: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # Channel-local conversation key, such as a Google Chat space/thread.
+    channel_thread_key: Mapped[str | None] = mapped_column(String(256), nullable=True)
     # Telegram Bot API 9.3+ topic thread ID. NULL for non-topic DMs.
     telegram_thread_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Codex SDK thread ID for native openai_codex provider resume support.

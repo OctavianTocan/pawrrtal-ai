@@ -116,14 +116,10 @@ async def handle_compact_command(
 
     # Default the summary model to whatever the conversation is using
     # (matches the fallback in ``compact_leaf_if_needed`` when
-    # ``lcm_summary_model`` is unset). Honours the user's pinned default
-    # before falling back to the catalog default — see
+    # ``lcm_summary_model`` is unset). Falls back to the catalog default
+    # when the conversation has no override — see
     # :func:`resolve_effective_model_id`.
-    summary_model_id = await resolve_effective_model_id(
-        session=session,
-        user_id=pawrrtal_user_id,
-        conversation_model_id=conversation.model_id,
-    )
+    summary_model_id = resolve_effective_model_id(conversation_model_id=conversation.model_id)
 
     # Take the per-conversation lock to serialize against any
     # background pass that turn_runner.py just scheduled — both paths

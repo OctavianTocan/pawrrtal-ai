@@ -19,7 +19,7 @@ from app.channels.telegram.handlers import TelegramTurnContext
 from app.infrastructure.database.legacy import async_session_maker
 from app.providers import resolve_llm
 from app.providers.base import AILLM
-from app.providers.catalog import default_model, require_known
+from app.providers.catalog import first_catalog_model, require_known
 from app.providers.model_id import InvalidModelId, UnknownModelId
 
 logger = logging.getLogger(__name__)
@@ -35,8 +35,8 @@ async def resolve_provider_with_auto_clear(
     On either :class:`InvalidModelId` (string doesn't parse) or
     :class:`UnknownModelId` (parses but isn't in the catalog), the stored
     ``conversation.model_id`` is cleared to ``NULL`` so the *next* turn
-    reads :func:`catalog.default_model` cleanly — no per-turn-fails-forever
-    UX trap — and the current turn falls back to the catalog default.
+    reads :func:`catalog.first_catalog_model` cleanly — no per-turn-fails-forever
+    UX trap — and the current turn falls back to the first catalog entry.
 
     Telegram is catalog-ignorant on the write side (``/model`` only runs
     the structural parser, per ADR 2026-05-14 §7), so this is the single
@@ -65,7 +65,7 @@ async def resolve_provider_with_auto_clear(
             workspace_root=workspace_root,
         )
     except (InvalidModelId, UnknownModelId) as exc:
-        fallback_id = default_model().id
+        fallback_id = first_catalog_model().id
         warning = (
             f"Model <code>{context.model_id}</code> isn't usable: {exc}. "
             f"Switching you back to the default ({fallback_id})."

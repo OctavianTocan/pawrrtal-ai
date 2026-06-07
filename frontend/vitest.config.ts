@@ -141,6 +141,14 @@ export default defineConfig({
 				'**/.next/**',
 				'components/ui/**',
 				'app/**',
+				// V8 coverage remaps currently parse this untested TSX file as
+				// plain JS under Rolldown. Keep hook/reducer coverage active and
+				// exclude this presentation layer until the parser path supports TSX.
+				'features/chat/ChatView.tsx',
+				// This helper imports Next's server-only marker. Vitest's V8
+				// uncovered-file pass remaps it as plain JS, so collect coverage
+				// through callers instead of parsing this server-only shim.
+				'lib/server-api.ts',
 				// Coverage for the vendored react-dropdown package is owned by
 				// its own vitest config in lib/react-dropdown/.
 				'lib/react-dropdown/**',

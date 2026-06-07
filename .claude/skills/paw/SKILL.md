@@ -48,7 +48,7 @@ Every row reflects a shipped subcommand. Source: `backend/app/cli/paw/commands/`
 | record / replay  | `record COMMAND…`, `replay --from FILE`                        | local (respx-backed)                     |
 | fanout           | `<N> COMMAND…`                                                 | local orchestrator over N parallel personas |
 | mirror           | `--upstream URL COMMAND…`                                      | local vs remote SSE diff                  |
-| verify           | `codex`, `chat-roundtrip`, `model-switch`, `telegram`, `cost`, `lcm`, `all` | end-to-end                   |
+| verify           | `codex`, `chat-roundtrip`, `model-switch`, `telegram`, `google-chat`, `cost`, `lcm`, `all` | end-to-end                   |
 | doctor           | (no verb)                                                      | local + ping `/api/v1/health` + models   |
 | dev              | `up`, `down`, `status`                                         | local backend lifecycle (pid file at `<PAW_CONFIG_DIR>/<profile>/dev.json`) |
 
@@ -141,7 +141,21 @@ greppable until those endpoints land.
 just paw verify all --json
 ```
 
-Runs `codex` + `chat-roundtrip` + `model-switch` + `telegram` + `cost` + `lcm` in sequence; aggregate exit code is 6 if any single suite fails.
+Runs `codex` + `chat-roundtrip` + `model-switch` + `telegram` + `google-chat` + `cost` + `lcm` in sequence; aggregate exit code is 6 if any single suite fails.
+
+### Verify the Google Chat channel
+
+```bash
+just paw verify google-chat --json | jq '.checks[] | select(.passed == false)'
+```
+
+The Google Chat channel has no HTTP surface (Pub/Sub in, Chat REST out), so
+this suite pings the backend for liveness and then asserts the channel's pure
+logic — Markdown→Chat formatting (the `*bold*`/`<url|label>` guards that catch
+raw-markup regressions), slash-command parsing of the add-on `appCommandPayload`
+shape, inbound field extraction, and channel registration. The full live
+Pub/Sub→Chat round-trip is bot-covered, recorded as the stable
+`live_pubsub_roundtrip_bot_covered` marker check.
 
 ### Capture a fixture for unit tests, then replay offline
 

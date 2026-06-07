@@ -46,9 +46,6 @@ from app.channels.crud import (
 from app.channels.telegram._attachments import (
     collect_attachments as collect_attachments,  # noqa: PLC0414
 )
-from app.channels.telegram.bot_permissions import (
-    build_telegram_permission_check as build_telegram_permission_check,  # noqa: PLC0414
-)
 from app.channels.telegram.dev_admin import resolve_or_autolink_telegram_user
 from app.channels.telegram.model_defaults import resolve_effective_model_id
 from app.channels.telegram.sender import TelegramSender as TelegramSender  # noqa: PLC0414
@@ -266,11 +263,7 @@ async def handle_plain_message(
         session=session,
         thread_id=sender.thread_id,
     )
-    model_id = await resolve_effective_model_id(
-        session=session,
-        user_id=pawrrtal_user_id,
-        conversation_model_id=conversation.model_id,
-    )
+    model_id = resolve_effective_model_id(conversation_model_id=conversation.model_id)
 
     logger.info(
         "TELEGRAM_TURN user_id=%s conversation_id=%s model=%s thread_id=%s text_len=%d",

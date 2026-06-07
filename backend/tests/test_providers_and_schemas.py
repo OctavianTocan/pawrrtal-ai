@@ -106,7 +106,6 @@ class _FakeCachedCodexProvider:
         tools: list[Any] | None = None,
         system_prompt: str | None = None,
         reasoning_effort: str | None = None,
-        permission_check: Any | None = None,
         images: list[dict[str, str]] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         del (
@@ -117,7 +116,6 @@ class _FakeCachedCodexProvider:
             tools,
             system_prompt,
             reasoning_effort,
-            permission_check,
             images,
         )
         if False:

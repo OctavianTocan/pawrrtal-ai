@@ -26,6 +26,7 @@ from httpx import AsyncClient
 from app.channels.sse import SSEChannel
 from app.models import Workspace
 from app.providers.base import StreamEvent
+from app.providers.catalog import first_catalog_model
 
 
 class _FakeProvider:
@@ -40,7 +41,6 @@ class _FakeProvider:
         tools: object = None,
         system_prompt: object = None,
         reasoning_effort: object = None,
-        permission_check: object = None,
         images: object = None,
     ) -> AsyncIterator[dict[str, str]]:
         """Emit one text delta so ``_finalize_turn`` has something to persist."""
@@ -87,7 +87,11 @@ async def test_chat_router_does_not_pass_request_session_into_turn_input(
 
     response = await client.post(
         "/api/v1/chat/",
-        json={"question": "hello", "conversation_id": str(conversation_id)},
+        json={
+            "question": "hello",
+            "conversation_id": str(conversation_id),
+            "model_id": first_catalog_model().id,
+        },
     )
 
     assert response.status_code == 200, response.text
@@ -126,7 +130,11 @@ async def test_chat_finalizes_assistant_status_on_sqlite(
 
     response = await client.post(
         "/api/v1/chat/",
-        json={"question": "hi", "conversation_id": str(conversation_id)},
+        json={
+            "question": "hi",
+            "conversation_id": str(conversation_id),
+            "model_id": first_catalog_model().id,
+        },
     )
     assert response.status_code == 200
     assert "data: [DONE]" in response.text
@@ -219,7 +227,11 @@ async def test_finalize_turn_leaves_message_complete_on_cost_write_failure(
 
     response = await client.post(
         "/api/v1/chat/",
-        json={"question": "hi", "conversation_id": str(conversation_id)},
+        json={
+            "question": "hi",
+            "conversation_id": str(conversation_id),
+            "model_id": first_catalog_model().id,
+        },
     )
     assert response.status_code == 200
     assert "data: [DONE]" in response.text

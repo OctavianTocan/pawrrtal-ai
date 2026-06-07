@@ -20,14 +20,15 @@ from app.agents import (
     UserMessage,
     agent_loop,
 )
+from app.agents.permissions import default_tool_permission_check
 from app.agents.safety_factory import safety_from_settings
-from app.agents.types import LLMEvent, PermissionCheckFn, TextContent
+from app.agents.types import LLMEvent, TextContent
 from app.infrastructure.config import settings
 from app.providers._stream_logging import log_provider_stream_event
 from app.providers.base import ReasoningEffort, StreamEvent
 from app.providers.gemini.events import agent_event_to_stream_event, identity_convert
 
-from .auth import AgyApiAuthError, load_agy_api_auth
+from .auth import AgyApiAuthError, ensure_agy_api_auth
 from .client import stream_llm_events
 from .events import AgyApiUsageAccumulator
 from .messages import build_agy_generation_config
@@ -44,7 +45,7 @@ def resolve_agy_api_wire_model_id(model_id: str) -> str:
     return _WIRE_MODEL_ALIASES.get(model_id, model_id)
 
 
-def make_agy_api_stream_fn(
+async def make_agy_api_stream_fn(
     model_id: str,
     workspace_root: Path | None,
     *,
@@ -53,7 +54,7 @@ def make_agy_api_stream_fn(
     usage_sink: AgyApiUsageAccumulator,
 ) -> StreamFn:
     """Build a StreamFn backed by Antigravity's direct API."""
-    auth = load_agy_api_auth(workspace_root)
+    auth = await ensure_agy_api_auth(workspace_root)
     wire_model_id = resolve_agy_api_wire_model_id(model_id)
     generation_config = build_agy_generation_config(
         model_id=model_id,
@@ -95,7 +96,6 @@ class AgyApiLLM:
         tools: list[AgentTool] | None = None,
         system_prompt: str | None = None,
         reasoning_effort: ReasoningEffort | None = None,
-        permission_check: PermissionCheckFn | None = None,
         images: list[dict[str, str]] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Stream one direct Antigravity API turn."""
@@ -110,13 +110,13 @@ class AgyApiLLM:
         prompt = UserMessage(role="user", content=question)
         config = AgentLoopConfig(
             convert_to_llm=identity_convert,
+            permission_check=default_tool_permission_check,
             safety=safety_from_settings(settings),
-            permission_check=permission_check,
         )
         usage = AgyApiUsageAccumulator()
 
         try:
-            stream_fn = self._stream_fn or make_agy_api_stream_fn(
+            stream_fn = self._stream_fn or await make_agy_api_stream_fn(
                 self._model_id,
                 self._workspace_root,
                 system_prompt=context.system_prompt,

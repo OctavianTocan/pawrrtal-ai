@@ -31,7 +31,7 @@ import anyio
 from acp import connect_to_agent
 
 from app.agents.display import tool_display_map
-from app.agents.types import AgentTool, PermissionCheckFn
+from app.agents.types import AgentTool
 from app.providers.base import ReasoningEffort, StreamEvent
 from app.providers.gemini_cli.acp import (
     AcpFatalError,
@@ -129,7 +129,6 @@ class GeminiCliLLM:
         tools: list[AgentTool] | None = None,
         system_prompt: str | None = None,
         reasoning_effort: ReasoningEffort | None = None,
-        permission_check: PermissionCheckFn | None = None,
         images: list[dict[str, str]] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Stream one chat turn from the Gemini CLI."""
@@ -175,7 +174,6 @@ class GeminiCliLLM:
                 question=question,
                 history=history,
                 system_prompt=system_prompt,
-                permission_check=permission_check,
                 tools=tools,
             ):
                 yield event
@@ -189,7 +187,6 @@ class GeminiCliLLM:
         question: str,
         history: list[dict[str, str]] | None,
         system_prompt: str | None,
-        permission_check: PermissionCheckFn | None,
         tools: list[AgentTool] | None = None,
     ) -> AsyncIterator[StreamEvent]:
         """Run one ACP initialize → new_session → prompt cycle on ``proc``.
@@ -205,7 +202,6 @@ class GeminiCliLLM:
         client_impl = PawrrtalAcpClient(
             event_queue=event_queue,
             workspace_root=self._workspace_root,
-            permission_check=permission_check,
             display_by_name=display_by_name,
         )
         # ``proc.stdin`` / ``proc.stdout`` are typed Optional because

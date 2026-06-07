@@ -24,7 +24,6 @@ from app.agents.tools import build_agent_tools
 from app.channels import ChannelMessage, resolve_channel, surface_from_header
 from app.channels.turn_runner import ChatTurnInput, EventHook, load_agy_conversation_id, run_turn
 from app.chat import (
-    build_chat_permission_check,
     enforce_cost_budget,
     load_external_mcp_configs,
     publish_turn_started,
@@ -36,7 +35,7 @@ from app.conversations.crud import (
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.database.legacy import User, get_async_session
 from app.infrastructure.middleware.logging import get_request_id
-from app.providers import StreamEvent, default_model, resolve_llm
+from app.providers import StreamEvent, resolve_llm
 from app.schemas import ChatRequest
 from app.tools.artifact_agent import (
     ARTIFACT_TOOL_NAME,
@@ -261,11 +260,16 @@ def get_chat_router() -> APIRouter:
             )
             raise HTTPException(status_code=404, detail="Conversation not found")
 
-        # Resolve model: request overrides stored model, stored model overrides
-        # catalog default.  Request and stored values are already canonical
-        # (validated by Pydantic at the API boundary); ``default_model().id``
-        # is the canonical wire form of the catalog default.
-        model_id = request.model_id or conversation.model_id or default_model().id
+        # Resolve model: the request overrides the conversation's stored
+        # model. Both are already canonical (validated by Pydantic at the API
+        # boundary). There is no default fallback — a model must be supplied
+        # by the request or already pinned on the conversation.
+        model_id = request.model_id or conversation.model_id
+        if not model_id:
+            raise HTTPException(
+                status_code=422,
+                detail="model_id is required: no model on the request or the conversation",
+            )
 
         # Apply the model switch (if any) and re-normalize the stored
         # reasoning_effort against the current model in a *single*
@@ -375,20 +379,6 @@ def get_chat_router() -> APIRouter:
             "model_id": model_id,
             "metadata": {},
         }
-        # Build the per-request permission gate (PR 03b + PR 06).  The
-        # helper bundles workspace-context loading, ``PermissionContext``
-        # construction, and the cross-provider closure that adapts
-        # ``(tool_name, arguments)`` so the context never leaks into the
-        # agent loop. Both providers consume the same closure — Claude
-        # via the SDK's ``can_use_tool`` hook, Gemini via
-        # ``AgentLoopConfig.permission_check``.
-        permission_check_for_request = build_chat_permission_check(
-            user_id=user.id,
-            workspace_root=root,
-            conversation_id=request.conversation_id,
-            surface=surface,
-        )
-
         # PR 09: forward multimodal image inputs from the request body to
         # the provider via ChatTurnInput.images.  Each provider bridges
         # these into its native content-block shape — Claude as
@@ -438,7 +428,6 @@ def get_chat_router() -> APIRouter:
             # from the shared backstop: per-turn override wins,
             # otherwise the conversation's normalized stored effort.
             reasoning_effort=effective_reasoning_effort,
-            permission_check=permission_check_for_request,
             images=image_inputs,
             history_window=_HISTORY_WINDOW,
             log_tag="CHAT",
