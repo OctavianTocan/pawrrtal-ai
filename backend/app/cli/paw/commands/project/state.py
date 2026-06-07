@@ -10,7 +10,7 @@ from pathlib import Path
 from app.cli.paw.config import profile_dir
 
 PROJECT_STATE_SCHEMA_VERSION = 1
-DEFAULT_FRONTEND_URL = "http://localhost:53001"
+DEFAULT_FRONTEND_URL = "http://localhost:3000"
 DEFAULT_BACKEND_URL = "http://127.0.0.1:8000"
 DEFAULT_BOOT_TIMEOUT_S = 45
 HEALTH_PROBE_INTERVAL_S = 0.5

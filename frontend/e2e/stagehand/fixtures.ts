@@ -44,7 +44,7 @@ import { test as base } from '@playwright/test';
 import { E2E_SKIP_ONBOARDING_STORAGE_KEY } from '../../features/onboarding/v2/OnboardingFlow';
 
 const BACKEND_URL = process.env.E2E_API_URL ?? 'http://localhost:8000';
-const FRONTEND_URL = process.env.E2E_BASE_URL ?? 'http://localhost:53001';
+const FRONTEND_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3000';
 
 /**
  * Repo-relative cache directory shared across all Stagehand specs.

@@ -2,7 +2,7 @@
  * Browser API requests are always same-origin.
  *
  * Local development keeps the familiar split: Next.js serves the browser on
- * `localhost:53001` and rewrites `/api/v1`, `/auth`, and `/users` to the
+ * `localhost:3000` and rewrites `/api/v1`, `/auth`, and `/users` to the
  * backend on `127.0.0.1:8000`. Cloudflared uses the same URL shape at the
  * edge, routing those paths directly to FastAPI and all other paths to Next.
  */

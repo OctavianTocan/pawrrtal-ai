@@ -2,20 +2,19 @@
  * Shared dev-port contract for the monorepo.
  *
  * The frontend dev server port and backend dev server port are a
- * cross-process contract (referenced from `dev.ts`, the Electrobun
- * shell's lifecycle module, comments in handbook docs, etc.). Owning
- * the literal values here gives every consumer one canonical import
- * and stops drift between repo root, frontend, and desktop shell.
+ * cross-process contract (referenced from `dev.ts`, frontend scripts,
+ * and handbook docs). Owning the literal values here gives every
+ * consumer one canonical import and stops drift between repo root and
+ * frontend.
  *
  * The frontend dev host/port also appears in `frontend/package.json`
- * (`scripts.dev`: `next dev --hostname 127.0.0.1 --port 53001`). Those
+ * (`scripts.dev`: `next dev --hostname 127.0.0.1 --port 3000`). Those
  * values must stay in sync with {@link DEV_FRONTEND_BIND_HOST} and
  * {@link DEV_FRONTEND_PORT}; the verification helper below is the gate
  * for that constraint — call it from CI or pre-commit if needed.
  *
  * @see frontend/package.json
  * @see dev.ts
- * @see electrobun/src/bun/server.ts
  * @see electron/src/server.ts (if present)
  */
 
@@ -25,7 +24,7 @@
  * Must match the `--port` flag in `frontend/package.json` -> `scripts.dev`.
  * Verified by {@link assertFrontendPortMatchesPackageJson}.
  */
-export const DEV_FRONTEND_PORT = 53001;
+export const DEV_FRONTEND_PORT = 3000;
 
 /**
  * Host the Next.js dev server binds to locally.

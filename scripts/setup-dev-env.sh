@@ -9,7 +9,7 @@
 #   GOOGLE_API_KEY=... AUTH_SECRET=... bash scripts/setup-dev-env.sh
 #
 # After running, start the dev servers with:
-#   just dev              # frontend (port 53001) + backend (port 8000)
+#   just dev              # frontend (port 3000) + backend (port 8000)
 #   just dev-telegram     # same, but with Telegram polling enabled
 #
 # The script is idempotent — safe to re-run. It will not overwrite
@@ -42,7 +42,7 @@ WORKSPACE_ENCRYPTION_KEY="${WORKSPACE_ENCRYPTION_KEY:-$(generate_fernet_key)}"
 GOOGLE_API_KEY="${GOOGLE_API_KEY:-}"
 ADMIN_EMAIL="${ADMIN_EMAIL:-admin@pawrrtal-ai.dev}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin1234}"
-CORS_ORIGINS="${CORS_ORIGINS:-[\"http://localhost:53001\"]}"
+CORS_ORIGINS="${CORS_ORIGINS:-[\"http://localhost:3000\"]}"
 ENV="${ENV:-dev}"
 
 if [ -z "$GOOGLE_API_KEY" ]; then
@@ -85,8 +85,8 @@ echo "Written $BACKEND_ENV"
 echo ""
 echo "Next steps:"
 echo "  1. just install      # install all dependencies"
-echo "  2. just dev           # start frontend (53001) + backend (8000)"
-echo "  3. Open http://localhost:53001"
+echo "  2. just dev           # start frontend (3000) + backend (8000)"
+echo "  3. Open http://localhost:3000"
 echo "  4. Dev login: POST http://localhost:8000/auth/dev-login"
 echo ""
 echo "For Telegram: set TELEGRAM_BOT_TOKEN and run 'just dev-telegram'"

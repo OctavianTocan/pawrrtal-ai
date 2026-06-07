@@ -4,7 +4,7 @@
 		"frontend": {
 			"name": "pawrrtal",
 			"script": "dev:app",
-			"appPort": 53001
+			"appPort": 3000
 		}
 	}
 }
