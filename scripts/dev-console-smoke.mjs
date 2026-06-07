@@ -30,9 +30,13 @@
  */
 
 import { spawnSync } from 'node:child_process';
+import { mkdirSync } from 'node:fs';
 import process from 'node:process';
 
 const DEV_URL = process.env.DEV_URL ?? 'http://localhost:3001';
+const AGENT_BROWSER_SOCKET_DIR =
+	process.env.AGENT_BROWSER_SOCKET_DIR ?? `/tmp/pawrrtal-agent-browser-${process.pid}`;
+mkdirSync(AGENT_BROWSER_SOCKET_DIR, { recursive: true });
 
 /** Routes a cold-boot user hits first. Each is checked independently
  *  so a regression in one doesn't mask regressions in another. */
@@ -70,7 +74,10 @@ function isAllowlisted(text) {
 }
 
 function ab(...args) {
-	const out = spawnSync('agent-browser', args, { encoding: 'utf8' });
+	const out = spawnSync('agent-browser', args, {
+		encoding: 'utf8',
+		env: { ...process.env, AGENT_BROWSER_SOCKET_DIR },
+	});
 	if (out.status !== 0 && out.status !== null) {
 		process.stderr.write(out.stderr ?? '');
 		process.stderr.write(out.stdout ?? '');
