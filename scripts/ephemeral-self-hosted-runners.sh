@@ -8,12 +8,13 @@
 set -euo pipefail
 
 REPO="${REPO:-OctavianTocan/Pawrrtal-AI}"
-RUNNER_BASE="${RUNNER_BASE:-/srv/github-runners/pawrrtal-ephemeral}"
+RUNNER_BASE="${RUNNER_BASE:-/mnt/HC_Volume_105512717/github-runners/pawrrtal-ephemeral}"
 LABELS="${LABELS:-self-hosted,openclaw-mini,pawrrtal}"
 RUNNER_COUNT="${RUNNER_COUNT:-3}"
 RUN_TAG="${RUN_TAG:-pr-474}"
 MEMORY_MAX="${MEMORY_MAX:-12G}"
 CPU_QUOTA="${CPU_QUOTA:-600%}"
+MIN_FREE_MB="${MIN_FREE_MB:-51200}"
 
 usage() {
     cat >&2 <<'USAGE'
@@ -24,10 +25,11 @@ Usage:
 
 Environment:
   REPO          GitHub repo, default OctavianTocan/Pawrrtal-AI
-  RUNNER_BASE   Local base directory, default /srv/github-runners/pawrrtal-ephemeral
+  RUNNER_BASE   Local base directory, default /mnt/HC_Volume_105512717/github-runners/pawrrtal-ephemeral
   LABELS        Runner labels, default self-hosted,openclaw-mini,pawrrtal
   MEMORY_MAX    systemd MemoryMax per runner, default 12G
   CPU_QUOTA     systemd CPUQuota per runner, default 600%
+  MIN_FREE_MB   Minimum free space before start, default 51200
 
 Authentication:
   Use the GitHub CLI's logged-in account or set GH_TOKEN to a token that can
@@ -68,7 +70,19 @@ validate_config() {
     [[ "$RUNNER_BASE" != "/" ]] || die "RUNNER_BASE cannot be /"
     [[ "$RUNNER_COUNT" =~ ^[1-9][0-9]*$ ]] || die "count must be a positive integer"
     ((RUNNER_COUNT <= 8)) || die "count must be 8 or less"
+    [[ "$MIN_FREE_MB" =~ ^[1-9][0-9]*$ ]] || die "MIN_FREE_MB must be a positive integer"
     safe_identifier "$RUN_TAG"
+}
+
+ensure_runner_disk_headroom() {
+    local base_parent available_mb
+    base_parent="$(dirname "$RUNNER_BASE")"
+    install -d -m 0755 "$base_parent"
+    available_mb="$(df -Pm "$base_parent" | awk 'NR == 2 {print $4}')"
+    [[ "$available_mb" =~ ^[0-9]+$ ]] || die "could not read free disk space for $base_parent"
+    ((available_mb >= MIN_FREE_MB)) || {
+        die "runner base ${RUNNER_BASE} has ${available_mb} MB free; need at least ${MIN_FREE_MB} MB"
+    }
 }
 
 parse_args() {
@@ -235,6 +249,7 @@ start_runner_unit() {
 
 start_runners() {
     local arch version tarball
+    ensure_runner_disk_headroom
     arch="$(resolve_arch)"
     version="$(latest_runner_version)"
     tarball="$(download_runner "$version" "$arch")"

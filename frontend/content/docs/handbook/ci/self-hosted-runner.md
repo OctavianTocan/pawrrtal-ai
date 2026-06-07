@@ -60,9 +60,9 @@ system user and a private runner directory:
 
 | Concern | Value |
 | --- | --- |
-| Base directory | `/srv/github-runners/pawrrtal-ephemeral/` |
+| Base directory | `/mnt/HC_Volume_105512717/github-runners/pawrrtal-ephemeral/` |
 | Runner user | `gha-paw-<tag>-NN`, system user, no login shell |
-| Runner directory | `/srv/github-runners/pawrrtal-ephemeral/runs/<tag>/<runner>/actions-runner/` |
+| Runner directory | `/mnt/HC_Volume_105512717/github-runners/pawrrtal-ephemeral/runs/<tag>/<runner>/actions-runner/` |
 | Labels | `self-hosted, openclaw-mini, pawrrtal` |
 | systemd unit | `pawrrtal-gha-<tag>-NN.service` |
 | Writable paths | Runner directory plus private `/tmp` |
@@ -79,6 +79,11 @@ Run on the VPS host, not inside an application container:
 ```bash
 sudo -E scripts/ephemeral-self-hosted-runners.sh start --count 3 --tag pr-474
 ```
+
+The script defaults `RUNNER_BASE` to the large mounted volume and checks
+for at least 50 GB free before starting a batch. Do not point
+`RUNNER_BASE` at the VPS root disk unless you have first verified enough
+headroom for every runner workdir and cache.
 
 Authentication comes from the GitHub CLI account or `GH_TOKEN`. If using
 `GH_TOKEN`, the token must be allowed to create repository self-hosted
