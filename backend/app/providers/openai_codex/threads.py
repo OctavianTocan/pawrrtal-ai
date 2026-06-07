@@ -11,7 +11,11 @@ from typing import Protocol, cast
 
 from app.agents.types import AgentTool
 from app.channels._turn_runtime_context import system_prompt_for_turn
-from app.channels.turn_orchestrator import load_codex_thread_state, persist_codex_thread_id
+from app.provider_sessions import (
+    ProviderSessionTurnState,
+    load_provider_session,
+    persist_provider_session,
+)
 from app.providers.base import ReasoningEffort
 from app.providers.openai_codex.dynamic_tools import dynamic_tool_fingerprint
 from app.providers.openai_codex.prompting import (
@@ -20,6 +24,7 @@ from app.providers.openai_codex.prompting import (
 )
 
 logger = logging.getLogger(__name__)
+PROVIDER_SESSION_KIND = "openai_codex"
 
 
 class _OpenAICodexProviderLike(Protocol):
@@ -35,6 +40,19 @@ class CodexThreadState:
     thread_id: str | None
     prompt_hash: str | None
     lightweight_prompt: bool = False
+
+    def to_turn_state(self) -> ProviderSessionTurnState:
+        """Return the generic turn state consumed by core orchestration."""
+        stream_kwargs = {"codex_thread_id": self.thread_id} if self.thread_id else {}
+        return ProviderSessionTurnState(
+            kind=PROVIDER_SESSION_KIND,
+            session_id=self.thread_id,
+            fingerprint=self.prompt_hash,
+            stream_kwargs=stream_kwargs,
+            per_turn_context_kwarg="per_turn_context",
+            omit_history=self.prompt_hash is not None,
+            force_low_reasoning=self.lightweight_prompt,
+        )
 
 
 async def ensure_codex_thread_id(
@@ -96,19 +114,29 @@ async def ensure_codex_thread_state(
         developer_instructions=CODEX_DEVELOPER_INSTRUCTIONS,
         tool_fingerprint=dynamic_tool_fingerprint(tools),
     )
-    existing = await load_codex_thread_state(conversation_id)
-    if existing and existing[0] and existing[1] == prompt_hash:
+    existing = await load_provider_session(conversation_id)
+    if (
+        existing
+        and existing.kind == PROVIDER_SESSION_KIND
+        and existing.session_id
+        and existing.fingerprint == prompt_hash
+    ):
         return CodexThreadState(
-            thread_id=existing[0],
+            thread_id=existing.session_id,
             prompt_hash=prompt_hash,
             lightweight_prompt=lightweight_prompt,
         )
-    if existing and existing[0]:
+    if existing and existing.kind == PROVIDER_SESSION_KIND and existing.session_id:
         logger.info(
             "openai_codex: discarding stale thread for conversation=%s reason=prompt_hash_changed",
             conversation_id,
         )
-        await persist_codex_thread_id(conversation_id, None, prompt_hash)
+        await persist_provider_session(
+            conversation_id,
+            kind=PROVIDER_SESSION_KIND,
+            session_id=None,
+            fingerprint=prompt_hash,
+        )
     return CodexThreadState(
         thread_id=None,
         prompt_hash=prompt_hash,
@@ -149,6 +177,7 @@ def _is_openai_codex_provider(provider: object) -> bool:
 
 __all__ = [
     "CODEX_DEVELOPER_INSTRUCTIONS",
+    "PROVIDER_SESSION_KIND",
     "CodexThreadState",
     "codex_thread_prompt_hash",
     "dynamic_tool_fingerprint",

@@ -76,12 +76,8 @@ class ConversationRead(BaseModel):
     # ID of the project this conversation belongs to, or null when the
     # conversation lives in the unattached "Chats" list.
     project_id: uuid.UUID | None = None
-    # Codex SDK thread ID assigned by the openai_codex provider on first
-    # turn and persisted across turns for resume support. NULL until the
-    # provider emits the "codex_thread_created" internal event. Exposed
-    # so HTTP clients (e.g. `paw verify codex`) can assert thread
-    # persistence end-to-end.
-    codex_thread_id: str | None = None
+    # Opaque provider-owned session handle persisted across turns.
+    provider_session_id: str | None = None
 
 
 class ConversationUpdate(BaseModel):

@@ -24,7 +24,6 @@ from app.channels import ChannelMessage, resolve_channel, surface_from_header
 from app.channels.turn_orchestrator import (
     ChatTurnInput,
     EventHook,
-    load_agy_conversation_id,
     run_turn,
 )
 from app.chat import (
@@ -41,6 +40,7 @@ from app.infrastructure.database.legacy import User, get_async_session
 from app.infrastructure.middleware.logging import get_request_id
 from app.plugins.adapters.turn_context import build_turn_context_providers
 from app.providers import StreamEvent, resolve_llm
+from app.providers.session_preparer import prepare_provider_session
 from app.schemas import ChatRequest
 from app.tools.artifact_agent import (
     ARTIFACT_TOOL_NAME,
@@ -395,20 +395,15 @@ def get_chat_router() -> APIRouter:
             else None
         )
 
-        # Ensure native Codex threads are created before the first streamed turn.
-        # Non-Codex providers return None and keep the existing history path.
-        from app.providers.openai_codex.threads import ensure_codex_thread_state  # noqa: PLC0415
-
-        codex_thread_state = await ensure_codex_thread_state(
+        provider_session = await prepare_provider_session(
+            provider,
             conversation_id=request.conversation_id,
-            provider=provider,
             workspace_root=root,
             model_id=model_id,
             tools=agent_tools,
             reasoning_effort=effective_reasoning_effort,
             question=request.question,
         )
-        agy_conversation_id = await load_agy_conversation_id(request.conversation_id)
 
         # ``db_session`` is intentionally left at its ``None`` default so the
         # turn runner opens its own ``async_session_maker()`` session inside
@@ -442,10 +437,7 @@ def get_chat_router() -> APIRouter:
                 "surface": surface,
             },
             turn_context_providers=build_turn_context_providers(workspace_root=root),
-            codex_thread_id=codex_thread_state.thread_id,
-            codex_thread_prompt_hash=codex_thread_state.prompt_hash,
-            codex_lightweight_prompt=codex_thread_state.lightweight_prompt,
-            agy_conversation_id=agy_conversation_id,
+            provider_session=provider_session,
         )
         hooks: list[EventHook] = [_artifact_hook, _drain_send_queue]
 

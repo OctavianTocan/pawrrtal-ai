@@ -225,9 +225,9 @@ async def test_agy_provider_yields_last_framed_answer(
     assert events == [
         {
             "type": "internal",
-            "kind": "agy_conversation_created",
+            "kind": "provider_session_created",
             "provider": "agy_cli",
-            "thread_id": "11111111-1111-4111-9111-111111111111",
+            "session_id": "11111111-1111-4111-9111-111111111111",
         },
         {"type": "delta", "content": "new"},
     ]

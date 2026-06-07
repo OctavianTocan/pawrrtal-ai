@@ -105,7 +105,7 @@ async def _diagnose_conversation_trace(
         "origin_channel": conversation.origin_channel,
         "telegram_thread_id": conversation.telegram_thread_id,
         "model_id": conversation.model_id,
-        "codex_thread_id": conversation.codex_thread_id,
+        "provider_session_id": conversation.provider_session_id,
         "reasoning_effort": conversation.reasoning_effort,
         "verbose_level": conversation.verbose_level,
         "workspace_skill_prompt_mode": settings.workspace_skill_prompt_mode,

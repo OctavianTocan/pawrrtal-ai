@@ -169,7 +169,7 @@ def _assert_turn_2(r: ScenarioResult, events: list[dict[str, Any]]) -> None:
 async def _assert_conversation_state(
     client: PawClient, r: ScenarioResult, conv_id: str
 ) -> str | None:
-    """Verify model + codex_thread_id were persisted after turn 1. Returns thread id."""
+    """Verify model + provider_session_id were persisted after turn 1."""
     detail_1 = (await client.request("GET", f"/api/v1/conversations/{conv_id}")).json()
     r.artifacts["conversation_detail_after_turn_1"] = detail_1
     r.add(
@@ -177,13 +177,13 @@ async def _assert_conversation_state(
         detail_1.get("model_id") == CODEX_MODEL,
         detail=f"got={detail_1.get('model_id')}",
     )
-    thread_id = detail_1.get("codex_thread_id")
+    session_id = detail_1.get("provider_session_id")
     r.add(
-        "codex_thread_id_persisted",
-        bool(thread_id),
-        detail=f"thread_id={thread_id}",
+        "provider_session_id_persisted",
+        bool(session_id),
+        detail=f"session_id={session_id}",
     )
-    return thread_id if isinstance(thread_id, str) else None
+    return session_id if isinstance(session_id, str) else None
 
 
 async def _assert_messages(client: PawClient, r: ScenarioResult, conv_id: str) -> None:
@@ -250,8 +250,8 @@ async def run_codex_scenario(
     r.artifacts["turn_1_ms"] = duration_1_ms
     _assert_turn_1(r, events_1, duration_1_ms)
 
-    # 4. Conversation row + codex_thread_id.
-    thread_id_1 = await _assert_conversation_state(client, r, conv_id)
+    # 4. Conversation row + provider_session_id.
+    session_id_1 = await _assert_conversation_state(client, r, conv_id)
 
     # 5. Messages.
     await _assert_messages(client, r, conv_id)
@@ -264,11 +264,11 @@ async def run_codex_scenario(
     # 7. Thread resumed (not recreated). Pin the exact value, not just non-null —
     #    a regression that mints a fresh thread per turn would otherwise pass.
     detail_2 = (await client.request("GET", f"/api/v1/conversations/{conv_id}")).json()
-    thread_id_2 = detail_2.get("codex_thread_id")
+    session_id_2 = detail_2.get("provider_session_id")
     r.add(
-        "codex_thread_id_unchanged_on_resume",
-        thread_id_2 == thread_id_1 and thread_id_1 is not None,
-        detail=f"before={thread_id_1!r} after={thread_id_2!r}",
+        "provider_session_id_unchanged_on_resume",
+        session_id_2 == session_id_1 and session_id_1 is not None,
+        detail=f"before={session_id_1!r} after={session_id_2!r}",
     )
 
     # 8. Cleanup.

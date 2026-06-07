@@ -18,16 +18,15 @@ from app.infrastructure.observability import (
     turn_span,
     workshop_event_hook,
 )
+from app.provider_sessions import (
+    _register_provider_session_persist_task,
+    persist_provider_session,
+)
 
 from .context_providers import _run_turn_context_providers
 from .finalize import _finalize_turn
 from .history import _load_history_and_persist
-from .state import (
-    _register_codex_persist_task,
-    _register_turn_finalize_task,
-    persist_agy_conversation_id,
-    persist_codex_thread_id,
-)
+from .state import _register_turn_finalize_task
 from .types import ChatTurnInput, EventHook, _EventCounter
 
 if TYPE_CHECKING:
@@ -223,25 +222,11 @@ async def _guarded_stream(
     ``error`` ``StreamEvent``, and the generator exits cleanly so the
     channel deliverer can finish its turn-level chrome.
     """
-    # ``codex_thread_id`` is an openai_codex-specific extension kwarg
-    # (multi-turn thread resume). Other providers' ``stream()`` signatures
-    # don't accept it, so we only forward it when it's actually set —
-    # which only happens for conversations bound to the openai_codex
-    # provider. The Protocol stays clean.
-    extra_kwargs: dict[str, Any] = {}
-    provider_history = history
-    if turn_input.codex_thread_prompt_hash is not None:
-        extra_kwargs["per_turn_context"] = per_turn_context
-        # Native Codex threads are the continuity source for this provider.
-        # When a thread is stale or missing, starting fresh with only this
-        # turn's compact context is much cheaper than replaying Pawrrtal's
-        # UI/audit history into a brand new native thread.
-        provider_history = []
-    if turn_input.codex_thread_id is not None:
-        extra_kwargs["codex_thread_id"] = turn_input.codex_thread_id
-    if turn_input.agy_conversation_id is not None:
-        extra_kwargs["agy_conversation_id"] = turn_input.agy_conversation_id
-        provider_history = []
+    provider_session = turn_input.provider_session
+    extra_kwargs: dict[str, Any] = dict(provider_session.stream_kwargs)
+    provider_history = [] if provider_session.omit_history else history
+    if provider_session.per_turn_context_kwarg is not None:
+        extra_kwargs[provider_session.per_turn_context_kwarg] = per_turn_context
     try:
         async for event in turn_input.provider.stream(
             turn_input.question,
@@ -299,27 +284,28 @@ async def _handle_internal_provider_event(
     """Handle provider-internal signals and return whether the event was consumed."""
     if event.get("type") != "internal":
         return False
-    kind = event.get("kind")
-    thread_id = event.get("thread_id")
-    if not isinstance(thread_id, str) or not thread_id:
+    if event.get("kind") != "provider_session_created":
         return True
-    if kind == "codex_thread_created":
-        # Detached task so the UPDATE survives cancellation of the streaming
-        # response (SIGTERM mid-stream, client disconnect). We track a strong
-        # reference so GC cannot collect it and lifespan shutdown drains it.
-        persist_task = asyncio.create_task(
-            persist_codex_thread_id(
-                turn_input.conversation_id,
-                thread_id,
-                turn_input.codex_thread_prompt_hash,
-            )
+    session_id = event.get("session_id")
+    if not isinstance(session_id, str) or not session_id:
+        return True
+    provider = event.get("provider")
+    provider_kind = provider if isinstance(provider, str) else turn_input.provider_session.kind
+    if provider_kind is None:
+        return True
+    # Detached task so the UPDATE survives cancellation of the streaming
+    # response (SIGTERM mid-stream, client disconnect). We track a strong
+    # reference so GC cannot collect it and lifespan shutdown drains it.
+    persist_task = asyncio.create_task(
+        persist_provider_session(
+            turn_input.conversation_id,
+            kind=provider_kind,
+            session_id=session_id,
+            fingerprint=turn_input.provider_session.fingerprint,
         )
-        _register_codex_persist_task(persist_task)
-        return True
-    if kind == "agy_conversation_created":
-        await persist_agy_conversation_id(turn_input.conversation_id, thread_id)
-        return True
-    return False
+    )
+    _register_provider_session_persist_task(persist_task)
+    return True
 
 
 def _request_id_from_extras(extras: dict[str, Any]) -> str:
@@ -340,7 +326,7 @@ def _provider_reasoning_effort(turn_input: ChatTurnInput) -> ReasoningEffort | N
     """Return the reasoning effort passed to the provider for this turn."""
     if turn_input.reasoning_effort is not None:
         return turn_input.reasoning_effort
-    if turn_input.codex_lightweight_prompt:
+    if turn_input.provider_session.force_low_reasoning:
         return "low"
     return None
 

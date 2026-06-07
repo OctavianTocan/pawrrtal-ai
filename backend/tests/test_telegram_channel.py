@@ -52,6 +52,7 @@ from app.channels.telegram.status import (
     handle_status_command,
 )
 from app.conversations.crud import ConversationStatus
+from app.provider_sessions import ProviderSessionTurnState
 from app.providers.base import StreamEvent
 from app.providers.catalog import first_catalog_model
 
@@ -1166,8 +1167,8 @@ class TestResolveProviderWithAutoClear:
 
 
 @pytest.mark.anyio
-async def test_run_llm_turn_passes_ensured_codex_thread_id(tmp_path: Path) -> None:
-    """Telegram turns must resume the native Codex thread just like web turns."""
+async def test_run_llm_turn_passes_prepared_provider_session(tmp_path: Path) -> None:
+    """Telegram turns must use the selected provider's session preparation hook."""
     context = TelegramTurnContext(
         pawrrtal_user_id=uuid.uuid4(),
         conversation_id=uuid.uuid4(),
@@ -1207,22 +1208,26 @@ async def test_run_llm_turn_passes_ensured_codex_thread_id(tmp_path: Path) -> No
             AsyncMock(return_value=None),
         ),
         patch(
-            "app.providers.openai_codex.threads.ensure_codex_thread_state",
+            "app.channels.telegram.bot.prepare_provider_session",
             AsyncMock(
-                return_value=SimpleNamespace(
-                    thread_id="thr_telegram",
-                    prompt_hash="hash_telegram",
-                    lightweight_prompt=True,
-                )
+                return_value=ProviderSessionTurnState(
+                    kind="openai_codex",
+                    session_id="thr_telegram",
+                    fingerprint="hash_telegram",
+                    stream_kwargs={"native_session_id": "thr_telegram"},
+                    per_turn_context_kwarg="per_turn_context",
+                    omit_history=True,
+                    force_low_reasoning=True,
+                ),
             ),
         ),
         patch("app.channels.telegram.bot.run_turn", new=fake_run_turn),
     ):
         await _run_llm_turn(message=cast(Any, message), context=context)
 
-    assert captured["turn_input"].codex_thread_id == "thr_telegram"
-    assert captured["turn_input"].codex_thread_prompt_hash == "hash_telegram"
-    assert captured["turn_input"].codex_lightweight_prompt is True
+    assert captured["turn_input"].provider_session.session_id == "thr_telegram"
+    assert captured["turn_input"].provider_session.fingerprint == "hash_telegram"
+    assert captured["turn_input"].provider_session.force_low_reasoning is True
     assert "reply_to_message_id" not in captured["turn_input"].channel_message["metadata"]
     message.answer.assert_awaited_once()
     assert "reply_parameters" not in message.answer.await_args.kwargs

@@ -91,14 +91,12 @@ class Conversation(Base):
     channel_thread_key: Mapped[str | None] = mapped_column(String(256), nullable=True)
     # Telegram Bot API 9.3+ topic thread ID. NULL for non-topic DMs.
     telegram_thread_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    # Codex SDK thread ID for native openai_codex provider resume support.
-    # Stored when the provider emits a "codex_thread_created" internal event.
-    codex_thread_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    # SHA-256 fingerprint of the prompt/model used to create codex_thread_id.
-    # A mismatch means prompt shape changed and the native thread must restart.
-    codex_thread_prompt_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    # Antigravity CLI native conversation ID for ``agy --conversation`` resume support.
-    agy_conversation_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    # Opaque provider-owned session handle for resume support. Core stores and
+    # forwards it without knowing whether it is a Codex thread, an Antigravity
+    # conversation, or a plugin-provided session.
+    provider_session_kind: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    provider_session_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    provider_session_fingerprint: Mapped[str | None] = mapped_column(String(128), nullable=True)
     # Lifecycle marker for the auto-title feature:
     # NULL = not yet titled, "auto" = generated, "user" = user-edited.
     title_set_by: Mapped[str | None] = mapped_column(String(16), nullable=True)

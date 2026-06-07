@@ -59,7 +59,7 @@ def _conversation_payload(conversation_id: str, **overrides: Any) -> dict[str, A
         "model_id": "gpt-4o",
         "labels": [],
         "project_id": None,
-        "codex_thread_id": None,
+        "provider_session_id": None,
     }
     base.update(overrides)
     return base
@@ -212,7 +212,7 @@ def test_replay_reconstructs_sse_stream_from_fixture(
                     json=_conversation_payload(
                         stable_uuid,
                         model_id=DEFAULT_MODEL,
-                        codex_thread_id="thread-abc",
+                        provider_session_id="thread-abc",
                     ),
                 ),
             ]
@@ -262,7 +262,7 @@ def test_replay_reconstructs_sse_stream_from_fixture(
     assert out["final_text"] == "Hi there"
     assert out["events"]["delta"] == 2
     assert out["events"]["usage"] == 1
-    assert out["codex_thread_id"] == "thread-abc"
+    assert out["provider_session_id"] == "thread-abc"
 
 
 SECOND_SSE_BODY = (

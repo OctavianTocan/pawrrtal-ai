@@ -60,10 +60,11 @@ from app.channels.telegram.handlers import (
     handle_verbose_command,
     handle_whoami_command,
 )
-from app.channels.turn_orchestrator import ChatTurnInput, load_agy_conversation_id, run_turn
+from app.channels.turn_orchestrator import ChatTurnInput, run_turn
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
 from app.plugins.adapters.turn_context import build_turn_context_providers
+from app.providers.session_preparer import prepare_provider_session
 
 from .channel import SURFACE_TELEGRAM, make_telegram_sender, render_initial
 
@@ -400,18 +401,15 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
         conversation_id=context.conversation_id,
         model_id=context.model_id,
     )
-    from app.providers.openai_codex.threads import ensure_codex_thread_state  # noqa: PLC0415
-
-    codex_thread_state = await ensure_codex_thread_state(
+    provider_session = await prepare_provider_session(
+        provider,
         conversation_id=context.conversation_id,
-        provider=provider,
         workspace_root=workspace_root,
         model_id=context.model_id,
         tools=agent_tools,
         reasoning_effort=effective_effort,
         question=user_text,
     )
-    agy_conversation_id = await load_agy_conversation_id(context.conversation_id)
 
     has_active_recall = False
 
@@ -454,10 +452,7 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
         ),
         turn_context_providers=turn_context_providers,
         reasoning_effort=effective_effort,
-        codex_thread_id=codex_thread_state.thread_id,
-        codex_thread_prompt_hash=codex_thread_state.prompt_hash,
-        codex_lightweight_prompt=codex_thread_state.lightweight_prompt,
-        agy_conversation_id=agy_conversation_id,
+        provider_session=provider_session,
     )
 
     async def _do_stream() -> None:

@@ -34,32 +34,30 @@ depends_on = None
 
 def upgrade() -> None:
     """Add the nullable FK column with an index for fast lookup."""
-    op.add_column(
-        "scheduled_jobs",
-        sa.Column("target_conversation_id", sa.Uuid(), nullable=True),
-    )
-    op.create_foreign_key(
-        "fk_scheduled_jobs_target_conversation_id",
-        "scheduled_jobs",
-        "conversations",
-        ["target_conversation_id"],
-        ["id"],
-        ondelete="SET NULL",
-    )
-    op.create_index(
-        "ix_scheduled_jobs_target_conversation_id",
-        "scheduled_jobs",
-        ["target_conversation_id"],
-        unique=False,
-    )
+    with op.batch_alter_table("scheduled_jobs") as batch_op:
+        batch_op.add_column(
+            sa.Column("target_conversation_id", sa.Uuid(), nullable=True),
+        )
+        batch_op.create_foreign_key(
+            "fk_scheduled_jobs_target_conversation_id",
+            "conversations",
+            ["target_conversation_id"],
+            ["id"],
+            ondelete="SET NULL",
+        )
+        batch_op.create_index(
+            "ix_scheduled_jobs_target_conversation_id",
+            ["target_conversation_id"],
+            unique=False,
+        )
 
 
 def downgrade() -> None:
     """Drop the index, FK, and column in reverse order."""
-    op.drop_index("ix_scheduled_jobs_target_conversation_id", table_name="scheduled_jobs")
-    op.drop_constraint(
-        "fk_scheduled_jobs_target_conversation_id",
-        "scheduled_jobs",
-        type_="foreignkey",
-    )
-    op.drop_column("scheduled_jobs", "target_conversation_id")
+    with op.batch_alter_table("scheduled_jobs") as batch_op:
+        batch_op.drop_index("ix_scheduled_jobs_target_conversation_id")
+        batch_op.drop_constraint(
+            "fk_scheduled_jobs_target_conversation_id",
+            type_="foreignkey",
+        )
+        batch_op.drop_column("target_conversation_id")

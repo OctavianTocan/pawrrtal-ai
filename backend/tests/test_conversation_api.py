@@ -150,12 +150,12 @@ async def test_generate_conversation_title_persists_usable_title(
 
 
 @pytest.mark.anyio
-async def test_conversation_response_includes_codex_thread_id(
+async def test_conversation_response_includes_provider_session_id(
     client: AsyncClient, db_session: AsyncSession, test_user: User
 ) -> None:
-    """ConversationRead must include codex_thread_id so paw verify can assert it.
+    """ConversationRead must include provider_session_id so paw verify can assert it.
 
-    The column already exists on the ORM (models.py: Conversation.codex_thread_id)
+    The column already exists on the ORM (models.py: Conversation.provider_session_id)
     but was being dropped from the API response. Without exposing it, an HTTP
     client has no way to observe that the codex provider persisted a stable
     thread id across turns.
@@ -169,7 +169,7 @@ async def test_conversation_response_includes_codex_thread_id(
         created_at=now,
         updated_at=now,
         model_id="openai-codex:openai/gpt-5.5",
-        codex_thread_id="thr_test_abc",
+        provider_session_id="thr_test_abc",
     )
     db_session.add(conversation)
     await db_session.commit()
@@ -178,5 +178,5 @@ async def test_conversation_response_includes_codex_thread_id(
 
     assert response.status_code == 200, response.text
     body = response.json()
-    assert "codex_thread_id" in body, f"missing field; got keys={list(body.keys())}"
-    assert body["codex_thread_id"] == "thr_test_abc"
+    assert "provider_session_id" in body, f"missing field; got keys={list(body.keys())}"
+    assert body["provider_session_id"] == "thr_test_abc"
