@@ -100,7 +100,7 @@ def done_event_from_response(response: Response) -> LLMDoneEvent:
 
     The loop uses ``stop_reason`` purely as a string discriminator
     (``"tool_use"`` vs ``"stop"`` vs ``"error"``) — see
-    ``app.agents.loop._should_stop``.  We map xAI's
+    ``app.agents.model_tool_loop._should_stop``.  We map xAI's
     ``REASON_TOOL_CALLS`` to ``"tool_use"`` so a tool-using turn
     triggers the loop's tool-dispatch path, and everything else falls
     through to ``"stop"``.
@@ -158,7 +158,7 @@ class UsageAccumulator:
 
     Mutable on purpose: the StreamFn closure owns one and writes into
     it from inside the stream; :class:`XaiLLM.stream` reads the totals
-    after :func:`agent_loop` returns and emits the terminal
+    after :func:`run_model_tool_loop` returns and emits the terminal
     ``StreamEvent(type="usage")``.
     """
 

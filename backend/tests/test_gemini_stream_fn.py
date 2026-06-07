@@ -1,9 +1,9 @@
-"""Tests for GeminiLLM's StreamFn wiring into agent_loop.
+"""Tests for GeminiLLM's StreamFn wiring into run_model_tool_loop.
 
-Uses ``ScriptedStreamFn`` from ``tests.agent_harness`` — no real Gemini
+Uses ``ScriptedStreamFn`` from ``tests.agent_loop_harness`` — no real Gemini
 API calls are made.  These tests exercise the provider's translation layer
 (AgentEvent → StreamEvent) and confirm that safety config flows end-to-end
-from ``safety_from_settings`` through ``agent_loop`` to the SSE output.
+from ``safety_from_settings`` through ``run_model_tool_loop`` to the SSE output.
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from app.agents.types import (
     ToolCallContent,
 )
 from app.providers.base import StreamEvent
-from tests.agent_harness import (
+from tests.agent_loop_harness import (
     ScriptedStreamFn,
     echo_tool,
     text_turn,
@@ -41,7 +41,7 @@ from tests.agent_harness import (
 async def test_gemini_provider_yields_delta_events_from_loop(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """GeminiLLM.stream() translates agent_loop text_deltas to StreamEvent deltas."""
+    """GeminiLLM.stream() translates run_model_tool_loop text_deltas to StreamEvent deltas."""
     from app.providers.gemini import GeminiLLM
 
     provider = GeminiLLM("gemini-test")
@@ -198,7 +198,7 @@ async def test_gemini_provider_emits_tool_use_and_result_events(
 async def test_gemini_provider_surfaces_agent_terminated_from_safety_config(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """safety_from_settings flows through GeminiLLM to agent_loop.
+    """safety_from_settings flows through GeminiLLM to run_model_tool_loop.
 
     Patches ``safety_from_settings`` to return ``max_iterations=3`` and
     injects a script with 10 tool-call turns.  After 3 iterations the
@@ -206,7 +206,7 @@ async def test_gemini_provider_surfaces_agent_terminated_from_safety_config(
     must be cut short at exactly 3 calls.
 
     This proves the full chain:
-        safety_from_settings → AgentLoopConfig.safety → agent_loop →
+        safety_from_settings → AgentLoopConfig.safety → run_model_tool_loop →
         AgentTerminatedEvent → GeminiLLM.stream() → StreamEvent("agent_terminated")
     """
     from app.agents import AgentSafetyConfig
@@ -269,7 +269,7 @@ async def test_gemini_provider_emits_thinking_events(
     Authoring a turn with ``thinking_then_text_turn`` proves the full
     chain:
         ScriptedStreamFn yields LLMThinkingDeltaEvent →
-        agent_loop forwards as ThinkingDeltaEvent →
+        run_model_tool_loop forwards as ThinkingDeltaEvent →
         GeminiLLM.stream() translates to StreamEvent(type="thinking").
     Thinking content must NOT appear as a regular ``delta`` event
     (it would render in the assistant transcript otherwise) and the
@@ -321,7 +321,7 @@ async def test_gemini_provider_accumulates_tool_result_in_context(
 
     After the tool executes, the second call's message list must include a
     ``toolResult`` role, proving history accumulation flows through
-    GeminiLLM.stream() → agent_loop.
+    GeminiLLM.stream() → run_model_tool_loop.
     """
     from app.providers.gemini import GeminiLLM
 

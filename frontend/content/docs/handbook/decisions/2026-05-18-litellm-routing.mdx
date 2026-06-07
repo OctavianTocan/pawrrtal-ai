@@ -60,7 +60,7 @@ pattern already used by `GeminiLLM`. Concretely:
 - **`LiteLLMLLM`** in
   `backend/app/core/providers/litellm_provider.py` — implements the
   `AILLM` protocol by composing `make_litellm_stream_fn(...)` with
-  the shared `agent_loop`. Reuses `agent_event_to_stream_event` and
+  the shared `run_model_tool_loop`. Reuses `agent_event_to_stream_event` and
   `identity_convert` from the Gemini provider's translation layer.
 - **`HOST_TO_PROVIDER[Host.litellm] = LiteLLMLLM`** registers the new
   class. `resolve_llm` adds a `LiteLLMLLM`-specific construction

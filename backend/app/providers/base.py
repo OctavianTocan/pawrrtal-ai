@@ -160,7 +160,7 @@ class AILLM(Protocol):
         provider, for example, accepts ``codex_thread_id: str | None`` for
         SDK multi-turn continuity. Cross-provider callers pass these
         through ``**extra_kwargs`` and only forward them when actually set
-        (see ``app.channels.turn_runner._guarded_stream``) so unrelated
+        (see ``app.channels.turn_orchestrator._guarded_stream``) so unrelated
         providers don't see unknown keys.
         """
         ...

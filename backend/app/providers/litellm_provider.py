@@ -56,7 +56,7 @@ from app.agents import (
     LLMTextDeltaEvent,
     StreamFn,
     UserMessage,
-    agent_loop,
+    run_model_tool_loop,
 )
 from app.agents.permissions import default_tool_permission_check
 from app.agents.safety_factory import safety_from_settings
@@ -351,7 +351,7 @@ def make_litellm_stream_fn(
 
 
 class LiteLLMLLM:
-    """AILLM backed by the agent_loop + a LiteLLM StreamFn.
+    """AILLM backed by the run_model_tool_loop + a LiteLLM StreamFn.
 
     Text-only v1: ``tools`` is accepted for protocol parity but the
     underlying StreamFn ignores them.  See module docstring.
@@ -455,7 +455,7 @@ class LiteLLMLLM:
         )
 
         try:
-            async for event in agent_loop([prompt], context, config, stream_fn):
+            async for event in run_model_tool_loop([prompt], context, config, stream_fn):
                 stream_event = agent_event_to_stream_event(event)
                 if stream_event is not None:
                     log_provider_stream_event(

@@ -10,7 +10,7 @@ Covers three layers:
    a ``tool_use`` from the model into the structured ``artifact`` SSE event
    the frontend renders.
 4. **End-to-end agent-loop scenarios** (``TestArtifactToolScenarios``) —
-   ``ScriptedStreamFn`` exercises the real ``agent_loop``, safety layer, and
+   ``ScriptedStreamFn`` exercises the real ``run_model_tool_loop``, safety layer, and
    tool-execution code without API calls.  These are the load-bearing tests:
    they prove the tool is wired in correctly and behaves under realistic
    multi-turn conversation conditions.
@@ -288,7 +288,7 @@ def test_artifact_tool_is_registered_in_build_agent_tools(tmp_path: Path) -> Non
     It also verifies no duplicate tool names are registered.
     """
 
-    from app.agents.tools import build_agent_tools
+    from app.agents.tool_surface import build_agent_tools
 
     tools = build_agent_tools(workspace_root=tmp_path)
     tool_names = [t.name for t in tools]
@@ -305,7 +305,7 @@ def test_artifact_tool_is_registered_in_build_agent_tools(tmp_path: Path) -> Non
 # ---------------------------------------------------------------------------
 # End-to-end agent-loop scenario tests
 #
-# These tests use ``ScriptedStreamFn`` to drive the real agent_loop through
+# These tests use ``ScriptedStreamFn`` to drive the real run_model_tool_loop through
 # deterministic sequences.  They are the authoritative proof that
 # render_artifact is wired correctly end-to-end — not just that the
 # functions exist, but that the loop actually calls the tool, feeds the
@@ -314,7 +314,7 @@ def test_artifact_tool_is_registered_in_build_agent_tools(tmp_path: Path) -> Non
 
 
 class TestArtifactToolScenarios:
-    """Scenario tests: render_artifact through the real agent_loop."""
+    """Scenario tests: render_artifact through the real run_model_tool_loop."""
 
     @pytest.mark.anyio
     async def test_single_artifact_happy_path(self) -> None:
@@ -325,7 +325,7 @@ class TestArtifactToolScenarios:
         - The LLM sees the confirmation summary on the next turn.
         - The agent finishes cleanly in 2 LLM calls.
         """
-        from tests.agent_harness import (
+        from tests.agent_loop_harness import (
             make_recording_stream_fn,
             run_scenario,
             text_turn,
@@ -371,7 +371,7 @@ class TestArtifactToolScenarios:
         the LLM can self-correct.  This test proves the whole retry cycle works
         end-to-end through the real loop.
         """
-        from tests.agent_harness import (
+        from tests.agent_loop_harness import (
             make_recording_stream_fn,
             run_scenario,
             text_turn,
@@ -432,7 +432,7 @@ class TestArtifactToolScenarios:
         calls render_artifact to display the result as a card.  Both tools must
         execute correctly and their results must accumulate in LLM context.
         """
-        from tests.agent_harness import (
+        from tests.agent_loop_harness import (
             echo_tool,
             make_recording_stream_fn,
             run_scenario,
@@ -486,7 +486,7 @@ class TestArtifactToolScenarios:
         Each artifact call should be independent: different ids, different titles,
         both confirmed to the LLM.
         """
-        from tests.agent_harness import (
+        from tests.agent_loop_harness import (
             make_recording_stream_fn,
             run_scenario,
             text_turn,
@@ -541,10 +541,10 @@ class TestArtifactToolScenarios:
 
     @pytest.mark.anyio
     async def test_agent_loop_emits_correct_event_sequence_for_artifact(self) -> None:
-        """The agent_loop emits tool_call_start → tool_call_end → tool_result
+        """The run_model_tool_loop emits tool_call_start → tool_call_end → tool_result
         for an artifact call — same sequencing contract as all other tools.
         """
-        from tests.agent_harness import (
+        from tests.agent_loop_harness import (
             ScriptedStreamFn,
             run_scenario,
             text_turn,
@@ -581,11 +581,11 @@ class TestArtifactToolScenarios:
 
     @pytest.mark.anyio
     async def test_unknown_artifact_tool_name_is_not_found(self) -> None:
-        """If the tool name doesn't match any registered tool, agent_loop yields
+        """If the tool name doesn't match any registered tool, run_model_tool_loop yields
         is_error=True with a 'not found' message — render_artifact name must be
         spelled exactly as ARTIFACT_TOOL_NAME in the script.
         """
-        from tests.agent_harness import (
+        from tests.agent_loop_harness import (
             ScriptedStreamFn,
             run_scenario,
             text_turn,
@@ -611,10 +611,10 @@ class TestArtifactToolScenarios:
 
     @pytest.mark.anyio
     async def test_empty_title_yields_corrective_error_not_loop_crash(self) -> None:
-        """Blank title is the most likely LLM mistake.  The agent_loop must NOT
+        """Blank title is the most likely LLM mistake.  The run_model_tool_loop must NOT
         crash — it must receive the corrective string and continue normally.
         """
-        from tests.agent_harness import (
+        from tests.agent_loop_harness import (
             ScriptedStreamFn,
             run_scenario,
             text_turn,
@@ -647,7 +647,7 @@ class TestArtifactToolScenarios:
         """Missing 'elements' key is another common model mistake.  Loop must
         feed the corrective string back cleanly.
         """
-        from tests.agent_harness import (
+        from tests.agent_loop_harness import (
             ScriptedStreamFn,
             run_scenario,
             text_turn,

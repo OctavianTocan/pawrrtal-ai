@@ -8,7 +8,7 @@ chat turn, and translates streamed ``session/update`` notifications into
 Pawrrtal :class:`StreamEvent` records. The CLI is *itself* a fully
 agentic loop (its own tool surface, planning, file system access), so we
 treat it as a black-box agent the way Claude Code is treated and bypass
-Pawrrtal's internal :func:`agent_loop`. History is replayed as a prefix
+Pawrrtal's internal :func:`run_model_tool_loop`. History is replayed as a prefix
 to the user's message (same fallback pattern :class:`ClaudeLLM` uses
 when its transcript is missing); a future revision can switch to ACP's
 ``session/load`` once we persist the CLI-assigned ``session_id`` per

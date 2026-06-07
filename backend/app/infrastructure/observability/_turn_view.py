@@ -1,12 +1,12 @@
 """Bridging helpers between Pawrrtal turn state and the Workshop span shape.
 
-Pulled out of ``app.channels.turn_runner`` so that module stays under
+Pulled out of ``app.channels.turn_orchestrator`` so that module stays under
 the project's 500-line ceiling (``scripts/check-file-lines.mjs``) and
 the Workshop-specific translations live next to the rest of the
 observability package.
 
 Both helpers are private to ``app.infrastructure.observability`` /
-``app.channels.turn_runner``; the public surface remains the context
+``app.channels.turn_orchestrator``; the public surface remains the context
 managers exposed via ``app.infrastructure.observability.workshop``.
 """
 

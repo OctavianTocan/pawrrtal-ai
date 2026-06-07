@@ -69,7 +69,7 @@ async def test_missing_api_key_surfaces_as_error_event(
     assert len(events) == 1, f"Expected single error event, got {events}"
     error_event = events[0]
     assert error_event["type"] == "error", (
-        f"Missing-key path leaked through agent_loop instead of "
+        f"Missing-key path leaked through run_model_tool_loop instead of "
         f"surfacing as error; got {error_event!r}"
     )
     assert "OpenCode" in str(error_event.get("content", ""))
@@ -80,13 +80,13 @@ async def test_missing_api_key_surfaces_as_error_event(
 async def test_missing_api_key_does_not_invoke_agent_loop(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The missing-key shortcut must run BEFORE ``agent_loop`` is touched.
+    """The missing-key shortcut must run BEFORE ``run_model_tool_loop`` is touched.
 
     Side-by-side guard against the regression where someone "fixes"
     the symptom by yielding an error event from inside the agent
     loop's safety budget — three 401s burn before the user sees
     anything. The shortcut at the top of ``stream()`` must bypass
-    ``agent_loop`` entirely when the key is empty.
+    ``run_model_tool_loop`` entirely when the key is empty.
     """
     monkeypatch.setattr(settings, "opencode_api_key", "")
 
@@ -99,7 +99,7 @@ async def test_missing_api_key_does_not_invoke_agent_loop(
         workspace_root=None,
     )
 
-    with patch("app.providers.opencode_go.provider.agent_loop") as patched_loop:
+    with patch("app.providers.opencode_go.provider.run_model_tool_loop") as patched_loop:
         events = [
             event
             async for event in llm.stream(

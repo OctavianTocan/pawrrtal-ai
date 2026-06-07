@@ -111,7 +111,7 @@ per-turn `UsageAccumulator` that the cost ledger consumes.
 │   ↓ Chunk / Response                                 │
 │ providers/xai/stream.py                              │
 │   ↓ deltas / tool_calls / usage → LLMEvent shapes    │
-│ agent_loop → providers/xai/events.py                 │
+│ run_model_tool_loop → providers/xai/events.py                 │
 │   ↓ AgentEvent → StreamEvent (text / thinking /      │
 │     tool_result / done / usage)                      │
 └──────────────────────────────────────────────────────┘

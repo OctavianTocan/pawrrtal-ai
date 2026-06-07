@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from app.channels.turn_runner import await_pending_codex_persist_tasks
+from app.channels.turn_orchestrator import await_pending_codex_persist_tasks
 from app.infrastructure.lifecycle import shutdown_hook
 
 if TYPE_CHECKING:

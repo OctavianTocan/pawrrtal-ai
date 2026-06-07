@@ -7,7 +7,7 @@ import json
 import uuid
 from pathlib import Path
 
-from app.agents.tools import build_agent_tools
+from app.agents.tool_surface import build_agent_tools
 from app.infrastructure.keys import save_workspace_env
 from app.plugins.state import PluginState, plugin_state_path, save_plugin_state
 

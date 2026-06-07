@@ -29,7 +29,7 @@ from app.agents.plugins import (
     register_plugin,
 )
 from app.agents.plugins.registry import reset_for_tests
-from app.agents.tools import build_agent_tools
+from app.agents.tool_surface import build_agent_tools
 from app.agents.types import AgentTool
 
 

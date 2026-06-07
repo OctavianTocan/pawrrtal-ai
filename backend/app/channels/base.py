@@ -14,7 +14,7 @@ the two directions of data flow:
 
     raw surface event
         → Channel.receive()          ← normalize to ChannelMessage
-        → resolve_llm() / agent_loop ← core is channel-agnostic
+        → resolve_llm() / run_model_tool_loop ← core is channel-agnostic
         → Channel.deliver()          ← surface-specific delivery
         → raw surface output
 

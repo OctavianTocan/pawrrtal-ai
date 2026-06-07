@@ -40,7 +40,7 @@ What the tool does *not* provide:
   * Hard kill on runaway.  See "wall-clock timeout" above.
 
 Composition: gated by ``settings.virtual_python_enabled`` (default
-``False``).  Wired in :func:`app.agents.tools.build_agent_tools`
+``False``).  Wired in :func:`app.agents.tool_surface.build_agent_tools`
 between ``markitdown_convert`` and ``send_message``.
 """
 
@@ -324,7 +324,7 @@ def _scrub_nul(text: str) -> str:
     """Replace embedded NULs so Postgres ``text`` columns accept the result.
 
     The agent loop persists every tool result (see
-    ``app/core/agent_loop/loop.py``'s ``ToolResultMessage`` write
+    ``app/core/run_model_tool_loop/loop.py``'s ``ToolResultMessage`` write
     path); NULs in JSON survive transport but Postgres rejects them.
     """
     return text.replace("\x00", r"\x00")

@@ -14,7 +14,7 @@ from typing import Any, cast
 
 import pytest
 
-from app.agents.loop import agent_loop
+from app.agents.model_tool_loop import run_model_tool_loop
 from app.agents.types import (
     AgentContext,
     AgentEvent,
@@ -112,7 +112,7 @@ async def test_agent_loop_carries_provider_state_to_followup_turn() -> None:
 
     events: list[AgentEvent] = [
         event
-        async for event in agent_loop(
+        async for event in run_model_tool_loop(
             [UserMessage(role="user", content="List files.")],
             AgentContext(system_prompt="", messages=[], tools=[_make_tool()]),
             AgentLoopConfig(convert_to_llm=_identity_convert),

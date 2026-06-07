@@ -136,7 +136,7 @@ class TestExaSearchToolExecute:
 
 
 # ---------------------------------------------------------------------------
-# GeminiLLM wiring — tool list flows through the real agent_loop unchanged
+# GeminiLLM wiring — tool list flows through the real run_model_tool_loop unchanged
 # ---------------------------------------------------------------------------
 
 
@@ -148,8 +148,8 @@ class TestGeminiToolPassthrough:
     job — the provider is just a translator.  See
     `.claude/rules/architecture/no-tools-in-providers.md`.
 
-    These tests use a *recording* StreamFn and let the real ``agent_loop``
-    run — no ``agent_loop`` monkeypatching.  This verifies the full path:
+    These tests use a *recording* StreamFn and let the real ``run_model_tool_loop``
+    run — no ``run_model_tool_loop`` monkeypatching.  This verifies the full path:
     ``provider.stream()`` → ``AgentContext.tools`` → ``StreamFn`` receives
     the tools list, not just that someone set a field somewhere.
     """
@@ -169,7 +169,7 @@ class TestGeminiToolPassthrough:
         ) -> AsyncIterator[Any]:
             nonlocal captured_tools
             captured_tools = list(tools)
-            # Yield a clean stop so agent_loop exits immediately.
+            # Yield a clean stop so run_model_tool_loop exits immediately.
             from app.agents.types import LLMDoneEvent, TextContent
 
             yield LLMDoneEvent(
@@ -241,7 +241,7 @@ class TestGeminiToolPassthrough:
         import uuid
 
         from app.providers.gemini import GeminiLLM
-        from tests.agent_harness import ScriptedStreamFn, text_turn, tool_call_turn
+        from tests.agent_loop_harness import ScriptedStreamFn, text_turn, tool_call_turn
 
         exa_tool = make_exa_search_tool()
 

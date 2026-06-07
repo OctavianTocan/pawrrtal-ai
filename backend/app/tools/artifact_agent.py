@@ -1,6 +1,6 @@
 """AgentTool wrapper for the ``render_artifact`` core.
 
-Builds the :class:`AgentTool` consumed by ``app.agents.tools``.  The
+Builds the :class:`AgentTool` consumed by ``app.agents.tool_surface``.  The
 JSON Schema below is what the LLM sees in its tool catalogue, so the
 descriptions are written *for the model*: explicit about when to call
 this, what shapes are valid, and what NOT to do.

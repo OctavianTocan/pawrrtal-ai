@@ -21,7 +21,7 @@ import asyncio
 
 import pytest
 
-from app.channels import turn_runner
+from app.channels import turn_orchestrator
 
 
 @pytest.mark.anyio
@@ -36,15 +36,15 @@ async def test_register_codex_persist_task_tracks_and_releases_on_completion() -
         finished.set()
 
     task = asyncio.create_task(_slow())
-    turn_runner._register_codex_persist_task(task)
-    assert task in turn_runner._PENDING_CODEX_PERSIST_TASKS
+    turn_orchestrator._register_codex_persist_task(task)
+    assert task in turn_orchestrator._PENDING_CODEX_PERSIST_TASKS
 
     await started.wait()
     await task
     await finished.wait()
     # done_callback fires synchronously after completion; give the loop one tick
     await asyncio.sleep(0)
-    assert task not in turn_runner._PENDING_CODEX_PERSIST_TASKS
+    assert task not in turn_orchestrator._PENDING_CODEX_PERSIST_TASKS
 
 
 @pytest.mark.anyio
@@ -58,25 +58,25 @@ async def test_await_pending_codex_persist_tasks_drains_pending_set() -> None:
 
     for label in (1, 2, 3):
         task = asyncio.create_task(_persist(label))
-        turn_runner._register_codex_persist_task(task)
+        turn_orchestrator._register_codex_persist_task(task)
 
-    await turn_runner.await_pending_codex_persist_tasks(timeout=2.0)
+    await turn_orchestrator.await_pending_codex_persist_tasks(timeout=2.0)
 
     # All three persists completed before the drain returned.
     assert sorted(completed) == [1, 2, 3]
     # The set is empty after drain.
-    assert not turn_runner._PENDING_CODEX_PERSIST_TASKS
+    assert not turn_orchestrator._PENDING_CODEX_PERSIST_TASKS
 
 
 @pytest.mark.anyio
 async def test_await_pending_codex_persist_tasks_returns_immediately_when_empty() -> None:
     """Empty set short-circuits — no asyncio.gather call, no spurious sleep."""
-    assert not turn_runner._PENDING_CODEX_PERSIST_TASKS
+    assert not turn_orchestrator._PENDING_CODEX_PERSIST_TASKS
     # If the implementation forgot the early-return guard, this would still
     # complete fast — but we time it loosely to detect any future regression
     # that introduces a per-call sleep.
     start = asyncio.get_event_loop().time()
-    await turn_runner.await_pending_codex_persist_tasks(timeout=5.0)
+    await turn_orchestrator.await_pending_codex_persist_tasks(timeout=5.0)
     elapsed = asyncio.get_event_loop().time() - start
     assert elapsed < 0.05
 
@@ -102,7 +102,7 @@ async def test_persist_task_survives_parent_task_cancellation() -> None:
     async def _spawn_and_be_cancelled() -> None:
         nonlocal persist_task
         persist_task = asyncio.create_task(_persist())
-        turn_runner._register_codex_persist_task(persist_task)
+        turn_orchestrator._register_codex_persist_task(persist_task)
         # Yield so the persist task starts.
         await asyncio.sleep(0)
         # Now block forever — the test cancels us.

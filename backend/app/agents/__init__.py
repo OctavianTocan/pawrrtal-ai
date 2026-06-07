@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from .loop import agent_loop
+from .model_tool_loop import run_model_tool_loop
 from .system_prompt import (
     DEFAULT_AGENT_SYSTEM_PROMPT,
     PAW_CORE_SYSTEM_PROMPT,
@@ -46,6 +46,6 @@ __all__ = [
     "StreamFn",
     "ToolResultMessage",
     "UserMessage",
-    "agent_loop",
     "compose_agent_system_prompt",
+    "run_model_tool_loop",
 ]

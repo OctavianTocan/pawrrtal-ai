@@ -14,7 +14,7 @@ Structure mirrors :mod:`gemini_provider`:
 * ``make_opencode_go_stream_fn`` — closes over the system prompt and
   returns a ``StreamFn`` the loop drives one turn at a time.
 * :class:`OpencodeGoLLM` — the ``AILLM`` instance the factory hands
-  back to the chat router. Wraps ``agent_loop`` and translates
+  back to the chat router. Wraps ``run_model_tool_loop`` and translates
   ``AgentEvent`` outputs into the wire ``StreamEvent`` shape.
 
 Cost: GLM-5.1 / Kimi K2.6 advertise interleaved chain-of-thought via a
@@ -50,7 +50,7 @@ from app.agents import (
     LLMTextDeltaEvent,
     StreamFn,
     UserMessage,
-    agent_loop,
+    run_model_tool_loop,
 )
 from app.agents.permissions import default_tool_permission_check
 from app.agents.safety_factory import safety_from_settings
@@ -186,7 +186,7 @@ def make_opencode_go_stream_fn(
 
 
 class OpencodeGoLLM:
-    """``AILLM`` backed by the agent_loop + an OpenCode Go StreamFn.
+    """``AILLM`` backed by the run_model_tool_loop + an OpenCode Go StreamFn.
 
     History is supplied by the caller (read from the Message table by
     the chat router, exactly like ``GeminiLLM``). Tools are injected
@@ -267,7 +267,7 @@ class OpencodeGoLLM:
         # ``api_key="missing"`` — produces a 401 whose text is rendered
         # by the legacy Telegram path as a single-chunk delta and
         # frequently appears as no reply at all (#350). The check runs
-        # before ``agent_loop`` so the loop's retry budget doesn't burn
+        # before ``run_model_tool_loop`` so the loop's retry budget doesn't burn
         # three 401s before giving up.
         api_key = _resolve_opencode_api_key(self._workspace_root)
         if not api_key:
@@ -318,7 +318,7 @@ class OpencodeGoLLM:
         )
 
         try:
-            async for event in agent_loop([prompt], context, config, stream_fn):
+            async for event in run_model_tool_loop([prompt], context, config, stream_fn):
                 stream_event = agent_event_to_stream_event(event)
                 if stream_event is not None:
                     log_provider_stream_event(

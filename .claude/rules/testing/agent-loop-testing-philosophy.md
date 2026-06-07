@@ -10,13 +10,13 @@ The agent loop, safety layer, and all StreamFn-based code must be tested with
 
 ## The `ScriptedStreamFn` pattern (mandatory for harness behavior tests)
 
-Instead of mocking `agent_loop`, `AgentContext`, or `AgentLoopConfig` directly,
+Instead of mocking `run_model_tool_loop`, `AgentContext`, or `AgentLoopConfig` directly,
 author deterministic LLM decision sequences and run them through the **real**
 harness. Only the `StreamFn` seam is replaced. Every other component —
 safety, tool execution, message accumulation — runs as it does in production.
 
 ```python
-from tests.agent_harness import (
+from tests.agent_loop_harness import (
     ScriptedStreamFn,
     echo_tool,
     error_turn,
@@ -40,17 +40,17 @@ assert script.call_count == 2              # two LLM calls were made
 assert any(e["type"] == "tool_result" for e in events)
 ```
 
-The shared primitives live in `backend/tests/agent_harness.py`.
+The shared primitives live in `backend/tests/agent_loop_harness.py`.
 
 ## Rules
 
-1. **Never patch `agent_loop` away in a harness behavior test.** Patching the
+1. **Never patch `run_model_tool_loop` away in a harness behavior test.** Patching the
    loop out means you're testing nothing — the safety layer, tool dispatch, and
    context accumulation are all skipped.
 
    ```python
    # ❌ WRONG — patches the loop, tests nothing real
-   with patch("app.core.providers.gemini_provider.agent_loop", side_effect=fake):
+   with patch("app.core.providers.gemini_provider.run_model_tool_loop", side_effect=fake):
        ...
 
    # ✅ RIGHT — injects script at StreamFn seam, real loop runs
@@ -84,7 +84,7 @@ The shared primitives live in `backend/tests/agent_harness.py`.
    translation tests (AgentEvent → StreamEvent) belong in
    `test_gemini_stream_fn.py` / `test_claude_provider.py`.
 
-7. **New harness primitives go in `agent_harness.py`**, not inline in test files.
+7. **New harness primitives go in `agent_loop_harness.py`**, not inline in test files.
    If you need a new turn shape, tool, or runner helper, add it to the shared
    module so other test files can reuse it.
 
@@ -104,6 +104,6 @@ The shared primitives live in `backend/tests/agent_harness.py`.
 
 ## Verify
 
-"Am I patching `agent_loop` directly? If yes, switch to `ScriptedStreamFn` at
+"Am I patching `run_model_tool_loop` directly? If yes, switch to `ScriptedStreamFn` at
 the `_stream_fn` seam. Did I assert `script.call_count`? Did I pass the
 `ScriptedStreamFn` object (not `script.turns`) to `run_scenario`?"

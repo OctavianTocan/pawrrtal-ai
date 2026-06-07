@@ -1,7 +1,7 @@
 """Shared test harness for agent-loop scenario tests.
 
 ``ScriptedStreamFn`` replaces the real LLM at the ``StreamFn`` seam so tests
-run through the genuine ``agent_loop``, safety layer, and tool-execution code
+run through the genuine ``run_model_tool_loop``, safety layer, and tool-execution code
 without any real API calls.
 
 The pattern is sometimes called "reverse eval" or "mock-provider scenario
@@ -10,7 +10,7 @@ testing":
 * You author a deterministic decision sequence (tool calls, text replies,
   errors) as a list of "turns".
 * ``ScriptedStreamFn`` replays the sequence one turn per agent-loop call.
-* The real harness (``agent_loop``, tool execution) runs against the
+* The real harness (``run_model_tool_loop``, tool execution) runs against the
   scripted decisions.
 * Assertions target what the harness *did*, not what the LLM *said*.
 
@@ -24,7 +24,7 @@ Usage
 -----
 ::
 
-    from tests.agent_harness import (
+    from tests.agent_loop_harness import (
         ScriptedStreamFn,
         echo_tool,
         error_turn,
@@ -52,7 +52,7 @@ from app.agents import (
     AgentSafetyConfig,
     AgentTool,
     UserMessage,
-    agent_loop,
+    run_model_tool_loop,
 )
 from app.agents.types import (
     LLMDoneEvent,
@@ -386,7 +386,7 @@ async def run_scenario(
     """Run an agent-loop scenario end-to-end and return all emitted events.
 
     Builds a minimal ``AgentContext`` and ``AgentLoopConfig`` then collects
-    every event from ``agent_loop`` into a list for assertion.
+    every event from ``run_model_tool_loop`` into a list for assertion.
 
     Args:
         turns: Either a pre-built ``ScriptedStreamFn`` (when you need to inspect
@@ -397,7 +397,7 @@ async def run_scenario(
         safety: Optional safety config; defaults to all-guards-disabled.
 
     Returns:
-        All ``AgentEvent`` instances emitted by ``agent_loop``, in order.
+        All ``AgentEvent`` instances emitted by ``run_model_tool_loop``, in order.
 
     Example — checking ``call_count`` after the run::
 
@@ -416,4 +416,4 @@ async def run_scenario(
         safety=safety or AgentSafetyConfig.disabled(),
     )
     prompt = UserMessage(role="user", content=question)
-    return [ev async for ev in agent_loop([prompt], ctx, cfg, stream_fn)]
+    return [ev async for ev in run_model_tool_loop([prompt], ctx, cfg, stream_fn)]

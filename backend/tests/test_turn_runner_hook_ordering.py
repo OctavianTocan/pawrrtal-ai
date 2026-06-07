@@ -20,7 +20,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.channels.base import ChannelMessage
-from app.channels.turn_runner import ChatTurnInput, _guarded_stream, run_turn
+from app.channels.turn_orchestrator import ChatTurnInput, _guarded_stream, run_turn
 from app.chat.aggregator import ChatTurnAggregator
 from app.providers.base import StreamEvent
 
@@ -241,7 +241,7 @@ async def test_agy_internal_conversation_id_is_persisted(
         persisted.append((conversation_id, agy_conversation_id))
 
     monkeypatch.setattr(
-        "app.channels.turn_runner.persist_agy_conversation_id",
+        "app.channels.turn_orchestrator.runner.persist_agy_conversation_id",
         fake_persist,
     )
 
@@ -349,8 +349,10 @@ async def test_lightweight_codex_turn_still_runs_pre_turn_hooks(
     async def no_finalize(**_kwargs: Any) -> None:
         return None
 
-    monkeypatch.setattr("app.channels.turn_runner._load_history_and_persist", no_persist)
-    monkeypatch.setattr("app.channels.turn_runner._finalize_turn", no_finalize)
+    monkeypatch.setattr(
+        "app.channels.turn_orchestrator.runner._load_history_and_persist", no_persist
+    )
+    monkeypatch.setattr("app.channels.turn_orchestrator.runner._finalize_turn", no_finalize)
 
     turn_input = ChatTurnInput(
         conversation_id=MagicMock(),

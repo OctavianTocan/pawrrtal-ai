@@ -33,7 +33,7 @@ from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
 from app.agents.hooks import build_pre_turn_hooks
-from app.agents.tools import build_agent_tools
+from app.agents.tool_surface import build_agent_tools
 from app.channels.base import ChannelMessage
 from app.channels.telegram.bot_runtime import (
     COMMAND_REFRESH_COOLDOWN_SECONDS,
@@ -61,7 +61,7 @@ from app.channels.telegram.handlers import (
     handle_verbose_command,
     handle_whoami_command,
 )
-from app.channels.turn_runner import ChatTurnInput, load_agy_conversation_id, run_turn
+from app.channels.turn_orchestrator import ChatTurnInput, load_agy_conversation_id, run_turn
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
 

@@ -57,7 +57,7 @@ subpackage so the side effect fires at app startup.
 Each entry in `tool_factories` is a function that takes a
 [`ToolContext`](../../../../../backend/app/core/plugins/types.py) and
 returns an
-[`AgentTool`](../../../../../backend/app/core/agent_loop/types.py).
+[`AgentTool`](../../../../../backend/app/core/run_model_tool_loop/types.py).
 `ToolContext` carries the active workspace ID, workspace root, user
 ID, and (optionally) the channel send callback. Use it for env-key
 resolution and per-call audit logging.

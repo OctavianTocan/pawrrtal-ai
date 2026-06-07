@@ -18,7 +18,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from app.agents.tools import build_agent_tools
+from app.agents.tool_surface import build_agent_tools
 from app.agents.types import AgentTool
 from app.tools.errors import ToolErrorCode
 from app.tools.markitdown_convert import make_markitdown_tool

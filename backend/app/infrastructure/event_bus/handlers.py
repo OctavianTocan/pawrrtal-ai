@@ -368,7 +368,7 @@ async def _run_agent_turn(*, prompt: str, user_id: uuid.UUID) -> str:
     """
     # All imports are lazy so the bus module can be loaded without
     # pulling in the chat router's heavy dependency tree.
-    from app.agents.tools import build_agent_tools  # noqa: PLC0415
+    from app.agents.tool_surface import build_agent_tools  # noqa: PLC0415
     from app.governance.workspace_context import (  # noqa: PLC0415
         load_workspace_context,
     )

@@ -8,7 +8,7 @@ from httpx import AsyncClient
 
 from app.agents.types import AgentSafetyConfig
 from app.models import Workspace  # used via fixture type hint
-from tests.agent_harness import ScriptedStreamFn, echo_tool, text_turn, tool_call_turn
+from tests.agent_loop_harness import ScriptedStreamFn, echo_tool, text_turn, tool_call_turn
 
 
 class FakeProvider:
@@ -270,13 +270,13 @@ async def test_chat_multi_turn_tool_call_flows_through_full_http_path(
     the full HTTP path:
 
         POST /api/v1/chat/
-          → chat.py → GeminiLLM.stream() → agent_loop (real)
+          → chat.py → GeminiLLM.stream() → run_model_tool_loop (real)
           → ScriptedStreamFn yields tool_call → echo_tool executes (real)
           → ScriptedStreamFn yields text reply
           → SSE frames: tool_use + tool_result + delta + [DONE]
 
     Only the LLM is replaced.  Every other component (HTTP routing,
-    agent_loop, tool execution, SSE serialization) runs as in production.
+    run_model_tool_loop, tool execution, SSE serialization) runs as in production.
     """
     from app.providers.gemini import GeminiLLM
 
@@ -332,7 +332,7 @@ async def test_chat_safety_layer_fires_and_surfaces_agent_terminated(
           → chat.py → GeminiLLM.stream()
           → safety_from_settings() builds AgentSafetyConfig(max_iterations=3)
           → ScriptedStreamFn serves 10 tool-call turns (runaway loop)
-          → agent_loop terminates after exactly 3 iterations
+          → run_model_tool_loop terminates after exactly 3 iterations
           → AgentTerminatedEvent → StreamEvent(type="agent_terminated")
           → SSE frame with reason="max_iterations"
 

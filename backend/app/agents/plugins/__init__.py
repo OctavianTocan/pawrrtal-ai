@@ -10,7 +10,7 @@ Design notes:
 
 * **Additive only.** Core tools (workspace files, web search, image
   generation, artifact rendering, message delivery) stay hardcoded in
-  :func:`app.agents.tools.build_agent_tools`. The registry append
+  :func:`app.agents.tool_surface.build_agent_tools`. The registry append
   happens *after* core tool composition. We avoid a refactor whose only
   payoff would be uniformity for its own sake.
 * **Tools only, v1.** Plugin-registered channels, providers, hooks, and

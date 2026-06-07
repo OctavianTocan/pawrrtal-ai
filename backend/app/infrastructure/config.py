@@ -101,7 +101,7 @@ class Settings(BaseSettings):
     # The base directory where workspaces will be stored. Each workspace can contain files, configurations, and other resources specific to a user's project or environment.
     workspace_base_dir: str = "/data/workspaces"
     # ── Agent loop safety ────────────────────────────────────────────────
-    # See backend/app/core/agent_loop/types.py::AgentSafetyConfig for the
+    # See backend/app/core/run_model_tool_loop/types.py::AgentSafetyConfig for the
     # behavioural contract.  All four caps accept None to opt out of the
     # specific guard (set the matching env var to an empty string in
     # ``.env`` and Pydantic will coerce to None — or pass --None).
@@ -112,7 +112,7 @@ class Settings(BaseSettings):
     agent_max_iterations: int | None = 25
 
     # Wall-clock budget (seconds) for one chat invocation.  Counted from
-    # entry to ``agent_loop``.  Default 300 (5 min); raise for long-
+    # entry to ``run_model_tool_loop``.  Default 300 (5 min); raise for long-
     # running automations.
     agent_max_wall_clock_seconds: float | None = 300.0
 

@@ -133,7 +133,7 @@ The provider follows the
 - Reasoning-content drain via
   `_opencode_go_events.read_reasoning`.
 
-Do not patch `agent_loop` or `openai.AsyncOpenAI.chat.completions.create`
+Do not patch `run_model_tool_loop` or `openai.AsyncOpenAI.chat.completions.create`
 in new tests — inject a `ScriptedStreamFn` at the
 `OpencodeGoLLM._stream_fn` seam.
 

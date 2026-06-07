@@ -51,7 +51,7 @@ from app.providers.claude.provider import (
 )
 
 # Note: ClaudeLLM runs its own agent loop via the Claude Code SDK subprocess
-# (max_turns controls iteration depth).  It does NOT use the Python agent_loop
+# (max_turns controls iteration depth).  It does NOT use the Python run_model_tool_loop
 # or ScriptedStreamFn — those apply to GeminiLLM and the generic loop seam.
 # Scenario-level tests here exercise the full provider.stream() path using a
 # mock SDK ``query`` that returns realistic SDK message sequences.
@@ -449,7 +449,7 @@ class TestProviderOptions:
         # subprocess never reads CLAUDE.md, .claude/settings.json
         # (hooks), or .mcp.json from whatever directory it happens
         # to be running in. The workspace's CLAUDE.md is injected
-        # via system_prompt= by ``turn_runner._workspace_system_prompt``
+        # via system_prompt= by ``turn_orchestrator._workspace_system_prompt``
         # from the *correct* user workspace root.
         assert options.setting_sources == []
         assert options.permission_mode == "default"

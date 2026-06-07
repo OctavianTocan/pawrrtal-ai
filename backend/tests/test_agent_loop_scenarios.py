@@ -1,7 +1,7 @@
 """Scripted-trajectory scenario tests for the agent loop.
 
 These tests author deterministic LLM decision sequences (tool calls, text
-replies, provider errors) and run them through the *real* agent_loop,
+replies, provider errors) and run them through the *real* run_model_tool_loop,
 safety layer, and tool-execution code.  Only the LLM is replaced — every
 other component executes as it would in production.
 
@@ -9,7 +9,7 @@ This "reverse eval" approach gives high confidence that the harness handles
 realistic multi-step flows correctly, without needing a live API key or
 mocking dozens of internal collaborators.
 
-See ``tests/agent_harness.py`` for the shared primitives and the full
+See ``tests/agent_loop_harness.py`` for the shared primitives and the full
 rationale for the pattern.
 """
 
@@ -33,10 +33,10 @@ from app.agents import (
     LLMTextDeltaEvent,
     LLMToolCallEvent,
     UserMessage,
-    agent_loop,
+    run_model_tool_loop,
 )
 from app.agents.types import TextContent, ToolCallContent
-from tests.agent_harness import (
+from tests.agent_loop_harness import (
     ScriptedStreamFn,
     echo_tool,
     error_turn,
@@ -167,7 +167,7 @@ async def test_tool_call_event_streams_before_provider_done() -> None:
             safety=AgentSafetyConfig.disabled(),
         )
         prompt = UserMessage(role="user", content="use the tool")
-        async for event in agent_loop([prompt], context, config, stream_fn):
+        async for event in run_model_tool_loop([prompt], context, config, stream_fn):
             events.append(event)
             if event["type"] == "tool_call_end":
                 saw_tool_call.set()
@@ -401,7 +401,7 @@ async def test_message_context_grows_across_turns() -> None:
         AgentLoopConfig,
         AgentSafetyConfig,
         UserMessage,
-        agent_loop,
+        run_model_tool_loop,
     )
     from app.agents.types import (
         LLMDoneEvent,
@@ -410,7 +410,7 @@ async def test_message_context_grows_across_turns() -> None:
         TextContent,
         ToolCallContent,
     )
-    from tests.agent_harness import identity_convert
+    from tests.agent_loop_harness import identity_convert
 
     seen_messages: list[list[Any]] = []
     turn_counter: list[int] = [0]
@@ -454,7 +454,9 @@ async def test_message_context_grows_across_turns() -> None:
     )
     events = [
         ev
-        async for ev in agent_loop([UserMessage(role="user", content="go")], ctx, cfg, recording_fn)
+        async for ev in run_model_tool_loop(
+            [UserMessage(role="user", content="go")], ctx, cfg, recording_fn
+        )
     ]
 
     # Two LLM calls happened.

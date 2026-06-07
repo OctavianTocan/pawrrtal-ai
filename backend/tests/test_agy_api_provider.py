@@ -25,7 +25,12 @@ from app.providers.agy_api.client import (
 from app.providers.agy_api.messages import build_agy_contents
 from app.providers.agy_api.provider import AgyApiLLM, resolve_agy_api_wire_model_id
 from app.providers.base import StreamEvent
-from tests.agent_harness import ScriptedStreamFn, text_turn, thinking_then_text_turn, tool_call_turn
+from tests.agent_loop_harness import (
+    ScriptedStreamFn,
+    text_turn,
+    thinking_then_text_turn,
+    tool_call_turn,
+)
 
 
 def test_load_agy_api_auth_uses_workspace_project_cache(

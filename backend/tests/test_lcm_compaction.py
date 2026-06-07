@@ -674,17 +674,23 @@ async def test_finalize_turn_triggers_lcm_compaction(
     from collections import Counter
     from unittest.mock import AsyncMock
 
-    from app.channels.turn_runner import ChatTurnInput, _finalize_turn
+    from app.channels.turn_orchestrator import ChatTurnInput, _finalize_turn
     from app.chat.aggregator import ChatTurnAggregator
 
     conv = await _make_conversation(db_session, test_user)
 
-    monkeypatch.setattr("app.channels.turn_runner.finalize_assistant_message", AsyncMock())
-    monkeypatch.setattr("app.channels.turn_runner.record_turn_cost_if_enabled", AsyncMock())
-    monkeypatch.setattr("app.channels.turn_runner.publish_if_available", AsyncMock())
+    monkeypatch.setattr(
+        "app.channels.turn_orchestrator.finalize.finalize_assistant_message", AsyncMock()
+    )
+    monkeypatch.setattr(
+        "app.channels.turn_orchestrator.finalize.record_turn_cost_if_enabled", AsyncMock()
+    )
+    monkeypatch.setattr("app.channels.turn_orchestrator.finalize.publish_if_available", AsyncMock())
 
     schedule_mock = MagicMock()
-    monkeypatch.setattr("app.channels.turn_runner.schedule_lcm_compaction", schedule_mock)
+    monkeypatch.setattr(
+        "app.channels.turn_orchestrator.finalize.schedule_lcm_compaction", schedule_mock
+    )
 
     turn_input = ChatTurnInput(
         conversation_id=conv.id,

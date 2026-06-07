@@ -372,7 +372,7 @@ def test_event_hook_mirrors_stream_events_onto_recorder(
 
 
 # ---------------------------------------------------------------------------
-# turn_runner integration — span layering + history rendering
+# turn_orchestrator integration — span layering + history rendering
 # ---------------------------------------------------------------------------
 
 
@@ -433,7 +433,7 @@ async def test_finalize_turn_errors_do_not_taint_llm_span(
     """
     import uuid as _uuid
 
-    from app.channels.turn_runner import ChatTurnInput, run_turn
+    from app.channels.turn_orchestrator import ChatTurnInput, run_turn
 
     # Minimal fake provider — yields one delta + one usage event so the
     # aggregator + LLM recorder both have something to flush.
@@ -474,11 +474,11 @@ async def test_finalize_turn_errors_do_not_taint_llm_span(
         raise RuntimeError("simulated DB persist failure")
 
     monkeypatch.setattr(
-        "app.channels.turn_runner._load_history_and_persist",
+        "app.channels.turn_orchestrator.runner._load_history_and_persist",
         _no_persist,
     )
     monkeypatch.setattr(
-        "app.channels.turn_runner._finalize_turn",
+        "app.channels.turn_orchestrator.runner._finalize_turn",
         _failing_finalize,
     )
 
@@ -513,7 +513,7 @@ async def test_run_turn_passes_history_into_llm_span(
     """``gen_ai.input.messages`` carries the full conversation, not only the new turn."""
     import uuid as _uuid
 
-    from app.channels.turn_runner import ChatTurnInput, run_turn
+    from app.channels.turn_orchestrator import ChatTurnInput, run_turn
 
     class _FakeProvider:
         async def stream(self, *_args: object, **_kwargs: object) -> AsyncIterator[Any]:
@@ -546,8 +546,8 @@ async def test_run_turn_passes_history_into_llm_span(
     async def _noop_finalize(**_kwargs):
         return None
 
-    monkeypatch.setattr("app.channels.turn_runner._load_history_and_persist", _persist)
-    monkeypatch.setattr("app.channels.turn_runner._finalize_turn", _noop_finalize)
+    monkeypatch.setattr("app.channels.turn_orchestrator.runner._load_history_and_persist", _persist)
+    monkeypatch.setattr("app.channels.turn_orchestrator.runner._finalize_turn", _noop_finalize)
 
     turn_input = ChatTurnInput(
         conversation_id=cast("UUID", channel_message["conversation_id"]),
@@ -718,7 +718,7 @@ async def test_run_turn_stamps_latency_attributes_on_turn_span(
     """
     import uuid as _uuid
 
-    from app.channels.turn_runner import ChatTurnInput, run_turn
+    from app.channels.turn_orchestrator import ChatTurnInput, run_turn
 
     class _FakeProvider:
         async def stream(self, *_args: object, **_kwargs: object) -> AsyncIterator[Any]:
@@ -755,8 +755,8 @@ async def test_run_turn_stamps_latency_attributes_on_turn_span(
         # plumbing, not only the span.
         _noop_finalize.last_kwargs = _kwargs  # type: ignore[attr-defined]
 
-    monkeypatch.setattr("app.channels.turn_runner._load_history_and_persist", _persist)
-    monkeypatch.setattr("app.channels.turn_runner._finalize_turn", _noop_finalize)
+    monkeypatch.setattr("app.channels.turn_orchestrator.runner._load_history_and_persist", _persist)
+    monkeypatch.setattr("app.channels.turn_orchestrator.runner._finalize_turn", _noop_finalize)
 
     turn_input = ChatTurnInput(
         conversation_id=cast("UUID", channel_message["conversation_id"]),

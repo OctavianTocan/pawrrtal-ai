@@ -16,13 +16,18 @@ from opentelemetry import trace as _otel_trace
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.hooks import build_pre_turn_hooks
-from app.agents.tools import build_agent_tools
+from app.agents.tool_surface import build_agent_tools
 
 # ``ChannelMessage`` is re-exported by ``app.channels.__init__``; we
 # pull all three names from the same package to keep chat.py's
 # fan-out under sentrux's ``no_god_files`` budget.
 from app.channels import ChannelMessage, resolve_channel, surface_from_header
-from app.channels.turn_runner import ChatTurnInput, EventHook, load_agy_conversation_id, run_turn
+from app.channels.turn_orchestrator import (
+    ChatTurnInput,
+    EventHook,
+    load_agy_conversation_id,
+    run_turn,
+)
 from app.chat import (
     enforce_cost_budget,
     load_external_mcp_configs,
@@ -122,7 +127,7 @@ async def _require_workspace(
     """Return the user's default workspace ``(id, path)`` or reject the chat turn.
 
     Returns the workspace UUID alongside the directory path so callers
-    can pass both into :func:`app.agents.tools.build_agent_tools` —
+    can pass both into :func:`app.agents.tool_surface.build_agent_tools` —
     the UUID drives plugin activation (and, post-migration, env-key
     resolution); the path drives the existing core workspace tools.
     """
@@ -326,7 +331,7 @@ def get_chat_router() -> APIRouter:
         # writes its transcripts under the user's workspace rather than
         # the uvicorn process directory.
         provider = resolve_llm(model_id, workspace_root=root)
-        # Per-turn tool composition lives in `app.agents.tools` —
+        # Per-turn tool composition lives in `app.agents.tool_surface` —
         # the chat router only decides *that* the agent gets tools,
         # not *which* (that's the builder's job, and where future
         # per-agent / per-user permission gating will land).  Provider

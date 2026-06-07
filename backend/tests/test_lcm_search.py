@@ -30,7 +30,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.tools import build_agent_tools
+from app.agents.tool_surface import build_agent_tools
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import User
 from app.models import ChatMessage, Conversation, LCMSummary

@@ -27,9 +27,9 @@ from typing import Any, cast
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.hooks import build_pre_turn_hooks
-from app.agents.tools import build_agent_tools
+from app.agents.tool_surface import build_agent_tools
 from app.channels.base import ChannelMessage
-from app.channels.turn_runner import ChatTurnInput, run_turn
+from app.channels.turn_orchestrator import ChatTurnInput, run_turn
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
 from app.models import Conversation

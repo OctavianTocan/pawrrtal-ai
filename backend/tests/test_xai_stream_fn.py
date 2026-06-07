@@ -1,11 +1,11 @@
-"""Tests for XaiLLM's StreamFn wiring into agent_loop.
+"""Tests for XaiLLM's StreamFn wiring into run_model_tool_loop.
 
-Uses ``ScriptedStreamFn`` from ``tests.agent_harness`` per
+Uses ``ScriptedStreamFn`` from ``tests.agent_loop_harness`` per
 ``.claude/rules/testing/agent-loop-testing-philosophy.md`` — no real
 xAI API calls are made.  These tests exercise the provider's
 translation layer (AgentEvent → StreamEvent) and confirm that safety
 config flows end-to-end from ``safety_from_settings`` through
-``agent_loop`` to the SSE output, mirroring the Gemini test suite so
+``run_model_tool_loop`` to the SSE output, mirroring the Gemini test suite so
 parity is verified, not asserted.
 """
 
@@ -27,7 +27,7 @@ from app.agents.types import (
     ToolCallContent,
 )
 from app.providers.base import StreamEvent
-from tests.agent_harness import (
+from tests.agent_loop_harness import (
     ScriptedStreamFn,
     echo_tool,
     text_turn,
@@ -39,7 +39,7 @@ from tests.agent_harness import (
 async def test_xai_provider_yields_delta_events_from_loop(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """XaiLLM.stream() translates agent_loop text_deltas to StreamEvent deltas."""
+    """XaiLLM.stream() translates run_model_tool_loop text_deltas to StreamEvent deltas."""
     from app.providers.xai import XaiLLM
 
     provider = XaiLLM("grok-test")
@@ -173,7 +173,7 @@ async def test_xai_provider_emits_tool_use_and_result_events(
 async def test_xai_provider_surfaces_agent_terminated_from_safety_config(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """safety_from_settings flows through XaiLLM to agent_loop."""
+    """safety_from_settings flows through XaiLLM to run_model_tool_loop."""
     from app.agents import AgentSafetyConfig
     from app.providers.xai import XaiLLM
 

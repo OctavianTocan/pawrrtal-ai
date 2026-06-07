@@ -1497,18 +1497,21 @@ Build:
 - Update `CONTEXT.md` with the final plugin-platform vocabulary.
 - Rename implementation terms before moving behavior:
   - `pre_turn_hook` becomes `turn_context_provider` or `turn_observer`.
-	  - `agent_harness` becomes `agent_runtime` when it is a session-owning runtime
-	    adapter.
-	  - `subagent` becomes `agent_profile` for reusable definitions and
-	    `delegated_agent_job` for executions.
-	  - `capability` means a Paw/user-facing searchable, selectable, invokable, or
-	    slotted surface.
+  - `agent_runtime` is reserved for session-owning runtime adapters.
+  - `backend/tests/agent_loop_harness.py` is the scripted model/tool loop test
+    harness, not a runtime adapter.
+  - `subagent` becomes `agent_profile` for reusable definitions and
+    `delegated_agent_job` for executions.
+  - `capability` means a Paw/user-facing searchable, selectable, invokable, or
+    slotted surface.
   - `adapter` means infrastructure that satisfies a kernel interface.
 - Rename the confusing agent-loop modules without behavior changes:
-  - `backend/app/channels/turn_runner.py` becomes the persisted turn
-    orchestrator module.
-  - `backend/app/agents/loop.py` becomes the model/tool loop module.
-  - `backend/app/agents/tools.py` becomes the tool surface module.
+  - The old persisted-turn module becomes the orchestrator package at
+    `backend/app/channels/turn_orchestrator/`.
+  - The old generic loop module becomes the model/tool loop package at
+    `backend/app/agents/model_tool_loop/`.
+  - The old tool-composition module becomes the tool surface module at
+    `backend/app/agents/tool_surface.py`.
 - Update import paths, docs, tests, and Paw CLI references in the same slice.
 
 Acceptance:
@@ -1517,8 +1520,8 @@ Acceptance:
 - Public docs use **Kernel**, **Plugin**, **Contribution**, **Capability**,
   **Adapter**, **Turn Context Provider**, **Turn Observer**, and **Agent Runtime
   Adapter**, **Agent Profile**, and **Delegated Agent Job** consistently.
-- No load-bearing implementation plan step still depends on `agent_harness` or
-  generic hook/subagent terminology.
+- No load-bearing implementation plan step still depends on the old generic
+  test-harness name or generic hook/subagent terminology.
 - Existing agent loop, turn runner, tool composition, provider, and channel tests
   still pass.
 

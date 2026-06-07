@@ -1,6 +1,6 @@
 """Compose the per-turn system prompt: workspace + runtime metadata.
 
-Tiny helper that keeps :mod:`app.channels.turn_runner` below the
+Tiny helper that keeps :mod:`app.channels.turn_orchestrator` below the
 fan-out budget the architecture gate (sentrux ``no_god_files``)
 enforces.  Without this seam the runner would pull
 :mod:`app.providers.catalog`, :mod:`app.providers.model_id`,

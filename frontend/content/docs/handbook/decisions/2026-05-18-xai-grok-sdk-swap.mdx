@@ -21,7 +21,7 @@ on its vendor's first-party SDK: Claude → `claude-agent-sdk`, Gemini →
 
 Pawrrtal's chat-provider abstraction (`backend/app/core/providers/`)
 hides each vendor behind an `AILLM` class that builds a per-request
-`StreamFn` for `agent_loop`. Adding Grok meant adding a fourth class
+`StreamFn` for `run_model_tool_loop`. Adding Grok meant adding a fourth class
 alongside `ClaudeLLM`, `GeminiLLM`, and `LiteLLMLLM`.
 
 The obvious first move was xAI's **OpenAI-compatible chat-completions
@@ -107,7 +107,7 @@ Concretely:
   constant the openai-compat path carried locally is gone — the
   SDK does the conversion. The `UsageAccumulator` consumes a typed
   `UsageRecord` and `XaiLLM.stream` emits the terminal
-  `StreamEvent(type="usage")` shape `agent_loop` already knows how
+  `StreamEvent(type="usage")` shape `run_model_tool_loop` already knows how
   to fold into the cost ledger via `record_turn_cost_if_enabled`.
 
 The provider stays tool-agnostic per

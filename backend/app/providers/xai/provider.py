@@ -13,7 +13,7 @@ Design parity with :mod:`app.providers.gemini_provider`:
   xAI OAuth or ``XAI_API_KEY`` credentials), the assembled ``system_prompt``, a
   caller-supplied :class:`UsageAccumulator`, and the reasoning-effort
   knob.
-* ``XaiLLM.stream`` runs :func:`agent_loop` against that StreamFn and
+* ``XaiLLM.stream`` runs :func:`run_model_tool_loop` against that StreamFn and
   translates each :class:`AgentEvent` into a :class:`StreamEvent` via
   :func:`_xai_events.agent_event_to_stream_event`.  After the loop
   returns, ``XaiLLM.stream`` emits one terminal
@@ -79,7 +79,7 @@ from app.agents import (
     LLMThinkingDeltaEvent,
     StreamFn,
     UserMessage,
-    agent_loop,
+    run_model_tool_loop,
 )
 from app.agents.permissions import default_tool_permission_check
 from app.agents.safety_factory import safety_from_settings
@@ -164,7 +164,7 @@ def make_xai_stream_fn(
             model default.
         usage_sink: Optional mutable :class:`UsageAccumulator` the
             StreamFn writes per-request usage into.  Shared across
-            every agent_loop iteration for a single ``XaiLLM.stream``
+            every run_model_tool_loop iteration for a single ``XaiLLM.stream``
             call so multi-turn tool-using conversations sum their cost
             correctly.  ``None`` skips usage capture entirely — useful
             for unit tests and utility callers that don't talk to the
@@ -173,7 +173,7 @@ def make_xai_stream_fn(
 
     Returns:
         An async generator factory that yields ``LLMEvent`` instances.
-        The factory is xai-specific; the surrounding :func:`agent_loop`
+        The factory is xai-specific; the surrounding :func:`run_model_tool_loop`
         stays provider-neutral.
     """
 
@@ -271,7 +271,7 @@ async def _stream_one_request(
 
 
 class XaiLLM:
-    """AILLM backed by the agent_loop + an xai-sdk StreamFn.
+    """AILLM backed by the run_model_tool_loop + an xai-sdk StreamFn.
 
     History is supplied by the caller (read from the Message table in
     ``api/chat.py``).  Tools are injected per-request via the
@@ -383,7 +383,7 @@ class XaiLLM:
         )
 
         try:
-            async for event in agent_loop([prompt], context, config, stream_fn):
+            async for event in run_model_tool_loop([prompt], context, config, stream_fn):
                 stream_event = agent_event_to_stream_event(event)
                 if stream_event is not None:
                     log_provider_stream_event(
