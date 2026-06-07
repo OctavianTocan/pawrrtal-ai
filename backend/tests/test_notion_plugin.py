@@ -27,7 +27,6 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.plugins.types import ToolContext
 from app.infrastructure.database.legacy import User
 from app.models import NotionOperationLog, Workspace
 from app.plugins.fingerprints import fingerprint_plugin
@@ -35,6 +34,7 @@ from app.plugins.manifest import validate_plugin_manifest
 from app.plugins.notion.audit import STATUS_ERROR, STATUS_OK
 from app.plugins.notion.ntn_client import NtnError, NtnResult, call_ntn
 from app.plugins.notion.tool import make_ntn_tool
+from app.plugins.tool_context import ToolContext
 
 NTN_BINARY_ENV_VAR = "NTN_BINARY"
 

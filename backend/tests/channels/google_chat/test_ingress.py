@@ -119,7 +119,11 @@ async def test_message_turn_forwards_google_chat_overrides_and_hooks(
     monkeypatch.setattr(ingress_module, "build_agent_tools", lambda **_kwargs: [])
     monkeypatch.setattr(ingress_module, "create_message", _fake_create_message)
     monkeypatch.setattr(ingress_module, "collect_attachments", _fake_collect)
-    monkeypatch.setattr(ingress_module, "build_pre_turn_hooks", lambda: [_fake_hook])
+    monkeypatch.setattr(
+        ingress_module,
+        "build_turn_context_providers",
+        lambda **_kwargs: [_fake_hook],
+    )
     monkeypatch.setattr(ingress_module, "run_turn", _fake_run_turn)
 
     await ingress_module._handle_message_event(addon_event(text="hello"))
@@ -127,7 +131,7 @@ async def test_message_turn_forwards_google_chat_overrides_and_hooks(
     turn_input = captured["turn_input"]
     assert turn_input.verbose_level == 2
     assert turn_input.reasoning_effort == "high"
-    assert turn_input.pre_turn_hooks == [_fake_hook]
+    assert turn_input.turn_context_providers == [_fake_hook]
 
 
 async def test_message_turn_clears_unsupported_reasoning(

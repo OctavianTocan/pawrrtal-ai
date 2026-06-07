@@ -407,7 +407,7 @@ class Settings(BaseSettings):
 
     # ── Pre-turn hooks ──────────────────────────────────────────────────
     # The timeout in seconds for each pre-turn hook.
-    pre_turn_hook_timeout_seconds: int = 10
+    turn_context_provider_timeout_seconds: int = 10
 
     @property
     def claude_sandbox_excluded_commands_list(self) -> list[str]:

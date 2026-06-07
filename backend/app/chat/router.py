@@ -15,7 +15,6 @@ from fastapi.routing import APIRouter
 from opentelemetry import trace as _otel_trace
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.hooks import build_pre_turn_hooks
 from app.agents.tool_surface import build_agent_tools
 
 # ``ChannelMessage`` is re-exported by ``app.channels.__init__``; we
@@ -40,6 +39,7 @@ from app.conversations.crud import (
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.database.legacy import User, get_async_session
 from app.infrastructure.middleware.logging import get_request_id
+from app.plugins.adapters.turn_context import build_turn_context_providers
 from app.providers import StreamEvent, resolve_llm
 from app.schemas import ChatRequest
 from app.tools.artifact_agent import (
@@ -441,7 +441,7 @@ def get_chat_router() -> APIRouter:
                 "model_id": model_id,
                 "surface": surface,
             },
-            pre_turn_hooks=build_pre_turn_hooks(),
+            turn_context_providers=build_turn_context_providers(workspace_root=root),
             codex_thread_id=codex_thread_state.thread_id,
             codex_thread_prompt_hash=codex_thread_state.prompt_hash,
             codex_lightweight_prompt=codex_thread_state.lightweight_prompt,

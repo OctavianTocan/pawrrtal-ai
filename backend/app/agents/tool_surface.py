@@ -31,11 +31,6 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from app.agents.plugins import (
-    ToolContext,
-    all_plugins,
-    is_activated_by_env_keys,
-)
 from app.agents.types import AgentTool
 from app.infrastructure.config import settings
 from app.infrastructure.keys import resolve_api_key
@@ -103,10 +98,9 @@ def build_agent_tools(
         user_id: Authenticated user UUID, used to resolve per-workspace
             API key overrides for tools that call external services.
         workspace_id: Active workspace UUID.  When supplied alongside
-            ``user_id``, plugin tools (additive integrations registered
-            under :mod:`app.agents.plugins`) are appended after the core
-        tools.  When ``None`` — including in tests that
-        don't need plugin tools — plugin tools are skipped; core
+            ``user_id``, manifest-backed plugin tools are appended after
+            the core tools.  When ``None`` — including in tests that
+            don't need plugin tools — plugin tools are skipped; core
             tool composition is unaffected.
         send_fn: Optional channel delivery callback.  When supplied the
             ``send_message`` tool is added to the list so the agent can
@@ -296,7 +290,6 @@ def build_agent_tools(
             workspace_root=workspace_root,
             user_id=user_id,
             workspace_id=workspace_id,
-            send_fn=send_fn,
         )
     )
 
@@ -315,9 +308,8 @@ def _build_plugin_tools(
     workspace_root: Path,
     user_id: uuid.UUID | None,
     workspace_id: uuid.UUID | None,
-    send_fn: SendFn | None,
 ) -> list[AgentTool]:
-    """Walk the plugin registry and return every activated plugin's tools.
+    """Build every active manifest-backed plugin tool.
 
     Skipped entirely when the workspace context isn't available
     (background jobs, tests without a workspace): plugins gate on workspace-scoped env keys,
@@ -326,20 +318,7 @@ def _build_plugin_tools(
     """
     if workspace_id is None or user_id is None:
         return []
-    ctx = ToolContext(
-        workspace_id=workspace_id,
-        workspace_root=workspace_root,
-        user_id=user_id,
-        send_fn=send_fn,
-    )
-    out: list[AgentTool] = []
-    out.extend(_build_manifest_plugin_tools(workspace_root=workspace_root))
-    for plugin in all_plugins():
-        predicate = plugin.is_activated or is_activated_by_env_keys(plugin)
-        if not predicate(ctx):
-            continue
-        out.extend(factory(ctx) for factory in plugin.tool_factories)
-    return out
+    return _build_manifest_plugin_tools(workspace_root=workspace_root)
 
 
 def _build_manifest_plugin_tools(*, workspace_root: Path) -> list[AgentTool]:

@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from app.agents.plugins.types import PreTurnHook
+from app.plugins.adapters.turn_context import TurnContextProviderAdapter
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,7 +41,7 @@ class ChatTurnInput:
         log_tag: The log tag.
         log_extras: The log extras.
         verbose_level: The verbose level.
-        pre_turn_hooks: The pre-turn hooks.
+        turn_context_providers: Plugin context providers run before the main model turn.
     """
 
     conversation_id: uuid.UUID
@@ -75,11 +75,10 @@ class ChatTurnInput:
     # Native Antigravity CLI conversation id used to resume ``agy --print``
     # without replaying Pawrrtal history into a fresh CLI conversation.
     agy_conversation_id: str | None = None
-    # These are the pre-turn hooks that will be run before the turn is started. They come from the plugin registry (for now).
-    pre_turn_hooks: list[PreTurnHook] | None = None
-    # Optional callback for pre-turn hooks to stream draft status back to the channel.
+    turn_context_providers: list[TurnContextProviderAdapter] | None = None
+    # Optional callback for context providers to stream draft status back to the channel.
     draft_updater: Callable[[str], Awaitable[None]] | None = None
-    on_pre_turn_finished: Callable[[], Awaitable[None]] | None = None
+    on_turn_context_finished: Callable[[], Awaitable[None]] | None = None
 
 
 @dataclass

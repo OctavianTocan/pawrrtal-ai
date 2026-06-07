@@ -1,7 +1,7 @@
 """Tool factory and plugin registration for Codex-driven image generation.
 
 This follows the exact modern pattern used by the notion plugin
-(tool_factories + ToolContext) and is a pure tool plugin (no pre-turn hooks).
+(tool_factories + ToolContext) and is a pure tool plugin.
 """
 
 from __future__ import annotations
@@ -9,11 +9,11 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from app.agents.plugins.types import ToolContext
 from app.agents.types import AgentTool
 from app.plugins.openai_codex_image_gen.codex_image_agent import (
     generate_image_with_codex_agent,
 )
+from app.plugins.tool_context import ToolContext
 
 CODEX_IMAGE_TOOL_NAME = "generate_image_via_codex"
 CODEX_IMAGE_TOOL_DESCRIPTION = (

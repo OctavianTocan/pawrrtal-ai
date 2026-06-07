@@ -1,5 +1,5 @@
-from app.plugins.active_recall.plugin import active_recall_plugin
+"""Active Recall turn context provider."""
 
-__all__ = [
-    "active_recall_plugin",
-]
+from app.plugins.active_recall.recall_agent import run_active_recall
+
+__all__ = ["run_active_recall"]

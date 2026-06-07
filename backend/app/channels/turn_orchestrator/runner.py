@@ -19,9 +19,9 @@ from app.infrastructure.observability import (
     workshop_event_hook,
 )
 
+from .context_providers import _run_turn_context_providers
 from .finalize import _finalize_turn
 from .history import _load_history_and_persist
-from .pre_turn import _run_pre_turn_hooks
 from .state import (
     _register_codex_persist_task,
     _register_turn_finalize_task,
@@ -58,11 +58,11 @@ async def run_turn(
     started_at = time.perf_counter()
     history, assistant_message_id = await _load_history_and_persist(turn_input)
 
-    # --- Pre-turn hooks ---
-    pre_turn_added_context: str | None = None
-    pre_turn_added_context = await _run_pre_turn_hooks(turn_input)
-    if turn_input.on_pre_turn_finished:
-        await turn_input.on_pre_turn_finished()
+    # --- Turn context providers ---
+    turn_context: str | None = None
+    turn_context = await _run_turn_context_providers(turn_input)
+    if turn_input.on_turn_context_finished:
+        await turn_input.on_turn_context_finished()
 
     # --- Main turn ---
     aggregator = ChatTurnAggregator()
@@ -77,7 +77,7 @@ async def run_turn(
         turn_input.workspace_root,
         model_id=model_id,
         tools=turn_input.tools,
-        extra_context=pre_turn_added_context,
+        extra_context=turn_context,
         reasoning_effort=turn_input.reasoning_effort,
     )
 
@@ -110,7 +110,7 @@ async def run_turn(
                 turn_input=turn_input,
                 history=history,
                 system_prompt=system_prompt,
-                per_turn_context=pre_turn_added_context,
+                per_turn_context=turn_context,
                 aggregator=aggregator,
                 counter=counter,
                 event_hooks=event_hooks,
