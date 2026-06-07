@@ -210,6 +210,37 @@ def test_bundled_image_generation_exposes_tool_when_enabled_and_configured(
     assert "generate_image" in _tool_names(tmp_path)
 
 
+def test_bundled_exa_search_manifest_is_disabled_by_default(tmp_path: Path) -> None:
+    save_workspace_env(tmp_path, {"EXA_API_KEY": "secret"})
+
+    assert "exa_search" not in _tool_names(tmp_path)
+
+
+def test_bundled_exa_search_requires_configuration_when_enabled(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("EXA_API_KEY", raising=False)
+    save_plugin_state(
+        plugin_state_path(plugin_id="exa_search", scope="workspace", workspace_root=tmp_path),
+        PluginState(enabled=True),
+    )
+
+    assert "exa_search" not in _tool_names(tmp_path)
+
+
+def test_bundled_exa_search_exposes_tool_when_enabled_and_configured(
+    tmp_path: Path,
+) -> None:
+    save_workspace_env(tmp_path, {"EXA_API_KEY": "secret"})
+    save_plugin_state(
+        plugin_state_path(plugin_id="exa_search", scope="workspace", workspace_root=tmp_path),
+        PluginState(enabled=True),
+    )
+
+    assert "exa_search" in _tool_names(tmp_path)
+
+
 def test_bundled_tasks_manifest_exposes_task_tools(tmp_path: Path) -> None:
     names = _tool_names(tmp_path)
 

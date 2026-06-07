@@ -15,8 +15,8 @@ Why a dedicated module instead of inlining in ``app.chat.router``:
     that logic in the chat handler would tangle it with the streaming
     code; putting it here keeps the gate testable in isolation.
   * It gives the test suite a single function to drive when verifying
-    "does the agent see Exa when EXA_API_KEY is configured?"
-    end-to-end — no mocking the FastAPI request cycle.
+    whether plugin-backed tools appear for a workspace end-to-end — no
+    mocking the FastAPI request cycle.
 
 The function is sync on purpose: every tool factory it calls is sync,
 and the composition itself does no I/O.  Async-ifying the signature
@@ -33,14 +33,12 @@ from typing import Any
 
 from app.agents.types import AgentTool
 from app.infrastructure.config import settings
-from app.infrastructure.keys import resolve_api_key
 from app.plugins.adapters.tools import build_snapshot_agent_tools
 from app.plugins.errors import PluginError
 from app.plugins.host import get_plugin_host
 from app.plugins.tool_context import ToolContext
 from app.providers.catalog import first_authenticated_catalog_model
 from app.tools.artifact_agent import make_artifact_tool
-from app.tools.exa_search_agent import make_exa_search_tool
 from app.tools.lcm_agents import (
     make_lcm_describe_tool,
     make_lcm_expand_query_tool,
@@ -118,8 +116,8 @@ def build_agent_tools(
     Returns:
         A fresh list of :class:`AgentTool` ready to hand to a provider.
         Order is **stable**: workspace tools first (the agent's default
-        operating surface), then capability-gated tools (web search,
-        future capabilities), then any plugin-contributed tools.
+        operating surface), then kernel tools, then plugin-contributed
+        tools.
         Stable order matters for the Claude bridge's ``allowed_tools``
         whitelist construction and for snapshot-style tests.
     """
@@ -129,21 +127,6 @@ def build_agent_tools(
     # the agent is fundamentally a notebook editor, and these are the
     # primitives it edits with.
     tools.extend(make_workspace_tools(workspace_root))
-
-    # Web search via Exa.  Capability-gated on a key being configured —
-    # either per-workspace or globally.  When `user_id` is supplied,
-    # `resolve_api_key` already handles workspace-then-settings fallback,
-    # so a single call is sufficient. The unauthenticated fallback (no
-    # `user_id` — e.g. background jobs) reads `settings.exa_api_key`
-    # directly.  The `workspace_id` guard is an auth-context check, not a
-    # path check — it distinguishes authenticated chat turns (which have
-    # a workspace-bound .env) from background callers (which don't).
-    if workspace_id is not None:
-        exa_key = resolve_api_key(workspace_root, "EXA_API_KEY")
-    else:
-        exa_key = settings.exa_api_key or None
-    if exa_key:
-        tools.append(make_exa_search_tool(workspace_root=workspace_root))
 
     # Artifact rendering.  Always present — the wire shape is purely
     # structural and the catalog of safe components is enforced on the

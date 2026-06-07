@@ -1,0 +1,45 @@
+{
+	"schema_version": 1,
+	"id": "exa_search",
+	"name": "Exa Search",
+	"description": "Search the public web through Exa as an optional agent capability.",
+	"version": "1.0.0",
+	"enabled_by_default": false,
+	"permissions": ["network", "external_read", "secrets"],
+	"capabilities": [
+		{
+			"type": "python_tool",
+			"id": "web_search",
+			"tool_name": "exa_search",
+			"title": "Exa Search",
+			"description": "Search the public web through Exa and return ranked source results.",
+			"tags": ["web", "search", "exa"],
+			"intents": ["web.search", "research.current"],
+			"slots": ["web_search"],
+			"exposure": "direct_and_catalog",
+			"permissions": ["network", "external_read", "secrets"],
+			"risk": "external_read",
+			"entrypoint": "app.plugins.exa_search.tools:make_exa_search_tool"
+		},
+		{
+			"type": "settings",
+			"id": "exa_search_settings",
+			"title": "Exa Search Settings",
+			"description": "Workspace-scoped Exa search credential metadata.",
+			"permissions": ["secrets"],
+			"env": [
+				{
+					"name": "EXA_API_KEY",
+					"required": true,
+					"scope": "workspace",
+					"overridable": true,
+					"gateway_fallback": true,
+					"secret": true,
+					"label": "Exa API Key",
+					"description": "Token used by the Exa web-search plugin.",
+					"help_url": "https://exa.ai"
+				}
+			]
+		}
+	]
+}
