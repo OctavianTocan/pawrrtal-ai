@@ -44,15 +44,6 @@ from app.tools.external_mcp import (
 from app.tools.report_issue import (
     make_report_issue_tool as make_report_issue_tool,  # noqa: PLC0414
 )
-from app.tools.skill_invocation import (
-    make_invoke_skill_tool as make_invoke_skill_tool,  # noqa: PLC0414
-)
-from app.tools.skill_invocation import (
-    make_list_skills_tool as make_list_skills_tool,  # noqa: PLC0414
-)
-from app.tools.skill_invocation import (
-    make_read_skill_tool as make_read_skill_tool,  # noqa: PLC0414
-)
 
 log = logging.getLogger(__name__)
 

@@ -171,6 +171,25 @@ def test_bundled_tasks_plugin_can_be_disabled(tmp_path: Path) -> None:
     assert "complete_task" not in names
 
 
+def test_bundled_skills_manifest_exposes_skill_tools(tmp_path: Path) -> None:
+    names = _tool_names(tmp_path)
+
+    assert {"list_skills", "read_skill", "invoke_skill"} <= names
+
+
+def test_bundled_skills_plugin_can_be_disabled(tmp_path: Path) -> None:
+    save_plugin_state(
+        plugin_state_path(plugin_id="skills", scope="workspace", workspace_root=tmp_path),
+        PluginState(enabled=False),
+    )
+
+    names = _tool_names(tmp_path)
+
+    assert "list_skills" not in names
+    assert "read_skill" not in names
+    assert "invoke_skill" not in names
+
+
 def test_non_bundled_python_tool_manifest_is_not_imported(tmp_path: Path) -> None:
     global_root = tmp_path / "global-plugins"
     workspace_root = tmp_path / "workspace"

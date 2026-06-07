@@ -52,10 +52,7 @@ from app.tools.lcm_agents import (
 from app.tools.markitdown_convert import make_markitdown_tool
 from app.tools.now import (
     build_external_mcp_tools,
-    make_invoke_skill_tool,
-    make_list_skills_tool,
     make_now_tool,
-    make_read_skill_tool,
     make_reminder_cancel_tool,
     make_reminder_list_tool,
     make_reminder_schedule_tool,
@@ -188,14 +185,6 @@ def build_agent_tools(
     # at turn start, the tool covers long-running multi-step turns.
     tools.append(make_now_tool())
 
-    # Skill discovery + invocation (#315).  Always present so the
-    # Paw can reason about which skills the workspace exposes; the
-    # tools themselves do no work when the workspace has no
-    # ``skills/`` directory.  Re-exported off ``now`` to stay under
-    # the sentrux fan-out budget.
-    tools.append(make_list_skills_tool(workspace_root=workspace_root))
-    tools.append(make_read_skill_tool(workspace_root=workspace_root))
-    tools.append(make_invoke_skill_tool(workspace_root=workspace_root))
     tools.append(make_search_plugin_capabilities_tool(workspace_root=workspace_root))
 
     # GitHub issue reporting.  Always present — the tool resolves
