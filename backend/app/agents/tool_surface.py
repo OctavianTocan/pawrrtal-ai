@@ -53,9 +53,6 @@ from app.tools.markitdown_convert import make_markitdown_tool
 from app.tools.now import (
     build_external_mcp_tools,
     make_now_tool,
-    make_reminder_cancel_tool,
-    make_reminder_list_tool,
-    make_reminder_schedule_tool,
     make_report_issue_tool,
 )
 from app.tools.plugin_catalog import make_search_plugin_capabilities_tool
@@ -193,22 +190,6 @@ def build_agent_tools(
     # missing scheduler.
     tools.append(make_report_issue_tool(workspace_root=workspace_root))
 
-    # Cron scheduling (#313).  Three tools that wrap the live
-    # JobScheduler — registered via ``set_active_scheduler`` in
-    # ``backend/main.py``'s lifespan.  Gated on ``user_id`` so an
-    # unauthenticated background path doesn't get the cron surface.
-    # Tools handle the ``scheduler_enabled = False`` case themselves
-    # via ``get_active_scheduler() is None``.
-    if user_id is not None:
-        tools.append(
-            make_reminder_schedule_tool(
-                user_id=user_id,
-                conversation_id=conversation_id,
-            )
-        )
-        tools.append(make_reminder_list_tool(user_id=user_id))
-        tools.append(make_reminder_cancel_tool(user_id=user_id))
-
     # Channel delivery — present for both web (asyncio-queue SSE drain)
     # and Telegram (MIME-aware bot API calls).  The mechanism differs;
     # the tool contract is identical.
@@ -258,6 +239,8 @@ def build_agent_tools(
             user_id=user_id,
             workspace_id=workspace_id,
             send_fn=send_fn,
+            conversation_id=conversation_id,
+            model_id=model_id,
         )
     )
 
@@ -277,6 +260,8 @@ def _build_plugin_tools(
     user_id: uuid.UUID | None,
     workspace_id: uuid.UUID | None,
     send_fn: SendFn | None,
+    conversation_id: uuid.UUID | None,
+    model_id: str | None,
 ) -> list[AgentTool]:
     """Build every active manifest-backed plugin tool.
 
@@ -293,6 +278,8 @@ def _build_plugin_tools(
             workspace_id=workspace_id,
             workspace_root=workspace_root,
             user_id=user_id,
+            conversation_id=conversation_id,
+            model_id=model_id,
             send_fn=send_fn,
         ),
     )

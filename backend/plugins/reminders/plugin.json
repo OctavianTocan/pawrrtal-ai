@@ -1,0 +1,53 @@
+{
+	"schema_version": 1,
+	"id": "reminders",
+	"name": "Reminders",
+	"description": "Schedule, list, and cancel user reminders through Pawrrtal's scheduler.",
+	"version": "1.0.0",
+	"enabled_by_default": true,
+	"permissions": ["external_read", "external_write"],
+	"capabilities": [
+		{
+			"type": "python_tool",
+			"id": "reminder_schedule",
+			"tool_name": "reminder_schedule",
+			"title": "Schedule Reminder",
+			"description": "Create a recurring or one-shot reminder for the current user.",
+			"tags": ["reminders", "scheduler"],
+			"intents": ["reminders.schedule", "scheduler.create"],
+			"slots": ["reminders", "scheduler"],
+			"exposure": "direct_and_catalog",
+			"permissions": ["external_write"],
+			"risk": "external_write",
+			"entrypoint": "app.plugins.reminders.tools:make_reminder_schedule_tool"
+		},
+		{
+			"type": "python_tool",
+			"id": "reminder_list",
+			"tool_name": "reminder_list",
+			"title": "List Reminders",
+			"description": "List active scheduled reminders for the current user.",
+			"tags": ["reminders", "scheduler"],
+			"intents": ["reminders.list", "scheduler.read"],
+			"slots": ["reminders", "scheduler"],
+			"exposure": "direct_and_catalog",
+			"permissions": ["external_read"],
+			"risk": "external_read",
+			"entrypoint": "app.plugins.reminders.tools:make_reminder_list_tool"
+		},
+		{
+			"type": "python_tool",
+			"id": "reminder_cancel",
+			"tool_name": "reminder_cancel",
+			"title": "Cancel Reminder",
+			"description": "Cancel a scheduled reminder for the current user by job id.",
+			"tags": ["reminders", "scheduler"],
+			"intents": ["reminders.cancel", "scheduler.cancel"],
+			"slots": ["reminders", "scheduler"],
+			"exposure": "direct_and_catalog",
+			"permissions": ["external_write"],
+			"risk": "external_write",
+			"entrypoint": "app.plugins.reminders.tools:make_reminder_cancel_tool"
+		}
+	]
+}

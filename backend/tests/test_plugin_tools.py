@@ -6,6 +6,9 @@ import asyncio
 import json
 import uuid
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
+
+import pytest
 
 from app.agents.tool_surface import build_agent_tools
 from app.infrastructure.keys import save_workspace_env
@@ -169,6 +172,59 @@ def test_bundled_tasks_plugin_can_be_disabled(tmp_path: Path) -> None:
     assert "add_task" not in names
     assert "list_tasks" not in names
     assert "complete_task" not in names
+
+
+def test_bundled_reminders_manifest_exposes_reminder_tools(tmp_path: Path) -> None:
+    names = _tool_names(tmp_path)
+
+    assert {"reminder_schedule", "reminder_list", "reminder_cancel"} <= names
+
+
+def test_bundled_reminders_plugin_can_be_disabled(tmp_path: Path) -> None:
+    save_plugin_state(
+        plugin_state_path(plugin_id="reminders", scope="workspace", workspace_root=tmp_path),
+        PluginState(enabled=False),
+    )
+
+    names = _tool_names(tmp_path)
+
+    assert "reminder_schedule" not in names
+    assert "reminder_list" not in names
+    assert "reminder_cancel" not in names
+
+
+def test_bundled_reminders_keep_conversation_context(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    scheduler = AsyncMock()
+    job_id = uuid.uuid4()
+    row = MagicMock()
+    row.id = job_id
+    row.name = "daily standup"
+    row.cron_expression = "0 9 * * 1-5"
+    scheduler.add_job.return_value = row
+    monkeypatch.setattr("app.tools.cron_tools.get_active_scheduler", lambda: scheduler)
+    conversation_id = uuid.uuid4()
+    tools = build_agent_tools(
+        workspace_root=tmp_path,
+        user_id=uuid.uuid4(),
+        workspace_id=uuid.uuid4(),
+        conversation_id=conversation_id,
+    )
+    tool = next(item for item in tools if item.name == "reminder_schedule")
+
+    result = asyncio.run(
+        tool.execute(
+            "call-1",
+            name="daily standup",
+            cron_expression="0 9 * * 1-5",
+            prompt="Remind me",
+        )
+    )
+
+    assert str(job_id) in result
+    assert scheduler.add_job.await_args.kwargs["target_conversation_id"] == conversation_id
 
 
 def test_bundled_skills_manifest_exposes_skill_tools(tmp_path: Path) -> None:

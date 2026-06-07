@@ -353,6 +353,8 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
             workspace_id=workspace.id,
             send_fn=tg_sender,
             surface="telegram",
+            conversation_id=context.conversation_id,
+            model_id=context.model_id,
         )
         if workspace is not None
         else []

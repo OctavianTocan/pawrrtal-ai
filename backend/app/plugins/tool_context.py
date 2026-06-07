@@ -18,4 +18,6 @@ class ToolContext:
     workspace_id: uuid.UUID
     workspace_root: Path
     user_id: uuid.UUID
+    conversation_id: uuid.UUID | None = None
+    model_id: str | None = None
     send_fn: SendFn | None = None
