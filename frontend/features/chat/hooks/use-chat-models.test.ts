@@ -30,7 +30,7 @@ describe('useChatModels', (): void => {
 		vi.stubGlobal('fetch', vi.fn());
 	});
 
-	it('returns the catalog and the FIRST entry as the default on the happy path', async (): Promise<void> => {
+	it('returns the catalog and the first auto-selectable entry as the default', async (): Promise<void> => {
 		const sonnet = makeModel({ id: 'agent-sdk:anthropic/claude-sonnet-4-6' });
 		const gemini = makeModel({
 			id: 'google-ai:google/gemini-3-flash-preview',
@@ -51,22 +51,30 @@ describe('useChatModels', (): void => {
 		});
 
 		expect(result.current.models).toEqual([sonnet, gemini]);
-		// Default is the FIRST catalog entry, not a server-declared default.
 		expect(result.current.default).toEqual(sonnet);
 		expect(result.current.error).toBeNull();
 	});
 
-	it('defaults to the first entry regardless of catalog order', async (): Promise<void> => {
-		const gemini = makeModel({
-			id: 'google-ai:google/gemini-3-flash-preview',
-			host: 'google-ai',
-			vendor: 'google',
-			model: 'gemini-3-flash-preview',
-			display_name: 'Gemini 3 Flash',
-			short_name: 'Gemini 3',
+	it('does not auto-select Codex SDK when another model is available', async (): Promise<void> => {
+		const codex = makeModel({
+			id: 'openai-codex:openai/gpt-5-codex',
+			host: 'openai-codex',
+			vendor: 'openai',
+			model: 'gpt-5-codex',
+			display_name: 'GPT-5 Codex',
+			short_name: 'Codex',
+			description: 'Codex SDK model.',
 		});
-		const sonnet = makeModel({ id: 'agent-sdk:anthropic/claude-sonnet-4-6' });
-		vi.mocked(fetch).mockResolvedValue(Response.json({ models: [gemini, sonnet] }));
+		const liteLlm = makeModel({
+			id: 'litellm:openai/gpt-4o-mini',
+			host: 'litellm',
+			vendor: 'openai',
+			model: 'gpt-4o-mini',
+			display_name: 'GPT-4o Mini',
+			short_name: 'GPT-4o Mini',
+			description: 'Workspace-authenticated OpenAI model.',
+		});
+		vi.mocked(fetch).mockResolvedValue(Response.json({ models: [codex, liteLlm] }));
 
 		const { result } = renderHook(() => useChatModels(), {
 			wrapper: createQueryClientWrapper(createTestQueryClient()),
@@ -76,7 +84,30 @@ describe('useChatModels', (): void => {
 			expect(result.current.isLoading).toBe(false);
 		});
 
-		expect(result.current.default).toEqual(gemini);
+		expect(result.current.default).toEqual(liteLlm);
+	});
+
+	it('falls back to Codex SDK when it is the only catalog entry', async (): Promise<void> => {
+		const codex = makeModel({
+			id: 'openai-codex:openai/gpt-5-codex',
+			host: 'openai-codex',
+			vendor: 'openai',
+			model: 'gpt-5-codex',
+			display_name: 'GPT-5 Codex',
+			short_name: 'Codex',
+			description: 'Codex SDK model.',
+		});
+		vi.mocked(fetch).mockResolvedValue(Response.json({ models: [codex] }));
+
+		const { result } = renderHook(() => useChatModels(), {
+			wrapper: createQueryClientWrapper(createTestQueryClient()),
+		});
+
+		await waitFor((): void => {
+			expect(result.current.isLoading).toBe(false);
+		});
+
+		expect(result.current.default).toEqual(codex);
 	});
 
 	it('returns null default when the models array is empty', async (): Promise<void> => {

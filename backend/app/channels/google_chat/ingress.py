@@ -53,7 +53,7 @@ from .client import (
     update_card_message,
 )
 from .commands import CommandContext, dispatch_command
-from .conversation import get_or_create_google_chat_conversation
+from .conversation import get_or_create_google_chat_conversation, google_chat_conversation_key
 from .delivery import DEFAULT_VERBOSE_LEVEL
 from .dev_admin import resolve_or_autolink_google_chat_user
 from .messages import (
@@ -214,6 +214,7 @@ class _ResolvedSender:
     """The bound Pawrrtal user + their Google Chat conversation."""
 
     user_id: uuid.UUID
+    channel_thread_key: str
     conversation: Conversation
 
 
@@ -225,17 +226,33 @@ async def _resolve_sender(event: dict[str, Any], session: AsyncSession) -> _Reso
     logged once here and the caller skips. ``space_name`` / ``sender_*`` read
     the message, command, and card-click event shapes alike.
     """
+    space = space_name(event)
+    if not space:
+        logger.warning("GOOGLE_CHAT_MISSING_SPACE sender=%s", sender_name(event))
+        return None
     user_id = await resolve_or_autolink_google_chat_user(
         session=session,
         external_user_id=sender_name(event),
-        space_name=space_name(event),
+        space_name=space,
         display=sender_display(event),
     )
     if user_id is None:
         logger.info("GOOGLE_CHAT_UNBOUND_SENDER sender=%s", sender_name(event))
         return None
-    conversation = await get_or_create_google_chat_conversation(user_id=user_id, session=session)
-    return _ResolvedSender(user_id=user_id, conversation=conversation)
+    channel_thread_key = google_chat_conversation_key(
+        space_name=space,
+        thread_name=thread_name(event),
+    )
+    conversation = await get_or_create_google_chat_conversation(
+        user_id=user_id,
+        channel_thread_key=channel_thread_key,
+        session=session,
+    )
+    return _ResolvedSender(
+        user_id=user_id,
+        channel_thread_key=channel_thread_key,
+        conversation=conversation,
+    )
 
 
 async def _workspace_root_for_user(
@@ -271,6 +288,7 @@ async def _handle_command_event(event: dict[str, Any], parsed: tuple[str, str]) 
                 ctx=CommandContext(
                     user_id=resolved.user_id,
                     conversation=resolved.conversation,
+                    channel_thread_key=resolved.channel_thread_key,
                     args=args,
                     sender_resource=sender_name(event),
                     sender_email=sender_email(event),

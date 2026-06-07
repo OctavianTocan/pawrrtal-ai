@@ -78,6 +78,7 @@ class CommandContext:
 
     user_id: uuid.UUID
     conversation: Conversation
+    channel_thread_key: str
     args: str
     sender_resource: str
     sender_email: str | None
@@ -105,7 +106,11 @@ async def _cmd_help(ctx: CommandContext) -> str:
 
 
 async def _cmd_new(ctx: CommandContext) -> str:
-    await start_new_google_chat_conversation(user_id=ctx.user_id, session=ctx.session)
+    await start_new_google_chat_conversation(
+        user_id=ctx.user_id,
+        channel_thread_key=ctx.channel_thread_key,
+        session=ctx.session,
+    )
     return "🆕 Started a fresh conversation. Earlier history is set aside."
 
 

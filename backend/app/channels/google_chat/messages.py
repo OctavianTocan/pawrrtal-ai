@@ -180,7 +180,8 @@ def space_name(event: dict[str, Any]) -> str:
 
 def thread_name(event: dict[str, Any]) -> str | None:
     """Return the ``spaces/{id}/threads/{id}`` name, or ``None`` for a top-level message."""
-    thread = _message(event).get("thread")
+    message = _message(event) or _button_clicked_payload(event).get("message")
+    thread = message.get("thread") if isinstance(message, dict) else None
     name = thread.get("name") if isinstance(thread, dict) else None
     return str(name) if name else None
 
