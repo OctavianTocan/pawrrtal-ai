@@ -1,1 +1,14 @@
 sandbox_mode = "workspace-write"
+
+[mcp_servers.context7]
+command = "npx"
+args = [
+    "-y",
+    "@upstash/context7-mcp",
+]
+
+[mcp_servers.deepwiki]
+url = "https://mcp.deepwiki.com/mcp"
+
+[mcp_servers.stagehand-docs]
+url = "https://docs.stagehand.dev/mcp"
