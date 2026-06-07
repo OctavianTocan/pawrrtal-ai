@@ -53,8 +53,8 @@ class TestBuildAgentToolsWithSendFn:
         names = [t.name for t in tools]
         assert "send_message" in names
 
-    def test_send_message_is_last_tool(self, tmp_workspace: Path) -> None:
-        """send_message appended after workspace + artifact tools."""
+    def test_send_message_is_last_tool_without_plugins(self, tmp_workspace: Path) -> None:
+        """send_message is last when no workspace plugin context is supplied."""
         send_fn = _make_send_fn()
         with patch("app.infrastructure.keys.resolve_api_key", return_value=None):
             tools = build_agent_tools(workspace_root=tmp_workspace, send_fn=send_fn)
@@ -62,13 +62,12 @@ class TestBuildAgentToolsWithSendFn:
         assert tools[-1].name == "send_message"
 
     def test_other_tools_still_present_with_send_fn(self, tmp_workspace: Path) -> None:
-        """Workspace and artifact tools survive alongside send_message."""
+        """Workspace tools survive alongside send_message."""
         send_fn = _make_send_fn()
         with patch("app.infrastructure.keys.resolve_api_key", return_value=None):
             tools = build_agent_tools(workspace_root=tmp_workspace, send_fn=send_fn)
 
         names = [t.name for t in tools]
-        assert "render_artifact" in names
         # At least one workspace tool (read_file / write_file / list_files)
         assert any(n in names for n in ("read_file", "write_file", "list_files"))
 

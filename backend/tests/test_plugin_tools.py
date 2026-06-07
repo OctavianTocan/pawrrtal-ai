@@ -277,6 +277,19 @@ def test_bundled_document_conversion_plugin_can_be_disabled(tmp_path: Path) -> N
     assert "convert_to_markdown" not in _tool_names(tmp_path)
 
 
+def test_bundled_artifacts_plugin_exposes_render_tool(tmp_path: Path) -> None:
+    assert "render_artifact" in _tool_names(tmp_path)
+
+
+def test_bundled_artifacts_plugin_can_be_disabled(tmp_path: Path) -> None:
+    save_plugin_state(
+        plugin_state_path(plugin_id="artifacts", scope="workspace", workspace_root=tmp_path),
+        PluginState(enabled=False),
+    )
+
+    assert "render_artifact" not in _tool_names(tmp_path)
+
+
 def test_bundled_reminders_manifest_exposes_reminder_tools(tmp_path: Path) -> None:
     names = _tool_names(tmp_path)
 

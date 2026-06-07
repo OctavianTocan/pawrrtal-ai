@@ -20,4 +20,5 @@ class ToolContext:
     user_id: uuid.UUID
     conversation_id: uuid.UUID | None = None
     model_id: str | None = None
+    surface: str | None = None
     send_fn: SendFn | None = None

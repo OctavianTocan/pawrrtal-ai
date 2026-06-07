@@ -19,6 +19,7 @@ Covers three layers:
 from __future__ import annotations
 
 import asyncio
+import uuid
 from pathlib import Path
 
 import pytest
@@ -290,7 +291,12 @@ def test_artifact_tool_is_registered_in_build_agent_tools(tmp_path: Path) -> Non
 
     from app.agents.tool_surface import build_agent_tools
 
-    tools = build_agent_tools(workspace_root=tmp_path)
+    tools = build_agent_tools(
+        workspace_root=tmp_path,
+        user_id=uuid.uuid4(),
+        workspace_id=uuid.uuid4(),
+        surface="web",
+    )
     tool_names = [t.name for t in tools]
 
     assert ARTIFACT_TOOL_NAME in tool_names, (
@@ -300,6 +306,9 @@ def test_artifact_tool_is_registered_in_build_agent_tools(tmp_path: Path) -> Non
     assert len(tool_names) == len(set(tool_names)), (
         f"Duplicate tool names in catalogue: {tool_names}"
     )
+    artifact_tool = next(tool for tool in tools if tool.name == ARTIFACT_TOOL_NAME)
+    spec_desc = artifact_tool.parameters["properties"]["spec"]["description"]
+    assert "ActionButton" in spec_desc
 
 
 # ---------------------------------------------------------------------------

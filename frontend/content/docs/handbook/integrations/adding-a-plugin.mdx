@@ -168,6 +168,10 @@ The bundled `exa_search` plugin is the first web-search slot implementation. It
 is disabled by default, requires `EXA_API_KEY`, and declares `web_search` as a
 non-exclusive slot so other search providers can be installed beside it.
 
+The bundled `artifacts` plugin is the presentation-tool template. It receives
+the active turn surface through `ToolContext.surface`, so web/electron can
+advertise interactive widgets while Telegram stays on the read-only catalog.
+
 ## Trusted Runtime Capabilities
 
 Runtime capabilities such as `turn_context_provider`, `provider`, `channel`,

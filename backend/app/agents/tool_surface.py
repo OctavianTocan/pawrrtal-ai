@@ -38,7 +38,6 @@ from app.plugins.errors import PluginError
 from app.plugins.host import get_plugin_host
 from app.plugins.tool_context import ToolContext
 from app.providers.catalog import first_authenticated_catalog_model
-from app.tools.artifact_agent import make_artifact_tool
 from app.tools.lcm_agents import (
     make_lcm_describe_tool,
     make_lcm_expand_query_tool,
@@ -128,17 +127,6 @@ def build_agent_tools(
     # primitives it edits with.
     tools.extend(make_workspace_tools(workspace_root))
 
-    # Artifact rendering.  Always present — the wire shape is purely
-    # structural and the catalog of safe components is enforced on the
-    # client, so there's no key/quota to gate on.  The chat router
-    # picks up artifact tool-calls and lifts the spec into a sibling
-    # SSE event (see ``app.chat.router`` and ``app.tools.artifact``).
-    # ``surface`` flips the tool description between the read-only and
-    # interactive catalogs — Telegram (text-only) sees the read-only one,
-    # web/electron sees the interactive widget catalog. Validation is
-    # surface-independent.
-    tools.append(make_artifact_tool(surface=surface))
-
     # Current wall-clock time.  Pure stdlib, no network — always present
     # so the model can re-query the clock mid-turn without burning
     # iterations on an Exa search.  Pairs with the time block in the
@@ -199,6 +187,7 @@ def build_agent_tools(
             send_fn=send_fn,
             conversation_id=conversation_id,
             model_id=model_id,
+            surface=surface,
         )
     )
 
@@ -220,6 +209,7 @@ def _build_plugin_tools(
     send_fn: SendFn | None,
     conversation_id: uuid.UUID | None,
     model_id: str | None,
+    surface: str | None,
 ) -> list[AgentTool]:
     """Build every active manifest-backed plugin tool.
 
@@ -238,6 +228,7 @@ def _build_plugin_tools(
             user_id=user_id,
             conversation_id=conversation_id,
             model_id=model_id,
+            surface=surface,
             send_fn=send_fn,
         ),
     )
