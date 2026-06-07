@@ -82,7 +82,7 @@ def _conversation_payload(
     conversation_id: str,
     *,
     model_id: str | None = CODEX_MODEL,
-    codex_thread_id: str | None = THREAD_ID,
+    provider_session_id: str | None = THREAD_ID,
     **overrides: Any,
 ) -> dict[str, Any]:
     """Minimal ``ConversationRead`` payload for the mocked GET endpoint."""
@@ -99,7 +99,7 @@ def _conversation_payload(
         "model_id": model_id,
         "labels": [],
         "project_id": None,
-        "codex_thread_id": codex_thread_id,
+        "provider_session_id": provider_session_id,
     }
     base.update(overrides)
     return base
@@ -158,8 +158,8 @@ def test_happy_path_passes_every_check(
     # on a couple by name so a future rename surfaces immediately.
     names = {c["name"] for c in payload["checks"]}
     assert "codex_model_in_catalog" in names
-    assert "codex_thread_id_persisted" in names
-    assert "codex_thread_id_unchanged_on_resume" in names
+    assert "provider_session_id_persisted" in names
+    assert "provider_session_id_unchanged_on_resume" in names
     assert "conversation_cleanup" in names
 
 
@@ -199,22 +199,22 @@ def test_sse_error_event_fails_turn_1_no_errors(
     assert "turn_1_no_errors" in _check_names(payload)
 
 
-def test_null_codex_thread_id_fails_persistence_check(
+def test_null_provider_session_id_fails_persistence_check(
     runner: CliRunner, seeded: PersonaState, stable_uuid: str
 ) -> None:
-    """A null ``codex_thread_id`` trips ``codex_thread_id_persisted``."""
+    """A null ``provider_session_id`` trips ``provider_session_id_persisted``."""
     with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
         _mock_happy_path(r, stable_uuid)
         r.get(f"/api/v1/conversations/{stable_uuid}").mock(
             return_value=httpx.Response(
-                200, json=_conversation_payload(stable_uuid, codex_thread_id=None)
+                200, json=_conversation_payload(stable_uuid, provider_session_id=None)
             )
         )
         result = runner.invoke(app, ["verify", "codex", "--json"])
 
     assert result.exit_code == 6, result.stdout
     payload = json.loads(result.stdout)
-    assert "codex_thread_id_persisted" in _check_names(payload)
+    assert "provider_session_id_persisted" in _check_names(payload)
 
 
 def test_changing_thread_id_fails_resume_check(
@@ -236,11 +236,11 @@ def test_changing_thread_id_fails_resume_check(
             side_effect=[
                 httpx.Response(
                     200,
-                    json=_conversation_payload(stable_uuid, codex_thread_id="thread-1"),
+                    json=_conversation_payload(stable_uuid, provider_session_id="thread-1"),
                 ),
                 httpx.Response(
                     200,
-                    json=_conversation_payload(stable_uuid, codex_thread_id="thread-2"),
+                    json=_conversation_payload(stable_uuid, provider_session_id="thread-2"),
                 ),
             ]
         )
@@ -252,7 +252,7 @@ def test_changing_thread_id_fails_resume_check(
 
     assert result.exit_code == 6, result.stdout
     payload = json.loads(result.stdout)
-    assert "codex_thread_id_unchanged_on_resume" in _check_names(payload)
+    assert "provider_session_id_unchanged_on_resume" in _check_names(payload)
 
 
 def test_cleanup_500_propagates_api_error(

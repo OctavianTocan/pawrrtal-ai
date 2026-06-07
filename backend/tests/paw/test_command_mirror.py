@@ -40,7 +40,7 @@ def _make_send_payload(
     body = {
         "conversation_id": conversation_id,
         "model_id": "litellm:openai/gpt-4o-mini",
-        "codex_thread_id": None,
+        "provider_session_id": None,
         "final_text": final_text,
         "events": events,
         "duration_ms": 100,

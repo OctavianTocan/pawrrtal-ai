@@ -23,6 +23,10 @@ from app.channels.base import ChannelMessage
 from app.channels.turn_orchestrator import ChatTurnInput, _guarded_stream, run_turn
 from app.chat.aggregator import ChatTurnAggregator
 from app.plugins.adapters.turn_context import TurnContextProviderAdapter
+from app.provider_sessions import (
+    ProviderSessionTurnState,
+    await_pending_provider_session_persist_tasks,
+)
 from app.providers.base import StreamEvent
 
 
@@ -69,24 +73,35 @@ def _make_turn_input(provider: _ScriptedProvider, *, verbose_level: int) -> Chat
 
 
 def _make_codex_turn_input(provider: _ScriptedProvider) -> ChatTurnInput:
-    """Build a turn input that simulates a native resumed Codex thread."""
+    """Build a turn input that simulates a provider-owned native session."""
     turn_input = _make_turn_input(provider, verbose_level=2)
     return ChatTurnInput(
         **{
             **turn_input.__dict__,
-            "codex_thread_id": "thr_existing",
-            "codex_thread_prompt_hash": "hash",
+            "provider_session": ProviderSessionTurnState(
+                kind="openai_codex",
+                session_id="thr_existing",
+                fingerprint="hash",
+                stream_kwargs={"native_session_id": "thr_existing"},
+                per_turn_context_kwarg="per_turn_context",
+                omit_history=True,
+            ),
         }
     )
 
 
 def _make_agy_turn_input(provider: _ScriptedProvider) -> ChatTurnInput:
-    """Build a turn input that simulates a native resumed Antigravity conversation."""
+    """Build a turn input that simulates another provider-owned native session."""
     turn_input = _make_turn_input(provider, verbose_level=2)
     return ChatTurnInput(
         **{
             **turn_input.__dict__,
-            "agy_conversation_id": "agy_existing",
+            "provider_session": ProviderSessionTurnState(
+                kind="agy_cli",
+                session_id="agy_existing",
+                stream_kwargs={"native_conversation_id": "agy_existing"},
+                omit_history=True,
+            ),
         }
     )
 
@@ -165,7 +180,7 @@ async def test_hooks_observe_thinking_at_verbose_normal() -> None:
 
 @pytest.mark.anyio
 async def test_resumed_codex_thread_does_not_replay_pawrrtal_history() -> None:
-    """Native Codex threads own continuity, so app history must not be replayed."""
+    """Provider-owned sessions can opt out of replaying app-side history."""
     provider = _ScriptedProvider([{"type": "delta", "content": "ok"}])
     turn_input = _make_codex_turn_input(provider)
     aggregator = ChatTurnAggregator()
@@ -187,13 +202,13 @@ async def test_resumed_codex_thread_does_not_replay_pawrrtal_history() -> None:
 
     assert delivered == [{"type": "delta", "content": "ok"}]
     assert provider.stream_kwargs["history"] == []
-    assert provider.stream_kwargs["codex_thread_id"] == "thr_existing"
+    assert provider.stream_kwargs["native_session_id"] == "thr_existing"
     assert provider.stream_kwargs["per_turn_context"] == "# TURN CONTEXT\n\nmemory"
 
 
 @pytest.mark.anyio
 async def test_resumed_agy_conversation_does_not_replay_pawrrtal_history() -> None:
-    """Native Antigravity conversations own continuity, so app history is skipped."""
+    """A second provider-owned session can also opt out of history replay."""
     provider = _ScriptedProvider([{"type": "delta", "content": "ok"}])
     turn_input = _make_agy_turn_input(provider)
     aggregator = ChatTurnAggregator()
@@ -215,20 +230,21 @@ async def test_resumed_agy_conversation_does_not_replay_pawrrtal_history() -> No
 
     assert delivered == [{"type": "delta", "content": "ok"}]
     assert provider.stream_kwargs["history"] == []
-    assert provider.stream_kwargs["agy_conversation_id"] == "agy_existing"
+    assert provider.stream_kwargs["native_conversation_id"] == "agy_existing"
 
 
 @pytest.mark.anyio
-async def test_agy_internal_conversation_id_is_persisted(
+async def test_provider_session_created_event_is_persisted(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """The first Antigravity turn persists its native id for later resumes."""
+    """The first native provider session event persists its id for later resumes."""
     provider = _ScriptedProvider(
         [
             {
                 "type": "internal",
-                "kind": "agy_conversation_created",
-                "thread_id": "agy_new",
+                "kind": "provider_session_created",
+                "provider": "agy_cli",
+                "session_id": "agy_new",
             },
             {"type": "delta", "content": "ok"},
         ]
@@ -236,13 +252,19 @@ async def test_agy_internal_conversation_id_is_persisted(
     turn_input = _make_turn_input(provider, verbose_level=2)
     aggregator = ChatTurnAggregator()
     counter = _Counter()
-    persisted: list[tuple[Any, str]] = []
+    persisted: list[tuple[Any, str | None, str | None, str | None]] = []
 
-    async def fake_persist(conversation_id: Any, agy_conversation_id: str) -> None:
-        persisted.append((conversation_id, agy_conversation_id))
+    async def fake_persist(
+        conversation_id: Any,
+        *,
+        kind: str | None,
+        session_id: str | None,
+        fingerprint: str | None = None,
+    ) -> None:
+        persisted.append((conversation_id, kind, session_id, fingerprint))
 
     monkeypatch.setattr(
-        "app.channels.turn_orchestrator.runner.persist_agy_conversation_id",
+        "app.channels.turn_orchestrator.runner.persist_provider_session",
         fake_persist,
     )
 
@@ -260,7 +282,8 @@ async def test_agy_internal_conversation_id_is_persisted(
     ]
 
     assert delivered == [{"type": "delta", "content": "ok"}]
-    assert persisted == [(turn_input.conversation_id, "agy_new")]
+    await await_pending_provider_session_persist_tasks()
+    assert persisted == [(turn_input.conversation_id, "agy_cli", "agy_new", None)]
 
 
 @pytest.mark.anyio
@@ -301,7 +324,7 @@ async def test_transient_progress_is_delivered_but_not_persisted() -> None:
 
 
 @pytest.mark.anyio
-async def test_non_codex_turn_replays_pawrrtal_history() -> None:
+async def test_turn_without_provider_session_replays_pawrrtal_history() -> None:
     """Non-native providers still receive app-side history."""
     provider = _ScriptedProvider([{"type": "delta", "content": "ok"}])
     turn_input = _make_turn_input(provider, verbose_level=2)
@@ -323,7 +346,7 @@ async def test_non_codex_turn_replays_pawrrtal_history() -> None:
     ]
 
     assert provider.stream_kwargs["history"] == history
-    assert "codex_thread_id" not in provider.stream_kwargs
+    assert "native_session_id" not in provider.stream_kwargs
 
 
 @pytest.mark.anyio
@@ -381,8 +404,13 @@ async def test_lightweight_codex_turn_still_runs_turn_context_providers(
                 provider=recall_hook,
             )
         ],
-        codex_thread_prompt_hash="hash",
-        codex_lightweight_prompt=True,
+        provider_session=ProviderSessionTurnState(
+            kind="openai_codex",
+            fingerprint="hash",
+            per_turn_context_kwarg="per_turn_context",
+            omit_history=True,
+            force_low_reasoning=True,
+        ),
     )
 
     _ = [chunk async for chunk in run_turn(turn_input)]

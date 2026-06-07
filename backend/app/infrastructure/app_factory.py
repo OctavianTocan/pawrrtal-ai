@@ -18,8 +18,10 @@ from app.infrastructure.router_registry import register_routers
 
 # Import lifecycle modules for decorator side effects.
 from app.infrastructure.shutdown import agy_api_client as _agy_api_client
-from app.infrastructure.shutdown import codex_persist_drain as _codex_persist_drain
-from app.infrastructure.shutdown import codex_provider_cache as _codex_provider_cache
+from app.infrastructure.shutdown import provider_caches as _provider_caches
+from app.infrastructure.shutdown import (
+    provider_session_persist_drain as _provider_session_persist_drain,
+)
 from app.infrastructure.shutdown import tracing as _shutdown_tracing
 from app.infrastructure.startup import admin_seed as _admin_seed
 from app.infrastructure.startup import database as _database
@@ -45,8 +47,8 @@ _LIFECYCLE_MODULES = (
     _scheduler,
     _telegram_lifespan,
     _google_chat_lifespan,
-    _codex_persist_drain,
-    _codex_provider_cache,
+    _provider_session_persist_drain,
+    _provider_caches,
     _agy_api_client,
     _shutdown_tracing,
 )

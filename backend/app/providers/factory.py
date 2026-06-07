@@ -42,10 +42,7 @@ def _load_openai_codex_provider_cls() -> type[AILLM]:
     """
     from .openai_codex import OpenAICodexProvider  # noqa: PLC0415
 
-    # __getattr__ on the openai_codex package returns Any; mypy can't
-    # see the concrete class. The Protocol-conformance check happens
-    # structurally at call time when resolve_llm constructs it.
-    return OpenAICodexProvider  # type: ignore[no-any-return]
+    return OpenAICodexProvider
 
 
 def _load_gemini_provider_cls() -> type[AILLM]:
@@ -298,6 +295,11 @@ async def close_openai_codex_provider_cache() -> None:
         result = close_method()
         if inspect.isawaitable(result):
             await result
+
+
+async def close_provider_caches() -> None:
+    """Close all provider-owned process caches."""
+    await close_openai_codex_provider_cache()
 
 
 def _build_opencode_go(parsed: ParsedModelId, workspace_root: Path | None) -> OpencodeGoLLM:

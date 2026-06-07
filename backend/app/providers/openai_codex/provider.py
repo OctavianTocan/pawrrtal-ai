@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from app.agents.types import AgentTool
+from app.provider_sessions import ProviderSessionTurnState
 from app.providers.base import (
     ReasoningEffort as PawReasoningEffort,
 )
@@ -38,6 +39,7 @@ from app.providers.openai_codex.dynamic_tools import (
 from app.providers.openai_codex.inputs import build_codex_run_input
 from app.providers.openai_codex.prompting import CODEX_DEVELOPER_INSTRUCTIONS
 from app.providers.openai_codex.telemetry import log_codex_phase
+from app.providers.openai_codex.threads import ensure_codex_thread_state
 from app.providers.openai_codex.turn_stream import stream_codex_turn
 
 # Make sure the vendored SDK is on sys.path before we statically import from
@@ -146,6 +148,28 @@ class OpenAICodexProvider:
     def model_id(self) -> str:
         """Native Codex model id used when creating or resuming SDK threads."""
         return self._model_id
+
+    async def prepare_turn_session(
+        self,
+        *,
+        conversation_id: uuid.UUID,
+        workspace_root: Path | None,
+        model_id: str | None,
+        tools: list[AgentTool] | None,
+        reasoning_effort: PawReasoningEffort | None,
+        question: str,
+    ) -> ProviderSessionTurnState:
+        """Prepare generic session continuity for the turn runner."""
+        state = await ensure_codex_thread_state(
+            conversation_id=conversation_id,
+            provider=self,
+            workspace_root=workspace_root,
+            model_id=model_id,
+            tools=tools,
+            reasoning_effort=reasoning_effort,
+            question=question,
+        )
+        return state.to_turn_state()
 
     async def close(self) -> None:
         """Close the owned Codex app-server client if it has been started."""
@@ -276,8 +300,8 @@ class OpenAICodexProvider:
         }
         # Thread lifecycle: prefer resuming an existing Codex thread when we have one
         # persisted for this conversation. Falls back to fresh thread_start.
-        # The actual persistence (storing codex_thread_id on the Conversation row)
-        # is handled by the turn runner / caller when we emit a thread creation signal.
+        # Persistence is handled by the generic turn runner when we emit a
+        # provider-session creation signal.
         try:
             if codex_thread_id:
                 yield {
@@ -322,8 +346,9 @@ class OpenAICodexProvider:
                     if new_thread_id:
                         yield {
                             "type": "internal",
-                            "kind": "codex_thread_created",
-                            "thread_id": new_thread_id,
+                            "kind": "provider_session_created",
+                            "provider": "openai_codex",
+                            "session_id": new_thread_id,
                         }
             else:
                 yield {
@@ -343,13 +368,14 @@ class OpenAICodexProvider:
                 )
                 # Signal to the caller that a new thread was created so it can be
                 # persisted against the conversation for future resume. The
-                # turn runner narrows on ``isinstance(thread_id, str)`` so a
+                # turn runner narrows on ``isinstance(session_id, str)`` so a
                 # missing/empty id is silently dropped rather than persisted.
                 if new_thread_id:
                     yield {
                         "type": "internal",
-                        "kind": "codex_thread_created",
-                        "thread_id": new_thread_id,
+                        "kind": "provider_session_created",
+                        "provider": "openai_codex",
+                        "session_id": new_thread_id,
                     }
         except Exception as exc:
             logger.exception("openai_codex: thread_start/resume failed")

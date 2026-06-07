@@ -38,6 +38,7 @@ from app.providers.catalog import first_authenticated_catalog_model
 from app.providers.factory import resolve_llm
 from app.providers.model_id import InvalidModelId, UnknownModelId
 from app.providers.reasoning import resolve_reasoning_effort
+from app.providers.session_preparer import prepare_provider_session
 from app.workspace.crud import get_default_workspace
 
 from .attachments import collect_attachments
@@ -432,6 +433,15 @@ async def _handle_message_event(event: dict[str, Any]) -> None:
         model_id=effective_model_id,
         stored_effort=target.reasoning_effort,
     ).effective
+    provider_session = await prepare_provider_session(
+        provider,
+        conversation_id=target.conversation_id,
+        workspace_root=target.workspace_root,
+        model_id=effective_model_id,
+        tools=agent_tools,
+        reasoning_effort=reasoning_effort,
+        question=question,
+    )
 
     channel_message: ChannelMessage = {
         "user_id": target.user_id,
@@ -458,6 +468,7 @@ async def _handle_message_event(event: dict[str, Any]) -> None:
         images=attachments.images or None,
         verbose_level=target.verbose_level,
         reasoning_effort=reasoning_effort,
+        provider_session=provider_session,
         turn_context_providers=build_turn_context_providers(workspace_root=target.workspace_root),
         log_tag="GOOGLE_CHAT",
     )

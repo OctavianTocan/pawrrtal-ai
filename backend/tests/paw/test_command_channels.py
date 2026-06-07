@@ -286,7 +286,7 @@ def test_channels_diagnose_telegram_can_focus_conversation(
             "conversation_trace": {
                 "conversation_id": conversation_id,
                 "model_id": "openai-codex:openai/gpt-5.5",
-                "codex_thread_id": "thr_123",
+                "provider_session_id": "thr_123",
                 "workspace_skill_prompt_mode": "manifest",
                 "recent_usage": [
                     {
@@ -320,7 +320,7 @@ def test_channels_diagnose_telegram_can_focus_conversation(
     )
 
     assert result.exit_code == 0, result.stdout
-    assert "codex_thread_id: thr_123" in result.stdout
+    assert "provider_session_id: thr_123" in result.stdout
     assert "skill_prompt_mode: manifest" in result.stdout
     assert "in=97" in result.stdout
     assert "duration_ms=1200" in result.stdout

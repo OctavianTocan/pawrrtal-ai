@@ -22,6 +22,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 from app.agents.types import AgentTool
+from app.provider_sessions import ProviderSessionTurnState, load_provider_session
 from app.providers._stream_logging import log_provider_stream_event
 from app.providers.base import ReasoningEffort, StreamEvent
 
@@ -31,6 +32,7 @@ from .output import build_framed_prompt, extract_final_answer, is_timeout_output
 from .session import parse_conversation_id
 
 logger = logging.getLogger(__name__)
+PROVIDER_SESSION_KIND = "agy_cli"
 
 
 class AgyCliLLM:
@@ -40,6 +42,28 @@ class AgyCliLLM:
         self._model_id = model_id
         self._workspace_root = workspace_root
         self._session_by_conversation: dict[uuid.UUID, str] = {}
+
+    async def prepare_turn_session(
+        self,
+        *,
+        conversation_id: uuid.UUID,
+        workspace_root: Path | None,
+        model_id: str | None,
+        tools: list[AgentTool] | None,
+        reasoning_effort: ReasoningEffort | None,
+        question: str,
+    ) -> ProviderSessionTurnState:
+        """Prepare generic session continuity for the turn runner."""
+        del workspace_root, model_id, tools, reasoning_effort, question
+        record = await load_provider_session(conversation_id)
+        if record is None or record.kind != PROVIDER_SESSION_KIND or not record.session_id:
+            return ProviderSessionTurnState(kind=PROVIDER_SESSION_KIND)
+        return ProviderSessionTurnState(
+            kind=PROVIDER_SESSION_KIND,
+            session_id=record.session_id,
+            stream_kwargs={"agy_conversation_id": record.session_id},
+            omit_history=True,
+        )
 
     async def stream(
         self,
@@ -112,9 +136,9 @@ class AgyCliLLM:
         if remembered_id and remembered_id != agy_conversation_id:
             yield StreamEvent(
                 type="internal",
-                kind="agy_conversation_created",
+                kind="provider_session_created",
                 provider="agy_cli",
-                thread_id=remembered_id,
+                session_id=remembered_id,
             )
         yield StreamEvent(type="delta", content=answer)
 

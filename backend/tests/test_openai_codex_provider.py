@@ -369,9 +369,8 @@ def _build_fake_codex(
 
 
 @pytest.mark.anyio
-async def test_provider_stream_emits_codex_thread_created_event(monkeypatch):
-    """First turn must emit an internal `codex_thread_created` event so the
-    caller can persist the thread id for resume on subsequent turns."""
+async def test_provider_stream_emits_provider_session_created_event(monkeypatch):
+    """First turn emits a generic session event so core can persist continuity."""
     if OpenAICodexProvider is None:
         pytest.skip("provider not importable")
 
@@ -389,7 +388,7 @@ async def test_provider_stream_emits_codex_thread_created_event(monkeypatch):
     events = [ev async for ev in provider.stream("hi", uuid.uuid4(), uuid.uuid4())]
 
     kinds = [(e.get("type"), e.get("kind")) for e in events]
-    assert ("internal", "codex_thread_created") in kinds
+    assert ("internal", "provider_session_created") in kinds
 
 
 @pytest.mark.anyio
@@ -441,7 +440,7 @@ async def test_stream_yields_error_event_on_turn_stream_exception(monkeypatch):
 async def test_stream_resumes_existing_thread_when_thread_id_provided(monkeypatch):
     """When the caller passes `codex_thread_id`, the provider must call
     thread_resume instead of thread_start, and must NOT emit a
-    `codex_thread_created` event."""
+    `provider_session_created` event."""
     if OpenAICodexProvider is None:
         pytest.skip("provider not importable")
 
@@ -469,7 +468,7 @@ async def test_stream_resumes_existing_thread_when_thread_id_provided(monkeypatc
     ]
 
     kinds = [(e.get("type"), e.get("kind")) for e in events]
-    assert ("internal", "codex_thread_created") not in kinds
+    assert ("internal", "provider_session_created") not in kinds
     assert fake_codex.thread_start_calls == 0
     assert fake_codex.thread_resume_calls == 1
     assert fake_codex.resumed_thread_ids == ["thr_existing_abc"]
@@ -914,6 +913,7 @@ async def test_ensure_codex_thread_returns_existing_id(monkeypatch):
     if OpenAICodexProvider is None:
         pytest.skip("provider not importable")
 
+    from app.provider_sessions import ProviderSessionRecord
     from app.providers.openai_codex import threads as threads_mod
     from app.providers.openai_codex.provider import OpenAICodexProvider as Provider
 
@@ -929,10 +929,14 @@ async def test_ensure_codex_thread_returns_existing_id(monkeypatch):
         tool_fingerprint=threads_mod.dynamic_tool_fingerprint([]),
     )
 
-    async def fake_load(_conversation_id):
-        return ("thr_existing", expected_hash)
+    async def fake_load(_conversation_id: uuid.UUID) -> ProviderSessionRecord:
+        return ProviderSessionRecord(
+            kind=threads_mod.PROVIDER_SESSION_KIND,
+            session_id="thr_existing",
+            fingerprint=expected_hash,
+        )
 
-    monkeypatch.setattr(threads_mod, "load_codex_thread_state", fake_load)
+    monkeypatch.setattr(threads_mod, "load_provider_session", fake_load)
     monkeypatch.setattr(Provider, "_ensure_codex", fail_ensure_codex)
 
     provider = Provider("gpt-5.5")
@@ -964,7 +968,7 @@ async def test_ensure_codex_thread_returns_missing_state_without_precreate(monke
         raise AssertionError("SDK should not be touched")
 
     monkeypatch.setattr(threads_mod, "system_prompt_for_turn", lambda *args, **kwargs: None)
-    monkeypatch.setattr(threads_mod, "load_codex_thread_state", fake_load)
+    monkeypatch.setattr(threads_mod, "load_provider_session", fake_load)
     monkeypatch.setattr(Provider, "_ensure_codex", fail_ensure_codex)
 
     provider = Provider("gpt-5.5")
@@ -993,22 +997,33 @@ async def test_ensure_codex_thread_restarts_when_prompt_hash_changes(monkeypatch
     if OpenAICodexProvider is None:
         pytest.skip("provider not importable")
 
+    from app.provider_sessions import ProviderSessionRecord
     from app.providers.openai_codex import threads as threads_mod
     from app.providers.openai_codex.provider import OpenAICodexProvider as Provider
 
     async def fake_load(_conversation_id):
-        return ("thr_old", "old_hash")
+        return ProviderSessionRecord(
+            kind=threads_mod.PROVIDER_SESSION_KIND,
+            session_id="thr_old",
+            fingerprint="old_hash",
+        )
 
-    persisted: list[tuple[uuid.UUID, str | None, str | None]] = []
+    persisted: list[tuple[uuid.UUID, str | None, str | None, str | None]] = []
 
-    async def fake_persist(conversation_id, thread_id, prompt_hash=None):
-        persisted.append((conversation_id, thread_id, prompt_hash))
+    async def fake_persist(
+        conversation_id: uuid.UUID,
+        *,
+        kind: str | None,
+        session_id: str | None,
+        fingerprint: str | None = None,
+    ) -> None:
+        persisted.append((conversation_id, kind, session_id, fingerprint))
 
-    async def fail_ensure_codex(_self):
+    async def fail_ensure_codex(_self: object) -> None:
         raise AssertionError("SDK should not be touched")
 
-    monkeypatch.setattr(threads_mod, "load_codex_thread_state", fake_load)
-    monkeypatch.setattr(threads_mod, "persist_codex_thread_id", fake_persist)
+    monkeypatch.setattr(threads_mod, "load_provider_session", fake_load)
+    monkeypatch.setattr(threads_mod, "persist_provider_session", fake_persist)
     monkeypatch.setattr(Provider, "_ensure_codex", fail_ensure_codex)
 
     conversation_id = uuid.uuid4()
@@ -1026,8 +1041,9 @@ async def test_ensure_codex_thread_restarts_when_prompt_hash_changes(monkeypatch
     assert state.thread_id is None
     assert state.prompt_hash != "old_hash"
     assert persisted[0][0] == conversation_id
-    assert persisted[0][1] is None
-    assert persisted[0][2] != "old_hash"
+    assert persisted[0][1] == threads_mod.PROVIDER_SESSION_KIND
+    assert persisted[0][2] is None
+    assert persisted[0][3] != "old_hash"
 
 
 # =============================================================================

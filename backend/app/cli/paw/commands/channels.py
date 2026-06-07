@@ -300,7 +300,7 @@ def diagnose_telegram(
                 "conversation_trace:",
                 f"  id: {trace['conversation_id']}",
                 f"  model_id: {trace['model_id'] or ''}",
-                f"  codex_thread_id: {trace['codex_thread_id'] or ''}",
+                f"  provider_session_id: {trace['provider_session_id'] or ''}",
                 f"  skill_prompt_mode: {trace.get('workspace_skill_prompt_mode') or ''}",
                 f"  message_count: {len(trace['messages'])}",
                 f"  usage_rows: {len(trace.get('recent_usage') or [])}",

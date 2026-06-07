@@ -17,7 +17,7 @@ from typing import Any
 class Check:
     """One named pass/fail assertion emitted by a scenario step.
 
-    ``name`` is the snake_case identifier (e.g. ``codex_thread_id_persisted``)
+    ``name`` is the snake_case identifier (e.g. ``provider_session_id_persisted``)
     that agents grep for; ``detail`` is a human-readable explanation that
     only appears in the human renderer when the check failed.
     """

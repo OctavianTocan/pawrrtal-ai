@@ -66,7 +66,6 @@ class PersonaState:
     user_email: str | None = None
     default_workspace_id: str | None = None
     default_workspace_path: str | None = None
-    default_model_id: str | None = None
     current_conversation_id: str | None = None
     created_at: str = field(
         default_factory=lambda: datetime.now(UTC).isoformat(),

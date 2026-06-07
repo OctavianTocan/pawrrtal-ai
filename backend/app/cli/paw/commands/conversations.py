@@ -184,7 +184,7 @@ def send(
 
     Streams the SSE response, accumulates ``delta``+``message`` content into
     ``final_text``, counts events by type, and re-fetches the conversation
-    afterward so ``codex_thread_id`` (set by the openai_codex provider on
+    afterward so ``provider_session_id`` (set by the openai_codex provider on
     first turn) is included in the output.
 
     Examples:
@@ -302,7 +302,7 @@ async def _send_turn(
             elif event_type == "error":
                 error_payload = event
 
-        # 3. Re-fetch the conversation so codex_thread_id (set by the
+        # 3. Re-fetch the conversation so provider_session_id (set by the
         #    openai_codex provider on first turn) is in the output.
         follow_up = await client.request(
             "GET",
@@ -315,7 +315,7 @@ async def _send_turn(
     output: dict[str, Any] = {
         "conversation_id": conversation_id,
         "model_id": conversation.get("model_id"),
-        "codex_thread_id": conversation.get("codex_thread_id"),
+        "provider_session_id": conversation.get("provider_session_id"),
         "final_text": "".join(final_text_parts),
         "events": event_counts,
         "duration_ms": duration_ms,
@@ -464,7 +464,7 @@ def show(
     emit_human(
         f"{conv.get('id')}  {conv.get('title') or '<empty>'}\n"
         f"  model:           {conv.get('model_id') or '<default>'}\n"
-        f"  codex_thread_id: {conv.get('codex_thread_id') or '<none>'}\n"
+        f"  provider_session_id: {conv.get('provider_session_id') or '<none>'}\n"
         f"  updated_at:      {conv.get('updated_at') or '<none>'}"
     )
     if with_messages:

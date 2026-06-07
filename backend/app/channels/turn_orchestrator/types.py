@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from app.plugins.adapters.turn_context import TurnContextProviderAdapter
+from app.provider_sessions import ProviderSessionTurnState
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -41,6 +42,7 @@ class ChatTurnInput:
         log_tag: The log tag.
         log_extras: The log extras.
         verbose_level: The verbose level.
+        provider_session: Opaque provider continuity state prepared by the provider.
         turn_context_providers: Plugin context providers run before the main model turn.
     """
 
@@ -63,18 +65,7 @@ class ChatTurnInput:
     log_tag: str = "TURN"
     log_extras: dict[str, Any] = field(default_factory=dict)
     verbose_level: int | None = None
-    # For the native openai_codex provider: the Codex thread id to resume
-    # if one was previously persisted for this conversation.
-    codex_thread_id: str | None = None
-    # Fingerprint of the prompt/model shape used to decide whether the
-    # current Codex thread is reusable.
-    codex_thread_prompt_hash: str | None = None
-    # True for simple Codex chat turns that should not pay the full
-    # workspace prompt / active-recall cost.
-    codex_lightweight_prompt: bool = False
-    # Native Antigravity CLI conversation id used to resume ``agy --print``
-    # without replaying Pawrrtal history into a fresh CLI conversation.
-    agy_conversation_id: str | None = None
+    provider_session: ProviderSessionTurnState = field(default_factory=ProviderSessionTurnState)
     turn_context_providers: list[TurnContextProviderAdapter] | None = None
     # Optional callback for context providers to stream draft status back to the channel.
     draft_updater: Callable[[str], Awaitable[None]] | None = None

@@ -73,7 +73,7 @@ def _conversation_payload(conversation_id: str, **overrides: Any) -> dict[str, A
         "model_id": "gpt-4o",
         "labels": [],
         "project_id": None,
-        "codex_thread_id": None,
+        "provider_session_id": None,
     }
     base.update(overrides)
     return base
@@ -102,7 +102,7 @@ def test_create_posts_to_uuid_endpoint_and_persists_state(
     assert reloaded.current_conversation_id == stable_uuid
 
 
-def test_send_new_streams_sse_and_fetches_codex_thread_id(
+def test_send_new_streams_sse_and_fetches_provider_session_id(
     runner: CliRunner, seeded: PersonaState, stable_uuid: str
 ) -> None:
     """`paw conversations send 'hi' --new --json` runs the full create+chat+followup flow."""
@@ -131,7 +131,7 @@ def test_send_new_streams_sse_and_fetches_codex_thread_id(
         r.get(f"/api/v1/conversations/{stable_uuid}").mock(
             return_value=httpx.Response(
                 200,
-                json=_conversation_payload(stable_uuid, codex_thread_id="thread-abc"),
+                json=_conversation_payload(stable_uuid, provider_session_id="thread-abc"),
             )
         )
         result = runner.invoke(
@@ -148,7 +148,7 @@ def test_send_new_streams_sse_and_fetches_codex_thread_id(
     )
     out = json.loads(result.stdout)
     assert out["conversation_id"] == stable_uuid
-    assert out["codex_thread_id"] == "thread-abc"
+    assert out["provider_session_id"] == "thread-abc"
     assert out["final_text"] == "Hi there"
     assert out["events"]["delta"] == 2
     assert out["events"]["usage"] == 1

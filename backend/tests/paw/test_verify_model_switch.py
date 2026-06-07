@@ -81,7 +81,7 @@ def _conv_payload(
         "model_id": model_id,
         "labels": [],
         "project_id": None,
-        "codex_thread_id": None,
+        "provider_session_id": None,
     }
 
 

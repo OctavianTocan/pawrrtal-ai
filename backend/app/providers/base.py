@@ -77,11 +77,10 @@ class StreamEvent(TypedDict, total=False):
     # emitted by the openai_codex provider, which separates summary vs raw
     # reasoning text deltas. Other providers treat the absence as "raw".
     summary: bool
-    # ``internal`` + ``artifact`` events: free-form subtype tag used by
-    # the openai_codex provider to mark out-of-band signals
-    # (``kind="codex_thread_created"``) and artifact subtypes
-    # (``kind="image"``). Consumers route on ``type`` first and only
-    # inspect ``kind`` when the type calls for it.
+    # ``internal`` + ``artifact`` events: free-form subtype tag used for
+    # provider-session signals (``kind="provider_session_created"``) and
+    # artifact subtypes (``kind="image"``). Consumers route on ``type`` first
+    # and only inspect ``kind`` when the type calls for it.
     kind: str
     # ``artifact`` events: opaque provider-supplied payload (the artifact
     # bytes / metadata). Renderers know how to interpret it based on
@@ -91,10 +90,9 @@ class StreamEvent(TypedDict, total=False):
     # produced the artifact (``"openai_codex"``, etc.) so downstream
     # plugins can dispatch without inspecting the message envelope.
     provider: str
-    # ``internal`` events: thread/session identifier the provider wants
-    # the caller to persist for resume on the next turn (codex stores
-    # this on the Conversation row).
-    thread_id: str
+    # ``internal`` events: opaque provider-session identifier the provider
+    # wants core to persist for resume on the next turn.
+    session_id: str
     # ``transient`` events are user-visible progress chrome only. Channels
     # may render them, but aggregators and cost/trace accounting should not
     # persist them as assistant content.
@@ -156,11 +154,9 @@ class AILLM(Protocol):
                      ignore the kwarg.
 
         Provider-specific extensions live on the concrete provider's
-        ``stream()`` signature, not on this Protocol. The openai_codex
-        provider, for example, accepts ``codex_thread_id: str | None`` for
-        SDK multi-turn continuity. Cross-provider callers pass these
-        through ``**extra_kwargs`` and only forward them when actually set
-        (see ``app.channels.turn_orchestrator._guarded_stream``) so unrelated
+        ``stream()`` signature, not on this Protocol. Cross-provider callers
+        pass these through provider-prepared ``stream_kwargs`` and only
+        forward them to the provider that prepared them, so unrelated
         providers don't see unknown keys.
         """
         ...
