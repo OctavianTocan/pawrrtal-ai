@@ -31,6 +31,8 @@ describe('PluginsSection', () => {
 						status: 'disabled',
 						reason: 'Plugin disabled.',
 						enabled: false,
+						manageable: true,
+						manage_reason: null,
 						missing_env: [],
 						fingerprint: 'abc',
 						manifest_path: '/repo/backend/plugins/python_shell/plugin.json',

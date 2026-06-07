@@ -55,6 +55,8 @@ function PluginCard({
 }): React.JSX.Element {
 	const title = plugin.name ?? plugin.plugin_id;
 	const capabilityCount = plugin.capabilities.length;
+	const managementReason = plugin.manageable ? null : plugin.manage_reason;
+	const controlDisabled = isUpdating || !plugin.manageable;
 	return (
 		<SettingsCard className="px-0 py-0">
 			<div className="flex items-start justify-between gap-4 border-b border-border/40 px-5 py-4">
@@ -77,13 +79,19 @@ function PluginCard({
 							<span aria-hidden="true">/</span>
 							<span>{capabilityCount} capabilities</span>
 						</div>
+						{managementReason ? (
+							<p className="mt-2 max-w-xl text-xs leading-snug text-muted-foreground">
+								{managementReason}
+							</p>
+						) : null}
 					</div>
 				</div>
 				<Switch
 					aria-label={`Enable ${title}`}
 					checked={plugin.enabled}
-					disabled={isUpdating}
+					disabled={controlDisabled}
 					onCheckedChange={(enabled) => onTogglePlugin(plugin, enabled)}
+					title={managementReason ?? undefined}
 				/>
 			</div>
 			<div className="px-5 py-3">

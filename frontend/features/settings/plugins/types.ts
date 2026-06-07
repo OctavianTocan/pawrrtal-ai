@@ -30,6 +30,8 @@ export interface WorkspacePlugin {
 	status: string;
 	reason: string | null;
 	enabled: boolean;
+	manageable: boolean;
+	manage_reason: string | null;
 	missing_env: string[];
 	fingerprint: string | null;
 	manifest_path: string;

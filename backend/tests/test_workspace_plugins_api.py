@@ -11,7 +11,7 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Workspace
-from app.plugins.state import load_plugin_state, plugin_state_path
+from app.plugins.state import PluginState, load_plugin_state, plugin_state_path, save_plugin_state
 
 
 def _plugin_by_id(body: dict[str, object], plugin_id: str) -> dict[str, object]:
@@ -49,6 +49,8 @@ async def test_plugins_list_includes_bundled_enabled_and_disabled_plugins(
     python_shell = _plugin_by_id(body, "python_shell")
     assert tasks["status"] == "active"
     assert tasks["enabled"] is True
+    assert tasks["manageable"] is True
+    assert tasks["manage_reason"] is None
     assert python_shell["status"] == "disabled"
     assert python_shell["enabled"] is False
     assert _capability_by_key(tasks, "tasks/add_task")["state"] == "enabled"
@@ -85,6 +87,59 @@ async def test_plugins_patch_enables_disabled_plugin(
 
 
 @pytest.mark.anyio
+async def test_channel_plugins_are_runtime_global_not_workspace_manageable(
+    client: AsyncClient,
+    seeded_default_workspace: Workspace,
+) -> None:
+    response = await client.get(f"/api/v1/workspaces/{seeded_default_workspace.id}/plugins")
+
+    assert response.status_code == 200
+    core_channels = _plugin_by_id(response.json(), "core_channels")
+    assert core_channels["status"] == "active"
+    assert core_channels["enabled"] is True
+    assert core_channels["manageable"] is False
+    assert "runtime-global channel adapters" in str(core_channels["manage_reason"])
+
+
+@pytest.mark.anyio
+async def test_plugins_patch_rejects_runtime_global_channel_plugin(
+    client: AsyncClient,
+    seeded_default_workspace: Workspace,
+) -> None:
+    response = await client.patch(
+        f"/api/v1/workspaces/{seeded_default_workspace.id}/plugins/core_channels",
+        json={"enabled": False},
+    )
+
+    assert response.status_code == 400
+    assert "runtime-global channel adapters" in response.text
+
+
+@pytest.mark.anyio
+async def test_channel_plugin_list_ignores_stale_workspace_state(
+    client: AsyncClient,
+    seeded_default_workspace: Workspace,
+) -> None:
+    workspace_root = Path(seeded_default_workspace.path)
+    save_plugin_state(
+        plugin_state_path(
+            plugin_id="core_channels",
+            scope="workspace",
+            workspace_root=workspace_root,
+        ),
+        PluginState(enabled=False),
+    )
+
+    response = await client.get(f"/api/v1/workspaces/{seeded_default_workspace.id}/plugins")
+
+    assert response.status_code == 200
+    core_channels = _plugin_by_id(response.json(), "core_channels")
+    assert core_channels["status"] == "active"
+    assert core_channels["enabled"] is True
+    assert core_channels["manageable"] is False
+
+
+@pytest.mark.anyio
 async def test_plugins_patch_rejects_unknown_plugin(
     client: AsyncClient,
     seeded_default_workspace: Workspace,
@@ -113,6 +168,20 @@ async def test_plugins_slot_preference_marks_capability_preferred(
     add_task = _capability_by_key(tasks, "tasks/add_task")
     assert list_tasks["preferred"] is True
     assert add_task["preferred"] is False
+
+
+@pytest.mark.anyio
+async def test_plugins_slot_preference_rejects_channel_capability(
+    client: AsyncClient,
+    seeded_default_workspace: Workspace,
+) -> None:
+    response = await client.put(
+        f"/api/v1/workspaces/{seeded_default_workspace.id}/plugins/slots/chat_surface",
+        json={"capability_key": "core_channels/telegram"},
+    )
+
+    assert response.status_code == 400
+    assert "runtime-global channel adapters" in response.text
 
 
 @pytest.mark.anyio

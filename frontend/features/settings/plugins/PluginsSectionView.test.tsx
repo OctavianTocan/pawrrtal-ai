@@ -13,6 +13,8 @@ const TASKS_PLUGIN: WorkspacePlugin = {
 	status: 'active',
 	reason: null,
 	enabled: true,
+	manageable: true,
+	manage_reason: null,
 	missing_env: [],
 	fingerprint: 'abc',
 	manifest_path: '/repo/backend/plugins/tasks/plugin.json',
@@ -73,6 +75,35 @@ describe('PluginsSectionView', () => {
 		await user.click(screen.getByRole('switch', { name: 'Enable Tasks' }));
 
 		expect(onTogglePlugin).toHaveBeenCalledWith(TASKS_PLUGIN, false);
+	});
+
+	it('disables toggles for runtime-global plugins', async () => {
+		const onTogglePlugin = vi.fn();
+		const user = userEvent.setup();
+		const reason = 'This plugin controls runtime-global channel adapters.';
+		const coreChannels: WorkspacePlugin = {
+			...TASKS_PLUGIN,
+			plugin_id: 'core_channels',
+			name: 'Core Channels',
+			manageable: false,
+			manage_reason: reason,
+		};
+		render(
+			<PluginsSectionView
+				errorMessage={null}
+				isLoading={false}
+				onTogglePlugin={onTogglePlugin}
+				plugins={[coreChannels]}
+				updatingPluginId={null}
+			/>
+		);
+
+		const toggle = screen.getByRole('switch', { name: 'Enable Core Channels' });
+		await user.click(toggle);
+
+		expect(toggle).toHaveProperty('disabled', true);
+		expect(screen.getByText(reason)).toBeTruthy();
+		expect(onTogglePlugin).not.toHaveBeenCalled();
 	});
 
 	it('renders missing env and error states', () => {

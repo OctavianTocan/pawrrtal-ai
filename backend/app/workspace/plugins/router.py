@@ -18,6 +18,12 @@ from app.plugins.host import get_plugin_host
 from app.plugins.registry import ContributionRegistrySnapshot, PluginLoadOutcome
 from app.plugins.state import PluginState, plugin_state_path, save_plugin_state
 
+RUNTIME_GLOBAL_CAPABILITY_TYPES = frozenset({"channel"})
+RUNTIME_GLOBAL_MANAGE_REASON = (
+    "This plugin controls runtime-global channel adapters and is managed from "
+    "global plugin state, not per-workspace settings."
+)
+
 
 class PluginUpdateRequest(BaseModel):
     """Request body for enabling or disabling one workspace plugin."""
@@ -65,6 +71,8 @@ class PluginRead(BaseModel):
     status: str
     reason: str | None
     enabled: bool
+    manageable: bool
+    manage_reason: str | None
     missing_env: list[str]
     fingerprint: str | None
     manifest_path: str
@@ -125,6 +133,7 @@ def get_workspace_plugins_router() -> APIRouter:
         workspace_root = Path(workspace.path)
         snapshot = _snapshot(workspace_root)
         outcome = _require_outcome(snapshot=snapshot, plugin_id=plugin_id)
+        _ensure_workspace_manageable(outcome)
         _save_state(
             workspace_root=workspace_root,
             plugin_id=plugin_id,
@@ -149,6 +158,7 @@ def get_workspace_plugins_router() -> APIRouter:
         workspace_root = Path(workspace.path)
         snapshot = _snapshot(workspace_root)
         capability = _require_capability(snapshot=snapshot, capability_key=payload.capability_key)
+        _ensure_capability_slot_manageable(capability)
         if slot_id not in capability.slots:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -173,16 +183,30 @@ def _snapshot(workspace_root: Path) -> ContributionRegistrySnapshot:
     return current
 
 
+def _runtime_snapshot() -> ContributionRegistrySnapshot:
+    """Reload and return the runtime-global plugin snapshot."""
+    _previous, current = get_plugin_host().reload()
+    return current
+
+
 def _response(
     *,
     workspace_id: uuid.UUID,
     snapshot: ContributionRegistrySnapshot,
 ) -> WorkspacePluginsResponse:
     """Serialize a plugin snapshot for HTTP clients."""
+    runtime_snapshot = _runtime_snapshot()
     return WorkspacePluginsResponse(
         workspace_id=workspace_id,
         fingerprint=snapshot.fingerprint,
-        plugins=[_plugin_read(outcome=outcome, snapshot=snapshot) for outcome in snapshot.outcomes],
+        plugins=[
+            _plugin_read(
+                outcome=outcome,
+                snapshot=snapshot,
+                runtime_snapshot=runtime_snapshot,
+            )
+            for outcome in snapshot.outcomes
+        ],
     )
 
 
@@ -190,27 +214,52 @@ def _plugin_read(
     *,
     outcome: PluginLoadOutcome,
     snapshot: ContributionRegistrySnapshot,
+    runtime_snapshot: ContributionRegistrySnapshot,
 ) -> PluginRead:
     """Serialize one plugin outcome."""
-    manifest = outcome.manifest
+    effective_outcome, effective_snapshot = _effective_read_scope(
+        outcome=outcome,
+        workspace_snapshot=snapshot,
+        runtime_snapshot=runtime_snapshot,
+    )
+    manageable = not _is_runtime_global_plugin(outcome)
+    manage_reason = None if manageable else RUNTIME_GLOBAL_MANAGE_REASON
+    manifest = effective_outcome.manifest
     return PluginRead(
-        plugin_id=outcome.plugin_id,
+        plugin_id=effective_outcome.plugin_id,
         name=manifest.name if manifest is not None else None,
         description=manifest.description if manifest is not None else None,
         version=manifest.version if manifest is not None else None,
-        source_type=outcome.source_type,
-        status=outcome.status,
-        reason=outcome.reason,
-        enabled=outcome.state.enabled,
-        missing_env=list(outcome.missing_env),
-        fingerprint=outcome.fingerprint,
-        manifest_path=str(outcome.manifest_path),
+        source_type=effective_outcome.source_type,
+        status=effective_outcome.status,
+        reason=effective_outcome.reason,
+        enabled=effective_outcome.state.enabled,
+        manageable=manageable,
+        manage_reason=manage_reason,
+        missing_env=list(effective_outcome.missing_env),
+        fingerprint=effective_outcome.fingerprint,
+        manifest_path=str(effective_outcome.manifest_path),
         capabilities=[
-            _capability_read(capability=capability, snapshot=snapshot)
-            for capability in snapshot.capabilities
-            if capability.plugin_id == outcome.plugin_id
+            _capability_read(capability=capability, snapshot=effective_snapshot)
+            for capability in effective_snapshot.capabilities
+            if capability.plugin_id == effective_outcome.plugin_id
         ],
     )
+
+
+def _effective_read_scope(
+    *,
+    outcome: PluginLoadOutcome,
+    workspace_snapshot: ContributionRegistrySnapshot,
+    runtime_snapshot: ContributionRegistrySnapshot,
+) -> tuple[PluginLoadOutcome, ContributionRegistrySnapshot]:
+    """Return the state scope that should be shown for one plugin."""
+    if not _is_runtime_global_plugin(outcome):
+        return outcome, workspace_snapshot
+    runtime_outcome = runtime_snapshot.outcome_for(outcome.plugin_id)
+    if runtime_outcome is None:
+        return outcome, workspace_snapshot
+    return runtime_outcome, runtime_snapshot
 
 
 def _capability_read(
@@ -274,6 +323,34 @@ def _require_capability(
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"Capability {capability_key!r} is not installed.",
+    )
+
+
+def _ensure_workspace_manageable(outcome: PluginLoadOutcome) -> None:
+    """Reject workspace writes for plugins managed by runtime-global state."""
+    if _is_runtime_global_plugin(outcome):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=RUNTIME_GLOBAL_MANAGE_REASON,
+        )
+
+
+def _ensure_capability_slot_manageable(capability: CapabilityRecord) -> None:
+    """Reject workspace slot preferences for runtime-global capabilities."""
+    if capability.type in RUNTIME_GLOBAL_CAPABILITY_TYPES:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=RUNTIME_GLOBAL_MANAGE_REASON,
+        )
+
+
+def _is_runtime_global_plugin(outcome: PluginLoadOutcome) -> bool:
+    """Return whether a plugin's capabilities are managed outside workspaces."""
+    manifest = outcome.manifest
+    if manifest is None:
+        return False
+    return any(
+        capability.type in RUNTIME_GLOBAL_CAPABILITY_TYPES for capability in manifest.capabilities
     )
 
 
