@@ -12,9 +12,22 @@ import { expect, test } from './fixtures';
 test.use({ skipOnboarding: false });
 
 async function openOnboardingFlow(page: Page): Promise<void> {
-	await page.evaluate((eventName) => {
-		window.dispatchEvent(new Event(eventName));
-	}, OPEN_ONBOARDING_FLOW_EVENT);
+	const identityHeading = page.getByRole('heading', { name: /Let's get to know you/i });
+
+	await expect
+		.poll(
+			async () => {
+				await page.evaluate((eventName) => {
+					window.dispatchEvent(new Event(eventName));
+				}, OPEN_ONBOARDING_FLOW_EVENT);
+				return identityHeading.isVisible();
+			},
+			{
+				intervals: [100, 250, 500],
+				timeout: 10_000,
+			}
+		)
+		.toBe(true);
 }
 
 test.describe('onboarding wizard', () => {
