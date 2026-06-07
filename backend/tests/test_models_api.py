@@ -162,8 +162,21 @@ def test_host_authenticated_does_not_expose_agy_cli_models(
     assert host_authenticated(Host.agy_cli) is False
 
 
-def test_host_authenticated_probes_agy_api_auth(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_host_authenticated_probes_agy_api_auth(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: object,
+) -> None:
     """Direct Antigravity API rows are visible when local agy auth is usable."""
-    monkeypatch.setattr("app.providers.agy_api.has_agy_api_auth", lambda: True)
+    from pathlib import Path
 
-    assert host_authenticated(Host.agy_api) is True
+    workspace_root = Path(str(tmp_path))
+    seen_workspace_roots: list[Path | None] = []
+
+    def has_auth(workspace_root: Path | None = None) -> bool:
+        seen_workspace_roots.append(workspace_root)
+        return True
+
+    monkeypatch.setattr("app.providers.agy_api.has_agy_api_auth", has_auth)
+
+    assert host_authenticated(Host.agy_api, workspace_root=workspace_root) is True
+    assert seen_workspace_roots == [workspace_root]

@@ -43,10 +43,11 @@ class AgyApiAuth:
 def has_agy_api_auth(workspace_root: Path | None = None) -> bool:
     """Return whether local Antigravity auth exists for this workspace."""
     try:
-        load_agy_api_auth(workspace_root)
+        token_body = _load_token_body()
+        _load_project_id(workspace_root)
+        return _has_usable_or_refreshable_token(token_body)
     except AgyApiAuthError:
         return False
-    return True
 
 
 _refresh_lock = asyncio.Lock()
@@ -69,17 +70,9 @@ async def ensure_agy_api_auth(workspace_root: Path | None = None) -> AgyApiAuth:
 
 def load_agy_api_auth(workspace_root: Path | None = None) -> AgyApiAuth:
     """Load a non-expired ``agy`` token and cached project id."""
-    raw_token = _load_json(_TOKEN_PATH, "Antigravity OAuth token")
-    if not isinstance(raw_token, dict):
-        raise AgyApiAuthError("Antigravity token file is malformed.")
-    token: dict[str, object] = dict(raw_token)
-    raw_token_body = token.get("token")
-    if not isinstance(raw_token_body, dict):
-        raise AgyApiAuthError("Antigravity token file is malformed.")
-    token_body: dict[str, object] = dict(raw_token_body)
+    token_body = _load_token_body()
 
-    expiry = token_body.get("expiry")
-    if isinstance(expiry, str) and _is_expired(expiry):
+    if _token_expired(token_body):
         raise AgyApiTokenExpiredError(
             "Antigravity access token is expired; run agy once in this workspace "
             "so the CLI refreshes its token."
@@ -93,6 +86,35 @@ def load_agy_api_auth(workspace_root: Path | None = None) -> AgyApiAuth:
         access_token=access_token,
         project_id=_load_project_id(workspace_root),
     )
+
+
+def _load_token_body() -> dict[str, object]:
+    """Load the nested OAuth token body written by the ``agy`` CLI."""
+    raw_token = _load_json(_TOKEN_PATH, "Antigravity OAuth token")
+    if not isinstance(raw_token, dict):
+        raise AgyApiAuthError("Antigravity token file is malformed.")
+    token: dict[str, object] = dict(raw_token)
+    raw_token_body = token.get("token")
+    if not isinstance(raw_token_body, dict):
+        raise AgyApiAuthError("Antigravity token file is malformed.")
+    return dict(raw_token_body)
+
+
+def _has_usable_or_refreshable_token(token_body: dict[str, object]) -> bool:
+    """Return whether the picker should show AGY API models."""
+    if _token_expired(token_body):
+        return _has_non_empty_string(token_body, "refresh_token")
+    return _has_non_empty_string(token_body, "access_token")
+
+
+def _token_expired(token_body: dict[str, object]) -> bool:
+    expiry = token_body.get("expiry")
+    return isinstance(expiry, str) and _is_expired(expiry)
+
+
+def _has_non_empty_string(values: dict[str, object], key: str) -> bool:
+    value = values.get(key)
+    return isinstance(value, str) and bool(value.strip())
 
 
 def _load_project_id(workspace_root: Path | None) -> str:

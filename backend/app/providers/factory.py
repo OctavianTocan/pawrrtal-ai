@@ -76,8 +76,9 @@ this table must always agree.
 # Host → (workspace env-key, settings attribute) used by the picker
 # filter (issue #370). The env-key path is what most providers invoke
 # at request time via :func:`app.infrastructure.keys.resolve_api_key`.
-# Local CLI hosts and xAI are exceptions: CLI hosts authenticate by
-# binary availability, and xAI workspace OAuth credentials also
+# Local CLI-derived hosts and xAI are exceptions: AGY API authenticates
+# through the local ``agy`` token/project cache, Gemini CLI authenticates
+# by binary availability, and xAI workspace OAuth credentials also
 # authenticate the host. :func:`host_authenticated` handles those
 # branches directly.
 # The settings attribute is the fallback when there is no workspace
@@ -133,7 +134,7 @@ def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> boo
     :class:`Host`.
     """
     if host in (Host.agy_api, Host.gemini_cli):
-        return _local_cli_host_authenticated(host)
+        return _local_cli_host_authenticated(host, workspace_root=workspace_root)
     keys = _HOST_AUTH_KEYS.get(host)
     if keys is None:
         return False
@@ -161,12 +162,12 @@ def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> boo
     return bool(getattr(settings, settings_attr))
 
 
-def _local_cli_host_authenticated(host: Host) -> bool:
-    """Return whether a local CLI host has its binary available."""
+def _local_cli_host_authenticated(host: Host, *, workspace_root: Path | None) -> bool:
+    """Return whether a local CLI host has the auth/binary state it needs."""
     if host is Host.agy_api:
         from .agy_api import has_agy_api_auth  # noqa: PLC0415
 
-        return has_agy_api_auth()
+        return has_agy_api_auth(workspace_root)
     # Local import: ``gemini_cli`` imports the agent loop which would
     # re-enter the factory module on a top-level import.
     from .gemini_cli import is_gemini_cli_available  # noqa: PLC0415
