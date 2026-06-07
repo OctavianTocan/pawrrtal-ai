@@ -155,6 +155,10 @@ The bundled `github_issues` plugin is the env-gated integration template. It
 declares `report_issue` as a `python_tool` and contributes settings metadata so
 each workspace can bring its own GitHub token and issue target.
 
+The bundled `document_conversion` plugin is the local-file adapter template. It
+declares `convert_to_markdown` as a `python_tool`, keeps MarkItDown scoped to
+the workspace root, and requires only `filesystem_read`.
+
 ## Trusted Runtime Capabilities
 
 Runtime capabilities such as `turn_context_provider`, `provider`, `channel`,

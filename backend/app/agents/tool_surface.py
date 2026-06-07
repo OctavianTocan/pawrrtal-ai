@@ -49,7 +49,6 @@ from app.tools.lcm_agents import (
     make_lcm_list_summaries_tool,
     make_lcm_search_tool,
 )
-from app.tools.markitdown_convert import make_markitdown_tool
 from app.tools.now import (
     build_external_mcp_tools,
     make_now_tool,
@@ -169,10 +168,6 @@ def build_agent_tools(
         codex_token = None
     if codex_token:
         tools.append(make_image_gen_tool(workspace_root=workspace_root))
-
-    # Document-to-Markdown conversion via markitdown.  Always present —
-    # no external API key required; all conversion happens locally.
-    tools.append(make_markitdown_tool(workspace_root=workspace_root))
 
     # Current wall-clock time.  Pure stdlib, no network — always present
     # so the model can re-query the clock mid-turn without burning

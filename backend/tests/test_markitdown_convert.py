@@ -12,6 +12,7 @@ Covers:
 
 from __future__ import annotations
 
+import uuid
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -142,18 +143,27 @@ async def test_converter_exception_returns_io_error(workspace: Path) -> None:
 def test_convert_to_markdown_in_build_agent_tools(tmp_path: Path) -> None:
     (tmp_path / "AGENTS.md").write_text("# Test workspace")
     with patch("app.infrastructure.keys.resolve_api_key", return_value=None):
-        tools = build_agent_tools(workspace_root=tmp_path)
+        tools = build_agent_tools(
+            workspace_root=tmp_path,
+            user_id=uuid.uuid4(),
+            workspace_id=uuid.uuid4(),
+        )
 
     names = [t.name for t in tools]
     assert "convert_to_markdown" in names
 
 
 def test_convert_to_markdown_precedes_send_message(tmp_path: Path) -> None:
-    """convert_to_markdown must be registered before send_message."""
+    """Plugin tools are registered after channel delivery tools."""
     (tmp_path / "AGENTS.md").write_text("# Test workspace")
     send_fn = AsyncMock(return_value=None)
     with patch("app.infrastructure.keys.resolve_api_key", return_value=None):
-        tools = build_agent_tools(workspace_root=tmp_path, send_fn=send_fn)
+        tools = build_agent_tools(
+            workspace_root=tmp_path,
+            user_id=uuid.uuid4(),
+            workspace_id=uuid.uuid4(),
+            send_fn=send_fn,
+        )
 
     names = [t.name for t in tools]
-    assert names.index("convert_to_markdown") < names.index("send_message")
+    assert names.index("send_message") < names.index("convert_to_markdown")
