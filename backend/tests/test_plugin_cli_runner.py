@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from pathlib import Path
 
 import pytest
@@ -46,6 +47,7 @@ def test_cli_runner_scrubs_env_and_injects_declared_keys(
         "print(json.dumps({"
         "'token': os.getenv('PLUGIN_TOKEN'), "
         "'leak': os.getenv('SHOULD_NOT_LEAK'), "
+        "'loader': os.getenv('LD_LIBRARY_PATH'), "
         "'home': os.getenv('HOME')"
         "}))"
     )
@@ -63,6 +65,7 @@ def test_cli_runner_scrubs_env_and_injects_declared_keys(
     payload = json.loads(result.stdout)
     assert payload["token"] == "secret"
     assert payload["leak"] is None
+    assert payload["loader"] == os.environ.get("LD_LIBRARY_PATH")
     assert "paw-plugin-home-" in payload["home"]
 
 

@@ -13,7 +13,15 @@ import anyio
 
 from app.plugins.errors import PluginRuntimeError
 
-BASE_ENV_KEYS = ("PATH", "LANG", "LC_ALL", "HTTPS_PROXY", "HTTP_PROXY", "NO_PROXY")
+BASE_ENV_KEYS = (
+    "PATH",
+    "LANG",
+    "LC_ALL",
+    "LD_LIBRARY_PATH",
+    "HTTPS_PROXY",
+    "HTTP_PROXY",
+    "NO_PROXY",
+)
 DEFAULT_OUTPUT_CAP_BYTES = 32_000
 
 
