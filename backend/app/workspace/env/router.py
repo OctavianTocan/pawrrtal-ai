@@ -11,6 +11,7 @@ Mounted at: ``/api/v1/workspaces/{workspace_id}/env``.
 
 from __future__ import annotations
 
+import logging
 import uuid
 from pathlib import Path
 
@@ -28,14 +29,19 @@ from app.infrastructure.keys import (
     save_workspace_env,
 )
 from app.models import Workspace
+from app.plugins.env import plugin_overridable_env_keys
+from app.plugins.errors import PluginError
+
+logger = logging.getLogger(__name__)
 
 # NOTE: Numeric limits on key count (was MAX_KEYS=10) and per-value length
 # (was MAX_VALUE_LENGTH=512) were removed. The per-workspace .env is
 # encrypted user-controlled data living inside the user's own workspace
 # directory (0600 perms). The only hard security boundary that remains is
 # the newline-rejection validator below (prevents key-injection on the
-# line-based serializer). The allowlist (OVERRIDABLE_KEYS) still gates
-# unknown keys with 400.
+# line-based serializer). The allowlist still gates unknown keys with 400,
+# but it now unions kernel-owned keys with env keys declared by plugins
+# installed for the specific workspace.
 
 
 class WorkspaceEnvVars(BaseModel):
@@ -77,9 +83,9 @@ class WorkspaceEnvVars(BaseModel):
 class WorkspaceEnvResponse(BaseModel):
     """Response body for ``GET`` and ``PUT /api/v1/workspace/env``.
 
-    Always contains every key in :data:`OVERRIDABLE_KEYS`; keys the user
-    has not set are returned with empty-string values so the frontend
-    can render every input field without an extra schema fetch.
+    Always contains every key users may configure in this workspace; keys
+    the user has not set are returned with empty-string values so the
+    frontend can render every input field without an extra schema fetch.
     """
 
     vars: dict[str, str] = Field(
@@ -91,9 +97,26 @@ class WorkspaceEnvResponse(BaseModel):
     )
 
 
-def _all_keys_response(env: dict[str, str]) -> WorkspaceEnvResponse:
+def _all_keys_response(
+    env: dict[str, str],
+    allowed_keys: frozenset[str],
+) -> WorkspaceEnvResponse:
     """Project a stored env dict onto the canonical full-key response shape."""
-    return WorkspaceEnvResponse(vars={k: env.get(k, "") for k in OVERRIDABLE_KEYS})
+    return WorkspaceEnvResponse(vars={k: env.get(k, "") for k in sorted(allowed_keys)})
+
+
+def _allowed_workspace_env_keys(workspace_root: Path) -> frozenset[str]:
+    """Return kernel and plugin env keys configurable for this workspace."""
+    try:
+        plugin_keys = plugin_overridable_env_keys(workspace_root=workspace_root)
+    except PluginError as exc:
+        logger.warning(
+            "workspace_env: plugin env discovery failed for %s: %s",
+            workspace_root,
+            exc,
+        )
+        plugin_keys = frozenset()
+    return OVERRIDABLE_KEYS | plugin_keys
 
 
 async def _get_owned_workspace(
@@ -143,7 +166,9 @@ def get_workspace_env_router() -> APIRouter:
     ) -> WorkspaceEnvResponse:
         """Return the workspace's env overrides."""
         ws = await _get_owned_workspace(workspace_id, user, session)
-        return _all_keys_response(load_workspace_env(Path(ws.path)))
+        workspace_root = Path(ws.path)
+        allowed_keys = _allowed_workspace_env_keys(workspace_root)
+        return _all_keys_response(load_workspace_env(workspace_root), allowed_keys)
 
     @router.put("/{workspace_id}/env", response_model=WorkspaceEnvResponse)
     async def put_workspace_env(
@@ -162,13 +187,13 @@ def get_workspace_env_router() -> APIRouter:
         """
         ws = await _get_owned_workspace(workspace_id, user, session)
         workspace_root = Path(ws.path)
+        allowed_keys = _allowed_workspace_env_keys(workspace_root)
         for k in payload.vars:
-            if k not in OVERRIDABLE_KEYS:
+            if k not in allowed_keys:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=(
-                        f"Unknown workspace env key: '{k}'. "
-                        f"Allowed keys: {sorted(OVERRIDABLE_KEYS)}."
+                        f"Unknown workspace env key: '{k}'. Allowed keys: {sorted(allowed_keys)}."
                     ),
                 )
         existing = load_workspace_env(workspace_root)
@@ -177,7 +202,7 @@ def get_workspace_env_router() -> APIRouter:
         # Re-load from disk so the response reflects what was actually
         # persisted (empty-string values are stripped during save, so the
         # echoed payload should match what subsequent GETs return).
-        return _all_keys_response(load_workspace_env(workspace_root))
+        return _all_keys_response(load_workspace_env(workspace_root), allowed_keys)
 
     @router.delete("/{workspace_id}/env/{key}", status_code=status.HTTP_204_NO_CONTENT)
     async def delete_workspace_env_key(
@@ -187,13 +212,14 @@ def get_workspace_env_router() -> APIRouter:
         session: AsyncSession = Depends(get_async_session),
     ) -> None:
         """Remove a single override key for the workspace."""
-        if key not in OVERRIDABLE_KEYS:
+        ws = await _get_owned_workspace(workspace_id, user, session)
+        workspace_root = Path(ws.path)
+        allowed_keys = _allowed_workspace_env_keys(workspace_root)
+        if key not in allowed_keys:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Unknown workspace env key: '{key}'.",
             )
-        ws = await _get_owned_workspace(workspace_id, user, session)
-        workspace_root = Path(ws.path)
         existing = load_workspace_env(workspace_root)
         existing.pop(key, None)
         save_workspace_env(workspace_root, existing)

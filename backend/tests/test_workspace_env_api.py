@@ -16,15 +16,21 @@ their own unit tests in test_keys.py). Covers:
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure import keys
 from app.infrastructure.config import settings
+from app.infrastructure.database.legacy import User
 from app.infrastructure.keys import OVERRIDABLE_KEYS
 from app.models import Workspace
+
+PLUGIN_TOKEN_KEY = "CUSTOM_PLUGIN_TOKEN"
 
 
 @pytest.fixture
@@ -36,6 +42,39 @@ def isolate_workspace_base(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> P
     """
     monkeypatch.setattr(settings, "workspace_base_dir", str(tmp_path))
     return tmp_path
+
+
+def _write_workspace_settings_plugin(workspace_root: Path) -> None:
+    """Write a workspace plugin that declares one overridable env key."""
+    plugin_dir = workspace_root / ".agent" / "plugins" / "custom_env"
+    plugin_dir.mkdir(parents=True)
+    manifest = {
+        "schema_version": 1,
+        "id": "custom_env",
+        "name": "Custom Env",
+        "version": "1.0.0",
+        "description": "Workspace plugin used to test dynamic env settings.",
+        "capabilities": [
+            {
+                "type": "settings",
+                "id": "custom_env_settings",
+                "title": "Custom Env Settings",
+                "description": "Settings metadata for a custom workspace plugin.",
+                "env": [
+                    {
+                        "name": PLUGIN_TOKEN_KEY,
+                        "label": "Custom Plugin Token",
+                        "description": "Token configured per workspace for this plugin.",
+                        "required": True,
+                        "scope": "workspace",
+                        "overridable": True,
+                        "secret": True,
+                    }
+                ],
+            }
+        ],
+    }
+    (plugin_dir / "plugin.json").write_text(json.dumps(manifest), encoding="utf-8")
 
 
 @pytest.mark.anyio
@@ -57,6 +96,52 @@ async def test_get_returns_all_keys_empty_for_new_user(
 
 
 @pytest.mark.anyio
+async def test_get_includes_workspace_plugin_env_keys(
+    client: AsyncClient,
+    isolate_workspace_base: Path,
+    seeded_default_workspace: Workspace,
+) -> None:
+    """Plugin settings contribute env keys to the owning workspace."""
+    _write_workspace_settings_plugin(Path(seeded_default_workspace.path))
+
+    response = await client.get(f"/api/v1/workspaces/{seeded_default_workspace.id}/env")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["vars"][PLUGIN_TOKEN_KEY] == ""
+
+
+@pytest.mark.anyio
+async def test_plugin_env_keys_do_not_leak_between_workspaces(
+    client: AsyncClient,
+    isolate_workspace_base: Path,
+    seeded_default_workspace: Workspace,
+    test_user: User,
+    db_session: AsyncSession,
+    tmp_path: Path,
+) -> None:
+    """A workspace-local plugin key is not accepted in another workspace."""
+    _write_workspace_settings_plugin(Path(seeded_default_workspace.path))
+    other_root = tmp_path / "other-workspace"
+    other_root.mkdir()
+    other = Workspace(
+        id=uuid4(),
+        user_id=test_user.id,
+        name="Other",
+        slug="other",
+        path=str(other_root),
+        is_default=False,
+    )
+    db_session.add(other)
+    await db_session.commit()
+
+    response = await client.get(f"/api/v1/workspaces/{other.id}/env")
+
+    assert response.status_code == 200
+    assert PLUGIN_TOKEN_KEY not in response.json()["vars"]
+
+
+@pytest.mark.anyio
 async def test_put_then_get_round_trips(
     client: AsyncClient,
     isolate_workspace_base: Path,
@@ -74,6 +159,27 @@ async def test_put_then_get_round_trips(
     get_response = await client.get(base)
     assert get_response.status_code == 200
     assert get_response.json()["vars"]["GEMINI_API_KEY"] == "real-key"
+
+
+@pytest.mark.anyio
+async def test_put_accepts_workspace_plugin_env_keys(
+    client: AsyncClient,
+    isolate_workspace_base: Path,
+    seeded_default_workspace: Workspace,
+) -> None:
+    """Custom plugin env keys are stored in the workspace env file."""
+    workspace_root = Path(seeded_default_workspace.path)
+    _write_workspace_settings_plugin(workspace_root)
+    base = f"/api/v1/workspaces/{seeded_default_workspace.id}/env"
+
+    put_response = await client.put(
+        base,
+        json={"vars": {PLUGIN_TOKEN_KEY: "plugin-secret"}},
+    )
+
+    assert put_response.status_code == 200
+    assert put_response.json()["vars"][PLUGIN_TOKEN_KEY] == "plugin-secret"
+    assert keys.load_workspace_env(workspace_root)[PLUGIN_TOKEN_KEY] == "plugin-secret"
 
 
 @pytest.mark.anyio
@@ -178,6 +284,25 @@ async def test_delete_removes_one_key(
     remaining = keys.load_workspace_env(Path(seeded_default_workspace.path))
     assert "GEMINI_API_KEY" not in remaining
     assert remaining.get("EXA_API_KEY") == "e"
+
+
+@pytest.mark.anyio
+async def test_delete_accepts_workspace_plugin_env_keys(
+    client: AsyncClient,
+    isolate_workspace_base: Path,
+    seeded_default_workspace: Workspace,
+) -> None:
+    """DELETE uses the same workspace-specific plugin key allowlist."""
+    ws_root = Path(seeded_default_workspace.path)
+    _write_workspace_settings_plugin(ws_root)
+    keys.save_workspace_env(ws_root, {PLUGIN_TOKEN_KEY: "plugin-secret"})
+
+    response = await client.delete(
+        f"/api/v1/workspaces/{seeded_default_workspace.id}/env/{PLUGIN_TOKEN_KEY}"
+    )
+
+    assert response.status_code == 204
+    assert PLUGIN_TOKEN_KEY not in keys.load_workspace_env(ws_root)
 
 
 @pytest.mark.anyio
