@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import logging
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, field_validator
@@ -29,7 +31,8 @@ from app.infrastructure.keys import (
     save_workspace_env,
 )
 from app.models import Workspace
-from app.plugins.env import plugin_overridable_env_keys
+from app.plugins.contributions import EnvVarSpec
+from app.plugins.env import plugin_env_specs_for_workspace
 from app.plugins.errors import PluginError
 
 logger = logging.getLogger(__name__)
@@ -80,6 +83,18 @@ class WorkspaceEnvVars(BaseModel):
         return v
 
 
+class WorkspaceEnvKeyRead(BaseModel):
+    """Display metadata for one workspace-configurable env key."""
+
+    key: str
+    label: str
+    description: str
+    secret: bool
+    required: bool
+    source: Literal["kernel", "plugin"]
+    help_url: str | None = None
+
+
 class WorkspaceEnvResponse(BaseModel):
     """Response body for ``GET`` and ``PUT /api/v1/workspace/env``.
 
@@ -95,28 +110,84 @@ class WorkspaceEnvResponse(BaseModel):
             "Keys not yet set by the user have an empty-string value."
         ),
     )
+    keys: list[WorkspaceEnvKeyRead] = Field(
+        default_factory=list,
+        description="Display metadata for every key in vars.",
+    )
 
 
-def _all_keys_response(
-    env: dict[str, str],
-    allowed_keys: frozenset[str],
-) -> WorkspaceEnvResponse:
+@dataclass(frozen=True, slots=True)
+class WorkspaceEnvSchema:
+    """Allowlist and metadata for one workspace env surface."""
+
+    allowed_keys: frozenset[str]
+    keys: tuple[WorkspaceEnvKeyRead, ...]
+
+
+def _all_keys_response(env: dict[str, str], schema: WorkspaceEnvSchema) -> WorkspaceEnvResponse:
     """Project a stored env dict onto the canonical full-key response shape."""
-    return WorkspaceEnvResponse(vars={k: env.get(k, "") for k in sorted(allowed_keys)})
+    return WorkspaceEnvResponse(
+        vars={k: env.get(k, "") for k in sorted(schema.allowed_keys)},
+        keys=list(schema.keys),
+    )
 
 
-def _allowed_workspace_env_keys(workspace_root: Path) -> frozenset[str]:
-    """Return kernel and plugin env keys configurable for this workspace."""
+def _workspace_env_schema(workspace_root: Path) -> WorkspaceEnvSchema:
+    """Return configurable env keys plus display metadata for this workspace."""
     try:
-        plugin_keys = plugin_overridable_env_keys(workspace_root=workspace_root)
+        plugin_specs = plugin_env_specs_for_workspace(workspace_root=workspace_root)
     except PluginError as exc:
         logger.warning(
             "workspace_env: plugin env discovery failed for %s: %s",
             workspace_root,
             exc,
         )
-        plugin_keys = frozenset()
-    return OVERRIDABLE_KEYS | plugin_keys
+        plugin_specs = ()
+    plugin_spec_by_name = {spec.name: spec for spec in plugin_specs}
+    allowed_keys = OVERRIDABLE_KEYS | frozenset(plugin_spec_by_name)
+    return WorkspaceEnvSchema(
+        allowed_keys=allowed_keys,
+        keys=tuple(
+            _key_metadata(key=key, plugin_spec=plugin_spec_by_name.get(key))
+            for key in sorted(allowed_keys)
+        ),
+    )
+
+
+def _key_metadata(
+    *,
+    key: str,
+    plugin_spec: EnvVarSpec | None,
+) -> WorkspaceEnvKeyRead:
+    """Return display metadata for a kernel or plugin env key."""
+    if plugin_spec is not None and key not in OVERRIDABLE_KEYS:
+        return WorkspaceEnvKeyRead(
+            key=key,
+            label=plugin_spec.label,
+            description=plugin_spec.description or f"Workspace value for {plugin_spec.label}.",
+            secret=plugin_spec.secret,
+            required=plugin_spec.required,
+            source="plugin",
+            help_url=plugin_spec.help_url,
+        )
+    return WorkspaceEnvKeyRead(
+        key=key,
+        label=_label_from_env_key(key),
+        description=f"Workspace override for {key}.",
+        secret=_is_secret_kernel_key(key),
+        required=False,
+        source="kernel",
+    )
+
+
+def _label_from_env_key(key: str) -> str:
+    """Return a readable fallback label for an env key."""
+    return key.replace("_", " ").title()
+
+
+def _is_secret_kernel_key(key: str) -> bool:
+    """Return whether the built-in workspace env key should be masked."""
+    return not (key == "GITHUB_ISSUES_REPO" or key.startswith("ACTIVE_RECALL_"))
 
 
 async def _get_owned_workspace(
@@ -167,8 +238,8 @@ def get_workspace_env_router() -> APIRouter:
         """Return the workspace's env overrides."""
         ws = await _get_owned_workspace(workspace_id, user, session)
         workspace_root = Path(ws.path)
-        allowed_keys = _allowed_workspace_env_keys(workspace_root)
-        return _all_keys_response(load_workspace_env(workspace_root), allowed_keys)
+        schema = _workspace_env_schema(workspace_root)
+        return _all_keys_response(load_workspace_env(workspace_root), schema)
 
     @router.put("/{workspace_id}/env", response_model=WorkspaceEnvResponse)
     async def put_workspace_env(
@@ -187,13 +258,14 @@ def get_workspace_env_router() -> APIRouter:
         """
         ws = await _get_owned_workspace(workspace_id, user, session)
         workspace_root = Path(ws.path)
-        allowed_keys = _allowed_workspace_env_keys(workspace_root)
+        schema = _workspace_env_schema(workspace_root)
         for k in payload.vars:
-            if k not in allowed_keys:
+            if k not in schema.allowed_keys:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=(
-                        f"Unknown workspace env key: '{k}'. Allowed keys: {sorted(allowed_keys)}."
+                        f"Unknown workspace env key: '{k}'. "
+                        f"Allowed keys: {sorted(schema.allowed_keys)}."
                     ),
                 )
         existing = load_workspace_env(workspace_root)
@@ -202,7 +274,7 @@ def get_workspace_env_router() -> APIRouter:
         # Re-load from disk so the response reflects what was actually
         # persisted (empty-string values are stripped during save, so the
         # echoed payload should match what subsequent GETs return).
-        return _all_keys_response(load_workspace_env(workspace_root), allowed_keys)
+        return _all_keys_response(load_workspace_env(workspace_root), schema)
 
     @router.delete("/{workspace_id}/env/{key}", status_code=status.HTTP_204_NO_CONTENT)
     async def delete_workspace_env_key(
@@ -214,8 +286,8 @@ def get_workspace_env_router() -> APIRouter:
         """Remove a single override key for the workspace."""
         ws = await _get_owned_workspace(workspace_id, user, session)
         workspace_root = Path(ws.path)
-        allowed_keys = _allowed_workspace_env_keys(workspace_root)
-        if key not in allowed_keys:
+        schema = _workspace_env_schema(workspace_root)
+        if key not in schema.allowed_keys:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Unknown workspace env key: '{key}'.",

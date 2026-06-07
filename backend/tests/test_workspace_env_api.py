@@ -65,6 +65,7 @@ def _write_workspace_settings_plugin(workspace_root: Path) -> None:
                         "name": PLUGIN_TOKEN_KEY,
                         "label": "Custom Plugin Token",
                         "description": "Token configured per workspace for this plugin.",
+                        "help_url": "https://example.com/plugin-token",
                         "required": True,
                         "scope": "workspace",
                         "overridable": True,
@@ -92,6 +93,7 @@ async def test_get_returns_all_keys_empty_for_new_user(
     # when new keys are added, and removes sensitivity to stale .pyc
     # files on the self-hosted runner.
     assert set(body["vars"].keys()) == set(OVERRIDABLE_KEYS)
+    assert {row["key"] for row in body["keys"]} == set(OVERRIDABLE_KEYS)
     assert all(v == "" for v in body["vars"].values())
 
 
@@ -109,6 +111,16 @@ async def test_get_includes_workspace_plugin_env_keys(
     assert response.status_code == 200
     body = response.json()
     assert body["vars"][PLUGIN_TOKEN_KEY] == ""
+    metadata = next(row for row in body["keys"] if row["key"] == PLUGIN_TOKEN_KEY)
+    assert metadata == {
+        "key": PLUGIN_TOKEN_KEY,
+        "label": "Custom Plugin Token",
+        "description": "Token configured per workspace for this plugin.",
+        "secret": True,
+        "required": True,
+        "source": "plugin",
+        "help_url": "https://example.com/plugin-token",
+    }
 
 
 @pytest.mark.anyio
@@ -139,6 +151,7 @@ async def test_plugin_env_keys_do_not_leak_between_workspaces(
 
     assert response.status_code == 200
     assert PLUGIN_TOKEN_KEY not in response.json()["vars"]
+    assert PLUGIN_TOKEN_KEY not in {row["key"] for row in response.json()["keys"]}
 
 
 @pytest.mark.anyio

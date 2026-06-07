@@ -11,9 +11,9 @@ import { useAuthedQuery } from '@/hooks/use-authed-query';
 import { API_ENDPOINTS } from '@/lib/api';
 
 /**
- * Canonical list of overridable workspace env keys, kept in sync with
- * `OVERRIDABLE_KEYS` in `backend/app/core/keys.py`. The shared string union
- * type is exposed so consumers can avoid hardcoding bare strings.
+ * Built-in workspace env keys shown before plugin-provided keys. The backend
+ * owns the final allowlist and may return additional plugin-declared keys in
+ * `WorkspaceEnvResponse.keys`.
  *
  * Adding a key here requires the matching change on the backend
  * `OVERRIDABLE_KEYS` frozenset; the PUT endpoint rejects anything not in
@@ -35,21 +35,32 @@ export const WORKSPACE_ENV_KEY_IDS = [
 	'ACTIVE_RECALL_SEARCH_WORKSPACE',
 	'ACTIVE_RECALL_TIMEOUT_S',
 	'ACTIVE_RECALL_SYSTEM_PROMPT',
-] as const satisfies readonly string[];
+] as const satisfies readonly WorkspaceEnvKey[];
 
-/** Union of valid workspace env key names. Derived from `WORKSPACE_ENV_KEY_IDS`. */
-export type WorkspaceEnvKey = (typeof WORKSPACE_ENV_KEY_IDS)[number];
+/** Workspace env key names are backend-owned and may come from plugins. */
+export type WorkspaceEnvKey = string;
+
+export interface WorkspaceEnvKeyRead {
+	key: WorkspaceEnvKey;
+	label: string;
+	description: string;
+	secret: boolean;
+	required: boolean;
+	source: 'kernel' | 'plugin';
+	help_url: string | null;
+}
 
 /**
  * Response shape returned by `GET /api/v1/workspaces/{workspace_id}/env`
  * and `PUT /api/v1/workspaces/{workspace_id}/env`. The backend always
- * returns every key in `OVERRIDABLE_KEYS`; unset keys come back with an
- * empty-string value so the form can render every input without an extra
- * schema fetch.
+ * returns every key the workspace may configure; unset keys come back with an
+ * empty-string value and `keys` carries display metadata for dynamic plugins.
  */
 export interface WorkspaceEnvResponse {
 	/** Map of every overridable key to its current value (empty string when unset). */
-	vars: Record<WorkspaceEnvKey, string>;
+	vars: Record<string, string>;
+	/** Display metadata for every key in `vars`. */
+	keys: WorkspaceEnvKeyRead[];
 }
 
 /** Minimal workspace shape pulled from `GET /api/v1/workspaces`. */
@@ -154,7 +165,7 @@ export function useWorkspaceEnv(): ReturnType<typeof useAuthedQuery<WorkspaceEnv
 export function useUpsertWorkspaceEnv(): UseMutationResult<
 	WorkspaceEnvResponse,
 	Error,
-	Partial<Record<WorkspaceEnvKey, string>>
+	Partial<Record<string, string>>
 > {
 	const fetcher = useAuthedFetch();
 	const queryClient = useQueryClient();
@@ -163,7 +174,7 @@ export function useUpsertWorkspaceEnv(): UseMutationResult<
 	return useMutation({
 		mutationKey: ['workspace-env', 'upsert', workspaceId ?? ''],
 		mutationFn: async (
-			vars: Partial<Record<WorkspaceEnvKey, string>>
+			vars: Partial<Record<string, string>>
 		): Promise<WorkspaceEnvResponse> => {
 			if (!workspaceId) {
 				throw new Error('Cannot save workspace env: default workspace has not loaded yet.');

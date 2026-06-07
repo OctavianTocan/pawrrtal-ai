@@ -24,6 +24,7 @@ import {
 	useWorkspaceEnv,
 	WORKSPACE_ENV_KEY_IDS,
 	type WorkspaceEnvKey,
+	type WorkspaceEnvResponse,
 } from '@/features/settings/workspace-env/use-workspace-env';
 import {
 	type WorkspaceEnvKeyMeta,
@@ -146,9 +147,45 @@ const KEY_METAS: readonly WorkspaceEnvKeyMeta[] = [
 	},
 ];
 
+const STATIC_KEY_METAS = new Map(KEY_METAS.map((meta) => [meta.key, meta]));
+
+function titleFromEnvKey(key: string): string {
+	return key
+		.split('_')
+		.filter(Boolean)
+		.map((part) => part.slice(0, 1) + part.slice(1).toLowerCase())
+		.join(' ');
+}
+
+function metaFromApiKey(
+	key: string,
+	response: WorkspaceEnvResponse | undefined
+): WorkspaceEnvKeyMeta {
+	const apiMeta = response?.keys.find((entry) => entry.key === key);
+	return {
+		key,
+		label: apiMeta?.label ?? titleFromEnvKey(key),
+		description: apiMeta?.description ?? 'Plugin-provided workspace setting.',
+		placeholder: apiMeta?.secret === false ? 'Enter value' : `Your ${titleFromEnvKey(key)}`,
+		url: apiMeta?.help_url ?? undefined,
+	};
+}
+
+export function workspaceEnvKeyMetasForResponse(
+	response: WorkspaceEnvResponse | undefined
+): readonly WorkspaceEnvKeyMeta[] {
+	const responseKeys =
+		response?.keys.map((entry) => entry.key) ?? Object.keys(response?.vars ?? {});
+	const orderedKeys = [
+		...WORKSPACE_ENV_KEY_IDS,
+		...responseKeys.filter((key) => !STATIC_KEY_METAS.has(key)),
+	];
+	return orderedKeys.map((key) => STATIC_KEY_METAS.get(key) ?? metaFromApiKey(key, response));
+}
+
 /** Empty record with every overridable key seeded to the empty string. */
-function emptyEnvRecord(): Record<WorkspaceEnvKey, string> {
-	const result = {} as Record<WorkspaceEnvKey, string>;
+export function emptyEnvRecord(): Record<WorkspaceEnvKey, string> {
+	const result: Record<WorkspaceEnvKey, string> = {};
 	for (const key of WORKSPACE_ENV_KEY_IDS) {
 		result[key] = '';
 	}
@@ -165,6 +202,7 @@ function emptyEnvRecord(): Record<WorkspaceEnvKey, string> {
 export function WorkspacesSection(): React.JSX.Element {
 	const query = useWorkspaceEnv();
 	const mutation = useUpsertWorkspaceEnv();
+	const keyMetas = workspaceEnvKeyMetasForResponse(query.data);
 
 	// Working copy: starts empty and is replaced once the query lands.
 	// Edits are tracked locally so Discard can revert to the last
@@ -224,7 +262,7 @@ export function WorkspacesSection(): React.JSX.Element {
 	return (
 		<WorkspacesSectionView
 			errorMessage={errorMessage}
-			keyMetas={KEY_METAS}
+			keyMetas={keyMetas}
 			onDiscard={handleDiscard}
 			onSave={handleSave}
 			onToggleVisibility={handleToggleVisibility}
