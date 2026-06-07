@@ -2,15 +2,32 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+from collections.abc import AsyncIterator
 from pathlib import Path
+from uuid import uuid4
 
 import pytest
 
-from app.plugins.adapters.turn_context import build_turn_context_providers
+from app.plugins.active_recall import recall_agent
+from app.plugins.adapters.turn_context import (
+    TurnContextProviderContext,
+    build_turn_context_providers,
+)
 from app.plugins.discovery import PluginRoot, discover_plugins
 from app.plugins.registry import build_registry_snapshot
 from app.plugins.state import PluginState, plugin_state_path, save_plugin_state
+
+
+class _FakeRecallProvider:
+    """Small provider stub that returns a single stream delta."""
+
+    def stream(self, **_kwargs: object) -> AsyncIterator[dict[str, object]]:
+        async def _events() -> AsyncIterator[dict[str, object]]:
+            yield {"type": "delta", "content": "NONE"}
+
+        return _events()
 
 
 def test_bundled_active_recall_manifest_builds_provider_by_default(
@@ -28,6 +45,42 @@ def test_bundled_active_recall_manifest_builds_provider_by_default(
     assert active_recall.capability_id == "active_recall"
     assert active_recall.timeout_seconds == 10
     assert active_recall.provider.__name__ == "run_active_recall"
+
+
+def test_active_recall_resolves_provider_with_workspace_root(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The recall sub-agent uses workspace-scoped provider credentials."""
+    seen: dict[str, object] = {}
+
+    def _resolve_llm(model_id: str, **kwargs: object) -> _FakeRecallProvider:
+        seen["model_id"] = model_id
+        seen["workspace_root"] = kwargs.get("workspace_root")
+        return _FakeRecallProvider()
+
+    monkeypatch.setattr(recall_agent, "resolve_llm", _resolve_llm)
+    ctx = TurnContextProviderContext(
+        conversation_id=uuid4(),
+        user_id=uuid4(),
+        question="What do we know?",
+        workspace_root=tmp_path,
+    )
+
+    result = asyncio.run(
+        recall_agent._run_recall_stream(
+            ctx,
+            "google-ai:google/gemini-3.1-flash-lite",
+            "",
+            False,
+        )
+    )
+
+    assert seen == {
+        "model_id": "google-ai:google/gemini-3.1-flash-lite",
+        "workspace_root": tmp_path,
+    }
+    assert result[0] == "NONE"
 
 
 def test_turn_context_provider_hot_reload_respects_workspace_state(

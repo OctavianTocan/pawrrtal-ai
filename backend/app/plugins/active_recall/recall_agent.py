@@ -213,7 +213,7 @@ async def _run_recall_stream(
     system_prompt: str,
     search_workspace: bool,
 ) -> tuple[str, list[str], int, int, float, str | None]:
-    provider = resolve_llm(model_id)
+    provider = resolve_llm(model_id, workspace_root=ctx.workspace_root)
     lcm_tools: list[AgentTool] = [
         make_lcm_grep_tool(conversation_id=ctx.conversation_id),
         make_lcm_search_tool(conversation_id=ctx.conversation_id),
