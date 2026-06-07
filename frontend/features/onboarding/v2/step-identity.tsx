@@ -1,6 +1,7 @@
 'use client';
 
 import type * as React from 'react';
+import { useId } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import type { PersonalizationProfile } from '@/lib/personalization/storage';
@@ -39,6 +40,11 @@ export function StepIdentity({
 	onContinue,
 }: StepIdentityProps): React.JSX.Element {
 	const goals = profile.goals ?? [];
+	const fieldId = useId();
+	const nameId = `${fieldId}-name`;
+	const companyWebsiteId = `${fieldId}-company-website`;
+	const linkedinId = `${fieldId}-linkedin`;
+	const roleId = `${fieldId}-role`;
 
 	const toggleGoal = (goal: string): void => {
 		const next = goals.includes(goal) ? goals.filter((g) => g !== goal) : [...goals, goal];
@@ -60,29 +66,37 @@ export function StepIdentity({
 			subtitle="We'll use this to personalize your agent."
 			title="Let's get to know you"
 		>
-			<Field label="Your name">
+			<Field htmlFor={nameId} label="Your name">
 				<Input
+					id={nameId}
 					onChange={(event) => onPatch({ name: event.target.value })}
 					placeholder="Your name"
 					value={profile.name ?? ''}
 				/>
 			</Field>
-			<Field label="Company website">
+			<Field htmlFor={companyWebsiteId} label="Company website">
 				<Input
+					id={companyWebsiteId}
 					onChange={(event) => onPatch({ companyWebsite: event.target.value })}
 					placeholder="https://yourcompany.com"
 					value={profile.companyWebsite ?? ''}
 				/>
 			</Field>
-			<Field helper="Optional — helps personalize your agent" label="Your LinkedIn profile">
+			<Field
+				helper="Optional — helps personalize your agent"
+				htmlFor={linkedinId}
+				label="Your LinkedIn profile"
+			>
 				<Input
+					id={linkedinId}
 					onChange={(event) => onPatch({ linkedin: event.target.value })}
 					placeholder="https://linkedin.com/in/yourname"
 					value={profile.linkedin ?? ''}
 				/>
 			</Field>
-			<Field label="Your role">
+			<Field htmlFor={roleId} label="Your role">
 				<Input
+					id={roleId}
 					onChange={(event) => onPatch({ role: event.target.value })}
 					placeholder="e.g. Founder, Engineering"
 					value={profile.role ?? ''}
@@ -120,16 +134,20 @@ export function StepIdentity({
 /** Small label-over-input wrapper used throughout step 1. */
 function Field({
 	label,
+	htmlFor,
 	helper,
 	children,
 }: {
 	label: React.ReactNode;
+	htmlFor: string;
 	helper?: React.ReactNode;
 	children: React.ReactNode;
 }): React.JSX.Element {
 	return (
 		<div className="flex flex-col gap-1.5">
-			<span className="text-sm font-medium text-foreground">{label}</span>
+			<label className="text-sm font-medium text-foreground" htmlFor={htmlFor}>
+				{label}
+			</label>
 			{children}
 			{helper ? <span className="text-sm text-muted-foreground">{helper}</span> : null}
 		</div>
