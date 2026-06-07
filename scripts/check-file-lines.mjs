@@ -26,7 +26,7 @@ const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), 
 const MAX_LINES = Number.parseInt(process.env.MAX_LINES ?? '500', 10);
 
 /** Roots we scan. Add new top-level source trees here. */
-const SCAN_ROOTS = ['frontend', 'backend'];
+const SCAN_ROOTS = ['frontend', 'backend', 'backend-ts'];
 
 /** Directory names we never descend into. */
 const SKIP_DIRECTORIES = new Set([
@@ -48,7 +48,6 @@ const SKIP_DIRECTORIES = new Set([
 	'.sentrux',
 	'.private',
 	'alembic',
-	'packages',
 	'tests',
 	'__tests__',
 	'vendor', // vendored submodules (e.g. backend/vendor/codex) follow their own line conventions
@@ -70,6 +69,7 @@ const EXEMPT_SUFFIXES = ['.test.ts', '.test.tsx', '.spec.ts', '.spec.tsx', '.d.t
  * split rather than letting the exemption become permanent.
  */
 const EXEMPT_PATH_FRAGMENTS = [
+	'frontend/packages/', // vendored workspace packages (see biome.json overrides)
 	'frontend/components/ui/',
 	// `frontend/lib/react-dropdown/` is a vendored copy of the
 	// `@octavian-tocan/react-dropdown` package that lives in its own git

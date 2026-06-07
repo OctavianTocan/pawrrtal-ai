@@ -30,23 +30,12 @@ From the repo root (recommended — also initializes `backend/vendor/effect-smol
 
 ```bash
 git submodule update --init backend/vendor/effect-smol
-just install-backend-ts
-just typecheck-backend-ts
+just install
+just check
+just typecheck
 ```
 
-Or only this workspace:
-
-```bash
-cd backend-ts && bun install && bun run typecheck
-```
-
-`just install` runs `bun install` at the root and in `backend-ts/`.
-
-## Scripts
-
-```bash
-cd backend-ts/apps/api && bun run typecheck
-```
+`just install` runs `bun install` at the root and in `backend-ts/`. Lint, format, and structural gates use the same repo-wide commands as the frontend (`just check`, `just lint-fix`, `just format`). TypeScript checking is part of `just typecheck` alongside Python mypy.
 
 ## Dev ports
 

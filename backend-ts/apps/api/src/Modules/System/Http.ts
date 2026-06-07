@@ -1,6 +1,6 @@
+import { Api } from '@pawrrtal/api-core';
 import { Effect } from 'effect';
 import { HttpApiBuilder } from 'effect/unstable/httpapi';
-import { Api } from '@pawrrtal/api-core';
 
 export const HttpSystemLive = HttpApiBuilder.group(
 	Api,

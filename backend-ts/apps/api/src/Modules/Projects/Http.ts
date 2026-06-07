@@ -9,7 +9,6 @@ import { HttpApiBuilder } from 'effect/unstable/httpapi';
 
 const STUB_USER_ID = '00000000-0000-0000-0000-000000000001' as UserId;
 
-
 function stubProject(name: string, id: ProjectId): Project {
 	const timestamp = DateTime.nowUnsafe();
 	return new Project({
