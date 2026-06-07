@@ -1,6 +1,6 @@
 import { HttpApi, OpenApi } from 'effect/unstable/httpapi';
-import { SystemApi } from './Modules/System/Api';
 import { ProjectsApi } from './Modules/Projects/Api';
+import { SystemApi } from './Modules/System/Api';
 
 export class Api extends HttpApi.make('api')
 	.add(SystemApi)

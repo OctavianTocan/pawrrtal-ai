@@ -55,9 +55,11 @@ lint-fix: lint-py-fix
 format: format-py
     bunx --bun @biomejs/biome@2.4.15 format --write .
 
-# Check (read-only) — Biome + ruff lint + ruff format check
+# Check (read-only) — Biome + ruff lint + ruff format check + TS structural gates
 check: check-py
     bunx --bun @biomejs/biome@2.4.15 check --no-errors-on-unmatched --files-ignore-unknown=true .
+    node scripts/check-file-lines.mjs
+    node scripts/check-nesting.mjs
 
 # --- Python: ruff (lint + format) and mypy (type check) ----------------------
 
@@ -78,9 +80,10 @@ check-py:
     cd backend && uv run ruff check .
     cd backend && uv run ruff format --check .
 
-# Static type-check with mypy. Gating — keep the gate green.
+# Static type-check — Python (mypy) + Effect TS workspace (tsc). Gating — keep green.
 typecheck:
     cd backend && uv run mypy
+    cd backend-ts && bun run typecheck
 
 # Security scan with bandit (Python). Findings here are real and should fail.
 security-py:
@@ -198,13 +201,6 @@ install:
 	cd backend-ts && bun install
 	uv sync --project backend --group dev
 	just install-hooks
-
-# Effect TypeScript workspace (Effect v4; vendor source in backend/vendor/effect-smol)
-install-backend-ts:
-	cd backend-ts && bun install
-
-typecheck-backend-ts:
-	cd backend-ts && bun run typecheck
 
 # Show active tasks from Notion
 tasks:

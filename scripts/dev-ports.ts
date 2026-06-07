@@ -81,8 +81,8 @@ export function assertFrontendPortMatchesPackageJson(packageJsonText: string): t
 	if (!packageJsonText.includes(expected)) {
 		throw new Error(
 			`frontend/package.json does not reference the canonical dev port. ` +
-			`Expected the substring '${expected}' in scripts.dev; update package.json ` +
-			`or scripts/dev-ports.ts so the two match.`
+				`Expected the substring '${expected}' in scripts.dev; update package.json ` +
+				`or scripts/dev-ports.ts so the two match.`
 		);
 	}
 	return true;

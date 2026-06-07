@@ -10,21 +10,25 @@ on:
     branches: [development, main]
     paths:
       - 'frontend/**'
+      - 'backend-ts/**'
       - 'scripts/check-file-lines.mjs'
       - 'scripts/check-nesting.mjs'
       - 'biome.json'
       - 'package.json'
       - 'bun.lock'
+      - 'backend-ts/bun.lock'
       - '.github/workflows/check.yml'
   push:
     branches: [development, main]
     paths:
       - 'frontend/**'
+      - 'backend-ts/**'
       - 'scripts/check-file-lines.mjs'
       - 'scripts/check-nesting.mjs'
       - 'biome.json'
       - 'package.json'
       - 'bun.lock'
+      - 'backend-ts/bun.lock'
       - '.github/workflows/check.yml'
 
 permissions:
@@ -70,7 +74,7 @@ jobs:
         working-directory: frontend
         run: bun run generate:docs
 
-      - name: Run check (Biome + TypeScript + file-lines)
+      - name: Run check (Biome + TypeScript + file-lines + nesting)
         id: check
         working-directory: frontend
         run: |
@@ -83,6 +87,9 @@ jobs:
             echo 'EOF'
           } >> "$GITHUB_OUTPUT"
           exit "$status"
+
+      - name: Run backend-ts typecheck
+        run: cd backend-ts && bun run typecheck
 
       - name: Comment PR on failure
         if: failure() && github.event_name == 'pull_request'
@@ -98,7 +105,7 @@ jobs:
               'One of the gates in `frontend/package.json`\'s `check` script reported errors:',
               '',
               '- **Biome** — lint or format violations',
-              '- **TypeScript** — `tsc --noEmit` type errors',
+              '- **TypeScript** — `tsc --noEmit` type errors (frontend + backend-ts)',
               '- **File-lines** — `node scripts/check-file-lines.mjs` 500-line budget overflow',
               '- **Nesting** — `node scripts/check-nesting.mjs` depth-3 budget overflow',
               '',

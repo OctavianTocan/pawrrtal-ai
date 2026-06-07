@@ -56,7 +56,7 @@ const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), 
 const MAX_DEPTH = Number.parseInt(process.env.MAX_DEPTH ?? '3', 10);
 
 /** Roots we scan. Add new top-level source trees here. */
-const SCAN_ROOTS = ['frontend'];
+const SCAN_ROOTS = ['frontend', 'backend-ts'];
 
 /** Directory names we never descend into. */
 const SKIP_DIRECTORIES = new Set([
@@ -260,14 +260,12 @@ async function main() {
 	}
 
 	if (all.length === 0) {
-		console.log(`check-nesting (frontend): OK (no functions exceed depth ${MAX_DEPTH})`);
+		console.log(`check-nesting: OK (no functions exceed depth ${MAX_DEPTH})`);
 		return;
 	}
 
 	all.sort((a, b) => b.deepest - a.deepest || a.path.localeCompare(b.path) || a.line - b.line);
-	console.error(
-		`check-nesting (frontend): ${all.length} function(s) exceed depth ${MAX_DEPTH}:\n`
-	);
+	console.error(`check-nesting: ${all.length} function(s) exceed depth ${MAX_DEPTH}:\n`);
 	for (const o of all) {
 		console.error(`  depth=${o.deepest}  ${o.path}:${o.line}  in ${o.name}()`);
 	}
