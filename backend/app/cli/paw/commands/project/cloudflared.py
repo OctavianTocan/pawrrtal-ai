@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-import contextlib
 import json
 import re
 import shutil
 import subprocess
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from urllib.parse import urlparse
@@ -15,46 +14,33 @@ from urllib.parse import urlparse
 import httpx
 import typer
 
+from app.cli.paw.commands.project.cloudflared_state import (
+    CLOUDFLARED_STATE_SCHEMA_VERSION,
+    CloudflaredState,
+    delete_state,
+    load_state,
+    save_state,
+)
 from app.cli.paw.commands.project.state import (
     DEFAULT_BACKEND_URL,
     HEALTH_PROBE_TIMEOUT_S,
     SERVER_ERROR_STATUS,
-    service_state_path,
 )
 from app.cli.paw.errors import LocalError
 from app.cli.paw.output import emit_human, emit_json, emit_plain_rows, require_one_output_mode
 
 app = typer.Typer(no_args_is_help=True)
 
-CLOUDFLARED_PROFILE = "cloudflared"
 CLOUDFLARED_SERVICE = "cloudflared"
 DEFAULT_TUNNEL_NAME = "pawrrtal"
 DEFAULT_CONFIG_PATH = Path("/etc/cloudflared/config.yml")
 DEFAULT_METRICS_ADDRESS = "127.0.0.1:20241"
 DEFAULT_TUNNEL_FRONTEND_ORIGIN = "http://127.0.0.1:3000"
-CLOUDFLARED_STATE_SCHEMA_VERSION = 1
 HOSTNAME_RE = re.compile(
     r"^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$"
 )
 SENSITIVE_OUTPUT_MARKERS = ("token", "secret", "origin cert", "cert.pem", "tunnel credentials")
 MAX_SAFE_OUTPUT_LINES = 3
-
-
-@dataclass(slots=True)
-class CloudflaredState:
-    """Persisted state for the Pawrrtal Cloudflared tunnel."""
-
-    schema_version: int
-    tunnel_name: str
-    tunnel_id: str
-    hostname: str
-    public_url: str
-    config_path: str
-    credentials_file: str
-    frontend_origin: str
-    backend_origin: str
-    metrics: str
-    installed_at: str
 
 
 @dataclass(slots=True)
@@ -65,10 +51,6 @@ class PublicAccessProbe:
     status_code: int
     location: str
     access_required: bool
-
-
-def _state_path() -> Path:
-    return service_state_path(CLOUDFLARED_PROFILE)
 
 
 def _run(args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -258,41 +240,6 @@ def _install_service(config_path: Path) -> None:
     _systemctl("enable", "--now", CLOUDFLARED_SERVICE)
 
 
-def _save_state(state: CloudflaredState) -> None:
-    path = _state_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(asdict(state), indent=2, sort_keys=True))
-
-
-def _load_state() -> CloudflaredState | None:
-    """Load Cloudflared deployment state, returning ``None`` when absent."""
-    path = _state_path()
-    if not path.exists():
-        return None
-    try:
-        raw = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
-        return None
-    return CloudflaredState(
-        schema_version=int(raw.get("schema_version", CLOUDFLARED_STATE_SCHEMA_VERSION)),
-        tunnel_name=str(raw["tunnel_name"]),
-        tunnel_id=str(raw["tunnel_id"]),
-        hostname=str(raw["hostname"]),
-        public_url=str(raw["public_url"]),
-        config_path=str(raw["config_path"]),
-        credentials_file=str(raw["credentials_file"]),
-        frontend_origin=str(raw["frontend_origin"]),
-        backend_origin=str(raw["backend_origin"]),
-        metrics=str(raw["metrics"]),
-        installed_at=str(raw["installed_at"]),
-    )
-
-
-def _delete_state() -> None:
-    with contextlib.suppress(FileNotFoundError):
-        _state_path().unlink()
-
-
 def _public_access_probe(hostname: str) -> PublicAccessProbe:
     url = f"https://{hostname}/"
     try:
@@ -345,7 +292,7 @@ def _path_exists(path: Path) -> bool:
 
 
 def _status_payload(config_path: Path | None) -> dict[str, object]:
-    state = _load_state()
+    state = load_state()
     resolved_config_path = _resolve_status_config_path(
         requested_config_path=config_path,
         state=state,
@@ -429,7 +376,7 @@ def install(
     _validate_ingress(config_path)
     _cloudflared("tunnel", "route", "dns", tunnel_name, host)
     _install_service(config_path)
-    _save_state(
+    save_state(
         CloudflaredState(
             schema_version=CLOUDFLARED_STATE_SCHEMA_VERSION,
             tunnel_name=tunnel_name,
@@ -465,7 +412,7 @@ def verify(
     json_out: bool = typer.Option(False, "--json", help="Emit JSON."),
 ) -> None:
     """Verify local origins, Cloudflared config, service state, and Access."""
-    state = _load_state()
+    state = load_state()
     host = _normalize_hostname(hostname or (state.hostname if state else ""))
     _require_binary("cloudflared")
     _validate_origins(frontend_origin, backend_origin)
@@ -513,12 +460,12 @@ def uninstall(
     keep_config: bool = typer.Option(False, "--keep-config", help="Leave config and credentials."),
 ) -> None:
     """Disable Cloudflared and remove Pawrrtal-managed files."""
-    state = _load_state()
+    state = load_state()
     _systemctl("disable", "--now", CLOUDFLARED_SERVICE, check=False)
     _cloudflared("service", "uninstall", check=False)
     if not keep_config:
         config_path.unlink(missing_ok=True)
         if state is not None:
             Path(state.credentials_file).unlink(missing_ok=True)
-    _delete_state()
+    delete_state()
     emit_human("removed Cloudflared Pawrrtal service")
