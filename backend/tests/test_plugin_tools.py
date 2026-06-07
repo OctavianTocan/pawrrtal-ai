@@ -9,7 +9,11 @@ from pathlib import Path
 
 from app.agents.tool_surface import build_agent_tools
 from app.infrastructure.keys import save_workspace_env
+from app.plugins.adapters.tools import build_snapshot_agent_tools
+from app.plugins.discovery import PluginRoot, discover_plugins
+from app.plugins.registry import build_registry_snapshot
 from app.plugins.state import PluginState, plugin_state_path, save_plugin_state
+from app.plugins.tool_context import ToolContext
 
 
 def _write_cli_plugin(
@@ -57,6 +61,34 @@ def _write_cli_plugin(
         ),
         PluginState(enabled=enabled),
     )
+
+
+def _write_python_tool_plugin(root: Path) -> None:
+    """Write a non-bundled Python tool plugin for trust-boundary tests."""
+    plugin_dir = root / "global_tasks"
+    plugin_dir.mkdir(parents=True)
+    payload = {
+        "schema_version": 1,
+        "id": "global_tasks",
+        "name": "Global Tasks",
+        "version": "1.0.0",
+        "enabled_by_default": True,
+        "description": "Global Python plugin that must not be imported by runtime tests.",
+        "permissions": ["filesystem_write"],
+        "capabilities": [
+            {
+                "type": "python_tool",
+                "id": "global_add_task",
+                "tool_name": "add_task",
+                "title": "Global Add Task",
+                "description": "Attempt to expose a Python task tool from a global plugin.",
+                "exposure": "direct_and_catalog",
+                "permissions": ["filesystem_write"],
+                "entrypoint": "app.plugins.tasks.tools:make_add_task_tool",
+            }
+        ],
+    }
+    (plugin_dir / "plugin.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
 def _tool_names(workspace_root: Path) -> set[str]:
@@ -118,3 +150,42 @@ def test_bundled_notion_manifest_exposes_tool_when_enabled_and_configured(
     )
 
     assert "notion_cli" in _tool_names(tmp_path)
+
+
+def test_bundled_tasks_manifest_exposes_task_tools(tmp_path: Path) -> None:
+    names = _tool_names(tmp_path)
+
+    assert {"add_task", "list_tasks", "complete_task"} <= names
+
+
+def test_bundled_tasks_plugin_can_be_disabled(tmp_path: Path) -> None:
+    save_plugin_state(
+        plugin_state_path(plugin_id="tasks", scope="workspace", workspace_root=tmp_path),
+        PluginState(enabled=False),
+    )
+
+    names = _tool_names(tmp_path)
+
+    assert "add_task" not in names
+    assert "list_tasks" not in names
+    assert "complete_task" not in names
+
+
+def test_non_bundled_python_tool_manifest_is_not_imported(tmp_path: Path) -> None:
+    global_root = tmp_path / "global-plugins"
+    workspace_root = tmp_path / "workspace"
+    _write_python_tool_plugin(global_root)
+    discovered = discover_plugins((PluginRoot("global", global_root),))
+    snapshot = build_registry_snapshot(discovered, workspace_root=workspace_root)
+
+    tools = build_snapshot_agent_tools(
+        snapshot=snapshot,
+        workspace_root=workspace_root,
+        tool_context=ToolContext(
+            workspace_id=uuid.uuid4(),
+            workspace_root=workspace_root,
+            user_id=uuid.uuid4(),
+        ),
+    )
+
+    assert "add_task" not in {tool.name for tool in tools}

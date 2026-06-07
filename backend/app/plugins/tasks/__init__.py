@@ -1,0 +1,1 @@
+"""Bundled task-management plugin."""

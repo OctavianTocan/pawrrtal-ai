@@ -99,11 +99,43 @@ new plugins do not need frontend/backend allowlist edits.
 Required env keys gate plugin activation. A plugin with missing required env is
 inspectable, but its direct capabilities are not exposed until configured.
 
+## Bundled Python Tools
+
+`python_tool` capabilities are bundled-only. They import first-party Python
+factories and receive `ToolContext`, so they must live in `backend/plugins` and
+point at code under `backend/app/plugins`. Workspace and global plugins should
+use `cli_tool` unless the host grows a narrower trust boundary for them.
+
+The bundled Tasks plugin is the template:
+
+```json
+{
+  "type": "python_tool",
+  "id": "add_task",
+  "tool_name": "add_task",
+  "title": "Add Task",
+  "description": "Append a new task to the workspace TASKS.md file.",
+  "slots": ["tasks"],
+  "exposure": "direct_and_catalog",
+  "permissions": ["filesystem_write"],
+  "entrypoint": "app.plugins.tasks.tools:make_add_task_tool"
+}
+```
+
+The factory signature is:
+
+```python
+def make_add_task_tool(ctx: ToolContext) -> AgentTool: ...
+```
+
+The returned `AgentTool.name` must match `tool_name`; mismatches are logged and
+omitted from the direct tool list.
+
 ## Trusted Runtime Capabilities
 
-Capabilities that import Python code, such as `turn_context_provider`,
-`provider`, `channel`, `router`, and `scheduler`, are trusted adapters. They are
-allowed from bundled and global plugin roots, not workspace roots.
+Runtime capabilities such as `turn_context_provider`, `provider`, `channel`,
+`router`, and `scheduler` are trusted adapters. They are allowed from bundled
+and global plugin roots, not workspace roots.
 
 Active Recall is the first bundled `turn_context_provider`:
 
@@ -181,6 +213,7 @@ can inspect all of them.
 Use these focused tests as examples:
 
 - `backend/tests/test_plugin_tools.py` covers direct CLI tool exposure and hot reload.
+- `backend/tests/test_plugin_tools.py` covers bundled Python tools and the non-bundled Python trust boundary.
 - `backend/tests/test_plugin_catalog_tool.py` covers the agent-facing capability search tool.
 - `backend/tests/test_turn_context_plugins.py` covers Active Recall as a manifest-backed context provider.
 - `backend/tests/test_workspace_env_api.py` covers plugin-declared workspace env overrides.

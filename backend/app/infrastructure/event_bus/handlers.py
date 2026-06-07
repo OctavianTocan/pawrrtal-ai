@@ -385,10 +385,11 @@ async def _run_agent_turn(*, prompt: str, user_id: uuid.UUID) -> str:
         build_agent_tools(
             workspace_root=workspace_root,
             user_id=user_id,
+            workspace_id=workspace.id,
             send_fn=None,
             surface="webhook",
         )
-        if workspace_root is not None
+        if workspace is not None and workspace_root is not None
         else []
     )
 

@@ -37,6 +37,7 @@ from app.infrastructure.keys import resolve_api_key
 from app.plugins.adapters.tools import build_snapshot_agent_tools
 from app.plugins.errors import PluginError
 from app.plugins.host import get_plugin_host
+from app.plugins.tool_context import ToolContext
 from app.providers.catalog import first_authenticated_catalog_model
 from app.tools.artifact_agent import make_artifact_tool
 from app.tools.exa_search_agent import make_exa_search_tool
@@ -51,11 +52,8 @@ from app.tools.lcm_agents import (
 from app.tools.markitdown_convert import make_markitdown_tool
 from app.tools.now import (
     build_external_mcp_tools,
-    make_add_task_tool,
-    make_complete_task_tool,
     make_invoke_skill_tool,
     make_list_skills_tool,
-    make_list_tasks_tool,
     make_now_tool,
     make_read_skill_tool,
     make_reminder_cancel_tool,
@@ -191,14 +189,6 @@ def build_agent_tools(
     # at turn start, the tool covers long-running multi-step turns.
     tools.append(make_now_tool())
 
-    # TASKS.md (#311 v1).  Three tiny tools that read/write the
-    # per-workspace task list.  Imported off ``now`` to keep this
-    # module under sentrux's ``no_god_files`` fan-out budget; the
-    # implementations live in ``app.tools.tasks_md``.
-    tools.append(make_add_task_tool(workspace_root=workspace_root))
-    tools.append(make_list_tasks_tool(workspace_root=workspace_root))
-    tools.append(make_complete_task_tool(workspace_root=workspace_root))
-
     # Skill discovery + invocation (#315).  Always present so the
     # Paw can reason about which skills the workspace exposes; the
     # tools themselves do no work when the workspace has no
@@ -292,6 +282,7 @@ def build_agent_tools(
             workspace_root=workspace_root,
             user_id=user_id,
             workspace_id=workspace_id,
+            send_fn=send_fn,
         )
     )
 
@@ -310,6 +301,7 @@ def _build_plugin_tools(
     workspace_root: Path,
     user_id: uuid.UUID | None,
     workspace_id: uuid.UUID | None,
+    send_fn: SendFn | None,
 ) -> list[AgentTool]:
     """Build every active manifest-backed plugin tool.
 
@@ -320,14 +312,30 @@ def _build_plugin_tools(
     """
     if workspace_id is None or user_id is None:
         return []
-    return _build_manifest_plugin_tools(workspace_root=workspace_root)
+    return _build_manifest_plugin_tools(
+        workspace_root=workspace_root,
+        tool_context=ToolContext(
+            workspace_id=workspace_id,
+            workspace_root=workspace_root,
+            user_id=user_id,
+            send_fn=send_fn,
+        ),
+    )
 
 
-def _build_manifest_plugin_tools(*, workspace_root: Path) -> list[AgentTool]:
+def _build_manifest_plugin_tools(
+    *,
+    workspace_root: Path,
+    tool_context: ToolContext,
+) -> list[AgentTool]:
     """Build dynamic manifest-backed plugin tools for one workspace."""
     try:
         _previous, snapshot = get_plugin_host().reload(workspace_root=workspace_root)
     except PluginError as exc:
         log.warning("manifest plugin reload failed during tool composition: %s", exc)
         return []
-    return build_snapshot_agent_tools(snapshot=snapshot, workspace_root=workspace_root)
+    return build_snapshot_agent_tools(
+        snapshot=snapshot,
+        workspace_root=workspace_root,
+        tool_context=tool_context,
+    )

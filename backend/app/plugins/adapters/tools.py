@@ -2,24 +2,34 @@
 
 from __future__ import annotations
 
+import importlib
 import json
+import logging
+from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from app.agents.types import AgentTool
 from app.plugins.cli_runner import CliRunRequest, CliRunResult, run_cli_plugin
-from app.plugins.contributions import CliToolCapability
+from app.plugins.contributions import Capability, CliToolCapability, PythonToolCapability
 from app.plugins.discovery import DiscoveredPlugin
 from app.plugins.env import resolve_plugin_env
-from app.plugins.registry import ContributionRegistrySnapshot
+from app.plugins.errors import PluginRuntimeError
+from app.plugins.registry import ContributionRegistrySnapshot, PluginLoadOutcome
+from app.plugins.tool_context import ToolContext
+
+logger = logging.getLogger(__name__)
+
+PythonToolFactory = Callable[[ToolContext], AgentTool]
 
 
 def build_snapshot_agent_tools(
     *,
     snapshot: ContributionRegistrySnapshot,
     workspace_root: Path,
+    tool_context: ToolContext | None = None,
 ) -> list[AgentTool]:
-    """Build direct AgentTool objects from active CLI plugin capabilities."""
+    """Build direct AgentTool objects from active plugin tool capabilities."""
     discovered_by_id = {
         outcome.plugin_id: outcome for outcome in snapshot.outcomes if outcome.active
     }
@@ -29,27 +39,50 @@ def build_snapshot_agent_tools(
         if manifest is None:
             continue
         for capability in manifest.capabilities:
-            if not isinstance(capability, CliToolCapability):
-                continue
-            if capability.exposure not in {"direct", "direct_and_catalog"}:
-                continue
-            if not outcome.state.is_capability_enabled(capability.id):
-                continue
-            tools.append(
-                _build_cli_agent_tool(
-                    plugin=DiscoveredPlugin(
-                        plugin_id=outcome.plugin_id,
-                        source_type=outcome.source_type,
-                        plugin_dir=outcome.manifest_path.parent,
-                        manifest_path=outcome.manifest_path,
-                        manifest=manifest,
-                        fingerprint=outcome.fingerprint,
-                    ),
-                    capability=capability,
-                    workspace_root=workspace_root,
-                )
+            tool = _build_agent_tool_for_capability(
+                outcome=outcome,
+                capability=capability,
+                workspace_root=workspace_root,
+                tool_context=tool_context,
             )
+            if tool is not None:
+                tools.append(tool)
     return tools
+
+
+def _build_agent_tool_for_capability(
+    *,
+    outcome: PluginLoadOutcome,
+    capability: Capability,
+    workspace_root: Path,
+    tool_context: ToolContext | None,
+) -> AgentTool | None:
+    """Build one direct tool capability from a plugin outcome."""
+    if not outcome.state.is_capability_enabled(capability.id):
+        return None
+    if isinstance(capability, CliToolCapability):
+        if capability.exposure not in {"direct", "direct_and_catalog"}:
+            return None
+        return _build_cli_agent_tool(
+            plugin=DiscoveredPlugin(
+                plugin_id=outcome.plugin_id,
+                source_type=outcome.source_type,
+                plugin_dir=outcome.manifest_path.parent,
+                manifest_path=outcome.manifest_path,
+                manifest=outcome.manifest,
+                fingerprint=outcome.fingerprint,
+            ),
+            capability=capability,
+            workspace_root=workspace_root,
+        )
+    if isinstance(capability, PythonToolCapability) and tool_context is not None:
+        return _build_python_agent_tool(
+            plugin_id=outcome.plugin_id,
+            source_type=outcome.source_type,
+            capability=capability,
+            tool_context=tool_context,
+        )
+    return None
 
 
 def _build_cli_agent_tool(
@@ -59,6 +92,8 @@ def _build_cli_agent_tool(
     workspace_root: Path,
 ) -> AgentTool:
     """Build one AgentTool from a CLI capability."""
+    if capability.exposure not in {"direct", "direct_and_catalog"}:
+        raise ValueError("CLI AgentTool requires direct exposure")
     manifest = plugin.manifest
     if manifest is None:
         raise ValueError("CLI AgentTool requires a valid plugin manifest")
@@ -93,6 +128,61 @@ def _build_cli_agent_tool(
         parameters=capability.args_schema or _default_parameters(),
         execute=execute,
     )
+
+
+def _build_python_agent_tool(
+    *,
+    plugin_id: str,
+    source_type: str,
+    capability: PythonToolCapability,
+    tool_context: ToolContext,
+) -> AgentTool | None:
+    """Build one trusted Python AgentTool from a bundled manifest capability."""
+    if capability.exposure not in {"direct", "direct_and_catalog"}:
+        return None
+    if source_type != "bundled":
+        logger.warning(
+            "python tool plugin skipped plugin_id=%s capability_id=%s source_type=%s",
+            plugin_id,
+            capability.id,
+            source_type,
+        )
+        return None
+    try:
+        factory = load_python_tool_factory(capability.entrypoint)
+        tool = factory(tool_context)
+    except PluginRuntimeError as exc:
+        logger.warning(
+            "python tool plugin load failed plugin_id=%s capability_id=%s error=%s",
+            plugin_id,
+            capability.id,
+            exc,
+        )
+        return None
+    if tool.name != capability.tool_name:
+        logger.warning(
+            "python tool plugin skipped plugin_id=%s capability_id=%s reason=tool_name_mismatch",
+            plugin_id,
+            capability.id,
+        )
+        return None
+    return tool
+
+
+def load_python_tool_factory(entrypoint: str) -> PythonToolFactory:
+    """Load a trusted Python tool factory from ``module:attribute``."""
+    module_name, separator, attribute_path = entrypoint.partition(":")
+    if not separator or not module_name or not attribute_path:
+        raise PluginRuntimeError("python_tool entrypoint must use 'module:attribute' syntax")
+    try:
+        target: Any = importlib.import_module(module_name)
+        for attribute in attribute_path.split("."):
+            target = getattr(target, attribute)
+    except (ImportError, AttributeError) as exc:
+        raise PluginRuntimeError(f"could not load python tool factory {entrypoint!r}") from exc
+    if not callable(target):
+        raise PluginRuntimeError(f"python tool factory {entrypoint!r} is not callable")
+    return cast(PythonToolFactory, target)
 
 
 def _materialize_env(*, workspace_root: Path, plugin: DiscoveredPlugin) -> dict[str, str]:

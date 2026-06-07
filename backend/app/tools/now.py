@@ -30,11 +30,6 @@ from app.tools.cron_tools import (
 from app.tools.cron_tools import (
     make_reminder_list_tool as make_reminder_list_tool,  # noqa: PLC0414
 )
-
-# Re-export the TASKS.md tools (#311 v1) through this module so
-# ``agent_tools.py`` can import them off ``now`` and stay under
-# sentrux's ``no_god_files`` fan-out ceiling. The aggregation is
-# purely organisational; the implementations live in ``tasks_md.py``.
 from app.tools.cron_tools import (
     make_reminder_schedule_tool as make_reminder_schedule_tool,  # noqa: PLC0414
 )
@@ -58,11 +53,6 @@ from app.tools.skill_invocation import (
 from app.tools.skill_invocation import (
     make_read_skill_tool as make_read_skill_tool,  # noqa: PLC0414
 )
-from app.tools.tasks_md import make_add_task_tool as make_add_task_tool  # noqa: PLC0414
-from app.tools.tasks_md import (
-    make_complete_task_tool as make_complete_task_tool,  # noqa: PLC0414
-)
-from app.tools.tasks_md import make_list_tasks_tool as make_list_tasks_tool  # noqa: PLC0414
 
 log = logging.getLogger(__name__)
 
