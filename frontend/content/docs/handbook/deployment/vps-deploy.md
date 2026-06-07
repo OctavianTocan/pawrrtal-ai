@@ -83,7 +83,7 @@ email allow policy.
 
 Backend secrets live in `backend/.env`. Minimum useful private setup:
 
-```env
+```bash
 ENV=prod
 AUTH_SECRET=<high entropy secret>
 WORKSPACE_ENCRYPTION_KEY=<fernet key>
@@ -103,7 +103,7 @@ caller can inject `X-Pawrrtal-Key`.
 
 Frontend server-side calls use:
 
-```env
+```bash
 BACKEND_INTERNAL_URL=http://127.0.0.1:8000
 ```
 
