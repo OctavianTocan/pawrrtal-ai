@@ -20,7 +20,7 @@ export function updateLastAssistantMessage(
 ): Array<ChatMessage> {
 	const lastIndex = messages.length - 1;
 	const last = messages[lastIndex];
-	if (!last || last.role !== 'assistant') return messages;
+	if (last?.role !== 'assistant') return messages;
 
 	const updated = [...messages];
 	updated[lastIndex] = update(last);

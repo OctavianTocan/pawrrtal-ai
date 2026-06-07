@@ -36,7 +36,6 @@ export function LoginForm({
 	postLoginTarget = '/',
 	...props
 }: LoginFormProps): React.JSX.Element {
-	// Destructure onSubmit from rest to avoid conflict with our custom onSubmit prop.
 	const { onSubmit: _nativeOnSubmit, ...divProps } = props;
 	const formId = useId();
 	const emailId = `${formId}-email`;
@@ -51,10 +50,6 @@ export function LoginForm({
 
 	const isLoading = loginMutation.isPending || devLoginMutation.isPending;
 
-	/**
-	 * Maps browser-specific fetch failures to a clearer backend-unreachable message,
-	 * while preserving any other surfaced error text.
-	 */
 	const setFriendlyNetworkError = (error: unknown): void => {
 		if (!(error instanceof Error)) {
 			return;
@@ -71,12 +66,9 @@ export function LoginForm({
 		}
 	};
 
-	// Prefer the local (network) error if the service failed to be reached entirely,
-	// otherwise show the specific API error from React Query.
 	const currentError =
 		localErrorMessage || loginMutation.error?.message || devLoginMutation.error?.message || '';
 
-	/** Form submit handler — prevents default page refresh. */
 	const handleSubmit = async (event: React.FormEvent<HTMLFormElement>): Promise<void> => {
 		event.preventDefault();
 		setLocalErrorMessage('');
@@ -91,7 +83,6 @@ export function LoginForm({
 		}
 	};
 
-	/** Calls a backend-only shortcut that logs in with the seeded admin account. */
 	const handleDevAdminLogin = async (): Promise<void> => {
 		setLocalErrorMessage('');
 		loginMutation.reset();

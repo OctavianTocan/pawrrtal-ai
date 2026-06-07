@@ -16,13 +16,15 @@
 		"themes:build": "bun run scripts/build-themes.ts"
 	},
 	"devDependencies": {
-		"@google/design.md": "^0.1.1",
-		"@tanstack/react-query-devtools": "^5.100.9",
-		"@types/bun": "latest",
-		"mcporter": "^0.11.1"
+		"@google/design.md": "^0.2.0",
+		"@tanstack/react-query-devtools": "^5.101.0",
+		"@types/bun": "^1.3.14",
+		"@types/react": "19.2.17",
+		"@types/react-dom": "^19.2.3",
+		"mcporter": "^0.11.3"
 	},
 	"peerDependencies": {
-		"typescript": "^5.9.3"
+		"typescript": "^6.0.3"
 	},
 	"workspaces": [
 		"frontend",
@@ -31,7 +33,7 @@
 		"frontend/lib/react-chat-composer"
 	],
 	"overrides": {
-		"react": "19.2.6",
-		"react-dom": "19.2.6"
+		"react": "19.2.7",
+		"react-dom": "19.2.7"
 	}
 }

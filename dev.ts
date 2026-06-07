@@ -1,8 +1,8 @@
 /**
  * Dev orchestrator: runs the Next.js frontend and FastAPI backend side-by-side
  * on plain localhost. Frontend / backend ports come from `scripts/dev-ports.ts`,
- * the single source of truth shared with the frontend's package.json `dev`
- * script. No proxies, no HTTPS, no special routing — just the two processes.
+ * the source of truth shared with the frontend's package.json `dev` script.
+ * Next rewrites same-origin backend paths to FastAPI in local dev.
  */
 import { type ChildProcess, spawn } from 'node:child_process';
 import { mkdir } from 'node:fs/promises';
@@ -70,13 +70,8 @@ async function assertPortAvailable(port: number, host: string): Promise<void> {
 await assertPortAvailable(DEV_FRONTEND_PORT, DEV_FRONTEND_BIND_HOST);
 await assertPortAvailable(DEV_BACKEND_PORT, '127.0.0.1');
 
-// Clear Next.js dev lock to avoid the "Unable to acquire lock" error on restart.
 await $`rm -rf frontend/.next/dev/lock`.quiet().nothrow();
 
-// Scope the implicit SQLite database to the current git branch. Honour an
-// existing `SQLITE_DB_FILENAME` override (one-off experiments). Local dev
-// defaults to SQLite even when the shell exports a global DATABASE_URL; set
-// PAWRRTAL_DEV_DATABASE_URL to opt into a non-SQLite dev database.
 if (!process.env.SQLITE_DB_FILENAME) {
 	const branchDbFilename = await sqliteDbFilenameForBranch();
 	if (branchDbFilename) {

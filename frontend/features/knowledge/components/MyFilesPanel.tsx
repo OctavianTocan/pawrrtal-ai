@@ -67,7 +67,7 @@ export function MyFilesPanel({
 		console.info('[knowledge] file row action', { action, name });
 	}, []);
 
-	if (!currentNode || currentNode.kind !== 'folder') {
+	if (currentNode?.kind !== 'folder') {
 		return (
 			<div className="flex h-full flex-col">
 				<div className="flex h-12 items-center justify-between gap-2 px-3">
