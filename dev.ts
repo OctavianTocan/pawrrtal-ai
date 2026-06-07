@@ -12,6 +12,7 @@ import { $ } from 'bun';
 import {
 	DEV_BACKEND_PORT,
 	DEV_BACKEND_URL,
+	DEV_FRONTEND_BIND_HOST,
 	DEV_FRONTEND_PORT,
 	DEV_FRONTEND_URL,
 } from './scripts/dev-ports';
@@ -67,7 +68,7 @@ async function assertPortAvailable(port: number, host: string): Promise<void> {
 	});
 }
 
-await assertPortAvailable(DEV_FRONTEND_PORT, '::');
+await assertPortAvailable(DEV_FRONTEND_PORT, DEV_FRONTEND_BIND_HOST);
 await assertPortAvailable(DEV_BACKEND_PORT, '127.0.0.1');
 
 // Clear Next.js dev lock to avoid the "Unable to acquire lock" error on restart.
