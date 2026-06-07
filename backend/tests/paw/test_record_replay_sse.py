@@ -25,6 +25,7 @@ from app.cli.paw.main import app
 MOCK_BACKEND = "http://test-backend"
 NEW_UUID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 EXPECTED_FRAME_COUNT = 4
+DEFAULT_MODEL = "litellm:openai/gpt-4o-mini"
 
 
 def _seed_persona(profile: str = "default") -> PersonaState:
@@ -62,6 +63,11 @@ def _conversation_payload(conversation_id: str, **overrides: Any) -> dict[str, A
     }
     base.update(overrides)
     return base
+
+
+def _models_payload() -> dict[str, Any]:
+    """Minimal model catalog payload used by CLI quick-start defaults."""
+    return {"models": [{"model_id": DEFAULT_MODEL}]}
 
 
 SSE_BODY = (
@@ -124,6 +130,7 @@ def test_record_captures_one_jsonl_row_per_sse_frame(
     _seed_persona()
     fixture = tmp_path / "chat_stream.jsonl"
     with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
+        r.get("/api/v1/models").mock(return_value=httpx.Response(200, json=_models_payload()))
         r.post(f"/api/v1/conversations/{stable_uuid}").mock(
             return_value=httpx.Response(200, json=_conversation_payload(stable_uuid))
         )
@@ -194,6 +201,7 @@ def test_replay_reconstructs_sse_stream_from_fixture(
 
     # First, record into the fixture.
     with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
+        r.get("/api/v1/models").mock(return_value=httpx.Response(200, json=_models_payload()))
         r.post(f"/api/v1/conversations/{stable_uuid}").mock(
             return_value=httpx.Response(200, json=_conversation_payload(stable_uuid))
         )
