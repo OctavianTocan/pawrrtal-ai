@@ -52,25 +52,29 @@ def _patch_github(
     return patch.object(httpx.AsyncClient, "post", mock_post)
 
 
-def _patch_token(token: str | None = FAKE_TOKEN) -> Any:
-    """Patch resolve_api_key to return the given token."""
+def _patch_github_env(
+    *,
+    token: str | None = FAKE_TOKEN,
+    repo: str | None = FAKE_REPO,
+) -> Any:
+    """Patch GitHub env resolution for the issue-reporting tool."""
+
+    def resolve(_workspace_root: Path, key: str) -> str | None:
+        if key == "GITHUB_TOKEN":
+            return token
+        if key == "GITHUB_ISSUES_REPO":
+            return repo
+        return None
+
     return patch(
         "app.tools.report_issue.resolve_api_key",
-        return_value=token,
-    )
-
-
-def _patch_repo(repo: str = FAKE_REPO) -> Any:
-    """Patch settings.github_issues_repo."""
-    return patch(
-        "app.tools.report_issue.settings",
-        github_issues_repo=repo,
+        side_effect=resolve,
     )
 
 
 async def test_report_issue_creates_github_issue(tmp_path: Path) -> None:
     tool = make_report_issue_tool(workspace_root=tmp_path)
-    with _patch_token(), _patch_repo(), _patch_github() as mock_post:
+    with _patch_github_env(), _patch_github() as mock_post:
         result = await tool.execute(
             "call-1",
             title="Fix login redirect loop",
@@ -95,7 +99,7 @@ async def test_report_issue_creates_github_issue(tmp_path: Path) -> None:
 
 async def test_report_issue_includes_steps_to_reproduce(tmp_path: Path) -> None:
     tool = make_report_issue_tool(workspace_root=tmp_path)
-    with _patch_token(), _patch_repo(), _patch_github() as mock_post:
+    with _patch_github_env(), _patch_github() as mock_post:
         await tool.execute(
             "call-1",
             title="Button unresponsive",
@@ -164,7 +168,7 @@ async def test_report_issue_rejects_invalid_priority(tmp_path: Path) -> None:
 
 async def test_report_issue_handles_missing_token(tmp_path: Path) -> None:
     tool = make_report_issue_tool(workspace_root=tmp_path)
-    with _patch_token(None), _patch_repo():
+    with _patch_github_env(token=None):
         result = await tool.execute(
             "call-1",
             title="Title",
@@ -176,10 +180,24 @@ async def test_report_issue_handles_missing_token(tmp_path: Path) -> None:
     assert "not configured" in result
 
 
+async def test_report_issue_handles_missing_repo(tmp_path: Path) -> None:
+    tool = make_report_issue_tool(workspace_root=tmp_path)
+    with _patch_github_env(repo=None):
+        result = await tool.execute(
+            "call-1",
+            title="Title",
+            body="Body",
+            type="bug",
+            priority="low",
+        )
+    assert "GITHUB_ISSUES_REPO" in result
+    assert "not configured" in result
+
+
 async def test_report_issue_handles_api_error(tmp_path: Path) -> None:
     tool = make_report_issue_tool(workspace_root=tmp_path)
     error_response = _mock_github_response(status_code=422)
-    with _patch_token(), _patch_repo(), _patch_github(error_response):
+    with _patch_github_env(), _patch_github(error_response):
         result = await tool.execute(
             "call-1",
             title="Title",
@@ -194,7 +212,7 @@ async def test_report_issue_handles_api_error(tmp_path: Path) -> None:
 
 async def test_report_issue_maps_type_to_labels(tmp_path: Path) -> None:
     tool = make_report_issue_tool(workspace_root=tmp_path)
-    with _patch_token(), _patch_repo(), _patch_github() as mock_post:
+    with _patch_github_env(), _patch_github() as mock_post:
         await tool.execute(
             "call-1",
             title="Add dark mode",

@@ -155,6 +155,32 @@ def test_bundled_notion_manifest_exposes_tool_when_enabled_and_configured(
     assert "notion_cli" in _tool_names(tmp_path)
 
 
+def test_bundled_github_issues_manifest_is_disabled_by_default(tmp_path: Path) -> None:
+    assert "report_issue" not in _tool_names(tmp_path)
+
+
+def test_bundled_github_issues_manifest_exposes_report_issue_when_configured(
+    tmp_path: Path,
+) -> None:
+    save_workspace_env(tmp_path, {"GITHUB_TOKEN": "secret"})
+    save_plugin_state(
+        plugin_state_path(plugin_id="github_issues", scope="workspace", workspace_root=tmp_path),
+        PluginState(enabled=True),
+    )
+
+    assert "report_issue" in _tool_names(tmp_path)
+
+
+def test_bundled_github_issues_plugin_can_be_disabled(tmp_path: Path) -> None:
+    save_workspace_env(tmp_path, {"GITHUB_TOKEN": "secret"})
+    save_plugin_state(
+        plugin_state_path(plugin_id="github_issues", scope="workspace", workspace_root=tmp_path),
+        PluginState(enabled=False),
+    )
+
+    assert "report_issue" not in _tool_names(tmp_path)
+
+
 def test_bundled_tasks_manifest_exposes_task_tools(tmp_path: Path) -> None:
     names = _tool_names(tmp_path)
 

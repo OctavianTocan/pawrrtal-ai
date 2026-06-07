@@ -31,11 +31,6 @@ from app.tools.external_mcp import (
     build_external_mcp_tools as build_external_mcp_tools,  # noqa: PLC0414
 )
 
-# Re-export for agent_tools — alphabetically after tasks_md.
-from app.tools.report_issue import (
-    make_report_issue_tool as make_report_issue_tool,  # noqa: PLC0414
-)
-
 log = logging.getLogger(__name__)
 
 

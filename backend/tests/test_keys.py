@@ -92,6 +92,20 @@ def test_resolve_api_key_falls_back_to_settings(
     assert keys.resolve_api_key(workspace_root, "EXA_API_KEY") == "from-settings"
 
 
+def test_resolve_github_issues_repo_supports_workspace_override(
+    tmp_workspace_base: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """GitHub Issues plugin can override its target repo per workspace."""
+    monkeypatch.setattr(settings, "github_issues_repo", "octavian/default")
+    workspace_root = tmp_workspace_base / str(uuid4())
+    assert keys.resolve_api_key(workspace_root, "GITHUB_ISSUES_REPO") == "octavian/default"
+
+    keys.save_workspace_env(workspace_root, {"GITHUB_ISSUES_REPO": "octavian/workspace"})
+
+    assert keys.resolve_api_key(workspace_root, "GITHUB_ISSUES_REPO") == "octavian/workspace"
+
+
 def test_resolve_api_key_returns_none_for_unset(
     tmp_workspace_base: Path,
     monkeypatch: pytest.MonkeyPatch,

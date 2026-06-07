@@ -98,6 +98,10 @@ new plugins do not need frontend/backend allowlist edits.
 
 Required env keys gate plugin activation. A plugin with missing required env is
 inspectable, but its direct capabilities are not exposed until configured.
+Optional env keys still appear in workspace settings but do not block
+activation. The bundled `github_issues` plugin uses this shape:
+`GITHUB_TOKEN` is required to expose `report_issue`, while
+`GITHUB_ISSUES_REPO` can override the gateway default per workspace.
 
 ## Bundled Python Tools
 
@@ -146,6 +150,10 @@ The bundled `reminders` plugin is the scheduler-backed Python-tool template. It
 keeps `reminder_schedule`, `reminder_list`, and `reminder_cancel` out of the
 kernel tool builder while still preserving the active conversation id when a
 reminder should target the current chat.
+
+The bundled `github_issues` plugin is the env-gated integration template. It
+declares `report_issue` as a `python_tool` and contributes settings metadata so
+each workspace can bring its own GitHub token and issue target.
 
 ## Trusted Runtime Capabilities
 
@@ -229,7 +237,7 @@ can inspect all of them.
 Use these focused tests as examples:
 
 - `backend/tests/test_plugin_tools.py` covers direct CLI tool exposure and hot reload.
-- `backend/tests/test_plugin_tools.py` covers bundled Python tools, reminder context, and the non-bundled Python trust boundary.
+- `backend/tests/test_plugin_tools.py` covers bundled Python tools, env-gated issue reporting, reminder context, and the non-bundled Python trust boundary.
 - `backend/tests/test_plugin_catalog_tool.py` covers the agent-facing capability search tool.
 - `backend/tests/test_turn_context_plugins.py` covers Active Recall as a manifest-backed context provider.
 - `backend/tests/test_workspace_env_api.py` covers plugin-declared workspace env overrides.

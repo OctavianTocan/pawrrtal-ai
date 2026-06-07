@@ -73,6 +73,13 @@ const KEY_METAS: readonly WorkspaceEnvKeyMeta[] = [
 		url: 'https://platform.openai.com/api-keys',
 	},
 	{
+		key: 'OPENAI_CODEX_OAUTH_TOKEN',
+		label: 'OpenAI Codex OAuth Token',
+		description: 'Enables Codex-backed image generation and other Codex plugin capabilities.',
+		placeholder: 'Your Codex OAuth token',
+		url: 'https://chatgpt.com/codex',
+	},
+	{
 		key: 'NOTION_API_KEY',
 		label: 'Notion API Key',
 		description:
@@ -87,6 +94,21 @@ const KEY_METAS: readonly WorkspaceEnvKeyMeta[] = [
 			'OpenCode Go gateway — open-weight coding models (GLM, Kimi). Get a key from opencode.ai.',
 		placeholder: 'Your OpenCode API key',
 		url: 'https://opencode.ai/docs/zen',
+	},
+	{
+		key: 'GITHUB_TOKEN',
+		label: 'GitHub Token',
+		description: 'Unlocks the GitHub Issues plugin so the agent can report actionable issues.',
+		placeholder: 'github_pat_...',
+		url: 'https://github.com/settings/tokens',
+	},
+	{
+		key: 'GITHUB_ISSUES_REPO',
+		label: 'GitHub Issues Repo',
+		description:
+			'Optional target repository for agent-reported issues. Leave empty to use the gateway default.',
+		placeholder: 'owner/repo',
+		url: 'https://docs.github.com/en/issues',
 	},
 	{
 		key: 'ACTIVE_RECALL_ENABLED',
@@ -108,6 +130,12 @@ const KEY_METAS: readonly WorkspaceEnvKeyMeta[] = [
 		description:
 			'Allow Active Recall to read local workspace files (e.g. TASKS.md) to gather context.',
 		placeholder: 'true',
+	},
+	{
+		key: 'ACTIVE_RECALL_TIMEOUT_S',
+		label: 'Active Recall Timeout',
+		description: 'Maximum seconds the Active Recall plugin may spend searching before a turn.',
+		placeholder: '10',
 	},
 	{
 		key: 'ACTIVE_RECALL_SYSTEM_PROMPT',

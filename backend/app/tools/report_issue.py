@@ -3,7 +3,9 @@
 Gives the agent a way to report bugs, improvements, and feature
 requests it encounters during a conversation. The tool POSTs to the
 GitHub REST API and returns the created issue URL. Capability-gated
-on ``GITHUB_TOKEN`` being configured (workspace or global).
+on ``GITHUB_TOKEN`` being configured (workspace or global). The target
+repository defaults to gateway settings and can be overridden per workspace
+via ``GITHUB_ISSUES_REPO``.
 
 Fields are intentionally minimal — title, body, type, priority, and
 an optional steps-to-reproduce block — so the agent can file quickly
@@ -21,7 +23,6 @@ from typing import Any
 import httpx
 
 from app.agents.types import AgentTool
-from app.infrastructure.config import settings
 from app.infrastructure.keys import resolve_api_key
 from app.tools.display import make_tool_display, truncate_text
 from app.tools.errors import ToolError, ToolErrorCode
@@ -152,7 +153,8 @@ def make_report_issue_tool(*, workspace_root: Path) -> AgentTool:
 
     The tool resolves ``GITHUB_TOKEN`` at call time via
     :func:`resolve_api_key` so it picks up workspace-level overrides.
-    The target repo comes from ``settings.github_issues_repo``.
+    The target repo comes from the workspace ``GITHUB_ISSUES_REPO`` override
+    or ``settings.github_issues_repo``.
     """
 
     async def execute(tool_call_id: str, **kwargs: Any) -> str:
@@ -166,7 +168,7 @@ def make_report_issue_tool(*, workspace_root: Path) -> AgentTool:
             return err.render()
 
         token = resolve_api_key(workspace_root, "GITHUB_TOKEN")
-        repo = settings.github_issues_repo
+        repo = resolve_api_key(workspace_root, "GITHUB_ISSUES_REPO")
         if not token or not repo:
             missing = "GITHUB_TOKEN" if not token else "GITHUB_ISSUES_REPO"
             return ToolError(

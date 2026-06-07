@@ -67,6 +67,7 @@ OVERRIDABLE_KEYS: frozenset[str] = frozenset(
         "NOTION_API_KEY",
         "OPENCODE_API_KEY",
         "GITHUB_TOKEN",
+        "GITHUB_ISSUES_REPO",
         # Active Recall plugin (see backend/app/plugins/active_recall/)
         "ACTIVE_RECALL_ENABLED",
         "ACTIVE_RECALL_MODEL",
@@ -88,6 +89,7 @@ _SETTINGS_ATTR_MAP: dict[str, str] = {
     "OPENAI_API_KEY": "openai_api_key",
     "OPENCODE_API_KEY": "opencode_api_key",
     "GITHUB_TOKEN": "github_token",
+    "GITHUB_ISSUES_REPO": "github_issues_repo",
     # OPENAI_CODEX_OAUTH_TOKEN intentionally absent — workspace-only, no
     # global settings fallback.  resolve_api_key() returns None for keys
     # missing from this map after the workspace lookup fails.

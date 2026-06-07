@@ -53,7 +53,6 @@ from app.tools.markitdown_convert import make_markitdown_tool
 from app.tools.now import (
     build_external_mcp_tools,
     make_now_tool,
-    make_report_issue_tool,
 )
 from app.tools.plugin_catalog import make_search_plugin_capabilities_tool
 from app.tools.send_message import SendFn, make_send_message_tool
@@ -183,12 +182,6 @@ def build_agent_tools(
     tools.append(make_now_tool())
 
     tools.append(make_search_plugin_capabilities_tool(workspace_root=workspace_root))
-
-    # GitHub issue reporting.  Always present — the tool resolves
-    # GITHUB_TOKEN at call time and returns a clear error when the
-    # token is not configured, same pattern as cron tools with a
-    # missing scheduler.
-    tools.append(make_report_issue_tool(workspace_root=workspace_root))
 
     # Channel delivery — present for both web (asyncio-queue SSE drain)
     # and Telegram (MIME-aware bot API calls).  The mechanism differs;
