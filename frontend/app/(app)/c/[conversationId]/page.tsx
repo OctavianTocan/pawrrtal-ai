@@ -2,10 +2,26 @@ import { cookies } from 'next/headers';
 import { notFound, unauthorized } from 'next/navigation';
 import ChatContainer from '@/features/chat/ChatContainer';
 import { API_ENDPOINTS, serverApiFetch } from '@/lib/server-api';
+import type { ChatMessage, Conversation } from '@/lib/types';
 
 /** Route params for `/c/:conversationId`. */
 interface ConversationPageProps {
 	params: Promise<{ conversationId: string }>;
+}
+
+function handleConversationFetchFailure(response: Response, label: string): void {
+	if (response.status === 401) {
+		unauthorized();
+	}
+	if (response.status === 404) {
+		notFound();
+	}
+	if (response.status === 500) {
+		throw new Error('Internal server error');
+	}
+	if (!response.ok) {
+		throw new Error(`Failed to fetch ${label}: ${response.statusText}`);
+	}
 }
 
 /**
@@ -30,35 +46,33 @@ export default async function ConversationPage({ params }: ConversationPageProps
 		headers.set('Cookie', `session_token=${sessionToken.value}`);
 	}
 
-	const response = await serverApiFetch(API_ENDPOINTS.conversations.getMessages(conversationId), {
-		cache: 'no-store',
-		method: 'GET',
-		headers,
-	});
+	const [conversationResponse, messagesResponse] = await Promise.all([
+		serverApiFetch(API_ENDPOINTS.conversations.get(conversationId), {
+			cache: 'no-store',
+			method: 'GET',
+			headers,
+		}),
+		serverApiFetch(API_ENDPOINTS.conversations.getMessages(conversationId), {
+			cache: 'no-store',
+			method: 'GET',
+			headers,
+		}),
+	]);
 
-	// Uses Next.js experimental authInterrupts feature.
-	if (response.status === 401) {
-		unauthorized();
-	}
-	if (response.status === 404) {
-		notFound();
-	}
-	if (response.status === 500) {
-		throw new Error('Internal server error');
-	}
+	handleConversationFetchFailure(conversationResponse, 'conversation metadata');
+	handleConversationFetchFailure(messagesResponse, 'conversation messages');
 
-	// Ensures we catch any other non-OK responses that we didn't explicitly handle above.
-	if (!response.ok) {
-		throw new Error(`Failed to fetch conversation messages: ${response.statusText}`);
-	}
-
-	const messages = await response.json();
+	const [conversation, messages] = await Promise.all([
+		conversationResponse.json() as Promise<Conversation | null>,
+		messagesResponse.json() as Promise<ChatMessage[]>,
+	]);
 
 	return (
 		<ChatContainer
 			key={conversationId}
 			conversationId={conversationId}
 			initialChatHistory={messages}
+			initialModelId={conversation?.model_id ?? null}
 		/>
 	);
 }

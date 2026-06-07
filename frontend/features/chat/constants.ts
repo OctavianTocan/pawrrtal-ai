@@ -47,10 +47,11 @@ export type ChatStorageKey = (typeof CHAT_STORAGE_KEYS)[keyof typeof CHAT_STORAG
 /**
  * Default reasoning level used when nothing is persisted yet.
  *
- * The default model is the FIRST entry the backend catalog returns
- * (`GET /api/v1/models`), resolved in-session and not persisted, so there
- * is no `DEFAULT_CHAT_MODEL_ID` constant or `selectedModelId` storage key
- * here — see `frontend/features/chat/hooks/use-chat-models.ts` and
+ * Fresh conversations start with the FIRST entry the backend catalog returns
+ * (`GET /api/v1/models`). Existing conversations seed from their stored
+ * `model_id`. Neither case uses localStorage, so there is no
+ * `DEFAULT_CHAT_MODEL_ID` constant or `selectedModelId` storage key here —
+ * see `frontend/features/chat/hooks/use-chat-models.ts` and
  * `ChatContainer`'s `useSelectedChatModel`.
  */
 export const DEFAULT_REASONING_LEVEL: ChatReasoningLevel = 'medium';

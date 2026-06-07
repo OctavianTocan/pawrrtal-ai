@@ -169,6 +169,8 @@ export interface Conversation {
 	is_unread: boolean;
 	/** Workflow status tag: 'todo', 'in_progress', 'done', or null. */
 	status: ConversationStatus;
+	/** Canonical model id pinned to this conversation, or null when none is pinned yet. */
+	model_id?: string | null;
 	// Optional sidebar metadata ported from Craft-style session rows.
 	/** Whether the conversation is currently generating a response. */
 	is_processing?: boolean;

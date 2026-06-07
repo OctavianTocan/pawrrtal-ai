@@ -20,31 +20,13 @@ import {
 } from './constants';
 import { type ChatModelOption, useChatModels } from './hooks/use-chat-models';
 import { useChatTurnController } from './hooks/use-chat-turn-controller';
+import { resolveSelectedModelId } from './lib/model-selection';
 
 /** Runtime guard for persisted reasoning levels. */
 function isChatReasoningLevel(value: unknown): value is ChatReasoningLevel {
 	return (
 		typeof value === 'string' && (CHAT_REASONING_LEVELS as readonly string[]).includes(value)
 	);
-}
-
-/**
- * Resolve the model ID to render: prefer the in-session user choice when it
- * still exists in the live catalog; otherwise fall back to the catalog's
- * first entry (the fresh-session default).
- *
- * A stale `userChoice` (e.g. the chosen model dropped out of the catalog
- * after a backend config change) silently falls back to the first model.
- */
-function resolveSelectedModelId(
-	userChoice: string | null,
-	models: readonly ChatModelOption[],
-	defaultEntry: ChatModelOption | null
-): string {
-	if (userChoice !== null && models.some((model): boolean => model.id === userChoice)) {
-		return userChoice;
-	}
-	return defaultEntry?.id ?? '';
 }
 
 /** Return shape for {@link useSelectedChatModel}. */
@@ -77,12 +59,14 @@ interface UseSelectedReasoningResult {
  * Hoists the catalog fetch + in-session selection so {@link ChatContainer}
  * stays under the project's per-function line budget.
  *
- * The product chose "first in list" over "remember last-used": there is no
- * `localStorage` persistence. A fresh session always starts on the catalog's
- * first model (`useChatModels().default`); the user's mid-session choice
- * lives in React state (`userChoice`) and resets to first-in-list on reload.
+ * There is no `localStorage` persistence. Fresh sessions start on the
+ * catalog's first model (`useChatModels().default`), while existing
+ * conversations seed from the model stored on the conversation row.
+ * The user's mid-session choice lives in React state (`userChoice`).
  */
-function useSelectedChatModel(): UseSelectedChatModelResult {
+function useSelectedChatModel(
+	initialModelId: string | null | undefined
+): UseSelectedChatModelResult {
 	const {
 		models,
 		default: defaultModel,
@@ -98,8 +82,14 @@ function useSelectedChatModel(): UseSelectedChatModelResult {
 	const [userChoice, setUserChoice] = useState<string | null>(null);
 
 	const selectedModelId = useMemo(
-		() => resolveSelectedModelId(userChoice, models, defaultModel),
-		[userChoice, models, defaultModel]
+		() =>
+			resolveSelectedModelId({
+				userChoice,
+				initialModelId,
+				models,
+				defaultEntry: defaultModel,
+			}),
+		[userChoice, initialModelId, models, defaultModel]
 	);
 
 	const selectModel = useCallback(
@@ -213,6 +203,8 @@ interface ChatContainerProps {
 	conversationId: string;
 	/** Pre-fetched messages to hydrate the chat on load (e.g. when opening an existing conversation). */
 	initialChatHistory?: Array<ChatMessage>;
+	/** Stored model id for an existing conversation. New conversations leave this unset. */
+	initialModelId?: string | null;
 }
 
 interface ComposerGateArgs {
@@ -271,7 +263,7 @@ function useComposerGate({
  * - Streams assistant responses and accumulates chat history (via {@link useChatTurns}).
  * - Keeps the browser URL and the Next.js router in sync.
  * - Fetches the live model catalog (via {@link useChatModels}) and tracks the
- *   in-session model selection (defaulting to the catalog's first entry).
+ *   in-session model selection (seeded from the conversation row when present).
  *
  * Render logic is delegated to the presentational {@link ChatView}. The
  * composer's textarea value lives here as a plain controlled string —
@@ -283,13 +275,14 @@ function useComposerGate({
 export default function ChatContainer({
 	conversationId,
 	initialChatHistory,
+	initialModelId,
 }: ChatContainerProps): React.JSX.Element | null {
 	const {
 		hasBackendConfig,
 		hasWorkspaceReady,
 		isLoading: isOnboardingReadinessLoading,
 	} = useOnboardingReadiness();
-	const model = useSelectedChatModel();
+	const model = useSelectedChatModel(initialModelId);
 	const reasoning = useSelectedReasoning();
 	const [composerText, setComposerText] = useState('');
 	const chat = useChatTurnController({
