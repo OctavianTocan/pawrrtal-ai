@@ -1,16 +1,24 @@
 # Running Pawrrtal with Docker Compose
 
-The repo ships four compose files:
+The repo ships three compose files:
 
 | File | Stack | Use case |
 |---|---|---|
 | `docker-compose.yml` | Postgres 16 + FastAPI backend | Base — same services every overlay extends |
 | `docker-compose.dev.yml` | + ports `5432`, `8000` published locally; source bind-mount + `uvicorn --reload` | Local dev where you run the Next.js frontend with hot-reload from your host |
-| `docker-compose.prod.yml` | + Next.js service + nginx reverse proxy on `:80` + health checks + memory caps + log rotation | A production-shaped stack on a VPS (TLS terminated upstream by Tailscale Serve / Caddy / etc.) |
 | `docker-compose.demo.yml` | + `DEMO_MODE=true`, low rate limits, no Telegram, ephemeral workspace, outbound network blocked at the tool layer | Public demo deployments |
 
 The Next.js frontend is left out of the base/dev stacks intentionally —
 you run it on the host so hot-reload keeps working.
+
+Public VPS deployment does not use a Compose reverse proxy. Run the
+frontend and backend on loopback, then publish them with:
+
+```bash
+paw project cloudflared install --hostname <pawrrtal-hostname> --tunnel-name pawrrtal
+```
+
+Cloudflare Access is the public gate for that hostname.
 
 ## Prerequisites
 
@@ -57,8 +65,9 @@ bun install          # or npm install
 bun dev              # or npm run dev
 ```
 
-The dev server starts at **http://localhost:3001** and points at the backend
-on port 8000 by default.
+The project dev server starts at **http://localhost:53001** and uses same-origin
+browser API paths. Next.js rewrites `/api/v1`, `/auth`, and `/users` to
+`BACKEND_INTERNAL_URL`, which defaults to **http://127.0.0.1:8000**.
 
 ## Useful commands
 
@@ -118,9 +127,10 @@ concern.
 
 ### Access control
 
-`BACKEND_API_KEY` (transport-level shared secret in `X-Pawrrtal-Key`
-header), `ALLOWED_EMAILS` (comma-separated email allowlist),
-`DEMO_MODE` (locks down public demo deploys).
+`ALLOWED_EMAILS` (comma-separated email allowlist), `DEMO_MODE` (locks
+down public demo deploys). `BACKEND_API_KEY` is optional and only fits
+server-to-server callers that can inject `X-Pawrrtal-Key`; leave it
+unset for the Cloudflared browser app.
 
 ### Agent loop safety (defaults work for most deploys)
 
@@ -240,5 +250,5 @@ Production users typically also attach a Railway volume mounted at
 `/data/workspaces` so workspace contents (memory, skills, encrypted
 `.env`) survive redeploys.
 
-For VPS deploys (Docker Compose prod overlay + nginx), see
+For VPS deploys with the Paw CLI Cloudflared profile, see
 [`frontend/content/docs/handbook/deployment/vps-deploy.md`](../frontend/content/docs/handbook/deployment/vps-deploy.md).

@@ -19,9 +19,9 @@
 #     files + artifact still work; web search + image gen do not.
 #
 # Hard requirements before deploying:
-#   * Set BACKEND_API_KEY to a long random value baked into the
-#     frontend build (NEXT_PUBLIC_BACKEND_API_KEY).  Otherwise anyone
-#     can hit the demo API directly.
+#   * Put the demo hostname behind Cloudflare edge protections
+#     (Access, WAF, Bot Fight Mode, or rate limiting depending on how
+#     public the demo should be).
 #   * Set ALLOWED_EMAILS="" intentionally (open) — anyone can sign up
 #     to try the demo.
 #   * Set CHAT_RATE_LIMIT_PER_MINUTE=15 (or whatever you can afford).

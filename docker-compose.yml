@@ -6,8 +6,9 @@
 #   Local development (ports published to host, hot-reload):
 #     docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 #
-#   Production (VPS + Tailscale Serve):
-#     docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#   Public VPS deployment:
+#     run local services on loopback and publish them with
+#     `paw project cloudflared install --hostname <host>`.
 #
 # The backend is available inside the Docker network at http://backend:8000.
 # The postgres instance is reachable inside the Docker network at postgres:5432.
