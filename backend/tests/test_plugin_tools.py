@@ -290,6 +290,19 @@ def test_bundled_artifacts_plugin_can_be_disabled(tmp_path: Path) -> None:
     assert "render_artifact" not in _tool_names(tmp_path)
 
 
+def test_bundled_time_tools_plugin_exposes_now_tool(tmp_path: Path) -> None:
+    assert "now" in _tool_names(tmp_path)
+
+
+def test_bundled_time_tools_plugin_can_be_disabled(tmp_path: Path) -> None:
+    save_plugin_state(
+        plugin_state_path(plugin_id="time_tools", scope="workspace", workspace_root=tmp_path),
+        PluginState(enabled=False),
+    )
+
+    assert "now" not in _tool_names(tmp_path)
+
+
 def test_bundled_reminders_manifest_exposes_reminder_tools(tmp_path: Path) -> None:
     names = _tool_names(tmp_path)
 

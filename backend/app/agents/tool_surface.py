@@ -45,10 +45,7 @@ from app.tools.lcm_agents import (
     make_lcm_list_summaries_tool,
     make_lcm_search_tool,
 )
-from app.tools.now import (
-    build_external_mcp_tools,
-    make_now_tool,
-)
+from app.tools.now import build_external_mcp_tools
 from app.tools.plugin_catalog import make_search_plugin_capabilities_tool
 from app.tools.send_message import SendFn, make_send_message_tool
 from app.tools.workspace_files import make_workspace_tools
@@ -126,13 +123,6 @@ def build_agent_tools(
     # the agent is fundamentally a notebook editor, and these are the
     # primitives it edits with.
     tools.extend(make_workspace_tools(workspace_root))
-
-    # Current wall-clock time.  Pure stdlib, no network — always present
-    # so the model can re-query the clock mid-turn without burning
-    # iterations on an Exa search.  Pairs with the time block in the
-    # system prompt (see ``app.agents.runtime_context``) — the block lands
-    # at turn start, the tool covers long-running multi-step turns.
-    tools.append(make_now_tool())
 
     tools.append(make_search_plugin_capabilities_tool(workspace_root=workspace_root))
 

@@ -172,6 +172,10 @@ The bundled `artifacts` plugin is the presentation-tool template. It receives
 the active turn surface through `ToolContext.surface`, so web/electron can
 advertise interactive widgets while Telegram stays on the read-only catalog.
 
+The bundled `time_tools` plugin is the pure utility template. It contributes
+`now` without permissions or env keys, proving small always-safe tools can still
+be discoverable and disableable.
+
 ## Trusted Runtime Capabilities
 
 Runtime capabilities such as `turn_context_provider`, `provider`, `channel`,
