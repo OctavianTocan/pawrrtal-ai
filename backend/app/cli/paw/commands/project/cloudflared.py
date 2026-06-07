@@ -323,8 +323,33 @@ def _service_state() -> tuple[str, str]:
     return (active.stdout or active.stderr).strip(), (enabled.stdout or enabled.stderr).strip()
 
 
-def _status_payload(config_path: Path) -> dict[str, object]:
+def _resolve_status_config_path(
+    *,
+    requested_config_path: Path | None,
+    state: CloudflaredState | None,
+) -> Path:
+    """Return the config path that status should inspect."""
+    if requested_config_path is not None:
+        return requested_config_path
+    if state is not None:
+        return Path(state.config_path)
+    return DEFAULT_CONFIG_PATH
+
+
+def _path_exists(path: Path) -> bool:
+    """Return whether a path exists without exposing filesystem permission errors."""
+    try:
+        return path.exists()
+    except OSError:
+        return False
+
+
+def _status_payload(config_path: Path | None) -> dict[str, object]:
     state = _load_state()
+    resolved_config_path = _resolve_status_config_path(
+        requested_config_path=config_path,
+        state=state,
+    )
     active, enabled = _service_state()
     version = _cloudflared("--version", check=False)
     return {
@@ -332,8 +357,8 @@ def _status_payload(config_path: Path) -> dict[str, object]:
         "service_active": active,
         "service_enabled": enabled,
         "cloudflared_version": (version.stdout or version.stderr).strip(),
-        "config_path": str(config_path),
-        "config_exists": config_path.exists(),
+        "config_path": str(resolved_config_path),
+        "config_exists": _path_exists(resolved_config_path),
         "hostname": state.hostname if state else None,
         "public_url": state.public_url if state else None,
         "tunnel_name": state.tunnel_name if state else None,
@@ -472,7 +497,7 @@ def verify(
 
 @app.command("status")
 def status(
-    config_path: Path = typer.Option(DEFAULT_CONFIG_PATH, "--config-path"),
+    config_path: Path | None = typer.Option(None, "--config-path"),
     json_out: bool = typer.Option(False, "--json", help="Emit JSON."),
     plain: bool = typer.Option(False, "--plain", help="TSV: tunnel hostname service."),
 ) -> None:
