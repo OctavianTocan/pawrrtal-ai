@@ -1,0 +1,33 @@
+backend-ts/apps/api/src/Modules/Projects/Http.ts
+  h_dad53a55d60d3d 6-7,10,12,15,21-22,24-25,27-31,33-35,37
+backend-ts/apps/api/src/Modules/Projects/Service.ts
+  h_dad53a55d60d3d 62-64
+backend-ts/packages/api-core/src/Api.ts
+  h_dad53a55d60d3d 5-7
+backend-ts/apps/api/src/Main.ts
+  h_dad53a55d60d3d 10,12-13,15,18
+  s_0d25eddc9a16a8::t_0ef690b19d61da 1-8,17
+backend-ts/apps/api/tsconfig.json
+  s_0d25eddc9a16a8::t_d189dbea3a4b62 9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "a59380eda36088395c307c3f6f19f9e444707487",
+  "prompts": {},
+  "humans": {
+    "h_dad53a55d60d3d": {
+      "author": "Octavian Tocan <contact@octaviantocan.com>"
+    }
+  },
+  "sessions": {
+    "s_0d25eddc9a16a8": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_15e29df10ffeACPGL23uxbhUqj",
+        "model": "MiniMax-M3"
+      },
+      "human_author": "Octavian Tocan <contact@octaviantocan.com>"
+    }
+  }
+}
