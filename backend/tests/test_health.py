@@ -1,11 +1,11 @@
 """Tests for the /api/v1/health liveness-probe endpoint.
 
-The health endpoint is added in feat/onboarding-revamp to support the
-onboarding step-server "Verify" button.  It must be:
+The health endpoint supports local service checks, Cloudflared origin
+verification, and Paw CLI diagnostics. It must be:
 
-1. Publicly accessible — no authentication required.  The verify button
-   is clicked *before* the user has a session (they're checking that the
-   remote URL resolves to a real Pawrrtal server).
+1. Publicly accessible — no authentication required. Cloudflared and local
+   service checks must be able to verify the backend before a user session
+   exists.
 2. Always fast — no database round-trips, no network calls.
 3. Structurally stable — the exact JSON shape ``{"status": "ok"}`` is
    what the frontend pings; changing it is a breaking wire change.
@@ -35,7 +35,7 @@ from main import create_app  # noqa: E402 — sys.path tweak above must precede
 
 
 @pytest.fixture
-def unauthenticated_app():
+def unauthenticated_app(monkeypatch: pytest.MonkeyPatch) -> FastAPI:
     """A bare FastAPI app with NO dependency overrides.
 
     Uses the real ``create_app()`` factory but with an in-memory DB so it
@@ -43,13 +43,11 @@ def unauthenticated_app():
     ``current_active_user`` override is applied — this proves the health
     endpoint is truly public.
     """
-    import os
-
     # Point the app at an in-memory SQLite so the lifespan startup doesn't
     # fail on a missing Postgres DSN.
-    os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
-    os.environ.setdefault("SECRET_KEY", "test-secret-key-not-real")
-    os.environ.setdefault("WORKSPACE_ENCRYPTION_KEY", "A" * 44)
+    monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key-not-real")
+    monkeypatch.setenv("WORKSPACE_ENCRYPTION_KEY", "A" * 44)
 
     return create_app()
 
@@ -63,59 +61,54 @@ async def raw_client(unauthenticated_app: FastAPI) -> AsyncGenerator[AsyncClient
 
 
 # ---------------------------------------------------------------------------
-# Tests using the standard auth-overridden client (from conftest)
+# Tests using the raw unauthenticated client
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
-async def test_health_returns_200(client: AsyncClient) -> None:
+async def test_health_returns_200(raw_client: AsyncClient) -> None:
     """Health endpoint responds with HTTP 200 OK."""
-    response = await client.get("/api/v1/health")
+    response = await raw_client.get("/api/v1/health")
     assert response.status_code == 200
 
 
 @pytest.mark.anyio
-async def test_health_response_body_is_status_ok(client: AsyncClient) -> None:
+async def test_health_response_body_is_status_ok(raw_client: AsyncClient) -> None:
     """Health endpoint returns exactly ``{"status": "ok"}``.
 
     The frontend pings this exact shape — it is a wire contract.
     """
-    response = await client.get("/api/v1/health")
+    response = await raw_client.get("/api/v1/health")
     assert response.json() == {"status": "ok"}
 
 
 @pytest.mark.anyio
-async def test_health_content_type_is_json(client: AsyncClient) -> None:
+async def test_health_content_type_is_json(raw_client: AsyncClient) -> None:
     """Health response Content-Type must be application/json.
 
-    The onboarding verify button inspects the JSON body; non-JSON
-    responses would fail silently on the client side.
+    Cloudflared verification and Paw CLI diagnostics inspect the JSON body;
+    non-JSON responses would fail silently on the client side.
     """
-    response = await client.get("/api/v1/health")
+    response = await raw_client.get("/api/v1/health")
     assert "application/json" in response.headers["content-type"]
 
 
 @pytest.mark.anyio
 async def test_health_is_idempotent_across_multiple_calls(
-    client: AsyncClient,
+    raw_client: AsyncClient,
 ) -> None:
     """Health endpoint returns the same result every time it is called.
 
-    Simulates the verify button being clicked repeatedly without a page
-    reload — all calls must succeed with the same body.
+    Simulates repeated local and Cloudflared probes without process restart;
+    all calls must succeed with the same body.
     """
     results = []
     for _ in range(5):
-        r = await client.get("/api/v1/health")
+        r = await raw_client.get("/api/v1/health")
         results.append((r.status_code, r.json()))
 
     assert all(status == 200 for status, _ in results)
     assert all(body == {"status": "ok"} for _, body in results)
-
-
-# ---------------------------------------------------------------------------
-# Tests using the raw unauthenticated client
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
@@ -125,9 +118,8 @@ async def test_health_is_accessible_without_authentication(
     """Health endpoint must NOT require a logged-in session.
 
     The whole point of this endpoint is to be called before the user has
-    authenticated (during the onboarding server-configuration step).  If
-    it were gated by ``current_active_user`` it would always return 401
-    for new users, making the verify button useless.
+    authenticated. Cloudflared, local service checks, and CLI verification
+    all need this endpoint before a browser session exists.
     """
     response = await raw_client.get("/api/v1/health")
     assert response.status_code == 200
@@ -152,9 +144,8 @@ async def test_health_not_401_for_anonymous_client(raw_client: AsyncClient) -> N
 async def test_health_endpoint_at_canonical_path(raw_client: AsyncClient) -> None:
     """The endpoint is at exactly /api/v1/health — canonical path must not drift.
 
-    If the router prefix changes (e.g. /api/v2/health) the onboarding
-    frontend would silently break.  Locking this path in a test makes the
-    drift visible immediately.
+    If the router prefix changes (e.g. /api/v2/health), Cloudflared and Paw
+    CLI verification drift. Locking this path in a test makes that visible.
     """
     # Correct path.
     good = await raw_client.get("/api/v1/health")
