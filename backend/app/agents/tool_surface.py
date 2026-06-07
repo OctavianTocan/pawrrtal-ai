@@ -62,7 +62,6 @@ from app.tools.now import (
     make_report_issue_tool,
 )
 from app.tools.plugin_catalog import make_search_plugin_capabilities_tool
-from app.tools.python_exec import make_virtual_python_tool
 from app.tools.send_message import SendFn, make_send_message_tool
 from app.tools.workspace_files import make_workspace_tools
 
@@ -220,19 +219,6 @@ def build_agent_tools(
         )
         tools.append(make_reminder_list_tool(user_id=user_id))
         tools.append(make_reminder_cancel_tool(user_id=user_id))
-
-    # In-process Python execution.  Opt-in via
-    # ``settings.virtual_python_enabled`` because the tool is *not*
-    # sandboxed — the deployment model assumes a single trusted
-    # operator (see ``app/core/tools/python_exec.py`` docstring).
-    if settings.virtual_python_enabled:
-        tools.append(
-            make_virtual_python_tool(
-                workspace_root=workspace_root,
-                timeout_seconds=settings.virtual_python_timeout_seconds,
-                output_cap_bytes=settings.virtual_python_output_cap_bytes,
-            )
-        )
 
     # Channel delivery — present for both web (asyncio-queue SSE drain)
     # and Telegram (MIME-aware bot API calls).  The mechanism differs;

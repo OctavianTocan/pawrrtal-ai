@@ -260,16 +260,11 @@ class Settings(BaseSettings):
     # persisted tool inputs (PR 02). Off only for adversarial test runs.
     secret_redaction_enabled: bool = True
 
-    # ── Tools: in-process Python execution ───────────────────────────────
-    # When True, ``build_agent_tools`` appends the ``python`` tool which
-    # runs LLM-supplied source via ``exec()`` in the FastAPI worker
-    # process.  Off by default: the execution is *not* sandboxed and the
-    # operator opts in explicitly per the threat model documented in
-    # ``app/core/tools/python_exec.py``.
-    virtual_python_enabled: bool = False
-    # Wall-clock cap (seconds) for one ``python`` tool call.  The
-    # awaiter is cancelled at this point; runaway code holds the worker
-    # thread until it returns (see module docstring).
+    # ── Python Shell plugin ──────────────────────────────────────────────
+    # Wall-clock cap (seconds) for one ``python`` tool call exposed by the
+    # disabled-by-default ``python_shell`` bundled plugin. The awaiter is
+    # cancelled at this point; runaway code holds the worker thread until
+    # it returns (see ``app.tools.python_exec``).
     virtual_python_timeout_seconds: float = 30.0
     # Maximum bytes of captured stdout + stderr returned to the model.
     # Head + tail truncation preserves tracebacks at the tail.
