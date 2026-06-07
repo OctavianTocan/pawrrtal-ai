@@ -10,10 +10,14 @@ set -euo pipefail
 REPO="${REPO:-OctavianTocan/Pawrrtal-AI}"
 RUNNER_BASE="${RUNNER_BASE:-/mnt/HC_Volume_105512717/github-runners/pawrrtal-ephemeral}"
 LABELS="${LABELS:-self-hosted,openclaw-mini,pawrrtal}"
-RUNNER_COUNT="${RUNNER_COUNT:-3}"
+RUNNER_COUNT="${RUNNER_COUNT:-2}"
 RUN_TAG="${RUN_TAG:-pr-474}"
-MEMORY_MAX="${MEMORY_MAX:-12G}"
-CPU_QUOTA="${CPU_QUOTA:-600%}"
+MEMORY_HIGH="${MEMORY_HIGH:-6G}"
+MEMORY_MAX="${MEMORY_MAX:-8G}"
+CPU_QUOTA="${CPU_QUOTA:-200%}"
+CPU_WEIGHT="${CPU_WEIGHT:-50}"
+IO_WEIGHT="${IO_WEIGHT:-50}"
+RUNNER_NICE="${RUNNER_NICE:-10}"
 MIN_FREE_MB="${MIN_FREE_MB:-51200}"
 
 usage() {
@@ -27,8 +31,12 @@ Environment:
   REPO          GitHub repo, default OctavianTocan/Pawrrtal-AI
   RUNNER_BASE   Local base directory, default /mnt/HC_Volume_105512717/github-runners/pawrrtal-ephemeral
   LABELS        Runner labels, default self-hosted,openclaw-mini,pawrrtal
-  MEMORY_MAX    systemd MemoryMax per runner, default 12G
-  CPU_QUOTA     systemd CPUQuota per runner, default 600%
+  MEMORY_HIGH   systemd MemoryHigh per runner, default 6G
+  MEMORY_MAX    systemd MemoryMax per runner, default 8G
+  CPU_QUOTA     systemd CPUQuota per runner, default 200%
+  CPU_WEIGHT    systemd CPUWeight per runner, default 50
+  IO_WEIGHT     systemd IOWeight per runner, default 50
+  RUNNER_NICE   Scheduling nice value per runner, default 10
   MIN_FREE_MB   Minimum free space before start, default 51200
 
 Authentication:
@@ -69,8 +77,14 @@ validate_config() {
     [[ "$RUNNER_BASE" = /* ]] || die "RUNNER_BASE must be absolute"
     [[ "$RUNNER_BASE" != "/" ]] || die "RUNNER_BASE cannot be /"
     [[ "$RUNNER_COUNT" =~ ^[1-9][0-9]*$ ]] || die "count must be a positive integer"
-    ((RUNNER_COUNT <= 8)) || die "count must be 8 or less"
+    ((RUNNER_COUNT <= 4)) || die "count must be 4 or less"
     [[ "$MIN_FREE_MB" =~ ^[1-9][0-9]*$ ]] || die "MIN_FREE_MB must be a positive integer"
+    [[ "$CPU_WEIGHT" =~ ^[1-9][0-9]*$ ]] || die "CPU_WEIGHT must be a positive integer"
+    [[ "$IO_WEIGHT" =~ ^[1-9][0-9]*$ ]] || die "IO_WEIGHT must be a positive integer"
+    [[ "$RUNNER_NICE" =~ ^-?[0-9]+$ ]] || die "RUNNER_NICE must be an integer"
+    ((CPU_WEIGHT <= 10000)) || die "CPU_WEIGHT must be 10000 or less"
+    ((IO_WEIGHT <= 10000)) || die "IO_WEIGHT must be 10000 or less"
+    ((RUNNER_NICE >= -20 && RUNNER_NICE <= 19)) || die "RUNNER_NICE must be between -20 and 19"
     safe_identifier "$RUN_TAG"
 }
 
@@ -214,6 +228,9 @@ start_runner_unit() {
     install -d -o "$user" -g "$user" -m 0700 "$dir/_temp"
     install -d -o "$user" -g "$user" -m 0700 "$dir/_tool"
     install -d -o "$user" -g "$user" -m 0700 "$dir/.cache"
+    install -d -o "$user" -g "$user" -m 0700 "$dir/.cache/bun"
+    install -d -o "$user" -g "$user" -m 0700 "$dir/.cache/npm"
+    install -d -o "$user" -g "$user" -m 0700 "$dir/.cache/uv"
     systemd-run \
         --unit "$unit" \
         --description "Pawrrtal ephemeral GitHub Actions runner ${unit}" \
@@ -226,18 +243,30 @@ start_runner_unit() {
         --property "Environment=AGENT_TOOLSDIRECTORY=${dir}/_tool" \
         --property "Environment=XDG_CACHE_HOME=${dir}/.cache" \
         --property "Environment=BUN_INSTALL=${dir}/.bun" \
+        --property "Environment=BUN_INSTALL_CACHE_DIR=${dir}/.cache/bun/install" \
+        --property "Environment=npm_config_cache=${dir}/.cache/npm" \
+        --property "Environment=UV_CACHE_DIR=${dir}/.cache/uv" \
+        --property "Environment=PLAYWRIGHT_BROWSERS_PATH=${dir}/.cache/ms-playwright" \
         --property "UMask=0077" \
+        --property "Nice=${RUNNER_NICE}" \
+        --property "CPUWeight=${CPU_WEIGHT}" \
         --property "MemoryMax=${MEMORY_MAX}" \
+        --property "MemoryHigh=${MEMORY_HIGH}" \
         --property "CPUQuota=${CPU_QUOTA}" \
-        --property "TasksMax=2048" \
+        --property "IOWeight=${IO_WEIGHT}" \
+        --property "TasksMax=1024" \
         --property "NoNewPrivileges=yes" \
         --property "PrivateDevices=yes" \
         --property "PrivateTmp=yes" \
         --property "ProtectHome=yes" \
         --property "ProtectSystem=strict" \
+        --property "ProtectClock=yes" \
         --property "ProtectControlGroups=yes" \
+        --property "ProtectHostname=yes" \
         --property "ProtectKernelModules=yes" \
         --property "ProtectKernelTunables=yes" \
+        --property "ProtectProc=invisible" \
+        --property "ProcSubset=pid" \
         --property "ReadWritePaths=${dir}" \
         --property "CapabilityBoundingSet=" \
         --property "LockPersonality=yes" \

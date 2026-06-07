@@ -19,7 +19,8 @@ job into a long-lived remote-code-execution surface on the host.
 3. **No privileged host access.** Runner users do not get sudo, shell access,
    Docker socket access, or shared host mounts.
 4. **Bounded concurrency.** Start only the number of runners needed for the
-   current CI drain. The default is three.
+   current CI drain. The default is two, and the launcher refuses batches
+   larger than four.
 5. **Clean after each drain.** Run cleanup after the queued jobs finish so
    local users, runner directories, and stale units disappear.
 
@@ -66,11 +67,13 @@ system user and a private runner directory:
 | Labels | `self-hosted, openclaw-mini, pawrrtal` |
 | systemd unit | `pawrrtal-gha-<tag>-NN.service` |
 | Writable paths | Runner directory plus private `/tmp` |
-| Cache paths | Inside the runner directory |
+| Cache paths | Inside the runner directory, deleted by cleanup |
+| Resource limits | `CPUQuota=200%`, `MemoryHigh=6G`, `MemoryMax=8G`, lower CPU/IO weight |
 
 The unit sets `NoNewPrivileges`, `PrivateTmp`, `PrivateDevices`,
 `ProtectHome`, `ProtectSystem=strict`, kernel/control-group protection,
-an empty capability bounding set, and per-runner CPU and memory ceilings.
+process table hiding, an empty capability bounding set, and per-runner CPU,
+memory, task, and IO ceilings.
 
 ## Starting runners
 
@@ -83,7 +86,9 @@ sudo -E scripts/ephemeral-self-hosted-runners.sh start --count 3 --tag pr-474
 The script defaults `RUNNER_BASE` to the large mounted volume and checks
 for at least 50 GB free before starting a batch. Do not point
 `RUNNER_BASE` at the VPS root disk unless you have first verified enough
-headroom for every runner workdir and cache.
+headroom for every runner workdir and cache. If the VPS is under load, use
+`--count 1` or `--count 2`; do not run a max-size batch just to shorten a
+queue.
 
 Authentication comes from the GitHub CLI account or `GH_TOKEN`. If using
 `GH_TOKEN`, the token must be allowed to create repository self-hosted
