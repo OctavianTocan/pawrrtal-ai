@@ -199,23 +199,29 @@ def test_replay_reconstructs_sse_stream_from_fixture(
     _seed_persona()
     fixture = tmp_path / "chat_stream.jsonl"
 
-    # First, record into the fixture.
+    # First, record an existing unpinned conversation into the fixture. The
+    # request sequence must match replay: pre-send conversation lookup, model
+    # lookup, streaming chat POST, then post-send conversation fetch.
     with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
         r.get("/api/v1/models").mock(return_value=httpx.Response(200, json=_models_payload()))
-        r.post(f"/api/v1/conversations/{stable_uuid}").mock(
-            return_value=httpx.Response(200, json=_conversation_payload(stable_uuid))
+        r.get(f"/api/v1/conversations/{stable_uuid}").mock(
+            side_effect=[
+                httpx.Response(200, json=_conversation_payload(stable_uuid, model_id=None)),
+                httpx.Response(
+                    200,
+                    json=_conversation_payload(
+                        stable_uuid,
+                        model_id=DEFAULT_MODEL,
+                        codex_thread_id="thread-abc",
+                    ),
+                ),
+            ]
         )
         r.post("/api/v1/chat/").mock(
             return_value=httpx.Response(
                 200,
                 headers={"content-type": "text/event-stream"},
                 content=SSE_BODY,
-            )
-        )
-        r.get(f"/api/v1/conversations/{stable_uuid}").mock(
-            return_value=httpx.Response(
-                200,
-                json=_conversation_payload(stable_uuid, codex_thread_id="thread-abc"),
             )
         )
         record_result = runner.invoke(
@@ -227,7 +233,8 @@ def test_replay_reconstructs_sse_stream_from_fixture(
                 "conversations",
                 "send",
                 "hi",
-                "--new",
+                "--conversation",
+                stable_uuid,
                 "--json",
             ],
         )

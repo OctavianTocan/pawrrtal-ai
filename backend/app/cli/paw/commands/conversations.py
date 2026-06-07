@@ -268,9 +268,12 @@ async def _send_turn(
         assert conversation_id is not None  # narrowed by branches above
 
         # 2. Stream the chat turn.
-        model_id = model
-        if create_new and model_id is None:
-            model_id = await _first_available_model_id(client)
+        model_id = await _model_id_for_send(
+            client,
+            conversation_id=conversation_id,
+            create_new=create_new,
+            requested_model=model,
+        )
         chat_body: dict[str, Any] = {
             "question": text,
             "conversation_id": conversation_id,
@@ -324,13 +327,34 @@ async def _send_turn(
     return output
 
 
+async def _model_id_for_send(
+    client: PawClient,
+    *,
+    conversation_id: str,
+    create_new: bool,
+    requested_model: str | None,
+) -> str | None:
+    """Return the explicit model ID the chat body needs, if any."""
+    if requested_model is not None:
+        return requested_model
+    if create_new:
+        return await _first_available_model_id(client)
+    existing = await client.request(
+        "GET", f"/api/v1/conversations/{conversation_id}", expect=(200,)
+    )
+    payload = existing.json() or {}
+    if payload.get("model_id"):
+        return None
+    return await _first_available_model_id(client)
+
+
 async def _first_available_model_id(client: PawClient) -> str:
     """Return the first authenticated model from the backend catalog."""
     resp = await client.request("GET", "/api/v1/models", expect=(200,))
     body = resp.json()
     models = body.get("models") if isinstance(body, dict) else None
     if not isinstance(models, list):
-        raise LocalError("Could not resolve a model for the new conversation.")
+        raise LocalError("Could not resolve a model for this chat turn.")
     for row in models:
         if isinstance(row, dict):
             model_id = row.get("model_id") or row.get("id")

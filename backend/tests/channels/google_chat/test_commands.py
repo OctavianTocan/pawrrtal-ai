@@ -47,6 +47,22 @@ def test_parse_command_from_app_command_id_without_slash_text() -> None:
     assert parse_command(event) == ("model", "openai/gpt-4o")
 
 
+def test_parse_command_ids_match_setup_docs() -> None:
+    """Configured command IDs must match the one-time Cloud Console setup docs."""
+    command_ids = {
+        "6": "config",
+        "7": "status",
+        "8": "whoami",
+        "9": "lcm",
+        "10": "compact",
+        "11": "stop",
+    }
+    for command_id, expected in command_ids.items():
+        event = addon_command_event(command_text="", argument_text="")
+        event["chat"]["appCommandPayload"]["appCommandMetadata"] = {"appCommandId": command_id}
+        assert parse_command(event) == (expected, "")
+
+
 def test_parse_command_no_args() -> None:
     assert parse_command(chat_event(text="/status")) == ("status", "")
 
