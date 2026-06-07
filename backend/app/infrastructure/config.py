@@ -2,19 +2,14 @@
 
 from pathlib import Path
 from typing import Literal
-from urllib.parse import urlparse
 
-from pydantic import Field, PositiveInt, field_validator, model_validator
+from pydantic import Field, PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.infrastructure.config_urls import (
-    async_database_url,
-    normalize_database_url,
-    sync_database_url,
-)
+from app.infrastructure.config_behavior import SettingsBehaviorMixin
 
 
-class Settings(BaseSettings):
+class Settings(BaseSettings, SettingsBehaviorMixin):
     """Application settings. This class uses Pydantic's BaseSettings to automatically read environment variables and provide type validation."""
 
     # Load environment variables from a .env file in the current directory, with UTF-8 encoding. This allows you to define your settings in a .env file instead of setting them directly in the environment.
@@ -146,7 +141,9 @@ class Settings(BaseSettings):
         if not self.allowed_emails:
             return frozenset()
         return frozenset(
-            addr.strip().lower() for addr in self.allowed_emails.split(",") if addr.strip()
+            addr.strip().lower()
+            for addr in self.allowed_emails.split(",")
+            if addr.strip()
         )
 
     # --- OAuth: Google ---
@@ -158,7 +155,9 @@ class Settings(BaseSettings):
     google_oauth_client_secret: str = ""
     # Where Google redirects back to after auth. Must be an authorized
     # redirect URI on the OAuth client. Default targets local dev.
-    google_oauth_redirect_uri: str = "http://localhost:8000/api/v1/auth/oauth/google/callback"
+    google_oauth_redirect_uri: str = (
+        "http://localhost:8000/api/v1/auth/oauth/google/callback"
+    )
 
     # --- OAuth: Apple ---
     # Apple Sign In requires four pieces: services ID (acts as client_id),
@@ -168,7 +167,9 @@ class Settings(BaseSettings):
     apple_oauth_team_id: str = ""
     apple_oauth_key_id: str = ""
     apple_oauth_private_key: str = ""
-    apple_oauth_redirect_uri: str = "http://localhost:8000/api/v1/auth/oauth/apple/callback"
+    apple_oauth_redirect_uri: str = (
+        "http://localhost:8000/api/v1/auth/oauth/apple/callback"
+    )
 
     # Where to send the user after a successful OAuth sign-in. Override in
     # production to point at the deployed frontend (e.g. https://app/...).
@@ -378,92 +379,6 @@ class Settings(BaseSettings):
     # ── Pre-turn hooks ──────────────────────────────────────────────────
     # The timeout in seconds for each pre-turn hook.
     turn_context_provider_timeout_seconds: int = 10
-
-    @property
-    def claude_sandbox_excluded_commands_list(self) -> list[str]:
-        """Parsed view of ``claude_sandbox_excluded_commands``."""
-        if not self.claude_sandbox_excluded_commands:
-            return []
-        return [
-            cmd.strip() for cmd in self.claude_sandbox_excluded_commands.split(",") if cmd.strip()
-        ]
-
-    @property
-    def voice_max_size_bytes(self) -> int:
-        """Voice size cap in bytes (the handler validates against this)."""
-        return self.voice_max_size_mb * 1024 * 1024
-
-    @field_validator("telegram_bot_username", mode="before")
-    @classmethod
-    def _strip_telegram_at_prefix(cls, value: object) -> object:
-        """Forgive a leading ``@`` in ``TELEGRAM_BOT_USERNAME``.
-
-        Telegram deep links are ``https://t.me/<username>``; an ``@``
-        produces ``t.me/@username`` which Telegram redirects to its
-        homepage instead of the bot. Humans frequently paste the
-        ``@``-prefixed handle into ``.env``, so we normalize once at the
-        config boundary instead of forcing every consumer to remember.
-        """
-        if isinstance(value, str):
-            return value.lstrip("@")
-        return value
-
-    @field_validator("telegram_verbose_default", mode="before")
-    @classmethod
-    def _coerce_telegram_verbose_default(cls, value: object) -> object:
-        """Coerce env-file string values before Literal validation."""
-        if isinstance(value, str) and value.strip() in {"0", "1", "2"}:
-            return int(value)
-        return value
-
-    @field_validator("workspace_base_dir", mode="after")
-    @classmethod
-    def _expand_workspace_base_dir(cls, value: str) -> str:
-        """Expand home-relative workspace roots from env files."""
-        return str(Path(value).expanduser())
-
-    @model_validator(mode="after")
-    def validate_secure_cookie(self) -> "Settings":
-        """Reject misconfigurations where ``SameSite=none`` is paired with insecure cookies."""
-        secure = self.cookie_secure if self.cookie_secure is not None else self.is_production
-        if self.cookie_samesite == "none" and not secure:
-            raise ValueError(
-                "cookie_samesite='none' requires HTTPS (cookie_secure must be True, or run with ENV=prod)."
-            )
-        return self
-
-    @property
-    def is_production(self) -> bool:
-        """A convenience property that returns True if the application is running in production mode (i.e., if env is set to "prod")."""
-        return self.env == "prod"
-
-    @property
-    def _normalized_database_url(self) -> str:
-        """Return the configured database URL in a normalized form."""
-        return normalize_database_url(self.database_url, self.sqlite_db_filename)
-
-    @property
-    def is_sqlite(self) -> bool:
-        """Whether the configured database uses SQLite."""
-        return urlparse(self._normalized_database_url).scheme.startswith("sqlite")
-
-    @property
-    def db_url_sync(self) -> str:
-        """Return the database URL formatted for synchronous connections.
-
-        PostgreSQL URLs are normalized to the installed psycopg driver, while
-        SQLite async URLs are converted back to the sync sqlite dialect.
-        """
-        return sync_database_url(self._normalized_database_url)
-
-    @property
-    def db_url_async(self) -> str:
-        """Return the database URL formatted for asynchronous connections.
-
-        PostgreSQL URLs are normalized to the psycopg async dialect and SQLite
-        sync URLs are converted to the aiosqlite dialect.
-        """
-        return async_database_url(self._normalized_database_url)
 
 
 settings = Settings()
