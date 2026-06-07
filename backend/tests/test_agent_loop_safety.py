@@ -20,6 +20,7 @@ from app.agents import (
     AgentContext,
     AgentLoopConfig,
     AgentSafetyConfig,
+    AgentTool,
     UserMessage,
     agent_loop,
 )
@@ -171,6 +172,42 @@ async def test_consecutive_tool_errors_reset_on_success():
     terminated = [e for e in events if e["type"] == "agent_terminated"]
     assert terminated == []
     assert script.call_count == 4
+
+
+@pytest.mark.anyio
+async def test_permission_hook_blocks_tool_before_execute() -> None:
+    """A denied tool call returns a permission error without running the tool."""
+    executed = False
+
+    async def _execute(_tool_call_id: str, **_kwargs: object) -> str:
+        nonlocal executed
+        executed = True
+        return "leaked"
+
+    def _deny(_tool: AgentTool, _tool_call_id: str, _arguments: dict[str, object]) -> str:
+        return "denied by test policy"
+
+    tool = AgentTool(
+        name="read_file",
+        description="read",
+        parameters={"type": "object"},
+        execute=_execute,
+    )
+    ctx = AgentContext(system_prompt="", messages=[], tools=[tool])
+    cfg = AgentLoopConfig(
+        convert_to_llm=identity_convert,
+        permission_check=_deny,
+        safety=AgentSafetyConfig.disabled(),
+    )
+    script = ScriptedStreamFn([tool_call_turn("read_file", {"path": ".env"})])
+
+    events = [ev async for ev in agent_loop([_user("go")], ctx, cfg, script)]
+
+    assert executed is False
+    results = [e for e in events if e["type"] == "tool_result"]
+    assert results[0]["is_error"] is True
+    assert results[0]["content"].startswith("[permission_denied]")
+    assert "denied by test policy" in results[0]["content"]
 
 
 @pytest.mark.anyio

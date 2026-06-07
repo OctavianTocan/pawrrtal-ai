@@ -22,18 +22,19 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.hooks import build_pre_turn_hooks
 from app.agents.tools import build_agent_tools
 from app.channels.base import ChannelMessage
 from app.channels.turn_runner import ChatTurnInput, run_turn
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
 from app.models import Conversation
-from app.providers.base import AILLM
-from app.providers.catalog import first_catalog_model
+from app.providers.base import AILLM, ReasoningEffort
+from app.providers.catalog import first_authenticated_catalog_model
 from app.providers.factory import resolve_llm
 from app.providers.model_id import InvalidModelId, UnknownModelId
 from app.workspace.crud import get_default_workspace
@@ -173,11 +174,14 @@ async def _pull_once() -> bool:
         if ack_id:
             ack_ids.append(ack_id)
         events.append(event)
-    await acknowledge(
+    acknowledged = await acknowledge(
         project_id=google_chat_settings.google_chat_project_id,
         subscription_id=google_chat_settings.google_chat_subscription_id,
         ack_ids=ack_ids,
     )
+    if not acknowledged:
+        logger.warning("GOOGLE_CHAT_ACK_FAILED_SKIP count=%d", len(events))
+        return False
     for event in events:
         await _maybe_handle(event)
     return True
@@ -233,6 +237,15 @@ async def _resolve_sender(event: dict[str, Any], session: AsyncSession) -> _Reso
     return _ResolvedSender(user_id=user_id, conversation=conversation)
 
 
+async def _workspace_root_for_user(
+    user_id: uuid.UUID,
+    session: AsyncSession,
+) -> Path | None:
+    """Return the user's default workspace root when one exists."""
+    workspace = await get_default_workspace(user_id, session)
+    return Path(workspace.path) if workspace is not None else None
+
+
 async def _handle_command_event(event: dict[str, Any], parsed: tuple[str, str]) -> None:
     """Resolve identity, then post a picker card (no-arg picker) or a text reply."""
     command, args = parsed
@@ -245,7 +258,12 @@ async def _handle_command_event(event: dict[str, Any], parsed: tuple[str, str]) 
         resolved = await _resolve_sender(event, session)
         if resolved is None:
             return
-        card = picker_card_for(command, resolved.conversation) if not args else None
+        workspace_root = await _workspace_root_for_user(resolved.user_id, session)
+        card = (
+            picker_card_for(command, resolved.conversation, workspace_root=workspace_root)
+            if not args
+            else None
+        )
         if card is None:
             reply = await dispatch_command(
                 command=command,
@@ -281,6 +299,7 @@ async def _handle_card_click(event: dict[str, Any]) -> None:
             user_id=resolved.user_id,
             conversation=resolved.conversation,
             session=session,
+            workspace_root=await _workspace_root_for_user(resolved.user_id, session),
         )
     if cards is not None:
         await update_card_message(message_name=message_name, cards=cards)
@@ -296,6 +315,7 @@ class _TurnTarget:
     workspace_id: uuid.UUID
     model_id: str
     verbose_level: int
+    reasoning_effort: ReasoningEffort | None
 
 
 async def _resolve_turn_target(event: dict[str, Any]) -> _TurnTarget | None:
@@ -313,18 +333,20 @@ async def _resolve_turn_target(event: dict[str, Any]) -> _TurnTarget | None:
             logger.warning("GOOGLE_CHAT_NO_WORKSPACE user_id=%s", resolved.user_id)
             return None
         conversation = resolved.conversation
+        workspace_root = Path(workspace.path)
         # Read the plain column values while the row is still attached.
         return _TurnTarget(
             user_id=resolved.user_id,
             conversation_id=conversation.id,
-            workspace_root=Path(workspace.path),
+            workspace_root=workspace_root,
             workspace_id=workspace.id,
-            model_id=conversation.model_id or first_catalog_model().id,
+            model_id=conversation.model_id or first_authenticated_catalog_model(workspace_root).id,
             verbose_level=(
                 conversation.verbose_level
                 if conversation.verbose_level is not None
                 else DEFAULT_VERBOSE_LEVEL
             ),
+            reasoning_effort=cast(ReasoningEffort | None, conversation.reasoning_effort),
         )
 
 
@@ -339,7 +361,7 @@ def _resolve_provider(model_id: str, workspace_root: Path) -> tuple[AILLM, str]:
     try:
         return resolve_llm(model_id, workspace_root=workspace_root), model_id
     except (InvalidModelId, UnknownModelId) as exc:
-        fallback = first_catalog_model().id
+        fallback = first_authenticated_catalog_model(workspace_root).id
         logger.warning(
             "GOOGLE_CHAT_MODEL_FALLBACK model=%s fallback=%s reason=%s",
             model_id,
@@ -410,6 +432,9 @@ async def _handle_message_event(event: dict[str, Any]) -> None:
         workspace_root=target.workspace_root,
         tools=agent_tools,
         images=attachments.images or None,
+        verbose_level=target.verbose_level,
+        reasoning_effort=target.reasoning_effort,
+        pre_turn_hooks=build_pre_turn_hooks(),
         log_tag="GOOGLE_CHAT",
     )
     async for _ in run_turn(turn_input):

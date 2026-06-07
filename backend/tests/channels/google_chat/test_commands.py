@@ -77,6 +77,13 @@ async def test_command_model_persists(command_ctx: CommandContext) -> None:
     assert command_ctx.conversation.model_id == "openai-codex:openai/gpt-5.5"
 
 
+async def test_command_model_rejects_unknown_id(command_ctx: CommandContext) -> None:
+    command_ctx.args = "not-a-real-model"
+    reply = await dispatch_command(command="model", ctx=command_ctx)
+    assert "Unknown model" in reply
+    assert command_ctx.conversation.model_id is None
+
+
 async def test_command_thinking_none_clears(command_ctx: CommandContext) -> None:
     command_ctx.conversation.reasoning_effort = "high"
     command_ctx.args = "none"

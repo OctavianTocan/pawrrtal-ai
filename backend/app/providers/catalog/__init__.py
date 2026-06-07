@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import asdict
+from pathlib import Path
 
 from app.providers.model_id import ParsedModelId, UnknownModelId, parse_model_id
 
@@ -29,6 +30,7 @@ __all__ = [
     "MODEL_CATALOG",
     "ModelEntry",
     "find",
+    "first_authenticated_catalog_model",
     "first_catalog_model",
     "is_known",
     "require_known",
@@ -74,6 +76,21 @@ def first_catalog_model() -> ModelEntry:
         The first :class:`ModelEntry` in :data:`MODEL_CATALOG`.
     """
     return MODEL_CATALOG[0]
+
+
+def first_authenticated_catalog_model(workspace_root: Path | None = None) -> ModelEntry:
+    """Return the first catalog entry whose host is authenticated.
+
+    Falls back to :func:`first_catalog_model` when no host currently passes
+    the auth gate so callers can still surface a deterministic provider error
+    instead of crashing before the turn starts.
+    """
+    from app.providers.factory import host_authenticated  # noqa: PLC0415
+
+    for entry in MODEL_CATALOG:
+        if host_authenticated(entry.host, workspace_root=workspace_root):
+            return entry
+    return first_catalog_model()
 
 
 def find(parsed: ParsedModelId) -> ModelEntry | None:

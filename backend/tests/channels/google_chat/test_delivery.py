@@ -175,3 +175,33 @@ async def test_streaming_marks_failed_tool(monkeypatch: pytest.MonkeyPatch) -> N
     out = delivery.render(streaming=False)
     assert "broken_tool" in out
     assert "⚠️" in out
+
+
+async def test_final_patch_retries_after_failed_progress_update(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[str] = []
+    results = [False, True]
+
+    async def _fake_update(*, message_name: str, text: str) -> bool:
+        assert message_name == "spaces/A/messages/M"
+        calls.append(text)
+        return results.pop(0)
+
+    monkeypatch.setattr(delivery_module, "update_message", _fake_update)
+    delivery = StreamingDelivery(message_name="spaces/A/messages/M", verbose_level=0)
+
+    await delivery.on_event({"type": "delta", "content": "answer"})
+    await delivery.finalize()
+
+    assert calls == ["answer", "answer"]
+
+
+def test_render_bounds_reply_to_google_chat_size_limit() -> None:
+    delivery = StreamingDelivery(message_name="spaces/A/messages/M", verbose_level=0)
+    delivery._answer = "x" * (delivery_module._CHAT_TEXT_CAP_BYTES + 1000)
+
+    rendered = delivery.render(streaming=False)
+
+    assert len(rendered.encode("utf-8")) <= delivery_module._CHAT_TEXT_CAP_BYTES
+    assert "Reply truncated" in rendered

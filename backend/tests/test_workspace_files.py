@@ -80,6 +80,17 @@ async def test_read_file_requires_path_argument(workspace: Path) -> None:
     assert out.startswith(f"[{ToolErrorCode.INVALID_PATH.value}]")
 
 
+@pytest.mark.anyio
+async def test_read_file_rejects_forbidden_filename(workspace: Path) -> None:
+    (workspace / ".env").write_text("TOKEN=secret", encoding="utf-8")
+    read = _tools(workspace)["read_file"]
+
+    out = await read.execute("call-6b", path=".env")  # type: ignore[attr-defined]
+
+    assert out.startswith(f"[{ToolErrorCode.PERMISSION_DENIED.value}]")
+    assert "TOKEN=secret" not in out
+
+
 # ---------------------------------------------------------------------------
 # write_file
 # ---------------------------------------------------------------------------
@@ -113,6 +124,18 @@ async def test_write_file_blocks_traversal(workspace: Path) -> None:
     )
     assert out.startswith(f"[{ToolErrorCode.OUT_OF_ROOT.value}]")
     assert not (workspace.parent / "escape.md").exists()
+
+
+@pytest.mark.anyio
+async def test_write_file_rejects_forbidden_filename(workspace: Path) -> None:
+    write = _tools(workspace)["write_file"]
+
+    out = await write.execute(  # type: ignore[attr-defined]
+        "call-9b", path=".env", content="TOKEN=secret"
+    )
+
+    assert out.startswith(f"[{ToolErrorCode.PERMISSION_DENIED.value}]")
+    assert not (workspace / ".env").exists()
 
 
 # ---------------------------------------------------------------------------

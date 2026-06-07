@@ -58,6 +58,7 @@ from app.agents import (
     UserMessage,
     agent_loop,
 )
+from app.agents.permissions import default_tool_permission_check
 from app.agents.safety_factory import safety_from_settings
 from app.agents.types import TextContent
 from app.infrastructure.config import settings
@@ -440,6 +441,7 @@ class LiteLLMLLM:
         prompt = UserMessage(role="user", content=question)
         config = AgentLoopConfig(
             convert_to_llm=identity_convert,
+            permission_check=default_tool_permission_check,
             safety=safety_from_settings(settings),
         )
 

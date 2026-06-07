@@ -187,6 +187,11 @@ def _wrap_workspace_tool(
             ).render()
         try:
             target = _resolve_safe(root, raw_path or "")
+            if raw_path and matches_forbidden_filename(str(raw_path)):
+                raise ToolError(
+                    ToolErrorCode.PERMISSION_DENIED,
+                    f"Path '{raw_path}' is blocked because it looks like a credential or sensitive config file.",
+                )
             return await body(target=target, raw_path=raw_path or "", **kwargs)
         except ToolError as err:
             return err.render()

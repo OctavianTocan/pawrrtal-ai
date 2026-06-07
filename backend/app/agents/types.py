@@ -11,7 +11,7 @@ Key separation:
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Callable, Coroutine
+from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine
 from dataclasses import dataclass, field
 from typing import Any, Literal, NotRequired, TypedDict
 
@@ -349,6 +349,12 @@ TransformContextFn = Callable[
 # ShouldStopFn: return True to exit after the current turn.
 ShouldStopFn = Callable[[AgentContext], bool]
 
+# ToolPermissionCheck: return a denial message to block one tool call.
+ToolPermissionCheck = Callable[
+    [AgentTool, str, dict[str, Any]],
+    str | None | Awaitable[str | None],
+]
+
 
 @dataclass(frozen=True)
 class AgentSafetyConfig:
@@ -426,6 +432,8 @@ class AgentLoopConfig:
         the message list before every LLM call (e.g. sliding window).
     should_stop_after_turn: optional — sync predicate; return True to stop
         the loop after the current turn even if more tool calls are pending.
+    permission_check: optional — sync or async per-tool-call gate. Return
+        a denial message to block execution before ``AgentTool.execute`` runs.
     safety: hard limits on iterations, wall-clock, retries, etc.  See
         :class:`AgentSafetyConfig`.  Defaults are conservative and
         appropriate for the chat path.
@@ -434,4 +442,5 @@ class AgentLoopConfig:
     convert_to_llm: Callable[[list[AgentMessage]], list[AgentMessage]]
     transform_context: TransformContextFn | None = None
     should_stop_after_turn: ShouldStopFn | None = None
+    permission_check: ToolPermissionCheck | None = None
     safety: AgentSafetyConfig = field(default_factory=AgentSafetyConfig)

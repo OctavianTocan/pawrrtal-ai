@@ -17,6 +17,7 @@ for a flat button card.
 from __future__ import annotations
 
 import uuid
+from pathlib import Path
 from typing import Any, get_args
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +29,8 @@ from app.channels.crud import (
 )
 from app.models import Conversation
 from app.providers.base import ReasoningEffort
-from app.providers.catalog import MODEL_CATALOG
+from app.providers.catalog import MODEL_CATALOG, ModelEntry
+from app.providers.factory import host_authenticated
 from app.providers.model_id import parse_model_id
 
 from .delivery import DEFAULT_VERBOSE_LEVEL
@@ -52,7 +54,11 @@ _VERBOSE_OPTIONS: tuple[tuple[int, str], ...] = ((0, "Quiet"), (1, "Tools"), (2,
 _VERBOSE_MIN, _VERBOSE_MAX = 0, 2
 
 
-def picker_card_for(command: str, conversation: Conversation) -> list[dict[str, Any]] | None:
+def picker_card_for(
+    command: str,
+    conversation: Conversation,
+    workspace_root: Path | None = None,
+) -> list[dict[str, Any]] | None:
     """Return the picker card for a no-arg ``/command``, or ``None`` if not a picker."""
     if command == "thinking":
         return thinking_picker_card(conversation.reasoning_effort or _THINKING_CLEAR)
@@ -64,7 +70,7 @@ def picker_card_for(command: str, conversation: Conversation) -> list[dict[str, 
         )
         return verbose_picker_card(level)
     if command == "model":
-        return model_host_card(conversation.model_id)
+        return model_host_card(conversation.model_id, workspace_root=workspace_root)
     return None
 
 
@@ -75,6 +81,7 @@ async def apply_card_click(
     user_id: uuid.UUID,
     conversation: Conversation,
     session: AsyncSession,
+    workspace_root: Path | None = None,
 ) -> list[dict[str, Any]] | None:
     """Apply a picker button click and return the refreshed card to patch.
 
@@ -98,12 +105,19 @@ async def apply_card_click(
         )
         return verbose_picker_card(level)
     if function == FN_MODEL_HOST:
-        return model_list_card(params.get(_PARAM_HOST, ""), conversation.model_id)
-    if function == FN_SET_MODEL:
-        await update_conversation_model(
-            conversation_id=conversation.id, model_id=value, session=session
+        return model_list_card(
+            params.get(_PARAM_HOST, ""),
+            conversation.model_id,
+            workspace_root=workspace_root,
         )
-        return model_list_card(parse_model_id(value).host.value, value)
+    if function == FN_SET_MODEL:
+        entry = _find_authenticated_model(value, workspace_root=workspace_root)
+        if entry is None:
+            return model_host_card(conversation.model_id, workspace_root=workspace_root)
+        await update_conversation_model(
+            conversation_id=conversation.id, model_id=entry.id, session=session
+        )
+        return model_list_card(entry.host.value, entry.id, workspace_root=workspace_root)
     return None
 
 
@@ -131,9 +145,12 @@ def verbose_picker_card(current: int) -> list[dict[str, Any]]:
     return _picker_card("verbose-picker", "Detail level", subtitle, buttons)
 
 
-def model_host_card(current_id: str | None) -> list[dict[str, Any]]:
+def model_host_card(
+    current_id: str | None,
+    workspace_root: Path | None = None,
+) -> list[dict[str, Any]]:
     """Build the first-level model picker — one button per host."""
-    hosts = sorted({entry.host.value for entry in MODEL_CATALOG})
+    hosts = sorted({entry.host.value for entry in _authenticated_model_entries(workspace_root)})
     buttons = [
         _action_button(
             label=host, function=FN_MODEL_HOST, value=host, selected=False, param_key=_PARAM_HOST
@@ -144,9 +161,17 @@ def model_host_card(current_id: str | None) -> list[dict[str, Any]]:
     return _picker_card("model-picker", "Model", subtitle, buttons)
 
 
-def model_list_card(host: str, current_id: str | None) -> list[dict[str, Any]]:
+def model_list_card(
+    host: str,
+    current_id: str | None,
+    workspace_root: Path | None = None,
+) -> list[dict[str, Any]]:
     """Build the second-level model picker — models for *host* (capped)."""
-    entries = [entry for entry in MODEL_CATALOG if entry.host.value == host]
+    entries = [
+        entry for entry in _authenticated_model_entries(workspace_root) if entry.host.value == host
+    ]
+    if not entries:
+        return model_host_card(current_id, workspace_root=workspace_root)
     buttons = [
         _action_button(
             label=entry.short_name,
@@ -161,6 +186,33 @@ def model_list_card(host: str, current_id: str | None) -> list[dict[str, Any]]:
     if overflow > 0:
         subtitle += f"\n(+{overflow} more — use /model &lt;id&gt;)"
     return _picker_card("model-picker", "Model", subtitle, buttons)
+
+
+def _authenticated_model_entries(workspace_root: Path | None) -> list[ModelEntry]:
+    return [
+        entry
+        for entry in MODEL_CATALOG
+        if host_authenticated(entry.host, workspace_root=workspace_root)
+    ]
+
+
+def _find_authenticated_model(
+    value: str,
+    *,
+    workspace_root: Path | None,
+) -> ModelEntry | None:
+    try:
+        parsed = parse_model_id(value)
+    except ValueError:
+        return None
+    for entry in _authenticated_model_entries(workspace_root):
+        if (
+            entry.host is parsed.host
+            and entry.vendor is parsed.vendor
+            and entry.model == parsed.model
+        ):
+            return entry
+    return None
 
 
 def _coerce_verbose(value: str) -> int:

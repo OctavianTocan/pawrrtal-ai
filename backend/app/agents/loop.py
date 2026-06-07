@@ -18,6 +18,7 @@ The loop never imports any provider SDK directly.
 from __future__ import annotations
 
 import asyncio
+import inspect
 import logging
 import time
 from collections.abc import AsyncIterator
@@ -25,6 +26,7 @@ from typing import Any
 
 from app.agents.display import render_display_from_map, tool_display_map
 from app.infrastructure.observability.workshop import tool_span
+from app.tools.errors import ToolError, ToolErrorCode
 
 from .types import (
     AgentContext,
@@ -102,7 +104,7 @@ async def _execute_and_log_tool_call(
         tool_map: ``name → AgentTool`` lookup built once per loop iteration.
         iteration: 1-based loop iteration, included in the trace lines so
             stuck loops are easy to bucket by turn in the log.
-        config: Loop config (reserved for future per-call hooks).
+        config: Loop config with optional per-call permission hook.
 
     Returns:
         A ``(result_text, is_error)`` tuple. ``result_text`` is always
@@ -179,14 +181,41 @@ async def _dispatch_tool_call(
         ``(result_text, is_error)`` where ``result_text`` is always
         non-empty.
     """
-    _ = config  # reserved for future per-call hooks
     tool = tool_map.get(name)
     if tool is None:
         return f"Tool '{name}' not found.", True
     try:
+        denial = await _tool_permission_denial(config, tool, call_id, arguments)
+    except Exception as exc:
+        return _permission_error(f"Tool permission check failed for '{name}': {exc}"), True
+    if denial is not None:
+        return _permission_error(denial), True
+    try:
         return await tool.execute(call_id, **arguments), False
     except Exception as exc:
         return f"Tool error: {exc}", True
+
+
+async def _tool_permission_denial(
+    config: AgentLoopConfig,
+    tool: AgentTool,
+    call_id: str,
+    arguments: dict[str, Any],
+) -> str | None:
+    """Return a denial message from the configured permission hook, if any."""
+    if config.permission_check is None:
+        return None
+    result = config.permission_check(tool, call_id, arguments)
+    if inspect.isawaitable(result):
+        result = await result
+    if result is None:
+        return None
+    return str(result) or f"Tool '{tool.name}' was denied."
+
+
+def _permission_error(message: str) -> str:
+    """Render a permission denial with the stable tool-error code."""
+    return ToolError(ToolErrorCode.PERMISSION_DENIED, message).render()
 
 
 async def agent_loop(
