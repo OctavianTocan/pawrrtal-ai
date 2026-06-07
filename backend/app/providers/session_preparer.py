@@ -57,5 +57,7 @@ async def prepare_provider_session(
         question=question,
     )
     if inspect.isawaitable(result):
-        return await result
+        result = await result
+    if not isinstance(result, ProviderSessionTurnState):
+        raise TypeError("prepare_turn_session() must return ProviderSessionTurnState")
     return result

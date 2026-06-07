@@ -138,6 +138,8 @@ jobs:
 
       - name: Build frontend (Next.js)
         working-directory: frontend
+        env:
+          BACKEND_INTERNAL_URL: http://127.0.0.1:8000
         run: bun run build
 
       - name: Start frontend

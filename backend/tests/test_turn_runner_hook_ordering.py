@@ -23,10 +23,7 @@ from app.channels.base import ChannelMessage
 from app.channels.turn_orchestrator import ChatTurnInput, _guarded_stream, run_turn
 from app.chat.aggregator import ChatTurnAggregator
 from app.plugins.adapters.turn_context import TurnContextProviderAdapter
-from app.provider_sessions import (
-    ProviderSessionTurnState,
-    await_pending_provider_session_persist_tasks,
-)
+from app.provider_sessions import ProviderSessionTurnState
 from app.providers.base import StreamEvent
 
 
@@ -282,7 +279,6 @@ async def test_provider_session_created_event_is_persisted(
     ]
 
     assert delivered == [{"type": "delta", "content": "ok"}]
-    await await_pending_provider_session_persist_tasks()
     assert persisted == [(turn_input.conversation_id, "agy_cli", "agy_new", None)]
 
 

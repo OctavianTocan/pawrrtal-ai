@@ -92,6 +92,9 @@ ALLOWED_EMAILS=octavian@example.com,esther@example.com
 COOKIE_SECURE=true
 COOKIE_SAMESITE=lax
 CORS_ORIGINS=["https://<pawrrtal-hostname>"]
+GOOGLE_OAUTH_REDIRECT_URI=https://<pawrrtal-hostname>/api/v1/auth/oauth/google/callback
+APPLE_OAUTH_REDIRECT_URI=https://<pawrrtal-hostname>/api/v1/auth/oauth/apple/callback
+OAUTH_POST_LOGIN_REDIRECT=https://<pawrrtal-hostname>/
 GOOGLE_API_KEY=<or another provider key>
 ```
 
@@ -107,8 +110,10 @@ Frontend server-side calls use:
 BACKEND_INTERNAL_URL=http://127.0.0.1:8000
 ```
 
-That is also the default, so it only needs to be set when the backend
-origin changes.
+Set this when building or running the frontend outside Cloudflared's
+path ingress, such as CI production-build E2E. Cloudflared public
+traffic sends `/api/v1`, `/auth`, and `/users` directly to FastAPI
+before those paths reach Next.js.
 
 ## Local Services
 
@@ -128,6 +133,10 @@ just paw project service status
 
 The service runs `dev.ts`, which starts Next.js on `127.0.0.1:3000`
 and FastAPI on `127.0.0.1:8000`. It does not expose a public port.
+If this VPS should use Postgres instead of local SQLite, set
+`PAWRRTAL_DEV_DATABASE_URL` before installing the service; the service
+intentionally clears the generic `DATABASE_URL` so unrelated shell
+state cannot leak into local project launches.
 
 ## Cloudflared Install
 
@@ -227,15 +236,11 @@ git fetch
 git checkout <release>
 git submodule update --init --recursive
 just install
-just paw project service restart
-just paw project cloudflared verify --hostname pawrrtal.octaviantocan.com
-```
-
-Run database migrations when schema changes land:
-
-```bash
 cd backend
 uv run alembic upgrade head
+cd ..
+just paw project service restart
+just paw project cloudflared verify --hostname pawrrtal.octaviantocan.com
 ```
 
 ## Troubleshooting

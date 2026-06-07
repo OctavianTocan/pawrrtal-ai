@@ -270,12 +270,12 @@ def _service_state() -> tuple[str, str]:
     return (active.stdout or active.stderr).strip(), (enabled.stdout or enabled.stderr).strip()
 
 
-def _resolve_status_config_path(
+def _resolve_config_path(
     *,
     requested_config_path: Path | None,
     state: CloudflaredState | None,
 ) -> Path:
-    """Return the config path that status should inspect."""
+    """Return an explicit config path or the saved install path."""
     if requested_config_path is not None:
         return requested_config_path
     if state is not None:
@@ -293,7 +293,7 @@ def _path_exists(path: Path) -> bool:
 
 def _status_payload(config_path: Path | None) -> dict[str, object]:
     state = load_state()
-    resolved_config_path = _resolve_status_config_path(
+    resolved_config_path = _resolve_config_path(
         requested_config_path=config_path,
         state=state,
     )
@@ -405,19 +405,30 @@ def install(
 @app.command("verify")
 def verify(
     hostname: str | None = typer.Option(None, "--hostname", help="Public hostname to verify."),
-    tunnel_name: str = typer.Option(DEFAULT_TUNNEL_NAME, "--tunnel-name"),
-    config_path: Path = typer.Option(DEFAULT_CONFIG_PATH, "--config-path"),
-    frontend_origin: str = typer.Option(DEFAULT_TUNNEL_FRONTEND_ORIGIN, "--frontend-origin"),
-    backend_origin: str = typer.Option(DEFAULT_BACKEND_URL, "--backend-origin"),
+    tunnel_name: str | None = typer.Option(None, "--tunnel-name"),
+    config_path: Path | None = typer.Option(None, "--config-path"),
+    frontend_origin: str | None = typer.Option(None, "--frontend-origin"),
+    backend_origin: str | None = typer.Option(None, "--backend-origin"),
     json_out: bool = typer.Option(False, "--json", help="Emit JSON."),
 ) -> None:
     """Verify local origins, Cloudflared config, service state, and Access."""
     state = load_state()
     host = _normalize_hostname(hostname or (state.hostname if state else ""))
+    effective_tunnel_name = tunnel_name or (state.tunnel_name if state else DEFAULT_TUNNEL_NAME)
+    effective_config_path = _resolve_config_path(
+        requested_config_path=config_path,
+        state=state,
+    )
+    effective_frontend_origin = frontend_origin or (
+        state.frontend_origin if state else DEFAULT_TUNNEL_FRONTEND_ORIGIN
+    )
+    effective_backend_origin = backend_origin or (
+        state.backend_origin if state else DEFAULT_BACKEND_URL
+    )
     _require_binary("cloudflared")
-    _validate_origins(frontend_origin, backend_origin)
-    _validate_ingress(config_path)
-    _cloudflared("tunnel", "info", tunnel_name)
+    _validate_origins(effective_frontend_origin, effective_backend_origin)
+    _validate_ingress(effective_config_path)
+    _cloudflared("tunnel", "info", effective_tunnel_name)
     active, enabled = _service_state()
     public_probe = _public_access_probe(host)
     if not public_probe.access_required:
@@ -428,8 +439,8 @@ def verify(
     payload = {
         "ok": True,
         "hostname": host,
-        "tunnel_name": tunnel_name,
-        "config_path": str(config_path),
+        "tunnel_name": effective_tunnel_name,
+        "config_path": str(effective_config_path),
         "service_active": active,
         "service_enabled": enabled,
         "access_required": True,
@@ -456,15 +467,19 @@ def status(
 
 @app.command("uninstall")
 def uninstall(
-    config_path: Path = typer.Option(DEFAULT_CONFIG_PATH, "--config-path"),
+    config_path: Path | None = typer.Option(None, "--config-path"),
     keep_config: bool = typer.Option(False, "--keep-config", help="Leave config and credentials."),
 ) -> None:
     """Disable Cloudflared and remove Pawrrtal-managed files."""
     state = load_state()
+    effective_config_path = _resolve_config_path(
+        requested_config_path=config_path,
+        state=state,
+    )
     _systemctl("disable", "--now", CLOUDFLARED_SERVICE, check=False)
     _cloudflared("service", "uninstall", check=False)
     if not keep_config:
-        config_path.unlink(missing_ok=True)
+        effective_config_path.unlink(missing_ok=True)
         if state is not None:
             Path(state.credentials_file).unlink(missing_ok=True)
     delete_state()

@@ -49,21 +49,21 @@ def load_state() -> CloudflaredState | None:
         return None
     try:
         raw = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
+        return CloudflaredState(
+            schema_version=int(raw.get("schema_version", CLOUDFLARED_STATE_SCHEMA_VERSION)),
+            tunnel_name=str(raw["tunnel_name"]),
+            tunnel_id=str(raw["tunnel_id"]),
+            hostname=str(raw["hostname"]),
+            public_url=str(raw["public_url"]),
+            config_path=str(raw["config_path"]),
+            credentials_file=str(raw["credentials_file"]),
+            frontend_origin=str(raw["frontend_origin"]),
+            backend_origin=str(raw["backend_origin"]),
+            metrics=str(raw["metrics"]),
+            installed_at=str(raw["installed_at"]),
+        )
+    except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
         return None
-    return CloudflaredState(
-        schema_version=int(raw.get("schema_version", CLOUDFLARED_STATE_SCHEMA_VERSION)),
-        tunnel_name=str(raw["tunnel_name"]),
-        tunnel_id=str(raw["tunnel_id"]),
-        hostname=str(raw["hostname"]),
-        public_url=str(raw["public_url"]),
-        config_path=str(raw["config_path"]),
-        credentials_file=str(raw["credentials_file"]),
-        frontend_origin=str(raw["frontend_origin"]),
-        backend_origin=str(raw["backend_origin"]),
-        metrics=str(raw["metrics"]),
-        installed_at=str(raw["installed_at"]),
-    )
 
 
 def delete_state() -> None:

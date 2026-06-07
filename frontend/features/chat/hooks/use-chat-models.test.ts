@@ -30,7 +30,7 @@ describe('useChatModels', (): void => {
 		vi.stubGlobal('fetch', vi.fn());
 	});
 
-	it('returns the catalog and the FIRST entry as the default on the happy path', async (): Promise<void> => {
+	it('returns the catalog and a usable first entry as the default on the happy path', async (): Promise<void> => {
 		const sonnet = makeModel({ id: 'agent-sdk:anthropic/claude-sonnet-4-6' });
 		const gemini = makeModel({
 			id: 'google-ai:google/gemini-3-flash-preview',
@@ -51,7 +51,6 @@ describe('useChatModels', (): void => {
 		});
 
 		expect(result.current.models).toEqual([sonnet, gemini]);
-		// Default is the FIRST catalog entry, not a server-declared default.
 		expect(result.current.default).toEqual(sonnet);
 		expect(result.current.error).toBeNull();
 	});
@@ -77,6 +76,58 @@ describe('useChatModels', (): void => {
 		});
 
 		expect(result.current.default).toEqual(gemini);
+	});
+
+	it('skips a Codex SDK row when another model is available for the default', async (): Promise<void> => {
+		const codex = makeModel({
+			id: 'openai-codex:openai/gpt-5.5',
+			host: 'openai-codex',
+			vendor: 'openai',
+			model: 'gpt-5.5',
+			display_name: 'GPT 5.5 Codex',
+			short_name: 'Codex',
+		});
+		const openai = makeModel({
+			id: 'litellm:openai/gpt-5.1',
+			host: 'litellm',
+			vendor: 'openai',
+			model: 'gpt-5.1',
+			display_name: 'GPT 5.1',
+			short_name: 'GPT 5.1',
+		});
+		vi.mocked(fetch).mockResolvedValue(Response.json({ models: [codex, openai] }));
+
+		const { result } = renderHook(() => useChatModels(), {
+			wrapper: createQueryClientWrapper(createTestQueryClient()),
+		});
+
+		await waitFor((): void => {
+			expect(result.current.isLoading).toBe(false);
+		});
+
+		expect(result.current.default).toEqual(openai);
+	});
+
+	it('uses Codex SDK as the default when it is the only model', async (): Promise<void> => {
+		const codex = makeModel({
+			id: 'openai-codex:openai/gpt-5.5',
+			host: 'openai-codex',
+			vendor: 'openai',
+			model: 'gpt-5.5',
+			display_name: 'GPT 5.5 Codex',
+			short_name: 'Codex',
+		});
+		vi.mocked(fetch).mockResolvedValue(Response.json({ models: [codex] }));
+
+		const { result } = renderHook(() => useChatModels(), {
+			wrapper: createQueryClientWrapper(createTestQueryClient()),
+		});
+
+		await waitFor((): void => {
+			expect(result.current.isLoading).toBe(false);
+		});
+
+		expect(result.current.default).toEqual(codex);
 	});
 
 	it('returns null default when the models array is empty', async (): Promise<void> => {

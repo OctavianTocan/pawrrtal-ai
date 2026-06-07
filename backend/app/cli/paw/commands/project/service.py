@@ -10,6 +10,7 @@ from pathlib import Path
 
 import typer
 
+from app.cli.paw.commands.project.cloudflared_state import load_state as load_cloudflared_state
 from app.cli.paw.commands.project.state import repo_root
 from app.cli.paw.errors import LocalError
 from app.cli.paw.output import emit_human
@@ -50,6 +51,17 @@ def _systemd_env_line(name: str, value: str) -> str:
     return f'Environment="{name}={escaped}"'
 
 
+def _next_allowed_dev_origins() -> str:
+    """Return explicit or Cloudflared-derived Next dev origins."""
+    explicit = os.environ.get("NEXT_ALLOWED_DEV_ORIGINS", "").strip()
+    if explicit:
+        return explicit
+    cloudflared_state = load_cloudflared_state()
+    if cloudflared_state is None:
+        return ""
+    return cloudflared_state.public_url.rstrip("/")
+
+
 def _unit_text() -> str:
     """Render the user service unit for the current checkout."""
     bun = _require_binary("bun")
@@ -57,6 +69,7 @@ def _unit_text() -> str:
     cache_root = root / ".cache"
     path = os.environ.get("PATH", "")
     dev_database_url = os.environ.get("PAWRRTAL_DEV_DATABASE_URL", "")
+    next_allowed_dev_origins = _next_allowed_dev_origins()
     env_lines = [
         _systemd_env_line("PATH", path),
         _systemd_env_line("UV_CACHE_DIR", str(cache_root / "uv")),
@@ -65,6 +78,8 @@ def _unit_text() -> str:
         _systemd_env_line("PAWRRTAL_DEV_DATABASE_URL", dev_database_url),
         _systemd_env_line("BACKEND_INTERNAL_URL", "http://127.0.0.1:8000"),
     ]
+    if next_allowed_dev_origins:
+        env_lines.append(_systemd_env_line("NEXT_ALLOWED_DEV_ORIGINS", next_allowed_dev_origins))
     return "\n".join(
         [
             "[Unit]",

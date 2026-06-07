@@ -15,6 +15,7 @@ import asyncio
 import pytest
 
 from app import provider_sessions
+from app.channels.turn_orchestrator import state as turn_state
 
 
 @pytest.mark.anyio
@@ -59,6 +60,25 @@ async def test_await_pending_provider_session_persist_tasks_drains_pending_set()
     assert sorted(completed) == [1, 2, 3]
     # The set is empty after drain.
     assert not provider_sessions._PENDING_PROVIDER_SESSION_PERSIST_TASKS
+
+
+@pytest.mark.anyio
+async def test_await_pending_turn_finalize_tasks_drains_pending_set() -> None:
+    """Shutdown drain blocks until every registered turn-finalizer task finishes."""
+    completed: list[int] = []
+
+    async def _finalize(label: int) -> None:
+        await asyncio.sleep(0.02)
+        completed.append(label)
+
+    for label in (1, 2, 3):
+        task = asyncio.create_task(_finalize(label))
+        turn_state._register_turn_finalize_task(task)
+
+    await turn_state.await_pending_turn_finalize_tasks(timeout=2.0)
+
+    assert sorted(completed) == [1, 2, 3]
+    assert not turn_state._PENDING_TURN_FINALIZE_TASKS
 
 
 @pytest.mark.anyio

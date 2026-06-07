@@ -16,6 +16,10 @@ export interface OnboardingReadiness {
 	isLoading: boolean;
 	/** True when the readiness endpoint failed. */
 	isError: boolean;
+	/** True while a retry is in flight. */
+	isRefetching: boolean;
+	/** Retry the readiness check. */
+	refetch: () => void;
 }
 
 /**
@@ -36,5 +40,9 @@ export function useOnboardingReadiness(): OnboardingReadiness {
 		hasWorkspaceReady: onboardingStatusQuery.data?.has_workspace_ready ?? false,
 		isLoading: onboardingStatusQuery.isLoading,
 		isError: onboardingStatusQuery.isError,
+		isRefetching: onboardingStatusQuery.isRefetching,
+		refetch: () => {
+			void onboardingStatusQuery.refetch();
+		},
 	};
 }

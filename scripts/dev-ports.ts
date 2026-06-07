@@ -49,7 +49,7 @@ export const DEV_BACKEND_PORT = 8000;
  * Centralised so the dev shell + status log + any future
  * health-probe consumer all read the same string.
  */
-export const DEV_FRONTEND_URL = `http://localhost:${DEV_FRONTEND_PORT}`;
+export const DEV_FRONTEND_URL = `http://${DEV_FRONTEND_BIND_HOST}:${DEV_FRONTEND_PORT}`;
 
 /**
  * URL the backend exposes during `bun run dev`.
