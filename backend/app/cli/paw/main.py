@@ -26,6 +26,7 @@ from app.cli.paw.commands import messages as messages_cmd
 from app.cli.paw.commands import mirror as mirror_cmd
 from app.cli.paw.commands import models as models_cmd
 from app.cli.paw.commands import personalization as personalization_cmd
+from app.cli.paw.commands import plugins as plugins_cmd
 from app.cli.paw.commands import project as project_cmd
 from app.cli.paw.commands import projects as projects_cmd
 from app.cli.paw.commands import record as record_cmd
@@ -138,6 +139,12 @@ app.add_typer(
     mcp_cmd.app,
     name="mcp",
     help="MCP server registry CRUD.",
+)
+
+app.add_typer(
+    plugins_cmd.app,
+    name="plugins",
+    help="Validate, inspect, and control dynamic plugins.",
 )
 
 app.add_typer(
