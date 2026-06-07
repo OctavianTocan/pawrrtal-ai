@@ -1,0 +1,243 @@
+---
+title: Generic Core and Plugin Extraction
+description: ADR plan - thin Pawrrtal core so providers, channels, tools, integrations, lifecycle hooks, model catalog rows, and agent runtime adapters are plugin contributions instead of hard-coded core branches.
+date: 2026-06-07
+status: Proposed
+related:
+  - 2026-06-06-plugin-system-v2
+---
+
+# Generic Core and Plugin Extraction
+
+**Status:** Proposed - 2026-06-07.
+**Extends:** [Capability Plugin Platform](./2026-06-06-plugin-system-v2).
+
+## Context
+
+The backend still has provider-, channel-, and tool-specific code in places that
+should be generic kernel code. This branch removes one major leak by replacing
+Codex and Antigravity-specific turn-session fields with a generic
+`ProviderSessionTurnState`, but the codebase is not done.
+
+The current audit found these remaining hard-coded seams:
+
+| Area | Current leak | Why it is wrong |
+| --- | --- | --- |
+| Provider resolution | `backend/app/providers/factory.py` imports concrete providers, owns `HOST_TO_PROVIDER`, auth keys, OpenAI Codex lazy loading, Gemini lazy loading, xAI workspace special cases, and Codex cache state. | Core cannot stay generic while adding providers requires editing the provider factory, host enum, auth checks, cache shutdown, catalog, and settings together. |
+| Model catalog | Provider model rows are still first-party Python constants under `backend/app/providers/catalog/`. | Model availability should be contributed by provider plugins and reloaded with the active plugin snapshot. |
+| Channel startup | `backend/app/infrastructure/app_factory.py` imports Telegram and Google Chat lifecycle modules for decorator side effects. | Core startup should iterate active plugin lifecycle contributions, not import channel modules directly. |
+| Channel routes | `backend/app/channels/router.py` contains Telegram link, unlink, webhook, simulate, settings, and parsing logic under a nominally generic `/channels` router. | Channel-specific HTTP flows belong to channel plugins. Core should own only generic channel binding records and route mounting. |
+| Tool composition | `backend/app/agents/tool_surface.py` imports concrete workspace, LCM, plugin catalog, send-message, external MCP, and Telegram tool factories. | Core should compose capability slots from the active plugin snapshot. The runner should not know a Telegram-only tool set exists. |
+| Title generation | `backend/app/conversations/gemini_utils.py` imports Gemini SDK and catalog data for conversation titles. | "Generate a title" is an internal task slot. It should use the configured provider/runtime, not a Gemini helper in conversation core. |
+| Env metadata | `backend/app/infrastructure/config.py` and `backend/app/infrastructure/keys.py` still enumerate provider, channel, tool, and integration keys. | Plugin env specs must drive gateway settings metadata and per-workspace overrides. |
+| Storage | Conversation rows still contain `telegram_thread_id`; Notion still has a first-party operation log table. | Plugin-owned state needs either generic plugin state tables or plugin-scoped migrations, not feature-specific columns in core models unless the field is truly cross-plugin. |
+| Naming | The "turn orchestrator" package owns history, streaming, provider session persistence, turn context, finalization, and channel delivery. | The name hides too much. The kernel needs smaller, explicit subsystems. |
+
+## Decision
+
+Pawrrtal core is the kernel. It keeps user identity, workspaces, conversations,
+messages, the generic turn pipeline, plugin loading, audit/cost records,
+generic capability search, generic env resolution, and generic persistence
+primitives. Everything else is a plugin contribution unless there is a written
+kernel reason for keeping it.
+
+No backwards compatibility shims are kept for removed core concepts. When a
+field, endpoint, setting, or command moves to the new plugin contract, the old
+name is deleted and tests are moved to the new surface.
+
+## Implementation Plan
+
+### 1. Finish the Provider Boundary
+
+Replace `providers.factory` and static catalog dispatch with a provider registry
+owned by the plugin host.
+
+1. Add `ProviderContribution` with `id`, `model_rows`, `auth_specs`,
+   `factory`, optional `cache_key`, optional `shutdown`, and optional
+   `prepare_turn_session`.
+2. Move built-in providers into repo plugins under `backend/plugins/providers/*`.
+3. Replace `Host`-centric `HOST_TO_PROVIDER` with active provider contributions.
+4. Replace `host_authenticated()` with plugin auth checks that use plugin env
+   metadata and workspace overrides.
+5. Move Codex cache closing from `providers.factory` into the Codex provider
+   plugin shutdown hook.
+6. Delete first-party provider imports from core factory modules.
+
+Acceptance checks:
+
+```bash
+rg -n "OpenAICodexProvider|GeminiLLM|ClaudeLLM|XaiLLM|HOST_TO_PROVIDER" backend/app --glob '!backend/app/plugins/**' --glob '!backend/app/providers/**'
+cd backend && uv run pytest tests/test_provider_registry.py
+```
+
+### 2. Make Channels Real Plugins
+
+Channel plugins own transport, lifecycle, command handlers, binding UX, and
+channel-owned routes.
+
+1. Add `ChannelContribution` with `surface`, `channel_factory`, `routers`,
+   `startup_hooks`, `shutdown_hooks`, `binding_flow`, `message_actions`, and
+   optional `dev_simulator`.
+2. Move Telegram and Google Chat router/lifespan code into channel plugins.
+3. Keep only generic channel binding CRUD in core.
+4. Replace `app_factory` channel lifecycle imports with plugin lifecycle
+   registration from the active snapshot.
+5. Replace `/api/v1/channels/telegram/*` hard-coded routes with plugin-mounted
+   routes declared by the Telegram plugin.
+6. Replace `telegram_thread_id` with `channel_thread_key` for all topic/thread
+   scoping, then delete the Telegram-specific column.
+
+Acceptance checks:
+
+```bash
+rg -n "telegram|google_chat" backend/app/infrastructure backend/app/channels/router.py
+cd backend && uv run pytest tests/test_channel_plugins.py tests/test_telegram_channel.py
+```
+
+### 3. Turn Tools Into Slotted Capabilities
+
+Core should ask "what tools satisfy this turn?" instead of importing concrete
+tool factories.
+
+1. Define capability slots such as `workspace.files`, `web.search`,
+   `memory.recall`, `task.manage`, `shell.python`, `message.send`,
+   `document.convert`, and `image.generate`.
+2. Convert workspace file tools, LCM/Active Recall tools, tasks, Python shell,
+   Notion, GitHub issues, external MCP, and Telegram action tools into plugin
+   tool contributions.
+3. Keep `build_agent_tools()` as a thin coordinator that requests enabled
+   capabilities from the plugin host, applies policy, and returns `AgentTool[]`.
+4. Make the catalog search tool query installed and enabled plugins plus their
+   slots, schemas, permissions, and env status.
+5. Allow multiple capabilities in the same slot by default. Exclusive slots
+   must be explicitly declared by slot policy, not assumed by implementation.
+
+Acceptance checks:
+
+```bash
+rg -n "app.tools.telegram_tools|make_lcm_|make_workspace_tools|build_external_mcp_tools" backend/app/agents/tool_surface.py
+cd backend && uv run pytest tests/test_tool_capability_slots.py
+```
+
+### 4. Plugin Env and Workspace Overrides
+
+Every plugin env key must be discoverable, validateable, and overridable per
+workspace when the plugin declares it.
+
+1. Replace static overridable env allowlists with active plugin env metadata.
+2. Keep resolution order: workspace override, gateway fallback only when
+   declared, then missing.
+3. Add `paw workspace env doctor` output that groups keys by plugin and status.
+4. Make plugin enablement validation fail closed when a required workspace key
+   is missing.
+5. Remove provider/channel/tool env keys from core config after their plugins
+   declare them.
+
+Acceptance checks:
+
+```bash
+cd backend && uv run pytest tests/test_plugin_env_resolution.py tests/test_workspace_env_api.py
+```
+
+### 5. Replace Hard-Coded Internal Tasks
+
+Conversation title generation, Active Recall expansion, background summaries,
+and other internal model calls become task slots.
+
+1. Add `InternalTaskContribution` with `slot`, `preferred_models`, `budget`,
+   `input_schema`, and `runner`.
+2. Move Gemini title generation into a `conversation.title.generate` task.
+3. Move Active Recall query expansion into a `memory.recall.expand_query` task.
+4. Let the runtime choose from enabled provider plugins using slot policy and
+   workspace auth.
+5. Delete `backend/app/conversations/gemini_utils.py` after the title task is
+   plugin-backed.
+
+Acceptance checks:
+
+```bash
+rg -n "gemini_utils|generate_text_once|genai.Client" backend/app --glob '!backend/app/plugins/**'
+cd backend && uv run pytest tests/test_internal_task_slots.py tests/test_conversation_api.py
+```
+
+### 6. Rename and Split the Turn Kernel
+
+Rename the confusing agent-loop packages before more plugin work lands.
+
+1. Rename `backend/app/channels/turn_orchestrator/` to
+   `backend/app/turns/pipeline/`.
+2. Split it into `input.py`, `history.py`, `streaming.py`, `provider_sessions.py`,
+   `context.py`, `finalize.py`, and `delivery.py`.
+3. Keep channel code outside `turns/pipeline`; it supplies a `Channel` and
+   `ChannelMessage`, nothing more.
+4. Keep subagents outside plugins. Plugins may ship `agent_profile`
+   definitions, but kernel owns delegated job lifecycle, cancellation,
+   permissions, persistence, and event streams.
+
+Acceptance checks:
+
+```bash
+rg -n "turn_orchestrator" backend/app backend/tests
+cd backend && uv run pytest tests/test_turn_runner_hook_ordering.py tests/test_chat_api.py
+```
+
+### 7. Storage Rules
+
+Use core database tables only for cross-plugin concepts. Use plugin state for
+plugin-owned details.
+
+1. Keep conversations, messages, users, workspaces, audit, cost, and generic
+   plugin state in core.
+2. Move channel-specific thread IDs into `channel_thread_key` or plugin state.
+3. Move Notion operation logs behind a generic plugin operation log unless
+   there is a Notion-specific UI that requires a dedicated plugin migration.
+4. Prefer files for workspace-authored plugin manifests, skills, and simple
+   declarative settings.
+5. Prefer DB rows for user-owned enablement, secrets metadata, audit trails,
+   and state that must be queryable across workspaces.
+
+### 8. Paw CLI as Development Surface
+
+The Paw CLI should be used to build and verify plugins, not only to operate the
+finished app.
+
+1. Add `paw plugins list`, `paw plugins doctor`, `paw plugins enable`,
+   `paw plugins disable`, `paw plugins reload`, `paw plugins search`, and
+   `paw plugins scaffold`.
+2. Add `paw plugins slots` to show which enabled capabilities satisfy each slot.
+3. Add `paw plugins validate <path>` for workspace-authored plugin manifests.
+4. Add `paw plugins dev watch` for hot reload in local development.
+5. Add `paw verify plugins` as a PR gate for manifest loading, env resolution,
+   hot reload, capability search, and plugin-owned routes.
+
+### 9. PR Slicing
+
+Use small commits and small PRs. Each commit should tell the architectural story
+of the slice.
+
+1. Provider sessions and API field rename.
+2. Electrobun deletion and frontend port migration.
+3. Provider plugin registry.
+4. Channel plugin registry and Telegram migration.
+5. Tool slots and capability search.
+6. Plugin env overrides.
+7. Internal task slots.
+8. Turn kernel rename.
+9. Storage cleanup.
+
+Do not merge a slice if it leaves old names working as compatibility aliases.
+Delete the old surface in the same slice that moves callers.
+
+## Branch Scope Already Covered
+
+This branch covers:
+
+- Generic provider-session persistence and turn state.
+- Deletion of browser-facing default model machinery included from PR #473.
+- Deletion of Electrobun workspace code.
+- Port migration from `53001` to `3000`.
+- Cache-only directory cleanup.
+
+It does not complete the full plugin extraction. The remaining work above is
+the follow-up plan that makes core genuinely provider-, tool-, channel-, and
+integration-agnostic.
