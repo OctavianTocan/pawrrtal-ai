@@ -1,9 +1,3 @@
-"""In-tree plugin packages.
+"""Legacy in-tree plugin packages not yet migrated to manifests."""
 
-Importing this module triggers each subpackage's import, which registers
-the plugin against ``app.agents.plugins.registry``.
-"""
-
-# Trigger plugin registration as import side-effects.
 from app.plugins import active_recall as active_recall
-from app.plugins import notion as notion

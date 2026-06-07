@@ -8,6 +8,7 @@ import uuid
 from pathlib import Path
 
 from app.agents.tools import build_agent_tools
+from app.infrastructure.keys import save_workspace_env
 from app.plugins.state import PluginState, plugin_state_path, save_plugin_state
 
 
@@ -105,3 +106,15 @@ def test_workspace_plugin_hot_reload_appears_on_next_tool_build(tmp_path: Path) 
     _write_cli_plugin(tmp_path)
 
     assert "echo_tool" in _tool_names(tmp_path)
+
+
+def test_bundled_notion_manifest_exposes_tool_when_enabled_and_configured(
+    tmp_path: Path,
+) -> None:
+    save_workspace_env(tmp_path, {"NOTION_API_KEY": "secret"})
+    save_plugin_state(
+        plugin_state_path(plugin_id="notion", scope="workspace", workspace_root=tmp_path),
+        PluginState(enabled=True),
+    )
+
+    assert "notion_cli" in _tool_names(tmp_path)
