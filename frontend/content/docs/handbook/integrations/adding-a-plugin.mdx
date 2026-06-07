@@ -133,16 +133,35 @@ enabled by plugin state or the Paw CLI. The host reloads from disk when composin
 plugin tools or turn context providers, so adding, removing, enabling, disabling,
 or editing a plugin is visible on the next turn.
 
+## Agent Discovery
+
+Every agent turn gets a core `search_plugin_capabilities` tool. Use it before
+assuming which optional plugin, provider, channel, or slot candidate exists:
+
+```json
+{
+  "slot": "web_search",
+  "include_unavailable": true
+}
+```
+
+The tool returns capability rows with composite keys (`plugin_id/capability_id`),
+types, slots, state, plugin load status, missing env names, and whether a row is
+preferred for the requested slot. This is intentionally separate from direct
+tool invocation: users can install several candidates for a slot and the agent
+can inspect all of them.
+
 ## Tests
 
 Use these focused tests as examples:
 
 - `backend/tests/test_plugin_tools.py` covers direct CLI tool exposure and hot reload.
+- `backend/tests/test_plugin_catalog_tool.py` covers the agent-facing capability search tool.
 - `backend/tests/test_turn_context_plugins.py` covers Active Recall as a manifest-backed context provider.
 - `backend/tests/test_workspace_env_api.py` covers plugin-declared workspace env overrides.
 
 At minimum, verify:
 
 ```bash
-cd backend && uv run pytest tests/test_plugin_tools.py tests/test_turn_context_plugins.py tests/test_workspace_env_api.py
+cd backend && uv run pytest tests/test_plugin_tools.py tests/test_plugin_catalog_tool.py tests/test_turn_context_plugins.py tests/test_workspace_env_api.py
 ```

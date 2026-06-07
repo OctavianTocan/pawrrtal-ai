@@ -188,7 +188,9 @@ def test_plugins_disable_deactivates_workspace_plugin(
             "--json",
         ],
     )
-    assert json.loads(listed.stdout)[0]["status"] == "disabled"
+    rows = json.loads(listed.stdout)
+    local_search = next(row for row in rows if row["plugin_id"] == "local_search")
+    assert local_search["status"] == "disabled"
 
 
 def test_plugins_capabilities_search_filters_enabled_slot(

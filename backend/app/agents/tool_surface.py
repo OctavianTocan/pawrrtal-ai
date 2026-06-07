@@ -63,6 +63,7 @@ from app.tools.now import (
     make_reminder_schedule_tool,
     make_report_issue_tool,
 )
+from app.tools.plugin_catalog import make_search_plugin_capabilities_tool
 from app.tools.python_exec import make_virtual_python_tool
 from app.tools.send_message import SendFn, make_send_message_tool
 from app.tools.workspace_files import make_workspace_tools
@@ -206,6 +207,7 @@ def build_agent_tools(
     tools.append(make_list_skills_tool(workspace_root=workspace_root))
     tools.append(make_read_skill_tool(workspace_root=workspace_root))
     tools.append(make_invoke_skill_tool(workspace_root=workspace_root))
+    tools.append(make_search_plugin_capabilities_tool(workspace_root=workspace_root))
 
     # GitHub issue reporting.  Always present — the tool resolves
     # GITHUB_TOKEN at call time and returns a clear error when the
