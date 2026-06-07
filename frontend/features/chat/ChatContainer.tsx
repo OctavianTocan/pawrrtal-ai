@@ -4,10 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import { useChatActivity } from '@/features/nav-chats/context/chat-activity-context';
 import { useOnboardingReadiness } from '@/features/onboarding/hooks/use-onboarding-readiness';
-import {
-	OPEN_ONBOARDING_FLOW_EVENT,
-	OPEN_ONBOARDING_SERVER_STEP_EVENT,
-} from '@/features/onboarding/v2/OnboardingFlow';
+import { OPEN_ONBOARDING_FLOW_EVENT } from '@/features/onboarding/v2/OnboardingFlow';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import type { ChatArtifactInteractionPayload, ChatMessage } from '@/lib/types';
 import { ArtifactInteractionProvider } from './artifacts/interaction-context';
@@ -43,8 +40,6 @@ interface UseSelectedChatModelResult {
 	isCatalogError: boolean;
 	/** True when at least one valid catalog entry is available. */
 	hasCatalog: boolean;
-	/** Backend target used for this catalog request. */
-	backendConfigFingerprint: string;
 }
 
 /** Return shape for {@link useSelectedReasoning}. */
@@ -73,7 +68,6 @@ function useSelectedChatModel(
 		isLoading: isCatalogLoading,
 		isError: isCatalogError,
 		hasCatalog,
-		backendConfigFingerprint,
 	} = useChatModels();
 
 	// `null` means "no explicit choice yet" — derive the effective selection
@@ -108,7 +102,6 @@ function useSelectedChatModel(
 		isCatalogLoading,
 		isCatalogError,
 		hasCatalog,
-		backendConfigFingerprint,
 	};
 }
 
@@ -160,36 +153,29 @@ function useChatActivitySync(
 }
 
 interface ComposerBlockReason {
-	backendConfigFingerprint: string;
-	hasBackendConfig: boolean;
 	hasCatalog: boolean;
 	hasWorkspaceReady: boolean;
 	isCatalogError: boolean;
 	isCatalogLoading: boolean;
 	isModelUnavailable: boolean;
+	isOnboardingReadinessError: boolean;
 	isOnboardingReadinessLoading: boolean;
 }
 
 function buildComposerBlockedMessage({
-	backendConfigFingerprint,
-	hasBackendConfig,
 	hasCatalog,
 	hasWorkspaceReady,
 	isCatalogError,
 	isCatalogLoading,
 	isModelUnavailable,
+	isOnboardingReadinessError,
 	isOnboardingReadinessLoading,
 }: ComposerBlockReason): string | undefined {
 	if (isOnboardingReadinessLoading) return 'Checking workspace setup before sending.';
-	if (!hasBackendConfig) return 'Connect a backend server to send messages.';
+	if (isOnboardingReadinessError) return 'Backend unavailable. Check the Pawrrtal service.';
 	if (!hasWorkspaceReady) return 'Finish workspace onboarding before sending messages.';
 	if (isCatalogLoading) return 'Loading model catalog.';
-	if (isCatalogError && process.env.NODE_ENV === 'production') {
-		return 'Model catalog unavailable. Check backend connection.';
-	}
-	if (isCatalogError) {
-		return `Model catalog unavailable from ${backendConfigFingerprint}. Check backend connection.`;
-	}
+	if (isCatalogError) return 'Model catalog unavailable. Check the Pawrrtal service.';
 	if (!hasCatalog) return 'No models are available from the connected backend.';
 	if (isModelUnavailable) return 'Select a model before sending.';
 	return undefined;
@@ -209,7 +195,7 @@ interface ChatContainerProps {
 
 interface ComposerGateArgs {
 	model: UseSelectedChatModelResult;
-	hasBackendConfig: boolean;
+	hasReadinessError: boolean;
 	hasWorkspaceReady: boolean;
 	isOnboardingReadinessLoading: boolean;
 }
@@ -222,35 +208,32 @@ interface ComposerGateResult {
 
 function useComposerGate({
 	model,
-	hasBackendConfig,
+	hasReadinessError,
 	hasWorkspaceReady,
 	isOnboardingReadinessLoading,
 }: ComposerGateArgs): ComposerGateResult {
 	const isModelUnavailable = model.selectedModelId.length === 0;
 	const isComposerBlocked =
 		isOnboardingReadinessLoading ||
-		!hasBackendConfig ||
+		hasReadinessError ||
 		!hasWorkspaceReady ||
 		model.isCatalogLoading ||
 		model.isCatalogError ||
 		isModelUnavailable;
 	const composerBlockedMessage = buildComposerBlockedMessage({
-		backendConfigFingerprint: model.backendConfigFingerprint,
-		hasBackendConfig,
 		hasCatalog: model.hasCatalog,
 		hasWorkspaceReady,
 		isCatalogError: model.isCatalogError,
 		isCatalogLoading: model.isCatalogLoading,
 		isModelUnavailable,
+		isOnboardingReadinessError: hasReadinessError,
 		isOnboardingReadinessLoading,
 	});
 	const openSetup = useCallback(() => {
-		const shouldOpenServerStep = !hasBackendConfig || model.isCatalogError;
-		const event = shouldOpenServerStep
-			? new Event(OPEN_ONBOARDING_SERVER_STEP_EVENT)
-			: new Event(OPEN_ONBOARDING_FLOW_EVENT);
-		window.dispatchEvent(event);
-	}, [hasBackendConfig, model.isCatalogError]);
+		if (!hasWorkspaceReady) {
+			window.dispatchEvent(new Event(OPEN_ONBOARDING_FLOW_EVENT));
+		}
+	}, [hasWorkspaceReady]);
 	return { composerBlockedMessage, isComposerBlocked, openSetup };
 }
 
@@ -278,7 +261,7 @@ export default function ChatContainer({
 	initialModelId,
 }: ChatContainerProps): React.JSX.Element | null {
 	const {
-		hasBackendConfig,
+		isError: hasReadinessError,
 		hasWorkspaceReady,
 		isLoading: isOnboardingReadinessLoading,
 	} = useOnboardingReadiness();
@@ -293,7 +276,7 @@ export default function ChatContainer({
 	});
 	const gate = useComposerGate({
 		model,
-		hasBackendConfig,
+		hasReadinessError,
 		hasWorkspaceReady,
 		isOnboardingReadinessLoading,
 	});

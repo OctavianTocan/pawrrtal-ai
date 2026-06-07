@@ -8,10 +8,6 @@
 #   runner  — minimal Node runtime image serving server.js + sharp for
 #             native Next.js image optimisation
 #
-# Build-time ARG:
-#   NEXT_PUBLIC_BROWSER_API_BASE  defaults to same-origin browser API calls.
-#                                Override only for browser-direct backends.
-#
 # Notes:
 #   - Node version is pinned to a specific minor for reproducibility.
 #     Bump the tag deliberately, never rely on "latest minor".
@@ -46,13 +42,9 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# NEXT_PUBLIC_* must be set BEFORE `bun run build` because Next.js inlines
-# these values into the client bundle at build time.
-#
-# Client-side browser calls hit /api/* via Nginx (same origin). Server-side
-# Next.js calls use BACKEND_INTERNAL_URL at runtime.
-ARG NEXT_PUBLIC_BROWSER_API_BASE=""
-ENV NEXT_PUBLIC_BROWSER_API_BASE=$NEXT_PUBLIC_BROWSER_API_BASE
+# Browser calls stay same-origin. Local/prod routing for `/api/v1`, `/auth`,
+# and `/users` is owned by Next rewrites or the outer Cloudflared ingress.
+# Server-side Next.js calls use BACKEND_INTERNAL_URL at runtime.
 
 RUN bun run build
 

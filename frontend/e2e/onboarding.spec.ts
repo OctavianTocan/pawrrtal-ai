@@ -1,8 +1,7 @@
 /**
- * Onboarding wizard smoke: without a backend config in localStorage,
- * AppShell dispatches the server-step event on mount, opening the
- * wizard at the "Where is your Pawrrtal?" step. We verify the wizard
- * opens and the Continue button advances to the next step.
+ * Onboarding wizard smoke: when the authenticated user has no workspace yet,
+ * AppShell opens the normal four-step onboarding flow. We verify the wizard
+ * opens at Identity and that Continue advances to Context.
  */
 
 import { expect, test } from './fixtures';
@@ -17,28 +16,25 @@ test.describe('onboarding wizard', () => {
 		expect(response.ok()).toBe(true);
 	});
 
-	test('renders the server selection step on fresh load', async ({ page }) => {
+	test('renders the identity step on fresh load', async ({ page }) => {
 		await page.goto('/');
-		await expect(page.getByRole('heading', { name: /Where is your Pawrrtal/i })).toBeVisible({
+		await expect(page.getByRole('heading', { name: /Let's get to know you/i })).toBeVisible({
 			timeout: 10_000,
 		});
-		await expect(page.getByText(/Hosted by Pawrrtal/i)).toBeVisible();
-		await expect(page.getByText(/Self-hosted/i)).toBeVisible();
+		await expect(page.getByLabel(/Your name/i)).toBeVisible();
 	});
 
-	test('Continue button progresses to the next step', async ({ page }) => {
+	test('Continue button progresses to the context step', async ({ page }) => {
 		await page.goto('/');
-		await expect(page.getByRole('heading', { name: /Where is your Pawrrtal/i })).toBeVisible({
+		await expect(page.getByRole('heading', { name: /Let's get to know you/i })).toBeVisible({
 			timeout: 10_000,
 		});
 		await page
 			.getByRole('button', { name: /Continue/i })
 			.first()
 			.click();
-		// After server step, the wizard advances (exact next step depends
-		// on configuration, so we just verify the heading changed).
 		await expect(
-			page.getByRole('heading', { name: /Where is your Pawrrtal/i })
-		).not.toBeVisible({ timeout: 5_000 });
+			page.getByRole('heading', { name: /Let's give your agent some context about you/i })
+		).toBeVisible({ timeout: 5_000 });
 	});
 });

@@ -17,17 +17,9 @@ import { StepContext } from './step-context';
 import { StepIdentity } from './step-identity';
 import { StepMessaging } from './step-messaging';
 import { StepPersonality } from './step-personality';
-import { StepServer } from './step-server';
 
 /** Browser event used by app chrome to open the onboarding flow. */
 export const OPEN_ONBOARDING_FLOW_EVENT = 'pawrrtal:open-onboarding-flow';
-
-/**
- * Browser event that opens the onboarding flow directly at the server
- * configuration step. Dispatched by the workspace-creation modal when the
- * user clicks "Connect to remote server".
- */
-export const OPEN_ONBOARDING_SERVER_STEP_EVENT = 'pawrrtal:open-onboarding-server-step';
 
 /**
  * Localstorage flag + query-string param that suppress the auto-open
@@ -58,7 +50,7 @@ export const E2E_SKIP_ONBOARDING_QUERY_PARAM = 'e2e_skip_onboarding';
 export const ONBOARDING_COMPLETE_STORAGE_KEY = 'pawrrtal:onboarding-v2-complete';
 
 /** Wizard step IDs in render order. */
-const STEP_IDS = ['identity', 'server', 'context', 'personality', 'messaging'] as const;
+const STEP_IDS = ['identity', 'context', 'personality', 'messaging'] as const;
 export type StepId = (typeof STEP_IDS)[number];
 
 interface OnboardingFlowState {
@@ -280,22 +272,6 @@ export function OnboardingFlow({
 		return () => window.removeEventListener(OPEN_ONBOARDING_FLOW_EVENT, handler);
 	}, [listenForOpenEvent]);
 
-	// Always listen for the server-step deep-link event — this is an explicit
-	// user action ("Connect to remote server" button) and must work regardless
-	// of the listenForOpenEvent flag.  E2E skip still applies.
-	useEffect(() => {
-		if (shouldSkipOnboardingForE2E()) return;
-		const serverHandler = (): void => {
-			dispatchFlowState({
-				type: 'open-at-step',
-				profile: loadPersonalizationProfile(),
-				step: 'server',
-			});
-		};
-		window.addEventListener(OPEN_ONBOARDING_SERVER_STEP_EVENT, serverHandler);
-		return () => window.removeEventListener(OPEN_ONBOARDING_SERVER_STEP_EVENT, serverHandler);
-	}, []);
-
 	return (
 		<Dialog onOpenChange={handleOpenChange} open={open}>
 			<DialogContent
@@ -311,9 +287,6 @@ export function OnboardingFlow({
 							onPatch={patchProfile}
 							profile={profile}
 						/>
-					) : null}
-					{step === 'server' ? (
-						<StepServer onContinue={goNext} onPatch={patchProfile} profile={profile} />
 					) : null}
 					{step === 'context' ? (
 						<StepContext

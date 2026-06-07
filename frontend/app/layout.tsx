@@ -54,7 +54,7 @@ export const metadata: Metadata = {
 /**
  * Agentation is an interactive inspection layer that intentionally blocks page
  * interactions while active. Keep it opt-in so normal dev sessions, including
- * Tailscale-served login flows, remain usable.
+ * Cloudflared-served login flows, remain usable.
  */
 const enableAgentation =
 	process.env.NODE_ENV === 'development' && process.env.ENABLE_AGENTATION === 'true';

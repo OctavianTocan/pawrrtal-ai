@@ -148,7 +148,6 @@ const EXEMPT_FILES = new Set([
 	'frontend/features/nav-chats/context/sidebar-focus.tsx',
 	'frontend/features/settings/sections/AppearanceRows.tsx',
 	'frontend/features/nav-chats/NavChats.tsx',
-	'frontend/features/onboarding/v2/step-server.tsx',
 	'frontend/features/onboarding/v2/OnboardingFlow.tsx',
 	'frontend/features/projects/components/ProjectsList.tsx',
 	'frontend/features/settings/primitives.tsx',

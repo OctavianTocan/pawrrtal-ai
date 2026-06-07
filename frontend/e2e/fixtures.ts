@@ -26,7 +26,6 @@ import { E2E_SKIP_ONBOARDING_STORAGE_KEY } from '../features/onboarding/v2/Onboa
 
 const BACKEND_URL = process.env.E2E_API_URL ?? 'http://localhost:8000';
 
-const BACKEND_CONFIG_STORAGE_KEY = 'pawrrtal:backend-config';
 const SESSION_COOKIE_NAME = 'session_token';
 
 async function readResponseSummary(response: Response): Promise<string> {
@@ -163,26 +162,10 @@ export const test = base.extend<E2EFixtures>({
 
 	context: async ({ context, skipOnboarding }, use) => {
 		await context.addInitScript(
-			({
-				skipKey,
-				configKey,
-				backendUrl,
-				shouldSkip,
-			}: {
-				skipKey: string;
-				configKey: string;
-				backendUrl: string;
-				shouldSkip: boolean;
-			}) => {
+			({ skipKey, shouldSkip }: { skipKey: string; shouldSkip: boolean }) => {
 				try {
 					if (shouldSkip) {
 						window.localStorage.setItem(skipKey, '1');
-						if (!window.localStorage.getItem(configKey)) {
-							window.localStorage.setItem(
-								configKey,
-								JSON.stringify({ url: backendUrl, apiKey: '' })
-							);
-						}
 					}
 				} catch {
 					// localStorage may throw in private browsing
@@ -190,8 +173,6 @@ export const test = base.extend<E2EFixtures>({
 			},
 			{
 				skipKey: E2E_SKIP_ONBOARDING_STORAGE_KEY,
-				configKey: BACKEND_CONFIG_STORAGE_KEY,
-				backendUrl: BACKEND_URL,
 				shouldSkip: skipOnboarding,
 			}
 		);

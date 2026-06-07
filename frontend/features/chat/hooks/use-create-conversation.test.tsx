@@ -6,7 +6,6 @@ import { createQueryClientWrapper, createTestQueryClient } from '@/test/utils/re
 import { useCreateConversation } from './use-create-conversation';
 
 const replaceMock = vi.fn();
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
 vi.mock('next/navigation', () => ({
 	useRouter: () => ({
@@ -49,18 +48,15 @@ describe('useCreateConversation', (): void => {
 			expect(result.current.isSuccess).toBe(true);
 		});
 
-		expect(fetch).toHaveBeenCalledWith(
-			`${apiBaseUrl}/api/v1/conversations/client-reserved-id`,
-			{
-				method: 'POST',
-				body: JSON.stringify({ title: 'Hello' }),
-				headers: {
-					'content-type': 'application/json',
-				},
-				credentials: 'include',
-				cache: 'no-store',
-			}
-		);
+		expect(fetch).toHaveBeenCalledWith('/api/v1/conversations/client-reserved-id', {
+			method: 'POST',
+			body: JSON.stringify({ title: 'Hello' }),
+			headers: {
+				'content-type': 'application/json',
+			},
+			credentials: 'include',
+			cache: 'no-store',
+		});
 	});
 
 	it('upserts the returned conversation at the head of the cached sidebar list', async (): Promise<void> => {

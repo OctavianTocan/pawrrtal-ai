@@ -2,7 +2,7 @@
  * Playwright config for the pawrrtal E2E suite.
  *
  * Tests live in `frontend/e2e/`. The suite assumes both servers are
- * already running on the documented dev ports (Next on :3001, FastAPI
+ * already running on the documented dev ports (Next on :53001, FastAPI
  * on :8000) — start them with `just dev` in another terminal before
  * running `just e2e` so we don't fight the dev workflow with
  * `webServer` lifecycles.

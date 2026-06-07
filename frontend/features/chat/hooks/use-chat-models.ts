@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import { z } from 'zod';
 import { useAuthedFetch } from '@/hooks/use-authed-fetch';
-import { API_ENDPOINTS, getBackendConfigFingerprint } from '@/lib/api';
+import { API_ENDPOINTS } from '@/lib/api';
 
 /**
  * Query key used by {@link useChatModels} and any cache mutator that
@@ -46,8 +46,6 @@ export interface UseChatModelsResult {
 	isError: boolean;
 	/** True when at least one valid model row is available. */
 	hasCatalog: boolean;
-	/** Stable identifier for the backend target used by this catalog request. */
-	backendConfigFingerprint: string;
 	/** Latest fetch / validation error, or `null` when healthy. */
 	error: Error | null;
 }
@@ -114,10 +112,9 @@ function selectDefaultModel(models: readonly ChatModelOption[]): ChatModelOption
  */
 export function useChatModels(): UseChatModelsResult {
 	const authedFetch = useAuthedFetch();
-	const backendConfigFingerprint = getBackendConfigFingerprint();
 
 	const query = useQuery<{ models: ChatModelOption[] }>({
-		queryKey: [CHAT_MODELS_QUERY_KEY, backendConfigFingerprint],
+		queryKey: [CHAT_MODELS_QUERY_KEY],
 		staleTime: Number.POSITIVE_INFINITY,
 		queryFn: async (): Promise<{ models: ChatModelOption[] }> => {
 			// Caching is disabled by default.
@@ -153,7 +150,6 @@ export function useChatModels(): UseChatModelsResult {
 		isLoading: query.isLoading,
 		isError: query.isError,
 		hasCatalog: models.length > 0,
-		backendConfigFingerprint,
 		error: query.error ?? null,
 	};
 }
