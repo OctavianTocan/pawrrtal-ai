@@ -44,6 +44,21 @@ async function collectStream(
 	return events;
 }
 
+async function expectRejectedMessage(
+	promise: Promise<unknown>,
+	expectedMessage: string
+): Promise<void> {
+	try {
+		await promise;
+	} catch (error) {
+		expect(error).toBeInstanceOf(Error);
+		expect((error as Error).message).toBe(expectedMessage);
+		return;
+	}
+
+	throw new Error(`Expected promise to reject with: ${expectedMessage}`);
+}
+
 describe('useChat', (): void => {
 	beforeEach((): void => {
 		replaceMock.mockClear();
@@ -61,16 +76,16 @@ describe('useChat', (): void => {
 
 		const { result } = renderHook(() => useChat());
 
-		await expect(
-			collectStream(
-				result.current.streamMessage(
-					'Hi',
-					'conversation-1',
-					'google-ai:google/gemini-3-flash-preview',
-					'high'
-				)
+		const events = await collectStream(
+			result.current.streamMessage(
+				'Hi',
+				'conversation-1',
+				'google-ai:google/gemini-3-flash-preview',
+				'high'
 			)
-		).resolves.toEqual([
+		);
+
+		expect(events).toEqual([
 			{ type: 'delta', content: 'Hel' },
 			{ type: 'delta', content: 'lo' },
 		]);
@@ -103,16 +118,16 @@ describe('useChat', (): void => {
 
 		const { result } = renderHook(() => useChat());
 
-		await expect(
-			collectStream(
-				result.current.streamMessage(
-					'Hi',
-					'conversation-1',
-					'google-ai:google/gemini-3-flash-preview',
-					'medium'
-				)
+		const events = await collectStream(
+			result.current.streamMessage(
+				'Hi',
+				'conversation-1',
+				'google-ai:google/gemini-3-flash-preview',
+				'medium'
 			)
-		).resolves.toEqual([{ type: 'delta', content: 'Split' }]);
+		);
+
+		expect(events).toEqual([{ type: 'delta', content: 'Split' }]);
 	});
 
 	it('yields thinking, tool_use, tool_progress, and tool_result events alongside deltas', async (): Promise<void> => {
@@ -129,16 +144,16 @@ describe('useChat', (): void => {
 
 		const { result } = renderHook(() => useChat());
 
-		await expect(
-			collectStream(
-				result.current.streamMessage(
-					'Hi',
-					'conversation-1',
-					'agent-sdk:anthropic/claude-sonnet-4-6',
-					'extra-high'
-				)
+		const events = await collectStream(
+			result.current.streamMessage(
+				'Hi',
+				'conversation-1',
+				'agent-sdk:anthropic/claude-sonnet-4-6',
+				'extra-high'
 			)
-		).resolves.toEqual([
+		);
+
+		expect(events).toEqual([
 			{ type: 'thinking', content: 'Let me search...' },
 			{
 				type: 'tool_use',
@@ -163,7 +178,7 @@ describe('useChat', (): void => {
 
 		const { result } = renderHook(() => useChat());
 
-		await expect(
+		await expectRejectedMessage(
 			collectStream(
 				result.current.streamMessage(
 					'Hi',
@@ -171,8 +186,9 @@ describe('useChat', (): void => {
 					'agent-sdk:anthropic/claude-sonnet-4-6',
 					'low'
 				)
-			)
-		).rejects.toThrow('Claude CLI failed: missing auth');
+			),
+			'Claude CLI failed: missing auth'
+		);
 	});
 
 	it('ignores frames with unknown event types', async (): Promise<void> => {
@@ -186,15 +202,15 @@ describe('useChat', (): void => {
 
 		const { result } = renderHook(() => useChat());
 
-		await expect(
-			collectStream(
-				result.current.streamMessage(
-					'Hi',
-					'conversation-1',
-					'google-ai:google/gemini-3-flash-preview',
-					'medium'
-				)
+		const events = await collectStream(
+			result.current.streamMessage(
+				'Hi',
+				'conversation-1',
+				'google-ai:google/gemini-3-flash-preview',
+				'medium'
 			)
-		).resolves.toEqual([{ type: 'delta', content: 'hi' }]);
+		);
+
+		expect(events).toEqual([{ type: 'delta', content: 'hi' }]);
 	});
 });

@@ -5,6 +5,21 @@ import { useAuthedFetch } from './use-authed-fetch';
 const replaceMock = vi.fn();
 const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
+async function expectRejectedMessage(
+	promise: Promise<unknown>,
+	expectedMessage: string
+): Promise<void> {
+	try {
+		await promise;
+	} catch (error) {
+		expect(error).toBeInstanceOf(Error);
+		expect((error as Error).message).toBe(expectedMessage);
+		return;
+	}
+
+	throw new Error(`Expected promise to reject with: ${expectedMessage}`);
+}
+
 vi.mock('next/navigation', () => ({
 	useRouter: () => ({
 		replace: replaceMock,
@@ -42,7 +57,7 @@ describe('useAuthedFetch', (): void => {
 
 		const { result } = renderHook(() => useAuthedFetch());
 
-		await expect(result.current('/me')).rejects.toThrow('User is not authenticated');
+		await expectRejectedMessage(result.current('/me'), 'User is not authenticated');
 		expect(replaceMock).toHaveBeenCalledOnce();
 		// Must point at /login and round-trip the original path through ?redirect=.
 		expect(replaceMock).toHaveBeenCalledWith(expect.stringMatching(/^\/login\?redirect=/));
@@ -53,7 +68,8 @@ describe('useAuthedFetch', (): void => {
 
 		const { result } = renderHook(() => useAuthedFetch());
 
-		await expect(result.current('/api/v1/conversations')).rejects.toThrow(
+		await expectRejectedMessage(
+			result.current('/api/v1/conversations'),
 			'API Error: 500 . Body: broken database'
 		);
 	});
