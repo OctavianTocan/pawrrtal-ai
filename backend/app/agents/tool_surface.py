@@ -41,7 +41,6 @@ from app.plugins.tool_context import ToolContext
 from app.providers.catalog import first_authenticated_catalog_model
 from app.tools.artifact_agent import make_artifact_tool
 from app.tools.exa_search_agent import make_exa_search_tool
-from app.tools.image_gen_agent import make_image_gen_tool
 from app.tools.lcm_agents import (
     make_lcm_describe_tool,
     make_lcm_expand_query_tool,
@@ -156,18 +155,6 @@ def build_agent_tools(
     # web/electron sees the interactive widget catalog. Validation is
     # surface-independent.
     tools.append(make_artifact_tool(surface=surface))
-
-    # Image generation — pure tool: generates PNG, saves to workspace,
-    # returns path.  The agent decides whether to send it via send_message.
-    # Capability-gated on OPENAI_CODEX_OAUTH_TOKEN being resolvable.
-    # Same auth-gate pattern as the Exa block above: `workspace_id`
-    # distinguishes authenticated turns from background callers.
-    if workspace_id is not None:
-        codex_token = resolve_api_key(workspace_root, "OPENAI_CODEX_OAUTH_TOKEN")
-    else:
-        codex_token = None
-    if codex_token:
-        tools.append(make_image_gen_tool(workspace_root=workspace_root))
 
     # Current wall-clock time.  Pure stdlib, no network — always present
     # so the model can re-query the clock mid-turn without burning

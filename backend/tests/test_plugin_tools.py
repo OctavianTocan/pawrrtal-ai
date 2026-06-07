@@ -181,6 +181,35 @@ def test_bundled_github_issues_plugin_can_be_disabled(tmp_path: Path) -> None:
     assert "report_issue" not in _tool_names(tmp_path)
 
 
+def test_bundled_image_generation_manifest_is_disabled_by_default(tmp_path: Path) -> None:
+    save_workspace_env(tmp_path, {"OPENAI_CODEX_OAUTH_TOKEN": "secret"})
+
+    assert "generate_image" not in _tool_names(tmp_path)
+
+
+def test_bundled_image_generation_requires_configuration_when_enabled(
+    tmp_path: Path,
+) -> None:
+    save_plugin_state(
+        plugin_state_path(plugin_id="image_generation", scope="workspace", workspace_root=tmp_path),
+        PluginState(enabled=True),
+    )
+
+    assert "generate_image" not in _tool_names(tmp_path)
+
+
+def test_bundled_image_generation_exposes_tool_when_enabled_and_configured(
+    tmp_path: Path,
+) -> None:
+    save_workspace_env(tmp_path, {"OPENAI_CODEX_OAUTH_TOKEN": "secret"})
+    save_plugin_state(
+        plugin_state_path(plugin_id="image_generation", scope="workspace", workspace_root=tmp_path),
+        PluginState(enabled=True),
+    )
+
+    assert "generate_image" in _tool_names(tmp_path)
+
+
 def test_bundled_tasks_manifest_exposes_task_tools(tmp_path: Path) -> None:
     names = _tool_names(tmp_path)
 

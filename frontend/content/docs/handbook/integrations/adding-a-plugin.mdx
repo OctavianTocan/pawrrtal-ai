@@ -159,6 +159,11 @@ The bundled `document_conversion` plugin is the local-file adapter template. It
 declares `convert_to_markdown` as a `python_tool`, keeps MarkItDown scoped to
 the workspace root, and requires only `filesystem_read`.
 
+The bundled `image_generation` plugin is the opt-in costly tool template. It is
+disabled by default, requires `OPENAI_CODEX_OAUTH_TOKEN`, and only exposes
+`generate_image` after the workspace enables the plugin and configures the
+credential.
+
 ## Trusted Runtime Capabilities
 
 Runtime capabilities such as `turn_context_provider`, `provider`, `channel`,
