@@ -320,7 +320,7 @@ runner_indexes_for_tag() {
     local tag_dir="${RUNNER_BASE}/runs/${RUN_TAG}"
     [[ -d "$tag_dir" ]] || return 0
     local dir base index
-    for dir in "$tag_dir"/pawrrtal-gha-"$RUN_TAG"-*; do
+    for dir in "$tag_dir"/pawrrtal-"$RUN_TAG"-*; do
         [[ -d "$dir" ]] || continue
         base="${dir##*-}"
         index="${base#0}"

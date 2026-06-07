@@ -12,7 +12,7 @@ def test_runner_index_discovery_uses_existing_tag_directories(tmp_path: Path) ->
     tag_dir = tmp_path / "runs" / "foo"
     tag_dir.mkdir(parents=True)
     for suffix in ("01", "02", "05"):
-        (tag_dir / f"pawrrtal-gha-foo-{suffix}").mkdir()
+        (tag_dir / f"pawrrtal-foo-{suffix}").mkdir()
 
     repo_root = Path(__file__).resolve().parents[2]
     script = repo_root / "scripts" / "ephemeral-self-hosted-runners.sh"
