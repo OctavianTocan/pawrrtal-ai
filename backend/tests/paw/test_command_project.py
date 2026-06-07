@@ -17,6 +17,7 @@ import app.cli.paw.commands.project.cloudflared as cloudflared_module
 import app.cli.paw.commands.project.service as service_module
 from app.cli.paw import config as paw_config
 from app.cli.paw.commands.project import cli as project_module
+from app.cli.paw.commands.project.cloudflared_state import CloudflaredState, save_state
 from app.cli.paw.commands.project.preflight import PreflightCheck
 from app.cli.paw.commands.project.state import PROJECT_STATE_SCHEMA_VERSION, repo_root
 from app.cli.paw.errors import LocalError
@@ -418,6 +419,36 @@ def test_project_service_install_preserves_explicit_dev_database_url(
     assert 'Environment="BACKEND_INTERNAL_URL=http://127.0.0.1:8000"' in unit
 
 
+def test_project_service_install_allows_saved_cloudflared_origin(
+    runner: CliRunner,
+    fake_systemd: list[list[str]],
+    tmp_path: Path,
+) -> None:
+    """The managed dev service allows the saved Cloudflared public hostname."""
+    save_state(
+        CloudflaredState(
+            schema_version=1,
+            tunnel_name="pawrrtal",
+            tunnel_id="tunnel-uuid",
+            hostname="pawrrtal.example.com",
+            public_url="https://pawrrtal.example.com/",
+            config_path="/etc/cloudflared/config.yml",
+            credentials_file="/etc/cloudflared/tunnel-uuid.json",
+            frontend_origin="http://127.0.0.1:3000",
+            backend_origin="http://127.0.0.1:8000",
+            metrics="127.0.0.1:20241",
+            installed_at="2026-06-07T00:00:00+00:00",
+        )
+    )
+
+    result = runner.invoke(app, ["project", "service", "install"])
+    assert result.exit_code == 0, result.stdout
+
+    unit_path = tmp_path / "xdg" / "systemd" / "user" / "pawrrtal-dev.service"
+    unit = unit_path.read_text()
+    assert 'Environment="NEXT_ALLOWED_DEV_ORIGINS=https://pawrrtal.example.com"' in unit
+
+
 def test_project_service_install_can_enable_linger(
     runner: CliRunner,
     fake_systemd: list[list[str]],
@@ -667,6 +698,43 @@ def test_project_cloudflared_verify_reports_access_json(
     assert payload["public_status"] == 302
 
 
+def test_project_cloudflared_verify_uses_saved_install_state(
+    runner: CliRunner,
+    fake_cloudflared: list[list[str]],
+    tmp_path: Path,
+) -> None:
+    """Verify reuses saved install flags when the user does not repeat them."""
+    config_path = tmp_path / "cloudflared" / "custom.yml"
+    runner.invoke(
+        app,
+        [
+            "project",
+            "cloudflared",
+            "install",
+            "--hostname",
+            "pawrrtal.example.com",
+            "--config-path",
+            str(config_path),
+            "--frontend-origin",
+            "http://127.0.0.1:3000",
+            "--backend-origin",
+            "http://127.0.0.1:8000",
+        ],
+    )
+    fake_cloudflared.clear()
+
+    result = runner.invoke(app, ["project", "cloudflared", "verify", "--json"])
+
+    assert result.exit_code == 0, result.stdout
+    payload = json.loads(result.stdout.strip().splitlines()[-1])
+    assert payload["config_path"] == str(config_path)
+    assert payload["tunnel_name"] == "pawrrtal"
+    assert ["cloudflared", "--config", str(config_path), "tunnel", "ingress", "validate"] in (
+        fake_cloudflared
+    )
+    assert ["cloudflared", "tunnel", "info", "pawrrtal"] in fake_cloudflared
+
+
 def test_project_cloudflared_status_hides_credentials(
     runner: CliRunner,
     fake_cloudflared: list[list[str]],
@@ -694,6 +762,35 @@ def test_project_cloudflared_status_hides_credentials(
     payload = json.loads(result.stdout.strip().splitlines()[-1])
     assert payload["hostname"] == "pawrrtal.example.com"
     assert payload["service_active"] == "active"
+
+
+def test_project_cloudflared_uninstall_removes_saved_config_path(
+    runner: CliRunner,
+    fake_cloudflared: list[list[str]],
+    tmp_path: Path,
+) -> None:
+    """Plain uninstall removes the config path recorded by install."""
+    config_path = tmp_path / "cloudflared" / "custom.yml"
+    runner.invoke(
+        app,
+        [
+            "project",
+            "cloudflared",
+            "install",
+            "--hostname",
+            "pawrrtal.example.com",
+            "--config-path",
+            str(config_path),
+        ],
+    )
+    credentials_path = config_path.parent / "tunnel-uuid.json"
+
+    result = runner.invoke(app, ["project", "cloudflared", "uninstall"])
+
+    assert result.exit_code == 0, result.stdout
+    assert not config_path.exists()
+    assert not credentials_path.exists()
+    assert not (paw_config.profile_dir("cloudflared") / "project-service.json").exists()
 
 
 def test_project_service_uninstall_disables_and_removes_unit(

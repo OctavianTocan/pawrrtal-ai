@@ -27,10 +27,21 @@ def upgrade() -> None:
         """
         UPDATE conversations
         SET
+            provider_session_kind = 'agy_cli',
+            provider_session_id = agy_conversation_id
+        WHERE agy_conversation_id IS NOT NULL
+          AND (model_id LIKE 'agy-api:%' OR model_id LIKE 'agy-cli:%')
+        """
+    )
+    op.execute(
+        """
+        UPDATE conversations
+        SET
             provider_session_kind = 'openai_codex',
             provider_session_id = codex_thread_id,
             provider_session_fingerprint = codex_thread_prompt_hash
-        WHERE codex_thread_id IS NOT NULL
+        WHERE provider_session_id IS NULL
+          AND codex_thread_id IS NOT NULL
         """
     )
     op.execute(

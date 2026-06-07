@@ -380,6 +380,7 @@ async def _run_agent_turn(*, prompt: str, user_id: uuid.UUID) -> str:
     workspace_root: Path | None = Path(workspace.path) if workspace is not None else None
     workspace_ctx = load_workspace_context(workspace_root) if workspace_root is not None else None
     system_prompt = workspace_ctx.system_prompt if workspace_ctx is not None else None
+    model_id = first_catalog_model().id
 
     agent_tools = (
         build_agent_tools(
@@ -388,6 +389,7 @@ async def _run_agent_turn(*, prompt: str, user_id: uuid.UUID) -> str:
             workspace_id=workspace.id,
             send_fn=None,
             surface="webhook",
+            model_id=model_id,
         )
         if workspace is not None and workspace_root is not None
         else []
@@ -397,7 +399,7 @@ async def _run_agent_turn(*, prompt: str, user_id: uuid.UUID) -> str:
     # per-user key resolution upstream. Kept for call-site symmetry.
     _ = user_id
     provider = resolve_llm(
-        first_catalog_model().id,
+        model_id,
         workspace_root=workspace_root,
     )
 

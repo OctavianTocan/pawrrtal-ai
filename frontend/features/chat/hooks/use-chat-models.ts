@@ -33,10 +33,9 @@ export interface UseChatModelsResult {
 	/** Catalog entries; empty array while the request is in flight. */
 	models: readonly ChatModelOption[];
 	/**
-	 * The first catalog entry — the pre-selected model for a fresh session.
-	 * `null` while loading or when the catalog is empty. The product chose
-	 * "first in list" over a server-declared default, so this is simply
-	 * `models[0]`.
+	 * The pre-selected model for a fresh session. `null` while loading or when
+	 * the catalog is empty. Codex SDK rows are skipped when another usable row
+	 * exists because host-authenticated Codex can still require local CLI auth.
 	 */
 	default: ChatModelOption | null;
 	/** True until the first response (success or error) lands. */
@@ -98,7 +97,7 @@ function parseCatalogModel(entry: unknown, index: number): ChatModelOption | nul
  * there, mirroring the boundary-validation pattern from
  * `frontend/hooks/get-conversations.ts`.
  *
- * @returns Catalog data, the first entry (the fresh-session default),
+ * @returns Catalog data, the fresh-session default,
  *   loading flag, and the latest error (or `null` while healthy).
  */
 export function useChatModels(): UseChatModelsResult {
@@ -130,13 +129,14 @@ export function useChatModels(): UseChatModelsResult {
 	});
 
 	const models = query.data?.models ?? [];
-	// Product decision: pre-select the FIRST catalog entry, not a
-	// server-declared default. `null` while the catalog is empty/loading.
-	const firstModel = useMemo<ChatModelOption | null>(() => models[0] ?? null, [models]);
+	const defaultModel = useMemo<ChatModelOption | null>(
+		() => models.find((model) => model.host !== 'openai-codex') ?? models[0] ?? null,
+		[models]
+	);
 
 	return {
 		models,
-		default: firstModel,
+		default: defaultModel,
 		isLoading: query.isLoading,
 		isError: query.isError,
 		hasCatalog: models.length > 0,

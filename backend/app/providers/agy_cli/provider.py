@@ -57,6 +57,7 @@ class AgyCliLLM:
         del workspace_root, model_id, tools, reasoning_effort, question
         record = await load_provider_session(conversation_id)
         if record is None or record.kind != PROVIDER_SESSION_KIND or not record.session_id:
+            self._session_by_conversation.pop(conversation_id, None)
             return ProviderSessionTurnState(kind=PROVIDER_SESSION_KIND)
         return ProviderSessionTurnState(
             kind=PROVIDER_SESSION_KIND,

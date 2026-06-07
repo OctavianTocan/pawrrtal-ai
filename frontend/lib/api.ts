@@ -14,7 +14,7 @@ function buildApiUrl(path: string): string {
 	return path.startsWith('/') ? path : `/${path}`;
 }
 
-/** Return the browser-visible URL for an API path using the active runtime config. */
+/** Normalize a browser API path for same-origin requests. */
 export function getBrowserApiUrl(path: string): string {
 	return buildApiUrl(path);
 }

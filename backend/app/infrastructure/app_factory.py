@@ -23,6 +23,7 @@ from app.infrastructure.shutdown import (
     provider_session_persist_drain as _provider_session_persist_drain,
 )
 from app.infrastructure.shutdown import tracing as _shutdown_tracing
+from app.infrastructure.shutdown import turn_finalize_drain as _turn_finalize_drain
 from app.infrastructure.startup import admin_seed as _admin_seed
 from app.infrastructure.startup import database as _database
 from app.infrastructure.startup import event_bus as _event_bus
@@ -47,6 +48,7 @@ _LIFECYCLE_MODULES = (
     _scheduler,
     _telegram_lifespan,
     _google_chat_lifespan,
+    _turn_finalize_drain,
     _provider_session_persist_drain,
     _provider_caches,
     _agy_api_client,

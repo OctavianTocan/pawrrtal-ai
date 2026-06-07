@@ -230,10 +230,11 @@ function useComposerGate({
 		isOnboardingReadinessLoading,
 	});
 	const openSetup = useCallback(() => {
+		if (hasReadinessError) return;
 		if (!hasWorkspaceReady) {
 			window.dispatchEvent(new Event(OPEN_ONBOARDING_FLOW_EVENT));
 		}
-	}, [hasWorkspaceReady]);
+	}, [hasReadinessError, hasWorkspaceReady]);
 	return { composerBlockedMessage, isComposerBlocked, openSetup };
 }
 

@@ -25,6 +25,35 @@ from app.providers.factory import resolve_llm
 from app.providers.model_id import Host, Vendor, parse_model_id
 
 
+@pytest.mark.anyio
+async def test_prepare_turn_session_clears_stale_cache_when_no_record(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    conversation_id = uuid4()
+    provider = AgyCliLLM("gemini-3.5-flash-high", workspace_root=None)
+    provider._session_by_conversation[conversation_id] = "stale-session"
+
+    async def fake_load_provider_session(_conversation_id: object) -> None:
+        return None
+
+    monkeypatch.setattr(
+        "app.providers.agy_cli.provider.load_provider_session",
+        fake_load_provider_session,
+    )
+
+    turn_state = await provider.prepare_turn_session(
+        conversation_id=conversation_id,
+        workspace_root=None,
+        model_id=None,
+        tools=None,
+        reasoning_effort=None,
+        question="hello",
+    )
+
+    assert turn_state.session_id is None
+    assert conversation_id not in provider._session_by_conversation
+
+
 def test_parse_model_id_accepts_agy_cli_host() -> None:
     parsed = parse_model_id("agy-cli:google/gemini-3.5-flash-high")
 

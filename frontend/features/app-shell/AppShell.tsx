@@ -19,6 +19,7 @@
 import React from 'react';
 import { NavUser, type NavUserIdentity } from '@/components/nav-user';
 import { NewSessionButton } from '@/components/new-session-button';
+import { Button } from '@/components/ui/button';
 import {
 	Sidebar,
 	SidebarContent,
@@ -63,6 +64,28 @@ function SidebarFooterUser(): React.JSX.Element {
 	};
 
 	return <NavUser user={sidebarUser} />;
+}
+
+function AppShellReadinessError({
+	isRetrying,
+	onRetry,
+}: {
+	isRetrying: boolean;
+	onRetry: () => void;
+}): React.JSX.Element {
+	return (
+		<div className="flex min-h-0 flex-1 items-center justify-center bg-background p-6">
+			<div className="flex w-full max-w-sm flex-col gap-3 text-center">
+				<h1 className="font-semibold text-lg text-foreground">Backend unavailable</h1>
+				<p className="text-muted-foreground text-sm">
+					Pawrrtal could not confirm workspace readiness. Check the service and try again.
+				</p>
+				<Button className="mx-auto" disabled={isRetrying} onClick={onRetry} type="button">
+					{isRetrying ? 'Retrying' : 'Retry'}
+				</Button>
+			</div>
+		</div>
+	);
 }
 
 /**
@@ -305,6 +328,7 @@ export function AppShell({ children }: { children: React.ReactNode }): React.JSX
 		(!onboardingReadiness.isLoading &&
 			!onboardingReadiness.isError &&
 			onboardingReadiness.hasWorkspaceReady);
+	const showReadinessError = !e2eBypass && onboardingReadiness.isError;
 
 	React.useEffect(() => {
 		if (e2eBypass) return;
@@ -348,6 +372,12 @@ export function AppShell({ children }: { children: React.ReactNode }): React.JSX
 						 * dropdown. Never opens automatically.
 						 */}
 						<OnboardingModal initialOpen={false} listenForOpenEvent />
+						{showReadinessError ? (
+							<AppShellReadinessError
+								isRetrying={onboardingReadiness.isRefetching}
+								onRetry={onboardingReadiness.refetch}
+							/>
+						) : null}
 						{isAppReady ? (
 							<>
 								<ResizableSidebarContent>

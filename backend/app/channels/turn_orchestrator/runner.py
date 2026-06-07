@@ -305,6 +305,7 @@ async def _handle_internal_provider_event(
         )
     )
     _register_provider_session_persist_task(persist_task)
+    await asyncio.shield(persist_task)
     return True
 
 

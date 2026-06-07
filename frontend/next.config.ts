@@ -20,27 +20,51 @@ const configuredAllowedDevOrigins = process.env.NEXT_ALLOWED_DEV_ORIGINS?.split(
 	.map((origin) => origin.trim())
 	.filter(Boolean);
 
-const backendInternalUrl = (
-	process.env.BACKEND_INTERNAL_URL ?? DEFAULT_BACKEND_INTERNAL_URL
-).replace(/\/$/, '');
+const publicHostname =
+	process.env.PAWRRTAL_PUBLIC_HOSTNAME ?? process.env.CLOUDFLARED_HOSTNAME ?? undefined;
 
-const allowedDevOrigins = configuredAllowedDevOrigins ?? [];
+function normalizeDevOrigin(hostname: string | undefined): string | undefined {
+	if (!hostname) return undefined;
+	const trimmed = hostname.trim();
+	if (!trimmed) return undefined;
+	return trimmed.startsWith('http://') || trimmed.startsWith('https://')
+		? trimmed.replace(/\/$/, '')
+		: `https://${trimmed}`;
+}
+
+const cloudflaredDevOrigin = normalizeDevOrigin(publicHostname);
+
+const backendInternalUrl = process.env.BACKEND_INTERNAL_URL?.replace(/\/$/, '');
+
+const enableBackendRewrites =
+	process.env.NODE_ENV !== 'production' ||
+	Boolean(process.env.BACKEND_INTERNAL_URL) ||
+	process.env.NEXT_ENABLE_BACKEND_REWRITES === '1';
+
+const allowedDevOrigins = [
+	...(configuredAllowedDevOrigins ?? []),
+	...(cloudflaredDevOrigin ? [cloudflaredDevOrigin] : []),
+];
 
 const nextConfig: NextConfig = {
 	allowedDevOrigins,
 	async rewrites() {
+		if (!enableBackendRewrites) {
+			return [];
+		}
+		const destinationBase = backendInternalUrl ?? DEFAULT_BACKEND_INTERNAL_URL;
 		return [
 			{
 				source: '/api/v1/:path*',
-				destination: `${backendInternalUrl}/api/v1/:path*`,
+				destination: `${destinationBase}/api/v1/:path*`,
 			},
 			{
 				source: '/auth/:path*',
-				destination: `${backendInternalUrl}/auth/:path*`,
+				destination: `${destinationBase}/auth/:path*`,
 			},
 			{
 				source: '/users/:path*',
-				destination: `${backendInternalUrl}/users/:path*`,
+				destination: `${destinationBase}/users/:path*`,
 			},
 		];
 	},
