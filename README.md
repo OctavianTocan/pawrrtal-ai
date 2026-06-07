@@ -179,7 +179,7 @@ Placeholder settings sections currently listed in the nav but not fully wired:
 - **Dev login**: `/auth/dev-login` logs in as the seeded admin in non-production when `ADMIN_EMAIL` and `ADMIN_PASSWORD` are configured. It also idempotently ensures a default workspace.
 - **Google OAuth**: Start/callback flow is implemented and gated by `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`.
 - **Apple OAuth**: Start route exists, but callback is currently a stub returning 501.
-- **Backend API key gate**: Optional `BACKEND_API_KEY` requires clients to send `X-Pawrrtal-Key`.
+- **Backend API key gate**: Optional server-to-server `BACKEND_API_KEY` requires clients to send `X-Pawrrtal-Key`. Leave it unset for the Cloudflared browser app, where Cloudflare Access is the public gate.
 - **Email allowlist**: Optional `ALLOWED_EMAILS` restricts authenticated access.
 - **Demo mode**: `DEMO_MODE=true` disables Telegram and applies demo deployment restrictions.
 
@@ -283,10 +283,11 @@ just paw project service status
 just paw project service logs --follow
 just paw project service uninstall
 
-# Optional private Tailscale HTTPS profile:
-just paw project service install --profile tailscale --tailscale-host <host.tailnet.ts.net> --tailscale-port 7447
-just paw project service status --profile tailscale
-just paw project service uninstall --profile tailscale
+# Cloudflared public deployment profile:
+just paw project cloudflared install --hostname pawrrtal.example.com --tunnel-name pawrrtal
+just paw project cloudflared verify --hostname pawrrtal.example.com --tunnel-name pawrrtal
+just paw project cloudflared status
+just paw project cloudflared uninstall
 
 # Short aliases:
 just paw run
@@ -297,7 +298,7 @@ Before changing startup code, run `just env-check`. It catches missing binaries,
 
 The service helper writes `~/.config/systemd/user/pawrrtal-dev.service` and manages it through `systemctl --user`. It uses the same `dev.ts` orchestrator as `just dev`, defaults to the local SQLite database, and preserves `PAWRRTAL_DEV_DATABASE_URL` when you intentionally want a non-SQLite dev database.
 
-The Tailscale profile writes `pawrrtal-dev-tailscale.service`, keeps Next.js and FastAPI bound to loopback, and publishes one private HTTPS origin through Tailscale Serve. Use `--tailscale-port` when port 443 is already serving another local tool. Browser API calls go same-origin through that URL; server-side Next.js fetches still use `BACKEND_INTERNAL_URL=http://127.0.0.1:8000`. The profile refuses existing unowned Serve config on the requested origin instead of overwriting it. It is intended for private tailnet use, not public Funnel exposure.
+The Cloudflared helper writes `/etc/cloudflared/config.yml`, keeps Next.js and FastAPI bound to loopback, routes `/api/v1`, `/auth`, and `/users` to FastAPI, and routes all other paths to Next.js. Public access must be protected by a Cloudflare Access self-hosted app. Browser API calls stay same-origin through the public hostname; server-side Next.js fetches still use `BACKEND_INTERNAL_URL=http://127.0.0.1:8000`.
 
 ### Docker
 
@@ -305,7 +306,7 @@ The Tailscale profile writes `pawrrtal-dev-tailscale.service`, keeps Next.js and
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
 ```
 
-The dev compose stack runs Postgres on `:5432` and backend on `:8000`. The prod overlay adds the Next.js service and nginx reverse proxy on `:80`.
+The dev compose stack runs Postgres on `:5432` and backend on `:8000`. Public VPS deployment uses the Paw CLI Cloudflared profile instead of a Compose reverse proxy.
 
 ### Logs
 
@@ -327,7 +328,8 @@ Required-at-minimum for a useful local app: `AUTH_SECRET`, `WORKSPACE_ENCRYPTION
 # Auth + access
 AUTH_SECRET=
 WORKSPACE_ENCRYPTION_KEY=
-BACKEND_API_KEY=
+# Optional server-to-server shared secret. Leave unset for the Cloudflared browser app.
+# BACKEND_API_KEY=
 ALLOWED_EMAILS=
 DEMO_MODE=false
 
@@ -523,8 +525,7 @@ pawrrtal/
 ├─ electrobun/
 ├─ docs/
 ├─ scripts/
-├─ docker-compose.{yml,dev,prod,demo}.yml
-├─ nginx/
+├─ docker-compose.{yml,dev,demo}.yml
 ├─ justfile
 ├─ DESIGN.md
 ├─ AGENTS.md / CLAUDE.md
@@ -663,8 +664,13 @@ just push             # Push with multi-account auth handling
 ### Docker Compose
 
 - **dev**: Postgres + backend, ports published locally, source-bind hot reload.
-- **prod**: Postgres + backend + Next.js + nginx. No published DB port; nginx is the public surface.
 - **demo**: `DEMO_MODE=true`, low rate limits, no Telegram, outbound network blocked at tool layer.
+
+### Cloudflared VPS
+
+- Run the local project service on loopback.
+- Publish one hostname with `paw project cloudflared install`.
+- Protect that hostname with Cloudflare Access before users open the app.
 
 ### Self-hosted CI runners
 

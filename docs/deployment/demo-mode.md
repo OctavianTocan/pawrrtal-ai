@@ -22,8 +22,8 @@ When `DEMO_MODE=true`:
   to any user who messages it, blowing the per-user rate budget on
   bot-initiated traffic.
 - **Open sign-up.**  `ALLOWED_EMAILS=""` so anyone can register and
-  start a chat.  The transport-layer `BACKEND_API_KEY` is what
-  protects the endpoint from arbitrary HTTP calls.
+  start a chat.  Cloudflare edge controls are what protect the public
+  hostname from arbitrary request floods.
 - **Hard rate cap.**  `CHAT_RATE_LIMIT_PER_MINUTE` is set low (15 by
   default in `docker-compose.demo.yml`).  One demo user can cost at
   most that many requests / minute.
@@ -83,7 +83,6 @@ The overlay:
 # ── Required ─────────────────────────────────────────────────────
 SECRET_KEY=...                       # JWT signing
 AUTH_SECRET=...                      # FastAPI-Users password reset
-BACKEND_API_KEY=...                  # Required.  Bake into NEXT_PUBLIC_BACKEND_API_KEY at frontend build time.
 WORKSPACE_ENCRYPTION_KEY=...         # Fernet key (cryptography.fernet.Fernet.generate_key())
 
 # ── LLM provider — pick ONE, scoped to a demo billing pool ──────
@@ -106,17 +105,15 @@ GOOGLE_OAUTH_REDIRECT_URI=https://demo.pawrrtal.ai/api/v1/auth/oauth/google/call
 
 ### Frontend build
 
-The frontend that talks to the demo backend must bake the
-`BACKEND_API_KEY` into the build so visitors don't have to enter it:
+The frontend uses same-origin browser API calls. Build it normally and
+publish it through the same Cloudflared hostname as the backend paths:
 
 ```bash
 cd frontend
-NEXT_PUBLIC_BACKEND_API_KEY="<same value as backend BACKEND_API_KEY>" bun run build
+bun run build
 ```
 
-Deploy the resulting `.next/standalone` build to your demo host (or
-serve it from the same Nginx container as the backend; see
-PR #173 for that overlay).
+Do not bake backend shared secrets into public frontend bundles.
 
 ## Recommended infra
 
@@ -138,9 +135,8 @@ PR #173 for that overlay).
   demo.
 - If demo gets abused, bump `CHAT_RATE_LIMIT_PER_MINUTE` down to 5
   and add Cloudflare's "I'm Under Attack" mode without redeploying.
-- The `BACKEND_API_KEY` is your kill switch.  Rotate it (regenerate +
-  rebuild frontend with a new `NEXT_PUBLIC_BACKEND_API_KEY`) to
-  immediately lock out the world without taking the backend down.
+- Cloudflare is your public kill switch. Tighten Access/WAF policies or
+  enable "I'm Under Attack" mode without taking the backend down.
 
 ## Open follow-ups
 

@@ -23,4 +23,4 @@ services:
 
   backend:
     ports:
-      - "127.0.0.1:8000:8000"   # hit the API directly from the host, bypass Nginx
+      - "127.0.0.1:8000:8000"   # local API access for curl, Paw CLI, and Cloudflared
