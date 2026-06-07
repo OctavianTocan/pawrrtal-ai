@@ -1,12 +1,21 @@
 /**
- * Onboarding wizard smoke: when the authenticated user has no workspace yet,
- * AppShell opens the normal four-step onboarding flow. We verify the wizard
- * opens at Identity and that Continue advances to Context.
+ * Onboarding wizard smoke: verify the normal four-step onboarding flow. CI
+ * reuses one dev-admin account across specs, so these tests open the flow
+ * through its browser event instead of depending on global workspace state from
+ * earlier specs.
  */
 
+import type { Page } from '@playwright/test';
+import { OPEN_ONBOARDING_FLOW_EVENT } from '../features/onboarding/v2/OnboardingFlow';
 import { expect, test } from './fixtures';
 
 test.use({ skipOnboarding: false });
+
+async function openOnboardingFlow(page: Page): Promise<void> {
+	await page.evaluate((eventName) => {
+		window.dispatchEvent(new Event(eventName));
+	}, OPEN_ONBOARDING_FLOW_EVENT);
+}
 
 test.describe('onboarding wizard', () => {
 	test.beforeEach(async ({ context }) => {
@@ -18,6 +27,7 @@ test.describe('onboarding wizard', () => {
 
 	test('renders the identity step on fresh load', async ({ page }) => {
 		await page.goto('/');
+		await openOnboardingFlow(page);
 		await expect(page.getByRole('heading', { name: /Let's get to know you/i })).toBeVisible({
 			timeout: 10_000,
 		});
@@ -26,6 +36,7 @@ test.describe('onboarding wizard', () => {
 
 	test('Continue button progresses to the context step', async ({ page }) => {
 		await page.goto('/');
+		await openOnboardingFlow(page);
 		await expect(page.getByRole('heading', { name: /Let's get to know you/i })).toBeVisible({
 			timeout: 10_000,
 		});

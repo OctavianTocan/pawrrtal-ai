@@ -109,7 +109,7 @@ jobs:
           AUTH_SECRET: e2e-not-a-secret
           GOOGLE_API_KEY: e2e-not-a-key
           WORKSPACE_ENCRYPTION_KEY: 'zG9KQK6sH0xLm4LJ4n8C9aD2vF3gN5pT7rE1yU8xKqM='
-          CORS_ORIGINS: '["http://localhost:53001","http://127.0.0.1:53001"]'
+          CORS_ORIGINS: '["http://localhost:3000","http://127.0.0.1:3000"]'
           DATABASE_URL: 'sqlite+aiosqlite:///./e2e.db'
           ADMIN_EMAIL: e2e-admin@example.com
           ADMIN_PASSWORD: e2e-admin-password
@@ -144,10 +144,10 @@ jobs:
         env:
           E2E_API_URL: http://127.0.0.1:8000
         run: |
-          PORT=53001 bun run start &
+          PORT=3000 bun run start &
           echo $! > /tmp/frontend.pid
           for i in $(seq 1 60); do
-            if curl -sSf http://127.0.0.1:53001 > /dev/null 2>&1; then
+            if curl -sSf http://127.0.0.1:3000 > /dev/null 2>&1; then
               echo "Frontend ready after ${i}s"
               exit 0
             fi
@@ -159,7 +159,7 @@ jobs:
       - name: Run Playwright suite
         working-directory: frontend
         env:
-          E2E_BASE_URL: http://127.0.0.1:53001
+          E2E_BASE_URL: http://127.0.0.1:3000
           E2E_API_URL: http://127.0.0.1:8000
         # ``--bun`` was making Playwright's request context lose the
         # configured ``E2E_API_URL`` host on retries: the dev-login
