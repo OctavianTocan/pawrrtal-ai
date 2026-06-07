@@ -1,229 +1,37 @@
 /**
- * Browser base URL for API requests.
- * Determined from NEXT_PUBLIC_BROWSER_API_BASE, falling back to the legacy
- * NEXT_PUBLIC_API_URL environment variable.
+ * Browser API requests are always same-origin.
  *
- * Default targets the local FastAPI dev server on `http://localhost:8000`.
- * Same-origin deployments can set this to an empty string so browser requests
- * go through the current origin's reverse proxy.
+ * Local development keeps the familiar split: Next.js serves the browser on
+ * `localhost:53001` and rewrites `/api/v1`, `/auth`, and `/users` to the
+ * backend on `127.0.0.1:8000`. Cloudflared uses the same URL shape at the
+ * edge, routing those paths directly to FastAPI and all other paths to Next.
  */
-export const BROWSER_API_BASE_URL =
-	process.env.NEXT_PUBLIC_BROWSER_API_BASE ??
-	process.env.NEXT_PUBLIC_API_URL ??
-	'http://localhost:8000';
 
-/** @deprecated Use BROWSER_API_BASE_URL for browser code and server-api.ts for RSC fetches. */
-export const API_BASE_URL = BROWSER_API_BASE_URL;
-
-const LOCAL_BACKEND_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1']);
-const TAILSCALE_HOST_SUFFIX = '.ts.net';
-
-/**
- * Backend API key for the X-Pawrrtal-Key header.
- *
- * Two sources, resolved at runtime (client-side precedence order):
- *   1. localStorage `pawrrtal:backend-config` — set via the Settings page when
- *      a user points at their own backend instance (URL + key stored together).
- *   2. NEXT_PUBLIC_BACKEND_API_KEY build-time env var — baked into the demo
- *      build so the demo instance works out-of-the-box without any config.
- *
- * When neither is set the header is omitted, which is correct for local dev
- * (backend has no BACKEND_API_KEY configured either).
- */
-const BACKEND_CONFIG_STORAGE_KEY = 'pawrrtal:backend-config';
-export const BACKEND_CONFIG_CHANGED_EVENT = 'pawrrtal:backend-config-changed';
-
-export interface BackendConfig {
-	url: string;
-	apiKey: string;
-}
-
-function readStoredBackendConfig(): BackendConfig | null {
-	if (typeof window === 'undefined') {
-		return null;
-	}
-	try {
-		const raw = window.localStorage.getItem(BACKEND_CONFIG_STORAGE_KEY);
-		if (!raw) {
-			return null;
-		}
-		const parsed = JSON.parse(raw) as Partial<BackendConfig>;
-		return coerceBrowserReachableBackendConfig({
-			url: parsed.url ?? '',
-			apiKey: parsed.apiKey ?? '',
-		});
-	} catch {
-		return null;
-	}
-}
-
-function normalizeBackendConfigUrl(url: string): string {
-	if (!url.trim()) {
-		return resolveDefaultBrowserApiBaseUrl();
-	}
-	try {
-		const parsed = new URL(url);
-		return parsed.toString().replace(/\/$/, '');
-	} catch {
-		return url.trim().replace(/\/$/, '');
-	}
-}
-
-function isTailscaleBrowserOrigin(): boolean {
-	if (typeof window === 'undefined') {
-		return false;
-	}
-	return window.location.hostname.endsWith(TAILSCALE_HOST_SUFFIX);
-}
-
-function isLocalBackendUrl(url: string): boolean {
-	try {
-		return LOCAL_BACKEND_HOSTNAMES.has(new URL(url).hostname);
-	} catch {
-		return false;
-	}
-}
-
-function resolveDefaultBrowserApiBaseUrl(): string {
-	if (isTailscaleBrowserOrigin() && isLocalBackendUrl(BROWSER_API_BASE_URL)) {
-		return '';
-	}
-	return BROWSER_API_BASE_URL;
-}
-
-function browserOrigin(): string {
-	if (typeof window === 'undefined') {
-		return '';
-	}
-	return window.location.origin;
-}
-
-function coerceBrowserReachableBackendConfig(config: BackendConfig): BackendConfig {
-	if (isTailscaleBrowserOrigin() && isLocalBackendUrl(config.url) && !config.apiKey) {
-		return { ...config, url: browserOrigin() };
-	}
-	return config;
-}
-
-/** Browser-reachable backend URL to persist when the user chooses hosted Pawrrtal. */
-export function getHostedBackendConfigUrl(): string {
-	const defaultUrl = resolveDefaultBrowserApiBaseUrl();
-	if (!defaultUrl) {
-		return browserOrigin();
-	}
-	return coerceBrowserReachableBackendConfig({ url: defaultUrl, apiKey: '' }).url;
-}
-
-function readBackendConfig(): BackendConfig {
-	const buildTimeKey = process.env.NEXT_PUBLIC_BACKEND_API_KEY ?? '';
-	const defaults: BackendConfig = { url: resolveDefaultBrowserApiBaseUrl(), apiKey: buildTimeKey };
-	const stored = readStoredBackendConfig();
-	if (stored) {
-		return stored;
-	}
-	return defaults;
-}
-
-/**
- * True when the runtime backend config has been explicitly configured in this
- * browser profile. This is the authoritative readiness signal for onboarding.
- */
-export function hasBackendConfig(): boolean {
-	const config = readStoredBackendConfig();
-	return Boolean(config?.url && config.url.trim());
-}
-
-/** Stable identifier for the active backend target. */
-export function getBackendConfigFingerprint(): string {
-	const { url, apiKey } = readBackendConfig();
-	const normalizedUrl = normalizeBackendConfigUrl(url);
-	return `${normalizedUrl}::${stableConfigKey(apiKey)}`;
-}
-
-function stableConfigKey(apiKey: string): string {
-	if (!apiKey) {
-		return 'key:none';
-	}
-	let hash = 5381;
-	for (let i = 0; i < apiKey.length; i += 1) {
-		hash = (hash * 33) ^ apiKey.charCodeAt(i);
-	}
-	return `key:${hash >>> 0}`;
-}
-
-function emitBackendConfigChange(): void {
-	if (typeof window === 'undefined') {
-		return;
-	}
-	window.dispatchEvent(new Event(BACKEND_CONFIG_CHANGED_EVENT));
-}
-
-/** Persist a new backend config (URL + API key) to localStorage. */
-export function saveBackendConfig(config: BackendConfig): void {
-	try {
-		const browserReachableConfig = coerceBrowserReachableBackendConfig(config);
-		window.localStorage.setItem(
-			BACKEND_CONFIG_STORAGE_KEY,
-			JSON.stringify(browserReachableConfig)
-		);
-		emitBackendConfigChange();
-	} catch {
-		/* quota / private browsing — ignore */
-	}
-}
-
-/** Clear the runtime backend config override (reverts to build-time defaults). */
-export function clearBackendConfig(): void {
-	try {
-		window.localStorage.removeItem(BACKEND_CONFIG_STORAGE_KEY);
-		emitBackendConfigChange();
-	} catch {
-		/* ignore */
-	}
-}
-
-function buildApiUrl(baseUrl: string, path: string): string {
+function buildApiUrl(path: string): string {
 	if (/^https?:\/\//.test(path)) {
 		return path;
 	}
-	const normalizedBase = normalizeBackendConfigUrl(baseUrl);
-	if (!normalizedBase) {
-		return path;
-	}
-	const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-	return `${normalizedBase}${normalizedPath}`;
+	return path.startsWith('/') ? path : `/${path}`;
 }
 
 /** Return the browser-visible URL for an API path using the active runtime config. */
 export function getBrowserApiUrl(path: string): string {
-	const { url } = readBackendConfig();
-	return buildApiUrl(url, path);
+	return buildApiUrl(path);
 }
 
 /**
  * Drop-in replacement for `fetch` that:
- *   - Prepends `API_BASE_URL` (or the runtime URL from localStorage) to the path.
- *   - Adds the `X-Pawrrtal-Key` header when an API key is configured.
+ *   - Normalizes relative API paths to a leading slash.
+ *   - Keeps absolute URLs untouched for rare explicit navigation/probe cases.
  *
  * Use this for every backend request instead of calling `fetch` directly so the
- * key header is applied consistently across the entire frontend.
+ * browser/runtime shape stays the same across localhost and Cloudflared.
  *
  * @example
  *   const res = await apiFetch('/api/v1/chat', { method: 'POST', body: JSON.stringify(msg) });
  */
 export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
-	const { url: baseUrl, apiKey } = readBackendConfig();
-	const requestUrl = buildApiUrl(baseUrl, path);
-	// Only wrap headers in a Headers object when we actually need to inject
-	// X-Pawrrtal-Key.  When no key is configured (local dev, tests) we pass
-	// init through unchanged so callers that stub `fetch` get back the same
-	// plain-object headers they supplied — keeping test assertions simple.
-	if (!apiKey) {
-		return fetch(requestUrl, init);
-	}
-	const headers = new Headers(init?.headers);
-	headers.set('X-Pawrrtal-Key', apiKey);
-	return fetch(requestUrl, { ...init, headers });
+	return fetch(buildApiUrl(path), init);
 }
 
 /**

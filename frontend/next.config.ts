@@ -14,16 +14,36 @@ import path from 'node:path';
 import { createMDX } from 'fumadocs-mdx/next';
 import type { NextConfig } from 'next';
 
-const DEFAULT_ALLOWED_DEV_ORIGINS = ['openclaw-vps.tailb0501a.ts.net', '*.tailb0501a.ts.net'];
+const DEFAULT_BACKEND_INTERNAL_URL = 'http://127.0.0.1:8000';
 
 const configuredAllowedDevOrigins = process.env.NEXT_ALLOWED_DEV_ORIGINS?.split(',')
 	.map((origin) => origin.trim())
 	.filter(Boolean);
 
-const allowedDevOrigins = [...DEFAULT_ALLOWED_DEV_ORIGINS, ...(configuredAllowedDevOrigins ?? [])];
+const backendInternalUrl = (
+	process.env.BACKEND_INTERNAL_URL ?? DEFAULT_BACKEND_INTERNAL_URL
+).replace(/\/$/, '');
+
+const allowedDevOrigins = configuredAllowedDevOrigins ?? [];
 
 const nextConfig: NextConfig = {
 	allowedDevOrigins,
+	async rewrites() {
+		return [
+			{
+				source: '/api/v1/:path*',
+				destination: `${backendInternalUrl}/api/v1/:path*`,
+			},
+			{
+				source: '/auth/:path*',
+				destination: `${backendInternalUrl}/auth/:path*`,
+			},
+			{
+				source: '/users/:path*',
+				destination: `${backendInternalUrl}/users/:path*`,
+			},
+		];
+	},
 	turbopack: {
 		root: path.resolve(__dirname, '../'),
 	},

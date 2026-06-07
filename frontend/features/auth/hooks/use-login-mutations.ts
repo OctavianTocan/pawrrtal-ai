@@ -65,9 +65,8 @@ export function useLoginMutation() {
 /**
  * Dev admin login shortcut.
  *
- * Calls `POST /auth/dev-login` on the FastAPI backend directly. On plain localhost
- * the frontend (`localhost:3001`) and backend (`localhost:8000`) are same-site, so
- * the session cookie set by the backend is available to the frontend without a proxy.
+ * Calls same-origin `POST /auth/dev-login`; local Next rewrites and the
+ * Cloudflared ingress both route that path to FastAPI.
  */
 export function useDevAdminLoginMutation() {
 	const queryClient = useQueryClient();

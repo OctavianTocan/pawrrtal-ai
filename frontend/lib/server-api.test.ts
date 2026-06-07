@@ -13,10 +13,9 @@ describe('buildServerApiUrl', (): void => {
 		expect(buildServerApiUrl('/api/v1/health')).toBe('http://127.0.0.1:8000/api/v1/health');
 	});
 
-	it('falls back to the legacy public API URL for existing deployments', async (): Promise<void> => {
-		vi.stubEnv('NEXT_PUBLIC_API_URL', 'https://api.example.com');
+	it('defaults to the local backend origin', async (): Promise<void> => {
 		const { buildServerApiUrl } = await import('./server-api-url');
 
-		expect(buildServerApiUrl('/api/v1/health')).toBe('https://api.example.com/api/v1/health');
+		expect(buildServerApiUrl('/api/v1/health')).toBe('http://127.0.0.1:8000/api/v1/health');
 	});
 });

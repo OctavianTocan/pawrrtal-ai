@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuthedFetch } from './use-authed-fetch';
 
 const replaceMock = vi.fn();
-const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000';
 
 async function expectRejectedMessage(
 	promise: Promise<unknown>,
@@ -32,7 +31,7 @@ describe('useAuthedFetch', (): void => {
 		vi.stubGlobal('fetch', vi.fn());
 	});
 
-	it('prefixes API URLs and includes credentials', async (): Promise<void> => {
+	it('uses same-origin API paths and includes credentials', async (): Promise<void> => {
 		vi.mocked(fetch).mockResolvedValue(new Response('ok'));
 
 		const { result } = renderHook(() => useAuthedFetch());
@@ -41,7 +40,7 @@ describe('useAuthedFetch', (): void => {
 			method: 'GET',
 		});
 
-		expect(fetch).toHaveBeenCalledWith(`${apiBaseUrl}/api/v1/conversations`, {
+		expect(fetch).toHaveBeenCalledWith('/api/v1/conversations', {
 			method: 'GET',
 			credentials: 'include',
 			cache: 'no-store',

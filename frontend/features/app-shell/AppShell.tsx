@@ -37,7 +37,6 @@ import {
 	E2E_SKIP_ONBOARDING_STORAGE_KEY,
 	OnboardingFlow,
 	OPEN_ONBOARDING_FLOW_EVENT,
-	OPEN_ONBOARDING_SERVER_STEP_EVENT,
 } from '@/features/onboarding/v2/OnboardingFlow';
 import { useCurrentUser } from '@/hooks/use-current-user';
 import { useGetPersonalization } from '@/lib/personalization/use-personalization';
@@ -304,25 +303,20 @@ export function AppShell({ children }: { children: React.ReactNode }): React.JSX
 	const isAppReady =
 		e2eBypass ||
 		(!onboardingReadiness.isLoading &&
-			onboardingReadiness.hasBackendConfig &&
+			!onboardingReadiness.isError &&
 			onboardingReadiness.hasWorkspaceReady);
-	const shouldOpenServerStep =
-		!e2eBypass && !onboardingReadiness.isLoading && !onboardingReadiness.hasBackendConfig;
 
 	React.useEffect(() => {
 		if (e2eBypass) return;
 		if (onboardingReadiness.isLoading) return;
+		if (onboardingReadiness.isError) return;
 
-		if (!onboardingReadiness.hasBackendConfig) {
-			window.dispatchEvent(new Event(OPEN_ONBOARDING_SERVER_STEP_EVENT));
-			return;
-		}
 		if (!onboardingReadiness.hasWorkspaceReady) {
 			window.dispatchEvent(new Event(OPEN_ONBOARDING_FLOW_EVENT));
 		}
 	}, [
 		e2eBypass,
-		onboardingReadiness.hasBackendConfig,
+		onboardingReadiness.isError,
 		onboardingReadiness.hasWorkspaceReady,
 		onboardingReadiness.isLoading,
 	]);
@@ -346,11 +340,7 @@ export function AppShell({ children }: { children: React.ReactNode }): React.JSX
 						 * Components → personalization-modal. Dismissing closes
 						 * for the session only; a browser refresh re-opens it.
 						 */}
-						<OnboardingFlow
-							key={shouldOpenServerStep ? 'server-step' : 'event-driven'}
-							initialOpen={shouldOpenServerStep}
-							initialStep={shouldOpenServerStep ? 'server' : 'identity'}
-						/>
+						<OnboardingFlow />
 						{/*
 						 * Workspace onboarding (Welcome → Create workspace →
 						 * Local workspace) is event-driven only — opens when

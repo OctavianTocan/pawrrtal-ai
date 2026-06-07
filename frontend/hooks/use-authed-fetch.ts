@@ -5,10 +5,9 @@ import { useCallback } from 'react';
 import { apiFetch } from '@/lib/api';
 
 /**
- * Returns a memoized `fetch` wrapper that targets the configured backend URL,
- * sends cookies, adds the `X-Pawrrtal-Key` header when configured, and handles auth failures.
+ * Returns a memoized same-origin `fetch` wrapper that sends cookies and handles auth failures.
  *
- * - Uses {@link apiFetch} so the backend API key header is included automatically.
+ * - Uses {@link apiFetch} so API path normalization stays consistent.
  * - Sends `credentials: 'include'` so the HTTP-only session cookie reaches the API.
  * - On `401`, replaces the route with `/login` and throws (callers should treat this as a hard logout signal).
  * - On other non-OK responses, throws with status and body text for debugging.
@@ -23,7 +22,7 @@ export function useAuthedFetch() {
 		async function authedFetch(endpoint: string | (() => string), options?: RequestInit) {
 			const path = typeof endpoint === 'function' ? endpoint() : endpoint;
 
-			// apiFetch prepends the backend URL and injects X-Pawrrtal-Key when configured.
+			// apiFetch normalizes browser API paths and keeps same-origin routing consistent.
 			const response = await apiFetch(path, {
 				...options,
 				// Include the session token in the request. (HTTPOnly Cookie)

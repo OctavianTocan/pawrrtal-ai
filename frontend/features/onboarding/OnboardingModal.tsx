@@ -142,7 +142,6 @@ export function OnboardingModal({
 					{step === 'create' ? (
 						<OnboardingCreateWorkspaceStep
 							onPickLocal={() => dispatch({ type: 'set-step', step: 'local' })}
-							onClose={() => dispatch({ type: 'set-open', open: false })}
 						/>
 					) : null}
 					{step === 'local' ? (
