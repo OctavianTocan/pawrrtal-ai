@@ -59,6 +59,9 @@ import { ProjectNotFoundError } from '@pawrrtal/api-core/Modules/Projects/Errors
 import { Context, Effect, Layer } from 'effect';
 import { ProjectsRepo, ProjectsRepoLive } from './Repo';
 
+/**
+ * The service class for the Projects module. It is used to define the service methods and their signatures to be used in the Http module.
+ */
 export class ProjectsService extends Context.Service<
 	ProjectsService,
 	{
