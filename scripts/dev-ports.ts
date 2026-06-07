@@ -7,11 +7,11 @@
  * the literal values here gives every consumer one canonical import
  * and stops drift between repo root, frontend, and desktop shell.
  *
- * The frontend dev port also appears in `frontend/package.json`
- * (`scripts.dev`: `next dev --port 53001`). That value must stay in
- * sync with {@link DEV_FRONTEND_PORT}; the verification helper below
- * is the gate for that constraint — call it from CI or pre-commit if
- * needed.
+ * The frontend dev host/port also appears in `frontend/package.json`
+ * (`scripts.dev`: `next dev --hostname 127.0.0.1 --port 53001`). Those
+ * values must stay in sync with {@link DEV_FRONTEND_BIND_HOST} and
+ * {@link DEV_FRONTEND_PORT}; the verification helper below is the gate
+ * for that constraint — call it from CI or pre-commit if needed.
  *
  * @see frontend/package.json
  * @see dev.ts
@@ -22,10 +22,18 @@
 /**
  * Port the Next.js dev server listens on locally.
  *
- * Must match the `--port` flag in `frontend/package.json` → `scripts.dev`.
+ * Must match the `--port` flag in `frontend/package.json` -> `scripts.dev`.
  * Verified by {@link assertFrontendPortMatchesPackageJson}.
  */
 export const DEV_FRONTEND_PORT = 53001;
+
+/**
+ * Host the Next.js dev server binds to locally.
+ *
+ * Keep this on loopback so Cloudflared, not the raw dev port, is the
+ * deployment's public surface.
+ */
+export const DEV_FRONTEND_BIND_HOST = '127.0.0.1';
 
 /**
  * Port the FastAPI dev server listens on locally.
@@ -66,14 +74,15 @@ export const DEV_BACKEND_URL = `http://127.0.0.1:${DEV_BACKEND_PORT}`;
  *   shape so callers can read it once with `Bun.file().text()` /
  *   `fs.readFileSync` without picking a JSON schema.
  * @returns `true` when the file references the canonical port via
- *   `next dev --port <DEV_FRONTEND_PORT>`. Throws an `Error` describing
- *   the mismatch when the port literal is missing or differs.
+ *   `next dev --hostname <DEV_FRONTEND_BIND_HOST> --port <DEV_FRONTEND_PORT>`.
+ *   Throws an `Error` describing the mismatch when the host or port literal
+ *   is missing or differs.
  */
 export function assertFrontendPortMatchesPackageJson(packageJsonText: string): true {
-	const expected = `next dev --port ${DEV_FRONTEND_PORT}`;
+	const expected = `next dev --hostname ${DEV_FRONTEND_BIND_HOST} --port ${DEV_FRONTEND_PORT}`;
 	if (!packageJsonText.includes(expected)) {
 		throw new Error(
-			`frontend/package.json does not reference the canonical dev port. ` +
+			`frontend/package.json does not reference the canonical dev host/port. ` +
 				`Expected the substring '${expected}' in scripts.dev; update package.json ` +
 				`or scripts/dev-ports.ts so the two match.`
 		);
