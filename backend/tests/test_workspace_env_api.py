@@ -29,6 +29,7 @@ from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import User
 from app.infrastructure.keys import OVERRIDABLE_KEYS
 from app.models import Workspace
+from app.plugins.env import plugin_env_specs_for_workspace
 
 PLUGIN_TOKEN_KEY = "CUSTOM_PLUGIN_TOKEN"
 
@@ -88,12 +89,15 @@ async def test_get_returns_all_keys_empty_for_new_user(
     response = await client.get(f"/api/v1/workspaces/{seeded_default_workspace.id}/env")
     assert response.status_code == 200
     body = response.json()
-    # Derive expected keys from the canonical OVERRIDABLE_KEYS constant
-    # rather than hardcoding them. This prevents the test from breaking
-    # when new keys are added, and removes sensitivity to stale .pyc
-    # files on the self-hosted runner.
-    assert set(body["vars"].keys()) == set(OVERRIDABLE_KEYS)
-    assert {row["key"] for row in body["keys"]} == set(OVERRIDABLE_KEYS)
+    plugin_keys = {
+        spec.name
+        for spec in plugin_env_specs_for_workspace(
+            workspace_root=Path(seeded_default_workspace.path)
+        )
+    }
+    expected_keys = set(OVERRIDABLE_KEYS) | plugin_keys
+    assert set(body["vars"].keys()) == expected_keys
+    assert {row["key"] for row in body["keys"]} == expected_keys
     assert all(v == "" for v in body["vars"].values())
 
 

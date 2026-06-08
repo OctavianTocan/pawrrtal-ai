@@ -1,16 +1,4 @@
-"""LCM PR #7 — condensation pass tests.
-
-Covers:
-- _condense_at_depth returns False when < 2 depth-0 summaries exist.
-- _condense_at_depth returns True and creates a depth-1 parent summary.
-- Source edges on the parent summary point at the depth-0 child summaries.
-- The depth-0 context items are replaced by a single depth-1 item.
-- Token budget limits the condensation batch.
-- compact_leaf_if_needed triggers condensation when lcm_incremental_max_depth >= 1.
-- lcm_incremental_max_depth=0 skips condensation.
-- Two sequential compactions produce a depth-1 condensed summary.
-- assemble_context after condensation returns depth-1 summary + fresh tail.
-"""
+"""Tests for incremental LCM condensation."""
 
 from __future__ import annotations
 
@@ -34,10 +22,6 @@ from app.models import (
     LCMSummary,
     LCMSummarySource,
 )
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 async def _make_conversation(session: AsyncSession, user: User) -> Conversation:
@@ -136,16 +120,8 @@ def _patch(monkeypatch: pytest.MonkeyPatch, provider: Any) -> None:
     import app.lcm as _lcm
     import app.lcm.condense as _lcm_condense
 
-    monkeypatch.setattr(_lcm, "resolve_llm", lambda *a, **kw: provider)
-    # Condensation lives in app.lcm.condense (split out for the
-    # file-line budget) — patch its resolve_llm import too so
-    # monkeypatched providers reach _condense_at_depth.
-    monkeypatch.setattr(_lcm_condense, "resolve_llm", lambda *a, **kw: provider)
-
-
-# ---------------------------------------------------------------------------
-# _condense_at_depth — gating
-# ---------------------------------------------------------------------------
+    monkeypatch.setattr(_lcm, "_resolve_summary_provider", lambda *a, **kw: provider)
+    monkeypatch.setattr(_lcm_condense, "_resolve_summary_provider", lambda *a, **kw: provider)
 
 
 @pytest.mark.anyio
@@ -184,11 +160,6 @@ async def test_condense_noop_no_summaries(
         max_chunk_tokens=100_000,
     )
     assert ran is False
-
-
-# ---------------------------------------------------------------------------
-# _condense_at_depth — happy path
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
