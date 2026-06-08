@@ -28,6 +28,7 @@ just paw login --dev-admin                     # seed the dev persona (cookie + 
 just paw verify codex --json                   # end-to-end Codex proof
 just paw verify all --json                     # every shippable suite
 just paw lab flows ls --json                   # discover manual/live flow checklists
+paw --api https://pawrrtal.octaviantocan.com doctor --json  # target any instance
 ```
 
 `paw` lives at `backend/app/cli/paw/`. `just paw <args>` forwards to `cd backend && uv run paw <args>`.
@@ -331,6 +332,7 @@ Every command supports:
 | ---------------- | ---------------------------------------------------------------- |
 | `PAW_PROFILE`    | Persona profile (default: `default`)                             |
 | `PAW_CONFIG_DIR` | Config root (default: `~/.config/pawrrtal`)                      |
+| `PAW_BACKEND_URL` | One-shot backend URL override; same effect as top-level `paw --api URL ...` |
 | `PAW_RECORD`     | Capture HTTP + SSE traffic to this JSONL path                    |
 | `PAW_E2E`        | `1` in pytest → run the live E2E suite (boots a real backend)    |
 | `UV_CACHE_DIR`   | Set by `dev.ts` / `paw project up` to `.cache/uv` when unset     |

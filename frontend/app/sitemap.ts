@@ -8,7 +8,7 @@
 import type { MetadataRoute } from 'next';
 import { handbookSource, productSource } from '@/lib/source';
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://pawrrtal.com';
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://pawrrtal.octaviantocan.com';
 
 /**
  * Generates sitemap entries for `/docs` + every handbook + product page.

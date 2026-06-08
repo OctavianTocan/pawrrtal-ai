@@ -487,7 +487,7 @@ ENV_BASE_URLS = {
     "local": "http://127.0.0.1:8000",
     "dev": "https://dev.pawrrtal.dev",
     "stg": "https://staging.pawrrtal.dev",
-    "prod": "https://pawrrtal.com",
+    "prod": "https://pawrrtal.octaviantocan.com",
 }
 
 

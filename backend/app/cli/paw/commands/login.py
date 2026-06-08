@@ -43,7 +43,11 @@ app = typer.Typer()
 @app.command("login")
 def login(
     env: str = typer.Option("local", "--env", help="Target environment: local/dev/stg/prod."),
-    api: str | None = typer.Option(None, "--api", help="Backend base URL override."),
+    api: str | None = typer.Option(
+        None,
+        "--api",
+        help="Backend base URL override. Equivalent to top-level `paw --api URL login ...`.",
+    ),
     profile: str = typer.Option("default", "--profile"),
     dev_admin: bool = typer.Option(
         False,

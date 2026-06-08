@@ -44,7 +44,7 @@ ENV_BASE_URLS = {
     "local": "http://127.0.0.1:8000",
     "dev": "https://dev.pawrrtal.dev",
     "stg": "https://staging.pawrrtal.dev",
-    "prod": "https://pawrrtal.com",
+    "prod": "https://pawrrtal.octaviantocan.com",
 }
 
 
@@ -79,13 +79,14 @@ class PersonaState:
         """Load the persona state JSON for ``profile`` or return a fresh default."""
         p = state_path(profile)
         if not p.exists():
-            return cls(profile=profile)
+            return _apply_backend_override(cls(profile=profile))
         raw = json.loads(p.read_text())
         if raw.get("schema_version") != SCHEMA_VERSION:
             raise RuntimeError(
                 f"State schema mismatch at {p}. Run `paw login --force` to recreate.",
             )
-        return cls(**{k: v for k, v in raw.items() if k in cls.__dataclass_fields__})
+        state = cls(**{k: v for k, v in raw.items() if k in cls.__dataclass_fields__})
+        return _apply_backend_override(state)
 
     def save(self) -> None:
         """Atomically write the state JSON, chmod 0600."""
@@ -121,3 +122,11 @@ def load_state(profile: str) -> PersonaState:
             f"No persona state for profile {profile!r}.",
             hint="Run `paw login` first.",
         ) from e
+
+
+def _apply_backend_override(state: PersonaState) -> PersonaState:
+    """Apply a process-scoped backend override without mutating saved state."""
+    backend_url = os.environ.get("PAW_BACKEND_URL", "").strip()
+    if backend_url:
+        state.api_base_url = backend_url
+    return state

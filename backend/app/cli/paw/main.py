@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 import typer
 
 from app.cli.paw.commands import admin as admin_cmd
@@ -34,6 +36,8 @@ from app.cli.paw.commands import replay as replay_cmd
 from app.cli.paw.commands import verify as verify_cmd
 from app.cli.paw.commands import workspaces as workspaces_cmd
 
+API_OVERRIDE_MARKER = "_PAW_CLI_API_OVERRIDE_ACTIVE"
+
 app = typer.Typer(
     name="paw",
     help=(
@@ -45,6 +49,7 @@ app = typer.Typer(
     add_completion=False,
     rich_markup_mode="rich",
 )
+
 
 app.add_typer(
     doctor_cmd.app,
@@ -243,8 +248,20 @@ app.command(
 
 
 @app.callback()
-def _root() -> None:
-    """No-op root callback so subcommands attach cleanly."""
+def _root(
+    api: str | None = typer.Option(
+        None,
+        "--api",
+        help="Backend base URL override for this invocation.",
+    ),
+) -> None:
+    """Configure process-scoped options shared by every paw command."""
+    if api:
+        os.environ["PAW_BACKEND_URL"] = api
+        os.environ[API_OVERRIDE_MARKER] = "1"
+        return
+    if os.environ.pop(API_OVERRIDE_MARKER, None):
+        os.environ.pop("PAW_BACKEND_URL", None)
 
 
 if __name__ == "__main__":

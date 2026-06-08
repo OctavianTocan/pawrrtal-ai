@@ -1778,7 +1778,7 @@ Create `frontend/app/sitemap.ts`:
 import type { MetadataRoute } from 'next';
 import { handbookSource, productSource } from '@/lib/source';
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://pawrrtal.com';
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://pawrrtal.octaviantocan.com';
 
 /**
  * Generates sitemap entries for `/docs` + every handbook + product page.
@@ -1817,7 +1817,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
 }
 ```
 
-Adjust `BASE_URL` default to the actual production host if it is something other than `pawrrtal.com`.
+Adjust `BASE_URL` default if the production host changes.
 
 - [ ] **Step 2: Format + tsc**
 
