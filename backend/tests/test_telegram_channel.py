@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -31,7 +32,9 @@ from app.channels.telegram.bot import (
     _TELEGRAM_COMMANDS,
     TelegramService,
     _refresh_telegram_commands_best_effort,
+    _should_suppress_aiogram_polling_log,
     _stop_polling_task,
+    _suppress_aiogram_polling_shutdown_logs,
     refresh_telegram_commands,
 )
 from app.channels.telegram.bot_provider_resolution import (
@@ -235,6 +238,34 @@ async def test_stop_polling_task_uses_dispatcher_stop_signal() -> None:
     dispatcher.stop_polling.assert_awaited_once()
     assert polling_task.done()
     assert not polling_task.cancelled()
+
+
+def test_aiogram_shutdown_log_filter_only_matches_during_teardown() -> None:
+    """Runtime polling errors must still log outside Pawrrtal's teardown window."""
+    record = logging.LogRecord(
+        "aiogram.dispatcher",
+        logging.ERROR,
+        "",
+        0,
+        "Failed to fetch updates - TelegramNetworkError: HTTP Client says - "
+        "ServerDisconnectedError: Server disconnected",
+        (),
+        None,
+    )
+    retry_record = logging.LogRecord(
+        "aiogram.dispatcher",
+        logging.WARNING,
+        "",
+        0,
+        "Sleep for 1.000000 seconds and try again... (tryings = 0, bot id = 1)",
+        (),
+        None,
+    )
+
+    assert _should_suppress_aiogram_polling_log(record) is False
+    with _suppress_aiogram_polling_shutdown_logs():
+        assert _should_suppress_aiogram_polling_log(record) is True
+        assert _should_suppress_aiogram_polling_log(retry_record) is True
 
 
 # ---------------------------------------------------------------------------

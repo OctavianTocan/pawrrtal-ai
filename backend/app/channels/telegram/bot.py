@@ -24,7 +24,7 @@ import ipaddress
 import logging
 import time
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from importlib import import_module
@@ -78,6 +78,8 @@ if TYPE_CHECKING:
     from app.channels.telegram._attachments import TelegramVoiceNote
 
 logger = logging.getLogger(__name__)
+_AIOGRAM_DISPATCHER_LOGGER = logging.getLogger("aiogram.dispatcher")
+_SUPPRESS_AIOGRAM_POLLING_SHUTDOWN_LOGS = False
 
 _TELEGRAM_COMMANDS: tuple[tuple[str, str], ...] = (
     ("start", "Connect your Pawrrtal account"),
@@ -98,6 +100,49 @@ _TELEGRAM_COMMANDS: tuple[tuple[str, str], ...] = (
 # without reading the wall clock at boot. Process-local — multi-worker
 # deployments report only the worker that handled the command.
 _BOT_START_MONOTONIC: float = time.monotonic()
+
+
+class _AiogramPollingShutdownFilter(logging.Filter):
+    """Hide aiogram long-poll cancellation noise during planned shutdown only."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not _should_suppress_aiogram_polling_log(record)
+
+
+def _should_suppress_aiogram_polling_log(record: logging.LogRecord) -> bool:
+    """Return whether an aiogram dispatcher record is expected shutdown noise."""
+    if not _SUPPRESS_AIOGRAM_POLLING_SHUTDOWN_LOGS:
+        return False
+    message = record.getMessage()
+    if "Failed to fetch updates" in message and "ServerDisconnectedError" in message:
+        return True
+    return message.startswith("Sleep for ") and "try again" in message
+
+
+def _install_aiogram_polling_shutdown_filter() -> None:
+    """Install the process-wide aiogram shutdown filter once."""
+    if any(
+        isinstance(item, _AiogramPollingShutdownFilter)
+        for item in _AIOGRAM_DISPATCHER_LOGGER.filters
+    ):
+        return
+    _AIOGRAM_DISPATCHER_LOGGER.addFilter(_AiogramPollingShutdownFilter())
+
+
+@contextlib.contextmanager
+def _suppress_aiogram_polling_shutdown_logs() -> Iterator[None]:
+    """Temporarily suppress aiogram polling cancellation logs during teardown."""
+    global _SUPPRESS_AIOGRAM_POLLING_SHUTDOWN_LOGS  # noqa: PLW0603
+
+    previous = _SUPPRESS_AIOGRAM_POLLING_SHUTDOWN_LOGS
+    _SUPPRESS_AIOGRAM_POLLING_SHUTDOWN_LOGS = True
+    try:
+        yield
+    finally:
+        _SUPPRESS_AIOGRAM_POLLING_SHUTDOWN_LOGS = previous
+
+
+_install_aiogram_polling_shutdown_filter()
 
 
 def get_bot_uptime_seconds() -> float:
@@ -1029,15 +1074,16 @@ async def _stop_polling_task(service: TelegramService) -> None:
     task = service.polling_task
     if task is None:
         return
-    if not task.done():
-        try:
-            await service.dispatcher.stop_polling()
-        except RuntimeError as exc:
-            if "Polling is not started" not in str(exc):
-                raise
-            task.cancel()
-    with contextlib.suppress(asyncio.CancelledError, Exception):
-        await task
+    with _suppress_aiogram_polling_shutdown_logs():
+        if not task.done():
+            try:
+                await service.dispatcher.stop_polling()
+            except RuntimeError as exc:
+                if "Polling is not started" not in str(exc):
+                    raise
+                task.cancel()
+        with contextlib.suppress(asyncio.CancelledError, Exception):
+            await task
 
 
 def _validate_telegram_webhook_url(url: str) -> None:
