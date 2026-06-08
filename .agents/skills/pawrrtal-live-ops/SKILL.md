@@ -22,16 +22,18 @@ Read the relevant cookbook before acting:
 | Live audit | [cookbook/live-audit.md](cookbook/live-audit.md) | Prove what is running and whether local/public origins are healthy. |
 | Functional verification | [cookbook/verify.md](cookbook/verify.md) | Prove user-visible flows such as login, chat, providers, and frontend checks. |
 | Telegram diagnosis | [cookbook/telegram.md](cookbook/telegram.md) | Telegram receives no reply, commands fail, polling/webhook is suspect, or bindings look wrong. |
+| Runner operations | `pawrrtal-runner-ops` skill | Start, stop, lock, clean, or inspect self-hosted GitHub Actions runners. |
 | Shutdown | [cookbook/take-down.md](cookbook/take-down.md) | Stop Pawrrtal cleanly, disable it, or prove it is down. |
 
 ## Operating Rules
 
 1. Do not trust memory. Inspect the live service state every time.
 2. Do not print tokens, credential JSON, origin certs, database URLs, service tokens, or bot tokens.
-3. Prefer `paw` for user-visible verification, but if `paw` fails before HTTP due local env drift, switch to live process logs and raw HTTP checks.
+3. Prefer `paw` for user-visible verification, but if `paw` fails before HTTP due to local env drift, switch to live process logs and raw HTTP checks.
 4. Compare the live process checkout and commit against the commit you think is deployed.
 5. If the database schema is involved, run migrations against the live service database, not the shell default.
-6. After starting self-hosted runners for CI or verification, clean them and prove no runner services or processes remain.
+6. Use real provider/channel/browser proof when the user-visible claim depends on real integrations. Simulated Telegram or mocked provider tests are not enough to claim live behavior.
+7. After touching self-hosted runners for CI or verification, use `pawrrtal-runner-ops` and prove runner location, labels, processes, services, and disk state.
 
 ## Fast Triage
 

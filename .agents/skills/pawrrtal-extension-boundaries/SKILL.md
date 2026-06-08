@@ -81,14 +81,15 @@ kernel with optional pieces installed as plugins.
 
 ## Verification
 
-Use the Paw CLI as the operator surface:
+Use Paw as the operator surface. From the repo root, prefer `just paw`; from
+`backend/`, use `uv run paw`.
 
 ```bash
-paw plugins spec --json
-paw plugins list --json
-paw plugins capabilities search --slot tasks --json
-paw plugins slots list --json
-paw plugins validate backend/plugins/<plugin_id>/plugin.json --source bundled --json
+just paw plugins spec --json
+just paw plugins list --json
+just paw plugins capabilities search --slot tasks --json
+just paw plugins slots list --json
+just paw plugins validate backend/plugins/<plugin_id>/plugin.json --source bundled --json
 ```
 
 For runtime changes, add focused tests and then run the relevant gates:
@@ -96,7 +97,7 @@ For runtime changes, add focused tests and then run the relevant gates:
 ```bash
 cd backend && uv run pytest tests/test_plugin_discovery.py tests/test_plugin_tools.py
 cd backend && uv run pytest tests/test_channel_plugins.py tests/test_provider_plugins.py
-paw verify chat-roundtrip --json
+cd backend && uv run paw verify chat-roundtrip --json
 ```
 
 Run broader CI gates before claiming the PR is ready.
