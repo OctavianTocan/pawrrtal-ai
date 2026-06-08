@@ -17,10 +17,9 @@ const STREAM_DONE = Symbol('STREAM_DONE');
 /**
  * Wire shape for one multimodal image attached to a chat request.
  *
- * Mirrors the backend's `ChatImageInput` schema (PR 09): a base64-encoded
- * blob (no `data:` URL prefix) plus an explicit MIME type the provider
- * bridge translates into a multimodal content block. Kept narrow to the
- * image MIME types the provider bridge actually supports.
+ * Mirrors the backend's `ChatImageInput` schema: a base64-encoded blob
+ * with no `data:` URL prefix plus an explicit MIME type the provider
+ * bridge translates into a multimodal content block.
  */
 export type ChatImageInput = {
 	/** Base64-encoded image bytes, with the `data:<mime>;base64,` prefix stripped. */
