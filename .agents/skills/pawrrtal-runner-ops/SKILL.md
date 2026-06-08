@@ -15,6 +15,17 @@ Use this before touching GitHub Actions runners for Pawrrtal.
 4. Use repo-scoped runners for `OctavianTocan/Pawrrtal-AI`. Do not create org/global runners for this repo without explicit user approval.
 5. Installing persistent runner services is a security model change. Get explicit approval after stating the blast radius.
 
+## Authoritative Discovery
+
+Treat this skill as the policy, but confirm the current repo constants before editing workflows or installing runners:
+
+```bash
+rg -n "github\\.actor|octavian-only|runs-on: \\[self-hosted|github-runners|ephemeral-self-hosted-runners" AGENTS.md .github/workflows frontend/content/docs scripts
+df -h / /mnt/HC_Volume_105512717
+```
+
+If the repo has intentionally renamed labels, paths, or scripts, follow the checked-in policy and update this skill in the same PR.
+
 ## Runner Labels
 
 Use these labels for Pawrrtal runners unless the workflow intentionally needs a narrower pool:

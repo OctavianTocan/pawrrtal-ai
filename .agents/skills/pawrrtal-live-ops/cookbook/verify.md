@@ -36,7 +36,7 @@ uv run paw verify all --json
 
 Use focused suites first when debugging. Use `verify all` as a release gate, not as the first diagnostic tool.
 
-When the claim involves subscription-auth providers or live model behavior, run at least one real model roundtrip through Paw with the same workspace/user the app uses:
+When the claim involves subscription-auth providers or live model behavior, run at least one real model roundtrip through Paw with the same workspace/user the app uses. The model must mirror the production/channel default being claimed. Discover that default from the live process environment, the channel diagnostics, or `paw models ls --json` plus the workspace's configured default before choosing the verifier model.
 
 ```bash
 cd backend
