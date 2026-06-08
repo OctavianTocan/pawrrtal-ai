@@ -50,7 +50,8 @@ NTN_TOOL_DESCRIPTION = (
     "\n"
     "Common subcommands (each arg is a separate `args` element; do not "
     "wrap values in shell quotes — there is no shell):\n"
-    '  • `args = ["api", "<path>"]` — call the Notion HTTP API. Add '
+    '  • `args = ["api", "/v1/<path>"]` — call the Notion HTTP API '
+    "(for example, `/v1/search`, `/v1/users/me`, or `/v1/pages/<id>`). Add "
     '`"-X", "PATCH"` / `"-X", "DELETE"` / `"-X", "POST"` for '
     'non-GET methods, `"-d", "<raw json>"` for a body, and '
     '`"key==value"` for query-string params.\n'
