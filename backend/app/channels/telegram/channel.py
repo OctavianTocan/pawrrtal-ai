@@ -7,9 +7,8 @@ yields nothing.
 Debounce: edits fire when ``_EDIT_DEBOUNCE_CHARS`` new chars accumulate
 or ``_MAX_EDIT_INTERVAL_S`` seconds elapse.  Final edit always fires.
 
-Non-text outcomes (agent_terminated, error) replace the ⏳ placeholder
-with a user-facing message.  "Empty stream" and "tool-only turn" (#293)
-also surface a closing reply so the user always knows the turn ended.
+Non-text outcomes replace the placeholder with a user-facing message. Empty
+and tool-only turns also surface a closing reply so the user knows the turn ended.
 """
 
 from __future__ import annotations
@@ -67,7 +66,7 @@ _EMPTY_RESPONSE_FALLBACK = "⚠️ The agent finished without producing a reply.
 
 
 def _build_regenerate_markup(conversation_id: Any) -> Any | None:
-    """Build the regenerate inline keyboard when the feature flag is on (#368)."""
+    """Build the regenerate inline keyboard when the feature flag is on."""
     if not settings.telegram_regenerate_button_enabled:
         return None
     from app.channels.telegram.regenerate_keyboard import regenerate_markup_for  # noqa: PLC0415
@@ -111,46 +110,27 @@ class TelegramChannel:
         message_id: int = meta["message_id"]
         reply_to_message_id = optional_int(meta.get("reply_to_message_id"))
         message_thread_id = optional_int(meta.get("message_thread_id"))
-        # #368: regenerate button built once per turn (off by default).
         reply_markup = _build_regenerate_markup(message["conversation_id"])
 
         tool_trace = ""
-        # Per-tool state dict for Workstream 4 success/failure timing.
-        # Keyed by tool call_id; maps to ToolLineState so tool_result
-        # events can mutate in-flight lines to show timing/errors.
         tool_states: dict[str, ToolLineState] = {}
 
         # ``tool_message_id`` starts as the placeholder so the FIRST tools
-        # block consumes the ⏳; on a thinking→tools transition (issue #288)
-        # we open a fresh Telegram message for the new tools block and
-        # rebind this slot so subsequent edits land there.
+        # block consumes it; later block transitions open fresh messages.
         tool_message_id: int = message_id
         text_state = TextDeliveryState(last_edit_at=asyncio.get_event_loop().time())
         thinking_text = ""
         thinking_message_id: int | None = message_id
-        # #306/#307: interleaved text deltas open their own Telegram
-        # messages in chronological order. ``text_message_id`` tracks
-        # the open text message; ``text_chars_since_edit`` and
-        # ``text_last_edit_at`` drive the debounce mirroring the tools
-        # path. On a text → tools/thinking transition,
-        # ``prepare_text_block`` resets the slot so the next delta
-        # opens a fresh message.
         chars_since_edit = 0
         last_edit_at = asyncio.get_event_loop().time()
         # ``previous_thinking_block_index`` tracks the ``block_index``
         # of the most recent thinking event so ``handle_thinking`` can
-        # insert a paragraph break only when a new block starts (#353).
+        # insert a paragraph break only when a new block starts.
         # ``None`` before the first thinking event so the very first
         # chunk does not get a leading separator.
         previous_thinking_block_index: int | None = None
-        # Block-transition tracking (#288). ``previous_block_kind`` is the
-        # kind of the most-recent block-emitting event (``"tools"`` /
-        # ``"thinking"``). When the incoming event's kind differs from the
-        # previous one (and we've already emitted at least one block), the
-        # active block is finalized — its last state stays in chat — and
-        # we open a new message for the incoming block so the chat reads
-        # as the natural ``thinking → tools → thinking`` sequence instead
-        # of two ever-growing blobs.
+        # The active block is finalized when the stream switches between
+        # thinking and tool output, so Telegram reads chronologically.
         previous_block_kind: str | None = None
         # ``first_block_kind`` records what the placeholder was used for,
         # so the post-stream cleanup can tell whether ⏳ holds real content
@@ -303,11 +283,8 @@ class TelegramChannel:
                 terminal_message, terminal_prefix = captured
                 continue
 
-        # #306: when text was already rendered progressively into an
-        # interleaved text message, skip the closing answer_text duplicate.
-        # Drafts (Bot API 9.3+) are ephemeral and auto-expire — they do NOT
-        # persist as a chat message, so even in draft mode we still send the
-        # full answer via ``safe_send_text`` to persist the conversation.
+        # When text was already rendered progressively into its own Telegram
+        # message, skip the closing answer duplicate.
         # Any terminal_message (error / agent_terminated) flushes regardless.
         final_text = final_reply_text(
             answer_text="" if text_state.message_id is not None else text_state.answer_text,

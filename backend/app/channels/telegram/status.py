@@ -26,10 +26,7 @@ from app.channels.crud import (
 )
 
 # Re-export so callers in ``bot.py`` import all LCM-flavoured handlers
-# from one module path — keeping ``bot.py``'s fan-out under sentrux's
-# ``no_god_files`` budget (issue #303 added the second helper). The
-# underlying implementations live in their own per-command files to
-# keep each module focused on one command.
+# from one module path while the implementations stay in focused files.
 from app.channels.telegram.compact_command import (
     handle_compact_command as handle_compact_command,  # noqa: PLC0414
 )

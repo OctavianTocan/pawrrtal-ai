@@ -2,7 +2,7 @@
 
 Surfaces Lossless Context Management state for the current conversation
 so the operator can diagnose memory regressions from Telegram without
-SSH'ing into the server. Closes #303.
+SSH'ing into the server.
 
 Mirrors :mod:`app.channels.telegram.status` in shape: pure
 formatter + one async handler + its own copy constants. Stays under
@@ -217,7 +217,6 @@ async def handle_lcm_command(
     compacting anything.  When enabled, queries the same tables LCM
     writes during ingest + compaction and renders a concise summary.
 
-    Closes #303.
     """
     if not settings.lcm_enabled:
         return _LCM_DISABLED_MESSAGE

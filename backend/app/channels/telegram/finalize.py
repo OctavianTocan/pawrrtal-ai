@@ -1,9 +1,4 @@
-"""Post-stream Telegram cleanup — extracted from ``_telegram_dispatch``.
-
-Split out so ``_telegram_dispatch`` fits the project's 500-line file
-budget. The function is mechanically identical to its previous form
-— no behavioural changes.
-"""
+"""Post-stream Telegram cleanup."""
 
 from __future__ import annotations
 
@@ -43,15 +38,14 @@ async def finalize_turn_delivery(
     message_thread_id: int | None,
     reply_markup: Any | None = None,
 ) -> None:
-    """Resolve the ⏳ placeholder and send the closing reply (#288, #293, #306).
+    """Resolve the placeholder and send the closing reply.
 
     When ``text_message_id`` is set, we flush its final buffer in place
     and skip the closing ``final_text`` send so the user doesn't see the
     answer twice.
 
-    ``reply_markup`` (#368) attaches an inline keyboard to the closing
-    reply when one is supplied — the regenerate button is the only
-    current caller. The markup rides on whichever message the user
+    ``reply_markup`` attaches an inline keyboard to the closing reply.
+    The markup rides on whichever message the user
     ultimately sees as the final answer; in the interleaved-text path
     that's the existing ``text_message_id`` edit, otherwise it's the
     closing ``safe_send_text``.
@@ -82,12 +76,9 @@ async def finalize_turn_delivery(
         )
         return
 
-    # Prefer ``final_text`` (the caller's authoritative ``answer_text``)
-    # over ``text_buffer`` when both diverge — defence in depth against
-    # the #346 regression class where ``text_buffer`` lagged the live
-    # accumulator. ``text_buffer`` is the fallback for callers that
-    # opened an interleaved message without producing a separate
-    # ``final_text`` for the closing reply.
+    # Prefer the caller's authoritative answer over the live text buffer.
+    # ``text_buffer`` is the fallback for callers that opened an interleaved
+    # message without producing separate closing text.
     if text_message_id is not None and (final_text or text_buffer):
         # Interleaved-text path: the answer already lives in an
         # in-place edited message. We don't re-edit the text just to
@@ -152,11 +143,10 @@ async def _send_regenerate_tail(
 ) -> None:
     """Post a minimal trailing message that carries the regenerate button.
 
-    Used only on the interleaved-text path (#306) where the final
-    answer was rendered into an in-place-edited Telegram message.
-    Re-editing that message with a markup would require a separate
-    ``editMessageReplyMarkup`` call; sending one tiny extra message
-    keeps the helper symmetric with the closing-send path.
+    Used only when the final answer was rendered into an in-place-edited
+    Telegram message. Re-editing that message with a markup would require
+    a separate ``editMessageReplyMarkup`` call; sending one tiny extra
+    message keeps the helper symmetric with the closing-send path.
     """
     await safe_send_text(
         bot,

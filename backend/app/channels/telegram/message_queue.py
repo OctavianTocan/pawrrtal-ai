@@ -1,4 +1,4 @@
-"""Per-chat FIFO queue dispatcher for Telegram turn processing (#357).
+"""Per-chat FIFO queue dispatcher for Telegram turn processing.
 
 The Telegram bot currently cancels the in-flight stream when a new
 user message arrives in the same chat — last-one-wins. That's fine
@@ -13,9 +13,8 @@ per-chat :class:`asyncio.Queue`. A single worker task per chat
 drains the queue serially so each turn runs to completion before the
 next one starts.
 
-The dispatcher is framework-free — the aiogram glue that builds the
-``QueuedTurn`` payload and calls :func:`enqueue` lives in
-:mod:`bot.py` once this lands behind a feature flag.
+The dispatcher is framework-free; aiogram glue builds ``QueuedTurn``
+payloads and calls :func:`enqueue` from :mod:`bot.py`.
 """
 
 from __future__ import annotations
@@ -44,7 +43,7 @@ class QueuedTurn:
     ``payload`` is opaque to the dispatcher — the consumer (bot.py)
     decides what to put in it. Today it's the inbound aiogram
     ``Message`` object; future producers can wrap any shape the
-    consumer recognises (e.g. a regenerate request from issue #368).
+    consumer recognises, such as a regenerate request.
     """
 
     chat_id: int
@@ -101,9 +100,7 @@ class ChatMessageQueueDispatcher:
     def is_running(self, chat_id: int) -> bool:
         """Return whether a turn is currently in flight for ``chat_id``.
 
-        Used by ``/status`` to decide between "running" / "idle".
-        Mirrors the existing ``is_chat_run_active`` API on the legacy
-        ``_running_tasks`` dict.
+        Used by ``/status`` to decide between "running" and "idle".
         """
         task = self._active_turns.get(chat_id)
         return task is not None and not task.done()
@@ -121,9 +118,9 @@ class ChatMessageQueueDispatcher:
     async def stop_chat(self, chat_id: int) -> bool:
         """Cancel the in-flight turn and drop every queued turn for ``chat_id``.
 
-        Returns ``True`` when something was actually cancelled,
-        ``False`` when the chat had nothing running and nothing
-        queued.  Mirrors the bool the legacy ``/stop`` path returns.
+            Returns ``True`` when something was actually cancelled,
+            ``False`` when the chat had nothing running and nothing
+        queued.
         """
         cancelled_anything = False
 

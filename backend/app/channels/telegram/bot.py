@@ -106,7 +106,7 @@ def is_chat_run_active(chat_id: int) -> bool:
 
     When the FIFO dispatcher is enabled (``settings.telegram_chat_queue_enabled``),
     delegates to :meth:`ChatMessageQueueDispatcher.is_running`; otherwise
-    reads the legacy ``_running_tasks`` dict.
+    reads the direct-execution task table.
     """
     if settings.telegram_chat_queue_enabled:
         return _get_chat_queue_dispatcher().is_running(chat_id)
@@ -171,9 +171,8 @@ async def _execute_turn_body(
     """Run the typing + stream + auto-title block under the FIFO dispatcher.
 
     Extracted from :func:`_run_llm_turn` so the dispatcher's consumer
-    has a clean callable to await. The legacy non-FIFO path still
-    inlines this logic (with the extra ``_running_tasks`` bookkeeping
-    the dispatcher does on its own).
+    has a clean callable to await. The direct path still inlines this
+    logic with its own ``_running_tasks`` bookkeeping.
     """
     chat_id = message.chat.id
     bot = message.bot
