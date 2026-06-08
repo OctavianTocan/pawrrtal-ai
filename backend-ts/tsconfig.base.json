@@ -1,4 +1,5 @@
 {
+	"$schema": "https://json.schemastore.org/tsconfig",
 	"compilerOptions": {
 		"target": "ES2022",
 		"lib": ["ES2022"],
@@ -6,12 +7,35 @@
 		"moduleResolution": "bundler",
 		"moduleDetection": "force",
 		"verbatimModuleSyntax": true,
+		"isolatedModules": true,
+		"allowJs": false,
+		"noEmit": true,
+		"skipLibCheck": true,
+		"resolveJsonModule": true,
+		"forceConsistentCasingInFileNames": true,
+		"noErrorTruncation": true,
+
 		"strict": true,
 		"noUncheckedIndexedAccess": true,
+		"noImplicitReturns": true,
 		"noUnusedLocals": true,
+		"noUnusedParameters": true,
 		"noFallthroughCasesInSwitch": true,
-		"skipLibCheck": true,
-		"isolatedModules": true,
-		"noEmit": true
+		"noImplicitOverride": true,
+		"exactOptionalPropertyTypes": true,
+
+		"plugins": [
+			{
+				"name": "@effect/language-service",
+				"transform": "@effect/language-service/transform",
+				"namespaceImportPackages": ["effect", "@effect/*"],
+				"diagnosticSeverity": {
+					"globalErrorInEffectFailure": "off"
+				},
+				"includeSuggestionsInTsc": false,
+				"ignoreEffectWarningsInTscExitCode": true,
+				"ignoreEffectErrorsInTscExitCode": true
+			}
+		]
 	}
 }
