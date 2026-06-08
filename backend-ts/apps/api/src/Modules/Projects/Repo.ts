@@ -11,6 +11,7 @@ const asProjects = (rows: ReadonlyArray<unknown>): ReadonlyArray<Project> =>
 	rows as unknown as ReadonlyArray<Project>;
 
 const asProject = (row: unknown): Project => row as unknown as Project;
+
 export class ProjectsRepo extends Context.Service<
 	ProjectsRepo,
 	{
@@ -27,7 +28,19 @@ export class ProjectsRepo extends Context.Service<
 	}
 >()('@pawrrtal/api/Projects/Repo') {}
 
-export const ProjectsRepoLive = Layer.effect(
+/**
+ * Repo body with no `SqlClient` source attached. Production wires it
+ * via {@link ProjectsRepoLive}; tests wire it with an in-memory SQLite
+ * layer.
+ *
+ * **Why not `Default` / `DefaultWithoutDependencies`:** those names
+ * come from Effect v3's `Effect.Service` class. In v4, `Context.Service`
+ * is the canonical shape and does not auto-generate the `.Default`
+ * pair, so we build the body layer manually here. The split mirrors
+ * the v3 convention one-for-one — the body is the "without
+ * dependencies" half.
+ */
+export const ProjectsRepoBody: Layer.Layer<ProjectsRepo, never, SqlClient.SqlClient> = Layer.effect(
 	ProjectsRepo,
 	Effect.gen(function* () {
 		const sql = yield* SqlClient.SqlClient;
@@ -46,7 +59,11 @@ export const ProjectsRepoLive = Layer.effect(
 		}) {
 			const now = yield* DateTime.now;
 			const id = crypto.randomUUID() as ProjectId;
-			const ts = DateTime.toDateUtc(now);
+			// TEXT column — ISO-8601 UTC. `DateTime.toDateUtc` returns a
+			// `Date` which `better-sqlite3` accepts only for INTEGER
+			// columns; the production schema declares `created_at` and
+			// `updated_at` as TEXT.
+			const ts = DateTime.formatIso(now);
 
 			yield* sql`INSERT INTO projects (id, user_id, name, created_at, updated_at) VALUES (${id}, ${input.user_id}, ${input.name}, ${ts}, ${ts})`.raw.pipe(
 				sql.withTransaction,
@@ -66,7 +83,7 @@ export const ProjectsRepoLive = Layer.effect(
 			name: string
 		) {
 			const now = yield* DateTime.now;
-			const ts = DateTime.toDateUtc(now);
+			const ts = DateTime.formatIso(now);
 
 			const result =
 				(yield* sql`UPDATE projects SET name = ${name}, updated_at = ${ts} WHERE id = ${id} AND user_id = ${userId}`.raw.pipe(
@@ -94,4 +111,10 @@ export const ProjectsRepoLive = Layer.effect(
 
 		return { listByUser, insert, update, delete: remove } as const;
 	})
-).pipe(Layer.provide(DatabaseLive));
+);
+
+/** Production repo layer: provides `ProjectsRepo` with the file-backed `DatabaseLive` baked in. */
+export const ProjectsRepoLive: Layer.Layer<ProjectsRepo, never, never> = Layer.provide(
+	ProjectsRepoBody,
+	[DatabaseLive]
+) as Layer.Layer<ProjectsRepo, never, never>;

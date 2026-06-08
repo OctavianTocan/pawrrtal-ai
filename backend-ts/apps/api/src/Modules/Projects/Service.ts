@@ -109,9 +109,12 @@ const resolveUpdateName = (
 };
 
 /**
- * The live implementation of the ProjectsService. Yields the ProjectsRepo and implements each method with Effect.fn.
+ * Service body with no `ProjectsRepo` source attached. Production wires
+ * it via {@link ProjectsServiceLive}; tests wire it with a `Ref`-backed
+ * stub. See {@link ProjectsRepoBody} for the same split rationale —
+ * letting tests override dependencies without fighting MemoMap.
  */
-export const ProjectsServiceLive = Layer.effect(
+export const ProjectsServiceBody: Layer.Layer<ProjectsService, never, ProjectsRepo> = Layer.effect(
 	ProjectsService,
 	Effect.gen(function* () {
 		const repo = yield* ProjectsRepo;
@@ -166,4 +169,10 @@ export const ProjectsServiceLive = Layer.effect(
 
 		return { listForUser, createForUser, updateForUser, deleteForUser } as const;
 	})
-).pipe(Layer.provide(ProjectsRepoLive));
+);
+
+/** Production service layer: provides `ProjectsService` and the production `ProjectsRepo`. */
+export const ProjectsServiceLive: Layer.Layer<ProjectsService, never, never> = Layer.provide(
+	ProjectsServiceBody,
+	[ProjectsRepoLive]
+) as Layer.Layer<ProjectsService, never, never>;
