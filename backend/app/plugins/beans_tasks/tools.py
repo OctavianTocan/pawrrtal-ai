@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import shutil
 import subprocess  # nosec B404 - canonical beans CLI invocation uses argv lists, never shell.
 import tempfile
@@ -21,6 +23,8 @@ _BEANS_BINARY = "beans"
 _BEANS_TIMEOUT_SECONDS = 5
 _UPDATE_BASE_ARG_COUNT = 2
 _VALID_STATUSES = frozenset({"todo", "in-progress", "completed", "scrapped"})
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True, slots=True)
@@ -233,7 +237,13 @@ def _load_beans(workspace_root: Path) -> list[Bean]:
     root = _beans_root(workspace_root)
     if not root.exists():
         return []
-    return sorted((_read_bean(path) for path in root.glob("*.md")), key=lambda bean: bean.bean_id)
+    beans: list[Bean] = []
+    for path in root.glob("*.md"):
+        try:
+            beans.append(_read_bean(path))
+        except (OSError, yaml.YAMLError) as exc:
+            logger.warning("BEANS_TASKS_SKIP_INVALID_FILE path=%s error=%s", path, exc)
+    return sorted(beans, key=lambda bean: bean.bean_id)
 
 
 def _find_bean(workspace_root: Path, query: str) -> Bean:
@@ -322,15 +332,6 @@ async def _run_beans(
     *,
     body_file_text: str | None = None,
 ) -> str:
-    return _run_beans_sync(workspace_root, args, body_file_text=body_file_text)
-
-
-def _run_beans_sync(
-    workspace_root: Path,
-    args: list[str],
-    *,
-    body_file_text: str | None,
-) -> str:
     binary = shutil.which(_BEANS_BINARY)
     if binary is None:
         raise ToolError(ToolErrorCode.NOT_FOUND, "beans CLI is not installed or not on PATH.")
@@ -340,27 +341,58 @@ def _run_beans_sync(
     if body_file_path is not None:
         cli_args.extend(["--body-file", str(body_file_path)])
 
+    stdout_path = _temp_output_path("stdout")
+    stderr_path = _temp_output_path("stderr")
+    stdout_file = stdout_path.open("wb")
+    stderr_file = stderr_path.open("wb")
+    process_finished = False
     try:
-        result = subprocess.run(  # noqa: S603  # nosec B603 - resolved binary, no shell.
+        # Only process creation is synchronous; waiting below is async polling.
+        process = subprocess.Popen(  # noqa: ASYNC220,S603  # nosec B603
             cli_args,
             cwd=workspace_root,
-            capture_output=True,
-            text=True,
-            timeout=_BEANS_TIMEOUT_SECONDS,
-            check=False,
+            stdin=subprocess.DEVNULL,
+            stdout=stdout_file,
+            stderr=stderr_file,
         )
-    except subprocess.TimeoutExpired as exc:
-        raise ToolError(ToolErrorCode.IO_ERROR, "beans CLI timed out.") from exc
+        stdout_file.close()
+        stderr_file.close()
+        if not await _wait_for_process(process, timeout_seconds=_BEANS_TIMEOUT_SECONDS):
+            process.kill()
+            await _wait_for_process(process, timeout_seconds=1)
+            raise ToolError(ToolErrorCode.IO_ERROR, "beans CLI timed out.")
+        process_finished = True
     except OSError as exc:
         raise ToolError(ToolErrorCode.IO_ERROR, f"beans CLI failed to start: {exc}") from exc
     finally:
+        if not stdout_file.closed:
+            stdout_file.close()
+        if not stderr_file.closed:
+            stderr_file.close()
         if body_file_path is not None:
             body_file_path.unlink(missing_ok=True)
+        if not process_finished:
+            stdout_path.unlink(missing_ok=True)
+            stderr_path.unlink(missing_ok=True)
 
-    if result.returncode != 0:
-        detail = (result.stderr or result.stdout).strip() or f"exit {result.returncode}"
+    stdout = stdout_path.read_text(encoding="utf-8", errors="replace").strip()
+    stderr = stderr_path.read_text(encoding="utf-8", errors="replace").strip()
+    stdout_path.unlink(missing_ok=True)
+    stderr_path.unlink(missing_ok=True)
+    if process.returncode != 0:
+        detail = stderr or stdout or f"exit {process.returncode}"
         raise ToolError(ToolErrorCode.IO_ERROR, f"{_beans_action(args)} failed: {detail}")
-    return result.stdout.strip()
+    return stdout
+
+
+async def _wait_for_process(process: subprocess.Popen[bytes], *, timeout_seconds: int) -> bool:
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout_seconds
+    while process.poll() is None:
+        if loop.time() >= deadline:
+            return False
+        await asyncio.sleep(0.05)
+    return True
 
 
 def _write_body_file(body_file_text: str | None) -> Path | None:
@@ -375,6 +407,15 @@ def _write_body_file(body_file_text: str | None) -> Path | None:
     ) as body_file:
         body_file.write(body_file_text)
         return Path(body_file.name)
+
+
+def _temp_output_path(stream_name: str) -> Path:
+    with tempfile.NamedTemporaryFile(
+        "wb",
+        prefix=f"pawrrtal-beans-{stream_name}-",
+        delete=False,
+    ) as output_file:
+        return Path(output_file.name)
 
 
 def _beans_action(args: list[str]) -> str:

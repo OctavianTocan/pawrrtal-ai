@@ -149,8 +149,10 @@ def fake_beans_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
             command = sys.argv[1]
             if command == "create":
                 create(sys.argv[2:])
+                sys.exit(0)
             elif command == "update":
                 update(sys.argv[2:])
+                sys.exit(0)
             else:
                 print(f"unsupported command {command}", file=sys.stderr)
                 sys.exit(2)
@@ -188,30 +190,37 @@ def test_beans_tools_create_list_update_and_complete(
     update = make_beans_update_tool(ctx)
     complete = make_beans_complete_tool(ctx)
 
-    created = asyncio.run(
-        create.execute("call-1", title="Fix mobile login", body="Tap should sign in.")
-    )
-    assert created == "Created bean pawrrtal-00000001: Fix mobile login"
+    async def run_scenario() -> tuple[str, str, str, str, str, str]:
+        created = await create.execute(
+            "call-1",
+            title="Fix mobile login",
+            body="Tap should sign in.",
+        )
+        listing = await list_tool.execute("call-2")
+        bean_id = listing.split()[1]
+        updated = await update.execute("call-3", bean=bean_id, status="in-progress")
+        completed = await complete.execute("call-4", bean="mobile login")
+        open_listing = await list_tool.execute("call-5")
+        all_listing = await list_tool.execute("call-6", include_completed=True)
+        return created, listing, updated, completed, open_listing, all_listing
 
-    listing = asyncio.run(list_tool.execute("call-2"))
+    created, listing, updated, completed, open_listing, all_listing = asyncio.run(run_scenario())
+
+    assert created == "Created bean pawrrtal-00000001: Fix mobile login"
     assert "Fix mobile login" in listing
     bean_id = listing.split()[1]
-
-    updated = asyncio.run(update.execute("call-3", bean=bean_id, status="in-progress"))
     assert updated == f"Updated bean {bean_id}."
-
-    completed = asyncio.run(complete.execute("call-4", bean="mobile login"))
     assert completed == f"Completed bean {bean_id}."
-
-    open_listing = asyncio.run(list_tool.execute("call-5"))
-    all_listing = asyncio.run(list_tool.execute("call-6", include_completed=True))
 
     assert "Fix mobile login" not in open_listing
     assert f"{bean_id} [completed/normal] Fix mobile login" in all_listing
     assert (tmp_path / ".beans").is_dir()
 
 
-def test_beans_create_passes_metadata_to_cli(tmp_path: Path, fake_beans_cli: None) -> None:
+def test_beans_create_passes_metadata_to_cli(
+    tmp_path: Path,
+    fake_beans_cli: None,
+) -> None:
     ctx = _ctx(tmp_path)
     create = make_beans_create_tool(ctx)
     title = "Settings layout: align fields"
@@ -260,8 +269,11 @@ def test_beans_update_and_complete_preserve_structured_frontmatter(
     update = make_beans_update_tool(ctx)
     complete = make_beans_complete_tool(ctx)
 
-    asyncio.run(update.execute("call-1", bean="existing", status="in-progress"))
-    asyncio.run(complete.execute("call-2", bean="existing"))
+    async def run_scenario() -> None:
+        await update.execute("call-1", bean="existing", status="in-progress")
+        await complete.execute("call-2", bean="existing")
+
+    asyncio.run(run_scenario())
 
     meta = _frontmatter(path)
     assert meta["status"] == "completed"
@@ -277,8 +289,11 @@ def test_beans_update_replaces_body_through_cli(
     create = make_beans_create_tool(ctx)
     update = make_beans_update_tool(ctx)
 
-    asyncio.run(create.execute("call-1", title="Body task", body="Old body."))
-    result = asyncio.run(update.execute("call-2", bean="Body task", body="New body."))
+    async def run_scenario() -> str:
+        await create.execute("call-1", title="Body task", body="Old body.")
+        return await update.execute("call-2", bean="Body task", body="New body.")
+
+    result = asyncio.run(run_scenario())
 
     assert result == "Updated bean pawrrtal-00000001."
     assert "New body." in next((tmp_path / ".beans").glob("*.md")).read_text(encoding="utf-8")
@@ -293,7 +308,41 @@ def test_beans_list_rejects_invalid_status_filter(tmp_path: Path) -> None:
     assert result == "[invalid_path] Unsupported bean status 'inprogress'."
 
 
-def test_beans_create_reports_missing_cli(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_beans_list_skips_malformed_frontmatter(tmp_path: Path) -> None:
+    root = tmp_path / ".beans"
+    root.mkdir()
+    (root / "pawrrtal-bad--broken.md").write_text(
+        "---\ntitle: [broken\n---\n\nBroken body.\n",
+        encoding="utf-8",
+    )
+    (root / "pawrrtal-good--valid.md").write_text(
+        "\n".join(
+            [
+                "---",
+                "# pawrrtal-good",
+                "title: Valid task",
+                "status: todo",
+                "priority: high",
+                "---",
+                "",
+                "Valid body.",
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    list_tool = make_beans_list_tool(_ctx(tmp_path))
+
+    result = asyncio.run(list_tool.execute("call-1"))
+
+    assert "pawrrtal-good [todo/high] Valid task" in result
+    assert "pawrrtal-bad" not in result
+
+
+def test_beans_create_reports_missing_cli(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     empty_path = tmp_path / "empty-path"
     empty_path.mkdir()
     monkeypatch.setenv("PATH", str(empty_path))
@@ -312,9 +361,11 @@ def test_beans_update_reports_ambiguous_matches(
     create = make_beans_create_tool(ctx)
     update = make_beans_update_tool(ctx)
 
-    asyncio.run(create.execute("call-1", title="Follow up"))
-    asyncio.run(create.execute("call-2", title="Follow through"))
+    async def run_scenario() -> str:
+        await create.execute("call-1", title="Follow up")
+        await create.execute("call-2", title="Follow through")
+        return await update.execute("call-3", bean="Follow")
 
-    result = asyncio.run(update.execute("call-3", bean="Follow"))
+    result = asyncio.run(run_scenario())
 
     assert result.startswith("[invalid_path] Multiple beans matched")

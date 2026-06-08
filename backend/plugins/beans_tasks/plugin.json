@@ -4,7 +4,7 @@
 	"name": "Beans Tasks",
 	"description": "Manage workspace Beans tasks through the canonical beans CLI.",
 	"version": "1.0.0",
-	"enabled_by_default": true,
+	"enabled_by_default": false,
 	"permissions": ["filesystem_read", "filesystem_write", "subprocess"],
 	"capabilities": [
 		{
