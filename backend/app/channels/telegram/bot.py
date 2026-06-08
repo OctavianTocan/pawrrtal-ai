@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import html as html_lib
 import ipaddress
 import logging
 import time
@@ -59,6 +60,7 @@ from app.channels.telegram.handlers import (
     handle_verbose_command,
     handle_whoami_command,
 )
+from app.channels.telegram.html import md_to_telegram_html
 from app.channels.telegram.tools_command import handle_tools_command
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
@@ -413,11 +415,16 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
 
     has_active_recall = False
 
-    async def _draft_updater(html: str) -> None:
+    async def _draft_updater(text: str) -> None:
         nonlocal has_active_recall
         has_active_recall = True
         if message.bot:
-            await safe_edit_html(message.bot, message.chat.id, thinking_msg.message_id, html)
+            await safe_edit_html(
+                message.bot,
+                message.chat.id,
+                thinking_msg.message_id,
+                _render_turn_context_draft_html(text),
+            )
 
     async def _on_turn_context_finished() -> None:
         if has_active_recall:
@@ -863,6 +870,17 @@ def _extract_start_payload(text: str) -> str | None:
     if len(parts) < _START_COMMAND_PARTS_WITH_PAYLOAD:
         return None
     return parts[1].strip() or None
+
+
+# ---------------------------------------------------------------------------
+# Turn-context draft helpers (module-level, not inside build_telegram_service)
+# ---------------------------------------------------------------------------
+
+
+def _render_turn_context_draft_html(text: str) -> str:
+    """Render generic turn-context draft text for Telegram."""
+    rendered = md_to_telegram_html(text)
+    return rendered if rendered else html_lib.escape(text)
 
 
 # ---------------------------------------------------------------------------

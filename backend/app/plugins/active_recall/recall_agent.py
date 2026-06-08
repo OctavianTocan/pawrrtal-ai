@@ -1,5 +1,4 @@
 import asyncio
-import html as html_lib
 import logging
 import os
 import time
@@ -10,7 +9,6 @@ from pathlib import Path
 from typing import Any
 
 from app.agents.types import AgentTool
-from app.channels.telegram.html import md_to_telegram_html
 from app.infrastructure.config import settings
 from app.infrastructure.keys import resolve_api_key
 from app.plugins.adapters.turn_context import TurnContextProviderContext
@@ -134,7 +132,7 @@ def _apply_stream_event(tel: _StreamTelemetry, event: dict[str, Any]) -> None:
         tel.error_msg = f"agent_terminated: {event.get('content')}"
 
 
-async def _collect_stream_telemetry(  # noqa: C901 — narrow per-event dispatch; splitting hurts readability
+async def _collect_stream_telemetry(
     stream: AsyncIterator[Any],
     draft_updater: DraftUpdater | None = None,
 ) -> tuple[str, list[str], int, int, float, str | None]:
@@ -147,27 +145,18 @@ async def _collect_stream_telemetry(  # noqa: C901 — narrow per-event dispatch
             return
 
         trace_str = " | ".join(trace_parts)
-        # Truncate so it works in one line
         max_len = 60
         if len(trace_str) > max_len:
             trace_str = "..." + trace_str[-(max_len - 3) :]
 
-        safe_trace = html_lib.escape(trace_str)
-        html = (
-            f"💭 <b>Recalling memory...</b>\n\n<i>{safe_trace}</i>"
-            if safe_trace
-            else "💭 <b>Recalling memory...</b>"
-        )
+        draft = f"Recalling memory...\n\n{trace_str}" if trace_str else "Recalling memory..."
 
         reply = "".join(tel.parts).strip()
         if reply:
-            rendered_reply = md_to_telegram_html(reply)
-            if rendered_reply is reply:
-                rendered_reply = html_lib.escape(reply)
-            html += f"\n\n<i>{rendered_reply}</i>"
+            draft += f"\n\n{reply}"
 
         try:
-            await asyncio.wait_for(draft_updater(html), timeout=_DRAFT_UPDATE_TIMEOUT_S)
+            await asyncio.wait_for(draft_updater(draft), timeout=_DRAFT_UPDATE_TIMEOUT_S)
         except TimeoutError:
             logger.warning("ACTIVE_RECALL_DRAFT_TIMEOUT timeout_s=%.1f", _DRAFT_UPDATE_TIMEOUT_S)
         except Exception:

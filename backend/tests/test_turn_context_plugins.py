@@ -83,6 +83,31 @@ def test_active_recall_resolves_provider_with_workspace_root(
     assert result[0] == "NONE"
 
 
+@pytest.mark.anyio
+async def test_active_recall_draft_updates_are_transport_neutral() -> None:
+    """Active Recall emits plain draft text; channels own presentation formatting."""
+    updates: list[str] = []
+
+    async def _events() -> AsyncIterator[dict[str, object]]:
+        yield {"type": "tool_use", "name": "lcm_search"}
+        yield {"type": "delta", "content": "**memory** <raw>"}
+
+    async def _draft_updater(text: str) -> None:
+        updates.append(text)
+
+    result = await recall_agent._collect_stream_telemetry(
+        _events(),
+        draft_updater=_draft_updater,
+    )
+
+    assert result[0] == "**memory** <raw>"
+    assert updates[0] == "Recalling memory..."
+    assert any("lcm_search()" in update for update in updates)
+    assert any("**memory** <raw>" in update for update in updates)
+    assert all("<b>" not in update for update in updates)
+    assert all("<i>" not in update for update in updates)
+
+
 def test_turn_context_provider_hot_reload_respects_workspace_state(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
