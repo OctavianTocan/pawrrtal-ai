@@ -59,7 +59,7 @@ def test_active_recall_resolves_provider_with_workspace_root(
         seen["workspace_root"] = kwargs.get("workspace_root")
         return _FakeRecallProvider()
 
-    monkeypatch.setattr(recall_agent, "resolve_llm", _resolve_llm)
+    monkeypatch.setattr("app.turns.pipeline.subcalls.resolve_llm", _resolve_llm)
     ctx = TurnContextProviderContext(
         conversation_id=uuid4(),
         user_id=uuid4(),

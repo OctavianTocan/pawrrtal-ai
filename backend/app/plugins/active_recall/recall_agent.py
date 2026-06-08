@@ -1,23 +1,27 @@
 import asyncio
+import json
 import logging
-import os
 import time
 import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from app.agents.types import AgentTool
 from app.infrastructure.config import settings
-from app.infrastructure.keys import resolve_api_key
 from app.plugins.adapters.turn_context import TurnContextProviderContext
+from app.plugins.contributions import EnvVarSpec
+from app.plugins.discovery import bundled_plugins_root
+from app.plugins.env import resolve_plugin_env
+from app.plugins.manifest import validate_plugin_manifest
 from app.providers._errors import ProviderError
-from app.providers.factory import resolve_llm
 from app.tools.errors import ToolError
 from app.tools.lcm_grep_agent import make_lcm_grep_tool
 from app.tools.lcm_search_agent import make_lcm_search_tool
 from app.tools.workspace_files import make_list_dir_tool, make_read_file_tool
+from app.turns.pipeline.subcalls import LlmSubcall, stream_llm_subcall
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +40,11 @@ _DRAFT_UPDATE_TIMEOUT_S: float = 2.0
 _DEFAULT_RECALL_TIMEOUT_S: float = 2.5
 
 DraftUpdater = Callable[[str], Awaitable[None]]
-"""Typed alias for the draft-updater callback. Receives the rendered HTML
-chunk; returns ``None``. Implementations should be idempotent — the same
-chunk may be passed twice if a retry fires."""
+"""Typed alias for the draft-updater callback.
+
+Receives neutral draft text and returns ``None``. Implementations should be
+idempotent; the same text may be passed twice if a retry fires.
+"""
 
 
 def _parse_bool(val: Any, default: bool) -> bool:
@@ -62,13 +68,31 @@ def _parse_positive_float(val: Any, default: float) -> float:
 
 
 def _resolve_active_recall_timeout_s(workspace_root: Path) -> float:
-    val_timeout_s = resolve_api_key(workspace_root, "ACTIVE_RECALL_TIMEOUT_S")
-    if val_timeout_s is None:
-        val_timeout_s = os.environ.get("ACTIVE_RECALL_TIMEOUT_S")
+    val_timeout_s = _resolve_active_recall_env(workspace_root, "ACTIVE_RECALL_TIMEOUT_S")
     return _parse_positive_float(
         val_timeout_s,
         default=_DEFAULT_RECALL_TIMEOUT_S,
     )
+
+
+@lru_cache(maxsize=1)
+def _active_recall_env_specs() -> dict[str, EnvVarSpec]:
+    """Return Active Recall env specs from the bundled plugin manifest."""
+    manifest_path = bundled_plugins_root() / "active_recall" / "plugin.json"
+    manifest = validate_plugin_manifest(
+        json.loads(manifest_path.read_text(encoding="utf-8")),
+        source_type="bundled",
+    )
+    return {spec.name: spec for spec in manifest.all_env_specs()}
+
+
+def _resolve_active_recall_env(workspace_root: Path, key: str) -> str | None:
+    """Resolve one Active Recall env value through plugin metadata."""
+    spec = _active_recall_env_specs().get(key)
+    if spec is None:
+        return None
+    resolution = resolve_plugin_env(workspace_root=workspace_root, spec=spec)
+    return resolution.value
 
 
 SYSTEM_PROMPT = """
@@ -202,7 +226,6 @@ async def _run_recall_stream(
     system_prompt: str,
     search_workspace: bool,
 ) -> tuple[str, list[str], int, int, float, str | None]:
-    provider = resolve_llm(model_id, workspace_root=ctx.workspace_root)
     lcm_tools: list[AgentTool] = [
         make_lcm_grep_tool(conversation_id=ctx.conversation_id),
         make_lcm_search_tool(conversation_id=ctx.conversation_id),
@@ -215,13 +238,17 @@ async def _run_recall_stream(
             ]
         )
 
-    stream = provider.stream(
-        question=_build_recall_question(ctx.question),
-        conversation_id=uuid.uuid4(),
-        user_id=ctx.user_id,
-        history=None,
-        tools=lcm_tools,
-        system_prompt=system_prompt or SYSTEM_PROMPT,
+    stream = stream_llm_subcall(
+        LlmSubcall(
+            model_id=model_id,
+            question=_build_recall_question(ctx.question),
+            conversation_id=uuid.uuid4(),
+            user_id=ctx.user_id,
+            workspace_root=ctx.workspace_root,
+            history=None,
+            tools=lcm_tools,
+            system_prompt=system_prompt or SYSTEM_PROMPT,
+        )
     )
     return await _collect_stream_telemetry(stream, draft_updater=ctx.draft_updater)
 
@@ -229,9 +256,7 @@ async def _run_recall_stream(
 async def run_active_recall(ctx: TurnContextProviderContext) -> str | None:
     """Search LCM for context relevant to the user's question before the main agent turn."""
     # Resolve ACTIVE_RECALL_ENABLED
-    val_enabled = resolve_api_key(ctx.workspace_root, "ACTIVE_RECALL_ENABLED")
-    if val_enabled is None:
-        val_enabled = os.environ.get("ACTIVE_RECALL_ENABLED")
+    val_enabled = _resolve_active_recall_env(ctx.workspace_root, "ACTIVE_RECALL_ENABLED")
     active_recall_enabled = _parse_bool(val_enabled, default=True)
 
     if active_recall_enabled is False or settings.lcm_enabled is False:
@@ -244,24 +269,23 @@ async def run_active_recall(ctx: TurnContextProviderContext) -> str | None:
         return None
 
     # Resolve ACTIVE_RECALL_MODEL
-    active_recall_model = resolve_api_key(ctx.workspace_root, "ACTIVE_RECALL_MODEL")
+    active_recall_model = _resolve_active_recall_env(ctx.workspace_root, "ACTIVE_RECALL_MODEL")
     if not active_recall_model:
-        active_recall_model = (
-            os.environ.get("ACTIVE_RECALL_MODEL") or "google-ai:google/gemini-3.1-flash-lite"
-        )
+        active_recall_model = "google-ai:google/gemini-3.1-flash-lite"
 
     # Resolve ACTIVE_RECALL_SEARCH_WORKSPACE
-    val_search_ws = resolve_api_key(ctx.workspace_root, "ACTIVE_RECALL_SEARCH_WORKSPACE")
-    if val_search_ws is None:
-        val_search_ws = os.environ.get("ACTIVE_RECALL_SEARCH_WORKSPACE")
+    val_search_ws = _resolve_active_recall_env(
+        ctx.workspace_root,
+        "ACTIVE_RECALL_SEARCH_WORKSPACE",
+    )
     active_recall_search_workspace = _parse_bool(val_search_ws, default=False)
 
     active_recall_timeout_s = _resolve_active_recall_timeout_s(ctx.workspace_root)
 
     # Resolve ACTIVE_RECALL_SYSTEM_PROMPT
-    active_recall_system_prompt = resolve_api_key(ctx.workspace_root, "ACTIVE_RECALL_SYSTEM_PROMPT")
-    if not active_recall_system_prompt:
-        active_recall_system_prompt = os.environ.get("ACTIVE_RECALL_SYSTEM_PROMPT") or ""
+    active_recall_system_prompt = (
+        _resolve_active_recall_env(ctx.workspace_root, "ACTIVE_RECALL_SYSTEM_PROMPT") or ""
+    )
 
     start_time = time.perf_counter()
     tools_called: list[str] = []
