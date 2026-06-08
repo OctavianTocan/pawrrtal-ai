@@ -391,6 +391,7 @@ def test_project_service_install_writes_system_unit_and_enables_now(
     assert "ExecStart=/fake/bin/bun run serve.ts" in unit
     assert "RestartSec=15" in unit
     assert "KillMode=control-group" in unit
+    assert "SuccessExitStatus=143 130" in unit
     assert "StartLimitBurst=3" in unit
     assert (
         'Environment="PATH=/fake/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"'

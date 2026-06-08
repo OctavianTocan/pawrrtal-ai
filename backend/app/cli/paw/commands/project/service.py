@@ -114,6 +114,7 @@ def _unit_text(*, enable_dev_login: bool, env_file: Path | None) -> str:
             "RestartSec=15",
             "KillMode=control-group",
             "TimeoutStopSec=25",
+            "SuccessExitStatus=143 130",
             *env_lines,
             "",
             "[Install]",
