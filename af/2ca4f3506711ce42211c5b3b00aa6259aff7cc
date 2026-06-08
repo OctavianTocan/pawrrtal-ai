@@ -1,0 +1,37 @@
+backend-ts/tsconfig.base.json
+  s_73e5c914fef949::t_d99311c8f05c72 2,10-17,20,22,24-39
+backend-ts/packages/api-core/tsconfig.json
+  s_73e5c914fef949::t_f1cb4df722b8b4 3-5
+backend-ts/apps/api/tsconfig.json
+  s_73e5c914fef949::t_48e0e5cca387fe 4
+backend-ts/package.json
+  s_73e5c914fef949::t_9817e8ec9edcaa 14
+  s_73e5c914fef949::t_9a98656b98fa63 12-13,15-16
+backend-ts/bun.lock
+  ai_agent 7-11,39-40
+backend-ts/apps/api/src/Main.ts
+  s_73e5c914fef949::t_3f18feb11f56ce 24-36
+  s_73e5c914fef949::t_a2ae181e817044 4-6,8,19-21
+  s_73e5c914fef949::t_504f8d5f64fb94 10-11
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.3",
+  "base_commit_sha": "af2ca4f3506711ce42211c5b3b00aa6259aff7cc",
+  "prompts": {},
+  "humans": {
+    "h_dad53a55d60d3d": {
+      "author": "Octavian Tocan <contact@octaviantocan.com>"
+    }
+  },
+  "sessions": {
+    "s_73e5c914fef949": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_15d6bd1eeffeZuGME6YM9hpcGK",
+        "model": "MiniMax-M3"
+      },
+      "human_author": "Octavian Tocan <contact@octaviantocan.com>"
+    }
+  }
+}
