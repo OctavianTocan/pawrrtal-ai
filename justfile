@@ -142,12 +142,16 @@ test-backend:
 test-frontend:
     cd frontend && bun run test
 
+# Run backend-ts Vitest suite (CI-style, no watcher)
+test-backend-ts:
+    cd backend-ts && bun run test
+
 # Run frontend Vitest with v8 coverage; report drops under frontend/coverage/
 test-coverage:
     cd frontend && bun run test:coverage
 
-# Run both suites. Use before pushing — local + CI parity (#271).
-test: test-backend test-frontend
+# Run all three suites. Use before pushing — local + CI parity (#271).
+test: test-backend test-backend-ts test-frontend
 
 # Playwright E2E suite (frontend/e2e/). Requires backend + frontend dev
 # servers to be already running on the standard ports — start them with

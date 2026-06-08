@@ -8,11 +8,14 @@
 	],
 	"scripts": {
 		"install:deps": "bun install",
-		"typecheck": "bun run --filter '@pawrrtal/*' typecheck"
+		"typecheck": "bun run --filter '@pawrrtal/*' typecheck",
+		"test": "vitest run --passWithNoTests"
 	},
 	"devDependencies": {
 		"@effect/language-service": "^0.85.1",
+		"@effect/vitest": "4.0.0-beta.74",
 		"@types/bun": "latest",
-		"typescript": "^5.9.3"
+		"typescript": "^5.9.3",
+		"vitest": "^3.0.0"
 	}
 }

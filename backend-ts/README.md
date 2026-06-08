@@ -42,6 +42,23 @@ just typecheck
 | Service | Port |
 |---------|------|
 | Python FastAPI | `8000` (`DEV_BACKEND_PORT` in `scripts/dev-ports.ts`) |
-| Effect TS API (planned) | `8001` (`DEV_BACKEND_TS_PORT`) |
+| Effect TS API | `8001` (`DEV_BACKEND_TS_PORT`) — started by `just dev`; set `PAWRRTAL_SKIP_TS_API=1` to opt out |
 
 Python stays canonical until route parity and tests pass on the TS stack.
+
+## Known issue: `better-sqlite3` under Bun
+
+`@effect/sql-sqlite-node` uses `better-sqlite3` (a Node native module),
+which Bun's runtime does not currently support. When `just dev` brings
+up the Effect TS API under Bun, the process crashes with
+`'better-sqlite3' is not yet supported in Bun`
+([oven-sh/bun#4290](https://github.com/oven-sh/bun/issues/4290)). Until
+Bun adds support, workarounds:
+
+- Run the Effect TS API under Node directly: change `apps/api/package.json`'s
+  `dev` script to `node --import tsx src/index.ts` (requires `tsx`),
+  or compile to JS and run with `node dist/index.js`.
+- Or swap `@effect/sql-sqlite-node` for `bun:sqlite` in dev only.
+
+The pilot's tests run under Vitest, which is unaffected by this issue
+(they don't go through `bun run dev`).
