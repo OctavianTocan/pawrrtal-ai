@@ -150,6 +150,7 @@ async def test_refresh_telegram_commands_sets_current_command_menu() -> None:
         "verbose",
         "stop",
         "status",
+        "tools",
         "whoami",
         "lcm",
         "compact",
