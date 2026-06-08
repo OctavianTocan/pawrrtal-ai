@@ -25,17 +25,19 @@ else
 	exit 1
 fi
 
-# Per-lib upstream patches we need to apply before building.  Each entry
-# is a file path under the lib dir + a sed expression.  Kept here rather
-# than in the submodule itself because the bot account that runs CI
-# can't push to the upstream package repos; once those fixes land
-# upstream, drop the matching patch.
+patch_typescript_6_tsconfig() {
+	local cfg="$1/tsconfig.json"
+	[ -f "$cfg" ] || return 0
+	if ! grep -q '"ignoreDeprecations"' "$cfg"; then
+		sed -i.bak 's|"compilerOptions": {|"compilerOptions": {\n    "ignoreDeprecations": "6.0",|' "$cfg"
+		rm -f "$cfg.bak"
+		echo "  patched $cfg (ignored TypeScript 6 deprecation warnings)"
+	fi
+}
+
 patch_react_dropdown_tsconfig() {
 	local cfg="$1/tsconfig.json"
 	[ -f "$cfg" ] || return 0
-	# tsup's dts pass fails on src/Slot.tsx (uses process.env) unless
-	# 'node' is in compilerOptions.types.  The upstream tsconfig only
-	# lists vitest/globals.
 	if ! grep -q '"node"' "$cfg"; then
 		sed -i.bak 's|"types": \["vitest/globals"\]|"types": ["vitest/globals", "node"]|' "$cfg"
 		rm -f "$cfg.bak"
@@ -64,6 +66,10 @@ dedupe_shared_deps() {
 for lib_dir in frontend/lib/*/; do
 	[ -f "$lib_dir/package.json" ] || continue
 	name=$(basename "$lib_dir")
+	patch_typescript_6_tsconfig "$lib_dir"
+	case "$name" in
+		react-dropdown) patch_react_dropdown_tsconfig "$lib_dir" ;;
+	esac
 	if [ -d "$lib_dir/dist" ] && [ -n "$(ls -A "$lib_dir/dist" 2>/dev/null)" ]; then
 		echo "✔ $name already built (dist/ non-empty), skipping build"
 		dedupe_shared_deps "$lib_dir"
@@ -71,14 +77,9 @@ for lib_dir in frontend/lib/*/; do
 	fi
 	case "$name" in
 		react-chat-composer)
-			# Vendored source — the host's bundler compiles it directly from
-			# TypeScript; no pre-build step required.  Its DTS pass also
-			# fails without the sibling react-dropdown workspace being
-			# installed first, so we skip it entirely here.
 			echo "✔ $name is vendored source — skipping pre-build"
 			continue
 			;;
-		react-dropdown) patch_react_dropdown_tsconfig "$lib_dir" ;;
 	esac
 	echo "→ building $name with $PM"
 	(cd "$lib_dir" && "${INSTALL_CMD[@]}")

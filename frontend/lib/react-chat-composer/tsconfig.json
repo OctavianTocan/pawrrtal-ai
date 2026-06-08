@@ -5,6 +5,7 @@
 		"lib": ["ES2022", "DOM", "DOM.Iterable"],
 		"jsx": "react-jsx",
 		"moduleResolution": "Bundler",
+		"ignoreDeprecations": "6.0",
 		"strict": true,
 		"noImplicitAny": true,
 		"noImplicitReturns": true,
