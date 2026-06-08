@@ -8,6 +8,7 @@
  * aren't appropriate for the smoke suite.
  */
 
+import { devices } from '@playwright/test';
 import { expect, test } from './fixtures';
 
 test.describe('login page', () => {
@@ -35,6 +36,29 @@ test.describe('login page', () => {
 		await page.getByRole('button', { name: 'Dev Admin' }).click();
 
 		expect((await devLoginResponse).ok()).toBe(true);
+		await expect(page).toHaveURL(/\/$/);
+
+		const isAuthenticated = await page.evaluate(async () => {
+			const response = await fetch('/api/v1/users/me', { credentials: 'include' });
+			return response.ok;
+		});
+		expect(isAuthenticated).toBe(true);
+	});
+});
+
+test.describe('mobile login page', () => {
+	test.use({ ...devices['iPhone 13'] });
+
+	test('dev-admin shortcut signs in from a touch tap', async ({ page }) => {
+		await page.goto('/login');
+		const devLoginResponse = page.waitForResponse(
+			(response) =>
+				response.url().includes('/auth/dev-login') && response.request().method() === 'POST'
+		);
+
+		await page.getByRole('button', { name: 'Dev Admin' }).tap();
+
+		expect([204, 303]).toContain((await devLoginResponse).status());
 		await expect(page).toHaveURL(/\/$/);
 
 		const isAuthenticated = await page.evaluate(async () => {

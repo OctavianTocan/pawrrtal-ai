@@ -1,7 +1,20 @@
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { LoginFormView } from './LoginFormView';
+import { type DevAdminLoginHandlers, LoginFormView } from './LoginFormView';
+
+function makeDevAdminHandlers(onCommit = vi.fn()): DevAdminLoginHandlers {
+	return {
+		onClick: (event: React.MouseEvent<HTMLButtonElement>) => {
+			event.preventDefault();
+			onCommit();
+		},
+		onTouchEnd: (event: React.TouchEvent<HTMLButtonElement>) => {
+			event.preventDefault();
+			onCommit();
+		},
+	};
+}
 
 const baseProps = {
 	emailId: 'email',
@@ -11,10 +24,12 @@ const baseProps = {
 	errorMessage: '',
 	isLoading: false,
 	canUseDevAdminLogin: false,
+	devAdminFormId: 'dev-admin-form',
+	devAdminLoginHandlers: makeDevAdminHandlers(),
+	postLoginTarget: '/',
 	onEmailChange: () => undefined,
 	onPasswordChange: () => undefined,
 	onSubmit: (e: React.FormEvent<HTMLFormElement>) => e.preventDefault(),
-	onDevAdminLogin: () => undefined,
 };
 
 describe('LoginFormView', () => {
@@ -41,10 +56,44 @@ describe('LoginFormView', () => {
 		const onDevAdminLogin = vi.fn();
 		const user = userEvent.setup();
 		const { getByRole } = render(
-			<LoginFormView {...baseProps} canUseDevAdminLogin onDevAdminLogin={onDevAdminLogin} />
+			<LoginFormView
+				{...baseProps}
+				canUseDevAdminLogin
+				devAdminLoginHandlers={makeDevAdminHandlers(onDevAdminLogin)}
+			/>
 		);
 		await user.click(getByRole('button', { name: 'Dev Admin' }));
 		expect(onDevAdminLogin).toHaveBeenCalled();
+	});
+
+	it('wires the dev-admin touch handler for touch-style taps', () => {
+		const onDevAdminLogin = vi.fn();
+		const { getByRole } = render(
+			<LoginFormView
+				{...baseProps}
+				canUseDevAdminLogin
+				devAdminLoginHandlers={makeDevAdminHandlers(onDevAdminLogin)}
+			/>
+		);
+		fireEvent.touchEnd(getByRole('button', { name: 'Dev Admin' }));
+		expect(onDevAdminLogin).toHaveBeenCalledTimes(1);
+	});
+
+	it('renders a form fallback for dev-admin login before hydration', () => {
+		const { container, getByRole } = render(
+			<LoginFormView {...baseProps} canUseDevAdminLogin postLoginTarget="/settings" />
+		);
+		const button = getByRole('button', { name: 'Dev Admin' });
+		const fallbackForm = container.querySelector(
+			'form[action="/auth/dev-login/browser?redirect_to=%2Fsettings"]'
+		);
+		expect(fallbackForm).toBeTruthy();
+		expect(fallbackForm?.getAttribute('method')).toBe('post');
+		expect(button.getAttribute('type')).toBe('submit');
+		expect(button.getAttribute('form')).toBe(fallbackForm?.id);
+		expect(
+			fallbackForm?.querySelector('input[name="redirect_to"]')?.getAttribute('value')
+		).toBe('/settings');
 	});
 
 	it('disables submit button when isLoading is true', () => {

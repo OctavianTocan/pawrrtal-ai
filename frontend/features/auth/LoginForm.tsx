@@ -1,9 +1,9 @@
 'use client';
 
 import type React from 'react';
-import { useId, useState } from 'react';
+import { useCallback, useId, useRef, useState } from 'react';
 import { useDevAdminLoginMutation, useLoginMutation } from './hooks/use-login-mutations';
-import { LoginFormView } from './LoginFormView';
+import { type DevAdminLoginHandlers, LoginFormView } from './LoginFormView';
 
 interface LoginFormProps extends React.ComponentProps<'div'> {
 	canUseDevAdminLogin?: boolean;
@@ -19,6 +19,36 @@ interface LoginFormProps extends React.ComponentProps<'div'> {
 	 * out for the entire ``/login`` page.
 	 */
 	postLoginTarget?: string;
+}
+
+function useTouchTapCommit(commit: () => void | Promise<void>): DevAdminLoginHandlers {
+	const touchCommittedRef = useRef(false);
+
+	const handleTouchEnd = useCallback(
+		(event: React.TouchEvent<HTMLButtonElement>): void => {
+			event.preventDefault();
+			touchCommittedRef.current = true;
+			void commit();
+		},
+		[commit]
+	);
+
+	const handleClick = useCallback(
+		(event: React.MouseEvent<HTMLButtonElement>): void => {
+			event.preventDefault();
+			if (touchCommittedRef.current) {
+				touchCommittedRef.current = false;
+				return;
+			}
+			void commit();
+		},
+		[commit]
+	);
+
+	return {
+		onClick: handleClick,
+		onTouchEnd: handleTouchEnd,
+	};
 }
 
 /**
@@ -40,6 +70,7 @@ export function LoginForm({
 	const formId = useId();
 	const emailId = `${formId}-email`;
 	const passwordId = `${formId}-password`;
+	const devAdminFormId = `${formId}-dev-admin`;
 
 	const [email, setEmail] = useState('');
 	const [password, setPassword] = useState('');
@@ -95,6 +126,7 @@ export function LoginForm({
 			setFriendlyNetworkError(error);
 		}
 	};
+	const devAdminLoginHandlers = useTouchTapCommit(handleDevAdminLogin);
 
 	return (
 		<LoginFormView
@@ -108,8 +140,10 @@ export function LoginForm({
 			errorMessage={currentError}
 			isLoading={isLoading}
 			canUseDevAdminLogin={canUseDevAdminLogin}
+			devAdminFormId={devAdminFormId}
+			devAdminLoginHandlers={devAdminLoginHandlers}
+			postLoginTarget={postLoginTarget}
 			onSubmit={handleSubmit}
-			onDevAdminLogin={handleDevAdminLogin}
 			{...divProps}
 		/>
 	);

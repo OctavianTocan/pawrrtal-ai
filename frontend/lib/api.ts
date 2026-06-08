@@ -103,6 +103,11 @@ export const API_ENDPOINTS = {
 		 */
 		devLogin: '/auth/dev-login',
 		/**
+		 * Dev-only admin login browser form fallback.
+		 * @returns `/auth/dev-login/browser`
+		 */
+		devLoginBrowser: '/auth/dev-login/browser',
+		/**
 		 * Register endpoint.
 		 * @returns `/auth/register`
 		 */

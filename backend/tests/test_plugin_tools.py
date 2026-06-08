@@ -275,6 +275,26 @@ def test_bundled_tasks_manifest_exposes_task_tools(tmp_path: Path) -> None:
     assert {"add_task", "list_tasks", "complete_task"} <= names
 
 
+def test_bundled_beans_tasks_manifest_exposes_task_tools(tmp_path: Path) -> None:
+    names = _tool_names(tmp_path)
+
+    assert {"beans_create", "beans_list", "beans_update", "beans_complete"} <= names
+
+
+def test_bundled_beans_tasks_plugin_can_be_disabled(tmp_path: Path) -> None:
+    save_plugin_state(
+        plugin_state_path(plugin_id="beans_tasks", scope="workspace", workspace_root=tmp_path),
+        PluginState(enabled=False),
+    )
+
+    names = _tool_names(tmp_path)
+
+    assert "beans_create" not in names
+    assert "beans_list" not in names
+    assert "beans_update" not in names
+    assert "beans_complete" not in names
+
+
 def test_bundled_tasks_plugin_can_be_disabled(tmp_path: Path) -> None:
     save_plugin_state(
         plugin_state_path(plugin_id="tasks", scope="workspace", workspace_root=tmp_path),

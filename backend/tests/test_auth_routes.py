@@ -18,6 +18,10 @@ from __future__ import annotations
 
 import pytest
 from fastapi import FastAPI
+from fastapi.responses import Response
+
+from app.infrastructure.auth.dev_login import _redirect_with_login_cookie, _safe_redirect_path
+from main import create_app
 
 
 def _route_methods(app: FastAPI, path: str) -> set[str]:
@@ -35,6 +39,12 @@ def _route_methods(app: FastAPI, path: str) -> set[str]:
     return methods
 
 
+@pytest.fixture
+def mounted_app() -> FastAPI:
+    """Build the app for route-table assertions without database fixtures."""
+    return create_app()
+
+
 class TestUsersMount:
     """The fastapi-users user router is mounted at two prefixes.
 
@@ -44,23 +54,21 @@ class TestUsersMount:
     """
 
     @pytest.mark.anyio
-    async def test_canonical_v1_users_me_is_mounted(self, app_with_overrides: FastAPI) -> None:
-        assert "GET" in _route_methods(app_with_overrides, "/api/v1/users/me")
-        assert "PATCH" in _route_methods(app_with_overrides, "/api/v1/users/me")
+    async def test_canonical_v1_users_me_is_mounted(self, mounted_app: FastAPI) -> None:
+        assert "GET" in _route_methods(mounted_app, "/api/v1/users/me")
+        assert "PATCH" in _route_methods(mounted_app, "/api/v1/users/me")
 
     @pytest.mark.anyio
-    async def test_legacy_users_me_alias_is_mounted(self, app_with_overrides: FastAPI) -> None:
-        assert "GET" in _route_methods(app_with_overrides, "/users/me")
-        assert "PATCH" in _route_methods(app_with_overrides, "/users/me")
+    async def test_legacy_users_me_alias_is_mounted(self, mounted_app: FastAPI) -> None:
+        assert "GET" in _route_methods(mounted_app, "/users/me")
+        assert "PATCH" in _route_methods(mounted_app, "/users/me")
 
     @pytest.mark.anyio
-    async def test_canonical_and_alias_expose_same_methods(
-        self, app_with_overrides: FastAPI
-    ) -> None:
+    async def test_canonical_and_alias_expose_same_methods(self, mounted_app: FastAPI) -> None:
         # If the two mounts ever drift, paw (canonical) and the frontend
         # (alias) would see divergent surfaces — guard against that.
-        canonical = _route_methods(app_with_overrides, "/api/v1/users/me")
-        alias = _route_methods(app_with_overrides, "/users/me")
+        canonical = _route_methods(mounted_app, "/api/v1/users/me")
+        alias = _route_methods(mounted_app, "/users/me")
         assert canonical == alias
 
 
@@ -73,10 +81,47 @@ class TestAuthLogoutRoute:
     """
 
     @pytest.mark.anyio
-    async def test_logout_route_is_mounted(self, app_with_overrides: FastAPI) -> None:
-        assert "POST" in _route_methods(app_with_overrides, "/auth/jwt/logout")
+    async def test_logout_route_is_mounted(self, mounted_app: FastAPI) -> None:
+        assert "POST" in _route_methods(mounted_app, "/auth/jwt/logout")
 
     @pytest.mark.anyio
-    async def test_login_route_is_mounted(self, app_with_overrides: FastAPI) -> None:
+    async def test_login_route_is_mounted(self, mounted_app: FastAPI) -> None:
         # Sanity check — the pair (login + logout) is what paw drives.
-        assert "POST" in _route_methods(app_with_overrides, "/auth/jwt/login")
+        assert "POST" in _route_methods(mounted_app, "/auth/jwt/login")
+
+    @pytest.mark.anyio
+    async def test_dev_login_route_is_mounted(self, mounted_app: FastAPI) -> None:
+        assert "POST" in _route_methods(mounted_app, "/auth/dev-login")
+        assert "POST" in _route_methods(mounted_app, "/auth/dev-login/browser")
+
+
+class TestDevLoginRoute:
+    """Dev-login supports API callers and pre-hydration browser form fallback."""
+
+    @pytest.mark.parametrize(
+        ("value", "expected"),
+        [
+            ("/", "/"),
+            ("/settings?tab=dev", "/settings?tab=dev"),
+            ("https://example.invalid/steal", "/"),
+            ("//example.invalid/steal", "/"),
+            ("\\settings", "/"),
+            (None, "/"),
+        ],
+    )
+    def test_safe_redirect_path_keeps_dev_login_local(
+        self,
+        value: object,
+        expected: str,
+    ) -> None:
+        assert _safe_redirect_path(value) == expected
+
+    def test_redirect_with_login_cookie_carries_session_cookie(self) -> None:
+        login_response = Response(status_code=204)
+        login_response.set_cookie("session_token", "test-session", httponly=True)
+
+        response = _redirect_with_login_cookie(login_response, "/settings")
+
+        assert response.status_code == 303
+        assert response.headers["location"] == "/settings"
+        assert "session_token=test-session" in response.headers.get("set-cookie", "")

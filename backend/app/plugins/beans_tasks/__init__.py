@@ -1,0 +1,1 @@
+"""Beans-backed task plugin."""

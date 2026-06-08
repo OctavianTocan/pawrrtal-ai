@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { getBrowserApiUrl } from '@/lib/api';
+import { API_ENDPOINTS, getBrowserApiUrl } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
 /** Backend OAuth start URLs the SSO buttons navigate to. */
@@ -43,6 +43,16 @@ function SsoButton({ disabled, icon, label, provider }: SsoButtonProps): React.J
 	);
 }
 
+function buildDevLoginFormAction(postLoginTarget: string): string {
+	const base = getBrowserApiUrl(API_ENDPOINTS.auth.devLoginBrowser);
+	return `${base}?redirect_to=${encodeURIComponent(postLoginTarget)}`;
+}
+
+export interface DevAdminLoginHandlers {
+	onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+	onTouchEnd: (event: React.TouchEvent<HTMLButtonElement>) => void;
+}
+
 export interface LoginFormViewProps extends Omit<React.ComponentProps<'div'>, 'onSubmit'> {
 	/** Unique ID prefix for form field elements. */
 	emailId: string;
@@ -62,10 +72,14 @@ export interface LoginFormViewProps extends Omit<React.ComponentProps<'div'>, 'o
 	isLoading: boolean;
 	/** Whether the dev-only admin shortcut is available. */
 	canUseDevAdminLogin: boolean;
+	/** ID of the browser fallback form submitted before hydration. */
+	devAdminFormId: string;
+	/** Hydrated button handlers for the dev-admin shortcut. */
+	devAdminLoginHandlers: DevAdminLoginHandlers;
+	/** Safe relative path to load after a successful login. */
+	postLoginTarget: string;
 	/** Called when the form is submitted. */
 	onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
-	/** Called when the "Dev Admin" button is clicked. */
-	onDevAdminLogin: () => void;
 }
 
 /**
@@ -86,8 +100,10 @@ export function LoginFormView({
 	errorMessage,
 	isLoading,
 	canUseDevAdminLogin,
+	devAdminFormId,
+	devAdminLoginHandlers,
+	postLoginTarget,
 	onSubmit,
-	onDevAdminLogin,
 	...props
 }: LoginFormViewProps): React.JSX.Element {
 	return (
@@ -159,8 +175,10 @@ export function LoginFormView({
 										<Button
 											className="cursor-pointer"
 											variant="outline"
-											type="button"
-											onClick={onDevAdminLogin}
+											type="submit"
+											form={devAdminFormId}
+											onClick={devAdminLoginHandlers.onClick}
+											onTouchEnd={devAdminLoginHandlers.onTouchEnd}
 											disabled={isLoading}
 										>
 											Dev Admin
@@ -188,6 +206,15 @@ export function LoginFormView({
 							</Field>
 						</FieldGroup>
 					</form>
+					{canUseDevAdminLogin && (
+						<form
+							action={buildDevLoginFormAction(postLoginTarget)}
+							id={devAdminFormId}
+							method="post"
+						>
+							<input type="hidden" name="redirect_to" value={postLoginTarget} />
+						</form>
+					)}
 				</CardContent>
 			</Card>
 		</div>

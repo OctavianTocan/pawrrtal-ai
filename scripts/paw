@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+repo_root="$(cd -- "${script_dir}/.." && pwd)"
+backend_dir="${PAWRRTAL_BACKEND_DIR:-${repo_root}/backend}"
+
+export UV_LINK_MODE="${UV_LINK_MODE:-copy}"
+
+cd "${backend_dir}"
+exec uv run paw "$@"
