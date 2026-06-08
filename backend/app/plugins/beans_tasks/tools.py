@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from app.agents.types import AgentTool
 from app.plugins.tool_context import ToolContext
 from app.tools.display import make_tool_display, summarize_title
@@ -26,7 +28,7 @@ class Bean:
 
     bean_id: str
     path: Path
-    meta: dict[str, str]
+    meta: dict[str, object]
     body: str
 
 
@@ -42,10 +44,10 @@ def make_beans_create_tool(ctx: ToolContext) -> AgentTool:
         priority = str(kwargs.get("priority") or "normal").strip() or "normal"
         task_type = str(kwargs.get("type") or "task").strip() or "task"
         body = str(kwargs.get("body") or "").strip()
-        bean_id = _new_bean_id()
+        bean_id = _new_bean_id({bean.bean_id for bean in _load_beans(ctx.workspace_root)})
         path = _beans_root(ctx.workspace_root) / f"{bean_id}--{_slug(title)}.md"
         now = _now()
-        meta = {
+        meta: dict[str, object] = {
             "title": title,
             "status": status,
             "type": task_type,
@@ -91,11 +93,14 @@ def make_beans_list_tool(ctx: ToolContext) -> AgentTool:
 
     async def execute(_tool_call_id: str, **kwargs: Any) -> str:
         include_completed = bool(kwargs.get("include_completed"))
-        status_filter = str(kwargs.get("status") or "").strip()
+        try:
+            status_filter = _optional_status(kwargs.get("status"))
+        except ToolError as exc:
+            return exc.render()
         beans = _load_beans(ctx.workspace_root)
         rows = []
         for bean in beans:
-            status = bean.meta.get("status", "todo")
+            status = _meta_text(bean, "status", "todo")
             if status_filter and status != status_filter:
                 continue
             if not include_completed and status in {"completed", "scrapped"}:
@@ -230,7 +235,7 @@ def _find_bean(workspace_root: Path, query: str) -> Bean:
     matches = [
         bean
         for bean in _load_beans(workspace_root)
-        if needle in bean.bean_id.casefold() or needle in bean.meta.get("title", "").casefold()
+        if needle in bean.bean_id.casefold() or needle in _meta_text(bean, "title", "").casefold()
     ]
     if not matches:
         raise ToolError(ToolErrorCode.NOT_FOUND, f"No bean matched {query!r}.")
@@ -246,26 +251,26 @@ def _read_bean(path: Path) -> Bean:
     return Bean(bean_id=_bean_id_from_path(path), path=path, meta=meta, body=body.strip())
 
 
-def _split_frontmatter(raw: str) -> tuple[dict[str, str], str]:
+def _split_frontmatter(raw: str) -> tuple[dict[str, object], str]:
     if not raw.startswith("---\n"):
         return {}, raw
     _, rest = raw.split("---\n", 1)
     head, marker, body = rest.partition("\n---\n")
     if not marker:
         return {}, raw
-    meta: dict[str, str] = {}
-    for line in head.splitlines():
-        if line.startswith("#") or ":" not in line:
-            continue
-        key, value = line.split(":", 1)
-        meta[key.strip()] = value.strip()
+    parsed = yaml.safe_load(head)
+    if not isinstance(parsed, dict):
+        return {}, body
+    meta = {str(key): value for key, value in parsed.items()}
     return meta, body
 
 
-def _write_bean(path: Path, *, bean_id: str, meta: dict[str, str], body: str) -> None:
+def _write_bean(path: Path, *, bean_id: str, meta: dict[str, object], body: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     lines = ["---", f"# {bean_id}"]
-    lines.extend(f"{key}: {value}" for key, value in meta.items())
+    dumped_meta = yaml.safe_dump(meta, allow_unicode=True, sort_keys=False).strip()
+    if dumped_meta and dumped_meta != "{}":
+        lines.extend(dumped_meta.splitlines())
     lines.extend(["---", "", body.strip(), ""])
     path.write_text("\n".join(lines), encoding="utf-8")
 
@@ -284,9 +289,17 @@ def _status(value: object) -> str:
     return status
 
 
-def _new_bean_id() -> str:
-    suffix = "".join(secrets.choice(_ID_ALPHABET) for _ in range(4))
-    return f"pawrrtal-{suffix}"
+def _optional_status(value: object) -> str:
+    raw = str(value or "").strip()
+    return _status(raw) if raw else ""
+
+
+def _new_bean_id(existing_ids: set[str]) -> str:
+    while True:
+        suffix = "".join(secrets.choice(_ID_ALPHABET) for _ in range(8))
+        bean_id = f"pawrrtal-{suffix}"
+        if bean_id not in existing_ids:
+            return bean_id
 
 
 def _slug(title: str) -> str:
@@ -303,7 +316,14 @@ def _now() -> str:
 
 
 def _format_row(bean: Bean) -> str:
-    title = bean.meta.get("title", "(untitled)")
-    status = bean.meta.get("status", "todo")
-    priority = bean.meta.get("priority", "normal")
+    title = _meta_text(bean, "title", "(untitled)")
+    status = _meta_text(bean, "status", "todo")
+    priority = _meta_text(bean, "priority", "normal")
     return f"- {bean.bean_id} [{status}/{priority}] {title}"
+
+
+def _meta_text(bean: Bean, key: str, fallback: str) -> str:
+    value = bean.meta.get(key)
+    if value is None:
+        return fallback
+    return str(value)
