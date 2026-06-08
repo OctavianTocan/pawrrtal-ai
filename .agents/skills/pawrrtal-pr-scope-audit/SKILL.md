@@ -25,9 +25,11 @@ Separate **repo changes**, **live operations**, **CI/review state**, and **unimp
 2. **Measure the PR honestly.**
 
    ```bash
-   git rev-list --count origin/main..HEAD
-   git log --oneline origin/main..HEAD
-   git diff --stat origin/main...HEAD
+   BASE_REF="$(gh pr view <number> --json baseRefName --jq .baseRefName)"
+   git fetch origin "$BASE_REF"
+   git rev-list --count "origin/${BASE_REF}..HEAD"
+   git log --oneline "origin/${BASE_REF}..HEAD"
+   git diff --stat "origin/${BASE_REF}...HEAD"
    ```
 
 3. **Map work to the user's requirements.** Make a table with:

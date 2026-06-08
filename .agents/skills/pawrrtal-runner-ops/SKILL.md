@@ -11,7 +11,7 @@ Use this before touching GitHub Actions runners for Pawrrtal.
 
 1. Runner work directories, `_work`, `_tool`, caches, and temp state belong under `/mnt/HC_Volume_105512717/github-runners/`. Never put them on `/`, `/root`, or the VPS main disk.
 2. Do not print runner registration tokens, removal tokens, repository tokens, secrets, service tokens, or environment files.
-3. Public-repo self-hosted jobs must be locked by workflow policy, not trust. Jobs must gate on `github.actor == 'OctavianTocan'` and self-hosted jobs should require the `octavian-only` label.
+3. Public-repo self-hosted jobs must be locked by workflow policy, not trust. Jobs must gate on `github.actor == 'OctavianTocan'`. If workflows require an `octavian-only` label, the runner launcher and CI handbook must register that label in the same PR.
 4. Use repo-scoped runners for `OctavianTocan/Pawrrtal-AI`. Do not create org/global runners for this repo without explicit user approval.
 5. Installing persistent runner services is a security model change. Get explicit approval after stating the blast radius.
 
@@ -28,14 +28,21 @@ If the repo has intentionally renamed labels, paths, or scripts, follow the chec
 
 ## Runner Labels
 
-Use these labels for Pawrrtal runners unless the workflow intentionally needs a narrower pool:
+Use the labels that the checked-in launcher and CI handbook agree on. Current `main` defaults to:
 
 ```text
 self-hosted
 openclaw-mini
 pawrrtal
-octavian-only
 ```
+
+When moving to an explicit `octavian-only` runner pool, update all of these together:
+
+- `.github/workflows/**` `runs-on` labels
+- `scripts/ephemeral-self-hosted-runners.sh` `LABELS`
+- `frontend/content/docs/handbook/ci/self-hosted-runner.md`
+- `AGENTS.md`
+- this skill
 
 ## Before Starting Runners
 
@@ -55,7 +62,7 @@ When explicitly approved, persistent runners should be:
 - under `/mnt/HC_Volume_105512717/github-runners/pawrrtal-persistent/`
 - one system user per runner
 - repo-scoped to `OctavianTocan/Pawrrtal-AI`
-- labeled with `pawrrtal`, `openclaw-mini`, and `octavian-only`
+- labeled to match the checked-in workflow requirements
 - resource-bounded with systemd CPU, memory, task, and IO limits
 - configured so `HOME`, `RUNNER_TOOL_CACHE`, `ACTIONS_RUNNER_TEMP`, `UV_CACHE_DIR`, `BUN_INSTALL_CACHE_DIR`, and `npm_config_cache` point inside the runner directory
 
