@@ -126,7 +126,7 @@ def _make_failing_provider() -> Any:
 
 
 def _patch_provider(monkeypatch: pytest.MonkeyPatch, provider: Any) -> None:
-    import app.tools.lcm_expand_query as _mod
+    import app.turns.pipeline.subcalls as _mod
 
     monkeypatch.setattr(_mod, "resolve_llm", lambda *a, **kw: provider)
 

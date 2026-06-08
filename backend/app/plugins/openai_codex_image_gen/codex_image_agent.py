@@ -11,9 +11,10 @@ so we get proper streaming, reasoning, cost tracking, and observability.
 from __future__ import annotations
 
 import logging
-import uuid
 from pathlib import Path
 from typing import Any
+
+from app.turns.pipeline.subcalls import CodexImageSubcall, stream_codex_image_subcall
 
 logger = logging.getLogger(__name__)
 
@@ -32,17 +33,7 @@ async def generate_image_with_codex_agent(
     of the "image generation via Codex agent" capability from the original
     Codex SDK integration plan.
     """
-    # Lazy import: the provider package's `__init__` runs the vendored SDK
-    # discovery dance, which we only want triggered when this plugin is
-    # actually invoked.
-    from app.providers.openai_codex import OpenAICodexProvider  # noqa: PLC0415
-
     try:
-        provider = OpenAICodexProvider(
-            model_id=model or "gpt-5.5",
-            workspace_root=workspace_root,
-        )
-
         system_prompt = (
             "You are Pawrrtal's expert image generation agent. "
             "You have direct access to Codex's powerful native image_generation capability. "
@@ -55,13 +46,14 @@ async def generate_image_with_codex_agent(
         if style:
             full_prompt += f"\n\nDesired style / aesthetic: {style}"
 
-        # Stream through the provider (gives us native thinking, deltas, artifacts, usage, etc.)
-        async for event in provider.stream(
-            full_prompt,
-            conversation_id=uuid.uuid4(),
-            user_id=uuid.uuid4(),
-            system_prompt=system_prompt,
-            reasoning_effort="medium",
+        async for event in stream_codex_image_subcall(
+            CodexImageSubcall(
+                prompt=full_prompt,
+                model_id=model or "gpt-5.5",
+                workspace_root=workspace_root,
+                reasoning_effort="medium",
+                system_prompt=system_prompt,
+            )
         ):
             if event.get("type") == "artifact" and event.get("kind") == "image":
                 return {

@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from app.agents.types import AgentTool
-from app.plugins.tool_context import ToolContext
-from app.tools.cron_tools import (
+from app.agents.tool_capabilities.core import (
     make_reminder_cancel_tool as build_reminder_cancel_tool,
 )
-from app.tools.cron_tools import (
+from app.agents.tool_capabilities.core import (
     make_reminder_list_tool as build_reminder_list_tool,
 )
-from app.tools.cron_tools import (
+from app.agents.tool_capabilities.core import (
     make_reminder_schedule_tool as build_reminder_schedule_tool,
 )
+from app.agents.types import AgentTool
+from app.plugins.tool_context import ToolContext
 
 
 def make_reminder_schedule_tool(ctx: ToolContext) -> AgentTool:

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from app.tools.send_message import SendFn
+    from app.agents.tool_capabilities.messaging import SendFn
 
 
 @dataclass(frozen=True)

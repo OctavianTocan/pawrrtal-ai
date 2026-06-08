@@ -31,23 +31,25 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from app.agents.tool_capabilities.core import (
+    SendFn,
+    build_external_mcp_tools,
+    make_lcm_describe_tool,
+    make_lcm_expand_query_tool,
+    make_lcm_grep_tool,
+    make_lcm_list_summaries_tool,
+    make_lcm_search_tool,
+    make_search_plugin_capabilities_tool,
+    make_send_message_tool,
+    make_telegram_capability_tools,
+    make_workspace_tools,
+)
 from app.agents.types import AgentTool
 from app.infrastructure.config import settings
 from app.plugins.adapters.tools import build_snapshot_agent_tools
 from app.plugins.errors import PluginError
 from app.plugins.host import get_plugin_host
 from app.plugins.tool_context import ToolContext
-from app.tools.lcm_agents import (
-    make_lcm_describe_tool,
-    make_lcm_expand_query_tool,
-    make_lcm_grep_tool,
-    make_lcm_list_summaries_tool,
-    make_lcm_search_tool,
-)
-from app.tools.now import build_external_mcp_tools
-from app.tools.plugin_catalog import make_search_plugin_capabilities_tool
-from app.tools.send_message import SendFn, make_send_message_tool
-from app.tools.workspace_files import make_workspace_tools
 
 log = logging.getLogger(__name__)
 
@@ -138,10 +140,6 @@ def build_agent_tools(
         # ``SendFn``; the model gets a richer tool catalogue without
         # the rest of the chat router learning about Telegram.
         if surface == "telegram":
-            from app.tools.telegram_tools import (  # noqa: PLC0415 — local import keeps the cross-channel tool surface lazy
-                make_telegram_capability_tools,
-            )
-
             tools.extend(make_telegram_capability_tools(send_fn))
 
     # LCM history tools — give the agent on-demand access to compacted

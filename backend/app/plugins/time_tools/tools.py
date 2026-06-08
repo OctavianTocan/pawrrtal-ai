@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from app.agents.tool_capabilities.core import make_now_tool as build_now_tool
 from app.agents.types import AgentTool
 from app.plugins.tool_context import ToolContext
-from app.tools.now import make_now_tool as build_now_tool
 
 
 def make_now_tool(_ctx: ToolContext) -> AgentTool:

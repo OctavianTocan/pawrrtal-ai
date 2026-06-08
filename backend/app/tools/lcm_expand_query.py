@@ -36,7 +36,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.infrastructure.config import settings as _settings
 from app.lcm.summarization import _collect_stream, _format_turns
 from app.models import ChatMessage, LCMContextItem, LCMSummary
-from app.providers import resolve_llm
+from app.turns.pipeline.subcalls import LlmSubcall, stream_llm_subcall
 
 # Hard cap so we never build a prompt larger than the model can handle.
 _MAX_EXPAND_ITEMS = 500
@@ -90,19 +90,18 @@ async def lcm_expand_query(
 
     expansion_prompt = f"CONVERSATION HISTORY:\n{_format_turns(turns)}\n\nQUESTION:\n{prompt}"
     expand_model = _settings.lcm_summary_model or model_id
-    # resolve_llm does not accept user_id; per-user key resolution flows
-    # through workspace_root upstream. Drop the kwarg to silence mypy.
-    _ = user_id
-    provider = resolve_llm(expand_model)
 
     try:
-        stream = provider.stream(
-            question=expansion_prompt,
-            conversation_id=uuid.uuid4(),  # isolated; not a real turn
-            user_id=user_id,
-            history=None,
-            tools=None,
-            system_prompt=_EXPAND_SYSTEM_PROMPT,
+        stream = stream_llm_subcall(
+            LlmSubcall(
+                model_id=expand_model,
+                question=expansion_prompt,
+                conversation_id=uuid.uuid4(),  # isolated; not a real turn
+                user_id=user_id,
+                history=None,
+                tools=[],
+                system_prompt=_EXPAND_SYSTEM_PROMPT,
+            )
         )
         answer = await _collect_stream(stream)
         if answer:

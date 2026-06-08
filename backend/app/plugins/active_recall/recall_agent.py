@@ -9,6 +9,13 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from app.agents.tool_capabilities.core import (
+    make_lcm_grep_tool,
+    make_lcm_search_tool,
+    make_list_dir_tool,
+    make_read_file_tool,
+)
+from app.agents.tool_capabilities.errors import ToolError
 from app.agents.types import AgentTool
 from app.infrastructure.config import settings
 from app.plugins.adapters.turn_context import TurnContextProviderContext
@@ -17,10 +24,6 @@ from app.plugins.discovery import bundled_plugins_root
 from app.plugins.env import resolve_plugin_env
 from app.plugins.manifest import validate_plugin_manifest
 from app.providers._errors import ProviderError
-from app.tools.errors import ToolError
-from app.tools.lcm_grep_agent import make_lcm_grep_tool
-from app.tools.lcm_search_agent import make_lcm_search_tool
-from app.tools.workspace_files import make_list_dir_tool, make_read_file_tool
 from app.turns.pipeline.subcalls import LlmSubcall, stream_llm_subcall
 
 logger = logging.getLogger(__name__)

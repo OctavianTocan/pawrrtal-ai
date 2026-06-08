@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from app.agents.types import AgentTool
-from app.plugins.tool_context import ToolContext
-from app.tools.tasks_md import (
+from app.agents.tool_capabilities.core import (
     make_add_task_tool as build_add_task_tool,
 )
-from app.tools.tasks_md import (
+from app.agents.tool_capabilities.core import (
     make_complete_task_tool as build_complete_task_tool,
 )
-from app.tools.tasks_md import (
+from app.agents.tool_capabilities.core import (
     make_list_tasks_tool as build_list_tasks_tool,
 )
+from app.agents.types import AgentTool
+from app.plugins.tool_context import ToolContext
 
 
 def make_add_task_tool(ctx: ToolContext) -> AgentTool:

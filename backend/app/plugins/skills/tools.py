@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from app.agents.types import AgentTool
-from app.plugins.tool_context import ToolContext
-from app.tools.skill_invocation import (
+from app.agents.tool_capabilities.core import (
     make_invoke_skill_tool as build_invoke_skill_tool,
 )
-from app.tools.skill_invocation import (
+from app.agents.tool_capabilities.core import (
     make_list_skills_tool as build_list_skills_tool,
 )
-from app.tools.skill_invocation import (
+from app.agents.tool_capabilities.core import (
     make_read_skill_tool as build_read_skill_tool,
 )
+from app.agents.types import AgentTool
+from app.plugins.tool_context import ToolContext
 
 
 def make_list_skills_tool(ctx: ToolContext) -> AgentTool:

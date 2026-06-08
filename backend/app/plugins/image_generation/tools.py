@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from app.agents.tool_capabilities.core import make_image_gen_tool as build_image_gen_tool
 from app.agents.types import AgentTool
 from app.plugins.tool_context import ToolContext
-from app.tools.image_gen_agent import make_image_gen_tool as build_image_gen_tool
 
 
 def make_image_gen_tool(ctx: ToolContext) -> AgentTool:

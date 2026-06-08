@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from app.agents.tool_capabilities.core import make_virtual_python_tool
 from app.agents.types import AgentTool
 from app.infrastructure.config import settings
 from app.plugins.tool_context import ToolContext
-from app.tools.python_exec import make_virtual_python_tool
 
 
 def make_python_tool(ctx: ToolContext) -> AgentTool:

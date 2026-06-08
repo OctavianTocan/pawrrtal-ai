@@ -13,10 +13,10 @@ from typing import Any
 
 import yaml
 
+from app.agents.tool_capabilities.display import make_tool_display, summarize_title
+from app.agents.tool_capabilities.errors import ToolError, ToolErrorCode
 from app.agents.types import AgentTool
 from app.plugins.tool_context import ToolContext
-from app.tools.display import make_tool_display, summarize_title
-from app.tools.errors import ToolError, ToolErrorCode
 
 _BEANS_DIR = ".beans"
 _BEANS_BINARY = "beans"

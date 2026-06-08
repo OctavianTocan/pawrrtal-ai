@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from app.agents.tool_capabilities.core import make_markitdown_tool as build_markitdown_tool
 from app.agents.types import AgentTool
 from app.plugins.tool_context import ToolContext
-from app.tools.markitdown_convert import make_markitdown_tool as build_markitdown_tool
 
 
 def make_markitdown_tool(ctx: ToolContext) -> AgentTool:

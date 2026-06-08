@@ -20,15 +20,18 @@ class LlmSubcall:
     question: str
     conversation_id: uuid.UUID
     user_id: uuid.UUID
-    workspace_root: Path
     tools: list[AgentTool]
     system_prompt: str
+    workspace_root: Path | None = None
     history: list[dict[str, str]] | None = None
 
 
 async def stream_llm_subcall(subcall: LlmSubcall) -> AsyncIterator[StreamEvent]:
     """Stream one internal LLM subcall through provider selection."""
-    provider = resolve_llm(subcall.model_id, workspace_root=subcall.workspace_root)
+    if subcall.workspace_root is None:
+        provider = resolve_llm(subcall.model_id)
+    else:
+        provider = resolve_llm(subcall.model_id, workspace_root=subcall.workspace_root)
     async for event in provider.stream(
         question=subcall.question,
         conversation_id=subcall.conversation_id,
@@ -36,5 +39,34 @@ async def stream_llm_subcall(subcall: LlmSubcall) -> AsyncIterator[StreamEvent]:
         history=subcall.history,
         tools=subcall.tools,
         system_prompt=subcall.system_prompt,
+    ):
+        yield event
+
+
+@dataclass(frozen=True, slots=True)
+class CodexImageSubcall:
+    """Codex image-generation subcall request owned by the Turn Pipeline."""
+
+    prompt: str
+    model_id: str
+    workspace_root: Path | None
+    system_prompt: str
+    reasoning_effort: str
+
+
+async def stream_codex_image_subcall(subcall: CodexImageSubcall) -> AsyncIterator[StreamEvent]:
+    """Stream one Codex image-generation subcall through provider selection."""
+    from app.providers.openai_codex import OpenAICodexProvider  # noqa: PLC0415
+
+    provider = OpenAICodexProvider(
+        model_id=subcall.model_id,
+        workspace_root=subcall.workspace_root,
+    )
+    async for event in provider.stream(
+        subcall.prompt,
+        conversation_id=uuid.uuid4(),
+        user_id=uuid.uuid4(),
+        system_prompt=subcall.system_prompt,
+        reasoning_effort=subcall.reasoning_effort,
     ):
         yield event
