@@ -36,7 +36,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.channels.crud import (
     get_or_create_telegram_conversation_full,
     redeem_link_code,
-    update_conversation_verbose_level,
 )
 from app.channels.telegram._attachments import (
     collect_attachments as collect_attachments,  # noqa: PLC0414
@@ -44,6 +43,7 @@ from app.channels.telegram._attachments import (
 from app.channels.telegram.dev_admin import resolve_or_autolink_telegram_user
 from app.channels.telegram.model_defaults import resolve_effective_model_id
 from app.channels.telegram.sender import TelegramSender as TelegramSender  # noqa: PLC0414
+from app.conversations.settings import update_conversation_verbose_level
 from app.infrastructure.config import settings
 
 # Loose match for the link-code shape (8 chars from the look-alike-free

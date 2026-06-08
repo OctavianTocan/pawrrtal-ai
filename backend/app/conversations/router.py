@@ -8,8 +8,8 @@ from fastapi import APIRouter, Body, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.conversations import crud
-from app.conversations.gemini_utils import generate_text_once
 from app.conversations.messages_crud import get_messages_for_conversation
+from app.conversations.title import generate_conversation_title_text
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.database.legacy import User, get_async_session
 from app.models import ChatMessage, Conversation
@@ -142,13 +142,14 @@ def get_conversations_router() -> APIRouter:  # noqa: C901 — FastAPI router bu
     ) -> str:
         """Generate and persist a short conversation title from the first message."""
         try:
-            raw_title = await generate_text_once(
-                "Generate a short title (max 8 words) for the conversation based on "
-                "this first message: " + first_message + ". Return only the title, nothing else."
+            raw_title = await generate_conversation_title_text(
+                first_message=first_message,
+                conversation_id=conversation_id,
+                user_id=user.id,
             )
         except Exception:
-            # Gemini API errors (invalid key, model unavailable, rate limit) must
-            # not 500 the whole request — the title is best-effort UI polish.
+            # Provider errors (invalid key, model unavailable, rate limit) must
+            # not 500 the whole request: the title is best-effort UI polish.
             logger.exception(
                 "Title generation failed for conversation %s — returning empty title",
                 conversation_id,

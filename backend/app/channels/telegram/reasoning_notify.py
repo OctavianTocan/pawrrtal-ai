@@ -23,7 +23,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from app.channels.crud import normalize_conversation_reasoning_effort
+from app.conversations.settings import normalize_conversation_reasoning_effort
 from app.infrastructure.database.legacy import async_session_maker
 from app.providers.reasoning import format_adaptation_notice
 

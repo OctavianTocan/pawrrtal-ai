@@ -130,12 +130,20 @@ async def test_generate_conversation_title_persists_usable_title(
 
     # Monkeypatch the actual call site so the test isn't pinned to the
     # provider implementation behind title generation.
-    async def _fake_generate_text(_prompt: str) -> str:
+    async def _fake_generate_title_text(
+        *,
+        first_message: str,
+        conversation_id: object,
+        user_id: object,
+    ) -> str:
+        assert first_message == "hello"
+        assert conversation_id is not None
+        assert user_id is not None
         return '"Better   Title"'
 
     monkeypatch.setattr(
-        "app.conversations.router.generate_text_once",
-        _fake_generate_text,
+        "app.conversations.router.generate_conversation_title_text",
+        _fake_generate_title_text,
     )
 
     response = await client.post(

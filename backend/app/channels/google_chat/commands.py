@@ -19,7 +19,7 @@ from typing import get_args
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.channels.crud import (
+from app.conversations.settings import (
     update_conversation_model,
     update_conversation_reasoning_effort,
     update_conversation_verbose_level,

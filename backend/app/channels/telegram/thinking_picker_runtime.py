@@ -9,10 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, cast
 
-from app.channels.crud import update_conversation_reasoning_effort
 from app.channels.telegram.handlers import TelegramSender
-
-# Re-exported so bot.py imports both via one module.
 from app.channels.telegram.thinking_picker import (
     THINKING_CALLBACK_PREFIX as THINKING_CALLBACK_PREFIX,  # noqa: PLC0414
 )
@@ -31,8 +28,11 @@ from app.channels.telegram.thinking_picker import (
     picker_stale_message,
     resolve_select,
 )
+from app.conversations.settings import update_conversation_reasoning_effort
 from app.infrastructure.database.legacy import async_session_maker
 
+# ``THINKING_CALLBACK_PREFIX`` is re-exported so bot.py imports both runtime
+# helpers and callback constants via one module.
 if TYPE_CHECKING:
     from aiogram.types import (
         CallbackQuery,

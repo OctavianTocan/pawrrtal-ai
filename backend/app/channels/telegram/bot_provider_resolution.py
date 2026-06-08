@@ -13,8 +13,8 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from app.channels.crud import update_conversation_model
 from app.channels.telegram.handlers import TelegramTurnContext
+from app.conversations.settings import update_conversation_model
 from app.infrastructure.database.legacy import async_session_maker
 from app.providers.selection import ProviderSelection, provider_or_default
 

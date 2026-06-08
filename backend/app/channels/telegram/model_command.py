@@ -18,11 +18,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.channels.crud import (
     get_or_create_telegram_conversation_full,
-    update_conversation_model,
 )
 from app.channels.telegram.dev_admin import resolve_or_autolink_telegram_user
 from app.channels.telegram.reasoning_notify import maybe_append_model_switch_notice
 from app.channels.telegram.sender import TelegramSender
+from app.conversations.settings import update_conversation_model
 from app.providers.catalog import find
 from app.providers.model_id import InvalidModelId, parse_model_id
 
