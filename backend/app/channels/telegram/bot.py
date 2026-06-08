@@ -60,6 +60,7 @@ from app.channels.telegram.handlers import (
     handle_verbose_command,
     handle_whoami_command,
 )
+from app.channels.telegram.tools_command import handle_tools_command
 from app.channels.turn_orchestrator import ChatTurnInput, run_turn
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
@@ -86,6 +87,7 @@ _TELEGRAM_COMMANDS: tuple[tuple[str, str], ...] = (
     ("verbose", "Set detail level: 0 quiet, 1 tools, 2 thinking"),
     ("stop", "Stop the active run"),
     ("status", "Show gateway + conversation status"),
+    ("tools", "Show available tools and plugin capabilities"),
     ("whoami", "Show your Telegram ID and Pawrrtal binding"),
     ("lcm", "Show LCM (long-context memory) status for this conversation"),
     ("compact", "Force an LCM leaf-compaction pass now"),
@@ -648,6 +650,7 @@ def _register_telegram_command_handlers(dispatcher: Dispatcher) -> None:
         await message.answer(reply)
 
     _register_telegram_config_command_handler(dispatcher)
+    _register_telegram_tools_command_handler(dispatcher)
     _register_telegram_identity_command_handlers(dispatcher)
     _register_telegram_lcm_command_handlers(dispatcher)
 
@@ -660,6 +663,18 @@ def _register_telegram_config_command_handler(dispatcher: Dispatcher) -> None:
     async def _on_config(message: Message) -> None:
         config_picker_runtime = import_module("app.channels.telegram.config_picker_runtime")
         await config_picker_runtime.answer_config_command(message=message)
+
+
+def _register_telegram_tools_command_handler(dispatcher: Dispatcher) -> None:
+    """Register the tool-surface diagnostic command."""
+    from aiogram.filters import Command  # noqa: PLC0415
+
+    @dispatcher.message(Command("tools"))
+    async def _on_tools(message: Message) -> None:
+        sender = _sender_from_message(message)
+        async with async_session_maker() as session:
+            reply = await handle_tools_command(sender=sender, session=session)
+        await message.answer(reply)
 
 
 def _register_telegram_identity_command_handlers(dispatcher: Dispatcher) -> None:
