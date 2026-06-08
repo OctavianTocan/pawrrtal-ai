@@ -124,19 +124,21 @@ just paw project up
 just paw project status
 ```
 
-For a persistent VPS process, install the user systemd service:
+For the persistent VPS process, install the systemd service:
 
 ```bash
-just paw project service install --linger
+just paw project service install --enable-dev-login
 just paw project service status
 ```
 
-The service runs `dev.ts`, which starts Next.js on `127.0.0.1:3000`
-and FastAPI on `127.0.0.1:8000`. It does not expose a public port.
-If this VPS should use Postgres instead of local SQLite, set
-`PAWRRTAL_DEV_DATABASE_URL` before installing the service; the service
-intentionally clears the generic `DATABASE_URL` so unrelated shell
-state cannot leak into local project launches.
+The service runs `serve.ts`: it builds the standalone Next.js bundle,
+starts the production Next server on `127.0.0.1:3000`, and starts
+FastAPI on `127.0.0.1:8000` without reload mode. It does not expose a
+public port. The service loads `backend/.env` through systemd's
+`EnvironmentFile`, and the generated unit only writes non-secret
+runtime settings such as ports, `ENV=prod`, and `BACKEND_INTERNAL_URL`.
+Use `--enable-dev-login` only for an operator deployment protected by
+Cloudflare Access.
 
 ## Cloudflared Install
 

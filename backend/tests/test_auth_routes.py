@@ -16,11 +16,18 @@ stable.
 
 from __future__ import annotations
 
+from typing import Any, cast
+
 import pytest
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import Response
 
-from app.infrastructure.auth.dev_login import _redirect_with_login_cookie, _safe_redirect_path
+from app.infrastructure.auth.dev_login import (
+    _dev_login_response,
+    _redirect_with_login_cookie,
+    _safe_redirect_path,
+)
+from app.infrastructure.config import settings
 from main import create_app
 
 
@@ -125,3 +132,39 @@ class TestDevLoginRoute:
         assert response.status_code == 303
         assert response.headers["location"] == "/settings"
         assert "session_token=test-session" in response.headers.get("set-cookie", "")
+
+    @pytest.mark.anyio
+    async def test_production_dev_login_requires_explicit_flag(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(settings, "env", "prod")
+        monkeypatch.setattr(settings, "pawrrtal_enable_dev_login", False)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await _dev_login_response(
+                cast(Any, object()),
+                cast(Any, object()),
+                fallback_redirect=None,
+            )
+
+        assert exc_info.value.status_code == 404
+
+    @pytest.mark.anyio
+    async def test_production_dev_login_flag_opens_normal_config_gate(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        monkeypatch.setattr(settings, "env", "prod")
+        monkeypatch.setattr(settings, "pawrrtal_enable_dev_login", True)
+        monkeypatch.setattr(settings, "admin_email", None)
+        monkeypatch.setattr(settings, "admin_password", None)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await _dev_login_response(
+                cast(Any, object()),
+                cast(Any, object()),
+                fallback_redirect=None,
+            )
+
+        assert exc_info.value.status_code == 503

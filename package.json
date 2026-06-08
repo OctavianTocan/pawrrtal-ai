@@ -6,6 +6,7 @@
 	"private": true,
 	"scripts": {
 		"dev": "bun run dev.ts",
+		"serve": "bun run serve.ts",
 		"commit": "bun run commit.ts",
 		"lint:file-lines": "node scripts/check-file-lines.mjs",
 		"lint:view-container": "node scripts/check-view-container.mjs",

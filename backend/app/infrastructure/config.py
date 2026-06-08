@@ -128,6 +128,10 @@ class Settings(BaseSettings):
     # Admin user credentials (for testing).
     admin_email: str | None = None
     admin_password: str | None = None
+    # Explicitly expose the seeded admin shortcut outside local development.
+    # Keep false by default; Cloudflare Access-protected operator deploys may
+    # set PAWRRTAL_ENABLE_DEV_LOGIN=true on both frontend and backend.
+    pawrrtal_enable_dev_login: bool = False
 
     # --- Access control ------------------------------------------------------
     # Optional bearer token all clients must supply in the X-Pawrrtal-Key

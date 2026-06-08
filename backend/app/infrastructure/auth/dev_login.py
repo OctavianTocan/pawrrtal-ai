@@ -48,7 +48,7 @@ async def _dev_login_response(
     user_manager: UserManager,
     fallback_redirect: str | None,
 ) -> Response:
-    if settings.is_production:
+    if settings.is_production and not settings.pawrrtal_enable_dev_login:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Dev login is not available in production.",
