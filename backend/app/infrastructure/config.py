@@ -53,10 +53,7 @@ class Settings(BaseSettings):
     # API key for xAI (https://x.ai). Consumed by Grok chat models and
     # Telegram voice-note transcription via xAI's REST STT endpoint.
     xai_api_key: str = ""
-    # OAuth 2.0 client id for the xAI device-code flow (#372). Set
-    # to the value xAI hands back from registering Pawrrtal as an
-    # OAuth client. When empty the device-code path is disabled
-    # and users must keep using the legacy long-lived ``xai_api_key``.
+    # OAuth 2.0 client id for the xAI device-code flow. Empty disables it.
     xai_oauth_client_id: str = ""
     # API key for OpenAI (https://platform.openai.com).  Consumed by the
     # LiteLLM provider for GPT-4o / o-series chat models.  Leave empty
@@ -252,12 +249,10 @@ class Settings(BaseSettings):
     # When False, the audit logger no-ops and the audit API returns 404.
     # The dashboard query still works against historical rows.
     audit_log_enabled: bool = True
-    # Retention for audit rows. The purge job runs from the scheduler
-    # lifespan (PR 12); zero disables the purge so rows live forever.
+    # Retention for audit rows. Zero disables the purge.
     audit_log_retention_days: int = 90
 
-    # Master switch for the secret-redaction pass over log lines and
-    # persisted tool inputs (PR 02). Off only for adversarial test runs.
+    # Master switch for secret redaction over log lines and persisted tool inputs.
     secret_redaction_enabled: bool = True
 
     # ── Python Shell plugin ──────────────────────────────────────────────
@@ -270,7 +265,7 @@ class Settings(BaseSettings):
     # Head + tail truncation preserves tracebacks at the tail.
     virtual_python_output_cap_bytes: int = 32_000
 
-    # ── Governance: Claude SDK options (PR 05) ───────────────────────────
+    # ── Governance: Claude SDK options ───────────────────────────────────
     # When True, the Claude provider passes the SDK's ``sandbox`` option
     # to the bundled CLI subprocess. The CLI's macOS Seatbelt sandbox
     # is the strongest containment for the agent's filesystem reach.
@@ -285,15 +280,14 @@ class Settings(BaseSettings):
     # env var stays a single-line string.
     claude_sandbox_excluded_commands: str = "sudo,ssh,scp,rsync"
 
-    # ── Governance: retry-with-backoff (PR 05) ───────────────────────────
-    # Mirrors CCT's transient-error retry. Capped to keep a single turn
-    # from spending minutes on a flapping network.
+    # ── Governance: retry-with-backoff ───────────────────────────────────
+    # Capped so one turn cannot spend minutes on a flapping network.
     claude_retry_max_attempts: int = 3
     claude_retry_base_delay_seconds: float = 1.0
     claude_retry_max_delay_seconds: float = 30.0
     claude_retry_backoff_factor: float = 2.0
 
-    # ── Governance: workspace context (PR 06) ────────────────────────────
+    # ── Governance: workspace context ────────────────────────────────────
     # When True, the chat router calls
     # ``governance.workspace_context.load_workspace_context`` to read
     # root prompt files plus the internal ``.agent/`` skills/protocols
@@ -313,15 +307,6 @@ class Settings(BaseSettings):
         Path(__file__).resolve().parents[3] / "backend" / "templates" / "workspace"
     )
 
-    # ── Ops platform: webhooks (removed) ─────────────────────────────────
-    # Compatibility placeholders retained so existing .env files still
-    # parse. The backend restructure removed the POST /webhooks routes;
-    # setting these values does not expose a webhook receiver.
-    webhook_api_enabled: bool = False
-    # Shared bearer token for non-GitHub providers.
-    webhook_api_secret: str = ""
-    # HMAC-SHA256 shared secret for GitHub deliveries.
-    github_webhook_secret: str = ""
     # Personal access token for creating GitHub issues via the
     # ``report_issue`` agent tool. Requires ``repo`` scope (or
     # ``public_repo`` for public repos). Leave empty to disable.
@@ -329,7 +314,7 @@ class Settings(BaseSettings):
     # Target repository for agent-reported issues (owner/repo).
     github_issues_repo: str = "octaviantocan/pawrrtal-ai"
 
-    # ── Ops platform: scheduler (PR 12) ──────────────────────────────────
+    # ── Ops platform: scheduler ──────────────────────────────────────────
     # When False the scheduler lifespan task never starts; the API
     # routes still serve historical job rows but disable mutate verbs.
     scheduler_enabled: bool = False
@@ -338,7 +323,7 @@ class Settings(BaseSettings):
     # lost on restart (fine for tests).
     scheduler_persistent_jobstore: bool = True
 
-    # ── Telegram polish (PR 07) ──────────────────────────────────────────
+    # ── Telegram ─────────────────────────────────────────────────────────
     # Default verbose level for new Telegram conversations.
     # 0 = quiet, 1 = normal (tool names live), 2 = detailed (+ thinking).
     telegram_verbose_default: Literal[0, 1, 2] = 1
@@ -348,16 +333,12 @@ class Settings(BaseSettings):
     telegram_typing_refresh_seconds: float = 2.5
 
     # When True, every assistant reply on Telegram carries a "🔄 Regenerate"
-    # inline-keyboard button (#368). Tapping the button replays the last
-    # user message through the turn pipeline. Off by default so the
-    # rollout is gradual.
+    # inline-keyboard button. Tapping it replays the last user message.
     telegram_regenerate_button_enabled: bool = False
     # When True, the Telegram bot uses a per-chat FIFO turn queue
     # (``ChatMessageQueueDispatcher``) instead of the legacy
     # "cancel previous task" behaviour. Mid-turn user messages
-    # queue up and run serially rather than clobbering the
-    # in-flight reply (#357). Default off until the dispatcher has
-    # baked in a deployment.
+    # queue up and run serially rather than clobbering the in-flight reply.
     telegram_chat_queue_enabled: bool = False
     # Vision-capable model used to describe Telegram image attachments before
     # the selected Paw agent model runs. The main model receives the resulting

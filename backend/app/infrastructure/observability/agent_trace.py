@@ -1,19 +1,10 @@
-"""Workshop-compatible OTel spans for the Pawrrtal agent loop and tools.
+"""OTel spans for Pawrrtal agent turns, model calls, and tools.
 
-`Raindrop Workshop`_ is a localhost OTLP collector (default
-``http://localhost:5899``) that renders an agent's tokens, tool calls, and
-turn boundaries live as the loop runs.  It ingests OTLP/HTTP-JSON at
-``/v1/traces`` and parses three vendor schemas: Vercel AI SDK, Claude
-Agent SDK, and OpenLLMetry / Traceloop semantic conventions.
+This module is the core agent-trace seam. It emits OpenLLMetry /
+Traceloop-style ``gen_ai.*`` attributes so the same spans work with local
+debug collectors and standard OTel backends.
 
-This module emits the **Traceloop / OpenLLMetry** flavour because that is
-the OTel community baseline (``gen_ai.*`` attributes) — it works in
-Workshop *and* every other OTel backend (Grafana, Honeycomb, SigNoz,
-Tempo, Jaeger).  No vendor-specific wire protocol; no extra dependency
-beyond the OTel SDK already pulled in by ``app.infrastructure.telemetry``.
-
-Schema we emit (see workshop/src/spans/adapters/traceloop.ts for the
-parser side):
+Schema:
 
 * **Turn span** — root for one chat turn.
     Attributes: ``pawrrtal.conversation_id``, ``pawrrtal.user_id``,
@@ -32,7 +23,7 @@ parser side):
   ``gen_ai.thinking.delta`` per streamed reasoning chunk.
 
 * **Tool span** (``traceloop.span.kind = "tool"``) — attributes:
-  ``traceloop.entity.name`` (tool name — Workshop's display key);
+  ``traceloop.entity.name`` (tool name);
   ``traceloop.entity.input``  (JSON string of arguments);
   ``traceloop.entity.output`` (JSON string of result);
   ``otel.status.message``     (error string on failure).
@@ -42,8 +33,6 @@ All recorders are no-ops when telemetry is disabled — the underlying
 ``OTEL_EXPORTER_OTLP_ENDPOINT`` is unset (see
 ``app.infrastructure.telemetry.setup_tracing``).  Importing this module is safe
 in tests and bare installs.
-
-.. _Raindrop Workshop: https://github.com/raindrop-ai/workshop
 """
 
 from __future__ import annotations
@@ -96,22 +85,18 @@ __all__ = [
     "LLMSpanRecorder",
     "ToolSpanRecorder",
     "TurnSpanRecorder",
+    "agent_event_hook",
     "llm_span",
     "reset_tracer_for_tests",
     "set_tracer_for_tests",
     "tool_span",
     "turn_span",
-    "workshop_event_hook",
 ]
 
 _tracer = trace.get_tracer(TRACER_NAME, TRACER_VERSION)
 
-# Test-injectable tracer override (#352 L6). When non-``None``, every
-# span recorder reads spans through this tracer instead of the
-# global ``_tracer``. ``InMemorySpanExporter``-based tests inject
-# their own provider's tracer here, so the test never has to swap
-# the global ``trace.set_tracer_provider`` (which is one-shot per
-# process and produces order-dependent flakes in pytest fixtures).
+# Test-injectable tracer override. Tests can inject an in-memory tracer without
+# swapping the process-global OpenTelemetry provider.
 _tracer_override: trace.Tracer | None = None
 
 
@@ -168,8 +153,7 @@ def turn_span(
     """Root span for one chat turn.
 
     Every LLM and tool span emitted inside this context-manager inherits
-    the same ``trace_id``, so Workshop groups them as one "run" (see
-    workshop/src/server.ts → ``upsertRun`` keyed by trace_id).
+    the same ``trace_id``.
 
     The yielded :class:`TurnSpanRecorder` carries the latency clocks:
     callers ping :meth:`TurnSpanRecorder.record_first_event` from the
@@ -192,7 +176,7 @@ def turn_span(
     """
     conv_key = str(conversation_id)
     # If this conversation had a previous turn, link to it so backends
-    # can chain the traces and Workshop shows "related runs".
+    # can chain the traces and trace backends show "related runs".
     prev_ctx = _previous_turn.get(conv_key)
     links = [trace.Link(prev_ctx)] if prev_ctx is not None else None
 
@@ -225,13 +209,13 @@ def llm_span(
 ) -> Iterator[LLMSpanRecorder]:
     """Span for one LLM call.
 
-    Workshop's UI renders the panel from ``gen_ai.input.messages`` (the
+    trace UI renders the panel from ``gen_ai.input.messages`` (the
     canonical messages list) and ``gen_ai.output.messages`` (stamped on
     flush), with per-token rows from the ``gen_ai.content.delta`` span
     events.  Errors raised inside the context-manager are recorded on
     the span (``Status.ERROR`` + ``otel.status.message``) before
     re-raising so a failed turn still shows up as a red row in
-    Workshop's run list.
+    trace backend.
 
     Args:
         model_id: Provider-qualified model identifier (used for both
@@ -241,7 +225,7 @@ def llm_span(
             shape the agent loop accumulates.  Rendered into the
             canonical OpenLLMetry ``parts`` schema.
         system_prompt: Workspace system prompt, if any.  Stored as
-            ``gen_ai.system_instructions`` so Workshop's panel can show
+            ``gen_ai.system_instructions`` so trace panels can show
             it above the conversation.
 
     Yields:
@@ -281,21 +265,20 @@ def tool_span(
 ) -> Iterator[ToolSpanRecorder]:
     """Span for one tool execution.
 
-    Workshop renders these as collapsible rows with the args + result
+    Trace viewers render these as collapsible rows with the args + result
     side-by-side.  Failures are recorded with ``Status.ERROR`` and
     ``otel.status.message`` so the row is highlighted in the timeline.
 
     The span name is ``"<tool_name>.tool"`` to match Traceloop's
-    convention (Workshop strips the ``.tool`` suffix when picking the
-    display name; see workshop/src/spans/adapters/traceloop.ts).
+    convention.
 
     Args:
         name: Tool name as registered in the agent loop's tool map.
         tool_call_id: Stable correlation ID from the provider, used to
             pair this span with its surrounding LLM span in the
-            Workshop UI.
+            trace UI.
         arguments: The kwargs the model produced for the tool.  Stored
-            as JSON so Workshop's renderer can show the parameter tree.
+            as JSON so renderers can show the parameter tree.
 
     Yields:
         A ``ToolSpanRecorder`` — call ``record_result`` (or
@@ -342,7 +325,7 @@ def _hook_error(recorder: LLMSpanRecorder, event: StreamEvent) -> None:
     recorder.record_error(event.get("content", "stream error"))
 
 
-# Dispatch table for ``workshop_event_hook`` — flat ``str → handler`` map
+# Dispatch table for ``agent_event_hook`` — flat ``str → handler`` map
 # instead of an if/elif ladder so the function stays inside the project's
 # nesting-depth budget (``scripts/check-nesting.py``).  Unknown event
 # types are silently ignored — observability must never crash a chat
@@ -356,7 +339,7 @@ _HOOK_DISPATCH: dict[str, Callable[[LLMSpanRecorder, StreamEvent], None]] = {
 }
 
 
-def workshop_event_hook(
+def agent_event_hook(
     recorder: LLMSpanRecorder,
     *,
     turn_recorder: TurnSpanRecorder | None = None,

@@ -1,15 +1,13 @@
-"""Workshop / OpenLLMetry attribute schema + payload renderers.
+"""OpenLLMetry attribute schema and payload renderers.
 
 Constants and helpers for the Traceloop / OpenLLMetry span shape that
-``app.infrastructure.observability.workshop`` emits.  Split out of ``workshop.py``
+``app.infrastructure.observability.agent_trace`` emits.  Split out of ``agent_trace.py``
 to keep that file under the project's 500-line ceiling
 (``scripts/check-file-lines.mjs``); private to the package — the public
-surface lives in ``workshop.py`` / the package ``__init__``.
+surface lives in ``agent_trace.py`` / the package ``__init__``.
 
-The constants here are the wire contract between Pawrrtal and Workshop
-(or any other OpenLLMetry-aware backend).  If Workshop's
-``traceloop.ts`` adapter changes, this is the only file that needs to
-move with it.
+The constants here are the wire contract between Pawrrtal and any
+OpenLLMetry-aware backend.
 """
 
 from __future__ import annotations
@@ -30,13 +28,12 @@ if TYPE_CHECKING:
 
 _log = logging.getLogger(__name__)
 
-# Tracer identity surfaced in the Workshop run header.  Bump when the
+# Tracer identity surfaced in trace backends. Bump when the
 # attribute schema changes so operators can spot the version skew.
-TRACER_NAME = "pawrrtal.workshop"
+TRACER_NAME = "pawrrtal.agent_trace"
 TRACER_VERSION = "1.0.0"
 
-# Workshop's Traceloop adapter (workshop/src/spans/adapters/traceloop.ts)
-# discriminates LLM / tool spans by these two attribute values.
+# Traceloop discriminates LLM / tool spans by these attribute values.
 KIND_LLM = "llm"
 KIND_TOOL = "tool"
 
@@ -58,8 +55,8 @@ ATTR_GENAI_INPUT_TOKENS = "gen_ai.usage.input_tokens"
 ATTR_GENAI_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
 ATTR_GENAI_COST_USD = "gen_ai.usage.cost_usd"
 
-# Pawrrtal-namespaced attributes — surfaced in Workshop's span detail
-# panel so an operator can filter "spans for this conversation".
+# Pawrrtal-namespaced attributes for filtering spans by conversation,
+# request, user, surface, and tool call.
 ATTR_CONVERSATION_ID = "pawrrtal.conversation_id"
 ATTR_USER_ID = "pawrrtal.user_id"
 ATTR_SURFACE = "pawrrtal.surface"
@@ -77,7 +74,7 @@ ATTR_PAWRRTAL_TURN_TTFT_MS = "pawrrtal.turn.ttft_ms"
 ATTR_PAWRRTAL_LLM_DURATION_MS = "pawrrtal.llm.duration_ms"
 ATTR_PAWRRTAL_LLM_TTFT_MS = "pawrrtal.llm.ttft_ms"
 
-# Span event names — Workshop surfaces these in the live timeline.
+# Span event names.
 EVENT_CONTENT_DELTA = "gen_ai.content.delta"
 EVENT_THINKING_DELTA = "gen_ai.thinking.delta"
 EVENT_ATTR_CONTENT_TEXT = "gen_ai.content.text"
@@ -85,7 +82,7 @@ EVENT_ATTR_THINKING_TEXT = "gen_ai.thinking.text"
 
 # StreamEvent type literals we care about (subset of
 # ``app.providers.base.StreamEvent``).  Centralised so the
-# ``workshop_event_hook`` dispatch table reads as a flat string map.
+# ``agent_event_hook`` dispatch table reads as a flat string map.
 STREAM_TYPE_DELTA = "delta"
 STREAM_TYPE_THINKING = "thinking"
 STREAM_TYPE_TOOL_USE = "tool_use"
@@ -94,9 +91,9 @@ STREAM_TYPE_ERROR = "error"
 
 
 def json_dumps(value: Any) -> str:
-    """Serialise *value* for a Workshop-parsed attribute.
+    """Serialize *value* for a JSON-parsed span attribute.
 
-    Workshop's adapter calls ``JSON.parse`` on these strings; an
+    Trace viewers may call ``JSON.parse`` on these strings; an
     unparseable string crashes its renderer for the affected span.
     The fallback shape preserves the *fact* of the failure (so a
     debugging operator sees it) without breaking the span.
@@ -104,14 +101,14 @@ def json_dumps(value: Any) -> str:
     try:
         return json.dumps(value, default=str, ensure_ascii=False)
     except (TypeError, ValueError):
-        _log.debug("WORKSHOP_JSON_SERIALISE_FAILED", exc_info=True)
-        return json.dumps({"_unserialisable": repr(value)})
+        _log.debug("AGENT_TRACE_JSON_SERIALIZE_FAILED", exc_info=True)
+        return json.dumps({"_unserializable": repr(value)})
 
 
 def render_input_messages(messages: list[AgentMessage]) -> list[dict[str, Any]]:
     """Render agent-loop messages in the canonical ``gen_ai.input.messages`` shape.
 
-    Workshop expects each message to be ``{"role": ..., "parts": [...]}``
+    Trace viewers expect each message to be ``{"role": ..., "parts": [...]}``
     with part types ``"text"``, ``"tool_call"``, or ``"tool_result"``.
     Mapping here keeps the wire shape consistent across providers (the
     loop's TypedDict messages are already provider-neutral).

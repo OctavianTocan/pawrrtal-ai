@@ -128,7 +128,7 @@ def test_otel_enabled_reads_endpoint_env_var(monkeypatch: pytest.MonkeyPatch) ->
 
 @pytest.mark.usefixtures("_clean_telemetry_state")
 def test_json_exporter_sends_valid_otlp_json(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The JSON exporter produces camelCase OTLP JSON that Workshop accepts."""
+    """The JSON exporter produces camelCase OTLP JSON."""
     import json
     from http.server import BaseHTTPRequestHandler, HTTPServer
     from threading import Thread

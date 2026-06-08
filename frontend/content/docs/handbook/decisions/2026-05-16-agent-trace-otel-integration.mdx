@@ -1,38 +1,34 @@
 ---
-title: Emit OpenLLMetry spans for Raindrop Workshop and other OTel backends
-description: ADR — instrument the agent loop and turn runner with Traceloop-shaped GenAI spans so the Raindrop Workshop local debugger and remote OTel backends share one wire contract.
+title: Emit OpenLLMetry spans for agent tracing
+description: ADR — instrument the agent loop and turn runner with Traceloop-shaped GenAI spans so local debuggers and remote OTel backends share one wire contract.
 ---
 
-# ADR: Emit OpenLLMetry spans for Raindrop Workshop and other OTel backends
+# ADR: Emit OpenLLMetry Spans For Agent Tracing
 
 - **Date:** 2026-05-16
 - **Owners:** OctavianTocan
-- **Tracking:** Workshop integration (this PR); follow-up bean for the
-  `/setup-agent-replay` scaffold against `channels/turn_orchestrator.run_turn`
-  (TBD).
+- **Tracking:** Agent trace integration.
 
 <Callout type="info" title="Status: Accepted">
-Add `app/core/observability/workshop.py` (Workshop-compatible OTel
-spans), wire it into `channels/turn_orchestrator.run_turn` and
-`run_model_tool_loop._execute_and_log_tool_call`. Local dev points
-`OTEL_EXPORTER_OTLP_ENDPOINT` at `http://localhost:5899` to render
-traces in the Workshop UI; the same spans route to Grafana / Honeycomb /
-SigNoz in deployed environments.
+Add `app/infrastructure/observability/agent_trace.py`, wire it into
+`channels/turn_orchestrator.run_turn` and model tool dispatch, and emit
+standard OTel spans. Local dev can point `OTEL_EXPORTER_OTLP_ENDPOINT`
+at a collector on `http://localhost:5899`; the same spans route to
+Grafana, Honeycomb, SigNoz, or another OTel backend in deployed
+environments.
 </Callout>
 
 ## Context
 
-`Raindrop Workshop` (https://github.com/raindrop-ai/workshop) is a
-localhost OTLP collector + UI that renders an agent's tokens, tool
-calls, and turn boundaries live. It ingests OTLP/HTTP-JSON at
-`POST :5899/v1/traces` and normalises spans from three vendor schemas:
-the Vercel AI SDK, the Claude Agent SDK, and **Traceloop /
-OpenLLMetry** (the `gen_ai.*` semantic-convention attribute family).
+Local OTLP collectors can render an agent's tokens, tool calls, and turn
+boundaries live. The wire format should stay generic: OTLP/HTTP-JSON
+with **Traceloop / OpenLLMetry** attributes from the `gen_ai.*`
+semantic-convention family.
 
 Pawrrtal already has the OTel SDK + OTLP/HTTP exporter wired in
 `backend/app/core/telemetry.py` (gated by `OTEL_EXPORTER_OTLP_ENDPOINT`).
-The chat pipeline has three architectural seams that Workshop's three
-span types map onto cleanly:
+The chat pipeline has three architectural seams that map cleanly to the
+span types:
 
 1. **Turn root** — `channels/turn_orchestrator.run_turn` is the single
    per-turn entry point shared by all surfaces (HTTP `/api/chat`,
@@ -48,12 +44,12 @@ span types map onto cleanly:
 ## Decision
 
 Emit OpenLLMetry / Traceloop-shaped spans, not a vendor-specific wire
-protocol. Workshop is the local renderer; the same spans route to any
-OTel backend without change.
+protocol. Local collectors and deployed OTel backends consume the same
+spans without change.
 
 ### Schema we emit
 
-Reference: `workshop/src/spans/adapters/traceloop.ts`.
+The schema follows the Traceloop/OpenLLMetry GenAI attributes.
 
 - **`pawrrtal.turn`** — root span per chat turn.
   Attributes: `pawrrtal.conversation_id`, `pawrrtal.user_id`,
@@ -75,28 +71,25 @@ Reference: `workshop/src/spans/adapters/traceloop.ts`.
 
 ### Wiring
 
-- `backend/app/core/observability/_schema.py` — attribute-name
+- `backend/app/infrastructure/observability/_schema.py` — attribute-name
   constants + payload renderers (`render_input_messages`).
-- `backend/app/core/observability/_recorders.py` — `LLMSpanRecorder` +
+- `backend/app/infrastructure/observability/_recorders.py` — `LLMSpanRecorder` +
   `ToolSpanRecorder` (mutable per-span state).
-- `backend/app/core/observability/workshop.py` — public context
-  managers (`turn_span`, `llm_span`, `tool_span`) + `workshop_event_hook`
+- `backend/app/infrastructure/observability/agent_trace.py` — public context
+  managers (`turn_span`, `llm_span`, `tool_span`) + `agent_event_hook`
   that mirrors `StreamEvent`s onto a recorder via a flat dispatch table.
-- `backend/app/channels/turn_orchestrator.py` — `run_turn` opens
-  `turn_span` + `llm_span`, registers `workshop_event_hook` ahead of
+- `backend/app/channels/turn_orchestrator/runner.py` — `run_turn` opens
+  `turn_span` + `llm_span`, registers `agent_event_hook` ahead of
   the caller's hooks, stamps usage / stop-reason on the LLM span at
   finalisation.
-- `backend/app/core/run_model_tool_loop/loop.py` —
-  `_execute_and_log_tool_call` wraps the dispatch in `tool_span`. The
-  existing `TOOL_CALL_START` / `TOOL_CALL_RESULT` log lines stay
-  side-by-side with the span.
+- `backend/app/agents/model_tool_loop/tool_calls.py` — wraps the dispatch
+  in `tool_span`.
 
 ### Configuration
 
 ```bash
-# Local dev with Workshop
+# Local dev with a collector
 OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:5899
-OTEL_EXPORTER_OTLP_PROTOCOL=http/json   # Workshop rejects protobuf
 OTEL_SERVICE_NAME=pawrrtal-backend
 ```
 
@@ -107,10 +100,9 @@ without OTel pay nothing.
 ## Why this shape
 
 1. **Open standard, not a vendor protocol.** The Traceloop attribute
-   schema is the OTel GenAI semantic convention. Workshop is one
-   consumer; Grafana, Honeycomb, SigNoz, Phoenix all parse the same
-   shape. No second instrumentation pass when we add a remote OTel
-   backend.
+   schema is the OTel GenAI semantic convention. Grafana, Honeycomb,
+   SigNoz, Phoenix, and local collectors all parse the same shape. No
+   second instrumentation pass when we add a remote OTel backend.
 2. **Three sites, three layers.** The instrumentation matches the
    chat pipeline's existing seams (router → channel → loop). No
    touching the providers — that surface stays restricted, and the
@@ -119,34 +111,34 @@ without OTel pay nothing.
 3. **`EventHook` is the right seam.** `turn_orchestrator` already designed
    for non-destructive sidecar emission via
    `EventHook = Callable[[StreamEvent], list[StreamEvent]]`. The
-   workshop hook returns `[]` so the chat aggregator + channel
+   agent trace hook returns `[]` so the chat aggregator + channel
    deliverer never see the observability layer.
 
 ## Alternatives considered
 
-- **Workshop's TypeScript live-event SDK
-  (`POST /v1/events/track`).** Requires a second protocol on top of
-  OTel and only Workshop consumes it. Rejected: locks us to Workshop.
-- **Custom non-Traceloop attributes.** Would render in Workshop only
-  if we maintained a parallel adapter. Rejected for the same reason.
+- **Vendor-specific live-event SDKs.** They require a second protocol on
+  top of OTel and tie traces to one viewer. Rejected: locks us to one
+  debugging surface.
+- **Custom non-Traceloop attributes.** Would require a parallel adapter.
+  Rejected for the same reason.
 - **Patching `providers/` directly.** Forbidden by
   `.claude/rules/architecture/no-tools-in-providers.md` and the
   CODEOWNERS scope on the provider files.
 
 ## Tests
 
-`backend/tests/test_observability_workshop.py` runs against an
+`backend/tests/test_observability_agent_trace.py` runs against an
 in-memory OTel `TracerProvider` + `InMemorySpanExporter` and asserts
-the exact Workshop attribute shape (`traceloop.span.kind`,
+the exact agent trace attribute shape (`traceloop.span.kind`,
 `gen_ai.input.messages`, etc.) for every code path. 11 tests; ~120ms
-total. Any future Workshop schema change surfaces as a test failure
-here rather than silently breaking the UI rendering.
+total. Any future schema change surfaces as a test failure here rather
+than silently breaking trace rendering.
 
 ## Follow-ups
 
-- `/setup-agent-replay` scaffold: ingest a captured Workshop trace
+- `/setup-agent-replay` scaffold: ingest a captured trace
   and re-run it through `run_turn` via `ScriptedStreamFn` for live
   regression coverage of the chat path.
 - Promote the `claude_provider.py` CLI stderr buffer into the LLM
   span as a span event so process-level errors show up alongside
-  token output in Workshop's timeline.
+  token output in the trace timeline.

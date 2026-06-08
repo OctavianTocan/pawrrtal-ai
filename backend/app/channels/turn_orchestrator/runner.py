@@ -12,11 +12,11 @@ from app.channels._turn_runtime_context import system_prompt_for_turn
 from app.chat.aggregator import ChatTurnAggregator, should_emit_event
 from app.infrastructure.observability import (
     TurnSpanRecorder,
+    agent_event_hook,
     aggregator_stop_reason,
     build_llm_view_messages,
     llm_span,
     turn_span,
-    workshop_event_hook,
 )
 from app.provider_sessions import (
     _register_provider_session_persist_task,
@@ -44,7 +44,7 @@ async def run_turn(
 ) -> AsyncIterator[bytes]:
     """Persist, stream, deliver, and finalize one chat turn.
 
-    Wraps the turn body in a Workshop-compatible OTel ``turn_span`` so
+    Wraps the turn body in an agent-trace OTel ``turn_span`` so
     every LLM stream and tool call dispatched downstream lands in the
     same trace.  When telemetry is disabled the spans are no-ops and
     add zero overhead (see ``app.infrastructure.telemetry.setup_tracing``).
@@ -67,11 +67,7 @@ async def run_turn(
     aggregator = ChatTurnAggregator()
     counter = _EventCounter()
     model_id = _channel_model_id(turn_input.channel_message)
-    # Compose the per-turn system prompt: workspace identity files +
-    # runtime metadata (current time, model/provider, iteration budget,
-    # tool inventory) appended on every turn so the model never has to
-    # guess at its environment.  See issues #289, #291, #294, #309 and
-    # ``app.channels._turn_runtime_context`` for the rationale.
+    # Workspace identity plus runtime metadata appended on every turn.
     system_prompt: str | None = system_prompt_for_turn(
         turn_input.workspace_root,
         model_id=model_id,
@@ -146,7 +142,7 @@ async def _stream_with_llm_span(
        caught by ``llm_span``'s ``except`` clause and stamped as an
        LLM error.
 
-    Workshop's UI panel for ``gen_ai.input.messages`` shows whatever
+    Trace UI panels for ``gen_ai.input.messages`` show whatever
     list this function passes in — the full ``history`` plus the new
     user turn — so operators debugging a multi-turn conversation
     see the same context the provider sees.
@@ -159,7 +155,7 @@ async def _stream_with_llm_span(
             system_prompt=system_prompt,
         ) as llm_recorder:
             hooks = [
-                workshop_event_hook(llm_recorder, turn_recorder=turn_recorder),
+                agent_event_hook(llm_recorder, turn_recorder=turn_recorder),
                 *(event_hooks or []),
             ]
             try:
@@ -239,14 +235,8 @@ async def _guarded_stream(
             images=turn_input.images,
             **extra_kwargs,
         ):
-            # Hooks fire BEFORE the verbose filter so observability sees
-            # every provider event — including thinking-deltas at
-            # ``verbose_level < 2``, which the filter would otherwise
-            # drop before the Workshop span recorder ever sees them
-            # (#347). The hook contract for ``workshop_event_hook``
-            # returns ``[]`` (side-effects only); extras from any
-            # future hook stay behind the filter so /verbose still
-            # gates what the channel renders.
+            # Hooks observe the full provider stream; hook-emitted extras
+            # still pass through the visible-channel filter.
             extras = list(_expand_hook_events(event, hooks))
             if await _handle_internal_provider_event(event, turn_input):
                 continue

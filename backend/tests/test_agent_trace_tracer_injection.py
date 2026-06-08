@@ -1,4 +1,4 @@
-"""Tests for the test-injectable tracer in workshop (#352 L6)."""
+"""Tests for the test-injectable tracer in agent_trace."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from app.infrastructure.observability.workshop import (
+from app.infrastructure.observability.agent_trace import (
     reset_tracer_for_tests,
     set_tracer_for_tests,
     turn_span,
@@ -24,8 +24,7 @@ def in_memory_tracer() -> Iterator[tuple[trace.Tracer, InMemorySpanExporter]]:
 
     Returns the tracer (for ``set_tracer_for_tests``) and the
     exporter (for reading recorded spans). The tracer provider is
-    discarded after the test — never installed globally — which is
-    exactly the property #352 L6 was designed to give us.
+    discarded after the test and never installed globally.
     """
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
