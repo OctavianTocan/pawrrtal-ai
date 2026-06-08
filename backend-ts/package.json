@@ -9,5 +9,10 @@
 	"scripts": {
 		"install:deps": "bun install",
 		"typecheck": "bun run --filter '@pawrrtal/*' typecheck"
+	},
+	"devDependencies": {
+		"@effect/language-service": "^0.85.1",
+		"@types/bun": "latest",
+		"typescript": "^5.9.3"
 	}
 }
