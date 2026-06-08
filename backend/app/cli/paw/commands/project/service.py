@@ -83,6 +83,7 @@ def _unit_text(*, enable_dev_login: bool, env_file: Path | None) -> str:
         _systemd_env_line("PATH", path),
         _systemd_env_line("UV_CACHE_DIR", str(cache_root / "uv")),
         _systemd_env_line("XDG_CACHE_HOME", str(cache_root / "xdg")),
+        _systemd_env_line("UV_LINK_MODE", "copy"),
         _systemd_env_line("NODE_ENV", "production"),
         _systemd_env_line("NEXT_TELEMETRY_DISABLED", "1"),
         _systemd_env_line("ENV", "prod"),

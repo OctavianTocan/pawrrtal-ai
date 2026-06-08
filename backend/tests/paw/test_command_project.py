@@ -397,6 +397,7 @@ def test_project_service_install_writes_system_unit_and_enables_now(
         'Environment="PATH=/fake/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"'
     ) in unit
     assert 'Environment="NODE_ENV=production"' in unit
+    assert 'Environment="UV_LINK_MODE=copy"' in unit
     assert 'Environment="ENV=prod"' in unit
     assert 'Environment="PAWRRTAL_BACKEND_HOST=127.0.0.1"' in unit
     assert 'Environment="PAWRRTAL_BACKEND_PORT=8000"' in unit

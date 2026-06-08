@@ -28,6 +28,7 @@ setEnv('NODE_ENV', 'production');
 setEnvDefault('NEXT_TELEMETRY_DISABLED', '1');
 setEnvDefault('UV_CACHE_DIR', `${CACHE_DIR}/uv`);
 setEnvDefault('XDG_CACHE_HOME', `${CACHE_DIR}/xdg`);
+setEnvDefault('UV_LINK_MODE', 'copy');
 setEnvDefault('BACKEND_INTERNAL_URL', BACKEND_URL);
 setEnvDefault('HOSTNAME', FRONTEND_BIND_HOST);
 setEnvDefault('PORT', String(FRONTEND_PORT));
@@ -123,6 +124,8 @@ const managedProcesses: ManagedProcess[] = [
 		'run',
 		'--project',
 		'backend',
+		'python',
+		'-m',
 		'uvicorn',
 		'main:app',
 		'--app-dir',
