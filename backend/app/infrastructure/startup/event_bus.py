@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from app.infrastructure.event_bus import EventBus
+from app.infrastructure.event_bus import AgentHandler, EventBus
 from app.infrastructure.event_bus.global_bus import set_event_bus
 from app.infrastructure.lifecycle import shutdown_hook, startup_hook
 
@@ -17,6 +17,7 @@ async def start_event_bus(app: FastAPI) -> None:
     """Start the process-wide event bus and expose it on app state."""
     event_bus = EventBus()
     await event_bus.start()
+    AgentHandler().register(event_bus)
     app.state.event_bus = event_bus
     set_event_bus(event_bus)
 

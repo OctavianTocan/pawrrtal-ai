@@ -29,6 +29,7 @@ from app.channels.crud import (
     issue_link_code,
     list_bindings,
 )
+from app.channels.telegram.diagnostics import diagnose_telegram_state
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import User, get_async_session
@@ -283,6 +284,20 @@ def get_channels_router() -> APIRouter:
         click without first checking state.
         """
         await delete_binding(user_id=user.id, provider=_TELEGRAM, session=session)
+
+    @router.get("/telegram/diagnose", include_in_schema=False)
+    async def diagnose_telegram(
+        limit: int = 10,
+        conversation_id: str | None = None,
+        user: User = Depends(get_allowed_user),
+    ) -> dict[str, Any]:
+        """Return user-scoped Telegram runtime and persistence diagnostics."""
+        bounded_limit = max(1, min(limit, 50))
+        return await diagnose_telegram_state(
+            limit=bounded_limit,
+            user_id=user.id,
+            conversation_id=conversation_id,
+        )
 
     @router.post(
         "/telegram/webhook",

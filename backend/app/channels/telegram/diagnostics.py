@@ -1,4 +1,4 @@
-"""Read-only local diagnostics for channel operator commands."""
+"""Read-only Telegram channel diagnostics."""
 
 from __future__ import annotations
 
@@ -21,13 +21,19 @@ TELEGRAM_PROVIDER = "telegram"
 async def diagnose_telegram_state(
     *,
     limit: int,
+    user_id: Any | None = None,
     conversation_id: str | None = None,
 ) -> dict[str, Any]:
     """Read local DB state needed to explain Telegram delivery failures."""
     async with async_session_maker() as session:
-        bindings = await _diagnose_bindings(session)
-        recent_messages = await _diagnose_recent_messages(session, limit=limit)
-        trace = await _diagnose_conversation_trace(session, conversation_id, limit=limit)
+        bindings = await _diagnose_bindings(session, user_id=user_id)
+        recent_messages = await _diagnose_recent_messages(session, limit=limit, user_id=user_id)
+        trace = await _diagnose_conversation_trace(
+            session,
+            conversation_id,
+            limit=limit,
+            user_id=user_id,
+        )
         stuck_messages = [
             message for message in recent_messages if message["assistant_status"] == "streaming"
         ]
@@ -41,15 +47,22 @@ async def diagnose_telegram_state(
     }
 
 
-async def _diagnose_bindings(session: AsyncSession) -> list[dict[str, Any]]:
+async def _diagnose_bindings(
+    session: AsyncSession,
+    *,
+    user_id: Any | None,
+) -> list[dict[str, Any]]:
     """Return Telegram channel bindings with best-effort user emails."""
     user_model = cast(Any, User)
-    result = await session.execute(
+    stmt = (
         select(ChannelBinding, user_model.email)
         .outerjoin(User, user_model.id == ChannelBinding.user_id)
         .where(ChannelBinding.provider == TELEGRAM_PROVIDER)
         .order_by(ChannelBinding.created_at.desc())
     )
+    if user_id is not None:
+        stmt = stmt.where(ChannelBinding.user_id == user_id)
+    result = await session.execute(stmt)
     return [
         {
             "user_id": str(binding.user_id),
@@ -63,15 +76,23 @@ async def _diagnose_bindings(session: AsyncSession) -> list[dict[str, Any]]:
     ]
 
 
-async def _diagnose_recent_messages(session: AsyncSession, *, limit: int) -> list[dict[str, Any]]:
+async def _diagnose_recent_messages(
+    session: AsyncSession,
+    *,
+    limit: int,
+    user_id: Any | None,
+) -> list[dict[str, Any]]:
     """Return recent Telegram-originated messages in reverse chronological order."""
-    result = await session.execute(
+    stmt = (
         select(ChatMessage, Conversation.model_id)
         .join(Conversation, Conversation.id == ChatMessage.conversation_id)
         .where(Conversation.origin_channel == TELEGRAM_PROVIDER)
         .order_by(ChatMessage.created_at.desc())
         .limit(limit)
     )
+    if user_id is not None:
+        stmt = stmt.where(Conversation.user_id == user_id)
+    result = await session.execute(stmt)
     return [_message_diagnostic(message, model_id=model_id) for message, model_id in result.all()]
 
 
@@ -80,8 +101,9 @@ async def _diagnose_conversation_trace(
     conversation_id: str | None,
     *,
     limit: int,
+    user_id: Any | None,
 ) -> dict[str, Any] | None:
-    """Return conversation-level Codex/thread state plus recent messages."""
+    """Return conversation-level provider/thread state plus recent messages."""
     if conversation_id is None:
         return None
     try:
@@ -89,7 +111,7 @@ async def _diagnose_conversation_trace(
     except ValueError as exc:
         raise LocalError(f"Invalid conversation UUID: {conversation_id}") from exc
     conversation = await session.get(Conversation, parsed_id)
-    if conversation is None:
+    if conversation is None or (user_id is not None and conversation.user_id != user_id):
         raise LocalError(f"No conversation found for id {conversation_id}.")
     result = await session.execute(
         select(ChatMessage)

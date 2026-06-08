@@ -2,7 +2,7 @@
 	"schema_version": 1,
 	"id": "core_channels",
 	"name": "Core Channels",
-	"description": "Bundled web, Electron, Telegram, and Google Chat channel adapters.",
+	"description": "Bundled web and Electron channel adapters.",
 	"version": "1.0.0",
 	"enabled_by_default": true,
 	"capabilities": [
@@ -23,24 +23,6 @@
 			"slots": ["chat_surface"],
 			"surface": "electron",
 			"entrypoint": "app.channels.plugin_adapters:make_sse_channel"
-		},
-		{
-			"type": "channel",
-			"id": "telegram",
-			"title": "Telegram Channel",
-			"description": "Telegram Bot API channel for linked Telegram conversations.",
-			"slots": ["chat_surface"],
-			"surface": "telegram",
-			"entrypoint": "app.channels.plugin_adapters:make_telegram_channel"
-		},
-		{
-			"type": "channel",
-			"id": "google_chat",
-			"title": "Google Chat Channel",
-			"description": "Google Chat channel for linked Google Workspace conversations.",
-			"slots": ["chat_surface"],
-			"surface": "google_chat",
-			"entrypoint": "app.channels.plugin_adapters:make_google_chat_channel"
 		}
 	]
 }

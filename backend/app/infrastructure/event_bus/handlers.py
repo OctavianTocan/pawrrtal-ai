@@ -1,28 +1,9 @@
-"""Event-bus subscribers — AgentHandler + NotificationService.
-
-Wires PRs 10/11/12 end-to-end:
-
-* :class:`AgentHandler` subscribes to :class:`WebhookEvent` and
-  :class:`ScheduledEvent`, runs an agent turn against the payload,
-  and publishes :class:`AgentResponseEvent` carrying the assistant's
-  reply text.
-* :class:`NotificationService` subscribes to
-  :class:`AgentResponseEvent` and delivers each one to the
-  configured Telegram chats (or the default broadcast list when
-  no specific chat was requested).
-
-Both are constructed once per process and registered on the global
-:class:`EventBus` from the FastAPI lifespan (``main.py``).  Failures
-in either handler are isolated by the bus's
-``return_exceptions=True`` dispatch — a crashed delivery never
-breaks an agent turn or a sibling handler.
-"""
+"""Event-bus subscribers for agent execution."""
 
 from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -41,10 +22,6 @@ logger = logging.getLogger(__name__)
 # Past this we truncate so a noisy GitHub payload can't blow the model
 # context in one go.
 _PAYLOAD_PROMPT_BUDGET_CHARS = 2000
-
-# Per-message Telegram cap (Bot API limit is 4096; we leave headroom
-# so a tool / verbose preamble can ride alongside without truncation).
-_TELEGRAM_MESSAGE_CHARS = 4000
 
 # Per-leaf preview cap inside a flattened webhook payload.  Long leaf
 # values (commit messages, diff snippets) get tail-truncated so the
@@ -150,41 +127,6 @@ class AgentHandler:
                 originating_event_id,
                 user_id,
             )
-            # try:
-            #     job_id = uuid.UUID(originating_event_id)
-            #     from app.models import ScheduledJob
-            #     from app.infrastructure.database.legacy import async_session_maker
-            #     from app.infrastructure.event_bus import AgentResponseEvent
-            #     from app.infrastructure.event_bus.global_bus import publish_if_available
-            #     from app.infrastructure.event_bus.handlers import _persist_assistant_response
-            #     import sys
-            #     err_msg = str(sys.exc_info()[1] or "Unknown error")
-            #     async with async_session_maker() as session:
-            #         row = await session.get(ScheduledJob, job_id)
-            #         if row:
-            #             row.last_status = "failed"
-            #             row.last_error = err_msg
-            #             if row.fire_at:
-            #                 row.is_active = False
-            #             await session.commit()
-            #             if row.target_conversation_id:
-            #                 await _persist_assistant_response(
-            #                     conversation_id=row.target_conversation_id,
-            #                     user_id=user_id,
-            #                     text=f"❌ **System Notification**: The scheduled job '{row.name}' failed to execute: {err_msg}.",
-            #                     originating_event_id=originating_event_id,
-            #                 )
-            #             for chat_id in row.target_chat_ids:
-            #                 await publish_if_available(
-            #                     AgentResponseEvent(
-            #                         user_id=user_id,
-            #                         chat_id=chat_id,
-            #                         text=f"❌ [System Notification]: The scheduled job '{row.name}' failed to execute: {err_msg}.",
-            #                         originating_event_id=originating_event_id,
-            #                     )
-            #                 )
-            # except Exception:
-            #     logger.exception("Failed to handle job execution error notification")
             return
         if not text:
             logger.info(
@@ -217,9 +159,6 @@ class AgentHandler:
                     )
                 )
         else:
-            # No explicit target — publish without a chat_id so the
-            # NotificationService falls back to the configured
-            # default broadcast list.
             await publish_if_available(
                 AgentResponseEvent(
                     user_id=user_id,
@@ -228,66 +167,6 @@ class AgentHandler:
                     originating_event_id=originating_event_id,
                 )
             )
-
-
-class NotificationService:
-    """Bus subscriber that delivers AgentResponseEvents to Telegram chats.
-
-    Pulled out of the bot module so it can be exercised from a unit
-    test with a mock bot.  The real bot instance comes off
-    ``app.state.telegram_service`` — the lifespan passes it in at
-    construction time.
-    """
-
-    def __init__(self, *, telegram_bot: Any | None) -> None:
-        self._bot = telegram_bot
-
-    def register(self, bus: Any) -> None:
-        """Attach the delivery handler to the bus."""
-        bus.subscribe(AgentResponseEvent, self.handle_response)
-
-    async def handle_response(self, event: Event) -> None:
-        """Deliver the response text to the configured Telegram chat(s)."""
-        if not isinstance(event, AgentResponseEvent):
-            return
-        if self._bot is None:
-            logger.debug(
-                "NOTIFICATION_NO_BOT originating_event_id=%s",
-                event.originating_event_id,
-            )
-            return
-
-        text = (event.text or "").strip()
-        if not text:
-            return
-        # Truncate to fit Telegram's per-message budget.  Splitting a
-        # long agent response into multiple sends is a future refinement
-        # — for now a single 4k tail is fine for webhook / scheduler
-        # use cases.
-        if len(text) > _TELEGRAM_MESSAGE_CHARS:
-            text = text[:_TELEGRAM_MESSAGE_CHARS] + "…"
-
-        target_chats = list(self._resolve_target_chats(event))
-        for chat_id in target_chats:
-            try:
-                await self._bot.send_message(chat_id=chat_id, text=text)
-            except Exception:
-                logger.exception(
-                    "NOTIFICATION_DELIVERY_FAILED chat_id=%s originating_event_id=%s",
-                    chat_id,
-                    event.originating_event_id,
-                )
-
-    def _resolve_target_chats(self, event: AgentResponseEvent) -> Iterable[str]:
-        """Pick which Telegram chats to deliver this response to."""
-        if event.chat_id:
-            yield event.chat_id
-            return
-        # Future: read default-chat-IDs list from settings; for now
-        # an event without a target falls through silently so the
-        # AgentHandler can still publish for audit / metrics
-        # subscribers without forcing a Telegram side-effect.
-        return
 
 
 def _build_webhook_prompt(event: WebhookEvent) -> str:

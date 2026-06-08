@@ -17,13 +17,6 @@ Verbs:
                                     — idempotent; 204 even when nothing
                                       was bound.
 
-Not implemented: ``simulate-update``. The closest backend surface
-(``POST /api/v1/channels/telegram/webhook``) accepts only real
-Telegram update payloads, requires the ``X-Telegram-Bot-Api-Secret-Token``
-header to match the deployment secret, and 404s outside webhook mode.
-A simulate endpoint can be added later as ``POST /api/v1/channels/{provider}/simulate``
-and wired here without churning the verb surface.
-
 Output modes mirror ``paw conversations`` / ``paw workspaces``:
 ``--json``, ``--plain``, default human-readable. Exit codes come from
 ``app.cli.paw.errors``.
@@ -38,7 +31,6 @@ import httpx
 import typer
 from sqlalchemy import select
 
-from app.cli.paw.commands.channel_diagnostics import diagnose_telegram_state as _diagnose_telegram
 from app.cli.paw.config import PersonaState, load_state
 from app.cli.paw.errors import LocalError
 from app.cli.paw.http import PawClient
@@ -263,6 +255,7 @@ def send_telegram(
 
 @app.command("diagnose-telegram")
 def diagnose_telegram(
+    profile: str = typer.Option("default", "--profile"),
     limit: int = typer.Option(10, "--limit", min=1, max=50),
     conversation_id: str | None = typer.Option(
         None,
@@ -272,7 +265,10 @@ def diagnose_telegram(
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
     """Inspect local Telegram binding and recent persisted turn state."""
-    payload = asyncio.run(_diagnose_telegram(limit=limit, conversation_id=conversation_id))
+    state = load_state(profile)
+    payload = asyncio.run(
+        _diagnose_telegram(state=state, limit=limit, conversation_id=conversation_id)
+    )
     if json_out:
         emit_json(payload)
         return
@@ -359,6 +355,28 @@ async def _issue_telegram_link_code(state: PersonaState) -> dict[str, Any]:
         )
     data = resp.json()
     return data if isinstance(data, dict) else {}
+
+
+async def _diagnose_telegram(
+    *,
+    state: PersonaState,
+    limit: int,
+    conversation_id: str | None,
+) -> dict[str, Any]:
+    params: dict[str, Any] = {"limit": limit}
+    if conversation_id is not None:
+        params["conversation_id"] = conversation_id
+    async with PawClient(state) as client:
+        resp = await client.request(
+            "GET",
+            "/api/v1/channels/telegram/diagnose",
+            params=params,
+            expect=(200,),
+        )
+    data = resp.json()
+    if not isinstance(data, dict):
+        raise LocalError("Telegram diagnose endpoint returned a non-object response.")
+    return data
 
 
 async def _unlink_provider(state: PersonaState, provider: str) -> dict[str, Any]:

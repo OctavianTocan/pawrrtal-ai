@@ -241,7 +241,13 @@ def test_channels_diagnose_telegram_reports_stuck_streams(
 ) -> None:
     """The local Telegram diagnostic command summarizes stuck assistant turns."""
 
-    async def fake_diagnose(*, limit: int, conversation_id: str | None = None) -> dict[str, Any]:
+    async def fake_diagnose(
+        *,
+        state: PersonaState,
+        limit: int,
+        conversation_id: str | None = None,
+    ) -> dict[str, Any]:
+        assert state.profile == "default"
         assert conversation_id is None
         return {
             "configured": True,
@@ -275,7 +281,13 @@ def test_channels_diagnose_telegram_can_focus_conversation(
     """The diagnostic command can include a conversation/thread trace."""
     conversation_id = "853434fb-5f09-4b58-8598-c0384e4fdc22"
 
-    async def fake_diagnose(*, limit: int, conversation_id: str | None = None) -> dict[str, Any]:
+    async def fake_diagnose(
+        *,
+        state: PersonaState,
+        limit: int,
+        conversation_id: str | None = None,
+    ) -> dict[str, Any]:
+        assert state.profile == "default"
         assert limit == 10
         return {
             "configured": True,
@@ -325,6 +337,31 @@ def test_channels_diagnose_telegram_can_focus_conversation(
     assert "in=97" in result.stdout
     assert "duration_ms=1200" in result.stdout
     assert "timeline=7" in result.stdout
+
+
+def test_channels_diagnose_telegram_calls_backend_endpoint(
+    runner: CliRunner,
+    seeded: PersonaState,
+) -> None:
+    payload = {
+        "configured": True,
+        "mode": "polling",
+        "bindings": [],
+        "recent_messages": [],
+        "stuck_streaming_messages": [],
+        "conversation_trace": None,
+    }
+    with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
+        route = r.get("/api/v1/channels/telegram/diagnose").mock(
+            return_value=httpx.Response(200, json=payload)
+        )
+        result = runner.invoke(app, ["channels", "diagnose-telegram", "--limit", "7", "--json"])
+
+    assert result.exit_code == 0, result.stdout
+    assert route.called
+    request = route.calls.last.request
+    assert request.url.params["limit"] == "7"
+    assert json.loads(result.stdout)["mode"] == "polling"
 
 
 def test_admin_seed_user_rejects_partial_telegram_options() -> None:

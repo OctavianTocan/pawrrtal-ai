@@ -124,14 +124,13 @@ def is_chat_run_active(chat_id: int) -> bool:
 # single-worker deployment; promote to a shared store (e.g. Redis pub/sub)
 # before running multiple uvicorn workers.
 #
-# When ``settings.telegram_chat_queue_enabled`` is True the dispatcher
-# from :mod:`message_queue` owns this state instead (#357).
+# When ``settings.telegram_chat_queue_enabled`` is true, the FIFO dispatcher
+# owns this state instead.
 _running_tasks: dict[int, asyncio.Task[None]] = {}
 
 
-# Singleton :class:`ChatMessageQueueDispatcher` for the per-chat FIFO
-# turn queue (#357). Built lazily on first access so processes that
-# never enable the dispatcher (the default) pay zero overhead.
+# Singleton per-chat FIFO turn queue, built lazily so processes that never
+# enable it pay no overhead.
 _CHAT_QUEUE_DISPATCHER: ChatMessageQueueDispatcher | None = None
 
 
@@ -302,13 +301,12 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
             ``chat.id``, ``bot``, and ``message_thread_id``).
         context: Resolved turn context from ``handle_plain_message``.
         images: Image inputs collected via :func:`collect_attachments`
-            (#305). Interpreted by a vision sub-agent before the main
-            provider runs.
+            and interpreted before the main provider runs.
         voice_notes: Downloaded Telegram voice-note payloads. Transcribed
             before the main provider runs.
         text_annotations: ``"User sent X."`` lines appended to the
             user message body so the agent has metadata for voice /
-            document attachments we couldn't fully extract (#304, #305).
+            document attachments we could not fully extract.
     """
     base_text = (message.text or message.caption or "").strip()
     if message.bot is None:
@@ -462,13 +460,8 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
     chat_id = message.chat.id
 
     if settings.telegram_chat_queue_enabled:
-        # FIFO mode (#357): enqueue the rest of the turn body and
-        # return. The dispatcher's per-chat worker drains the queue
-        # serially so a second message arriving here gets appended
-        # to the same worker's queue instead of clobbering the
-        # in-flight turn. The run_turn + auto-title block below is
-        # bound into a coroutine factory and handed to the dispatcher
-        # as the payload.
+        # The per-chat worker drains queued turns serially instead of
+        # clobbering the in-flight turn.
         async def _enqueued_body() -> None:
             await _execute_turn_body(
                 message=message,
@@ -691,7 +684,6 @@ def _register_telegram_lcm_command_handlers(dispatcher: Dispatcher) -> None:
 
     @dispatcher.message(Command("lcm"))
     async def _on_lcm(message: Message) -> None:
-        # Diagnostic surface for Lossless Context Management — closes #303.
         sender = _sender_from_message(message)
         async with async_session_maker() as session:
             reply = await handle_lcm_command(sender=sender, session=session)
@@ -747,15 +739,8 @@ def _register_telegram_message_handler(dispatcher: Dispatcher) -> None:
 
     @dispatcher.message()
     async def _on_message(message: Message) -> None:
-        # Collect inbound attachments BEFORE deciding to skip the message.
-        # An image-only message (no text) is still a real turn now (#305).
-        # Voice / documents become text annotations so the agent has
-        # metadata to act on (partial #304 / #305 — full STT + markitdown
-        # extraction land in follow-up PRs).  ``collect_attachments`` is
-        # re-exported through ``handlers`` so ``bot.py`` doesn't pick up
-        # an extra fan-out edge that would push it over sentrux's
-        # ``no_god_files`` ceiling — see #281's ADR for the long-term
-        # registry split.
+        # Collect attachments before deciding whether a message is empty;
+        # media-only updates are still real user turns.
         attachments = (
             await collect_attachments(message, message.bot) if message.bot is not None else None
         )
