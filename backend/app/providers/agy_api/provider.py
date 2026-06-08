@@ -26,7 +26,7 @@ from app.agents.types import LLMEvent, TextContent
 from app.infrastructure.config import settings
 from app.providers._stream_logging import log_provider_stream_event
 from app.providers.base import ReasoningEffort, StreamEvent
-from app.providers.gemini.events import agent_event_to_stream_event, identity_convert
+from app.providers.events import agent_event_to_stream_event, identity_convert
 
 from .auth import AgyApiAuthError, ensure_agy_api_auth
 from .client import stream_llm_events

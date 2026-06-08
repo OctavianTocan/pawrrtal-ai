@@ -60,7 +60,7 @@ from app.agents.types import (
 from app.infrastructure.config import settings
 from app.providers._stream_logging import log_provider_stream_event
 from app.providers.base import ReasoningEffort, StreamEvent
-from app.providers.gemini.events import agent_event_to_stream_event, identity_convert
+from app.providers.events import agent_event_to_stream_event, identity_convert
 
 from .events import (
     _OPENCODE_MISSING_KEY_NOTICE,

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.agents.types import AgentTool
-from app.providers.base import StreamEvent
+from app.providers.base import ReasoningEffort, StreamEvent
 from app.providers.factory import resolve_llm
 
 
@@ -51,22 +51,26 @@ class CodexImageSubcall:
     model_id: str
     workspace_root: Path | None
     system_prompt: str
-    reasoning_effort: str
+    reasoning_effort: ReasoningEffort
 
 
 async def stream_codex_image_subcall(subcall: CodexImageSubcall) -> AsyncIterator[StreamEvent]:
     """Stream one Codex image-generation subcall through provider selection."""
-    from app.providers.openai_codex import OpenAICodexProvider  # noqa: PLC0415
-
-    provider = OpenAICodexProvider(
-        model_id=subcall.model_id,
-        workspace_root=subcall.workspace_root,
-    )
+    model_id = _codex_model_id(subcall.model_id)
+    provider = resolve_llm(model_id, workspace_root=subcall.workspace_root)
     async for event in provider.stream(
-        subcall.prompt,
+        question=subcall.prompt,
         conversation_id=uuid.uuid4(),
         user_id=uuid.uuid4(),
+        tools=[],
         system_prompt=subcall.system_prompt,
         reasoning_effort=subcall.reasoning_effort,
     ):
         yield event
+
+
+def _codex_model_id(model_id: str) -> str:
+    """Return a canonical OpenAI Codex model id."""
+    if ":" in model_id:
+        return model_id
+    return f"openai-codex:openai/{model_id}"
