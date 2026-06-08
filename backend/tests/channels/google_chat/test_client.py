@@ -48,6 +48,14 @@ class _FakeStreamClient:
         return _FakeStream(self.response)
 
 
+class _FakeGetClient:
+    def __init__(self, response: httpx.Response) -> None:
+        self.response = response
+
+    async def get(self, *_args: Any, **_kwargs: Any) -> httpx.Response:
+        return self.response
+
+
 async def test_acknowledge_returns_false_on_api_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -57,13 +65,11 @@ async def test_acknowledge_returns_false_on_api_failure(
     monkeypatch.setattr(client_module, "_headers", _fake_headers)
     monkeypatch.setattr(client_module, "_client", lambda: _FakePostClient(httpx.Response(500)))
 
-    ok = await client_module.acknowledge(
+    await client_module.acknowledge(
         project_id="p",
         subscription_id="s",
         ack_ids=["ack-1"],
     )
-
-    assert ok is False
 
 
 async def test_update_message_returns_false_on_transport_failure(
@@ -88,16 +94,23 @@ async def test_download_attachment_rejects_declared_oversize(
 
     response = httpx.Response(200, headers={"content-length": "10"}, content=b"")
     monkeypatch.setattr(client_module, "_headers", _fake_headers)
-    monkeypatch.setattr(client_module, "_client", lambda: _FakeStreamClient(response))
+    monkeypatch.setattr(client_module, "_client", lambda: _FakeGetClient(response))
 
     data = await client_module.download_attachment(resource_name="r", max_bytes=3)
 
     assert data is None
 
 
-async def test_read_limited_response_rejects_chunked_oversize() -> None:
-    response = httpx.Response(200, content=b"abcdef")
+async def test_download_attachment_rejects_response_oversize(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def _fake_headers() -> dict[str, str]:
+        return {"Authorization": "Bearer test"}
 
-    data = await client_module._read_limited_response(response, max_bytes=3)
+    response = httpx.Response(200, content=b"abcdef")
+    monkeypatch.setattr(client_module, "_headers", _fake_headers)
+    monkeypatch.setattr(client_module, "_client", lambda: _FakeGetClient(response))
+
+    data = await client_module.download_attachment(resource_name="r", max_bytes=3)
 
     assert data is None

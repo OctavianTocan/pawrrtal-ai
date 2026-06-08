@@ -41,28 +41,6 @@ def test_parse_command_from_app_command_payload() -> None:
     assert parse_command(event) == ("model", "gpt")
 
 
-def test_parse_command_from_app_command_id_without_slash_text() -> None:
-    event = addon_command_event(command_text="", argument_text="openai/gpt-4o")
-    event["chat"]["appCommandPayload"]["appCommandMetadata"] = {"appCommandId": "3"}
-    assert parse_command(event) == ("model", "openai/gpt-4o")
-
-
-def test_parse_command_ids_match_setup_docs() -> None:
-    """Configured command IDs must match the one-time Cloud Console setup docs."""
-    command_ids = {
-        "6": "config",
-        "7": "status",
-        "8": "whoami",
-        "9": "lcm",
-        "10": "compact",
-        "11": "stop",
-    }
-    for command_id, expected in command_ids.items():
-        event = addon_command_event(command_text="", argument_text="")
-        event["chat"]["appCommandPayload"]["appCommandMetadata"] = {"appCommandId": command_id}
-        assert parse_command(event) == (expected, "")
-
-
 def test_parse_command_no_args() -> None:
     assert parse_command(chat_event(text="/status")) == ("status", "")
 
@@ -97,34 +75,6 @@ async def test_command_model_persists(command_ctx: CommandContext) -> None:
     reply = await dispatch_command(command="model", ctx=command_ctx)
     assert "openai-codex:openai/gpt-5.5" in reply
     assert command_ctx.conversation.model_id == "openai-codex:openai/gpt-5.5"
-
-
-async def test_command_model_rejects_unauthenticated_host(
-    command_ctx: CommandContext,
-    monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
-) -> None:
-    import app.channels.google_chat.commands as commands_module
-
-    command_ctx.workspace_root = tmp_path
-    command_ctx.args = "agent-sdk:anthropic/claude-opus-4-7"
-    monkeypatch.setattr(
-        commands_module,
-        "host_authenticated",
-        lambda _host, *, workspace_root=None: False,
-    )
-
-    reply = await dispatch_command(command="model", ctx=command_ctx)
-
-    assert "not available" in reply
-    assert command_ctx.conversation.model_id is None
-
-
-async def test_command_model_rejects_unknown_id(command_ctx: CommandContext) -> None:
-    command_ctx.args = "not-a-real-model"
-    reply = await dispatch_command(command="model", ctx=command_ctx)
-    assert "Unknown model" in reply
-    assert command_ctx.conversation.model_id is None
 
 
 async def test_command_thinking_none_clears(command_ctx: CommandContext) -> None:

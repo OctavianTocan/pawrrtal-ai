@@ -92,7 +92,7 @@ def click_event(*, function: str, value: str) -> dict[str, Any]:
         "chat": {
             "user": {"name": DEV_ADMIN_SENDER, "displayName": "Tavi"},
             "buttonClickedPayload": {
-                "message": {"name": f"{SPACE}/messages/CARD", "thread": {"name": THREAD}},
+                "message": {"name": f"{SPACE}/messages/CARD"},
                 "space": {"name": SPACE},
             },
         },

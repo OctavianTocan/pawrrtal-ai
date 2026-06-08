@@ -27,9 +27,7 @@ from app.channels.crud import (
 from app.infrastructure.keys import load_workspace_env, save_workspace_env
 from app.models import Conversation
 from app.providers.base import ReasoningEffort
-from app.providers.catalog import first_authenticated_catalog_model, require_known
-from app.providers.factory import host_authenticated
-from app.providers.model_id import InvalidModelId, UnknownModelId
+from app.providers.catalog import first_catalog_model
 from app.workspace.crud import get_default_workspace
 
 from .conversation import start_new_google_chat_conversation
@@ -78,12 +76,10 @@ class CommandContext:
 
     user_id: uuid.UUID
     conversation: Conversation
-    channel_thread_key: str
     args: str
     sender_resource: str
     sender_email: str | None
     session: AsyncSession
-    workspace_root: Path | None = None
 
 
 async def dispatch_command(*, command: str, ctx: CommandContext) -> str:
@@ -106,11 +102,7 @@ async def _cmd_help(ctx: CommandContext) -> str:
 
 
 async def _cmd_new(ctx: CommandContext) -> str:
-    await start_new_google_chat_conversation(
-        user_id=ctx.user_id,
-        channel_thread_key=ctx.channel_thread_key,
-        session=ctx.session,
-    )
+    await start_new_google_chat_conversation(user_id=ctx.user_id, session=ctx.session)
     return "🆕 Started a fresh conversation. Earlier history is set aside."
 
 
@@ -124,7 +116,7 @@ async def _cmd_whoami(ctx: CommandContext) -> str:
 
 async def _cmd_status(ctx: CommandContext) -> str:
     conv = ctx.conversation
-    model = conv.model_id or f"{first_authenticated_catalog_model(ctx.workspace_root).id} (default)"
+    model = conv.model_id or f"{first_catalog_model().id} (default)"
     verbose = _verbose_of(conv)
     reasoning = conv.reasoning_effort or "provider default"
     return (
@@ -137,22 +129,13 @@ async def _cmd_status(ctx: CommandContext) -> str:
 
 async def _cmd_model(ctx: CommandContext) -> str:
     if not ctx.args:
-        current = (
-            ctx.conversation.model_id
-            or f"{first_authenticated_catalog_model(ctx.workspace_root).id} (default)"
-        )
+        current = ctx.conversation.model_id or f"{first_catalog_model().id} (default)"
         return f"Current model: {current}\nSet one with `/model <id>`."
     model_id = ctx.args.strip()
-    try:
-        entry = require_known(model_id)
-    except (InvalidModelId, UnknownModelId):
-        return f"Unknown model '{model_id}'. Use `/model` to pick a catalog model."
-    if not host_authenticated(entry.host, workspace_root=ctx.workspace_root):
-        return f"Model '{entry.id}' is not available for this workspace. Use `/model` to pick an authenticated model."
     await update_conversation_model(
-        conversation_id=ctx.conversation.id, model_id=entry.id, session=ctx.session
+        conversation_id=ctx.conversation.id, model_id=model_id, session=ctx.session
     )
-    return f"✅ Model set to {entry.id} for this conversation."
+    return f"✅ Model set to {model_id} for this conversation."
 
 
 async def _cmd_thinking(ctx: CommandContext) -> str:
@@ -206,7 +189,7 @@ async def _cmd_lcm(ctx: CommandContext) -> str:
 
 
 async def _cmd_compact(ctx: CommandContext) -> str:
-    model_id = ctx.conversation.model_id or first_authenticated_catalog_model(ctx.workspace_root).id
+    model_id = ctx.conversation.model_id or first_catalog_model().id
     return await run_compaction(
         conversation_id=ctx.conversation.id, user_id=ctx.user_id, model_id=model_id
     )

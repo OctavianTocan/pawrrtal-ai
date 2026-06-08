@@ -26,7 +26,6 @@ from tests.channels.google_chat.helpers import (
     THREAD,
     addon_event,
     chat_event,
-    click_event,
     pubsub_envelope,
 )
 
@@ -72,12 +71,6 @@ def test_addon_event_extractors_read_message_fields() -> None:
     assert thread_name(event) == THREAD
     assert sender_name(event) == DEV_ADMIN_SENDER
     assert sender_display(event) == "Tavi"
-
-
-def test_card_click_event_extractors_read_space_and_thread() -> None:
-    event = click_event(function="verbose", value="2")
-    assert space_name(event) == SPACE
-    assert thread_name(event) == THREAD
 
 
 def test_decode_pubsub_message_decodes_addon_event() -> None:

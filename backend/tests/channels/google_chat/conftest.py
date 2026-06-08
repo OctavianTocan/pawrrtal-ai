@@ -15,10 +15,9 @@ import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.channels.google_chat.commands import CommandContext
-from app.channels.google_chat.conversation import google_chat_conversation_key
 from app.infrastructure.database.legacy import User
 from app.models import Conversation
-from tests.channels.google_chat.helpers import DEV_ADMIN_SENDER, SPACE, THREAD
+from tests.channels.google_chat.helpers import DEV_ADMIN_SENDER
 
 
 @pytest.fixture
@@ -34,13 +33,11 @@ async def command_ctx(db_session: AsyncSession) -> CommandContext:
     )
     db_session.add(user)
     await db_session.commit()
-    channel_thread_key = google_chat_conversation_key(space_name=SPACE, thread_name=THREAD)
     conversation = Conversation(
         id=uuid4(),
         user_id=user.id,
         title="Google Chat",
         origin_channel="google_chat",
-        channel_thread_key=channel_thread_key,
         created_at=datetime.now(),
         updated_at=datetime.now(),
     )
@@ -50,7 +47,6 @@ async def command_ctx(db_session: AsyncSession) -> CommandContext:
     return CommandContext(
         user_id=user.id,
         conversation=conversation,
-        channel_thread_key=channel_thread_key,
         args="",
         sender_resource=DEV_ADMIN_SENDER,
         sender_email="cmd@pawrrtal.dev",

@@ -1,9 +1,9 @@
-"""Persistent per-surface conversation lookup for the Google Chat channel.
+"""Persistent per-user conversation for the Google Chat channel.
 
 Lives in the package (not ``app.channels.crud``, which is at the 500-line
-file budget). Each row is tagged ``origin_channel="google_chat"`` and scoped
-to the Chat space/thread that produced it, so bound users keep separate
-history across rooms and threads.
+file budget) and mirrors the legacy Telegram DM lookup: one conversation
+per user, tagged ``origin_channel="google_chat"``, so message history
+survives across app restarts.
 """
 
 from __future__ import annotations
@@ -21,25 +21,20 @@ from app.models import Conversation
 GOOGLE_CHAT_ORIGIN_CHANNEL = "google_chat"
 
 
-def google_chat_conversation_key(*, space_name: str, thread_name: str | None) -> str:
-    """Return the channel-local key for a Google Chat space/thread surface."""
-    return f"{space_name}|{thread_name or 'top-level'}"
-
-
 async def get_or_create_google_chat_conversation(
     *,
     user_id: uuid.UUID,
-    channel_thread_key: str,
     session: AsyncSession,
 ) -> Conversation:
-    """Return the persistent Google Chat conversation for one user + surface.
+    """Return the persistent Google Chat conversation for *user_id*.
 
-    Returns the full ORM row so the ingress can read the per-conversation
-    ``model_id`` override in one round-trip.
+    Single-user dogfood scope: one conversation per user, so message
+    history survives across app restarts — the same persistence guarantee
+    the Telegram DM lookup gives. Returns the full ORM row so the ingress
+    can read the per-conversation ``model_id`` override in one round-trip.
 
     Args:
         user_id: Pawrrtal user who owns the conversation.
-        channel_thread_key: Google Chat space/thread resource key.
         session: Async database session.
 
     Returns:
@@ -50,7 +45,6 @@ async def get_or_create_google_chat_conversation(
         .where(
             Conversation.user_id == user_id,
             Conversation.origin_channel == GOOGLE_CHAT_ORIGIN_CHANNEL,
-            Conversation.channel_thread_key == channel_thread_key,
         )
         .order_by(Conversation.updated_at.desc())
         .limit(1)
@@ -59,37 +53,27 @@ async def get_or_create_google_chat_conversation(
     if existing is not None:
         return existing
 
-    return await _insert_new_conversation(
-        user_id=user_id,
-        channel_thread_key=channel_thread_key,
-        session=session,
-    )
+    return await _insert_new_conversation(user_id=user_id, session=session)
 
 
 async def start_new_google_chat_conversation(
     *,
     user_id: uuid.UUID,
-    channel_thread_key: str,
     session: AsyncSession,
 ) -> Conversation:
-    """Create and return a fresh Google Chat conversation for one surface.
+    """Create and return a fresh Google Chat conversation for *user_id*.
 
     Backs the ``/new`` command: a brand-new row has the most-recent
     ``updated_at``, so :func:`get_or_create_google_chat_conversation`
-    returns it on the next turn in the same Chat space/thread, without
-    touching other spaces or threads.
+    returns it on the next turn — starting a clean thread without touching
+    the prior history.
     """
-    return await _insert_new_conversation(
-        user_id=user_id,
-        channel_thread_key=channel_thread_key,
-        session=session,
-    )
+    return await _insert_new_conversation(user_id=user_id, session=session)
 
 
 async def _insert_new_conversation(
     *,
     user_id: uuid.UUID,
-    channel_thread_key: str,
     session: AsyncSession,
 ) -> Conversation:
     """Insert, commit, and return a fresh Google Chat conversation row."""
@@ -98,7 +82,6 @@ async def _insert_new_conversation(
         user_id=user_id,
         title="Google Chat",
         origin_channel=GOOGLE_CHAT_ORIGIN_CHANNEL,
-        channel_thread_key=channel_thread_key,
         created_at=datetime.now(),
         updated_at=datetime.now(),
     )

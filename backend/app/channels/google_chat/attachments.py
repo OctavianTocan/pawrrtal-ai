@@ -35,10 +35,7 @@ logger = logging.getLogger(__name__)
 # inline small payloads; larger ones degrade to a metadata annotation.
 _MAX_IMAGE_BYTES = 10 * 1024 * 1024
 _MAX_FILE_BYTES = 20 * 1024 * 1024
-_MAX_TOTAL_DOWNLOAD_BYTES = 20 * 1024 * 1024
-_MAX_ATTACHMENT_COUNT = 4
 _MAX_DOC_INLINE_CHARS = 8000
-_SUPPORTED_IMAGE_MIME_TYPES = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp"})
 
 _DRIVE_FILE_SOURCE = "DRIVE_FILE"
 
@@ -53,46 +50,15 @@ class GoogleChatAttachments:
     annotations: list[str] = field(default_factory=list)
 
 
-@dataclass
-class _AttachmentBudget:
-    downloaded_bytes: int = 0
-
-    @property
-    def remaining_bytes(self) -> int:
-        return max(0, _MAX_TOTAL_DOWNLOAD_BYTES - self.downloaded_bytes)
-
-    def record(self, raw: bytes) -> None:
-        self.downloaded_bytes += len(raw)
-
-
 async def collect_attachments(event: dict[str, Any]) -> GoogleChatAttachments:
     """Process every attachment on the inbound message (best-effort)."""
     result = GoogleChatAttachments()
-    budget = _AttachmentBudget()
-    attachments = attachments_of(event)
-    for index, attachment in enumerate(attachments):
-        if index >= _MAX_ATTACHMENT_COUNT:
-            skipped = len(attachments) - index
-            result.annotations.append(
-                f"[Skipped {skipped} additional attachment(s); per-message attachment limit reached.]"
-            )
-            break
-        try:
-            await _process_attachment(attachment, result, budget)
-        except Exception:
-            logger.exception("GOOGLE_CHAT_ATTACHMENT_PROCESS_FAILED")
-            name = str(attachment.get("contentName") or "(unnamed)")
-            result.annotations.append(
-                f"[User sent {name}, but Pawrrtal could not process that attachment.]"
-            )
+    for attachment in attachments_of(event):
+        await _process_attachment(attachment, result)
     return result
 
 
-async def _process_attachment(
-    attachment: dict[str, Any],
-    result: GoogleChatAttachments,
-    budget: _AttachmentBudget,
-) -> None:
+async def _process_attachment(attachment: dict[str, Any], result: GoogleChatAttachments) -> None:
     name = str(attachment.get("contentName") or "(unnamed)")
     content_type = str(attachment.get("contentType") or "application/octet-stream")
     if str(attachment.get("source") or "") == _DRIVE_FILE_SOURCE:
@@ -107,29 +73,20 @@ async def _process_attachment(
         )
         return
     if content_type.startswith("image/"):
-        if content_type not in _SUPPORTED_IMAGE_MIME_TYPES:
-            result.annotations.append(
-                f"[User sent an unsupported image: {name} ({content_type}); ask for PNG, JPEG, GIF, or WebP.]"
-            )
-            return
-        await _add_image(str(resource), content_type, name, result, budget)
+        await _add_image(str(resource), content_type, name, result)
     elif content_type.startswith("audio/"):
         result.annotations.append(f"[User sent a voice/audio message: {name} ({content_type}).]")
     else:
-        await _add_document(str(resource), name, content_type, result, budget)
+        await _add_document(str(resource), name, content_type, result)
 
 
 async def _add_image(
-    resource: str,
-    content_type: str,
-    name: str,
-    result: GoogleChatAttachments,
-    budget: _AttachmentBudget,
+    resource: str, content_type: str, name: str, result: GoogleChatAttachments
 ) -> None:
-    raw = await _download_with_budget(resource, max_bytes=_MAX_IMAGE_BYTES, budget=budget)
+    raw = await download_attachment(resource_name=resource, max_bytes=_MAX_IMAGE_BYTES)
     if raw is None:
         result.annotations.append(
-            f"[User sent an image {name} but it couldn't be fetched within processing limits.]"
+            f"[User sent an image {name} but it couldn't be fetched for analysis.]"
         )
         return
     result.images.append(
@@ -138,16 +95,12 @@ async def _add_image(
 
 
 async def _add_document(
-    resource: str,
-    name: str,
-    content_type: str,
-    result: GoogleChatAttachments,
-    budget: _AttachmentBudget,
+    resource: str, name: str, content_type: str, result: GoogleChatAttachments
 ) -> None:
-    raw = await _download_with_budget(resource, max_bytes=_MAX_FILE_BYTES, budget=budget)
+    raw = await download_attachment(resource_name=resource, max_bytes=_MAX_FILE_BYTES)
     if raw is None:
         result.annotations.append(
-            f"[User sent a document: {name} ({content_type}); couldn't fetch it within processing limits.]"
+            f"[User sent a document: {name} ({content_type}); couldn't fetch it for extraction.]"
         )
         return
     markdown = await _extract_markdown(raw, file_name=name)
@@ -162,22 +115,6 @@ async def _add_document(
     result.annotations.append(
         f"[User sent a document: {name} ({content_type}). Extracted Markdown{suffix}:\n{excerpt}]"
     )
-
-
-async def _download_with_budget(
-    resource: str,
-    *,
-    max_bytes: int,
-    budget: _AttachmentBudget,
-) -> bytes | None:
-    """Download one attachment without exceeding the message-level byte budget."""
-    remaining = min(max_bytes, budget.remaining_bytes)
-    if remaining <= 0:
-        return None
-    raw = await download_attachment(resource_name=resource, max_bytes=remaining)
-    if raw is not None:
-        budget.record(raw)
-    return raw
 
 
 async def _extract_markdown(raw_bytes: bytes, *, file_name: str) -> str | None:

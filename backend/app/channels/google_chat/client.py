@@ -112,16 +112,14 @@ async def acknowledge(
     project_id: str,
     subscription_id: str,
     ack_ids: list[str],
-) -> bool:
+) -> None:
     """Acknowledge processed messages so Pub/Sub stops redelivering them."""
     if not ack_ids:
-        return True
+        return
     url = f"{_PUBSUB_BASE_URL}/projects/{project_id}/subscriptions/{subscription_id}:acknowledge"
     response = await _client().post(url, headers=await _headers(), json={"ackIds": ack_ids})
     if response.status_code >= _HTTP_BAD_REQUEST:
         logger.warning("GOOGLE_CHAT_ACK_ERR %s", _short_error(response))
-        return False
-    return True
 
 
 async def create_message(
@@ -159,16 +157,12 @@ async def update_message(*, message_name: str, text: str) -> bool:
     so a transient patch error can't crash the turn.
     """
     url = f"{_CHAT_BASE_URL}/{message_name}"
-    try:
-        response = await _client().patch(
-            url,
-            headers=await _headers(),
-            params={"updateMask": "text"},
-            json={"text": text},
-        )
-    except httpx.HTTPError:
-        logger.exception("GOOGLE_CHAT_UPDATE_TRANSPORT_ERR message_name=%s", message_name)
-        return False
+    response = await _client().patch(
+        url,
+        headers=await _headers(),
+        params={"updateMask": "text"},
+        json={"text": text},
+    )
     if response.status_code >= _HTTP_BAD_REQUEST:
         logger.warning("GOOGLE_CHAT_UPDATE_ERR %s", _short_error(response))
         return False
@@ -225,44 +219,12 @@ async def download_attachment(*, resource_name: str, max_bytes: int) -> bytes | 
     served here; the caller annotates those instead.
     """
     url = f"{_CHAT_BASE_URL}/media/{resource_name}"
-    async with _client().stream(
-        "GET",
-        url,
-        headers=await _headers(),
-        params={"alt": "media"},
-    ) as response:
-        if response.status_code >= _HTTP_BAD_REQUEST:
-            logger.warning("GOOGLE_CHAT_MEDIA_ERR %s", await _short_stream_error(response))
-            return None
-        declared = _content_length(response)
-        if declared is not None and declared > max_bytes:
-            logger.warning("GOOGLE_CHAT_MEDIA_TOO_LARGE bytes=%d cap=%d", declared, max_bytes)
-            return None
-        return await _read_limited_response(response, max_bytes=max_bytes)
-
-
-def _content_length(response: httpx.Response) -> int | None:
-    raw = response.headers.get("content-length")
-    if raw is None:
+    response = await _client().get(url, headers=await _headers(), params={"alt": "media"})
+    if response.status_code >= _HTTP_BAD_REQUEST:
+        logger.warning("GOOGLE_CHAT_MEDIA_ERR %s", _short_error(response))
         return None
-    try:
-        return int(raw)
-    except ValueError:
+    data = response.content
+    if len(data) > max_bytes:
+        logger.warning("GOOGLE_CHAT_MEDIA_TOO_LARGE bytes=%d cap=%d", len(data), max_bytes)
         return None
-
-
-async def _read_limited_response(response: httpx.Response, *, max_bytes: int) -> bytes | None:
-    chunks: list[bytes] = []
-    total = 0
-    async for chunk in response.aiter_bytes():
-        total += len(chunk)
-        if total > max_bytes:
-            logger.warning("GOOGLE_CHAT_MEDIA_TOO_LARGE bytes=%d cap=%d", total, max_bytes)
-            return None
-        chunks.append(chunk)
-    return b"".join(chunks)
-
-
-async def _short_stream_error(response: httpx.Response) -> str:
-    body = await response.aread()
-    return f"{response.status_code}: {body[:300].decode('utf-8', errors='replace')}"
+    return data

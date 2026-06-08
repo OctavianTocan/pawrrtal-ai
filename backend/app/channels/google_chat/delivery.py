@@ -48,8 +48,6 @@ _MIN_PATCH_INTERVAL_S = 1.5
 _ERROR_PREFIX = "❌ "
 _TERMINATED_PREFIX = "⚠️ "
 _EMPTY_RESPONSE_FALLBACK = "⚠️ The agent finished without producing a reply. Please try again."
-_CHAT_TEXT_CAP_BYTES = 32_000
-_TRUNCATED_NOTICE = "\n\n[Reply truncated to fit Google Chat message limit.]"
 
 _MILLIS_PER_SECOND = 1000
 
@@ -94,8 +92,7 @@ class StreamingDelivery:
         rendered = self.render(streaming=False)
         if rendered == self._last_rendered:
             return
-        if await update_message(message_name=self.message_name, text=rendered):
-            self._last_rendered = rendered
+        await update_message(message_name=self.message_name, text=rendered)
 
     # Event type → method name. A flat dispatch table keeps ``_accumulate``
     # both shallow (no elif ladder) and single-return, satisfying the
@@ -158,8 +155,8 @@ class StreamingDelivery:
         if not rendered or rendered == self._last_rendered:
             return
         self._last_patch_at = now
-        if await update_message(message_name=self.message_name, text=rendered):
-            self._last_rendered = rendered
+        self._last_rendered = rendered
+        await update_message(message_name=self.message_name, text=rendered)
 
     def render(self, *, streaming: bool) -> str:
         """Compose the message text from the accumulated state.
@@ -169,7 +166,7 @@ class StreamingDelivery:
         empty-turn fallback so the placeholder never sits on "Working…".
         """
         if self._error_text is not None:
-            return _bound_chat_text(f"{_ERROR_PREFIX}{self._error_text}")
+            return f"{_ERROR_PREFIX}{self._error_text}"
         parts: list[str] = []
         if self.verbose_level >= VERBOSE_THINKING and self._thinking.strip():
             parts.append(f"💭 _Thinking_\n{self._thinking.strip()}")
@@ -179,8 +176,8 @@ class StreamingDelivery:
             parts.append(format_for_chat(self._answer))
         body = "\n\n".join(part for part in parts if part)
         if streaming:
-            return _bound_chat_text(body)
-        return _bound_chat_text(self._finalize_body(body))
+            return body
+        return self._finalize_body(body)
 
     def _finalize_body(self, body: str) -> str:
         if self._terminated_text:
@@ -208,13 +205,3 @@ def _fmt_elapsed(elapsed_s: float | None) -> str:
     if elapsed_s < 1:
         return f"{int(elapsed_s * _MILLIS_PER_SECOND)}ms"
     return f"{elapsed_s:.1f}s"
-
-
-def _bound_chat_text(text: str) -> str:
-    encoded = text.encode("utf-8")
-    if len(encoded) <= _CHAT_TEXT_CAP_BYTES:
-        return text
-    notice = _TRUNCATED_NOTICE.encode("utf-8")
-    budget = max(0, _CHAT_TEXT_CAP_BYTES - len(notice))
-    truncated = encoded[:budget].decode("utf-8", errors="ignore").rstrip()
-    return truncated + _TRUNCATED_NOTICE

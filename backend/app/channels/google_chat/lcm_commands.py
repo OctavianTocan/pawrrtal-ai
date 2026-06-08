@@ -58,8 +58,6 @@ async def run_compaction(*, conversation_id: uuid.UUID, user_id: uuid.UUID, mode
                 fresh_tail_count=settings.lcm_fresh_tail_count,
                 max_chunk_tokens=settings.lcm_leaf_chunk_tokens,
             )
-            if compacted:
-                await session.commit()
     except (OSError, RuntimeError, TimeoutError, SQLAlchemyError, InvalidModelId) as exc:
         return f"❌ Compaction failed: `{type(exc).__name__}`. Check the backend log."
     if compacted:

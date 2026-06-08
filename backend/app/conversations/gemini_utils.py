@@ -4,9 +4,11 @@ from __future__ import annotations
 
 from functools import cache
 
+from google import genai
+from google.genai import types
+
 from app.infrastructure.config import settings
 from app.providers.catalog import MODEL_CATALOG
-from app.providers.gemini.sdk import genai, gtypes
 from app.providers.model_id import Host
 
 
@@ -47,8 +49,8 @@ async def generate_text_once(prompt: str, model_id: str | None = None) -> str:
     # Annotate as the published union so the literal isn't inferred as
     # ``list[Content]`` (which the SDK's overloaded ``contents=`` param
     # type rejects even though it accepts it at runtime).
-    contents: list[gtypes.ContentUnion] = [
-        gtypes.Content(role="user", parts=[gtypes.Part.from_text(text=prompt)])
+    contents: list[types.ContentUnion] = [
+        types.Content(role="user", parts=[types.Part.from_text(text=prompt)])
     ]
     response = await client.aio.models.generate_content(
         model=resolved_model_id,
