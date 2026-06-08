@@ -11,6 +11,14 @@
 import { devices } from '@playwright/test';
 import { expect, test } from './fixtures';
 
+const mobileLoginDevice = {
+	deviceScaleFactor: devices['iPhone 13'].deviceScaleFactor,
+	hasTouch: devices['iPhone 13'].hasTouch,
+	isMobile: devices['iPhone 13'].isMobile,
+	userAgent: devices['iPhone 13'].userAgent,
+	viewport: devices['iPhone 13'].viewport,
+};
+
 test.describe('login page', () => {
 	test('renders email + password fields and the SSO buttons', async ({ page }) => {
 		await page.goto('/login');
@@ -47,7 +55,7 @@ test.describe('login page', () => {
 });
 
 test.describe('mobile login page', () => {
-	test.use({ ...devices['iPhone 13'] });
+	test.use(mobileLoginDevice);
 
 	test('dev-admin shortcut signs in from a touch tap', async ({ page }) => {
 		await page.goto('/login');
