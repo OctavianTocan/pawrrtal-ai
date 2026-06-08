@@ -416,3 +416,78 @@ async def test_lightweight_codex_turn_still_runs_turn_context_providers(
     assert "memory" in provider.stream_kwargs["system_prompt"]
     assert "## Tools available this turn" in provider.stream_kwargs["system_prompt"]
     assert provider.stream_kwargs["reasoning_effort"] == "low"
+
+
+@pytest.mark.anyio
+async def test_turn_context_provider_draft_updater_is_surface_agnostic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Context providers receive the generic draft callback from ``ChatTurnInput``."""
+    provider = _ScriptedProvider(
+        [
+            {"type": "delta", "content": "ok"},
+            {"type": "done"},
+        ]
+    )
+    draft_updates: list[str] = []
+    finished = False
+
+    async def draft_updater(text: str) -> None:
+        draft_updates.append(text)
+
+    async def recall_hook(ctx: Any) -> str:
+        assert ctx.draft_updater is draft_updater
+        assert ctx.workspace_root is not None
+        await ctx.draft_updater("checking memory")
+        return "memory"
+
+    async def on_finished() -> None:
+        nonlocal finished
+        finished = True
+
+    async def no_persist(_turn_input: ChatTurnInput) -> tuple[list[dict[str, str]], Any]:
+        return [], "assistant-id"
+
+    async def no_finalize(**_kwargs: Any) -> None:
+        return None
+
+    monkeypatch.setattr(
+        "app.channels.turn_orchestrator.runner._load_history_and_persist", no_persist
+    )
+    monkeypatch.setattr("app.channels.turn_orchestrator.runner._finalize_turn", no_finalize)
+
+    turn_input = ChatTurnInput(
+        conversation_id=MagicMock(),
+        user_id=MagicMock(),
+        question="hi",
+        provider=provider,
+        channel=_PassthroughChannel(),
+        channel_message={
+            "conversation_id": MagicMock(),
+            "metadata": {},
+            "model_id": "agent-sdk:anthropic/claude-opus-4-7",
+            "surface": "web",
+            "text": "hi",
+            "user_id": MagicMock(),
+        },
+        workspace_root=None,
+        tools=[],
+        turn_context_providers=[
+            TurnContextProviderAdapter(
+                plugin_id="active_recall",
+                capability_id="active_recall",
+                title="Active Recall",
+                order=100,
+                timeout_seconds=10,
+                provider=recall_hook,
+            )
+        ],
+        draft_updater=draft_updater,
+        on_turn_context_finished=on_finished,
+    )
+
+    _ = [chunk async for chunk in run_turn(turn_input)]
+
+    assert draft_updates == ["checking memory"]
+    assert finished is True
+    assert "# TURN CONTEXT\n\nmemory" in provider.stream_kwargs["system_prompt"]

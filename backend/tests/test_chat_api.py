@@ -100,6 +100,43 @@ async def test_chat_streams_provider_events(
 
 
 @pytest.mark.anyio
+async def test_chat_persists_user_and_finalized_assistant_messages(
+    client: AsyncClient,
+    monkeypatch: pytest.MonkeyPatch,
+    seeded_default_workspace: Workspace,
+) -> None:
+    """Web chat persists both sides of a successful streaming turn."""
+    conversation_id = uuid4()
+    await client.post(f"/api/v1/conversations/{conversation_id}", json={"title": "Chat"})
+    monkeypatch.setattr(
+        "app.chat.router.resolve_llm",
+        lambda _model_id, **kwargs: FakeProvider([{"type": "delta", "content": "hello"}]),
+    )
+
+    response = await client.post(
+        "/api/v1/chat/",
+        json={
+            "question": "hello",
+            "conversation_id": str(conversation_id),
+            "model_id": "agent-sdk:anthropic/claude-opus-4-7",
+        },
+    )
+    messages_response = await client.get(f"/api/v1/conversations/{conversation_id}/messages")
+
+    assert response.status_code == 200
+    assert "data: [DONE]" in response.text
+    assert messages_response.status_code == 200
+    messages = messages_response.json()
+    assert len(messages) == 2
+    assert messages[0]["role"] == "user"
+    assert messages[0]["content"] == "hello"
+    assert messages[0]["assistant_status"] is None
+    assert messages[1]["role"] == "assistant"
+    assert messages[1]["content"] == "hello"
+    assert messages[1]["assistant_status"] == "complete"
+
+
+@pytest.mark.anyio
 async def test_chat_forwards_reasoning_effort(
     client: AsyncClient,
     monkeypatch: pytest.MonkeyPatch,

@@ -55,6 +55,12 @@ def test_default_sqlite_filename_is_pawrrtal_db(isolated_env: None) -> None:
     assert settings._normalized_database_url == "sqlite:///./pawrrtal.db"
 
 
+def test_empty_database_url_falls_back_to_default_sqlite(isolated_env: None) -> None:
+    """Blank ``DATABASE_URL`` currently behaves like an omitted ``DATABASE_URL``."""
+    settings = Settings(_env_file=None, database_url="   ")
+    assert settings._normalized_database_url == "sqlite:///./pawrrtal.db"
+
+
 def test_sqlite_db_filename_overrides_default(isolated_env: None) -> None:
     """``SQLITE_DB_FILENAME`` rewrites the implicit fallback filename."""
     settings = Settings(_env_file=None, sqlite_db_filename="experiment.db")
