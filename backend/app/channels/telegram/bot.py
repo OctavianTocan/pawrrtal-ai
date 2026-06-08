@@ -989,7 +989,11 @@ async def telegram_lifespan() -> AsyncIterator[TelegramService | None]:
             await service.bot.delete_webhook(drop_pending_updates=True)
             logger.info("TELEGRAM_BOOT mode=polling")
             service.polling_task = asyncio.create_task(
-                service.dispatcher.start_polling(service.bot, handle_signals=False),
+                service.dispatcher.start_polling(
+                    service.bot,
+                    handle_signals=False,
+                    close_bot_session=False,
+                ),
                 name="telegram-polling",
             )
         else:
@@ -1011,19 +1015,29 @@ async def telegram_lifespan() -> AsyncIterator[TelegramService | None]:
         yield service
     finally:
         await shutdown_chat_queue_dispatcher()
-        if service.polling_task is not None:
-            service.polling_task.cancel()
-            # The task either finishes cleanly (CancelledError) or surfaces
-            # an unrelated shutdown error.  We swallow both because the
-            # lifespan is already tearing down; there is nothing to recover.
-            with contextlib.suppress(asyncio.CancelledError, Exception):
-                await service.polling_task
+        await _stop_polling_task(service)
         try:
             await service.bot.session.close()
         except Exception:
             logger.warning("TELEGRAM_SHUTDOWN session_close_failed", exc_info=True)
         if service.polling_lock is not None:
             service.polling_lock.release()
+
+
+async def _stop_polling_task(service: TelegramService) -> None:
+    """Stop aiogram polling through its dispatcher-owned shutdown signal."""
+    task = service.polling_task
+    if task is None:
+        return
+    if not task.done():
+        try:
+            await service.dispatcher.stop_polling()
+        except RuntimeError as exc:
+            if "Polling is not started" not in str(exc):
+                raise
+            task.cancel()
+    with contextlib.suppress(asyncio.CancelledError, Exception):
+        await task
 
 
 def _validate_telegram_webhook_url(url: str) -> None:

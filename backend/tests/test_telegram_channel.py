@@ -13,11 +13,13 @@ Covers:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -27,7 +29,9 @@ from app.channels.base import ChannelMessage
 from app.channels.telegram import SURFACE_TELEGRAM, TelegramChannel
 from app.channels.telegram.bot import (
     _TELEGRAM_COMMANDS,
+    TelegramService,
     _refresh_telegram_commands_best_effort,
+    _stop_polling_task,
     refresh_telegram_commands,
 )
 from app.channels.telegram.bot_provider_resolution import (
@@ -205,6 +209,32 @@ def test_telegram_command_refresh_cooldown() -> None:
 
     assert should_refresh_commands(token=token, now=159.0) is False
     assert should_refresh_commands(token=token, now=160.0) is True
+
+
+@pytest.mark.anyio
+async def test_stop_polling_task_uses_dispatcher_stop_signal() -> None:
+    """Polling teardown should ask aiogram to stop instead of cancelling directly."""
+    stopped = asyncio.Event()
+
+    async def wait_for_stop() -> None:
+        await stopped.wait()
+
+    async def stop_polling() -> None:
+        stopped.set()
+
+    polling_task = asyncio.create_task(wait_for_stop())
+    dispatcher = SimpleNamespace(stop_polling=AsyncMock(side_effect=stop_polling))
+    service = TelegramService(
+        bot=cast(Any, object()),
+        dispatcher=cast(Any, dispatcher),
+        polling_task=polling_task,
+    )
+
+    await _stop_polling_task(service)
+
+    dispatcher.stop_polling.assert_awaited_once()
+    assert polling_task.done()
+    assert not polling_task.cancelled()
 
 
 # ---------------------------------------------------------------------------
