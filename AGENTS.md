@@ -280,6 +280,14 @@ The Notion database query revealed the complete project scope after user questio
 Access 85k tokens of past work via get_observations([IDs]) or mem-search skill.
 ## Agent skills
 
+Use project skills before improvising recurring Pawrrtal workflows:
+
+- `retro` — use after a messy or long session to turn failures into durable skills, rules, beans, or memory notes.
+- `pawrrtal-pr-scope-audit` — use before answering whether work is really in a PR, before claiming a long goal is complete, or when repo work and VPS operations were mixed together.
+- `pawrrtal-live-ops` — use for live deployment, Cloudflared, Telegram, database, browser, shutdown, and real integration verification.
+- `pawrrtal-runner-ops` — use before touching self-hosted GitHub Actions runners; runner state must stay on `/mnt/HC_Volume_105512717/github-runners/` and self-hosted jobs must be locked to Octavian-only workflow gates.
+- `pawrrtal-extension-boundaries` — use before changing providers, channels, tools, plugins, subagents, context providers, or turn orchestration.
+
 ### Issue tracker
 
 Local markdown via `beans` CLI — tasks live in `.beans/` as individual markdown files with frontmatter (`status`, `type`, `priority`, `tags`). See `frontend/content/docs/handbook/agents/issue-tracker.md`.
