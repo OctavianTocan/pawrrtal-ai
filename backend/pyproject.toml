@@ -34,29 +34,8 @@ dependencies = [
     "opentelemetry-instrumentation-logging>=0.50b0",
     "markitdown[all]>=0.1.1",
     "xai-sdk>=1.12.0",
-    # ``openai`` is a core dependency now that the OpenCode Go provider
-    # ships in-tree (``app.providers.opencode_go_provider`` —
-    # OpenAI-compatible gateway at https://opencode.ai/zen/go/v1).  The
-    # LiteLLM provider also depends on it transitively for the
-    # OpenAI-compat protocol.  Listing here means the voice-via-openai
-    # path piggybacks on the same install instead of being a separate
-    # optional extra.
     "openai>=1.0.0",
-    # The Codex CLI binary is built from the submodule at
-    # ``backend/vendor/codex`` (pinned at ``rust-v0.134.0``). The binary
-    # lives at ``backend/vendor/codex/codex-rs/target/release/codex``
-    # and is discovered by ``app.providers.openai_codex._vendor``
-    # before the SDK's bundled-binary fallback is consulted. Build with
-    # ``cargo build --release -p codex-cli --bin codex --manifest-path
-    # backend/vendor/codex/codex-rs/Cargo.toml``.  We deliberately don't
-    # depend on the ``openai-codex-cli-bin`` PyPI package because it
-    # ships no manylinux wheel (only macOS, Windows, musllinux), which
-    # breaks ``uv sync`` on every glibc x86_64 CI runner.
     "httpx[http2]>=0.28",
-    # ``respx`` is needed at runtime by ``tests/paw`` collection, but pytest
-    # collection doesn't activate the dev group. Listing here ensures the
-    # ``paw`` test suite collects under a plain ``uv run pytest`` without
-    # extra group flags. Tiny pure-python httpx mock.
     "respx>=0.21",
     "typer>=0.13",
 ]
@@ -266,12 +245,9 @@ disallow_untyped_decorators = false  # FastAPI/pytest decorators trip this
 # Required because ``app.models`` and ``app.api.models`` both end with ``models.py``
 # — without explicit package bases, mypy can't disambiguate them.
 explicit_package_bases = true
-# The openai_codex SDK is loaded at runtime from the git submodule at
-# ``vendor/codex/sdk/python/src`` via ``_vendor.ensure_openai_codex_available``.
-# That sys.path injection is invisible to mypy, so add the same directory
-# to ``mypy_path`` to let static analysis resolve ``import openai_codex``.
-# The SDK ships a ``py.typed`` marker, so this gives mypy real stubs.
-mypy_path = ".:vendor/codex/sdk/python/src"
+# Optional provider SDKs live behind plugin/provider boundaries; local stubs
+# let strict checks run when a worktree has not initialized every SDK.
+mypy_path = ".:typestubs:vendor/codex/sdk/python/src"
 plugins = ["pydantic.mypy"]
 exclude = [
     "alembic/versions/",
@@ -293,11 +269,7 @@ exclude = [
     "\\.zed/",
     "\\.vscode/",
     "\\.sentrux/",
-    # TEMP: ``tests/test_provider_images.py`` calls provider helper
-    # functions (build_gemini_contents, build_xai_messages,
-    # _build_litellm_messages, build_openai_messages) with an
-    # ``images=`` kwarg that the in-tree helpers don't yet accept.
-    # Drop this entry once the per-provider images-support PRs land.
+    # Provider image translation is not implemented for every host yet.
     "tests/test_provider_images.py",
 ]
 files = ["app", "tests", "main.py"]
