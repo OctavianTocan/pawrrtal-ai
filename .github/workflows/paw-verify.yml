@@ -49,10 +49,10 @@ jobs:
     # octaviantocan-only-and-self-hosted-runner.md). Push events have no
     # pull_request payload, so the second clause is vacuously true.
     if: >-
-      (github.actor == 'OctavianTocan' || github.actor == 'octagent') &&
+      github.actor == 'OctavianTocan' &&
       (github.event_name != 'pull_request' ||
         github.event.pull_request.head.repo.full_name == github.repository)
-    runs-on: [self-hosted, openclaw-mini, pawrrtal]
+    runs-on: [self-hosted, openclaw-mini, pawrrtal, octavian-only]
     timeout-minutes: 45
     steps:
       - name: Checkout repository

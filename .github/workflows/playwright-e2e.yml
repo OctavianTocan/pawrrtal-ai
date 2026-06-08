@@ -40,7 +40,7 @@ jobs:
   e2e:
     name: Playwright suite
     if: >-
-      (github.actor == 'OctavianTocan' || github.actor == 'octagent') &&
+      github.actor == 'OctavianTocan' &&
       (github.event_name != 'pull_request' ||
         github.event.pull_request.head.repo.full_name == github.repository)
     # Documented exception to the self-hosted-runner default per

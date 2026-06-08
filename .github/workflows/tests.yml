@@ -41,10 +41,10 @@ jobs:
   frontend:
     name: Frontend Vitest
     if: >-
-      (github.actor == 'OctavianTocan' || github.actor == 'octagent') &&
+      github.actor == 'OctavianTocan' &&
       (github.event_name != 'pull_request' ||
         github.event.pull_request.head.repo.full_name == github.repository)
-    runs-on: [self-hosted, pawrrtal]
+    runs-on: [self-hosted, pawrrtal, octavian-only]
     timeout-minutes: 15
     steps:
       - name: Checkout repository
@@ -131,10 +131,10 @@ jobs:
   backend:
     name: Backend pytest
     if: >-
-      (github.actor == 'OctavianTocan' || github.actor == 'octagent') &&
+      github.actor == 'OctavianTocan' &&
       (github.event_name != 'pull_request' ||
         github.event.pull_request.head.repo.full_name == github.repository)
-    runs-on: [self-hosted, openclaw-mini, pawrrtal]
+    runs-on: [self-hosted, openclaw-mini, pawrrtal, octavian-only]
     timeout-minutes: 15
     steps:
       - name: Checkout repository

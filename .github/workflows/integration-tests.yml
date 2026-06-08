@@ -41,7 +41,7 @@ jobs:
   integration:
     name: Integration suite
     if: >-
-      (github.actor == 'OctavianTocan' || github.actor == 'octagent') &&
+      github.actor == 'OctavianTocan' &&
       (github.event_name != 'pull_request' ||
         github.event.pull_request.head.repo.full_name == github.repository)
     # Self-hosted to keep token spend bounded: the runner already has
@@ -50,7 +50,7 @@ jobs:
     # is on Tavi's box, not GitHub's.  Reserving 「ubuntu-latest」 for
     # the GitHub-hosted-only workloads (「playwright install --with-deps」
     # in the dev-console smoke).
-    runs-on: [self-hosted, pawrrtal]
+    runs-on: [self-hosted, pawrrtal, octavian-only]
     timeout-minutes: 20
     steps:
       - name: Checkout repository

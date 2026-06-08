@@ -114,8 +114,8 @@ jobs:
 
             if [[ -n "$CLAUDE_TRIGGER_TOKEN" ]]; then
               # Comments authored with the repository GITHUB_TOKEN show up as github-actions[bot]
-              # and Claude ignores that automated mention. Use a separate user/app token
-              # (preferably octagent) so the handoff matches the working manual comment path.
+              # and Claude ignores that automated mention. Use a separate approved
+              # user/app token so the handoff matches the working manual comment path.
               GH_TOKEN="$CLAUDE_TRIGGER_TOKEN" gh pr comment "$PR_NUMBER" --body "$CLAUDE_REQUEST"
             else
               MANUAL_FOLLOWUP=$(printf '⚠️ **Automated Rebase Blocked by Conflicts:** `CLAUDE_TRIGGER_TOKEN` is not configured, so this workflow cannot summon Claude automatically. A maintainer needs to post this comment manually:\n\n%s' "$CLAUDE_REQUEST")

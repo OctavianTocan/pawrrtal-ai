@@ -43,10 +43,10 @@ jobs:
   check:
     name: bun run check
     if: >-
-      (github.actor == 'OctavianTocan' || github.actor == 'octagent') &&
+      github.actor == 'OctavianTocan' &&
       (github.event_name != 'pull_request' ||
         github.event.pull_request.head.repo.full_name == github.repository)
-    runs-on: [self-hosted, pawrrtal]
+    runs-on: [self-hosted, pawrrtal, octavian-only]
     timeout-minutes: 10
     steps:
       - name: Checkout repository
