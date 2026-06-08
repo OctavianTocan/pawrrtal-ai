@@ -1,4 +1,4 @@
-"""Tests for the AgentHandler + NotificationService bus subscribers.
+"""Tests for the agent handler and Telegram notification subscriber.
 
 Both handlers are bus-driven so the tests publish events through a
 real :class:`EventBus` and assert on the resulting side-effects.
@@ -11,11 +11,11 @@ import uuid
 
 import pytest
 
+from app.channels.telegram.notifications import TelegramNotificationService
 from app.infrastructure.event_bus import (
     AgentHandler,
     AgentResponseEvent,
     EventBus,
-    NotificationService,
     ScheduledEvent,
     WebhookEvent,
 )
@@ -47,12 +47,12 @@ class _RecordingBot:
         self.calls.append((chat_id, text))
 
 
-class TestNotificationServiceDelivery:
+class TestTelegramNotificationDelivery:
     async def test_delivers_to_event_chat_id(self) -> None:
         bus = EventBus()
         await bus.start()
         bot = _RecordingBot()
-        NotificationService(telegram_bot=bot).register(bus)
+        TelegramNotificationService(telegram_bot=bot).register(bus)
         await bus.publish(
             AgentResponseEvent(chat_id="42", text="hello", originating_event_id="abc")
         )
@@ -65,7 +65,7 @@ class TestNotificationServiceDelivery:
         bus = EventBus()
         await bus.start()
         bot = _RecordingBot()
-        NotificationService(telegram_bot=bot).register(bus)
+        TelegramNotificationService(telegram_bot=bot).register(bus)
         await bus.publish(AgentResponseEvent(chat_id=None, text="hello"))
         await _drain(bus)
         await bus.stop()
@@ -75,7 +75,7 @@ class TestNotificationServiceDelivery:
         """No bot configured → the service silently no-ops."""
         bus = EventBus()
         await bus.start()
-        NotificationService(telegram_bot=None).register(bus)
+        TelegramNotificationService(telegram_bot=None).register(bus)
         await bus.publish(AgentResponseEvent(chat_id="42", text="hello"))
         await _drain(bus)
         await bus.stop()
@@ -86,7 +86,7 @@ class TestNotificationServiceDelivery:
         bus = EventBus()
         await bus.start()
         bot = _RecordingBot()
-        NotificationService(telegram_bot=bot).register(bus)
+        TelegramNotificationService(telegram_bot=bot).register(bus)
         long_text = "x" * 5000
         await bus.publish(AgentResponseEvent(chat_id="42", text=long_text))
         await _drain(bus)
@@ -94,7 +94,7 @@ class TestNotificationServiceDelivery:
         assert len(bot.calls) == 1
         sent = bot.calls[0][1]
         assert sent.endswith("…")
-        assert len(sent) <= 4001  # 4000 budget + the single trailing ellipsis
+        assert len(sent) <= 4000
 
     async def test_delivery_failure_isolated(self) -> None:
         """A bot-side exception is swallowed so it doesn't poison the bus."""
@@ -105,7 +105,7 @@ class TestNotificationServiceDelivery:
 
         bus = EventBus()
         await bus.start()
-        NotificationService(telegram_bot=ExplodingBot()).register(bus)
+        TelegramNotificationService(telegram_bot=ExplodingBot()).register(bus)
         await bus.publish(AgentResponseEvent(chat_id="42", text="hello"))
         await _drain(bus)
         await bus.stop()
@@ -130,7 +130,7 @@ class TestAgentHandlerRouting:
         await bus.start()
         bot = _RecordingBot()
         AgentHandler().register(bus)
-        NotificationService(telegram_bot=bot).register(bus)
+        TelegramNotificationService(telegram_bot=bot).register(bus)
         await bus.publish(WebhookEvent(provider="github", event_type_name="push", payload={}))
         await _drain(bus)
         await bus.stop()

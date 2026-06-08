@@ -9,7 +9,7 @@ import httpx
 import typer
 
 from app.cli.paw.config import PersonaState, cookies_path, profile_dir, state_path
-from app.cli.paw.errors import AuthError, BackendUnreachable
+from app.cli.paw.errors import AuthError, BackendUnreachableError
 from app.cli.paw.http import PawClient
 from app.cli.paw.output import emit_human, emit_json
 
@@ -126,7 +126,7 @@ async def _append_token_valid_check(checks: list[Check], state: PersonaState) ->
         checks.append(Check("token_valid", True))
     except AuthError:
         checks.append(Check("token_valid", False, detail="session expired; run paw login --force"))
-    except BackendUnreachable as e:
+    except BackendUnreachableError as e:
         checks.append(Check("token_valid", False, detail=str(e.message)))
 
 
@@ -157,7 +157,7 @@ async def _append_models_endpoint_check(checks: list[Check], state: PersonaState
         checks.append(
             Check("models_endpoint_returns_nonempty", False, detail="auth required"),
         )
-    except BackendUnreachable as e:
+    except BackendUnreachableError as e:
         checks.append(
             Check("models_endpoint_returns_nonempty", False, detail=str(e.message)),
         )

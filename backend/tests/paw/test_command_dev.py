@@ -323,7 +323,7 @@ def test_status_when_tracked_but_pid_dead(
 
     result = runner.invoke(app, ["dev", "status"])
     assert result.exit_code == EXIT_DEV_DEAD
-    # Exit 7 must remain distinct from 4 (BackendUnreachable) so callers
+    # Exit 7 must remain distinct from 4 (BackendUnreachableError) so callers
     # can tell "tracked process died" from "couldn't reach backend".
     assert EXIT_DEV_DEAD == 7
     assert "stopped" in result.stdout
@@ -532,7 +532,7 @@ def test_dev_down_refuses_when_start_time_missing(
     fast_polls,
     monkeypatch,
 ):
-    """v1 state files (no ``start_time``) trigger the safe refusal too.
+    """A missing ``start_time`` triggers the safe refusal too.
 
     Without a persisted creation time we can't verify the PID is still
     ours, so the conservative default is to leave the live process

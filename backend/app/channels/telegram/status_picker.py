@@ -1,4 +1,4 @@
-"""Inline-keyboard helpers for the interactive ``/status`` panel (#361).
+"""Inline-keyboard helpers for the interactive ``/status`` panel.
 
 The existing ``/status`` slash command (in :mod:`status`) builds one
 monolithic Telegram reply with every diagnostic — gateway uptime,

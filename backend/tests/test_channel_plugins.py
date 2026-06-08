@@ -28,7 +28,7 @@ def test_core_channels_manifest_registers_runtime_channels(
     assert isinstance(resolve_channel(SURFACE_GOOGLE_CHAT), GoogleChatChannel)
 
 
-def test_disabled_core_channel_plugin_falls_back_to_web(
+def test_disabled_core_channel_plugin_keeps_independent_channel_plugins(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -45,5 +45,32 @@ def test_disabled_core_channel_plugin_falls_back_to_web(
 
     surfaces = registered_surfaces()
 
-    assert surfaces == [SURFACE_WEB]
+    assert SURFACE_ELECTRON not in surfaces
+    assert SURFACE_WEB in surfaces
+    assert SURFACE_TELEGRAM in surfaces
+    assert SURFACE_GOOGLE_CHAT in surfaces
+    assert resolve_channel(SURFACE_ELECTRON).surface == SURFACE_WEB
+
+
+def test_disabled_external_channel_plugins_fall_back_to_web(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    pawrrtal_home = tmp_path / "home"
+    monkeypatch.setenv("PAWRRTAL_HOME", str(pawrrtal_home))
+    for plugin_id in ("telegram_channel", "google_chat_channel"):
+        save_plugin_state(
+            plugin_state_path(
+                plugin_id=plugin_id,
+                scope="global",
+                pawrrtal_home=pawrrtal_home,
+            ),
+            PluginState(enabled=False),
+        )
+
+    surfaces = registered_surfaces()
+
+    assert SURFACE_TELEGRAM not in surfaces
+    assert SURFACE_GOOGLE_CHAT not in surfaces
     assert resolve_channel(SURFACE_TELEGRAM).surface == SURFACE_WEB
+    assert resolve_channel(SURFACE_GOOGLE_CHAT).surface == SURFACE_WEB

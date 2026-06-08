@@ -15,11 +15,6 @@ from __future__ import annotations
 
 import typer
 
-# ``paw dev status`` returns this when the persisted dev-backend PID
-# exists in state but no longer responds to signal 0 (the process was
-# killed externally or crashed). Distinct from exit 4 (BackendUnreachable),
-# which means "I tried to reach the backend over HTTP and could not" —
-# a transient network/health condition rather than a dead-process one.
 EXIT_DEV_DEAD = 7
 
 
@@ -65,13 +60,6 @@ class BackendUnreachableError(PawError):
         super().__init__(msg, exit_code=4, hint=hint)
 
 
-# Backwards-compatible alias for the historical un-suffixed name. Kept so
-# the rename can land without churning unrelated consumers in flight
-# (mirror.py, http.py, doctor.py, etc.). New code should reference
-# ``BackendUnreachableError`` directly.
-BackendUnreachable = BackendUnreachableError
-
-
 class ApiError(PawError):
     """Backend returned an HTTP error other than 401 auth (exit 5)."""
 
@@ -91,7 +79,3 @@ class VerificationFailedError(PawError):
 
     def __init__(self, msg: str, hint: str | None = None) -> None:
         super().__init__(msg, exit_code=6, hint=hint)
-
-
-# Backwards-compatible alias (see ``BackendUnreachable`` note above).
-VerificationFailed = VerificationFailedError

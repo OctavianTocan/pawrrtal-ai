@@ -11,8 +11,7 @@ Usage
     from app.channels.registry import resolve_channel
 
     channel = resolve_channel("web")      # SSEChannel(surface="web")
-    channel = resolve_channel("electron") # SSEChannel(surface="electron")
-    channel = resolve_channel("telegram") # TelegramChannel when enabled
+    channel = resolve_channel("electron") # plugin channel when enabled
 
 Extending
 ---------

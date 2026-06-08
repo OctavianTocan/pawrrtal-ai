@@ -8,7 +8,7 @@ from typing import Any
 import typer
 
 from app.cli.paw.config import PersonaState, state_path
-from app.cli.paw.errors import AuthError, BackendUnreachable
+from app.cli.paw.errors import AuthError, BackendUnreachableError
 from app.cli.paw.http import PawClient
 from app.cli.paw.output import emit_human, emit_json
 
@@ -45,7 +45,7 @@ def status(
     state = PersonaState.load(profile)
     try:
         out = asyncio.run(_verify(state))
-    except (AuthError, BackendUnreachable) as e:
+    except (AuthError, BackendUnreachableError) as e:
         if json_out:
             emit_json(
                 {

@@ -6,9 +6,7 @@ Auth flow notes (verified against backend/app/api/auth.py and backend/main.py):
   admin user. Returns 204 with a ``session_token`` cookie via fastapi-users.
 - ``POST /auth/jwt/login`` — standard fastapi-users JWT login; form body
   ``username`` + ``password`` (OAuth2PasswordRequestForm).
-- ``GET /api/v1/users/me`` — fastapi-users user info; canonical v1 mount.
-  The legacy ``/users/me`` alias is kept on the server for frontend compat
-  but new clients (paw) standardize on ``/api/v1/users``.
+- ``GET /api/v1/users/me`` — fastapi-users user info.
 - Workspaces are seeded as a side-effect of ``PUT /api/v1/personalization``;
   there is no public POST endpoint for workspace creation. We call
   personalization with an empty profile (idempotent — workspace creation is
@@ -30,7 +28,7 @@ from app.cli.paw.config import (
     profile_dir,
     state_path,
 )
-from app.cli.paw.errors import AuthError, BackendUnreachable, LocalError
+from app.cli.paw.errors import AuthError, BackendUnreachableError, LocalError
 from app.cli.paw.http import load_cookies, save_cookies
 from app.cli.paw.output import emit_human, emit_json
 
@@ -123,7 +121,7 @@ async def _authenticate(
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
     except httpx.ConnectError as e:
-        raise BackendUnreachable(
+        raise BackendUnreachableError(
             f"Cannot reach backend at {base_url}: {e}",
         ) from e
 

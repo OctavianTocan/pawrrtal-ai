@@ -1,4 +1,4 @@
-"""Inline-keyboard helpers for the per-turn ``Regenerate`` button (#368).
+"""Inline-keyboard helpers for the per-turn ``Regenerate`` button.
 
 After every assistant reply the Telegram channel attaches a small
 inline keyboard with a single ``🔄 Regenerate`` button. Tapping the

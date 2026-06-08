@@ -126,6 +126,53 @@ async def test_list_channels_starts_empty(channels_client: AsyncClient) -> None:
     assert response.json() == []
 
 
+async def test_diagnose_telegram_is_user_scoped(
+    channels_client: AsyncClient,
+    test_user: User,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The HTTP diagnostic endpoint uses the authenticated user's scope."""
+    captured: dict[str, Any] = {}
+
+    async def fake_diagnose(
+        *,
+        limit: int,
+        service: Any | None = None,
+        user_id: Any | None = None,
+        conversation_id: str | None = None,
+    ) -> dict[str, Any]:
+        captured.update(
+            limit=limit,
+            service=service,
+            user_id=user_id,
+            conversation_id=conversation_id,
+        )
+        return {
+            "configured": True,
+            "mode": "polling",
+            "runtime": {"service_running": service is not None},
+            "bindings": [],
+            "recent_messages": [],
+            "stuck_streaming_messages": [],
+            "conversation_trace": None,
+        }
+
+    monkeypatch.setattr("app.channels.router.diagnose_telegram_state", fake_diagnose)
+
+    response = await channels_client.get(
+        "/api/v1/channels/telegram/diagnose",
+        params={"limit": 99, "conversation_id": "853434fb-5f09-4b58-8598-c0384e4fdc22"},
+    )
+
+    assert response.status_code == 200
+    assert captured == {
+        "limit": 50,
+        "service": None,
+        "user_id": test_user.id,
+        "conversation_id": "853434fb-5f09-4b58-8598-c0384e4fdc22",
+    }
+
+
 async def test_unlink_is_idempotent(channels_client: AsyncClient) -> None:
     """DELETE on a non-existent binding still returns 204 so the UI can fire-and-forget."""
     response = await channels_client.delete("/api/v1/channels/telegram/link")

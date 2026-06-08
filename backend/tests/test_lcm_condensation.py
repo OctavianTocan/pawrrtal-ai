@@ -1,16 +1,4 @@
-"""LCM PR #7 — condensation pass tests.
-
-Covers:
-- _condense_at_depth returns False when < 2 depth-0 summaries exist.
-- _condense_at_depth returns True and creates a depth-1 parent summary.
-- Source edges on the parent summary point at the depth-0 child summaries.
-- The depth-0 context items are replaced by a single depth-1 item.
-- Token budget limits the condensation batch.
-- compact_leaf_if_needed triggers condensation when lcm_incremental_max_depth >= 1.
-- lcm_incremental_max_depth=0 skips condensation.
-- Two sequential compactions produce a depth-1 condensed summary.
-- assemble_context after condensation returns depth-1 summary + fresh tail.
-"""
+"""Tests for incremental LCM condensation."""
 
 from __future__ import annotations
 
@@ -34,10 +22,6 @@ from app.models import (
     LCMSummary,
     LCMSummarySource,
 )
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 async def _make_conversation(session: AsyncSession, user: User) -> Conversation:
@@ -136,23 +120,14 @@ def _patch(monkeypatch: pytest.MonkeyPatch, provider: Any) -> None:
     import app.lcm as _lcm
     import app.lcm.condense as _lcm_condense
 
-    monkeypatch.setattr(_lcm, "resolve_llm", lambda *a, **kw: provider)
-    # Condensation lives in app.lcm.condense (split out for the
-    # file-line budget) — patch its resolve_llm import too so
-    # monkeypatched providers reach _condense_at_depth.
-    monkeypatch.setattr(_lcm_condense, "resolve_llm", lambda *a, **kw: provider)
-
-
-# ---------------------------------------------------------------------------
-# _condense_at_depth — gating
-# ---------------------------------------------------------------------------
+    monkeypatch.setattr(_lcm, "_resolve_summary_provider", lambda *a, **kw: provider)
+    monkeypatch.setattr(_lcm_condense, "_resolve_summary_provider", lambda *a, **kw: provider)
 
 
 @pytest.mark.anyio
 async def test_condense_noop_with_single_summary(
     db_session: AsyncSession, test_user: User, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Returns False when only 1 depth-0 summary exists."""
     conv = await _make_conversation(db_session, test_user)
     await _insert_summary_item(db_session, conv, "just one summary", ordinal=0, depth=0)
     await db_session.commit()
@@ -184,11 +159,6 @@ async def test_condense_noop_no_summaries(
         max_chunk_tokens=100_000,
     )
     assert ran is False
-
-
-# ---------------------------------------------------------------------------
-# _condense_at_depth — happy path
-# ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
@@ -315,16 +285,10 @@ async def test_condense_replaces_leaf_items_with_parent_item(
     assert items[1].item_kind == "message"
 
 
-# ---------------------------------------------------------------------------
-# Integration with compact_leaf_if_needed
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.anyio
 async def test_compact_triggers_condensation_when_depth_ge_1(
     db_session: AsyncSession, test_user: User, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """After two leaf compactions, condensation should produce a depth-1 summary."""
     conv = await _make_conversation(db_session, test_user)
 
     # Seed enough messages so two separate compactions each produce one leaf summary.
@@ -436,7 +400,6 @@ async def test_compact_triggers_condensation_when_depth_ge_1(
 async def test_compact_skips_condensation_when_depth_is_0(
     db_session: AsyncSession, test_user: User, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """lcm_incremental_max_depth=0 means leaf-only, no condensation."""
     conv = await _make_conversation(db_session, test_user)
 
     # Pre-populate two depth-0 leaf summary context items.
@@ -501,16 +464,10 @@ async def test_compact_skips_condensation_when_depth_is_0(
     assert len(depth1) == 0
 
 
-# ---------------------------------------------------------------------------
-# assemble_context after condensation
-# ---------------------------------------------------------------------------
-
-
 @pytest.mark.anyio
 async def test_assemble_after_condensation(
     db_session: AsyncSession, test_user: User, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """After condensation, assemble_context returns depth-1 summary + fresh tail."""
     conv = await _make_conversation(db_session, test_user)
     await _insert_summary_item(db_session, conv, "leaf A", ordinal=0, depth=0)
     await _insert_summary_item(db_session, conv, "leaf B", ordinal=1, depth=0)

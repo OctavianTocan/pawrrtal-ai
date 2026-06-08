@@ -1,4 +1,4 @@
-"""FastAPI app factory for the current transitional backend layout."""
+"""FastAPI app factory."""
 
 from __future__ import annotations
 
@@ -28,10 +28,9 @@ from app.infrastructure.startup import admin_seed as _admin_seed
 from app.infrastructure.startup import database as _database
 from app.infrastructure.startup import event_bus as _event_bus
 from app.infrastructure.startup import gemini_cli_check as _gemini_cli_check
-from app.infrastructure.startup import google_chat_lifespan as _google_chat_lifespan
+from app.infrastructure.startup import plugin_lifespans as _plugin_lifespans
 from app.infrastructure.startup import scheduler as _scheduler
 from app.infrastructure.startup import stale_streaming_messages as _stale_streaming_messages
-from app.infrastructure.startup import telegram_lifespan as _telegram_lifespan
 from app.infrastructure.startup import tracing as _startup_tracing
 from app.infrastructure.startup import workspace_env_migration as _workspace_env_migration
 
@@ -46,8 +45,7 @@ _LIFECYCLE_MODULES = (
     _stale_streaming_messages,
     _event_bus,
     _scheduler,
-    _telegram_lifespan,
-    _google_chat_lifespan,
+    _plugin_lifespans,
     _turn_finalize_drain,
     _provider_session_persist_drain,
     _provider_caches,

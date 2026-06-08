@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import logging
 import uuid
-from collections.abc import AsyncIterator
 from typing import Any
 
 from sqlalchemy import func, select
@@ -23,22 +22,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.config import settings as settings
 from app.lcm.condense import run_condensation_cascade
+from app.lcm.summarization import (
+    _approx_tokens,
+    _format_turns,
+    _resolve_summary_provider,
+    _summarize,
+)
 from app.models import ChatMessage, LCMContextItem, LCMSummary, LCMSummarySource
-from app.providers import resolve_llm
 
 _log = logging.getLogger(__name__)
-
-# Character cap for the deterministic-truncation fallback when both the
-# normal and aggressive provider summarisations fail or return empty
-# text.  Tuned to roughly 375 tokens (4 chars ≈ 1 token), small enough
-# to keep the assembled context tight while still leaving the model
-# enough surface to recover continuity.
-_FALLBACK_TRUNCATE_CHARS = 1500
-
-
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
 
 
 async def ingest_message(
@@ -224,110 +216,6 @@ def _assemble_item_to_turn(
     return None
 
 
-# ---------------------------------------------------------------------------
-# Summarisation prompts — three-level escalation mirrors the upstream plugin.
-# ---------------------------------------------------------------------------
-
-_PROMPT_NORMAL = """\
-You are a memory compressor for an AI assistant.  Summarise the following
-conversation extract into a compact but lossless paragraph.  Preserve every
-decision, fact, file name, error message, and instruction so the assistant can
-reconstruct the full context from your summary alone.  Output the summary only
-— no preamble, no commentary.
-
-{turns}"""
-
-_PROMPT_AGGRESSIVE = """\
-Summarise the following conversation in one tight paragraph.  Keep only the
-most important decisions, facts, and instructions.  Output the summary only.
-
-{turns}"""
-
-
-# ---------------------------------------------------------------------------
-# Internal helpers
-# ---------------------------------------------------------------------------
-
-
-def _approx_tokens(text: str) -> int:
-    """Rough token count: 4 characters ≈ 1 token (good enough for budgeting)."""
-    return max(1, len(text) // 4)
-
-
-def _format_turns(messages: list[dict[str, str]]) -> str:
-    """Format [{role, content}] as a plain-text transcript for the summary prompt."""
-    parts: list[str] = []
-    for m in messages:
-        role = m.get("role", "").upper()
-        content = m.get("content", "")
-        if content:
-            parts.append(f"{role}: {content}")
-    return "\n\n".join(parts)
-
-
-# TODO: It's a little crazy that this is in the LCM part of things, particularly because it's completely unrelated, and useful for many other things.
-async def _collect_stream(stream: AsyncIterator[Any]) -> str:
-    """Consume a provider stream and return all concatenated delta text."""
-    parts: list[str] = []
-    async for event in stream:
-        if event.get("type") == "delta":
-            chunk = event.get("content") or ""
-            if chunk:
-                parts.append(chunk)
-    return "".join(parts).strip()
-
-
-async def _summarize(
-    provider: Any,
-    turns_text: str,
-    user_id: uuid.UUID,
-) -> tuple[str, str]:
-    """Call the provider to summarise a turn block.
-
-    Three-level escalation:
-    1. Normal prompt — full fidelity.
-    2. Aggressive prompt — shorter, if normal fails or returns empty.
-    3. Deterministic fallback — first 1 500 chars of the raw transcript.
-
-    Returns:
-        ``(summary_text, summary_kind)`` where ``summary_kind`` is one of
-        ``"normal"``, ``"aggressive"``, or ``"fallback"``.
-    """
-    # Narrow exception classes to the failure modes we expect from the
-    # provider/streaming layer (network, timeout, transient provider
-    # errors).  Programmer errors (``TypeError``, ``AttributeError``,
-    # ``ImportError``) intentionally bubble up so they surface during
-    # development rather than being masked as a summarisation flake;
-    # the deterministic-truncation fallback below covers the legitimate
-    # transient-failure case.
-    for prompt_template, kind in (
-        (_PROMPT_NORMAL, "normal"),
-        (_PROMPT_AGGRESSIVE, "aggressive"),
-    ):
-        try:
-            stream = provider.stream(
-                question=prompt_template.format(turns=turns_text),
-                conversation_id=uuid.uuid4(),
-                user_id=user_id,
-                history=None,
-                tools=None,
-                system_prompt=None,
-            )
-            text = await _collect_stream(stream)
-            if text:
-                return text, kind
-        except (OSError, RuntimeError, ValueError, TimeoutError):
-            _log.warning("LCM_SUMMARIZE_%s_FAILED", kind.upper(), exc_info=True)
-
-    # Deterministic truncation — always produces output.
-    return turns_text[:_FALLBACK_TRUNCATE_CHARS], "fallback"
-
-
-# ---------------------------------------------------------------------------
-# Compaction
-# ---------------------------------------------------------------------------
-
-
 async def compact_leaf_if_needed(
     session: AsyncSession,
     *,
@@ -422,7 +310,7 @@ async def compact_leaf_if_needed(
     # resolution flows through workspace_root, which the chat router
     # passes in. Drop the kwarg at the call site to silence mypy.
     _ = user_id
-    provider = resolve_llm(summary_model)
+    provider = _resolve_summary_provider(summary_model)
     turns_text = _format_turns(selected_messages)
     summary_text, summary_kind = await _summarize(provider, turns_text, user_id)
 

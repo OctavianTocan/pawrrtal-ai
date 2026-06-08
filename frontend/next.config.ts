@@ -13,8 +13,7 @@
 import path from 'node:path';
 import { createMDX } from 'fumadocs-mdx/next';
 import type { NextConfig } from 'next';
-
-const DEFAULT_BACKEND_INTERNAL_URL = 'http://127.0.0.1:8000';
+import { backendRewriteRules } from './next.backend-rewrites';
 
 const configuredAllowedDevOrigins = process.env.NEXT_ALLOWED_DEV_ORIGINS?.split(',')
 	.map((origin) => origin.trim())
@@ -34,13 +33,6 @@ function normalizeDevOrigin(hostname: string | undefined): string | undefined {
 
 const cloudflaredDevOrigin = normalizeDevOrigin(publicHostname);
 
-const backendInternalUrl = process.env.BACKEND_INTERNAL_URL?.replace(/\/$/, '');
-
-const enableBackendRewrites =
-	process.env.NODE_ENV !== 'production' ||
-	Boolean(process.env.BACKEND_INTERNAL_URL) ||
-	process.env.NEXT_ENABLE_BACKEND_REWRITES === '1';
-
 const allowedDevOrigins = [
 	...(configuredAllowedDevOrigins ?? []),
 	...(cloudflaredDevOrigin ? [cloudflaredDevOrigin] : []),
@@ -49,24 +41,7 @@ const allowedDevOrigins = [
 const nextConfig: NextConfig = {
 	allowedDevOrigins,
 	async rewrites() {
-		if (!enableBackendRewrites) {
-			return [];
-		}
-		const destinationBase = backendInternalUrl ?? DEFAULT_BACKEND_INTERNAL_URL;
-		return [
-			{
-				source: '/api/v1/:path*',
-				destination: `${destinationBase}/api/v1/:path*`,
-			},
-			{
-				source: '/auth/:path*',
-				destination: `${destinationBase}/auth/:path*`,
-			},
-			{
-				source: '/users/:path*',
-				destination: `${destinationBase}/users/:path*`,
-			},
-		];
+		return backendRewriteRules();
 	},
 	turbopack: {
 		root: path.resolve(__dirname, '../'),

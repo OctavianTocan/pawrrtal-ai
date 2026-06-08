@@ -111,8 +111,7 @@ export function NavChatsView({
 	contentSearchResults,
 	activeChatMatchInfo,
 	multiSelectedIds,
-	// TODO(#83): Pass focusedConversationId down to ConversationRow for roving tabindex.
-	// Currently unused — the orchestration layer (PR #83) will wire this through.
+	// Pass this down when ConversationRow gets roving tabindex.
 	focusedConversationId: _focusedConversationId,
 	onConversationClick,
 	onConversationMouseDown,

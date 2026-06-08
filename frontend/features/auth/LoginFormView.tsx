@@ -109,7 +109,6 @@ export function LoginFormView({
 									<AlertDescription>{errorMessage}</AlertDescription>
 								</Alert>
 							)}
-							{/* -- Email -- */}
 							<Field>
 								<FieldLabel htmlFor={emailId}>Email</FieldLabel>
 								<Input
@@ -122,7 +121,6 @@ export function LoginFormView({
 									onChange={(e) => onEmailChange(e.target.value)}
 								/>
 							</Field>
-							{/* -- Password -- */}
 							<Field>
 								<div className="flex items-center">
 									<FieldLabel htmlFor={passwordId}>Password</FieldLabel>
@@ -142,7 +140,6 @@ export function LoginFormView({
 									onChange={(e) => onPasswordChange(e.target.value)}
 								/>
 							</Field>
-							{/* -- Actions -- */}
 							<Field>
 								<Button
 									className="cursor-pointer"
@@ -173,13 +170,6 @@ export function LoginFormView({
 										</FieldDescription>
 									</>
 								)}
-								{/*
-								 * SSO buttons navigate to backend start endpoints. The
-								 * backend redirects to Google/Apple consent (when env
-								 * vars are configured) or returns 503 with a clear
-								 * "not configured" message otherwise — see
-								 * backend/app/api/oauth.py.
-								 */}
 								<SsoButton
 									disabled={isLoading}
 									icon={<GoogleIcon className="size-4" />}

@@ -24,7 +24,7 @@ Vendor compatibility
 The OTLP/HTTP exporter we use is the standard one, so any OTel
 backend works:
 
-- Grafana Cloud (free tier; what PR #155 / Sigil is built around)
+- Grafana Cloud
 - Honeycomb
 - Datadog
 - New Relic
@@ -48,15 +48,9 @@ Suppressions
   would just relocate the mutable state without changing the
   invariants, so the globals stay.
 
-Coexistence with PR #155 (Grafana Sigil)
-----------------------------------------
-PR #155 adds Sigil-specific provider spans (Gemini stream chunks,
-Claude SDK iterations) using its own runtime initialiser.  This module
-is the **underlying HTTP / DB / outbound** trace backbone.  Both can
-run together: this module owns the global TracerProvider; Sigil
-publishes additional spans into the same provider.  If both are
-imported the first one to call ``setup_tracing`` wins (idempotent
-guard), so the explicit lifespan order in ``main.py`` is what matters.
+Agent traces add provider and tool spans on top of this HTTP / DB / outbound
+trace backbone. This module owns the global TracerProvider; every higher-level
+recorder publishes into that provider.
 """
 
 from __future__ import annotations
@@ -92,8 +86,8 @@ def _drop_grpc_connect_spans(exporter: Any) -> Any:
     ``OTEL_EXPORTER_OTLP_ENDPOINT``, bypassing the Python
     TracerProvider entirely.  When those spans pass through the Python
     provider (e.g. via the xAI SDK's ``get_tracer`` calls) they show
-    up alongside our high-level workshop spans and clutter the
-    Workshop UI.  This processor drops any top-level span whose name
+    up alongside our high-level agent spans and clutter trace views.
+    This processor drops any top-level span whose name
     is exactly ``"connect"`` so they never reach the exporter.
 
     The wrapper is transparent for all other spans — no overhead
@@ -129,14 +123,13 @@ def _make_json_exporter() -> Any:
 
     The standard ``OTLPSpanExporter`` from
     ``opentelemetry-exporter-otlp-proto-http`` always sends **protobuf**.
-    Raindrop Workshop (and several other lightweight collectors) only
-    accept OTLP JSON.  This thin wrapper reuses the SDK's
+    Some lightweight collectors only accept OTLP JSON.  This thin wrapper reuses the SDK's
     ``encode_spans`` protobuf encoder but serialises to camelCase JSON
     via ``MessageToJson`` — the standard OTLP JSON wire format — and
     POSTs with ``Content-Type: application/json``.
 
-    Remote backends (Grafana, Honeycomb, SigNoz) also accept OTLP JSON,
-    so this does not restrict compatibility.
+    Remote backends such as Grafana, Honeycomb, and SigNoz also accept
+    OTLP JSON, so this does not restrict compatibility.
     """
     from collections.abc import Sequence
 
@@ -276,8 +269,8 @@ def setup_tracing(app: FastAPI | None = None) -> None:
     provider = TracerProvider(resource=resource)
     # OTLP/HTTP JSON exporter.  Reads the endpoint + headers from standard
     # env vars (OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_EXPORTER_OTLP_HEADERS).
-    # We send OTLP JSON (not protobuf) so Raindrop Workshop and other
-    # lightweight collectors that only accept JSON can ingest traces.
+    # We send OTLP JSON (not protobuf) so lightweight collectors that
+    # only accept JSON can ingest traces.
     provider.add_span_processor(BatchSpanProcessor(_drop_grpc_connect_spans(_make_json_exporter())))
     trace.set_tracer_provider(provider)
 

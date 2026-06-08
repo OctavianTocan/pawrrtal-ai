@@ -242,9 +242,7 @@ def is_pid_recycled(state: DevState) -> bool:
     for some other program). Signalling such a PID would attack an
     innocent third-party process, so the caller must refuse to signal.
 
-    If we have no recorded ``start_time`` (v1 state file, or psutil-less
-    environment where ``process_create_time`` returned ``None``) we
-    treat the PID as recycled — the safer default.
+    If we have no recorded ``start_time``, treat the PID as recycled.
     """
     if state.start_time is None:
         return True

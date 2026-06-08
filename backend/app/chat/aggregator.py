@@ -55,9 +55,8 @@ class _ToolCall:
         return payload
 
 
-# Verbose levels (PR 07).  Filter applied to events before the
-# aggregator persists them and before the Telegram channel renders
-# inline tool glyphs.  Mirrors CCT's ``/verbose 0|1|2`` semantics.
+# Filter applied before the aggregator persists events and before channels
+# render optional diagnostic detail.
 VERBOSE_QUIET = 0
 VERBOSE_NORMAL = 1
 VERBOSE_DETAILED = 2
@@ -66,7 +65,7 @@ VERBOSE_DETAILED = 2
 def should_emit_event(event: StreamEvent, verbose_level: int) -> bool:
     """Return ``True`` when the event survives the configured verbose filter.
 
-    Level semantics (matches CCT):
+    Level semantics:
     * ``0`` (quiet) — only ``delta`` (final answer) + ``error`` + ``usage``
       survive.  Tool calls and thinking are dropped.
     * ``1`` (normal, default) — adds ``tool_use`` + ``tool_progress`` +
@@ -95,11 +94,8 @@ class ChatTurnAggregator:
     few lists/strings. All semantics (e.g. which timeline entries merge) match
     the frontend reducer so live and rehydrated views are byte-identical.
 
-    PR 04: ``total_input_tokens`` / ``total_output_tokens`` /
-    ``total_cost_usd`` are folded from ``usage`` events emitted by the
-    provider on the terminal turn.  The chat router reads these after
-    the stream completes and writes a ``cost_ledger`` row.  Multiple
-    ``usage`` events sum (some providers emit per-turn, others per-call).
+    Usage totals are folded from provider ``usage`` events. Multiple usage
+    events sum because providers may emit per-turn or per-call totals.
     """
 
     content: str = ""
@@ -124,7 +120,7 @@ class ChatTurnAggregator:
         so per-block providers (Gemini, Claude) render with visible
         boundaries. When the provider omits ``block_index`` we fall
         back to the legacy "consecutive thinking events coalesce"
-        behaviour so older callers and tests stay green. See #353.
+        behaviour for providers that do not emit block metadata.
         """
         if self.timeline and self.timeline[-1].get("kind") == "thinking":
             previous_index = self.timeline[-1].get("block_index")
@@ -178,9 +174,8 @@ class ChatTurnAggregator:
             self.error_text = event.get("content") or "Chat stream failed."
             return
         if event_type == "usage":
-            # Token / cost accounting (PR 04). Providers emit one
-            # ``usage`` event per turn on their terminal envelope;
-            # multiple turns within a single ``stream()`` call sum.
+            # Providers may emit one terminal usage event or multiple
+            # per-call usage events. Sum all of them.
             self.total_input_tokens += int(event.get("input_tokens", 0) or 0)
             self.total_output_tokens += int(event.get("output_tokens", 0) or 0)
             self.total_cost_usd += float(event.get("cost_usd", 0.0) or 0.0)

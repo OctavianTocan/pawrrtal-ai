@@ -1,7 +1,7 @@
 """Hook-ordering tests for ``_guarded_stream`` (#347 / #352 L3).
 
 The verbose filter is a channel rendering concern; observability hooks
-(Workshop / OTel span recorders) must see every event regardless of
+(agent trace / OTel span recorders) must see every event regardless of
 ``verbose_level``. The previous implementation ran the filter first,
 short-circuiting before the hook fan-out — so thinking deltas at
 ``verbose_level=1`` (Telegram's default) were invisible to the LLM
@@ -136,7 +136,7 @@ async def test_hooks_observe_thinking_at_verbose_normal() -> None:
 
     With ``verbose_level=1`` (Telegram's default) the filter drops
     ``thinking`` events before they reach the channel — but the
-    Workshop hook lives in the same ``hooks`` list and must observe
+    agent trace hook lives in the same ``hooks`` list and must observe
     every event so the LLM span gets ``gen_ai.thinking.delta`` entries.
     """
     seen_events: list[StreamEvent] = []

@@ -1,4 +1,4 @@
-"""aiogram runtime for the regenerate-keyboard callback (#368).
+"""aiogram runtime for the regenerate-keyboard callback.
 
 The runtime answers a callback (``rgn:<conversation-id>``) by
 fetching the latest user message in that conversation from the
@@ -9,9 +9,8 @@ pipeline without the runtime having to duplicate any of it.
 The bot's regular message handler ignores messages from itself, so
 "post the user's last message verbatim" via ``bot.send_message``
 won't work. Instead this runtime sends a short "🔄 Regenerating…"
-notice and stores the regen state, then drives the turn directly
-through the legacy ``_run_llm_turn`` import (resolved lazily to
-avoid a circular import).
+notice and stores the regen state, then drives the turn directly through
+the lazily resolved ``_run_llm_turn`` helper.
 
 Ownership / authorisation: the callback verifies that
 ``callback.from_user.id`` matches the user who owns

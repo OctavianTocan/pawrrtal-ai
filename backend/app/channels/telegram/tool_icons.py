@@ -6,13 +6,9 @@ tool mid-turn, the Telegram channel injects a one-line glyph + tool
 name into the live edit stream so the user sees what the agent is
 doing in real time.
 
-Used by:
-
-* :class:`TelegramChannel.deliver` (PR 07) — appends a line per
-  ``tool_use`` event.
-* The verbose filter (PR 07) — at level 0 the glyph is suppressed
-  entirely; at level 1 it shows the bare name; at level 2 it shows
-  the redacted input shape too.
+Used by :class:`TelegramChannel.deliver` to render ``tool_use`` events.
+The verbose filter suppresses glyphs at level 0, shows the bare name at
+level 1, and shows the redacted input shape at level 2.
 """
 
 from __future__ import annotations

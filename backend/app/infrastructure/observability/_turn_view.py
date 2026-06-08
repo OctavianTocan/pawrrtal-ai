@@ -1,13 +1,13 @@
-"""Bridging helpers between Pawrrtal turn state and the Workshop span shape.
+"""Bridging helpers between Pawrrtal turn state and the agent trace span shape.
 
 Pulled out of ``app.channels.turn_orchestrator`` so that module stays under
 the project's 500-line ceiling (``scripts/check-file-lines.mjs``) and
-the Workshop-specific translations live next to the rest of the
+the agent-trace translations live next to the rest of the
 observability package.
 
 Both helpers are private to ``app.infrastructure.observability`` /
 ``app.channels.turn_orchestrator``; the public surface remains the context
-managers exposed via ``app.infrastructure.observability.workshop``.
+managers exposed via ``app.infrastructure.observability.agent_trace``.
 """
 
 from __future__ import annotations
@@ -28,8 +28,7 @@ def build_llm_view_messages(
     The chat-message table stores both user and assistant turns as
     flat ``{"role": ..., "content": str}`` rows so
     ``_load_history_and_persist`` can hand them to the provider
-    unchanged.  Workshop's ``gen_ai.input.messages`` panel — and any
-    other OTel backend rendering the OpenLLMetry shape — expects the
+    unchanged. Trace viewers that render ``gen_ai.input.messages`` expect the
     canonical ``AgentMessage`` union, so we lift each row into the
     matching TypedDict here.
 
@@ -61,19 +60,19 @@ def build_llm_view_messages(
 
 
 def aggregator_stop_reason(aggregator: ChatTurnAggregator) -> str:
-    """Best-effort ``stop_reason`` for the Workshop LLM span.
+    """Best-effort ``stop_reason`` for the trace viewer LLM span.
 
     The :class:`ChatTurnAggregator` does not track the provider's
     literal ``stop_reason`` — it normalises the wire shape to
     ``status`` (``complete`` / ``failed``) at finalisation time.  For
-    Workshop's ``gen_ai.response.finish_reasons`` attribute we infer:
+    trace viewer's ``gen_ai.response.finish_reasons`` attribute we infer:
 
     * ``"error"`` when the aggregator captured an error event,
     * ``"tool_use"`` when at least one tool call was dispatched,
     * ``"stop"`` otherwise (the normal text-only finish).
 
     This matches the three values the agent loop's ``stop_reason``
-    enum can take, so the Workshop UI shows the same labels operators
+    enum can take, so the trace UI shows the same labels operators
     see in the backend logs.
     """
     if aggregator.error_text:

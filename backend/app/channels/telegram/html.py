@@ -94,7 +94,7 @@ _TEXT_PRESERVING_TAGS = frozenset(
 # fragments inside a bullet (``<strong>Foo</strong> <em>bar</em>``)
 # survive. The pure-newline loose-list artifact (``<li>\n<p>…</p>\n``)
 # is filtered separately in ``_is_inter_block_whitespace`` — see the
-# special case there. Issue #417.
+# special case there.
 
 
 class _TelegramRenderer(HTMLParser):
@@ -162,8 +162,8 @@ class _TelegramRenderer(HTMLParser):
         # Loose-list artifact: markdown-it emits ``<li>\n<p>…</p>\n</li>``
         # when items are blank-line-separated. The ``\n`` chunks directly
         # under ``<li>`` (no inline tags open) are layout, not content;
-        # keeping them puts the bullet on its own line above the text
-        # (issue #417). We narrowly target *pure-newline* whitespace so
+        # keeping them puts the bullet on its own line above the text.
+        # We narrowly target *pure-newline* whitespace so
         # the legitimate single space between ``<strong>Foo</strong>`` and
         # ``<em>bar</em>`` inside a bullet still survives.
         if (

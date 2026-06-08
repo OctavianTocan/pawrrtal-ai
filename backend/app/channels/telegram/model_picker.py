@@ -70,7 +70,7 @@ class ModelCallback:
 
     action: ModelCallbackAction
     host: str | None = None
-    provider: str | None = None  # vendor slug; name kept for runtime compatibility
+    provider: str | None = None
     page: int = 1
     index: int | None = None
     catalog_token: str | None = None
@@ -270,9 +270,8 @@ def _host_to_vendors() -> dict[str, dict[str, list[ModelEntry]]]:
     """Group the catalog as ``{host_slug: {vendor_slug: [entries]}}``.
 
     Hosts whose gateway-global API key is absent are filtered out so
-    the picker only shows providers the user can actually invoke
-    (#370). Both layers preserve a stable, alphabetised order so the
-    keyboards are deterministic.
+    the picker only shows providers the user can actually invoke. Both
+    layers preserve a stable, alphabetised order so keyboards are deterministic.
     """
     grouped: dict[str, dict[str, list[ModelEntry]]] = {}
     for entry in MODEL_CATALOG:

@@ -1,11 +1,4 @@
-"""Heartbeat sync helper — workspace HEARTBEAT.md → scheduled_jobs rows.
-
-The sync is the only piece of heartbeat-specific runtime. Everything
-else (cron firing, agent turn, persistence into the heartbeat
-conversation, Telegram fan-out) is the existing JobScheduler +
-EventBus + AgentHandler + NotificationService pipeline. This module
-just bridges "what HEARTBEAT.md says" to "what JobScheduler runs."
-"""
+"""Heartbeat sync helper for workspace HEARTBEAT.md scheduled jobs."""
 
 from __future__ import annotations
 
@@ -59,10 +52,9 @@ async def sync_workspace_heartbeats(
     one ``scheduled_jobs`` row per check (replacing any existing rows
     that this workspace previously synced).
 
-    ``telegram_chat_id`` is the user's linked Telegram chat — when
-    set, every heartbeat job also fans out to that chat via the
-    existing NotificationService. When the user hasn't linked
-    Telegram, jobs run web-only without changing.
+    ``telegram_chat_id`` is the user's linked Telegram chat. When set,
+    every heartbeat job also targets that chat. When the user has not
+    linked Telegram, jobs run web-only.
 
     Idempotent: re-running picks up the latest HEARTBEAT.md, removes
     job rows whose ``name`` is no longer in the file, and replaces

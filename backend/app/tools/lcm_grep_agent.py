@@ -1,16 +1,7 @@
-"""Agent-loop adapter for the LCM grep tool (PR #4).
+"""Agent-loop adapter for the LCM grep tool.
 
-Exposes :func:`make_lcm_grep_tool` which returns an :class:`AgentTool`
-that the provider can append to ``AgentContext.tools``.  The actual DB
-search lives in :mod:`app.tools.lcm_grep`; this module only handles
-the JSON schema and the thin async wrapper the loop calls.
-
-Usage::
-
-    from app.tools.lcm_grep_agent import make_lcm_grep_tool
-
-    if settings.lcm_enabled:
-        tools.append(make_lcm_grep_tool(conversation_id=conv.id))
+The actual DB search lives in :mod:`app.tools.lcm_grep`; this module only
+handles the JSON schema and the async wrapper the loop calls.
 """
 
 from __future__ import annotations

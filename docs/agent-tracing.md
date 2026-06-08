@@ -1,4 +1,4 @@
-# Workshop & OTLP Tracing Setup
+# Agent Trace & OTLP Setup
 
 Tracing is **off by default**. Set `OTEL_EXPORTER_OTLP_ENDPOINT` to enable it; unset it and everything is a no-op.
 
@@ -19,11 +19,11 @@ Auto-instrumented layers (always on when tracing is enabled):
 - **httpx** — one span per outbound call (LLM providers, OAuth, etc.)
 - **Logging** — `trace_id` + `span_id` injected into every log line
 
-## Local setup with Raindrop Workshop
+## Local setup with an OTLP collector
 
-Workshop is a localhost OTLP collector with a live UI that renders agent tokens, tool calls, and turn boundaries in real time.
+Use a localhost OTLP collector with a live UI when you need to inspect agent tokens, tool calls, and turn boundaries in real time.
 
-### 1. Install Workshop
+### 1. Install a collector
 
 ```bash
 curl -fsSL https://raindrop.sh/install | bash
@@ -42,7 +42,7 @@ The backend sends OTLP JSON automatically — no `OTEL_EXPORTER_OTLP_PROTOCOL` n
 
 ### 3. Run
 
-Start the backend normally (`just dev`). You should see `TELEMETRY_ENABLED` in the startup logs. Workshop listens on `http://localhost:5899` — open it in a browser, then use the app. Traces appear live as you chat.
+Start the backend normally (`just dev`). You should see `TELEMETRY_ENABLED` in the startup logs. Open the collector UI, then use the app. Traces appear live as you chat.
 
 ## Remote backends (Grafana, Honeycomb, etc.)
 
@@ -68,10 +68,10 @@ Request → turn_span (root)
 
 Key files:
 
-- `backend/app/core/telemetry.py` — OTel bootstrap, auto-instrumentation
-- `backend/app/core/observability/workshop.py` — span context managers, event hook
-- `backend/app/core/observability/_schema.py` — attribute/event constants
-- `backend/app/core/observability/_recorders.py` — buffers streamed data, flushes to spans
-- `backend/app/channels/turn_runner.py` — wires spans into the turn pipeline
-- `backend/app/core/agent_loop/loop.py` — wraps tool calls in `tool_span()`
-- `backend/tests/test_observability_workshop.py` — test suite for the span contract
+- `backend/app/infrastructure/telemetry/__init__.py` — OTel bootstrap and auto-instrumentation
+- `backend/app/infrastructure/observability/agent_trace.py` — span context managers and event hook
+- `backend/app/infrastructure/observability/_schema.py` — attribute and event constants
+- `backend/app/infrastructure/observability/_recorders.py` — buffers streamed data and flushes it to spans
+- `backend/app/channels/turn_orchestrator/runner.py` — wires spans into the turn pipeline
+- `backend/app/agents/model_tool_loop/tool_calls.py` — wraps tool calls in `tool_span()`
+- `backend/tests/test_observability_agent_trace.py` — test suite for the span contract

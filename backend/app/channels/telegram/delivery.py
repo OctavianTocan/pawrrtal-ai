@@ -98,11 +98,8 @@ def chunk_html_for_telegram(html: str, *, max_len: int = MAX_MESSAGE_LEN) -> lis
 
     Telegram caps a single ``sendMessage`` body at 4096 UTF-16 code units
     (we approximate with Python string length — close enough for the
-    ASCII-dominant tool output we ship). Previously the delivery helpers
-    truncated overflow with ``"..."``, which silently dropped the tail
-    of long continuous tool-call logs (#424). The replacement strategy
-    is to split into multiple sequential messages so the user sees the
-    full transcript.
+    ASCII-dominant tool output we ship). Long output is split into
+    multiple sequential messages so the user sees the full transcript.
 
     Splitting is conservative: we prefer a blank-line boundary, fall
     back to a single newline, and only resort to a hard character
@@ -226,7 +223,6 @@ def thinking_html(text: str) -> str:
     ``<a>`` / etc. nested inside ``<i>``, so the combination renders
     correctly even when the model emits formatting mid-trace.
 
-    Closes #287.
     """
     rendered = md_to_telegram_html(text)
     # ``md_to_telegram_html`` falls back to the raw text when conversion
@@ -315,13 +311,12 @@ async def safe_send_html(
 
     Long messages are split into multiple sequential sends via
     :func:`chunk_html_for_telegram` so the user sees the full
-    transcript instead of a ``"..."`` truncation tail (#424). Only the
+    transcript instead of a ``"..."`` truncation tail. Only the
     first chunk replies to ``reply_to_message_id``; the rest land as
     sibling messages in the same thread so the chain reads naturally.
 
-    ``reply_markup`` (#368) attaches an inline keyboard (e.g. the
-    regenerate button) to the *last* chunk so the button sits directly
-    below the final answer text.
+    ``reply_markup`` attaches an inline keyboard to the *last* chunk so
+    the button sits directly below the final answer text.
 
     Returns the message_id of the *first* chunk so existing callers
     that pin/edit/delete a single message keep working unchanged.

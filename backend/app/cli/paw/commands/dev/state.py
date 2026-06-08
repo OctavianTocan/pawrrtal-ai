@@ -16,10 +16,7 @@ from app.cli.paw.config import profile_dir
 
 logger = logging.getLogger(__name__)
 
-# State file schema version. Bump when the persisted shape changes
-# in a non-backwards-compatible way. v2 added ``start_time`` so
-# ``paw dev down`` can verify the tracked PID hasn't been recycled by
-# the kernel for an unrelated process before signalling.
+# State file schema version. Bump when the persisted shape changes.
 DEV_STATE_SCHEMA_VERSION = 2
 
 
@@ -36,9 +33,8 @@ class DevState:
     process may have died and an unrelated process picked up the same
     PID. ``stop_tracked_backend`` re-reads the live process's creation
     time and refuses to signal if it doesn't match what we persisted.
-    Stored as ``float | None`` for backwards compatibility with v1 state
-    files: a missing value forces the conservative refuse-to-signal
-    path, matching the new safety contract.
+    Stored as ``float | None`` so a missing value forces the conservative
+    refuse-to-signal path.
     """
 
     schema_version: int

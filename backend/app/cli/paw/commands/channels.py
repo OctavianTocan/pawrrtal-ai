@@ -17,13 +17,6 @@ Verbs:
                                     — idempotent; 204 even when nothing
                                       was bound.
 
-Not implemented: ``simulate-update``. The closest backend surface
-(``POST /api/v1/channels/telegram/webhook``) accepts only real
-Telegram update payloads, requires the ``X-Telegram-Bot-Api-Secret-Token``
-header to match the deployment secret, and 404s outside webhook mode.
-A simulate endpoint can be added later as ``POST /api/v1/channels/{provider}/simulate``
-and wired here without churning the verb surface.
-
 Output modes mirror ``paw conversations`` / ``paw workspaces``:
 ``--json``, ``--plain``, default human-readable. Exit codes come from
 ``app.cli.paw.errors``.
@@ -38,9 +31,8 @@ import httpx
 import typer
 from sqlalchemy import select
 
-from app.cli.paw.commands.channel_diagnostics import diagnose_telegram_state as _diagnose_telegram
 from app.cli.paw.config import PersonaState, load_state
-from app.cli.paw.errors import LocalError
+from app.cli.paw.errors import ApiError, LocalError, PawError
 from app.cli.paw.http import PawClient
 from app.cli.paw.output import emit_human, emit_json, emit_plain_rows, require_one_output_mode
 from app.infrastructure.config import settings
@@ -263,6 +255,7 @@ def send_telegram(
 
 @app.command("diagnose-telegram")
 def diagnose_telegram(
+    profile: str = typer.Option("default", "--profile"),
     limit: int = typer.Option(10, "--limit", min=1, max=50),
     conversation_id: str | None = typer.Option(
         None,
@@ -272,17 +265,31 @@ def diagnose_telegram(
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
     """Inspect local Telegram binding and recent persisted turn state."""
-    payload = asyncio.run(_diagnose_telegram(limit=limit, conversation_id=conversation_id))
+    state = load_state(profile)
+    try:
+        payload = asyncio.run(
+            _diagnose_telegram(state=state, limit=limit, conversation_id=conversation_id)
+        )
+    except PawError as exc:
+        _emit_diagnose_telegram_error(exc, json_out=json_out)
+        raise typer.Exit(exc.exit_code) from exc
     if json_out:
         emit_json(payload)
         return
+    runtime = _runtime(payload)
     lines = [
         f"telegram_configured: {payload['configured']}",
         f"telegram_mode: {payload['mode']}",
+        f"telegram_service_running: {runtime.get('service_running')}",
         f"bindings: {len(payload['bindings'])}",
         f"recent_messages: {len(payload['recent_messages'])}",
         f"stuck_streaming_messages: {len(payload['stuck_streaming_messages'])}",
     ]
+    polling_task = runtime.get("polling_task")
+    if isinstance(polling_task, dict):
+        lines.append(f"telegram_polling_task: {polling_task}")
+    if runtime.get("polling_lock_path"):
+        lines.append(f"telegram_polling_lock_path: {runtime['polling_lock_path']}")
     lines.extend(
         (
             "stuck\t"
@@ -334,6 +341,30 @@ def diagnose_telegram(
     emit_human("\n".join(lines))
 
 
+def _runtime(payload: dict[str, Any]) -> dict[str, Any]:
+    runtime = payload.get("runtime")
+    return runtime if isinstance(runtime, dict) else {}
+
+
+def _emit_diagnose_telegram_error(exc: PawError, *, json_out: bool) -> None:
+    if json_out:
+        payload: dict[str, Any] = {
+            "ok": False,
+            "error": exc.message,
+            "exit_code": exc.exit_code,
+        }
+        if exc.hint:
+            payload["hint"] = exc.hint
+        if isinstance(exc, ApiError) and exc.status_code is not None:
+            payload["status_code"] = exc.status_code
+        emit_json(payload)
+        return
+    lines = [f"Telegram diagnostic failed: {exc.message}"]
+    if exc.hint:
+        lines.append(f"Hint: {exc.hint}")
+    emit_human("\n".join(lines))
+
+
 # --------------------------------------------------------------------------- #
 # HTTP helpers
 # --------------------------------------------------------------------------- #
@@ -359,6 +390,28 @@ async def _issue_telegram_link_code(state: PersonaState) -> dict[str, Any]:
         )
     data = resp.json()
     return data if isinstance(data, dict) else {}
+
+
+async def _diagnose_telegram(
+    *,
+    state: PersonaState,
+    limit: int,
+    conversation_id: str | None,
+) -> dict[str, Any]:
+    params: dict[str, Any] = {"limit": limit}
+    if conversation_id is not None:
+        params["conversation_id"] = conversation_id
+    async with PawClient(state) as client:
+        resp = await client.request(
+            "GET",
+            "/api/v1/channels/telegram/diagnose",
+            params=params,
+            expect=(200,),
+        )
+    data = resp.json()
+    if not isinstance(data, dict):
+        raise LocalError("Telegram diagnose endpoint returned a non-object response.")
+    return data
 
 
 async def _unlink_provider(state: PersonaState, provider: str) -> dict[str, Any]:

@@ -21,8 +21,13 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.config import settings as settings  # noqa: PLC0414
+from app.lcm.summarization import (
+    _approx_tokens,
+    _format_turns,
+    _resolve_summary_provider,
+    _summarize,
+)
 from app.models import LCMContextItem, LCMSummary, LCMSummarySource
-from app.providers import resolve_llm
 
 _log = logging.getLogger(__name__)
 
@@ -96,9 +101,6 @@ async def _condense_at_depth(
         ``True`` if a condensation pass ran, ``False`` if fewer than 2
         eligible items exist (nothing to condense at this depth).
     """
-    # Lazy import: keeps the ``lcm`` ↔ ``lcm_condense`` cycle one-way.
-    from app.lcm import _approx_tokens, _format_turns, _summarize  # noqa: PLC0415
-
     all_items_result = await session.execute(
         select(LCMContextItem)
         .where(LCMContextItem.conversation_id == conversation_id)
@@ -157,7 +159,7 @@ async def _condense_at_depth(
     summary_text, summary_kind = await _summarize(
         # resolve_llm does not accept user_id; kept as unused param for
         # call-site symmetry with workspace key resolution upstream.
-        resolve_llm(settings.lcm_summary_model or model_id),
+        _resolve_summary_provider(settings.lcm_summary_model or model_id),
         turns_text,
         user_id,
     )

@@ -187,7 +187,7 @@ export const TASK_SEED: readonly Task[] = [
 	// ─── Today (later in the day) ────────────────────────────────────────
 	{
 		id: 'today-pr-review',
-		title: 'Review PR #487 — sidebar resize jitter fix',
+		title: 'Review sidebar resize jitter fix',
 		description:
 			'Single-file change, should be under 10 minutes — push reviewer queue to zero.',
 		dueAt: offsetHours(2),

@@ -146,10 +146,8 @@ export const ChainOfThought = memo(function ChainOfThought({
 	const items = useMemo(() => {
 		// Keys are baked into each item at flatten time so the JSX `key=`
 		// expression is a stable string lookup, not a render-time index
-		// derivation.  Historical conversations whose tool_call_ids collided
-		// before backend PR #292 (which appended a uuid4 suffix to Gemini
-		// tool ids) still produce unique React keys via the flatten counter
-		// — but the counter lives on the data, not on the render call.
+		// derivation. Tool id collisions still produce unique React keys
+		// via the flatten counter, but the counter lives on the data.
 		type Item =
 			| { kind: 'thinking'; key: string; title: string; content: string }
 			| { kind: 'tool'; key: string; call: ChatToolCall; chips: ToolResultChips };

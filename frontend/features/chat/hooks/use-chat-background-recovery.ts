@@ -81,10 +81,7 @@ export function useChatBackgroundRecovery({
 		// incomplete — otherwise the user just opened a finished conversation
 		// and we shouldn't replay anything.
 		const lastIsIncomplete =
-			!last ||
-			last.role !== 'assistant' ||
-			last.assistant_status === 'failed' ||
-			last.content === '';
+			last?.role !== 'assistant' || last.assistant_status === 'failed' || last.content === '';
 		if (!lastIsIncomplete) return;
 
 		const queued = readBreadcrumb(conversationId);

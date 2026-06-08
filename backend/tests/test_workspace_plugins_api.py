@@ -176,8 +176,8 @@ async def test_plugins_slot_preference_rejects_channel_capability(
     seeded_default_workspace: Workspace,
 ) -> None:
     response = await client.put(
-        f"/api/v1/workspaces/{seeded_default_workspace.id}/plugins/slots/chat_surface",
-        json={"capability_key": "core_channels/telegram"},
+        f"/api/v1/workspaces/{seeded_default_workspace.id}/plugins/slots/channel:telegram",
+        json={"capability_key": "telegram_channel/telegram"},
     )
 
     assert response.status_code == 400

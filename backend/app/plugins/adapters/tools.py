@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import json
 import logging
 from collections.abc import Callable
@@ -19,6 +18,7 @@ from app.plugins.contributions import (
     capability_declared_permissions,
 )
 from app.plugins.discovery import DiscoveredPlugin
+from app.plugins.entrypoints import load_entrypoint_callable
 from app.plugins.env import resolve_plugin_env
 from app.plugins.errors import PluginRuntimeError
 from app.plugins.registry import ContributionRegistrySnapshot, PluginLoadOutcome
@@ -183,18 +183,10 @@ def _build_python_agent_tool(
 
 def load_python_tool_factory(entrypoint: str) -> PythonToolFactory:
     """Load a trusted Python tool factory from ``module:attribute``."""
-    module_name, separator, attribute_path = entrypoint.partition(":")
-    if not separator or not module_name or not attribute_path:
-        raise PluginRuntimeError("python_tool entrypoint must use 'module:attribute' syntax")
-    try:
-        target: Any = importlib.import_module(module_name)
-        for attribute in attribute_path.split("."):
-            target = getattr(target, attribute)
-    except (ImportError, AttributeError) as exc:
-        raise PluginRuntimeError(f"could not load python tool factory {entrypoint!r}") from exc
-    if not callable(target):
-        raise PluginRuntimeError(f"python tool factory {entrypoint!r} is not callable")
-    return cast(PythonToolFactory, target)
+    return cast(
+        PythonToolFactory,
+        load_entrypoint_callable(entrypoint, context="python tool factory"),
+    )
 
 
 def _materialize_env(*, workspace_root: Path, plugin: DiscoveredPlugin) -> dict[str, str]:

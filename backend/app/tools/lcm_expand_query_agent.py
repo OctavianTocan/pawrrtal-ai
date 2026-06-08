@@ -1,20 +1,8 @@
-"""Agent-loop adapter for the LCM expand_query tool (PR #6).
+"""Agent-loop adapter for the LCM expand_query tool.
 
 Exposes :func:`make_lcm_expand_query_tool` which returns an
 :class:`AgentTool` for deep recall over the full conversation history.
 
-Usage::
-
-    from app.tools.lcm_expand_query_agent import make_lcm_expand_query_tool
-
-    if settings.lcm_enabled:
-        tools.append(
-            make_lcm_expand_query_tool(
-                conversation_id=conv.id,
-                user_id=user.id,
-                model_id=model_id,
-            )
-        )
 """
 
 from __future__ import annotations

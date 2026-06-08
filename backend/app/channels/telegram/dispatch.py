@@ -1,20 +1,11 @@
-"""Per-event handlers extracted from :mod:`app.channels.telegram`.
-
-Pulled out so ``telegram.py`` stays under the 500-line ceiling enforced
-by ``scripts/check-file-lines.mjs``. The functions are mechanically
-identical to their previous in-file forms — no behavioural changes.
-
-The split is along clean seams:
+"""Per-event Telegram delivery handlers.
 
 * :func:`prepare_tools_block` / :func:`prepare_thinking_block` — block-
-  transition resets used by :meth:`TelegramChannel.deliver` (#288).
+  transition resets used by :meth:`TelegramChannel.deliver`.
 * :func:`handle_tool_use` / :func:`handle_thinking` — per-event
   Telegram I/O that ``deliver`` delegates into.
 * :func:`finalize_turn_delivery` — post-stream cleanup of the
-  placeholder + final-answer message (#288, #293, #306).
-
-Draft streaming helpers (Workstream 1) live alongside the Telegram
-delivery modules in this package.
+  placeholder and final-answer message.
 """
 
 from __future__ import annotations
@@ -112,7 +103,7 @@ async def prepare_tools_block(
     message_thread_id: int | None,
     tool_states: dict[str, ToolLineState] | None = None,
 ) -> tuple[str, int, int, float]:
-    """Open a fresh tools message on a ``thinking → tools`` transition (#288).
+    """Open a fresh tools message on a ``thinking → tools`` transition.
 
     Returns the (possibly updated) tuple
     ``(tool_trace, tool_message_id, chars_since_edit, last_edit_at)``.
@@ -142,7 +133,7 @@ def prepare_thinking_block(
     thinking_text: str,
     thinking_message_id: int | None,
 ) -> tuple[str, int | None]:
-    """Reset the thinking slot on a ``tools → thinking`` transition (#288)."""
+    """Reset the thinking slot on a ``tools → thinking`` transition."""
     if previous_block_kind in (None, "thinking"):
         return thinking_text, thinking_message_id
     return "", None
@@ -161,9 +152,8 @@ async def handle_tool_use(
 ) -> tuple[str, int, float]:
     """Inject a detailed tool-call row into the editable Telegram trace.
 
-    When ``tool_states`` is provided (Workstream 4), the per-tool state
-    dict is updated so downstream ``tool_result`` events can update the
-    line in-place.
+    When ``tool_states`` is provided, downstream ``tool_result`` events
+    can update the line in-place.
 
     Returns the updated ``(tool_trace, chars_since_edit, last_edit_at)``
     triple.
@@ -284,7 +274,7 @@ async def handle_tool_progress(
     return tool_trace, next_chars_since_edit, last_edit_at
 
 
-# Inserted between thinking deltas whose ``block_index`` differs (#353).
+# Inserted between thinking deltas whose ``block_index`` differs.
 # Same-block deltas (xAI per-token, all ``block_index=0``) concatenate
 # verbatim with no separator; different-block deltas (Gemini per-Part,
 # Claude per ThinkingBlock) get a paragraph break so the rendered
@@ -307,9 +297,9 @@ async def handle_thinking(
 
     The model owns its whitespace and paragraph breaks within a block;
     between blocks we insert :data:`_THINKING_BLOCK_SEPARATOR` so
-    per-block providers (Gemini, Claude) get visible boundaries while
+    per-block providers get visible boundaries while
     per-token providers (xAI) — which emit a constant ``block_index`` —
-    stay tightly concatenated. Covers #345 + #351 + #353.
+    stay tightly concatenated.
 
     ``previous_thinking_block_index`` is the index from the previous
     thinking event on this turn, or ``None`` for the first thinking
@@ -396,23 +386,21 @@ async def dispatch_text_delta(
     reply_to_message_id: int | None,
     message_thread_id: int | None,
 ) -> tuple[str, int | None, int, float, bool]:
-    """Apply the #306 fresh-block reset (if needed) and stream the chunk.
+    """Apply the fresh-block reset when needed and stream the chunk.
 
     Returns the updated text-buffer state plus a ``rendered`` flag:
 
-    * ``rendered=False`` for the legacy accumulate path — when no thinking
+    * ``rendered=False`` for the accumulate path — when no thinking
       or tool block has rendered yet we keep "send the final answer at
       the end" UX.
     * ``rendered=True`` when an interleaved text block was opened or edited.
     """
-    # Legacy editMessageText path: only open an interleaved text
+    # Only open an interleaved text
     # message on a block transition. Pure-text turns (no prior block)
     # keep accumulating into ``answer_text`` for the closing reply.
     # ``previous_block_kind == "text"`` now FALLS THROUGH so subsequent
     # same-block deltas EXTEND the open interleaved message instead of
-    # being dropped (#346): the previous short-circuit on ``"text"``
-    # caused only the first chunk to render whenever text followed a
-    # thinking / tools block.
+    # being dropped when text follows a thinking or tools block.
     if previous_block_kind is None:
         return text_buffer, text_message_id, chars_since_edit, last_edit_at, False
     if previous_block_kind != "text":
@@ -451,12 +439,11 @@ async def handle_text_delta(
     reply_to_message_id: int | None,
     message_thread_id: int | None,
 ) -> tuple[str, int | None, int, float]:
-    """Append ``chunk`` to the live text message — open one if needed (#306)."""
+    """Append ``chunk`` to the live text message, opening one when needed."""
     if not chunk:
         return text_buffer, text_message_id, chars_since_edit, last_edit_at
     text_buffer = f"{text_buffer}{chunk}"
 
-    # Legacy editMessageText path.
     if text_message_id is None:
         new_id = await safe_send_text(
             bot,

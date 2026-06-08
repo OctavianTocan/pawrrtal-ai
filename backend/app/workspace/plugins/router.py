@@ -157,7 +157,11 @@ def get_workspace_plugins_router() -> APIRouter:
         workspace = await _get_owned_workspace(workspace_id, user, session)
         workspace_root = Path(workspace.path)
         snapshot = _snapshot(workspace_root)
-        capability = _require_capability(snapshot=snapshot, capability_key=payload.capability_key)
+        capability = _require_workspace_slot_capability(
+            workspace_snapshot=snapshot,
+            runtime_snapshot=_runtime_snapshot(),
+            capability_key=payload.capability_key,
+        )
         _ensure_capability_slot_manageable(capability)
         if slot_id not in capability.slots:
             raise HTTPException(
@@ -311,15 +315,34 @@ def _require_outcome(
     return outcome
 
 
-def _require_capability(
+def _find_capability(
     *,
     snapshot: ContributionRegistrySnapshot,
     capability_key: str,
-) -> CapabilityRecord:
-    """Return a capability by composite key or raise 404."""
+) -> CapabilityRecord | None:
+    """Return a capability by composite key when the snapshot contains it."""
     for capability in snapshot.capabilities:
         if capability.key == capability_key:
             return capability
+    return None
+
+
+def _require_workspace_slot_capability(
+    *,
+    workspace_snapshot: ContributionRegistrySnapshot,
+    runtime_snapshot: ContributionRegistrySnapshot,
+    capability_key: str,
+) -> CapabilityRecord:
+    """Return a workspace capability or reject runtime-global slot writes."""
+    capability = _find_capability(snapshot=workspace_snapshot, capability_key=capability_key)
+    if capability is not None:
+        return capability
+    runtime_capability = _find_capability(snapshot=runtime_snapshot, capability_key=capability_key)
+    if runtime_capability is not None and _is_runtime_global_capability(runtime_capability):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=RUNTIME_GLOBAL_MANAGE_REASON,
+        )
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"Capability {capability_key!r} is not installed.",
@@ -337,11 +360,16 @@ def _ensure_workspace_manageable(outcome: PluginLoadOutcome) -> None:
 
 def _ensure_capability_slot_manageable(capability: CapabilityRecord) -> None:
     """Reject workspace slot preferences for runtime-global capabilities."""
-    if capability.type in RUNTIME_GLOBAL_CAPABILITY_TYPES:
+    if _is_runtime_global_capability(capability):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=RUNTIME_GLOBAL_MANAGE_REASON,
         )
+
+
+def _is_runtime_global_capability(capability: CapabilityRecord) -> bool:
+    """Return whether this capability is managed outside workspace plugin state."""
+    return capability.type in RUNTIME_GLOBAL_CAPABILITY_TYPES
 
 
 def _is_runtime_global_plugin(outcome: PluginLoadOutcome) -> bool:

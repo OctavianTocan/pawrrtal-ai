@@ -9,7 +9,7 @@ from typing import Any
 
 from app.agents.permissions import render_permission_denied
 from app.agents.types import AgentLoopConfig, AgentTool
-from app.infrastructure.observability.workshop import tool_span
+from app.infrastructure.observability import tool_span
 
 _log = logging.getLogger(__name__)
 
@@ -78,9 +78,6 @@ async def _execute_and_log_tool_call(
         args_preview,
     )
 
-    # Workshop / OTel tool span — gives the live trace viewer a row
-    # per call with the args + result + duration, scoped under the
-    # surrounding ``pawrrtal.turn`` span.  No-op when telemetry off.
     with tool_span(name=name, tool_call_id=call_id, arguments=arguments) as ts:
         started_at = time.monotonic()
         result_text, is_error = await _dispatch_tool_call(

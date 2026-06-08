@@ -1,8 +1,8 @@
-"""Span recorder classes for ``app.infrastructure.observability.workshop``.
+"""Span recorder classes for ``app.infrastructure.observability.agent_trace``.
 
 Holds the mutable per-span state (streamed deltas, buffered tool calls,
 final usage) that the ``llm_span`` / ``tool_span`` context managers
-stamp onto their OTel spans.  Split out so the public ``workshop``
+stamp onto their OTel spans.  Split out so the public ``agent_trace``
 module stays inside the project's file-line budget
 (``scripts/check-file-lines.mjs``); private to the package.
 """
@@ -40,10 +40,10 @@ _MS_PER_SECOND = 1000.0
 class LLMSpanRecorder:
     """Accumulates streamed deltas + final usage onto the live LLM span.
 
-    Workshop's adapter reads ``gen_ai.output.messages`` once the span
+    trace parsers reads ``gen_ai.output.messages`` once the span
     closes, so we buffer the text + tool-call parts in memory and
     stamp the attribute on ``flush()``.  Per-delta events also go on
-    the span as OTel span events so Workshop's live websocket
+    the span as OTel span events so live trace streams
     broadcast surfaces them while the turn is still running.
 
     The recorder is intentionally tolerant of partial input — each
@@ -181,7 +181,7 @@ class TurnSpanRecorder:
     first user-visible chunk is produced, and :meth:`flush` stamps the
     final ``pawrrtal.turn.duration_ms`` (always) and
     ``pawrrtal.turn.ttft_ms`` (when a first event was observed).
-    Workshop's UI ignores attributes it doesn't recognise, so this is
+    trace UI ignores attributes it doesn't recognise, so this is
     safe to emit alongside the existing turn-span attributes.
     """
 

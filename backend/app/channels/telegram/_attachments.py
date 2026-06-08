@@ -1,8 +1,7 @@
 """Telegram inbound-attachment processing.
 
-Closes #304 (voice transcription) and #305 (image + file ingestion).
-Each attachment type maps to a single normalization step that runs
-inside :func:`collect_attachments`:
+Each attachment type maps to a single normalization step that runs inside
+:func:`collect_attachments`:
 
 * **photo** → base64 image entry for a pre-turn image-understanding
   sub-agent.

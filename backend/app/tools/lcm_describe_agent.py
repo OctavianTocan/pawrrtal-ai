@@ -1,4 +1,4 @@
-"""Agent-loop adapter for the LCM describe tool (PR #5).
+"""Agent-loop adapter for the LCM describe tools.
 
 Exposes two :class:`AgentTool` factories:
 
@@ -7,16 +7,6 @@ Exposes two :class:`AgentTool` factories:
   the current conversation (so the agent can find the right ID to pass
   to ``lcm_describe``).
 
-Usage::
-
-    from app.tools.lcm_describe_agent import (
-        make_lcm_describe_tool,
-        make_lcm_list_summaries_tool,
-    )
-
-    if settings.lcm_enabled:
-        tools.append(make_lcm_list_summaries_tool(conversation_id=conv.id))
-        tools.append(make_lcm_describe_tool(conversation_id=conv.id))
 """
 
 from __future__ import annotations
@@ -28,10 +18,6 @@ from app.agents.types import AgentTool
 from app.infrastructure.database.legacy import async_session_maker
 from app.tools.display import make_tool_display
 from app.tools.lcm_describe import lcm_describe, lcm_list_summaries
-
-# ---------------------------------------------------------------------------
-# lcm_list_summaries
-# ---------------------------------------------------------------------------
 
 _LIST_TOOL_NAME = "lcm_list_summaries"
 
@@ -74,10 +60,6 @@ def make_lcm_list_summaries_tool(*, conversation_id: uuid.UUID) -> AgentTool:
         ),
     )
 
-
-# ---------------------------------------------------------------------------
-# lcm_describe
-# ---------------------------------------------------------------------------
 
 _DESCRIBE_TOOL_NAME = "lcm_describe"
 

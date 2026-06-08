@@ -13,7 +13,7 @@ from app.channels._turn_cost import record_turn_cost_if_enabled
 from app.chat.aggregator import ChatTurnAggregator
 from app.conversations.messages_crud import finalize_assistant_message
 from app.infrastructure.event_bus import TurnCompletedEvent, publish_if_available
-from app.lcm import schedule_lcm_compaction
+from app.plugins.adapters.conversation_memory import resolve_conversation_memory
 
 from .history import _turn_session
 from .types import ChatTurnInput
@@ -120,9 +120,6 @@ async def _finalize_turn(
         breakdown,
         extras,
     )
-    # PR 10: announce completion (success / failure both surface here
-    # because the caller wraps run_turn in a try/finally).  Subscribers
-    # can react to spend, latency, etc.
     surface = (
         (turn_input.channel_message.get("surface") or "") if turn_input.channel_message else ""
     )
@@ -144,12 +141,10 @@ async def _finalize_turn(
             source=turn_input.log_tag.lower(),
         )
     )
-    # Fire-and-forget LCM leaf compaction.  Runs after the assistant row is
-    # finalized so the just-completed turn is eligible for compaction.
-    # The helper handles the ``settings.lcm_enabled`` gate, task-strong-ref
-    # bookkeeping, and exception suppression in one place.
-    schedule_lcm_compaction(
-        conversation_id=turn_input.conversation_id,
-        user_id=turn_input.user_id,
-        model_id=model_id,
-    )
+    memory = resolve_conversation_memory(workspace_root=turn_input.workspace_root)
+    if memory is not None:
+        memory.backend.schedule_compaction(
+            conversation_id=turn_input.conversation_id,
+            user_id=turn_input.user_id,
+            model_id=model_id,
+        )

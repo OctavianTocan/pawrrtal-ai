@@ -10,9 +10,8 @@ from __future__ import annotations
 from app.infrastructure.config import settings
 
 # Host → settings field that must be non-empty for the host to appear in
-# the picker (#370). Hosts that don't require a gateway API key
-# (``gemini-cli`` uses a local subprocess) are absent from this map and
-# always shown.
+# the picker. Hosts that don't require a gateway API key are absent from
+# this map and always shown.
 _HOST_AUTH_SETTING: dict[str, str] = {
     "agent-sdk": "claude_code_oauth_token",
     "google-ai": "google_api_key",

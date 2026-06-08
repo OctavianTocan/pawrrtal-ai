@@ -216,7 +216,7 @@ Use small commits and small PRs. Each commit should tell the architectural story
 of the slice.
 
 1. Provider sessions and API field rename.
-2. Electrobun deletion and frontend port migration.
+2. Frontend port normalization.
 3. Provider plugin registry.
 4. Channel plugin registry and Telegram migration.
 5. Tool slots and capability search.
@@ -234,8 +234,7 @@ This branch covers:
 
 - Generic provider-session persistence and turn state.
 - Deletion of browser-facing default model machinery included from PR #473.
-- Deletion of Electrobun workspace code.
-- Port migration from `53001` to `3000`.
+- Frontend dev and Cloudflared origin port normalization.
 - Cache-only directory cleanup.
 
 It does not complete the full plugin extraction. The remaining work above is

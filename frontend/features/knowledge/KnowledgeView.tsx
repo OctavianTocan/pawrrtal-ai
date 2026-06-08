@@ -101,7 +101,7 @@ export interface KnowledgeViewProps {
  * viewer) or the standard folder grid.
  */
 function isLeafFolder(node: FileTreeNode | null): boolean {
-	if (!node || node.kind !== 'folder') return false;
+	if (node?.kind !== 'folder') return false;
 	if (node.children.length === 0) return false;
 	return node.children.every((child) => child.kind === 'file');
 }

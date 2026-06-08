@@ -13,14 +13,12 @@ This package provides:
 from .base import Channel, ChannelMessage, ChannelResponse
 from .registry import registered_surfaces, resolve_channel
 from .sse import SSEChannel, surface_from_header
-from .telegram import TelegramChannel
 
 __all__ = [
     "Channel",
     "ChannelMessage",
     "ChannelResponse",
     "SSEChannel",
-    "TelegramChannel",
     "registered_surfaces",
     "resolve_channel",
     "surface_from_header",

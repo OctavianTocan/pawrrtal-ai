@@ -38,11 +38,6 @@ from app.channels.crud import (
     redeem_link_code,
     update_conversation_verbose_level,
 )
-
-# Re-export so ``bot.py`` imports both ``handle_plain_message`` and
-# ``collect_attachments`` from the same module — keeps ``bot.py`` under
-# sentrux's ``no_god_files`` fan-out budget without forcing a registry
-# refactor in this PR (the long-term home is #281).
 from app.channels.telegram._attachments import (
     collect_attachments as collect_attachments,  # noqa: PLC0414
 )
@@ -125,8 +120,7 @@ class TelegramTurnContext:
     """Telegram topic thread ID, forwarded from the sender. None for plain DMs."""
 
     verbose_level: int | None = None
-    """Per-conversation verbose level (PR 07): None inherits the global
-    default ``settings.telegram_verbose_default``; 0/1/2 override."""
+    """Per-conversation verbose level; None inherits the global default."""
 
 
 async def handle_start_command(

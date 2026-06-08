@@ -2,9 +2,10 @@
  * Login + dev-admin shortcut smoke tests.
  *
  * Asserts the login page renders the expected affordances (email +
- * password fields, Login + SSO buttons, dev-admin shortcut on
- * non-prod). Does NOT exercise the OAuth handshakes — those go to
- * external providers and aren't appropriate for the smoke suite.
+ * password fields, Login + SSO buttons, dev-admin shortcut on non-prod)
+ * and proves the dev-admin button signs in through the browser path. Does
+ * NOT exercise the OAuth handshakes — those go to external providers and
+ * aren't appropriate for the smoke suite.
  */
 
 import { expect, test } from './fixtures';
@@ -23,23 +24,33 @@ test.describe('login page', () => {
 		await page.goto('/login');
 		await expect(page.getByRole('button', { name: 'Dev Admin' })).toBeVisible();
 	});
+
+	test('dev-admin shortcut signs in through the UI path', async ({ page }) => {
+		await page.goto('/login');
+		const devLoginResponse = page.waitForResponse(
+			(response) =>
+				response.url().includes('/auth/dev-login') && response.request().method() === 'POST'
+		);
+
+		await page.getByRole('button', { name: 'Dev Admin' }).click();
+
+		expect((await devLoginResponse).ok()).toBe(true);
+		await expect(page).toHaveURL(/\/$/);
+
+		const isAuthenticated = await page.evaluate(async () => {
+			const response = await fetch('/api/v1/users/me', { credentials: 'include' });
+			return response.ok;
+		});
+		expect(isAuthenticated).toBe(true);
+	});
 });
 
 test.describe('authenticated landing', () => {
-	test('dev-login + provisioned workspace lands on the home shell', async ({ page, context }) => {
-		const backend = process.env.E2E_API_URL ?? 'http://localhost:8000';
-		// ``context.request`` shares cookies with the browser context, so
-		// the dev-login session carries into the personalization upsert.
-		const loginResponse = await context.request.post(`${backend}/auth/dev-login`);
-		expect(loginResponse.ok()).toBe(true);
-		// The home shell only renders once the user has a provisioned
-		// workspace (see ``useOnboardingReadiness`` + ``AppShell``).
-		// Trigger the personalization upsert so onboarding-status reports
-		// has_workspace_ready=true before we navigate.
-		const provisionResponse = await context.request.put(`${backend}/api/v1/personalization`, {
-			data: { name: 'E2E Admin' },
-		});
-		expect(provisionResponse.ok()).toBe(true);
+	test('dev-login + provisioned workspace lands on the home shell', async ({
+		page,
+		authenticatedPageWithWorkspace,
+	}) => {
+		void authenticatedPageWithWorkspace;
 
 		await page.goto('/');
 		// The chat composer is visible from the home page once authenticated.

@@ -9,11 +9,8 @@ dev-admin user (whose credentials are ``ADMIN_EMAIL`` /
 when the env var is unset (default), the admin credentials aren't
 configured, or the sender's Telegram ID doesn't match.
 
-Pairs with the branch-scoped SQLite filename (PR #363): switching git
-branches now spins up a fresh DB and an empty bindings table, which
-previously meant manually re-running ``/start <code>`` after every
-checkout. With this auto-link the dev-admin's Telegram identity is
-re-bound on first contact in each new database.
+    This avoids manually re-running ``/start <code>`` after every fresh
+    branch-scoped SQLite database.
 """
 
 from __future__ import annotations
