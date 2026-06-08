@@ -157,12 +157,16 @@ async def update_message(*, message_name: str, text: str) -> bool:
     so a transient patch error can't crash the turn.
     """
     url = f"{_CHAT_BASE_URL}/{message_name}"
-    response = await _client().patch(
-        url,
-        headers=await _headers(),
-        params={"updateMask": "text"},
-        json={"text": text},
-    )
+    try:
+        response = await _client().patch(
+            url,
+            headers=await _headers(),
+            params={"updateMask": "text"},
+            json={"text": text},
+        )
+    except httpx.HTTPError:
+        logger.warning("GOOGLE_CHAT_UPDATE_TRANSPORT_ERR", exc_info=True)
+        return False
     if response.status_code >= _HTTP_BAD_REQUEST:
         logger.warning("GOOGLE_CHAT_UPDATE_ERR %s", _short_error(response))
         return False
@@ -223,6 +227,15 @@ async def download_attachment(*, resource_name: str, max_bytes: int) -> bytes | 
     if response.status_code >= _HTTP_BAD_REQUEST:
         logger.warning("GOOGLE_CHAT_MEDIA_ERR %s", _short_error(response))
         return None
+    content_length = response.headers.get("content-length")
+    if content_length is not None:
+        try:
+            declared_bytes = int(content_length)
+        except ValueError:
+            declared_bytes = 0
+        if declared_bytes > max_bytes:
+            logger.warning("GOOGLE_CHAT_MEDIA_TOO_LARGE bytes=%d cap=%d", declared_bytes, max_bytes)
+            return None
     data = response.content
     if len(data) > max_bytes:
         logger.warning("GOOGLE_CHAT_MEDIA_TOO_LARGE bytes=%d cap=%d", len(data), max_bytes)
