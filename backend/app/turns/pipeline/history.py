@@ -8,7 +8,6 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from app.channels._turn_workspace import workspace_system_prompt
 from app.conversations.messages_crud import (
     append_assistant_placeholder,
     append_user_message,
@@ -19,6 +18,7 @@ from app.plugins.adapters.conversation_memory import (
     ConversationMemoryBackend,
     resolve_conversation_memory,
 )
+from app.turns.pipeline.workspace_context import workspace_system_prompt
 
 from .types import ChatTurnInput
 

@@ -30,7 +30,7 @@ async def await_pending_turn_finalize_tasks(
     except TimeoutError:
         outstanding = [task for task in pending if not task.done()]
         logger.warning(
-            "turn_orchestrator: shutdown drain timed out after %.1fs; %d finalize task(s) still running",
+            "turn_pipeline: shutdown drain timed out after %.1fs; %d finalize task(s) still running",
             timeout,
             len(outstanding),
         )

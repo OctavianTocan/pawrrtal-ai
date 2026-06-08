@@ -122,7 +122,7 @@ async def handle_compact_command(
     summary_model_id = resolve_effective_model_id(conversation_model_id=conversation.model_id)
 
     # Take the per-conversation lock to serialize against any
-    # background pass that turn_orchestrator.py just scheduled — both paths
+    # background pass that the Turn Pipeline just scheduled — both paths
     # mutate the ``(conversation_id, ordinal)`` slot so they must not
     # interleave.
     async with acquire_lcm_lock(conversation.id):

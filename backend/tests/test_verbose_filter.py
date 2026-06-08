@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import pytest
 
-from app.channels.turn_orchestrator import _should_deliver_event
 from app.chat.aggregator import (
     VERBOSE_DETAILED,
     VERBOSE_NORMAL,
@@ -16,6 +15,7 @@ from app.chat.aggregator import (
     should_emit_event,
 )
 from app.providers.base import StreamEvent
+from app.turns.pipeline import _should_deliver_event
 
 
 def _ev(t: str, **kw: object) -> StreamEvent:

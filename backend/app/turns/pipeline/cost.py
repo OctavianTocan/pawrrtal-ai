@@ -1,6 +1,6 @@
-"""Per-turn cost-ledger write — extracted from ``turn_orchestrator``.
+"""Per-turn cost-ledger write for the Turn Pipeline.
 
-Keeps ``app.channels.turn_orchestrator`` under the 500-line module budget
+Keeps ``app.turns.pipeline`` under the 500-line module budget
 while keeping the cost-ledger write tightly bound to the turn lifecycle
 (same DB session as the assistant-message persist so a failed commit
 leaves no orphaned ledger row).
@@ -43,8 +43,8 @@ async def record_turn_cost_if_enabled(
     transaction.
 
     Pass plain values rather than a ``ChatTurnInput`` so this module
-    has no import dependency on ``turn_orchestrator`` (sentrux disallows the
-    cycle, even via ``TYPE_CHECKING``).
+    has no import dependency on the rest of the Turn Pipeline (sentrux
+    disallows the cycle, even via ``TYPE_CHECKING``).
     """
     if not settings.cost_tracker_enabled:
         return

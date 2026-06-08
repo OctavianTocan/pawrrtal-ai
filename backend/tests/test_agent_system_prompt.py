@@ -9,7 +9,7 @@ from app.agents import (
     PAW_CORE_SYSTEM_PROMPT,
     compose_agent_system_prompt,
 )
-from app.channels.turn_orchestrator import _workspace_system_prompt
+from app.turns.pipeline import _workspace_system_prompt
 from app.workspace.persona_bootstrap import IDENTITY_BEGIN, IDENTITY_END
 
 

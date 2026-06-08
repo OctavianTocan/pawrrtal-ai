@@ -344,13 +344,13 @@ def agent_event_hook(
     *,
     turn_recorder: TurnSpanRecorder | None = None,
 ) -> Callable[[StreamEvent], list[StreamEvent]]:
-    """Return a ``turn_orchestrator.EventHook`` that mirrors stream events onto *recorder*.
+    """Return a Turn Pipeline event hook that mirrors stream events onto *recorder*.
 
     The hook is read-only — it always returns ``[]`` so the upstream
     chat aggregator + channel deliverer see the original stream
     unchanged.  It exists so the channel turn-runner can keep its
     instrumentation layered side-by-side with the rest of its
-    ``event_hooks`` list (existing seam at ``turn_orchestrator.py``: ``EventHook
+    ``event_hooks`` list (existing Turn Pipeline seam: ``EventHook
     = Callable[[StreamEvent], list[StreamEvent]]``).
 
     Dispatch is via :data:`_HOOK_DISPATCH` so the closure stays flat —

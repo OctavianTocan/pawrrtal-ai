@@ -359,7 +359,7 @@ def test_event_hook_mirrors_stream_events_onto_recorder(
 
 
 # ---------------------------------------------------------------------------
-# turn_orchestrator integration — span layering + history rendering
+# Turn Pipeline integration — span layering + history rendering
 # ---------------------------------------------------------------------------
 
 

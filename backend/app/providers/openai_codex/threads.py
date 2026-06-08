@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Protocol, cast
 
 from app.agents.types import AgentTool
-from app.channels._turn_runtime_context import system_prompt_for_turn
 from app.provider_sessions import (
     ProviderSessionTurnState,
     load_provider_session,
@@ -22,6 +21,7 @@ from app.providers.openai_codex.prompting import (
     CODEX_DEVELOPER_INSTRUCTIONS,
     should_use_lightweight_codex_prompt,
 )
+from app.turns.pipeline.runtime_context import system_prompt_for_turn
 
 logger = logging.getLogger(__name__)
 PROVIDER_SESSION_KIND = "openai_codex"

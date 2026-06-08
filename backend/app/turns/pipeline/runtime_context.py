@@ -1,6 +1,6 @@
 """Compose the per-turn system prompt: workspace + runtime metadata.
 
-Tiny helper that keeps :mod:`app.channels.turn_orchestrator` below the
+Tiny helper that keeps :mod:`app.turns.pipeline` below the
 fan-out budget the architecture gate (sentrux ``no_god_files``)
 enforces.  Without this seam the runner would pull
 :mod:`app.providers.catalog`, :mod:`app.providers.model_id`,
@@ -18,10 +18,10 @@ from typing import TYPE_CHECKING
 
 from app.agents.runtime_context import ProviderIdentity, append_runtime_context
 from app.agents.safety_factory import safety_from_settings
-from app.channels._turn_workspace import workspace_system_prompt
 from app.infrastructure.config import settings
 from app.providers.catalog import find as find_catalog_entry
 from app.providers.model_id import InvalidModelId, parse_model_id
+from app.turns.pipeline.workspace_context import workspace_system_prompt
 
 if TYPE_CHECKING:
     from app.agents.types import AgentTool

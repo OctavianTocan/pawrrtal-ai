@@ -449,7 +449,7 @@ class TestProviderOptions:
         # subprocess never reads CLAUDE.md, .claude/settings.json
         # (hooks), or .mcp.json from whatever directory it happens
         # to be running in. The workspace's CLAUDE.md is injected
-        # via system_prompt= by ``turn_orchestrator._workspace_system_prompt``
+        # via system_prompt= by ``turns.pipeline.workspace_context``
         # from the *correct* user workspace root.
         assert options.setting_sources == []
         assert options.permission_mode == "default"

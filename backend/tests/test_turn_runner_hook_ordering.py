@@ -20,11 +20,11 @@ from unittest.mock import MagicMock
 import pytest
 
 from app.channels.base import ChannelMessage
-from app.channels.turn_orchestrator import ChatTurnInput, _guarded_stream, run_turn
 from app.chat.aggregator import ChatTurnAggregator
 from app.plugins.adapters.turn_context import TurnContextProviderAdapter
 from app.provider_sessions import ProviderSessionTurnState
 from app.providers.base import StreamEvent
+from app.turns.pipeline import ChatTurnInput, _guarded_stream, run_turn
 
 
 class _ScriptedProvider:
@@ -261,7 +261,7 @@ async def test_provider_session_created_event_is_persisted(
         persisted.append((conversation_id, kind, session_id, fingerprint))
 
     monkeypatch.setattr(
-        "app.channels.turn_orchestrator.runner.persist_provider_session",
+        "app.turns.pipeline.runner.persist_provider_session",
         fake_persist,
     )
 
@@ -369,10 +369,8 @@ async def test_lightweight_codex_turn_still_runs_turn_context_providers(
     async def no_finalize(**_kwargs: Any) -> None:
         return None
 
-    monkeypatch.setattr(
-        "app.channels.turn_orchestrator.runner._load_history_and_persist", no_persist
-    )
-    monkeypatch.setattr("app.channels.turn_orchestrator.runner._finalize_turn", no_finalize)
+    monkeypatch.setattr("app.turns.pipeline.runner._load_history_and_persist", no_persist)
+    monkeypatch.setattr("app.turns.pipeline.runner._finalize_turn", no_finalize)
 
     turn_input = ChatTurnInput(
         conversation_id=MagicMock(),
@@ -451,10 +449,8 @@ async def test_turn_context_provider_draft_updater_is_surface_agnostic(
     async def no_finalize(**_kwargs: Any) -> None:
         return None
 
-    monkeypatch.setattr(
-        "app.channels.turn_orchestrator.runner._load_history_and_persist", no_persist
-    )
-    monkeypatch.setattr("app.channels.turn_orchestrator.runner._finalize_turn", no_finalize)
+    monkeypatch.setattr("app.turns.pipeline.runner._load_history_and_persist", no_persist)
+    monkeypatch.setattr("app.turns.pipeline.runner._finalize_turn", no_finalize)
 
     turn_input = ChatTurnInput(
         conversation_id=MagicMock(),

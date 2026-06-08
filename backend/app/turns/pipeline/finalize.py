@@ -9,11 +9,11 @@ from collections import Counter
 
 from sqlalchemy import exc as sa_exc
 
-from app.channels._turn_cost import record_turn_cost_if_enabled
 from app.chat.aggregator import ChatTurnAggregator
 from app.conversations.messages_crud import finalize_assistant_message
 from app.infrastructure.event_bus import TurnCompletedEvent, publish_if_available
 from app.plugins.adapters.conversation_memory import resolve_conversation_memory
+from app.turns.pipeline.cost import record_turn_cost_if_enabled
 
 from .history import _turn_session
 from .types import ChatTurnInput

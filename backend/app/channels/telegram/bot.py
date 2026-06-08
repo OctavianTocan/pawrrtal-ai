@@ -62,11 +62,11 @@ from app.channels.telegram.handlers import (
     handle_whoami_command,
 )
 from app.channels.telegram.tools_command import handle_tools_command
-from app.channels.turn_orchestrator import ChatTurnInput, run_turn
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
 from app.plugins.adapters.turn_context import build_turn_context_providers
 from app.providers.session_preparer import prepare_provider_session
+from app.turns.pipeline import ChatTurnInput, run_turn
 
 from .channel import SURFACE_TELEGRAM, make_telegram_sender, render_initial
 from .error_handler import register_telegram_error_handler
@@ -1076,14 +1076,35 @@ async def _stop_polling_task(service: TelegramService) -> None:
         return
     with _suppress_aiogram_polling_shutdown_logs():
         if not task.done():
-            try:
-                await service.dispatcher.stop_polling()
-            except RuntimeError as exc:
-                if "Polling is not started" not in str(exc):
-                    raise
-                task.cancel()
-        with contextlib.suppress(asyncio.CancelledError, Exception):
-            await task
+            await _request_polling_stop(service, task)
+        await _await_polling_task(task)
+
+
+async def _request_polling_stop(
+    service: TelegramService,
+    task: asyncio.Task[None],
+) -> None:
+    """Ask aiogram to stop polling, tolerating the already-stopped race."""
+    try:
+        await service.dispatcher.stop_polling()
+    except RuntimeError as exc:
+        _handle_stop_polling_runtime_error(exc, task)
+
+
+def _handle_stop_polling_runtime_error(
+    exc: RuntimeError,
+    task: asyncio.Task[None],
+) -> None:
+    """Cancel the polling task only when aiogram says polling was already stopped."""
+    if "Polling is not started" not in str(exc):
+        raise exc
+    task.cancel()
+
+
+async def _await_polling_task(task: asyncio.Task[None]) -> None:
+    """Wait for the polling task while preserving the old shutdown suppression."""
+    with contextlib.suppress(asyncio.CancelledError, Exception):
+        await task
 
 
 def _validate_telegram_webhook_url(url: str) -> None:

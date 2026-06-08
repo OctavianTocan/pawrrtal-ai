@@ -39,12 +39,11 @@ layers =
     chat : conversations : agents : providers : tools : lcm : workspace : projects : governance : integrations : schemas
     models : governance_models : lcm_models : mcp_models
     infrastructure.auth : infrastructure.database : infrastructure.lifecycle : infrastructure.logging : infrastructure.middleware : infrastructure.models
-; `app.channels` is intentionally NOT in any layer here:
-; `channels/base.py` + `channels/registry.py` are foundational, but
-; `channels/turn_runner.py` (added in #204) is orchestration that
-; pulls domain persistence helpers and database plumbing. The directory mixes layers and
-; should be split — tracked as a follow-up. Until then it stays
-; unlayered (sentrux ignores unlayered files).
+; `app.channels` is intentionally NOT in any layer here yet:
+; `channels/base.py` + `channels/registry.py` are foundational, while the
+; concrete Telegram / Google Chat adapters still assemble domain state,
+; provider resolution, and delivery details. Keep tightening those seams in
+; focused follow-ups rather than misrepresenting the package as layer-pure.
 ;
 ; `app.core`, `app.infrastructure.event_bus`, and
 ; `app.infrastructure.observability` are also intentionally unlayered
@@ -137,3 +136,13 @@ source_modules =
     app
 forbidden_modules =
     frontend
+
+; --- Contract 4: provider adapters must not depend on channel adapters. ----
+
+[importlinter:contract:providers-must-not-import-channels]
+name = Providers must not import channels
+type = forbidden
+source_modules =
+    app.providers
+forbidden_modules =
+    app.channels

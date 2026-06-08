@@ -1,12 +1,12 @@
 """Bridging helpers between Pawrrtal turn state and the agent trace span shape.
 
-Pulled out of ``app.channels.turn_orchestrator`` so that module stays under
+Pulled out of ``app.turns.pipeline`` so that module stays under
 the project's 500-line ceiling (``scripts/check-file-lines.mjs``) and
 the agent-trace translations live next to the rest of the
 observability package.
 
 Both helpers are private to ``app.infrastructure.observability`` /
-``app.channels.turn_orchestrator``; the public surface remains the context
+``app.turns.pipeline``; the public surface remains the context
 managers exposed via ``app.infrastructure.observability.agent_trace``.
 """
 

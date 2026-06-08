@@ -86,7 +86,7 @@ async def db_session(
     # mode). In tests, point those calls at the in-memory engine so the
     # runner sees the same tables and seeded rows as the request session.
     monkeypatch.setattr(
-        "app.channels.turn_orchestrator.history.async_session_maker",
+        "app.turns.pipeline.history.async_session_maker",
         session_maker,
         raising=True,
     )

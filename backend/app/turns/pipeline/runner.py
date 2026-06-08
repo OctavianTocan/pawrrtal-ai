@@ -8,7 +8,6 @@ import time
 from collections.abc import AsyncIterator, Callable, Coroutine, Iterator
 from typing import TYPE_CHECKING, Any
 
-from app.channels._turn_runtime_context import system_prompt_for_turn
 from app.chat.aggregator import ChatTurnAggregator, should_emit_event
 from app.infrastructure.observability import (
     TurnSpanRecorder,
@@ -22,6 +21,7 @@ from app.provider_sessions import (
     _register_provider_session_persist_task,
     persist_provider_session,
 )
+from app.turns.pipeline.runtime_context import system_prompt_for_turn
 
 from .context_providers import _run_turn_context_providers
 from .finalize import _finalize_turn

@@ -12,7 +12,7 @@ import pytest
 from app.channels.google_chat import ingress
 from app.channels.google_chat.attachments import GoogleChatAttachments
 from app.channels.google_chat.channel import SURFACE_GOOGLE_CHAT
-from app.channels.turn_orchestrator import ChatTurnInput
+from app.turns.pipeline import ChatTurnInput
 
 
 class _Provider:

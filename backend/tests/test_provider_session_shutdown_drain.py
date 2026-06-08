@@ -15,7 +15,7 @@ import asyncio
 import pytest
 
 from app import provider_sessions
-from app.channels.turn_orchestrator import state as turn_state
+from app.turns.pipeline import state as turn_state
 
 
 @pytest.mark.anyio

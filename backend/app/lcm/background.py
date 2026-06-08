@@ -1,7 +1,7 @@
 """Fire-and-forget LCM compaction trigger.
 
 Splits the background-task plumbing out of
-``app.channels.turn_orchestrator`` to keep that module under the project's
+``app.turns.pipeline`` to keep that module under the project's
 500-line file budget while keeping the public surface tiny:
 ``schedule_lcm_compaction`` is the single seam ``_finalize_turn``
 calls when ``settings.lcm_enabled`` is on.

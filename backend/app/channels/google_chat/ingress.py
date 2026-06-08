@@ -28,7 +28,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.tool_surface import build_agent_tools
 from app.channels.base import ChannelMessage
-from app.channels.turn_orchestrator import ChatTurnInput, run_turn
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
 from app.models import Conversation
@@ -36,6 +35,7 @@ from app.providers.base import AILLM
 from app.providers.catalog import first_catalog_model
 from app.providers.factory import resolve_llm
 from app.providers.model_id import InvalidModelId, UnknownModelId
+from app.turns.pipeline import ChatTurnInput, run_turn
 from app.workspace.crud import get_default_workspace
 
 from .attachments import collect_attachments

@@ -14,10 +14,10 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from app.channels.turn_orchestrator import ChatTurnInput, _finalize_turn
 from app.chat.aggregator import ChatTurnAggregator
 from app.infrastructure.database.legacy import User
 from app.models import LCMSummary
+from app.turns.pipeline import ChatTurnInput, _finalize_turn
 from tests.lcm_helpers import (
     make_conversation,
     make_fake_provider,
@@ -143,14 +143,14 @@ async def test_finalize_turn_triggers_lcm_compaction(
 ) -> None:
     conv = await make_conversation(db_session, test_user)
     monkeypatch.setattr(
-        "app.channels.turn_orchestrator.finalize.finalize_assistant_message",
+        "app.turns.pipeline.finalize.finalize_assistant_message",
         AsyncMock(),
     )
     monkeypatch.setattr(
-        "app.channels.turn_orchestrator.finalize.record_turn_cost_if_enabled",
+        "app.turns.pipeline.finalize.record_turn_cost_if_enabled",
         AsyncMock(),
     )
-    monkeypatch.setattr("app.channels.turn_orchestrator.finalize.publish_if_available", AsyncMock())
+    monkeypatch.setattr("app.turns.pipeline.finalize.publish_if_available", AsyncMock())
     schedule_mock = MagicMock()
 
     class _MemoryBackend:
@@ -158,7 +158,7 @@ async def test_finalize_turn_triggers_lcm_compaction(
             schedule_mock(**kwargs)
 
     monkeypatch.setattr(
-        "app.channels.turn_orchestrator.finalize.resolve_conversation_memory",
+        "app.turns.pipeline.finalize.resolve_conversation_memory",
         MagicMock(return_value=SimpleNamespace(backend=_MemoryBackend())),
     )
     turn_input = ChatTurnInput(

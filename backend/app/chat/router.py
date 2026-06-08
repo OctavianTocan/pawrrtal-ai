@@ -21,11 +21,6 @@ from app.agents.tool_surface import build_agent_tools
 # pull all three names from the same package to keep chat.py's
 # fan-out under sentrux's ``no_god_files`` budget.
 from app.channels import ChannelMessage, resolve_channel, surface_from_header
-from app.channels.turn_orchestrator import (
-    ChatTurnInput,
-    EventHook,
-    run_turn,
-)
 from app.chat import (
     enforce_cost_budget,
     load_external_mcp_configs,
@@ -46,6 +41,11 @@ from app.tools.artifact_agent import (
     ARTIFACT_TOOL_NAME,
     ArtifactValidationError,
     build_artifact,
+)
+from app.turns.pipeline import (
+    ChatTurnInput,
+    EventHook,
+    run_turn,
 )
 from app.workspace.crud import get_default_workspace
 

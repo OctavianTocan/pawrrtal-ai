@@ -409,7 +409,7 @@ class XaiLLM:
 
         # Terminal usage event — the chat aggregator folds it into the
         # cost ledger (see ``ChatTurnAggregator.apply`` and
-        # ``app.channels._turn_cost.record_turn_cost_if_enabled``).
+        # ``app.turns.pipeline.cost.record_turn_cost_if_enabled``).
         # Skip when no chunk reported usage (test scripts, error-only
         # turns) so the ledger doesn't see spurious zero rows.
         if usage_sink.saw_any:
