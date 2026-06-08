@@ -1,16 +1,11 @@
 """LCM grep — search conversation history across messages and summaries.
 
-This is the backing implementation for the ``lcm_grep`` agent tool introduced
-in PR #4 of the LCM stack.
-
 Design
 ------
 The upstream lossless-claw plugin uses SQLite FTS5 for full-text search.
 We run Postgres in production, where a dedicated ``tsvector`` index is the
-right long-term solution (tracked in ``.beans/lcm-followups.md``).  For this
-tracer-bullet PR we use ``ILIKE '%query%'`` which works on both SQLite (tests)
-and Postgres (production) without a schema migration.  The FTS upgrade can
-land in a follow-up once we have real production workloads to benchmark.
+right long-term solution. For now we use ``ILIKE '%query%'`` because it works
+on SQLite tests and Postgres production without a schema migration.
 
 Returned result format
 ----------------------

@@ -1,8 +1,5 @@
 """LCM expand_query — bounded deep-recall via a single focused LLM call.
 
-This is the backing implementation for the ``lcm_expand_query`` agent tool
-introduced in PR #6 of the LCM stack.
-
 Design
 ------
 The upstream lossless-claw plugin spawns an OpenClaw sub-agent that walks
@@ -37,7 +34,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.infrastructure.config import settings as _settings
-from app.lcm import _collect_stream, _format_turns
+from app.lcm.summarization import _collect_stream, _format_turns
 from app.models import ChatMessage, LCMContextItem, LCMSummary
 from app.providers import resolve_llm
 

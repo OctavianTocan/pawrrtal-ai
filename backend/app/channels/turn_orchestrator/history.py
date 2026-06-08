@@ -14,10 +14,11 @@ from app.conversations.messages_crud import (
     append_user_message,
     get_messages_for_conversation,
 )
-from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
-from app.lcm import assemble_context as lcm_assemble_context
-from app.lcm import ingest_message as lcm_ingest_message
+from app.plugins.adapters.conversation_memory import (
+    ConversationMemoryBackend,
+    resolve_conversation_memory,
+)
 
 from .types import ChatTurnInput
 
@@ -28,34 +29,15 @@ if TYPE_CHECKING:
 async def _load_history_and_persist(
     turn_input: ChatTurnInput,
 ) -> tuple[list[dict[str, str]], uuid.UUID]:
-    """Read recent history, then persist the current user turn and placeholder.
-
-    When ``settings.lcm_enabled`` is ``True``, the history slice is
-    assembled from the LCM context list (``lcm_context_items``) so that
-    compacted summaries are visible to the provider, and both the user
-    turn and assistant placeholder are ingested into the LCM context
-    list before the stream starts.  When LCM is off the behaviour is
-    unchanged — a raw ``LIMIT history_window`` query over
-    ``chat_messages``.
-    """
+    """Read recent history, then persist the current user turn and placeholder."""
+    memory = resolve_conversation_memory(workspace_root=turn_input.workspace_root)
+    memory_backend = memory.backend if memory is not None else None
     async with _turn_session(turn_input) as session:
-        if settings.lcm_enabled:
-            history = await lcm_assemble_context(
-                session,
-                conversation_id=turn_input.conversation_id,
-                fresh_tail_count=settings.lcm_fresh_tail_count,
-            )
-        else:
-            recent_rows = await get_messages_for_conversation(
-                session,
-                turn_input.conversation_id,
-                limit=turn_input.history_window,
-            )
-            history = [
-                {"role": row.role, "content": row.content or ""}
-                for row in recent_rows
-                if row.role in {"user", "assistant"}
-            ]
+        history = await _load_provider_history(
+            session=session,
+            turn_input=turn_input,
+            memory_backend=memory_backend,
+        )
         user_msg = await append_user_message(
             session,
             conversation_id=turn_input.conversation_id,
@@ -67,19 +49,51 @@ async def _load_history_and_persist(
             conversation_id=turn_input.conversation_id,
             user_id=turn_input.user_id,
         )
-        if settings.lcm_enabled:
-            await lcm_ingest_message(
+        if memory_backend is not None:
+            await memory_backend.ingest_messages(
                 session,
                 conversation_id=turn_input.conversation_id,
-                message_id=user_msg.id,
-            )
-            await lcm_ingest_message(
-                session,
-                conversation_id=turn_input.conversation_id,
-                message_id=assistant_row.id,
+                user_message_id=user_msg.id,
+                assistant_message_id=assistant_row.id,
             )
         await session.commit()
         return history, assistant_row.id
+
+
+async def _load_provider_history(
+    *,
+    session: AsyncSession,
+    turn_input: ChatTurnInput,
+    memory_backend: ConversationMemoryBackend | None,
+) -> list[dict[str, str]]:
+    """Load plugin memory history or fall back to raw message history."""
+    if memory_backend is not None:
+        history = await memory_backend.load_history(
+            session,
+            conversation_id=turn_input.conversation_id,
+            history_window=turn_input.history_window,
+        )
+        if history is not None:
+            return history
+    return await _load_raw_history(session=session, turn_input=turn_input)
+
+
+async def _load_raw_history(
+    *,
+    session: AsyncSession,
+    turn_input: ChatTurnInput,
+) -> list[dict[str, str]]:
+    """Load raw user and assistant messages from the conversation."""
+    recent_rows = await get_messages_for_conversation(
+        session,
+        turn_input.conversation_id,
+        limit=turn_input.history_window,
+    )
+    return [
+        {"role": row.role, "content": row.content or ""}
+        for row in recent_rows
+        if row.role in {"user", "assistant"}
+    ]
 
 
 @asynccontextmanager

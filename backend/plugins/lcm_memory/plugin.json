@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "id": "lcm_memory",
+  "name": "LCM Memory",
+  "description": "Conversation history assembly, ingest, and compaction backed by LCM.",
+  "version": "1.0.0",
+  "enabled_by_default": true,
+  "permissions": ["external_read", "costly"],
+  "env": [
+    {
+      "name": "LCM_ENABLED",
+      "required": false,
+      "scope": "workspace",
+      "overridable": true,
+      "gateway_fallback": true,
+      "secret": false,
+      "label": "LCM Enabled",
+      "description": "Enables LCM history assembly and post-turn compaction."
+    },
+    {
+      "name": "LCM_SUMMARY_MODEL",
+      "required": false,
+      "scope": "user_workspace",
+      "overridable": true,
+      "gateway_fallback": true,
+      "secret": false,
+      "label": "LCM Summary Model",
+      "description": "Optional model used for LCM summary generation."
+    }
+  ],
+  "capabilities": [
+    {
+      "type": "conversation_memory",
+      "id": "lcm",
+      "title": "LCM",
+      "description": "Uses LCM context items to assemble history and compact completed turns.",
+      "tags": ["memory", "conversation-history", "compaction"],
+      "intents": ["history", "compaction", "long-context"],
+      "slots": ["conversation_memory"],
+      "priority": 100,
+      "exposure": "catalog",
+      "permissions": ["external_read", "costly"],
+      "risk": "costly",
+      "entrypoint": "app.plugins.lcm_memory.backend:create_memory_backend",
+      "order": 100
+    }
+  ]
+}

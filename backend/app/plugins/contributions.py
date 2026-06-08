@@ -226,6 +226,15 @@ class TurnObserverCapability(CapabilityBase):
     order: int = 100
 
 
+class ConversationMemoryCapability(CapabilityBase):
+    """A conversation history and compaction backend capability."""
+
+    type: Literal["conversation_memory"] = "conversation_memory"
+    entrypoint: str
+    order: int = 100
+    lifecycle: dict[str, Any] = Field(default_factory=dict)
+
+
 class ProviderModel(FrozenModel):
     """One model declared by a provider plugin."""
 
@@ -322,6 +331,7 @@ Capability = Annotated[
     | PythonToolCapability
     | TurnContextProviderCapability
     | TurnObserverCapability
+    | ConversationMemoryCapability
     | ProviderCapability
     | AgentRuntimeCapability
     | AgentProfileCapability

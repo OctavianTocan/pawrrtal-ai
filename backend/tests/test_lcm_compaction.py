@@ -1,4 +1,4 @@
-"""LCM PR #3 — leaf compaction tests.
+"""LCM leaf compaction tests.
 
 Covers:
 - compact_leaf_if_needed returns False when items ≤ fresh_tail_count.
@@ -21,6 +21,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
+from types import SimpleNamespace
 from typing import Any, cast
 from unittest.mock import MagicMock
 
@@ -128,10 +129,10 @@ def _make_failing_provider() -> Any:
 
 
 # Patch the provider resolution so compaction uses our mock.
-def _patch_resolve_llm(monkeypatch: pytest.MonkeyPatch, provider: Any) -> None:
+def _patch_summary_provider(monkeypatch: pytest.MonkeyPatch, provider: Any) -> None:
     import app.lcm as _lcm
 
-    monkeypatch.setattr(_lcm, "resolve_llm", lambda *args, **kwargs: provider)
+    monkeypatch.setattr(_lcm, "_resolve_summary_provider", lambda *args, **kwargs: provider)
 
 
 # ---------------------------------------------------------------------------
@@ -148,7 +149,7 @@ async def test_compact_noop_when_within_fresh_tail(
     await _seed_context(db_session, test_user, conv, [("user", "hi"), ("assistant", "hello")])
 
     provider = _make_fake_provider()
-    _patch_resolve_llm(monkeypatch, provider)
+    _patch_summary_provider(monkeypatch, provider)
 
     ran = await compact_leaf_if_needed(
         db_session,
@@ -171,7 +172,7 @@ async def test_compact_noop_empty_conversation(
     """Returns False for an empty conversation."""
     conv = await _make_conversation(db_session, test_user)
     provider = _make_fake_provider()
-    _patch_resolve_llm(monkeypatch, provider)
+    _patch_summary_provider(monkeypatch, provider)
 
     ran = await compact_leaf_if_needed(
         db_session,
@@ -201,7 +202,7 @@ async def test_compact_runs_when_items_exceed_fresh_tail(
         conv,
         [("user", "msg0"), ("assistant", "msg1"), ("user", "msg2")],
     )
-    _patch_resolve_llm(monkeypatch, _make_fake_provider("compacted"))
+    _patch_summary_provider(monkeypatch, _make_fake_provider("compacted"))
 
     ran = await compact_leaf_if_needed(
         db_session,
@@ -226,7 +227,7 @@ async def test_compact_creates_summary_and_sources(
         conv,
         [("user", "hello"), ("assistant", "world"), ("user", "question")],
     )
-    _patch_resolve_llm(monkeypatch, _make_fake_provider("hello world summary"))
+    _patch_summary_provider(monkeypatch, _make_fake_provider("hello world summary"))
 
     await compact_leaf_if_needed(
         db_session,
@@ -275,7 +276,7 @@ async def test_compact_replaces_message_items_with_summary_item(
         conv,
         [("user", "old"), ("assistant", "reply"), ("user", "new")],
     )
-    _patch_resolve_llm(monkeypatch, _make_fake_provider("summary text"))
+    _patch_summary_provider(monkeypatch, _make_fake_provider("summary text"))
 
     await compact_leaf_if_needed(
         db_session,
@@ -329,7 +330,7 @@ async def test_compact_multiple_eligible_messages(
             ("user", "e"),  # fresh tail end
         ],
     )
-    _patch_resolve_llm(monkeypatch, _make_fake_provider("summary abc"))
+    _patch_summary_provider(monkeypatch, _make_fake_provider("summary abc"))
 
     await compact_leaf_if_needed(
         db_session,
@@ -389,7 +390,7 @@ async def test_compact_respects_token_budget(
             ("user", "fresh tail msg"),  # fresh tail
         ],
     )
-    _patch_resolve_llm(monkeypatch, _make_fake_provider("first only"))
+    _patch_summary_provider(monkeypatch, _make_fake_provider("first only"))
 
     await compact_leaf_if_needed(
         db_session,
@@ -442,7 +443,7 @@ async def test_compact_uses_fallback_when_provider_fails(
         conv,
         [("user", "old message"), ("assistant", "reply"), ("user", "fresh")],
     )
-    _patch_resolve_llm(monkeypatch, _make_failing_provider())
+    _patch_summary_provider(monkeypatch, _make_failing_provider())
 
     ran = await compact_leaf_if_needed(
         db_session,
@@ -483,7 +484,7 @@ async def test_assemble_after_compaction_returns_summary_plus_fresh(
         conv,
         [("user", "old"), ("assistant", "tail1"), ("user", "tail2")],
     )
-    _patch_resolve_llm(monkeypatch, _make_fake_provider("the summary"))
+    _patch_summary_provider(monkeypatch, _make_fake_provider("the summary"))
 
     await compact_leaf_if_needed(
         db_session,
@@ -543,7 +544,7 @@ async def test_schedule_lcm_compaction_runs_background_task_under_lock(
     monkeypatch.setattr(bg_mod.settings, "lcm_leaf_chunk_tokens", 100_000)
 
     # Patch the LLM provider for compaction
-    _patch_resolve_llm(monkeypatch, _make_fake_provider("compacted"))
+    _patch_summary_provider(monkeypatch, _make_fake_provider("compacted"))
 
     # Patch async_session_maker in the background module to use our test engine
     shared_maker = async_sessionmaker(db_session.bind, expire_on_commit=False)
@@ -688,8 +689,14 @@ async def test_finalize_turn_triggers_lcm_compaction(
     monkeypatch.setattr("app.channels.turn_orchestrator.finalize.publish_if_available", AsyncMock())
 
     schedule_mock = MagicMock()
+
+    class _MemoryBackend:
+        def schedule_compaction(self, **kwargs: Any) -> None:
+            schedule_mock(**kwargs)
+
     monkeypatch.setattr(
-        "app.channels.turn_orchestrator.finalize.schedule_lcm_compaction", schedule_mock
+        "app.channels.turn_orchestrator.finalize.resolve_conversation_memory",
+        MagicMock(return_value=SimpleNamespace(backend=_MemoryBackend())),
     )
 
     turn_input = ChatTurnInput(

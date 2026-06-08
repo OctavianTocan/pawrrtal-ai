@@ -1,8 +1,5 @@
 """LCM describe — cheap inspection of a single LCMSummary node.
 
-This is the backing implementation for the ``lcm_describe`` agent tool
-introduced in PR #5 of the LCM stack.
-
 Use case
 --------
 After ``lcm_grep`` returns a match inside a summary node, the agent may want
