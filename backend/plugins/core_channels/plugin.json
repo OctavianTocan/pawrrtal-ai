@@ -23,6 +23,16 @@
 			"slots": ["chat_surface"],
 			"surface": "electron",
 			"entrypoint": "app.channels.plugin_adapters:make_sse_channel"
+		},
+		{
+			"type": "router",
+			"id": "channel_routes",
+			"title": "Channel Routes",
+			"description": "HTTP routes for channel binding, diagnostics, webhook ingress, and local simulation.",
+			"slots": ["api_router", "channel:messaging"],
+			"entrypoint": "app.channels.router:get_channels_router",
+			"prefix": "/api/v1/channels",
+			"tags": ["channels"]
 		}
 	]
 }

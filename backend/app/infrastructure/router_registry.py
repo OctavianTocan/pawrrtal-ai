@@ -7,6 +7,8 @@ from typing import Any, cast
 
 from fastapi import APIRouter, FastAPI
 
+from app.plugins.adapters.routers import build_plugin_routers
+
 _ROUTER_FACTORIES: tuple[tuple[str, str], ...] = (
     ("app.infrastructure.auth.dev_login", "get_auth_router"),
     ("app.conversations.router", "get_conversations_router"),
@@ -17,7 +19,6 @@ _ROUTER_FACTORIES: tuple[tuple[str, str], ...] = (
     ("app.workspace.personalization.router", "get_personalization_router"),
     ("app.workspace.appearance.router", "get_appearance_router"),
     ("app.infrastructure.auth.oauth.router", "get_oauth_router"),
-    ("app.channels.router", "get_channels_router"),
     ("app.workspace.router", "get_workspace_router"),
     ("app.workspace.env.router", "get_workspace_env_router"),
     ("app.workspace.plugins.router", "get_workspace_plugins_router"),
@@ -83,3 +84,5 @@ def register_routers(app: FastAPI) -> None:
 
     for module_path, factory_name in _ROUTER_FACTORIES:
         app.include_router(_router_from_factory(module_path, factory_name))
+    for router in build_plugin_routers():
+        app.include_router(router)

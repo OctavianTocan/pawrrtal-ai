@@ -40,6 +40,15 @@ def test_register_routers_adds_health_endpoint() -> None:
     assert any(getattr(route, "path", None) == "/api/v1/health" for route in app.routes)
 
 
+def test_register_routers_adds_plugin_channel_routes() -> None:
+    """Channel HTTP routes are mounted through plugin router contributions."""
+    app = FastAPI()
+    register_routers(app)
+    assert any(
+        getattr(route, "path", None) == "/api/v1/channels/telegram/webhook" for route in app.routes
+    )
+
+
 @pytest.mark.anyio
 async def test_create_app_health_endpoint_responds() -> None:
     """Factory-created app can serve a health request without lifespan startup."""
