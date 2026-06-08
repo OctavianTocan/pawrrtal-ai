@@ -78,6 +78,7 @@
           "verbose",
           "stop",
           "status",
+          "tools",
           "whoami",
           "lcm",
           "compact"

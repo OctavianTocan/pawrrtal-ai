@@ -13,8 +13,10 @@ Covers:
 
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import AsyncIterator
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -24,6 +26,7 @@ from app.channels import registered_surfaces, resolve_channel
 from app.channels.base import ChannelMessage
 from app.channels.telegram import SURFACE_TELEGRAM, TelegramChannel
 from app.channels.telegram.bot import (
+    _TELEGRAM_COMMANDS,
     _refresh_telegram_commands_best_effort,
     refresh_telegram_commands,
 )
@@ -156,6 +159,16 @@ async def test_refresh_telegram_commands_sets_current_command_menu() -> None:
         "compact",
     ]
     assert all(command.description for command in commands)
+
+
+def test_telegram_channel_manifest_commands_match_runtime_menu() -> None:
+    manifest_path = Path(__file__).resolve().parents[1] / "plugins/telegram_channel/plugin.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    capability = manifest["capabilities"][0]
+
+    assert capability["commands"]["slash"] == [
+        command for command, _description in _TELEGRAM_COMMANDS
+    ]
 
 
 @pytest.mark.anyio
