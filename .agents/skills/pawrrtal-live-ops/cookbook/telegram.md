@@ -11,7 +11,8 @@ Use this when the Telegram bot does not reply, commands do nothing, link flow fa
 Start with logs around the user attempt:
 
 ```bash
-journalctl --user -u pawrrtal-dev.service --since '20 minutes ago' --no-pager \
+{ journalctl -u pawrrtal.service --since '20 minutes ago' --no-pager \
+  || journalctl --user -u pawrrtal-dev.service --since '20 minutes ago' --no-pager; } \
   | rg -i 'telegram|aiogram|bot id|update id|poll|webhook|undefinedcolumn|error|traceback|exception|disabled'
 ```
 
@@ -20,7 +21,7 @@ If you see `Update id=... is not handled` or an exception after an update, Teleg
 ### 2. Check Telegram runtime configuration
 
 ```bash
-systemctl --user status pawrrtal-dev.service --no-pager
+systemctl status pawrrtal.service --no-pager || systemctl --user status pawrrtal-dev.service --no-pager
 ss -ltnp '( sport = :8000 )'
 tr '\0' '\n' < /proc/<backend-pid>/environ \
   | rg '^(TELEGRAM|DATABASE_URL|PAWRRTAL_DEV_DATABASE_URL)=' \
@@ -60,7 +61,7 @@ LIVE_DATABASE_URL="$(tr '\0' '\n' < /proc/$BACKEND_PID/environ | sed -n 's/^DATA
 cd backend
 DATABASE_URL="$LIVE_DATABASE_URL" uv run alembic current
 DATABASE_URL="$LIVE_DATABASE_URL" uv run alembic upgrade head
-systemctl --user restart pawrrtal-dev.service
+systemctl restart pawrrtal.service || systemctl --user restart pawrrtal-dev.service
 ```
 
 Re-send a Telegram message after restart and re-read logs.

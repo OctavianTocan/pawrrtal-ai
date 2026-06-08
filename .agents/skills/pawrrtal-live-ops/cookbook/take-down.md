@@ -9,13 +9,16 @@ Use this when the user asks to stop Pawrrtal, disable the live service, free por
 ### 1. Identify what owns the running app
 
 ```bash
-cd /mnt/HC_Volume_105512717/dev/pawrrtal
+cd /mnt/HC_Volume_105512717/deploy/pawrrtal
 cd backend && uv run paw project status --json
+systemctl status pawrrtal.service --no-pager || true
 systemctl --user status pawrrtal-dev.service --no-pager || true
 ss -ltnp '( sport = :8000 or sport = :3000 or sport = :53001 )'
 ```
 
-If `paw project status --json` says `tracked=true`, Paw CLI owns the process. If systemd is active, systemd owns it.
+If `paw project status --json` says `tracked=true`, Paw CLI owns the process.
+If root `pawrrtal.service` is active, it owns production. If only the user
+`pawrrtal-dev.service` is active, treat that as a dev-service fallback.
 
 ### 2. Stop the app gracefully
 
@@ -26,16 +29,16 @@ cd backend
 uv run paw project down
 ```
 
-For the user systemd service:
+For a systemd-owned process:
 
 ```bash
-systemctl --user stop pawrrtal-dev.service
+systemctl stop pawrrtal.service || systemctl --user stop pawrrtal-dev.service
 ```
 
 Only disable autostart when the user asks for a persistent takedown:
 
 ```bash
-systemctl --user disable pawrrtal-dev.service
+systemctl disable pawrrtal.service || systemctl --user disable pawrrtal-dev.service
 ```
 
 ### 3. Stop public exposure when requested

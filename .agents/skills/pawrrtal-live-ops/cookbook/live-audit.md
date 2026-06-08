@@ -9,20 +9,24 @@ Use this when you need to prove Pawrrtal is operationally live, identify what co
 ### 1. Identify the live processes
 
 ```bash
-ROOT=${PAWRRTAL_ROOT:-/mnt/HC_Volume_105512717/dev/pawrrtal}
+ROOT=${PAWRRTAL_ROOT:-/mnt/HC_Volume_105512717/deploy/pawrrtal}
 cd "$ROOT"
-systemctl --user status pawrrtal-dev.service --no-pager
+systemctl status pawrrtal.service --no-pager || systemctl --user status pawrrtal-dev.service --no-pager
 ss -ltnp '( sport = :8000 or sport = :3000 or sport = :53001 )'
-ps -eo pid,ppid,stat,etime,cmd | rg 'dev.ts|uvicorn|next-server|cloudflared'
+ps -eo pid,ppid,stat,etime,cmd | rg 'serve.ts|dev.ts|uvicorn|next-server|cloudflared'
 ```
 
 Record the backend PID, frontend PID, service name, frontend port, backend port, and how long the processes have been running.
+Production normally uses root `pawrrtal.service` from
+`/mnt/HC_Volume_105512717/deploy/pawrrtal`; the user
+`pawrrtal-dev.service` is only a dev fallback.
 
 ### 2. Prove the running checkout and commit
 
 ```bash
 git rev-parse --abbrev-ref HEAD
 git rev-parse HEAD
+git rev-list --left-right --count HEAD...origin/main
 git status --short
 ```
 
@@ -34,6 +38,8 @@ readlink -f /proc/<frontend-pid>/cwd
 ```
 
 If the running checkout is not on the expected branch or commit, say that directly. Do not call the deployment current just because `main` is merged on GitHub.
+The deploy checkout can sit on a stale local branch label while its commit
+matches `origin/main`; use commit parity over branch name.
 
 ### 3. Inspect live environment without leaking secrets
 
@@ -49,11 +55,14 @@ Use this to detect shell/service mismatch. If a Paw CLI command fails because it
 
 ```bash
 curl -fsS http://127.0.0.1:8000/api/v1/health
+curl -fsS http://127.0.0.1:8000/api/v1/health/ready
 curl -fsSI http://127.0.0.1:3000 || curl -fsSI http://127.0.0.1:53001
 cd backend && uv run paw project status --json
 ```
 
 `paw project status --json` may report `tracked=false` when systemd owns the service. That is not a failure if the health checks and process table prove the service is live.
+If sandbox-local `curl` fails but systemd logs show Next or uvicorn bound to
+loopback, retry the same probes at host level before reporting an outage.
 
 ### 5. Check Cloudflared public exposure
 

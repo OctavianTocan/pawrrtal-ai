@@ -13,6 +13,12 @@ Use this skill when the question is about the real running Pawrrtal service, not
 
 Treat the running service as authoritative. The local shell may be on the wrong branch, may have the wrong `DATABASE_URL`, or may run a different Paw CLI profile than the user-facing service.
 
+On the VPS production deployment, the authoritative unit is usually root
+`pawrrtal.service` with working directory
+`/mnt/HC_Volume_105512717/deploy/pawrrtal`. The older user unit
+`pawrrtal-dev.service` is a dev-service fallback only; do not assume it exists
+or owns production unless live checks prove it.
+
 ## Cookbook
 
 Read the relevant cookbook before acting:
@@ -40,14 +46,19 @@ Read the relevant cookbook before acting:
 For most incidents, run these in order:
 
 ```bash
-ROOT=${PAWRRTAL_ROOT:-/mnt/HC_Volume_105512717/dev/pawrrtal}
+ROOT=${PAWRRTAL_ROOT:-/mnt/HC_Volume_105512717/deploy/pawrrtal}
 cd "$ROOT"
 git rev-parse --abbrev-ref HEAD
 git rev-parse HEAD
 git status --short
-systemctl --user status pawrrtal-dev.service --no-pager
+systemctl status pawrrtal.service --no-pager || systemctl --user status pawrrtal-dev.service --no-pager
 ss -ltnp '( sport = :8000 or sport = :3000 or sport = :53001 )'
 curl -fsS http://127.0.0.1:8000/api/v1/health
+curl -fsS http://127.0.0.1:8000/api/v1/health/ready
 ```
 
-If Telegram is the complaint, go directly to [cookbook/telegram.md](cookbook/telegram.md) after the service status and health check.
+If sandbox-local `curl` cannot reach loopback while systemd logs show the host
+service is bound, rerun the HTTP probes at host level before declaring the app
+down. If Telegram is the complaint, go directly to
+[cookbook/telegram.md](cookbook/telegram.md) after the service status and
+health check.
