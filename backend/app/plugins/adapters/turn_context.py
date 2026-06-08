@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import logging
 import uuid
 from collections.abc import Awaitable, Callable, Coroutine
@@ -11,6 +10,7 @@ from pathlib import Path
 from typing import Any, cast
 
 from app.plugins.contributions import TurnContextProviderCapability
+from app.plugins.entrypoints import load_entrypoint_callable
 from app.plugins.errors import PluginError, PluginRuntimeError
 from app.plugins.host import get_plugin_host
 
@@ -82,22 +82,10 @@ def build_turn_context_providers(*, workspace_root: Path) -> list[TurnContextPro
 
 def load_turn_context_provider(entrypoint: str) -> TurnContextProvider:
     """Load a trusted Python turn context provider from ``module:attribute``."""
-    module_name, separator, attribute_path = entrypoint.partition(":")
-    if not separator or not module_name or not attribute_path:
-        raise PluginRuntimeError(
-            "turn_context_provider entrypoint must use 'module:attribute' syntax"
-        )
-
-    try:
-        target: Any = importlib.import_module(module_name)
-        for attribute in attribute_path.split("."):
-            target = getattr(target, attribute)
-    except (ImportError, AttributeError) as exc:
-        raise PluginRuntimeError(f"could not load turn context provider {entrypoint!r}") from exc
-
-    if not callable(target):
-        raise PluginRuntimeError(f"turn context provider {entrypoint!r} is not callable")
-    return cast(TurnContextProvider, target)
+    return cast(
+        TurnContextProvider,
+        load_entrypoint_callable(entrypoint, context="turn context provider"),
+    )
 
 
 def _build_adapter(

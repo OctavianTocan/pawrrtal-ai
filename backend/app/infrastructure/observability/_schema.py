@@ -1,13 +1,11 @@
-"""OpenLLMetry attribute schema and payload renderers.
+"""OpenTelemetry GenAI attribute schema and payload renderers.
 
-Constants and helpers for the Traceloop / OpenLLMetry span shape that
-``app.infrastructure.observability.agent_trace`` emits.  Split out of ``agent_trace.py``
-to keep that file under the project's 500-line ceiling
-(``scripts/check-file-lines.mjs``); private to the package — the public
-surface lives in ``agent_trace.py`` / the package ``__init__``.
+Constants and helpers for the Traceloop / OpenTelemetry GenAI span shape that
+``app.infrastructure.observability.agent_trace`` emits. Private to the package;
+the public surface lives in ``agent_trace.py`` / the package ``__init__``.
 
 The constants here are the wire contract between Pawrrtal and any
-OpenLLMetry-aware backend.
+OpenTelemetry-aware backend.
 """
 
 from __future__ import annotations
@@ -37,7 +35,7 @@ TRACER_VERSION = "1.0.0"
 KIND_LLM = "llm"
 KIND_TOOL = "tool"
 
-# OpenLLMetry / OTel-GenAI attribute names — the source of truth for
+# OpenTelemetry GenAI attribute names — the source of truth for
 # every ``span.set_attribute`` call in the public module.
 ATTR_TRACELOOP_KIND = "traceloop.span.kind"
 ATTR_TRACELOOP_NAME = "traceloop.entity.name"

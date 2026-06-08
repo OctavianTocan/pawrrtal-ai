@@ -1,6 +1,6 @@
 """OTel spans for Pawrrtal agent turns, model calls, and tools.
 
-This module is the core agent-trace seam. It emits OpenLLMetry /
+This module is the core agent-trace seam. It emits OpenTelemetry GenAI /
 Traceloop-style ``gen_ai.*`` attributes so the same spans work with local
 debug collectors and standard OTel backends.
 
@@ -223,7 +223,7 @@ def llm_span(
             ``gen_ai.response.model`` attribute).
         messages: Conversation history + the new user turn — the same
             shape the agent loop accumulates.  Rendered into the
-            canonical OpenLLMetry ``parts`` schema.
+            canonical OpenTelemetry GenAI ``parts`` schema.
         system_prompt: Workspace system prompt, if any.  Stored as
             ``gen_ai.system_instructions`` so trace panels can show
             it above the conversation.

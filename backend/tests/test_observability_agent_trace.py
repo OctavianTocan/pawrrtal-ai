@@ -19,10 +19,10 @@ from collections.abc import Iterator
 from typing import cast
 
 import pytest
-from opentelemetry import trace
 from opentelemetry.sdk.trace import ReadableSpan, TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
+from opentelemetry.trace import StatusCode
 
 from app.agents.types import AgentMessage
 from app.infrastructure.observability import agent_trace as agent_trace_module
@@ -38,24 +38,18 @@ from app.infrastructure.observability.agent_trace import (
 def span_exporter() -> Iterator[InMemorySpanExporter]:
     """Install an in-memory OTel exporter for the duration of one test.
 
-    The agent_trace module caches its tracer at import time, so we have
-    to repoint that cached tracer at our provider as well — otherwise
-    the recorders write to the global no-op tracer and nothing gets
-    captured.
+    The agent_trace module exposes a test tracer override so these tests
+    do not mutate the process-global OpenTelemetry provider.
     """
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    previous_provider = trace.get_tracer_provider()
-    previous_module_tracer = agent_trace_module._tracer
-    trace.set_tracer_provider(provider)
-    agent_trace_module._tracer = provider.get_tracer("test")
+    agent_trace_module.set_tracer_for_tests(provider.get_tracer("test"))
     try:
         yield exporter
     finally:
-        agent_trace_module._tracer = previous_module_tracer
+        agent_trace_module.reset_tracer_for_tests()
         agent_trace_module._previous_turn.clear()
-        trace.set_tracer_provider(previous_provider)
         provider.shutdown()
 
 
@@ -175,7 +169,7 @@ def test_llm_span_renders_assistant_tool_call_history(
         },
     ]
 
-    with llm_span(model_id="m", messages=cast("list[AgentMessage]", messages), system_prompt=None):
+    with llm_span(model_id="m", messages=cast(list[AgentMessage], messages), system_prompt=None):
         pass
 
     span = _span_by_name(span_exporter, "pawrrtal.llm.chat")
@@ -257,7 +251,7 @@ def test_llm_span_records_exception_status(span_exporter: InMemorySpanExporter) 
         _run()
 
     span = _span_by_name(span_exporter, "pawrrtal.llm.chat")
-    assert span.status.status_code == trace.StatusCode.ERROR
+    assert span.status.status_code == StatusCode.ERROR
     attrs = _attrs(span)
     assert attrs["otel.status.message"] == "boom"
     output = json.loads(str(attrs["gen_ai.output.messages"]))
@@ -281,7 +275,7 @@ def test_tool_span_records_input_and_output(span_exporter: InMemorySpanExporter)
     assert json.loads(str(attrs["traceloop.entity.input"])) == {"q": "x"}
     assert json.loads(str(attrs["traceloop.entity.output"])) == {"hits": 3}
     assert attrs["pawrrtal.tool_call_id"] == "tc-1"
-    assert span.status.status_code != trace.StatusCode.ERROR
+    assert span.status.status_code != StatusCode.ERROR
 
 
 def test_tool_span_marks_errored_on_is_error_true(
@@ -292,7 +286,7 @@ def test_tool_span_marks_errored_on_is_error_true(
         ts.record_result("Tool 'search' not found.", is_error=True)
 
     span = _span_by_name(span_exporter, "search.tool")
-    assert span.status.status_code == trace.StatusCode.ERROR
+    assert span.status.status_code == StatusCode.ERROR
     assert _attrs(span)["otel.status.message"] == "Tool 'search' not found."
 
 
@@ -307,7 +301,7 @@ def test_tool_span_records_exception(span_exporter: InMemorySpanExporter) -> Non
         _run()
 
     span = _span_by_name(span_exporter, "search.tool")
-    assert span.status.status_code == trace.StatusCode.ERROR
+    assert span.status.status_code == StatusCode.ERROR
     attrs = _attrs(span)
     assert attrs["otel.status.message"] == "kaboom"
     assert json.loads(str(attrs["traceloop.entity.output"])) == {"error": "kaboom"}

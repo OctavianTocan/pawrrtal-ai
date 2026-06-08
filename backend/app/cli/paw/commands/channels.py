@@ -276,13 +276,20 @@ def diagnose_telegram(
     if json_out:
         emit_json(payload)
         return
+    runtime = _runtime(payload)
     lines = [
         f"telegram_configured: {payload['configured']}",
         f"telegram_mode: {payload['mode']}",
+        f"telegram_service_running: {runtime.get('service_running')}",
         f"bindings: {len(payload['bindings'])}",
         f"recent_messages: {len(payload['recent_messages'])}",
         f"stuck_streaming_messages: {len(payload['stuck_streaming_messages'])}",
     ]
+    polling_task = runtime.get("polling_task")
+    if isinstance(polling_task, dict):
+        lines.append(f"telegram_polling_task: {polling_task}")
+    if runtime.get("polling_lock_path"):
+        lines.append(f"telegram_polling_lock_path: {runtime['polling_lock_path']}")
     lines.extend(
         (
             "stuck\t"
@@ -332,6 +339,11 @@ def diagnose_telegram(
             for message in trace["messages"]
         )
     emit_human("\n".join(lines))
+
+
+def _runtime(payload: dict[str, Any]) -> dict[str, Any]:
+    runtime = payload.get("runtime")
+    return runtime if isinstance(runtime, dict) else {}
 
 
 def _emit_diagnose_telegram_error(exc: PawError, *, json_out: bool) -> None:

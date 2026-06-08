@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-import importlib
+import asyncio
 import inspect
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from app.infrastructure.lifecycle import shutdown_hook, startup_hook
 from app.plugins.contributions import ChannelCapability
+from app.plugins.entrypoints import load_entrypoint_callable
 from app.plugins.errors import PluginError, PluginRuntimeError
 from app.plugins.host import get_plugin_host
 from app.plugins.registry import ContributionRegistrySnapshot, PluginLoadOutcome
@@ -50,14 +51,11 @@ async def reload_plugin_lifespans(app: FastAPI) -> None:
     if snapshot is None:
         setattr(app.state, _STATE_KEY, ())
         return
-    contexts = [
-        context
-        for context in [
-            await _enter_lifespan(app, plugin_id=plugin_id, capability=capability)
-            for plugin_id, capability in _channel_lifespans(snapshot)
-        ]
-        if context is not None
+    tasks = [
+        _enter_lifespan(app, plugin_id=plugin_id, capability=capability)
+        for plugin_id, capability in _channel_lifespans(snapshot)
     ]
+    contexts = [context for context in await asyncio.gather(*tasks) if context is not None]
     setattr(app.state, _STATE_KEY, tuple(contexts))
 
 
@@ -111,16 +109,27 @@ async def _enter_lifespan(
     capability: ChannelCapability,
 ) -> PluginLifespanContext | None:
     try:
-        context_manager = _load_callable(_required_lifespan_value(capability, "entrypoint"))()
+        context_manager = load_entrypoint_callable(
+            _required_lifespan_value(capability, "entrypoint"),
+            context="plugin lifespan entrypoint",
+        )()
         service = await context_manager.__aenter__()
-        _store_lifespan_state(app, capability=capability, context_manager=context_manager)
-        _store_service_state(app, capability=capability, service=service)
-        await _run_post_start(app, capability=capability, service=service)
-        return PluginLifespanContext(
-            plugin_id=plugin_id,
-            capability_id=capability.id,
-            context_manager=context_manager,
-        )
+        try:
+            _store_lifespan_state(app, capability=capability, context_manager=context_manager)
+            _store_service_state(app, capability=capability, service=service)
+            await _run_post_start(app, capability=capability, service=service)
+            return PluginLifespanContext(
+                plugin_id=plugin_id,
+                capability_id=capability.id,
+                context_manager=context_manager,
+            )
+        except Exception:
+            await _exit_entered_lifespan(
+                context_manager=context_manager,
+                plugin_id=plugin_id,
+                capability_id=capability.id,
+            )
+            raise
     except Exception:
         logger.exception(
             "PLUGIN_LIFESPAN_START_FAILED plugin_id=%s capability_id=%s",
@@ -128,6 +137,22 @@ async def _enter_lifespan(
             capability.id,
         )
         return None
+
+
+async def _exit_entered_lifespan(
+    *,
+    context_manager: Any,
+    plugin_id: str,
+    capability_id: str,
+) -> None:
+    try:
+        await context_manager.__aexit__(None, None, None)
+    except Exception:
+        logger.exception(
+            "PLUGIN_LIFESPAN_ABORT_CLEANUP_FAILED plugin_id=%s capability_id=%s",
+            plugin_id,
+            capability_id,
+        )
 
 
 def _required_lifespan_value(capability: ChannelCapability, key: str) -> str:
@@ -173,7 +198,10 @@ async def _run_post_start(
     entrypoint = _optional_lifespan_value(capability, "post_start")
     if entrypoint is None:
         return
-    result = _load_callable(entrypoint)(app, service)
+    result = load_entrypoint_callable(
+        entrypoint,
+        context="plugin lifespan post_start",
+    )(app, service)
     if inspect.isawaitable(result):
         await result
 
@@ -190,18 +218,3 @@ async def _stop_plugin_lifespans(app: FastAPI) -> None:
                 context.plugin_id,
                 context.capability_id,
             )
-
-
-def _load_callable(entrypoint: str) -> Any:
-    module_name, separator, attribute_path = entrypoint.partition(":")
-    if not separator or not module_name or not attribute_path:
-        raise PluginRuntimeError("plugin lifespan entrypoint must use 'module:attribute' syntax")
-    try:
-        target = importlib.import_module(module_name)
-        for attribute in attribute_path.split("."):
-            target = getattr(target, attribute)
-    except (ImportError, AttributeError) as exc:
-        raise PluginRuntimeError(f"could not load plugin lifespan {entrypoint!r}") from exc
-    if not callable(target):
-        raise PluginRuntimeError(f"plugin lifespan {entrypoint!r} is not callable")
-    return cast(Any, target)

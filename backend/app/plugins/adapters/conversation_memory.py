@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import logging
 import uuid
 from collections.abc import Callable
@@ -11,6 +10,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from app.plugins.contributions import ConversationMemoryCapability
+from app.plugins.entrypoints import load_entrypoint_callable
 from app.plugins.errors import PluginError, PluginRuntimeError
 from app.plugins.host import get_plugin_host
 
@@ -83,18 +83,10 @@ def resolve_conversation_memory(
 
 def load_memory_factory(entrypoint: str) -> MemoryFactory:
     """Load a trusted Python memory backend factory from ``module:attribute``."""
-    module_name, separator, attribute_path = entrypoint.partition(":")
-    if not separator or not module_name or not attribute_path:
-        raise PluginRuntimeError("conversation_memory entrypoint must use 'module:attribute'")
-    try:
-        target: Any = importlib.import_module(module_name)
-        for attribute in attribute_path.split("."):
-            target = getattr(target, attribute)
-    except (ImportError, AttributeError) as exc:
-        raise PluginRuntimeError(f"could not load memory factory {entrypoint!r}") from exc
-    if not callable(target):
-        raise PluginRuntimeError(f"conversation_memory factory {entrypoint!r} is not callable")
-    return cast(MemoryFactory, target)
+    return cast(
+        MemoryFactory,
+        load_entrypoint_callable(entrypoint, context="conversation_memory factory"),
+    )
 
 
 def _memory_capabilities(

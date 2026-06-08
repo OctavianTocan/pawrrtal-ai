@@ -137,13 +137,20 @@ async def test_diagnose_telegram_is_user_scoped(
     async def fake_diagnose(
         *,
         limit: int,
+        service: Any | None = None,
         user_id: Any | None = None,
         conversation_id: str | None = None,
     ) -> dict[str, Any]:
-        captured.update(limit=limit, user_id=user_id, conversation_id=conversation_id)
+        captured.update(
+            limit=limit,
+            service=service,
+            user_id=user_id,
+            conversation_id=conversation_id,
+        )
         return {
             "configured": True,
             "mode": "polling",
+            "runtime": {"service_running": service is not None},
             "bindings": [],
             "recent_messages": [],
             "stuck_streaming_messages": [],
@@ -160,6 +167,7 @@ async def test_diagnose_telegram_is_user_scoped(
     assert response.status_code == 200
     assert captured == {
         "limit": 50,
+        "service": None,
         "user_id": test_user.id,
         "conversation_id": "853434fb-5f09-4b58-8598-c0384e4fdc22",
     }

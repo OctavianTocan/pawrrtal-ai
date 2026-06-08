@@ -71,4 +71,6 @@ def _fit_telegram_message(text: str) -> str:
     """Return one Telegram-safe message body."""
     if len(text) <= _TELEGRAM_MESSAGE_CHARS:
         return text
-    return text[:_TELEGRAM_MESSAGE_CHARS] + "…"
+    if _TELEGRAM_MESSAGE_CHARS <= 1:
+        return text[:_TELEGRAM_MESSAGE_CHARS]
+    return text[: _TELEGRAM_MESSAGE_CHARS - 1] + "…"

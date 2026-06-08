@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-import importlib
 import logging
 from collections.abc import Callable
-from typing import Any, cast
+from typing import cast
 
 from app.channels.base import Channel
 from app.plugins.contributions import ChannelCapability
+from app.plugins.entrypoints import load_entrypoint_callable
 from app.plugins.errors import PluginError, PluginRuntimeError
 from app.plugins.host import get_plugin_host
 
@@ -43,18 +43,7 @@ def build_channel_registry() -> dict[str, Channel]:
 
 def load_channel_factory(entrypoint: str) -> ChannelFactory:
     """Load a trusted Python channel factory from ``module:attribute``."""
-    module_name, separator, attribute_path = entrypoint.partition(":")
-    if not separator or not module_name or not attribute_path:
-        raise PluginRuntimeError("channel entrypoint must use 'module:attribute' syntax")
-    try:
-        target: Any = importlib.import_module(module_name)
-        for attribute in attribute_path.split("."):
-            target = getattr(target, attribute)
-    except (ImportError, AttributeError) as exc:
-        raise PluginRuntimeError(f"could not load channel factory {entrypoint!r}") from exc
-    if not callable(target):
-        raise PluginRuntimeError(f"channel factory {entrypoint!r} is not callable")
-    return cast(ChannelFactory, target)
+    return cast(ChannelFactory, load_entrypoint_callable(entrypoint, context="channel factory"))
 
 
 def _build_channel(

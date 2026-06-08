@@ -94,7 +94,7 @@ class TestTelegramNotificationDelivery:
         assert len(bot.calls) == 1
         sent = bot.calls[0][1]
         assert sent.endswith("…")
-        assert len(sent) <= 4001  # 4000 budget + the single trailing ellipsis
+        assert len(sent) <= 4000
 
     async def test_delivery_failure_isolated(self) -> None:
         """A bot-side exception is swallowed so it doesn't poison the bus."""

@@ -73,6 +73,18 @@ def _diagnostics_payload() -> dict[str, Any]:
     return {
         "configured": True,
         "mode": "polling",
+        "runtime": {
+            "service_running": True,
+            "polling_task": {
+                "present": True,
+                "done": False,
+                "cancelled": False,
+                "exception": None,
+            },
+            "polling_lock_path": "/tmp/pawrrtal-telegram-polling.lock-test",
+            "webhook_url_set": False,
+            "webhook_secret_set": False,
+        },
         "bindings": [_binding_payload()],
         "recent_messages": [],
         "stuck_streaming_messages": [],
@@ -133,6 +145,9 @@ def test_happy_path_passes_every_check(runner: CliRunner, seeded: PersonaState) 
         "telegram_status_command_simulated",
         "telegram_simulate_targets_bound_chat",
         "telegram_diagnostics_available",
+        "telegram_runtime_configured",
+        "telegram_service_running",
+        "telegram_polling_task_running",
     } <= names
 
 
@@ -240,3 +255,33 @@ def test_missing_diagnostics_endpoint_fails_diagnostics_check(
     assert result.exit_code == 6, result.stdout
     payload = json.loads(result.stdout)
     assert "telegram_diagnostics_available" in _check_names(payload)
+
+
+def test_configured_bot_without_runtime_fails_service_check(
+    runner: CliRunner,
+    seeded: PersonaState,
+) -> None:
+    with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
+        _mock_happy_path(r)
+        payload = _diagnostics_payload()
+        payload["runtime"] = {
+            "service_running": False,
+            "polling_task": {
+                "present": False,
+                "done": None,
+                "cancelled": None,
+                "exception": None,
+            },
+            "polling_lock_path": None,
+            "webhook_url_set": False,
+            "webhook_secret_set": False,
+        }
+        r.get("/api/v1/channels/telegram/diagnose").mock(
+            return_value=httpx.Response(200, json=payload)
+        )
+        result = runner.invoke(app, ["verify", "telegram", "--json"])
+
+    assert result.exit_code == 6, result.stdout
+    failed = _check_names(json.loads(result.stdout))
+    assert "telegram_service_running" in failed
+    assert "telegram_polling_task_running" in failed

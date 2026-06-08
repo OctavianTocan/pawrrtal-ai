@@ -287,14 +287,17 @@ def get_channels_router() -> APIRouter:
 
     @router.get("/telegram/diagnose", include_in_schema=False)
     async def diagnose_telegram(
+        request: Request,
         limit: int = 10,
         conversation_id: str | None = None,
         user: User = Depends(get_allowed_user),
     ) -> dict[str, Any]:
         """Return user-scoped Telegram runtime and persistence diagnostics."""
         bounded_limit = max(1, min(limit, 50))
+        service = getattr(request.app.state, "telegram_service", None)
         return await diagnose_telegram_state(
             limit=bounded_limit,
+            service=service,
             user_id=user.id,
             conversation_id=conversation_id,
         )

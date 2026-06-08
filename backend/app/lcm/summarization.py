@@ -84,7 +84,7 @@ async def _summarize(
             text = await _collect_stream(stream)
             if text:
                 return text, kind
-        except (OSError, RuntimeError, ValueError, TimeoutError):
+        except Exception:
             _log.warning("LCM_SUMMARIZE_%s_FAILED", kind.upper(), exc_info=True)
 
     return turns_text[:_FALLBACK_TRUNCATE_CHARS], "fallback"

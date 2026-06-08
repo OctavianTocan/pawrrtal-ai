@@ -11,7 +11,7 @@
  * - role-based selectors only (no CSS/id locators)
  * - web-first assertions
  * - never wait for `networkidle`
- * - API-driven setup via the backend dev-login endpoint, no UI clicks
+ * - API-driven setup by default; login.spec also smokes the dev button itself
  */
 
 import { defineConfig } from '@playwright/test';

@@ -28,8 +28,7 @@ def build_llm_view_messages(
     The chat-message table stores both user and assistant turns as
     flat ``{"role": ..., "content": str}`` rows so
     ``_load_history_and_persist`` can hand them to the provider
-    unchanged.  trace viewer's ``gen_ai.input.messages`` panel — and any
-    other OTel backend rendering the OpenLLMetry shape — expects the
+    unchanged. Trace viewers that render ``gen_ai.input.messages`` expect the
     canonical ``AgentMessage`` union, so we lift each row into the
     matching TypedDict here.
 

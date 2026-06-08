@@ -35,6 +35,11 @@ async def _fake_post_start(app: FastAPI, service: Any) -> None:
     app.state.post_started_with = service.bot
 
 
+async def _failing_post_start(_app: FastAPI, _service: Any) -> None:
+    _EVENTS.append("post-failed")
+    raise RuntimeError("post-start failed")
+
+
 async def test_reload_plugin_lifespans_enters_and_stops_channel_lifespan(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -42,7 +47,7 @@ async def test_reload_plugin_lifespans_enters_and_stops_channel_lifespan(
     _EVENTS.clear()
     app = FastAPI()
     monkeypatch.setattr(plugin_lifespans, "_reload_plugins", _fake_snapshot)
-    monkeypatch.setattr(plugin_lifespans, "_load_callable", _fake_load_callable)
+    monkeypatch.setattr(plugin_lifespans, "load_entrypoint_callable", _fake_load_callable)
 
     await plugin_lifespans.reload_plugin_lifespans(app)
 
@@ -55,14 +60,34 @@ async def test_reload_plugin_lifespans_enters_and_stops_channel_lifespan(
     assert _EVENTS == ["enter", "post:fake-bot", "exit"]
 
 
-def _fake_load_callable(entrypoint: str) -> Any:
+async def test_reload_plugin_lifespans_exits_entered_lifespan_when_post_start_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _EVENTS.clear()
+    app = FastAPI()
+    monkeypatch.setattr(
+        plugin_lifespans,
+        "_reload_plugins",
+        lambda: _fake_snapshot(post_start="test:failing_post_start"),
+    )
+    monkeypatch.setattr(plugin_lifespans, "load_entrypoint_callable", _fake_load_callable)
+
+    await plugin_lifespans.reload_plugin_lifespans(app)
+
+    assert _EVENTS == ["enter", "post-failed", "exit"]
+    assert app.state.plugin_lifespan_contexts == ()
+
+
+def _fake_load_callable(entrypoint: str, *, context: str = "plugin entrypoint") -> Any:
+    _ = context
     return {
         "test:lifespan": _fake_channel_lifespan,
         "test:post_start": _fake_post_start,
+        "test:failing_post_start": _failing_post_start,
     }[entrypoint]
 
 
-def _fake_snapshot() -> ContributionRegistrySnapshot:
+def _fake_snapshot(*, post_start: str = "test:post_start") -> ContributionRegistrySnapshot:
     manifest = PluginManifest.model_validate(
         {
             "schema_version": 1,
@@ -83,7 +108,7 @@ def _fake_snapshot() -> ContributionRegistrySnapshot:
                         "entrypoint": "test:lifespan",
                         "context_key": "test_lifespan_context",
                         "service_key": "test_service",
-                        "post_start": "test:post_start",
+                        "post_start": post_start,
                         "order": 1,
                     },
                 }

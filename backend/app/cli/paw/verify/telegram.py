@@ -11,7 +11,7 @@ follow-up path.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, cast
 
 from app.cli.paw.config import PersonaState
 from app.cli.paw.http import PawClient
@@ -188,9 +188,49 @@ async def _check_diagnostics(client: PawClient, r: ScenarioResult) -> None:
     r.artifacts["diagnostics"] = body
     r.add(
         "telegram_diagnostics_available",
-        {"configured", "mode", "bindings", "recent_messages"}.issubset(body.keys()),
+        {"configured", "mode", "runtime", "bindings", "recent_messages"}.issubset(body.keys()),
         detail=f"keys={sorted(body.keys())}",
     )
+    _check_runtime(body, r)
+
+
+def _check_runtime(body: dict[str, Any], r: ScenarioResult) -> None:
+    """Assert configured Telegram bot ingress is alive."""
+    runtime_value = body.get("runtime")
+    runtime = cast("dict[str, Any]", runtime_value) if isinstance(runtime_value, dict) else {}
+    configured = body.get("configured") is True
+    mode = body.get("mode")
+    service_running = runtime.get("service_running") is True
+    r.add(
+        "telegram_runtime_configured",
+        configured,
+        detail=f"configured={configured} mode={mode!r}",
+    )
+    r.add(
+        "telegram_service_running",
+        configured and service_running,
+        detail=f"service_running={runtime.get('service_running')!r}",
+    )
+    if mode == "polling":
+        task_value = runtime.get("polling_task")
+        task = cast("dict[str, Any]", task_value) if isinstance(task_value, dict) else {}
+        r.add(
+            "telegram_polling_task_running",
+            service_running and task.get("present") is True and task.get("done") is False,
+            detail=f"polling_task={task}",
+        )
+        return
+    if mode == "webhook":
+        r.add(
+            "telegram_webhook_runtime_ready",
+            service_running
+            and runtime.get("webhook_url_set") is True
+            and runtime.get("webhook_secret_set") is True,
+            detail=(
+                f"webhook_url_set={runtime.get('webhook_url_set')!r} "
+                f"webhook_secret_set={runtime.get('webhook_secret_set')!r}"
+            ),
+        )
 
 
 async def run_telegram_scenario(

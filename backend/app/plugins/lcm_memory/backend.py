@@ -22,8 +22,7 @@ class LCMConversationMemoryBackend:
         conversation_id: uuid.UUID,
         history_window: int,
     ) -> list[dict[str, str]] | None:
-        """Return LCM-assembled history when LCM is enabled."""
-        _ = history_window
+        """Return LCM history; LCM uses its configured fresh-tail count."""
         if not settings.lcm_enabled:
             return None
         return await assemble_context(
@@ -62,6 +61,8 @@ class LCMConversationMemoryBackend:
         model_id: str,
     ) -> None:
         """Schedule LCM compaction for a completed turn."""
+        if not settings.lcm_enabled:
+            return
         schedule_lcm_compaction(
             conversation_id=conversation_id,
             user_id=user_id,

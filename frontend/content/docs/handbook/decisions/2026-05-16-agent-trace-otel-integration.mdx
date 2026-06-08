@@ -1,9 +1,9 @@
 ---
-title: Emit OpenLLMetry spans for agent tracing
+title: Emit OpenTelemetry GenAI spans for agent tracing
 description: ADR — instrument the agent loop and turn runner with Traceloop-shaped GenAI spans so local debuggers and remote OTel backends share one wire contract.
 ---
 
-# ADR: Emit OpenLLMetry Spans For Agent Tracing
+# ADR: Emit OpenTelemetry GenAI Spans For Agent Tracing
 
 - **Date:** 2026-05-16
 - **Owners:** OctavianTocan
@@ -22,7 +22,7 @@ environments.
 
 Local OTLP collectors can render an agent's tokens, tool calls, and turn
 boundaries live. The wire format should stay generic: OTLP/HTTP-JSON
-with **Traceloop / OpenLLMetry** attributes from the `gen_ai.*`
+with **OpenTelemetry GenAI / Traceloop** attributes from the `gen_ai.*`
 semantic-convention family.
 
 Pawrrtal already has the OTel SDK + OTLP/HTTP exporter wired in
@@ -43,13 +43,14 @@ span types:
 
 ## Decision
 
-Emit OpenLLMetry / Traceloop-shaped spans, not a vendor-specific wire
+Emit OpenTelemetry GenAI / Traceloop-shaped spans, not a vendor-specific wire
 protocol. Local collectors and deployed OTel backends consume the same
 spans without change.
 
 ### Schema we emit
 
-The schema follows the Traceloop/OpenLLMetry GenAI attributes.
+The schema follows OpenTelemetry GenAI attributes, with Traceloop-compatible
+fields where collectors still expect them.
 
 - **`pawrrtal.turn`** — root span per chat turn.
   Attributes: `pawrrtal.conversation_id`, `pawrrtal.user_id`,

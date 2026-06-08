@@ -200,7 +200,7 @@ Placeholder settings sections currently listed in the nav but not fully wired:
 - **Secret redaction**: Tool inputs/log output can be redacted when `SECRET_REDACTION_ENABLED=true`.
 - **Request logging**: Every request gets a request id for log correlation.
 - **Health probes**: `/api/v1/health` is liveness. `/api/v1/health/ready` checks DB connectivity and at least one configured LLM provider.
-- **OpenTelemetry**: Traces include `pawrrtal.turn` and `pawrrtal.llm.chat` spans, model/user/conversation/surface metadata, usage, cost, and OpenLLMetry-compatible event hooks.
+- **OpenTelemetry**: Traces include `pawrrtal.turn` and `pawrrtal.llm.chat` spans, model/user/conversation/surface metadata, usage, cost, and OpenTelemetry-compatible event hooks.
 - **Event bus**: A process-local async pub/sub bus publishes turn, scheduled, and agent-response events.
 - **Scheduler**: `SCHEDULER_ENABLED=true` starts a cron scheduler. The API can list historical jobs regardless of the flag, but create/delete live jobs require a running scheduler.
 

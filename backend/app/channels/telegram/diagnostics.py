@@ -21,6 +21,7 @@ TELEGRAM_PROVIDER = "telegram"
 async def diagnose_telegram_state(
     *,
     limit: int,
+    service: Any | None = None,
     user_id: Any | None = None,
     conversation_id: str | None = None,
 ) -> dict[str, Any]:
@@ -40,10 +41,47 @@ async def diagnose_telegram_state(
     return {
         "configured": bool(settings.telegram_bot_token),
         "mode": settings.telegram_mode,
+        "runtime": _diagnose_runtime(service),
         "bindings": bindings,
         "recent_messages": recent_messages,
         "stuck_streaming_messages": stuck_messages,
         "conversation_trace": trace,
+    }
+
+
+def _diagnose_runtime(service: Any | None) -> dict[str, Any]:
+    """Render secret-safe Telegram service health."""
+    polling_task = getattr(service, "polling_task", None) if service is not None else None
+    polling_lock = getattr(service, "polling_lock", None) if service is not None else None
+    lock_path = getattr(polling_lock, "path", None)
+    return {
+        "service_running": service is not None,
+        "polling_task": _task_status(polling_task),
+        "polling_lock_path": str(lock_path) if lock_path is not None else None,
+        "webhook_url_set": bool(settings.telegram_webhook_url),
+        "webhook_secret_set": bool(settings.telegram_webhook_secret),
+    }
+
+
+def _task_status(task: Any | None) -> dict[str, Any]:
+    if task is None:
+        return {
+            "present": False,
+            "done": None,
+            "cancelled": None,
+            "exception": None,
+        }
+    done = bool(task.done())
+    cancelled = bool(task.cancelled())
+    exception = None
+    if done and not cancelled:
+        error = task.exception()
+        exception = f"{type(error).__name__}: {error}" if error is not None else None
+    return {
+        "present": True,
+        "done": done,
+        "cancelled": cancelled,
+        "exception": exception,
     }
 
 
