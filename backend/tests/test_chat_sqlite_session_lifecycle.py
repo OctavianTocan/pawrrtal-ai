@@ -16,7 +16,7 @@ generator — same connection lifecycle the Telegram path already uses.
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
 from typing import Any, cast
 from uuid import uuid4
 
@@ -25,8 +25,18 @@ from httpx import AsyncClient
 
 from app.channels.sse import SSEChannel
 from app.models import Workspace
-from app.providers.base import StreamEvent
+from app.providers.base import AILLM, StreamEvent
 from app.providers.catalog import first_catalog_model
+from app.providers.selection import ProviderSelection
+
+
+def _select_provider(provider: object) -> Callable[..., ProviderSelection]:
+    """Return a turn-pipeline provider selector for ``provider``."""
+
+    def _require_provider(model_id: str, **_kwargs: object) -> ProviderSelection:
+        return ProviderSelection(provider=cast(AILLM, provider), effective_model_id=model_id)
+
+    return _require_provider
 
 
 class _FakeProvider:
@@ -67,8 +77,8 @@ async def test_chat_router_does_not_pass_request_session_into_turn_input(
         json={"title": "SQLite Lifecycle"},
     )
     monkeypatch.setattr(
-        "app.turns.pipeline.prepare.resolve_llm",
-        lambda _model_id, **kwargs: _FakeProvider(),
+        "app.turns.pipeline.prepare.require_provider",
+        _select_provider(_FakeProvider()),
     )
 
     captured: dict[str, Any] = {}
@@ -127,8 +137,8 @@ async def test_chat_finalizes_assistant_status_on_sqlite(
         json={"title": "Finalize"},
     )
     monkeypatch.setattr(
-        "app.turns.pipeline.prepare.resolve_llm",
-        lambda _model_id, **kwargs: _FakeProvider(),
+        "app.turns.pipeline.prepare.require_provider",
+        _select_provider(_FakeProvider()),
     )
 
     response = await client.post(
@@ -212,8 +222,8 @@ async def test_finalize_turn_leaves_message_complete_on_cost_write_failure(
         json={"title": "Cost Failure"},
     )
     monkeypatch.setattr(
-        "app.turns.pipeline.prepare.resolve_llm",
-        lambda _model_id, **kwargs: _FakeProvider(),
+        "app.turns.pipeline.prepare.require_provider",
+        _select_provider(_FakeProvider()),
     )
 
     async def _explode(**_kwargs: Any) -> None:

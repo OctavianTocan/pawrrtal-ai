@@ -46,7 +46,7 @@ _TOOL_ICONS: dict[str, str] = {
     "TodoWrite": "☑️",
     # Pawrrtal-native cross-provider tool factories (
     # ``app/core/tools/...``).  Each lands here when the chat router
-    # composes them via ``build_agent_tools``.
+    # composes them through the Turn Pipeline.
     "workspace_read": "\U0001f4d6",
     "read_file": "\U0001f4d6",
     "workspace_write": "✏️",

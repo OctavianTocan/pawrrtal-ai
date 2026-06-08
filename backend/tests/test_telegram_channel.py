@@ -61,6 +61,7 @@ from app.channels.telegram.status import (
 from app.conversations.crud import ConversationStatus
 from app.providers.base import StreamEvent
 from app.providers.catalog import first_catalog_model
+from app.providers.selection import ProviderSelection
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -1127,11 +1128,11 @@ class TestResolveProviderWithAutoClear:
     """Cover the chat-turn safety net that catches unknown/malformed stored IDs.
 
     The handler in :mod:`app.channels.telegram.bot` wraps the
-    ``resolve_llm`` call so that an unknown-but-well-formed stored model
+    provider selection so that an unknown-but-well-formed stored model
     surfaces an immediate user-facing warning, clears the stored value,
     and still completes the current turn using the catalog default.
 
-    These tests mock ``async_session_maker`` and ``resolve_llm`` so the
+    These tests mock ``async_session_maker`` and provider selection so the
     branching is exercised without spinning up the DB or the providers.
     """
 
@@ -1157,8 +1158,14 @@ class TestResolveProviderWithAutoClear:
 
         fake_default_provider = MagicMock(name="default_provider")
         update_mock = AsyncMock(return_value=True)
-        # ``resolve_llm`` is a sync function — use MagicMock, not AsyncMock.
-        resolve_mock = MagicMock(side_effect=[fake_default_provider])
+        selection_mock = MagicMock(
+            return_value=ProviderSelection(
+                provider=fake_default_provider,
+                effective_model_id=first_catalog_model().id,
+                warning="model not in catalog",
+                bad_model_id=context.model_id,
+            )
+        )
 
         # ``async_session_maker`` is used as an async context manager.
         fake_session = AsyncMock()
@@ -1168,8 +1175,8 @@ class TestResolveProviderWithAutoClear:
 
         with (
             patch(
-                "app.channels.telegram.bot_provider_resolution.resolve_llm",
-                new=resolve_mock,
+                "app.channels.telegram.bot_provider_resolution.provider_or_default",
+                new=selection_mock,
             ),
             patch(
                 "app.channels.telegram.bot_provider_resolution.update_conversation_model",
@@ -1180,7 +1187,7 @@ class TestResolveProviderWithAutoClear:
                 new=fake_session_maker,
             ),
         ):
-            provider, warning = await _resolve_provider_with_auto_clear(context)
+            selection, warning = await _resolve_provider_with_auto_clear(context)
 
         # Warning was produced and mentions the bad ID + the fallback.
         assert warning is not None
@@ -1193,13 +1200,9 @@ class TestResolveProviderWithAutoClear:
         assert update_mock.await_args.kwargs["model_id"] is None
         assert update_mock.await_args.kwargs["conversation_id"] == context.conversation_id
 
-        # resolve_llm was called *once* — only for the catalog fallback.
-        # (For the unknown path ``require_known()`` raises first, so
-        # ``resolve_llm`` is only invoked for the fallback.)
-        assert resolve_mock.call_count == 1
-        fallback_call = resolve_mock.call_args
-        assert fallback_call.args[0] == first_catalog_model().id
-        assert provider is fake_default_provider
+        selection_mock.assert_called_once_with(context.model_id, workspace_root=None)
+        assert selection.provider is fake_default_provider
+        assert selection.effective_model_id == first_catalog_model().id
 
     async def test_following_turn_uses_catalog_default_after_clear(self) -> None:
         """After the auto-clear, a turn with ``model_id=None`` resolves cleanly.
@@ -1213,28 +1216,31 @@ class TestResolveProviderWithAutoClear:
 
         fake_default_provider = MagicMock(name="default_provider")
         update_mock = AsyncMock(return_value=True)
-        resolve_mock = MagicMock(side_effect=[fake_default_provider])
+        selection_mock = MagicMock(
+            return_value=ProviderSelection(
+                provider=fake_default_provider,
+                effective_model_id=first_catalog_model().id,
+            )
+        )
 
         with (
             patch(
-                "app.channels.telegram.bot_provider_resolution.resolve_llm",
-                new=resolve_mock,
+                "app.channels.telegram.bot_provider_resolution.provider_or_default",
+                new=selection_mock,
             ),
             patch(
                 "app.channels.telegram.bot_provider_resolution.update_conversation_model",
                 new=update_mock,
             ),
         ):
-            provider, warning = await _resolve_provider_with_auto_clear(context)
+            selection, warning = await _resolve_provider_with_auto_clear(context)
 
         # Clean path: no warning, no clear.
         assert warning is None
         update_mock.assert_not_awaited()
 
-        # resolve_llm was called exactly once with the stored canonical ID.
-        assert resolve_mock.call_count == 1
-        assert resolve_mock.call_args.args[0] == first_catalog_model().id
-        assert provider is fake_default_provider
+        selection_mock.assert_called_once_with(context.model_id, workspace_root=None)
+        assert selection.provider is fake_default_provider
 
 
 # ---------------------------------------------------------------------------

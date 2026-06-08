@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 from app.plugins.adapters.turn_context import TurnContextProviderAdapter
 from app.provider_sessions import ProviderSessionTurnState
+from app.providers.selection import ProviderSelection
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
@@ -30,8 +31,8 @@ class TurnCommand:
     conversation_id: uuid.UUID
     user_id: uuid.UUID
     question: str
-    workspace_root: Path
-    workspace_id: uuid.UUID
+    workspace_root: Path | None
+    workspace_id: uuid.UUID | None
     surface: str
     model_id: str
     reasoning_effort: ReasoningEffort | None = None
@@ -41,6 +42,12 @@ class TurnCommand:
     history_window: int = 20
     log_tag: str = "TURN"
     send_fn: SendMessageFn | None = None
+    channel_text: str | None = None
+    channel_metadata: dict[str, Any] = field(default_factory=dict)
+    verbose_level: int | None = None
+    provider_selection: ProviderSelection | None = None
+    draft_updater: Callable[[str], Awaitable[None]] | None = None
+    on_turn_context_finished: Callable[[], Awaitable[None]] | None = None
     db_session: AsyncSession | None = field(default=None, repr=False, compare=False)
 
 

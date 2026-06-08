@@ -1,6 +1,7 @@
 """API tests for chat streaming routes."""
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Callable
+from typing import cast
 from uuid import uuid4
 
 import pytest
@@ -8,7 +9,18 @@ from httpx import AsyncClient
 
 from app.agents.types import AgentSafetyConfig
 from app.models import Workspace  # used via fixture type hint
+from app.providers.base import AILLM
+from app.providers.selection import ProviderSelection
 from tests.agent_loop_harness import ScriptedStreamFn, echo_tool, text_turn, tool_call_turn
+
+
+def _select_provider(provider: object) -> Callable[..., ProviderSelection]:
+    """Return a turn-pipeline provider selector for ``provider``."""
+
+    def _require_provider(model_id: str, **_kwargs: object) -> ProviderSelection:
+        return ProviderSelection(provider=cast(AILLM, provider), effective_model_id=model_id)
+
+    return _require_provider
 
 
 class FakeProvider:
@@ -81,8 +93,8 @@ async def test_chat_streams_provider_events(
     conversation_id = uuid4()
     await client.post(f"/api/v1/conversations/{conversation_id}", json={"title": "Chat"})
     monkeypatch.setattr(
-        "app.turns.pipeline.prepare.resolve_llm",
-        lambda _model_id, **kwargs: FakeProvider([{"type": "delta", "content": "hello"}]),
+        "app.turns.pipeline.prepare.require_provider",
+        _select_provider(FakeProvider([{"type": "delta", "content": "hello"}])),
     )
 
     response = await client.post(
@@ -109,8 +121,8 @@ async def test_chat_persists_user_and_finalized_assistant_messages(
     conversation_id = uuid4()
     await client.post(f"/api/v1/conversations/{conversation_id}", json={"title": "Chat"})
     monkeypatch.setattr(
-        "app.turns.pipeline.prepare.resolve_llm",
-        lambda _model_id, **kwargs: FakeProvider([{"type": "delta", "content": "hello"}]),
+        "app.turns.pipeline.prepare.require_provider",
+        _select_provider(FakeProvider([{"type": "delta", "content": "hello"}])),
     )
 
     response = await client.post(
@@ -173,8 +185,8 @@ async def test_chat_forwards_reasoning_effort(
                 yield event
 
     monkeypatch.setattr(
-        "app.turns.pipeline.prepare.resolve_llm",
-        lambda _model_id, **_kwargs: CapturingProvider([{"type": "delta", "content": "ok"}]),
+        "app.turns.pipeline.prepare.require_provider",
+        _select_provider(CapturingProvider([{"type": "delta", "content": "ok"}])),
     )
 
     response = await client.post(
@@ -201,8 +213,8 @@ async def test_chat_persists_requested_model_id(
     conversation_id = uuid4()
     await client.post(f"/api/v1/conversations/{conversation_id}", json={"title": "Model"})
     monkeypatch.setattr(
-        "app.turns.pipeline.prepare.resolve_llm",
-        lambda _model_id, **kwargs: FakeProvider([{"type": "delta", "content": "ok"}]),
+        "app.turns.pipeline.prepare.require_provider",
+        _select_provider(FakeProvider([{"type": "delta", "content": "ok"}])),
     )
 
     response = await client.post(
@@ -277,7 +289,7 @@ async def test_chat_stream_converts_provider_exception_to_error_event(
             yield {"type": "delta", "content": "unreachable"}
 
     monkeypatch.setattr(
-        "app.turns.pipeline.prepare.resolve_llm", lambda _model_id, **kwargs: FailingProvider()
+        "app.turns.pipeline.prepare.require_provider", _select_provider(FailingProvider())
     )
 
     response = await client.post(
@@ -329,7 +341,7 @@ async def test_chat_multi_turn_tool_call_flows_through_full_http_path(
     monkeypatch.setattr(provider, "_stream_fn", script)
 
     # Inject both the provider and the echo tool into the chat path.
-    monkeypatch.setattr("app.turns.pipeline.prepare.resolve_llm", lambda _model_id, **_kw: provider)
+    monkeypatch.setattr("app.turns.pipeline.prepare.require_provider", _select_provider(provider))
     monkeypatch.setattr(
         "app.turns.pipeline.prepare.build_agent_tools", lambda *_args, **_kw: [echo]
     )
@@ -403,7 +415,7 @@ async def test_chat_safety_layer_fires_and_surfaces_agent_terminated(
         ),
     )
 
-    monkeypatch.setattr("app.turns.pipeline.prepare.resolve_llm", lambda _model_id, **_kw: provider)
+    monkeypatch.setattr("app.turns.pipeline.prepare.require_provider", _select_provider(provider))
     monkeypatch.setattr(
         "app.turns.pipeline.prepare.build_agent_tools", lambda *_args, **_kw: [echo_tool("ping")]
     )

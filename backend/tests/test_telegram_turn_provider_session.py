@@ -14,6 +14,7 @@ import pytest
 from app.channels.telegram.bot import _run_llm_turn
 from app.channels.telegram.handlers import TelegramTurnContext
 from app.provider_sessions import ProviderSessionTurnState
+from app.providers.selection import ProviderSelection
 
 
 @pytest.mark.anyio
@@ -36,8 +37,8 @@ async def test_run_llm_turn_passes_prepared_provider_session(tmp_path: Path) -> 
     )
     captured: dict[str, Any] = {}
 
-    async def fake_run_turn(turn_input: Any) -> AsyncIterator[bytes]:
-        captured["turn_input"] = turn_input
+    async def fake_run_prepared_turn(prepared_turn: Any) -> AsyncIterator[bytes]:
+        captured["turn_input"] = prepared_turn.turn_input
         if False:
             yield b""
 
@@ -48,18 +49,25 @@ async def test_run_llm_turn_passes_prepared_provider_session(tmp_path: Path) -> 
     with (
         patch("app.channels.telegram.bot.async_session_maker", new=fake_session_maker),
         patch("app.workspace.crud.get_default_workspace", AsyncMock(return_value=workspace)),
-        patch("app.channels.telegram.bot.build_agent_tools", MagicMock(return_value=[])),
         patch(
             "app.channels.telegram.bot.resolve_provider_with_auto_clear",
-            AsyncMock(return_value=(MagicMock(), None)),
+            AsyncMock(
+                return_value=(
+                    ProviderSelection(
+                        provider=MagicMock(),
+                        effective_model_id="openai-codex:openai/gpt-5.5",
+                    ),
+                    None,
+                )
+            ),
         ),
         patch(
             "app.channels.telegram.bot.normalize_reasoning_and_notify",
             AsyncMock(return_value=None),
         ),
         patch(
-            "app.channels.telegram.bot.prepare_provider_session",
-            AsyncMock(
+            "app.turns.pipeline.prepare.prepare_provider_session",
+            new=AsyncMock(
                 return_value=ProviderSessionTurnState(
                     kind="openai_codex",
                     session_id="thr_telegram",
@@ -71,7 +79,7 @@ async def test_run_llm_turn_passes_prepared_provider_session(tmp_path: Path) -> 
                 ),
             ),
         ),
-        patch("app.channels.telegram.bot.run_turn", new=fake_run_turn),
+        patch("app.channels.telegram.bot.run_prepared_turn", new=fake_run_prepared_turn),
     ):
         await _run_llm_turn(message=cast(Any, message), context=context)
 

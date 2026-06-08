@@ -26,16 +26,11 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.tool_surface import build_agent_tools
-from app.channels.base import ChannelMessage
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
 from app.models import Conversation
-from app.providers.base import AILLM
-from app.providers.catalog import first_catalog_model
-from app.providers.factory import resolve_llm
-from app.providers.model_id import InvalidModelId, UnknownModelId
-from app.turns.pipeline import ChatTurnInput, run_turn
+from app.providers.selection import default_model_id, provider_or_default
+from app.turns.pipeline import TurnCommand, prepare_turn, run_prepared_turn
 from app.workspace.crud import get_default_workspace
 
 from .attachments import collect_attachments
@@ -319,34 +314,13 @@ async def _resolve_turn_target(event: dict[str, Any]) -> _TurnTarget | None:
             conversation_id=conversation.id,
             workspace_root=Path(workspace.path),
             workspace_id=workspace.id,
-            model_id=conversation.model_id or first_catalog_model().id,
+            model_id=conversation.model_id or default_model_id(),
             verbose_level=(
                 conversation.verbose_level
                 if conversation.verbose_level is not None
                 else DEFAULT_VERBOSE_LEVEL
             ),
         )
-
-
-def _resolve_provider(model_id: str, workspace_root: Path) -> tuple[AILLM, str]:
-    """Resolve a provider, falling back to the first catalog entry on a bad id.
-
-    Returns ``(provider, effective_model_id)`` so the channel envelope and
-    cost ledger record the model actually used. The first catalog entry is a
-    tool-forwarding model, so this also keeps the channel off the
-    tool-dropping CLI hosts by default.
-    """
-    try:
-        return resolve_llm(model_id, workspace_root=workspace_root), model_id
-    except (InvalidModelId, UnknownModelId) as exc:
-        fallback = first_catalog_model().id
-        logger.warning(
-            "GOOGLE_CHAT_MODEL_FALLBACK model=%s fallback=%s reason=%s",
-            model_id,
-            fallback,
-            exc,
-        )
-        return resolve_llm(fallback, workspace_root=workspace_root), fallback
 
 
 async def _handle_message_event(event: dict[str, Any]) -> None:
@@ -361,15 +335,17 @@ async def _handle_message_event(event: dict[str, Any]) -> None:
     if target is None:
         return
 
-    provider, effective_model_id = _resolve_provider(target.model_id, target.workspace_root)
-    agent_tools = build_agent_tools(
+    provider_selection = provider_or_default(
+        target.model_id,
         workspace_root=target.workspace_root,
-        user_id=target.user_id,
-        workspace_id=target.workspace_id,
-        surface=SURFACE_GOOGLE_CHAT,
-        conversation_id=target.conversation_id,
-        model_id=effective_model_id,
     )
+    if provider_selection.warning is not None:
+        logger.warning(
+            "GOOGLE_CHAT_MODEL_FALLBACK model=%s fallback=%s reason=%s",
+            target.model_id,
+            provider_selection.effective_model_id,
+            provider_selection.warning,
+        )
 
     thread = thread_name(event)
     message_name = await create_message(
@@ -381,38 +357,31 @@ async def _handle_message_event(event: dict[str, Any]) -> None:
         logger.warning("GOOGLE_CHAT_PLACEHOLDER_FAILED space=%s", space)
         return
 
-    # Local import breaks the registry ↔ google_chat package import cycle.
-    from app.channels.registry import resolve_channel  # noqa: PLC0415
-
     attachments = await collect_attachments(event)
     question = _build_question(text, attachments.annotations)
 
-    channel_message: ChannelMessage = {
-        "user_id": target.user_id,
-        "conversation_id": target.conversation_id,
-        "text": text or "(attachment)",
-        "surface": SURFACE_GOOGLE_CHAT,
-        "model_id": effective_model_id,
-        "metadata": {
-            "space_name": space,
-            "thread_name": thread,
-            "message_name": message_name,
-            "verbose_level": target.verbose_level,
-        },
-    }
-    turn_input = ChatTurnInput(
-        conversation_id=target.conversation_id,
-        user_id=target.user_id,
-        question=question,
-        provider=provider,
-        channel=resolve_channel(SURFACE_GOOGLE_CHAT),
-        channel_message=channel_message,
-        workspace_root=target.workspace_root,
-        tools=agent_tools,
-        images=attachments.images or None,
-        log_tag="GOOGLE_CHAT",
+    prepared_turn = await prepare_turn(
+        TurnCommand(
+            conversation_id=target.conversation_id,
+            user_id=target.user_id,
+            question=question,
+            workspace_root=target.workspace_root,
+            workspace_id=target.workspace_id,
+            surface=SURFACE_GOOGLE_CHAT,
+            model_id=target.model_id,
+            provider_selection=provider_selection,
+            channel_text=text or "(attachment)",
+            channel_metadata={
+                "space_name": space,
+                "thread_name": thread,
+                "message_name": message_name,
+                "verbose_level": target.verbose_level,
+            },
+            images=attachments.images or None,
+            log_tag="GOOGLE_CHAT",
+        )
     )
-    async for _ in run_turn(turn_input):
+    async for _ in run_prepared_turn(prepared_turn):
         pass
 
 

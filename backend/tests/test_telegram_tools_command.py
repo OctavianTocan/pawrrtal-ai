@@ -93,7 +93,7 @@ async def test_tools_command_renders_actual_tools_and_plugin_capabilities(
             new=MagicMock(return_value=conversation.model_id),
         ),
         patch(
-            "app.channels.telegram.tools_command.build_agent_tools",
+            "app.channels.telegram.tools_command.compose_turn_tools",
             new=MagicMock(return_value=[tool]),
         ),
         patch("app.channels.telegram.tools_command.get_plugin_host", return_value=host),

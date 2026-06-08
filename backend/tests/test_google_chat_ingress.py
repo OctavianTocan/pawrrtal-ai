@@ -12,7 +12,8 @@ import pytest
 from app.channels.google_chat import ingress
 from app.channels.google_chat.attachments import GoogleChatAttachments
 from app.channels.google_chat.channel import SURFACE_GOOGLE_CHAT
-from app.turns.pipeline import ChatTurnInput
+from app.providers.selection import ProviderSelection
+from app.turns.pipeline import PreparedTurn
 
 
 class _Provider:
@@ -36,7 +37,7 @@ async def test_google_chat_message_event_submits_normalized_turn(
     workspace_id = uuid4()
     provider: Any = _Provider()
     channel: Any = _Channel()
-    captured: dict[str, ChatTurnInput] = {}
+    captured: dict[str, PreparedTurn] = {}
 
     async def resolve_turn_target(_event: dict[str, Any]) -> ingress._TurnTarget:
         return ingress._TurnTarget(
@@ -65,21 +66,24 @@ async def test_google_chat_message_event_submits_normalized_turn(
             annotations=["[User sent a document: brief.md.]"],
         )
 
-    async def run_turn(turn_input: ChatTurnInput) -> AsyncIterator[bytes]:
-        captured["turn_input"] = turn_input
+    async def run_prepared_turn(prepared_turn: PreparedTurn) -> AsyncIterator[bytes]:
+        captured["prepared_turn"] = prepared_turn
         yield b""
 
     monkeypatch.setattr(ingress, "_resolve_turn_target", resolve_turn_target)
     monkeypatch.setattr(
         ingress,
-        "_resolve_provider",
-        lambda model_id, workspace_root: (provider, "agent-sdk:anthropic/claude-opus-4-7"),
+        "provider_or_default",
+        lambda model_id, workspace_root: ProviderSelection(
+            provider=provider,
+            effective_model_id="agent-sdk:anthropic/claude-opus-4-7",
+        ),
     )
-    monkeypatch.setattr(ingress, "build_agent_tools", lambda **_kwargs: [])
     monkeypatch.setattr(ingress, "create_message", create_placeholder)
     monkeypatch.setattr(ingress, "collect_attachments", collect_attachments)
-    monkeypatch.setattr("app.channels.registry.resolve_channel", lambda _surface: channel)
-    monkeypatch.setattr(ingress, "run_turn", run_turn)
+    monkeypatch.setattr("app.turns.pipeline.prepare.compose_turn_tools", lambda **_kwargs: [])
+    monkeypatch.setattr("app.turns.pipeline.prepare.resolve_channel", lambda _surface: channel)
+    monkeypatch.setattr(ingress, "run_prepared_turn", run_prepared_turn)
 
     event = {
         "type": "MESSAGE",
@@ -93,7 +97,7 @@ async def test_google_chat_message_event_submits_normalized_turn(
 
     await ingress._handle_message_event(event)
 
-    turn_input = captured["turn_input"]
+    turn_input = captured["prepared_turn"].turn_input
     assert turn_input.conversation_id == conversation_id
     assert turn_input.user_id == user_id
     assert turn_input.question == "hello\n\n[User sent a document: brief.md.]"

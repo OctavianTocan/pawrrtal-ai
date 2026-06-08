@@ -32,8 +32,6 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from urllib.parse import urlparse
 
-from app.agents.tool_surface import build_agent_tools
-from app.channels.base import ChannelMessage
 from app.channels.telegram.bot_runtime import (
     COMMAND_REFRESH_COOLDOWN_SECONDS,
     ChatMessageQueueDispatcher,
@@ -64,9 +62,7 @@ from app.channels.telegram.handlers import (
 from app.channels.telegram.tools_command import handle_tools_command
 from app.infrastructure.config import settings
 from app.infrastructure.database.legacy import async_session_maker
-from app.plugins.adapters.turn_context import build_turn_context_providers
-from app.providers.session_preparer import prepare_provider_session
-from app.turns.pipeline import ChatTurnInput, run_turn
+from app.turns.pipeline import PreparedTurn, TurnCommand, prepare_turn, run_prepared_turn
 
 from .channel import SURFACE_TELEGRAM, make_telegram_sender, render_initial
 from .error_handler import register_telegram_error_handler
@@ -213,7 +209,7 @@ async def _chat_queue_consumer(turn: QueuedTurn) -> None:
 async def _execute_turn_body(
     *,
     message: Message,
-    turn_input: ChatTurnInput,
+    prepared_turn: PreparedTurn,
     user_text: str,
     context: TelegramTurnContext,
 ) -> None:
@@ -233,7 +229,7 @@ async def _execute_turn_body(
             name=f"telegram-typing-{chat_id}",
         )
     try:
-        async for _ in run_turn(turn_input):
+        async for _ in run_prepared_turn(prepared_turn):
             pass
     except asyncio.CancelledError:
         logger.info("TELEGRAM_STREAM_CANCELLED chat_id=%s", chat_id)
@@ -393,45 +389,12 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
         message_thread_id=context.thread_id,
         reply_to_message_id=None,
     )
-    agent_tools = (
-        build_agent_tools(
-            workspace_root=Path(workspace.path),
-            user_id=context.pawrrtal_user_id,
-            workspace_id=workspace.id,
-            send_fn=tg_sender,
-            surface="telegram",
-            conversation_id=context.conversation_id,
-            model_id=context.model_id,
-        )
-        if workspace is not None
-        else []
-    )
-    turn_context_providers = (
-        build_turn_context_providers(workspace_root=workspace_root)
-        if workspace_root is not None
-        else []
-    )
-
-    provider, warning = await resolve_provider_with_auto_clear(
+    provider_selection, warning = await resolve_provider_with_auto_clear(
         context,
         workspace_root=workspace_root,
     )
     if warning is not None:
         await message.answer(warning, reply_parameters=_reply_parameters(message.message_id))
-
-    channel_message: ChannelMessage = {
-        "user_id": context.pawrrtal_user_id,
-        "conversation_id": context.conversation_id,
-        "text": user_text,
-        "surface": SURFACE_TELEGRAM,
-        "model_id": context.model_id,
-        "metadata": {
-            "bot": message.bot,
-            "chat_id": message.chat.id,
-            "message_id": thinking_msg.message_id,
-            "message_thread_id": context.thread_id,
-        },
-    }
 
     # Backstop: re-validate the stored reasoning_effort against the
     # current model. Telegram's /thinking picker writes the column,
@@ -445,16 +408,7 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
     effective_effort = await normalize_reasoning_and_notify(
         message=message,
         conversation_id=context.conversation_id,
-        model_id=context.model_id,
-    )
-    provider_session = await prepare_provider_session(
-        provider,
-        conversation_id=context.conversation_id,
-        workspace_root=workspace_root,
-        model_id=context.model_id,
-        tools=agent_tools,
-        reasoning_effort=effective_effort,
-        question=user_text,
+        model_id=provider_selection.effective_model_id,
     )
 
     has_active_recall = False
@@ -472,37 +426,41 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
             thinking_msg = await message.answer(
                 render_initial(),
             )
-            channel_message["metadata"]["message_id"] = thinking_msg.message_id
+            channel_metadata["message_id"] = thinking_msg.message_id
 
-    from app.channels.registry import resolve_channel  # noqa: PLC0415
-
-    turn_input = ChatTurnInput(
-        conversation_id=context.conversation_id,
-        user_id=context.pawrrtal_user_id,
-        question=user_text,
-        provider=provider,
-        channel=resolve_channel(SURFACE_TELEGRAM),
-        channel_message=channel_message,
-        workspace_root=workspace_root,
-        tools=agent_tools,
-        images=None,
-        # Helper to let context providers stream progress into the placeholder message.
-        draft_updater=_draft_updater,
-        on_turn_context_finished=_on_turn_context_finished,
-        log_tag="TELEGRAM",
-        log_extras={"chat_id": message.chat.id},
-        verbose_level=(
-            context.verbose_level
-            if context.verbose_level is not None
-            else settings.telegram_verbose_default
-        ),
-        turn_context_providers=turn_context_providers,
-        reasoning_effort=effective_effort,
-        provider_session=provider_session,
+    channel_metadata = {
+        "bot": message.bot,
+        "chat_id": message.chat.id,
+        "message_id": thinking_msg.message_id,
+        "message_thread_id": context.thread_id,
+    }
+    prepared_turn = await prepare_turn(
+        TurnCommand(
+            conversation_id=context.conversation_id,
+            user_id=context.pawrrtal_user_id,
+            question=user_text,
+            workspace_root=workspace_root,
+            workspace_id=workspace.id if workspace is not None else None,
+            surface=SURFACE_TELEGRAM,
+            model_id=context.model_id,
+            provider_selection=provider_selection,
+            send_fn=tg_sender,
+            channel_text=user_text,
+            channel_metadata=channel_metadata,
+            reasoning_effort=effective_effort,
+            draft_updater=_draft_updater,
+            on_turn_context_finished=_on_turn_context_finished,
+            log_tag="TELEGRAM",
+            verbose_level=(
+                context.verbose_level
+                if context.verbose_level is not None
+                else settings.telegram_verbose_default
+            ),
+        )
     )
 
     async def _do_stream() -> None:
-        async for _ in run_turn(turn_input):
+        async for _ in run_prepared_turn(prepared_turn):
             pass
 
     chat_id = message.chat.id
@@ -513,7 +471,7 @@ async def _run_llm_turn(  # noqa: C901, PLR0915
         async def _enqueued_body() -> None:
             await _execute_turn_body(
                 message=message,
-                turn_input=turn_input,
+                prepared_turn=prepared_turn,
                 user_text=user_text,
                 context=context,
             )

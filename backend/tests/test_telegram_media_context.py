@@ -5,15 +5,16 @@ from __future__ import annotations
 import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 
 from app.channels.telegram._attachments import TelegramVoiceNote
 from app.channels.telegram.media_context import prepare_telegram_media_context
 from app.infrastructure.config import Settings
-from app.providers.base import StreamEvent
+from app.providers.base import AILLM, StreamEvent
 from app.providers.model_id import Host, parse_model_id
+from app.providers.selection import ProviderSelection
 
 pytestmark = pytest.mark.anyio
 
@@ -49,8 +50,11 @@ async def test_prepare_media_context_interprets_images_with_sub_agent(
     """Image bytes become a text annotation and are not sent to the main model."""
     provider = _FakeImageProvider()
     monkeypatch.setattr(
-        "app.channels.telegram.media_context.resolve_llm",
-        lambda model_id, *, workspace_root: provider,
+        "app.turns.media_interpreter.require_provider",
+        lambda model_id, *, workspace_root: ProviderSelection(
+            provider=cast(AILLM, provider),
+            effective_model_id=model_id,
+        ),
     )
     monkeypatch.setattr(
         "app.channels.telegram.media_context.settings.telegram_image_interpreter_model_id",

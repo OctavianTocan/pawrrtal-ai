@@ -8,7 +8,6 @@ from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.tool_surface import build_agent_tools
 from app.agents.types import AgentTool
 from app.channels.crud import get_or_create_telegram_conversation_full
 from app.channels.telegram.dev_admin import resolve_or_autolink_telegram_user
@@ -17,6 +16,7 @@ from app.channels.telegram.sender import TelegramSender
 from app.plugins.capability_catalog import CapabilityRecord
 from app.plugins.errors import PluginError
 from app.plugins.host import get_plugin_host
+from app.turns.pipeline.prepare import compose_turn_tools
 from app.workspace.crud import get_default_workspace
 
 _NOT_BOUND_MESSAGE = "Connect your account first before listing tools."
@@ -53,7 +53,7 @@ async def handle_tools_command(*, sender: TelegramSender, session: AsyncSession)
     )
     model_id = resolve_effective_model_id(conversation_model_id=conversation.model_id)
     workspace_root = Path(workspace.path)
-    tools = build_agent_tools(
+    tools = compose_turn_tools(
         workspace_root=workspace_root,
         user_id=pawrrtal_user_id,
         workspace_id=workspace.id,
