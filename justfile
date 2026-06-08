@@ -20,20 +20,26 @@ dev-telegram:
 #   just paw doctor --json
 #   just paw doctor --profile staging
 paw *ARGS:
-    @BRANCH="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"; SAFE="$(printf "%s" "$BRANCH" | sed -E 's/[^A-Za-z0-9._-]+/-/g; s/-+/-/g; s/^[-.]+//; s/[-.]+$//' | cut -c1-80)"; if [ -z "$SAFE" ] || [ "$SAFE" = "HEAD" ]; then SAFE=""; fi; DATABASE_URL="" SQLITE_DB_FILENAME="${SAFE:+pawrrtal-$SAFE.db}" uv run --project backend paw {{ARGS}}
+    @scripts/paw {{ARGS}}
+
+# Install the Paw launcher on PATH for invoking `paw` from any directory.
+install-paw:
+    mkdir -p "$HOME/.local/bin"
+    ln -sf "{{justfile_directory()}}/scripts/paw" "$HOME/.local/bin/paw"
+    @printf 'Installed paw launcher at %s\n' "$HOME/.local/bin/paw"
 
 # Fast local environment check for agents and CI smoke loops. This does not
 # start servers; it verifies writable cache/config paths, binaries, and ports.
 env-check:
-    cd backend && PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" uv run paw env check
+    PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" scripts/paw env check
 
 # Start, probe, and stop the full local app. Use this before claiming that
 # the developer startup path works end-to-end.
 smoke-dev:
-    cd backend && PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" uv run paw project preflight
-    cd backend && PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" uv run paw project up --boot-timeout 45
-    cd backend && PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" uv run paw project status
-    cd backend && PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" uv run paw project down
+    PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" scripts/paw project preflight
+    PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" scripts/paw project up --boot-timeout 45
+    PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" scripts/paw project status
+    PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" scripts/paw project down
 
 # Auto-generate conventional commit via Gemini
 commit *ARGS:

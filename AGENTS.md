@@ -31,6 +31,7 @@
 We rely on `just` as our primary task runner for the repository.
 
 - **Start all dev servers**: `just dev` (starts both frontend and backend concurrently).
+- **Paw CLI from any directory**: `just install-paw` installs the repo launcher to `~/.local/bin/paw`; then use `paw ...` directly instead of repeating `cd backend && uv run paw ...`.
 - **Check (Lint/Format read-only)**: `just check` (runs Biome).
 - **Lint & Auto-fix**: `just lint-fix` (runs Biome check with writes).
 - **Format**: `just format` (runs Biome format).

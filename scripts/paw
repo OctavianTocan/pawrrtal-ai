@@ -26,6 +26,14 @@ if [[ ! -d "${backend_dir}" ]]; then
 	exit 1
 fi
 
+safe_branch="$(git -C "${repo_root}" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+safe_branch="$(printf '%s' "${safe_branch}" | sed -E 's/[^A-Za-z0-9._-]+/-/g; s/-+/-/g; s/^[-.]+//; s/[-.]+$//' | cut -c1-80)"
+if [[ -z "${safe_branch}" || "${safe_branch}" == "HEAD" ]]; then
+	safe_branch=""
+fi
+export DATABASE_URL="${DATABASE_URL-}"
+export SQLITE_DB_FILENAME="${SQLITE_DB_FILENAME:-${safe_branch:+pawrrtal-${safe_branch}.db}}"
+
 env_file="${PAWRRTAL_ENV_FILE:-}"
 if [[ -z "${env_file}" && -f "${backend_dir}/.env" ]]; then
 	env_file="${backend_dir}/.env"
