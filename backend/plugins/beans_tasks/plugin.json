@@ -2,22 +2,22 @@
 	"schema_version": 1,
 	"id": "beans_tasks",
 	"name": "Beans Tasks",
-	"description": "Manage workspace .beans task files through agent tools.",
+	"description": "Manage workspace Beans tasks through the canonical beans CLI.",
 	"version": "1.0.0",
 	"enabled_by_default": true,
-	"permissions": ["filesystem_read", "filesystem_write"],
+	"permissions": ["filesystem_read", "filesystem_write", "subprocess"],
 	"capabilities": [
 		{
 			"type": "python_tool",
 			"id": "beans_create",
 			"tool_name": "beans_create",
 			"title": "Beans Create",
-			"description": "Create a task bean in the workspace .beans directory.",
+			"description": "Create a task bean through the workspace beans CLI.",
 			"tags": ["tasks", "beans", "workspace"],
 			"intents": ["tasks.add", "workspace.plan"],
 			"slots": ["tasks"],
 			"exposure": "direct_and_catalog",
-			"permissions": ["filesystem_write"],
+			"permissions": ["filesystem_write", "subprocess"],
 			"risk": "local_read",
 			"entrypoint": "app.plugins.beans_tasks.tools:make_beans_create_tool"
 		},
@@ -45,7 +45,7 @@
 			"intents": ["tasks.update", "workspace.plan"],
 			"slots": ["tasks"],
 			"exposure": "direct_and_catalog",
-			"permissions": ["filesystem_read", "filesystem_write"],
+			"permissions": ["filesystem_read", "filesystem_write", "subprocess"],
 			"risk": "local_read",
 			"entrypoint": "app.plugins.beans_tasks.tools:make_beans_update_tool"
 		},
@@ -59,7 +59,7 @@
 			"intents": ["tasks.complete", "workspace.plan"],
 			"slots": ["tasks"],
 			"exposure": "direct_and_catalog",
-			"permissions": ["filesystem_read", "filesystem_write"],
+			"permissions": ["filesystem_read", "filesystem_write", "subprocess"],
 			"risk": "local_read",
 			"entrypoint": "app.plugins.beans_tasks.tools:make_beans_complete_tool"
 		}

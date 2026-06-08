@@ -1,20 +1,34 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+launcher_path="${BASH_SOURCE[0]}"
+while [[ -L "${launcher_path}" ]]; do
+	launcher_dir="$(cd -P -- "$(dirname -- "${launcher_path}")" && pwd)"
+	launcher_path="$(readlink -- "${launcher_path}")"
+	if [[ "${launcher_path}" != /* ]]; then
+		launcher_path="${launcher_dir}/${launcher_path}"
+	fi
+done
+script_dir="$(cd -P -- "$(dirname -- "${launcher_path}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/.." && pwd)"
-if [[ -d "${repo_root}/backend" ]]; then
-	default_backend_dir="${repo_root}/backend"
+
+if [[ -n "${PAWRRTAL_BACKEND_DIR:-}" ]]; then
+	backend_dir="${PAWRRTAL_BACKEND_DIR}"
+elif [[ -d "${repo_root}/backend" ]]; then
+	backend_dir="${repo_root}/backend"
 else
-	default_backend_dir="/mnt/HC_Volume_105512717/dev/pawrrtal/backend"
+	printf 'Error: could not locate Pawrrtal backend. Set PAWRRTAL_BACKEND_DIR or run this launcher from the repository scripts directory.\n' >&2
+	exit 1
 fi
-backend_dir="${PAWRRTAL_BACKEND_DIR:-${default_backend_dir}}"
+
+if [[ ! -d "${backend_dir}" ]]; then
+	printf 'Error: Pawrrtal backend directory does not exist: %s\n' "${backend_dir}" >&2
+	exit 1
+fi
+
 env_file="${PAWRRTAL_ENV_FILE:-}"
 if [[ -z "${env_file}" && -f "${backend_dir}/.env" ]]; then
 	env_file="${backend_dir}/.env"
-fi
-if [[ -z "${env_file}" && -f "/mnt/HC_Volume_105512717/dev/pawrrtal/backend/.env" ]]; then
-	env_file="/mnt/HC_Volume_105512717/dev/pawrrtal/backend/.env"
 fi
 
 export UV_LINK_MODE="${UV_LINK_MODE:-copy}"

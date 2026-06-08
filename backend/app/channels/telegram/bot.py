@@ -49,6 +49,7 @@ from app.channels.telegram.bot_runtime import (
     safe_edit_html,
     should_refresh_commands,
 )
+from app.channels.telegram.delivery import safe_send_html
 from app.channels.telegram.handlers import (
     TelegramSender,
     TelegramTurnContext,
@@ -674,7 +675,15 @@ def _register_telegram_tools_command_handler(dispatcher: Dispatcher) -> None:
         sender = _sender_from_message(message)
         async with async_session_maker() as session:
             reply = await handle_tools_command(sender=sender, session=session)
-        await message.answer(reply)
+        if message.bot is None:
+            raise RuntimeError("Telegram /tools command received a message without a bot.")
+        await safe_send_html(
+            message.bot,
+            message.chat.id,
+            reply,
+            reply_to_message_id=message.message_id,
+            message_thread_id=message.message_thread_id,
+        )
 
 
 def _register_telegram_identity_command_handlers(dispatcher: Dispatcher) -> None:

@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import datetime as dt
-import re
-import secrets
-import string
+import shutil
+import subprocess  # nosec B404 - canonical beans CLI invocation uses argv lists, never shell.
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -18,7 +17,9 @@ from app.tools.display import make_tool_display, summarize_title
 from app.tools.errors import ToolError, ToolErrorCode
 
 _BEANS_DIR = ".beans"
-_ID_ALPHABET = string.ascii_lowercase + string.digits
+_BEANS_BINARY = "beans"
+_BEANS_TIMEOUT_SECONDS = 5
+_UPDATE_BASE_ARG_COUNT = 2
 _VALID_STATUSES = frozenset({"todo", "in-progress", "completed", "scrapped"})
 
 
@@ -44,19 +45,18 @@ def make_beans_create_tool(ctx: ToolContext) -> AgentTool:
         priority = str(kwargs.get("priority") or "normal").strip() or "normal"
         task_type = str(kwargs.get("type") or "task").strip() or "task"
         body = str(kwargs.get("body") or "").strip()
-        bean_id = _new_bean_id({bean.bean_id for bean in _load_beans(ctx.workspace_root)})
-        path = _beans_root(ctx.workspace_root) / f"{bean_id}--{_slug(title)}.md"
-        now = _now()
-        meta: dict[str, object] = {
-            "title": title,
-            "status": status,
-            "type": task_type,
-            "priority": priority,
-            "created_at": now,
-            "updated_at": now,
-        }
-        _write_bean(path, bean_id=bean_id, meta=meta, body=body)
-        return f"Created bean {bean_id}: {title}"
+        before = {bean.bean_id for bean in _load_beans(ctx.workspace_root)}
+        args = ["create", title, "-s", status, "-p", priority, "-t", task_type]
+        if body:
+            args.extend(["-d", body])
+        try:
+            stdout = await _run_beans(ctx.workspace_root, args)
+        except ToolError as exc:
+            return exc.render()
+        created = [bean for bean in _load_beans(ctx.workspace_root) if bean.bean_id not in before]
+        if len(created) == 1:
+            return f"Created bean {created[0].bean_id}: {_meta_text(created[0], 'title', title)}"
+        return stdout or "Created bean."
 
     return AgentTool(
         name="beans_create",
@@ -140,24 +140,28 @@ def make_beans_update_tool(ctx: ToolContext) -> AgentTool:
             bean = _find_bean(ctx.workspace_root, _required_text(kwargs, "bean"))
         except ToolError as exc:
             return exc.render()
-        meta = dict(bean.meta)
+        args = ["update", bean.bean_id]
         for key in ("title", "priority", "type"):
             value = kwargs.get(key)
             if isinstance(value, str) and value.strip():
-                meta[key] = value.strip()
+                args.extend(_field_args(key, value.strip()))
         if kwargs.get("status"):
             try:
-                meta["status"] = _status(kwargs["status"])
+                args.extend(["-s", _status(kwargs["status"])])
             except ToolError as exc:
                 return exc.render()
-        meta["updated_at"] = _now()
-        body = bean.body
+        body_file_text = None
         if isinstance(kwargs.get("body"), str):
-            body = kwargs["body"].strip()
+            body_file_text = kwargs["body"].strip()
         if isinstance(kwargs.get("body_append"), str) and kwargs["body_append"].strip():
-            body = f"{body.rstrip()}\n\n{kwargs['body_append'].strip()}".strip()
-        _write_bean(bean.path, bean_id=bean.bean_id, meta=meta, body=body)
-        return f"Updated bean {bean.bean_id}."
+            args.extend(["--body-append", kwargs["body_append"].strip()])
+        if len(args) == _UPDATE_BASE_ARG_COUNT and body_file_text is None:
+            return f"No bean changes requested for {bean.bean_id}."
+        try:
+            stdout = await _run_beans(ctx.workspace_root, args, body_file_text=body_file_text)
+        except ToolError as exc:
+            return exc.render()
+        return stdout or f"Updated bean {bean.bean_id}."
 
     return AgentTool(
         name="beans_update",
@@ -193,11 +197,13 @@ def make_beans_complete_tool(ctx: ToolContext) -> AgentTool:
             bean = _find_bean(ctx.workspace_root, _required_text(kwargs, "bean"))
         except ToolError as exc:
             return exc.render()
-        meta = dict(bean.meta)
-        meta["status"] = "completed"
-        meta["updated_at"] = _now()
-        _write_bean(bean.path, bean_id=bean.bean_id, meta=meta, body=bean.body)
-        return f"Completed bean {bean.bean_id}."
+        try:
+            stdout = await _run_beans(
+                ctx.workspace_root, ["update", bean.bean_id, "-s", "completed"]
+            )
+        except ToolError as exc:
+            return exc.render()
+        return stdout or f"Completed bean {bean.bean_id}."
 
     return AgentTool(
         name="beans_complete",
@@ -265,16 +271,6 @@ def _split_frontmatter(raw: str) -> tuple[dict[str, object], str]:
     return meta, body
 
 
-def _write_bean(path: Path, *, bean_id: str, meta: dict[str, object], body: str) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    lines = ["---", f"# {bean_id}"]
-    dumped_meta = yaml.safe_dump(meta, allow_unicode=True, sort_keys=False).strip()
-    if dumped_meta and dumped_meta != "{}":
-        lines.extend(dumped_meta.splitlines())
-    lines.extend(["---", "", body.strip(), ""])
-    path.write_text("\n".join(lines), encoding="utf-8")
-
-
 def _required_text(kwargs: dict[str, Any], key: str) -> str:
     value = str(kwargs.get(key) or "").strip()
     if not value:
@@ -294,25 +290,8 @@ def _optional_status(value: object) -> str:
     return _status(raw) if raw else ""
 
 
-def _new_bean_id(existing_ids: set[str]) -> str:
-    while True:
-        suffix = "".join(secrets.choice(_ID_ALPHABET) for _ in range(8))
-        bean_id = f"pawrrtal-{suffix}"
-        if bean_id not in existing_ids:
-            return bean_id
-
-
-def _slug(title: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", title.casefold()).strip("-")
-    return slug[:70] or "task"
-
-
 def _bean_id_from_path(path: Path) -> str:
     return path.stem.split("--", 1)[0]
-
-
-def _now() -> str:
-    return dt.datetime.now(dt.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _format_row(bean: Bean) -> str:
@@ -327,3 +306,78 @@ def _meta_text(bean: Bean, key: str, fallback: str) -> str:
     if value is None:
         return fallback
     return str(value)
+
+
+def _field_args(key: str, value: str) -> list[str]:
+    if key == "title":
+        return ["--title", value]
+    if key == "priority":
+        return ["-p", value]
+    return ["-t", value]
+
+
+async def _run_beans(
+    workspace_root: Path,
+    args: list[str],
+    *,
+    body_file_text: str | None = None,
+) -> str:
+    return _run_beans_sync(workspace_root, args, body_file_text=body_file_text)
+
+
+def _run_beans_sync(
+    workspace_root: Path,
+    args: list[str],
+    *,
+    body_file_text: str | None,
+) -> str:
+    binary = shutil.which(_BEANS_BINARY)
+    if binary is None:
+        raise ToolError(ToolErrorCode.NOT_FOUND, "beans CLI is not installed or not on PATH.")
+
+    body_file_path = _write_body_file(body_file_text)
+    cli_args = [binary, *args]
+    if body_file_path is not None:
+        cli_args.extend(["--body-file", str(body_file_path)])
+
+    try:
+        result = subprocess.run(  # noqa: S603  # nosec B603 - resolved binary, no shell.
+            cli_args,
+            cwd=workspace_root,
+            capture_output=True,
+            text=True,
+            timeout=_BEANS_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise ToolError(ToolErrorCode.IO_ERROR, "beans CLI timed out.") from exc
+    except OSError as exc:
+        raise ToolError(ToolErrorCode.IO_ERROR, f"beans CLI failed to start: {exc}") from exc
+    finally:
+        if body_file_path is not None:
+            body_file_path.unlink(missing_ok=True)
+
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout).strip() or f"exit {result.returncode}"
+        raise ToolError(ToolErrorCode.IO_ERROR, f"{_beans_action(args)} failed: {detail}")
+    return result.stdout.strip()
+
+
+def _write_body_file(body_file_text: str | None) -> Path | None:
+    if body_file_text is None:
+        return None
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        prefix="pawrrtal-bean-body-",
+        suffix=".md",
+        delete=False,
+    ) as body_file:
+        body_file.write(body_file_text)
+        return Path(body_file.name)
+
+
+def _beans_action(args: list[str]) -> str:
+    if args:
+        return f"beans {args[0]}"
+    return "beans"

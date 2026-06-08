@@ -26,7 +26,18 @@ _MAX_CAPABILITY_ROWS = 40
 
 
 async def handle_tools_command(*, sender: TelegramSender, session: AsyncSession) -> str:
-    """Return the concrete tools and plugin capabilities for this Telegram turn."""
+    """Return available tools and plugin capabilities for one Telegram sender.
+
+    Args:
+        sender: Telegram chat and user identity for the command request.
+        session: Database session used to resolve bindings, workspace, and conversation state.
+
+    Returns:
+        HTML-formatted text suitable for Telegram delivery. The text includes the effective
+        model, concrete agent tools, and enabled plugin capabilities for the resolved
+        workspace. Short plain-text messages are returned when the sender is not bound or
+        does not have an onboarded workspace.
+    """
     pawrrtal_user_id = await resolve_or_autolink_telegram_user(session=session, sender=sender)
     if pawrrtal_user_id is None:
         return _NOT_BOUND_MESSAGE
