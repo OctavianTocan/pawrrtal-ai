@@ -67,6 +67,7 @@ from app.plugins.adapters.turn_context import build_turn_context_providers
 from app.providers.session_preparer import prepare_provider_session
 
 from .channel import SURFACE_TELEGRAM, make_telegram_sender, render_initial
+from .error_handler import register_telegram_error_handler
 
 if TYPE_CHECKING:
     from aiogram import Bot, Dispatcher
@@ -561,6 +562,7 @@ def build_telegram_service() -> TelegramService:
     )
     dispatcher = Dispatcher()
 
+    register_telegram_error_handler(dispatcher)
     _register_telegram_command_handlers(dispatcher)
     _register_telegram_callback_handlers(dispatcher)
     _register_telegram_message_handler(dispatcher)
