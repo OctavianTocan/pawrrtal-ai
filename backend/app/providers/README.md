@@ -7,7 +7,7 @@ This directory contains the AI provider implementations for Pawrrtal. The provid
 ## 1. Architectural Philosophy
 
 The provider system is designed around three main pillars:
-* **Interface Uniformity**: All providers implement the `AILLM` protocol defined in [base.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/providers/base.py), which enforces a single async generator method `stream(...)` returning a sequence of unified `StreamEvent` dictionaries.
+* **Interface Uniformity**: All providers implement the `AILLM` protocol defined in [base.py](base.py), which enforces a single async generator method `stream(...)` returning a sequence of unified `StreamEvent` dictionaries.
 * **Configuration Decoupling**: Provider classes are kept configuration-agnostic and trivially testable. They do not read `app.infrastructure.config.settings` directly. Instead, the provider factory matches hosts, resolves credentials, constructs provider-specific config objects (e.g. `ClaudeLLMConfig`), and injects them.
 * **Workspace Isolation**: When a chat starts, the factory accepts a `workspace_root` path. This path is used to resolve workspace-specific API key overrides from local env files and isolates execution directories.
 
@@ -15,7 +15,7 @@ The provider system is designed around three main pillars:
 
 ## 2. Anatomy of a Model ID
 
-A model identifier in Pawrrtal is a parsed, structured object. The parsing mechanics reside entirely in [model_id.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/providers/model_id.py).
+A model identifier in Pawrrtal is a parsed, structured object. The parsing mechanics reside entirely in [model_id.py](model_id.py).
 
 ### A. The Wire Format: `[host:]vendor/model`
 Model IDs are represented as strings. The prefix `host:` is optional on input, but internally resolved.
@@ -24,7 +24,7 @@ Model IDs are represented as strings. The prefix `host:` is optional on input, b
 * **`model`**: The raw string name of the specific model. Examples: `claude-sonnet-4-6`, `gemini-3-flash-preview`, `gpt-4o`.
 
 ### B. Canonical Host Mapping
-To avoid requiring verbose `host:` prefixes everywhere, [model_id.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/providers/model_id.py) maintains a `CANONICAL_HOST` mapping:
+To avoid requiring verbose `host:` prefixes everywhere, [model_id.py](model_id.py) maintains a `CANONICAL_HOST` mapping:
 
 ```python
 CANONICAL_HOST: dict[Vendor, Host] = {
@@ -46,7 +46,7 @@ When a bare model ID like `"google/gemini-3-flash-preview"` is parsed:
 
 ## 3. The Model Catalog
 
-The model catalog in [catalog.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/providers/catalog.py) is the single source of truth for the models that Pawrrtal supports.
+The model catalog in [catalog/](catalog/) is the single source of truth for the models that Pawrrtal supports.
 
 ### A. Catalog Structure
 Every model is registered as a `ModelEntry` dataclass carrying:
@@ -61,7 +61,7 @@ To allow client applications (like the frontend) to query and cache the catalog 
 
 ## 4. The Resolver Factory (`resolve_llm`)
 
-The factory in [factory.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/providers/factory.py) parses model IDs and instantiates the correct concrete `AILLM` class.
+The factory in [factory.py](factory.py) parses model IDs and instantiates the correct concrete `AILLM` class.
 
 ### Resolution Pipeline
 
@@ -105,7 +105,7 @@ This is a deliberate architectural decision driven by three factors:
 ### A. Dynamic Model Catalogs
 The list of available models is highly dynamic. New models are released frequently, and older models are deprecated. If model references were hardcoded as code constants:
 * Every upstream change or model deprecation would require code changes, compiling, and redeploying.
-* In contrast, string-based identifiers allow models to be added, modified, or removed purely by updating the data structure in [catalog.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/providers/catalog.py) (or eventually loading the catalog from a database or config file dynamically).
+* In contrast, string-based identifiers allow models to be added, modified, or removed purely by updating the data structure in [catalog/](catalog/) (or eventually loading the catalog from a database or config file dynamically).
 
 ### B. Serialization & Cross-Stack Boundaries
 Model selections must travel across network boundaries and database tables:
@@ -117,7 +117,7 @@ Model selections must travel across network boundaries and database tables:
 ### C. Gateway and Third-Party Flexibility
 For gateway hosts like `Host.litellm` or `Host.opencode-go`, the backend acts as a pass-through client.
 * For example, the `opencode-go` provider queries a hosted gateway that serves open-weight models.
-* By using string-based identifiers, we can support new models exposed by these gateways without updating any python structures or writing new provider classes. We simply add a new string mapping to [catalog.py](file:///Volumes/WorkDriveExternal/Projects/Personal/Pawrrtal-Two-Ai/Pawrrtal-AI/backend/app/core/providers/catalog.py).
+* By using string-based identifiers, we can support new models exposed by these gateways without updating any python structures or writing new provider classes. We simply add a new string mapping to [catalog/](catalog/).
 
 ### D. Safety at the Boundary
 To prevent developers or users from messing up the string-based model IDs, validation is enforced strictly at the outermost boundary:

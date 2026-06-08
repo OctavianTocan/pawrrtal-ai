@@ -40,18 +40,15 @@ layers =
     models : governance_models : lcm_models : mcp_models
     infrastructure.auth : infrastructure.database : infrastructure.lifecycle : infrastructure.logging : infrastructure.middleware : infrastructure.models
 ; `app.channels` is intentionally NOT in any layer here yet:
-; `channels/base.py` + `channels/registry.py` are foundational, while the
-; concrete Telegram / Google Chat adapters still assemble domain state,
-; provider resolution, and delivery details. Keep tightening those seams in
-; focused follow-ups rather than misrepresenting the package as layer-pure.
+; `channels/base.py` + `channels/registry.py` are generic adapter interfaces,
+; while the concrete Telegram / Google Chat adapters still own surface-specific
+; route, command, and delivery behavior. Keep tightening those seams in focused
+; follow-ups rather than misrepresenting the package as layer-pure.
 ;
-; `app.core`, `app.infrastructure.event_bus`, and
-; `app.infrastructure.observability` are also intentionally unlayered
-; during the backend-domain restructuring branch. They are mixed
-; utility/orchestration packages: domains still read core config helpers,
-; while the remaining core helpers, event bus, and observability code
-; also call back into domain/provider surfaces. They should be split in
-; focused follow-ups rather than misrepresented as lower-level packages.
+; `app.infrastructure.event_bus` and `app.infrastructure.observability` are
+; also intentionally unlayered during this cleanup: both still bridge runtime
+; orchestration, provider events, and persistence side effects. Split those
+; modules in focused follow-ups before adding them to a lower-level layer.
 ;
 ; PR #223 extracted `Base` into `app.db_base`, breaking the legacy
 ; `app.db -> app.models` cycle that previously needed grandfathering here.

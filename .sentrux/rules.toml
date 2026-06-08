@@ -66,28 +66,27 @@ order = 0
 
 [[layers]]
 name = "be-api"
-paths = ["backend/app/api/*", "backend/app/users.py", "backend/app/integrations/*"]
+paths = ["backend/app/chat/*", "backend/app/conversations/*", "backend/app/workspace/*", "backend/app/projects/*", "backend/app/integrations/*"]
 order = 1
 
 [[layers]]
 name = "be-crud"
-paths = ["backend/app/crud/*"]
+paths = ["backend/app/*/crud.py", "backend/app/*/crud/*"]
 order = 2
 
 [[layers]]
 name = "be-models"
-paths = ["backend/app/models.py", "backend/app/schemas.py"]
+paths = ["backend/app/infrastructure/models/*", "backend/app/models.py", "backend/app/schemas.py"]
 order = 3
 
 [[layers]]
 name = "be-core"
-# `app.channels/*` is intentionally NOT pinned to a layer here:
-# `channels/base.py` + `channels/registry.py` are foundational, but
-# `channels/turn_runner.py` (added in #204) is orchestration that pulls
-# `app.crud.*` and `app.db`. Putting the directory in be-core would
-# falsely flag turn_runner; putting it higher would understate the
-# abstractions. Splitting the module is tracked as a follow-up.
-paths = ["backend/app/core/*", "backend/app/db.py", "backend/app/logger_setup.py"]
+# Only leaf-level foundations are pinned here. Mixed runtime packages such as
+# `app.tools`, `app.lcm`, `app.turns`, `app.infrastructure.event_bus`, and
+# concrete channel adapters are intentionally enforced by focused import-linter
+# contracts until their model/persistence dependencies are split behind smaller
+# interfaces.
+paths = ["backend/app/db_base.py", "backend/app/logger_setup.py"]
 order = 4
 
 # --- Boundaries (deny lists) ---

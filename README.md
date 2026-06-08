@@ -318,7 +318,7 @@ tail -f backend/app.log
 
 ## Configuration
 
-Every backend setting lives on `backend/app/core/config.py::Settings`. The full annotated reference is `backend/.env.example`; `backend/.env.docker.example` is the Compose quick-start subset; `docs/docker.md` groups settings by concern.
+Every backend setting lives on `backend/app/infrastructure/config.py::Settings`. The full annotated reference is `backend/.env.example`; `backend/.env.docker.example` is the Compose quick-start subset; `docs/docker.md` groups settings by concern.
 
 Required-at-minimum for a useful local app: `AUTH_SECRET`, `WORKSPACE_ENCRYPTION_KEY`, `CORS_ORIGINS`, and at least one provider key.
 

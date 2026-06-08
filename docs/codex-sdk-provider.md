@@ -39,7 +39,7 @@ native image capability and returns the result as a normal Pawrrtal image artifa
 
 ## Developer Notes
 
-- Source: `backend/app/core/providers/openai_codex/`
+- Source: `backend/app/providers/openai_codex/`
 - Vendoring + bootstrap logic lives in `_vendor.py` + `__init__.py`
 - Full implementation plan + history: `docs/design/codex-sdk-provider.md`
 - Earlier Responses-based work (now secondary): `docs/design/codex-oauth-text-provider.md`

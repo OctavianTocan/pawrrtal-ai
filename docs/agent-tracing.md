@@ -72,6 +72,6 @@ Key files:
 - `backend/app/infrastructure/observability/agent_trace.py` — span context managers and event hook
 - `backend/app/infrastructure/observability/_schema.py` — attribute and event constants
 - `backend/app/infrastructure/observability/_recorders.py` — buffers streamed data and flushes it to spans
-- `backend/app/channels/turn_orchestrator/runner.py` — wires spans into the turn pipeline
+- `backend/app/turns/pipeline/runner.py` — wires spans into the Turn Pipeline
 - `backend/app/agents/model_tool_loop/tool_calls.py` — wraps tool calls in `tool_span()`
 - `backend/tests/test_observability_agent_trace.py` — test suite for the span contract

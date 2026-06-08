@@ -6,8 +6,14 @@ status: Accepted
 
 # Folder structure review (May 2026)
 
-**Status:** Accepted — 2026-05-17.
+**Status:** Superseded for backend guidance — 2026-06-08.
 **Closes:** #300 (folder structure review).
+
+> Backend note, 2026-06-08: this ADR is historical. The backend no longer uses
+> the former backend core directory as the organizing root, and turn orchestration
+> now lives under `backend/app/turns/pipeline/`, not under channel adapters.
+> Current backend navigation guidance lives in `AGENTS.md`, `.sentrux/rules.toml`,
+> `backend/.importlinter`, and the provider README.
 
 ## Context
 
@@ -73,10 +79,9 @@ discipline; the audit shows nothing currently misplaced.
    mirror by more than two weeks, either re-sync or drop the mirror.
 3. `.beans/` — the `ai-nexus-*` slugs were renamed during #292;
    verify no `ai-nexus-*` files remain (none expected).
-4. `app/core/` sub-grouping — if direct children of `core/` cross
-   25 files, draft a follow-up ADR proposing `core/governance/`,
-   `core/observability/`, `core/providers/` (some of which already
-   exist) as the canonical pattern.
+4. Historical backend core sub-grouping — this item is superseded by the
+   June 2026 backend layout. Use the current package guidance in `AGENTS.md`
+   and `.sentrux/rules.toml` instead.
 
 ## Decision
 

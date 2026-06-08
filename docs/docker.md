@@ -95,7 +95,7 @@ docker compose down
 ## Environment variables
 
 Every variable below maps to a field on
-[`backend/app/core/config.py::Settings`](../backend/app/core/config.py).
+[`backend/app/infrastructure/config.py::Settings`](../backend/app/infrastructure/config.py).
 `backend/.env.example` is the **full reference** (one entry per Settings
 field with inline docs); `backend/.env.docker.example` is the Compose
 quick-start subset. This page is the cheat-sheet view, grouped by
