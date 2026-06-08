@@ -8,8 +8,6 @@ name: Playwright E2E
 # it costs LLM tokens and runs on a different cadence.  This one is
 # token-free.
 #
-# Closes #273.
-
 on:
   pull_request:
     branches: [development, main]
@@ -113,11 +111,7 @@ jobs:
           DATABASE_URL: 'sqlite+aiosqlite:///./e2e.db'
           ADMIN_EMAIL: e2e-admin@example.com
           ADMIN_PASSWORD: e2e-admin-password
-          # ``workspace_base_dir`` defaults to ``/data/workspaces`` which
-          # the CI runner cannot write to. Point at a temp directory so
-          # the dev-login workspace seed (#317 follow-up) can succeed
-          # and the FE's onboarding-status endpoint reports a ready
-          # workspace, letting the sidebar render.
+          # The CI runner cannot write to the production workspace path.
           WORKSPACE_BASE_DIR: /tmp/pawrrtal-e2e-workspaces
           COOKIE_SAMESITE: lax
           COOKIE_SECURE: 'false'
@@ -139,12 +133,14 @@ jobs:
         working-directory: frontend
         env:
           BACKEND_INTERNAL_URL: http://127.0.0.1:8000
+          PAWRRTAL_ENABLE_DEV_LOGIN: 'true'
         run: bun run build
 
       - name: Start frontend
         working-directory: frontend
         env:
           E2E_API_URL: http://127.0.0.1:8000
+          PAWRRTAL_ENABLE_DEV_LOGIN: 'true'
         run: |
           PORT=3000 bun run start &
           echo $! > /tmp/frontend.pid
@@ -163,14 +159,14 @@ jobs:
         env:
           E2E_BASE_URL: http://127.0.0.1:3000
           E2E_API_URL: http://127.0.0.1:8000
+          PAWRRTAL_ENABLE_DEV_LOGIN: 'true'
         # ``--bun`` was making Playwright's request context lose the
         # configured ``E2E_API_URL`` host on retries: the dev-login
         # ``POST`` returned 204 cleanly, but a follow-up URL parse
         # against just the path threw "/auth/dev-login cannot be
         # parsed as a URL" and brought the browser context down.
         # Running without ``--bun`` keeps env propagation straight
-        # and matches the local ``just e2e`` invocation. Was failing
-        # consistently on ``development`` before this change.
+        # and matches the local ``just e2e`` invocation.
         run: bunx playwright test
 
       # Always upload the HTML report so the trace is downloadable on failure.
