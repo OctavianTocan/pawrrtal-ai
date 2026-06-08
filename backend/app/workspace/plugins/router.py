@@ -338,8 +338,11 @@ def _require_workspace_slot_capability(
     if capability is not None:
         return capability
     runtime_capability = _find_capability(snapshot=runtime_snapshot, capability_key=capability_key)
-    if runtime_capability is not None:
-        _ensure_capability_slot_manageable(runtime_capability)
+    if runtime_capability is not None and _is_runtime_global_capability(runtime_capability):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=RUNTIME_GLOBAL_MANAGE_REASON,
+        )
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,
         detail=f"Capability {capability_key!r} is not installed.",
@@ -357,11 +360,16 @@ def _ensure_workspace_manageable(outcome: PluginLoadOutcome) -> None:
 
 def _ensure_capability_slot_manageable(capability: CapabilityRecord) -> None:
     """Reject workspace slot preferences for runtime-global capabilities."""
-    if capability.type in RUNTIME_GLOBAL_CAPABILITY_TYPES:
+    if _is_runtime_global_capability(capability):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=RUNTIME_GLOBAL_MANAGE_REASON,
         )
+
+
+def _is_runtime_global_capability(capability: CapabilityRecord) -> bool:
+    """Return whether this capability is managed outside workspace plugin state."""
+    return capability.type in RUNTIME_GLOBAL_CAPABILITY_TYPES
 
 
 def _is_runtime_global_plugin(outcome: PluginLoadOutcome) -> bool:

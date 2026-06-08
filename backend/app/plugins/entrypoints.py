@@ -13,7 +13,10 @@ def load_entrypoint_callable(
     *,
     context: str = "plugin entrypoint",
 ) -> Any:
-    """Load a callable declared as ``module:attribute``."""
+    """Load a callable declared as ``module:attribute`` from trusted plugin code.
+
+    Entrypoints are imported directly, so manifests must be bundled or validated before loading.
+    """
     module_name, separator, attribute_path = entrypoint.partition(":")
     if not separator or not module_name or not attribute_path:
         raise PluginRuntimeError(f"{context} must use 'module:attribute' syntax")
