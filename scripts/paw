@@ -3,9 +3,27 @@ set -euo pipefail
 
 script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/.." && pwd)"
-backend_dir="${PAWRRTAL_BACKEND_DIR:-${repo_root}/backend}"
+if [[ -d "${repo_root}/backend" ]]; then
+	default_backend_dir="${repo_root}/backend"
+else
+	default_backend_dir="/mnt/HC_Volume_105512717/dev/pawrrtal/backend"
+fi
+backend_dir="${PAWRRTAL_BACKEND_DIR:-${default_backend_dir}}"
+env_file="${PAWRRTAL_ENV_FILE:-}"
+if [[ -z "${env_file}" && -f "${backend_dir}/.env" ]]; then
+	env_file="${backend_dir}/.env"
+fi
+if [[ -z "${env_file}" && -f "/mnt/HC_Volume_105512717/dev/pawrrtal/backend/.env" ]]; then
+	env_file="/mnt/HC_Volume_105512717/dev/pawrrtal/backend/.env"
+fi
 
 export UV_LINK_MODE="${UV_LINK_MODE:-copy}"
+export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/pawrrtal-uv-cache}"
+mkdir -p "${UV_CACHE_DIR}"
 
 cd "${backend_dir}"
+if [[ -n "${env_file}" ]]; then
+	exec uv run python -m dotenv --file "${env_file}" run -- uv run paw "$@"
+fi
+
 exec uv run paw "$@"
