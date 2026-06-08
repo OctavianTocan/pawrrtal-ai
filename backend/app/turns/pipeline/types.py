@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import uuid
 from collections import Counter
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from app.plugins.adapters.turn_context import TurnContextProviderAdapter
 from app.provider_sessions import ProviderSessionTurnState
@@ -20,6 +20,62 @@ if TYPE_CHECKING:
     from app.providers.base import AILLM, ReasoningEffort, StreamEvent
 
 EventHook = Callable[["StreamEvent"], list["StreamEvent"]]
+SendMessageFn = Callable[[str | None, Path | None, str | None], Awaitable[None]]
+
+
+@dataclass(frozen=True)
+class TurnCommand:
+    """Unresolved command for one user-visible assistant turn."""
+
+    conversation_id: uuid.UUID
+    user_id: uuid.UUID
+    question: str
+    workspace_root: Path
+    workspace_id: uuid.UUID
+    surface: str
+    model_id: str
+    reasoning_effort: ReasoningEffort | None = None
+    images: list[dict[str, str]] | None = None
+    request_id: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    history_window: int = 20
+    log_tag: str = "TURN"
+    send_fn: SendMessageFn | None = None
+    db_session: AsyncSession | None = field(default=None, repr=False, compare=False)
+
+
+@dataclass(frozen=True)
+class PreparedTurn:
+    """Resolved turn inputs ready for streaming through the runner."""
+
+    turn_input: ChatTurnInput
+    effective_model_id: str
+    event_hooks: list[EventHook] = field(default_factory=list)
+
+
+class DeliveryAdapter(Protocol):
+    """Protocol for channel-native stream delivery."""
+
+    surface: str
+
+    def deliver(
+        self,
+        stream: AsyncIterator[StreamEvent],
+        message: ChannelMessage,
+    ) -> AsyncIterator[bytes]:
+        """Consume provider stream events and yield channel output bytes."""
+
+
+@dataclass(frozen=True)
+class TurnResult:
+    """Final turn summary shape for future non-streaming callers."""
+
+    assistant_message_id: uuid.UUID | None = None
+    final_text: str = ""
+    event_counts: dict[str, int] = field(default_factory=dict)
+    stop_reason: str | None = None
+    elapsed_ms: float | None = None
+    error: str | None = None
 
 
 @dataclass(frozen=True)

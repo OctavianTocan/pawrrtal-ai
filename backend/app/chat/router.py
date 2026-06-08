@@ -15,17 +15,8 @@ from fastapi.routing import APIRouter
 from opentelemetry import trace as _otel_trace
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.tool_surface import build_agent_tools
-
-# ``ChannelMessage`` is re-exported by ``app.channels.__init__``; we
-# pull all three names from the same package to keep chat.py's
-# fan-out under sentrux's ``no_god_files`` budget.
-from app.channels import ChannelMessage, resolve_channel, surface_from_header
-from app.chat import (
-    enforce_cost_budget,
-    load_external_mcp_configs,
-    publish_turn_started,
-)
+from app.channels import surface_from_header
+from app.chat import publish_turn_started
 from app.conversations.crud import (
     apply_model_switch_and_normalize_reasoning,
     get_conversation,
@@ -33,9 +24,7 @@ from app.conversations.crud import (
 from app.infrastructure.auth.users import get_allowed_user
 from app.infrastructure.database.legacy import User, get_async_session
 from app.infrastructure.middleware.logging import get_request_id
-from app.plugins.adapters.turn_context import build_turn_context_providers
-from app.providers import StreamEvent, resolve_llm
-from app.providers.session_preparer import prepare_provider_session
+from app.providers import StreamEvent
 from app.schemas import ChatRequest
 from app.tools.artifact_agent import (
     ARTIFACT_TOOL_NAME,
@@ -43,9 +32,10 @@ from app.tools.artifact_agent import (
     build_artifact,
 )
 from app.turns.pipeline import (
-    ChatTurnInput,
     EventHook,
-    run_turn,
+    TurnCommand,
+    prepare_turn,
+    run_prepared_turn,
 )
 from app.workspace.crud import get_default_workspace
 
@@ -127,9 +117,9 @@ async def _require_workspace(
     """Return the user's default workspace ``(id, path)`` or reject the chat turn.
 
     Returns the workspace UUID alongside the directory path so callers
-    can pass both into :func:`app.agents.tool_surface.build_agent_tools` —
-    the UUID drives plugin activation (and, post-migration, env-key
-    resolution); the path drives the existing core workspace tools.
+    can pass both into the Turn Pipeline — the UUID drives plugin activation
+    (and, post-migration, env-key resolution); the path drives the existing
+    core workspace tools.
     """
     workspace = await get_default_workspace(user_id, session)
     if workspace is None:
@@ -230,7 +220,6 @@ def get_chat_router() -> APIRouter:
         # Entry log — pairs with REQ_IN/REQ_OUT from the request middleware via rid.
         # Question length, not contents, to avoid leaking PII into the log file.
         surface = surface_from_header(x_pawrrtal_surface)
-        channel = resolve_channel(surface)
 
         rid = get_request_id()
 
@@ -298,32 +287,12 @@ def get_chat_router() -> APIRouter:
         # Refuse with 412 (Precondition Failed) so the frontend can route to
         # onboarding instead of pretending we shipped a degraded reply.
         #
-        # Hoisted above ``resolve_llm`` so we can pass ``workspace_root``
-        # into the Claude SDK as its ``cwd``. Without it, the SDK falls
-        # back to the uvicorn process directory and writes its transcript
-        # files there.
+        # Hoisted above turn preparation so provider adapters receive
+        # ``workspace_root`` for workspace-scoped credentials and native
+        # transcript paths.
         workspace_id, root = await _require_workspace(
             user_id=user.id, session=session, request_id=rid
         )
-        # Refuse over-budget turns before tool composition or provider work.
-        await enforce_cost_budget(
-            user_id=user.id,
-            session=session,
-            rid=rid,
-        )
-
-        # Provider construction must happen *after* workspace resolution so
-        # workspace-scoped API-key overrides (Gemini/Claude) take effect.
-        # ``workspace_root`` is also forwarded so the Claude SDK subprocess
-        # writes its transcripts under the user's workspace rather than
-        # the uvicorn process directory.
-        provider = resolve_llm(model_id, workspace_root=root)
-        # Per-turn tool composition lives in `app.agents.tool_surface` —
-        # the chat router only decides *that* the agent gets tools,
-        # not *which* (that's the builder's job, and where future
-        # per-agent / per-user permission gating will land).  Provider
-        # files stay tool-agnostic; see
-        # `.claude/rules/architecture/no-tools-in-providers.md`.
         # Web send_fn — lets the agent call send_message() to push text or
         # files back to the user mid-turn.  Events are placed on a per-request
         # queue and drained into the SSE stream after each provider event,
@@ -341,18 +310,6 @@ def get_chat_router() -> APIRouter:
                 event["mime"] = mime
             await _web_send_queue.put(event)
 
-        external_mcp_configs = await load_external_mcp_configs(session=session, user_id=user.id)
-        agent_tools = build_agent_tools(
-            workspace_root=root,
-            user_id=user.id,
-            workspace_id=workspace_id,
-            send_fn=_web_send_fn,
-            surface=surface,
-            conversation_id=request.conversation_id,
-            model_id=model_id,
-            external_mcp_configs=external_mcp_configs,
-        )
-
         def _artifact_hook(event: StreamEvent) -> list[StreamEvent]:
             extra = _maybe_artifact_event(event)
             return [extra] if extra is not None else []
@@ -363,14 +320,6 @@ def get_chat_router() -> APIRouter:
                 out.append(_web_send_queue.get_nowait())
             return out
 
-        channel_message: ChannelMessage = {
-            "user_id": user.id,
-            "conversation_id": request.conversation_id,
-            "text": request.question,
-            "surface": surface,
-            "model_id": model_id,
-            "metadata": {},
-        }
         # Forward multimodal image inputs in the provider-neutral turn input.
         image_inputs = (
             [{"data": img.data, "media_type": img.media_type} for img in request.images]
@@ -378,19 +327,29 @@ def get_chat_router() -> APIRouter:
             else None
         )
 
-        provider_session = await prepare_provider_session(
-            provider,
-            conversation_id=request.conversation_id,
-            workspace_root=root,
-            model_id=model_id,
-            tools=agent_tools,
-            reasoning_effort=effective_reasoning_effort,
-            question=request.question,
+        prepared_turn = await prepare_turn(
+            TurnCommand(
+                conversation_id=request.conversation_id,
+                user_id=user.id,
+                question=request.question,
+                workspace_root=root,
+                workspace_id=workspace_id,
+                surface=surface,
+                model_id=model_id,
+                reasoning_effort=effective_reasoning_effort,
+                images=image_inputs,
+                request_id=rid,
+                history_window=_HISTORY_WINDOW,
+                log_tag="CHAT",
+                send_fn=_web_send_fn,
+                db_session=session,
+            )
         )
 
-        # ``db_session`` is intentionally left at its ``None`` default so the
-        # turn runner opens its own ``async_session_maker()`` session inside
-        # the streaming generator. Passing the request-scoped session from
+        # ``db_session`` is intentionally not forwarded through
+        # ``TurnCommand`` into the persisted runner. The streaming path
+        # opens its own ``async_session_maker()`` session inside the
+        # response generator. Passing the request-scoped session from
         # ``Depends(get_async_session)`` breaks under SQLite/aiosqlite because
         # ``StreamingResponse`` keeps the response body iterating long after
         # the route handler returns — by the time ``_finalize_turn`` runs,
@@ -398,30 +357,6 @@ def get_chat_router() -> APIRouter:
         # ``session.execute`` raises ``OperationalError: no active connection``.
         # Postgres masks this because pool checkout + ``pool_pre_ping`` can
         # transparently reconnect; aiosqlite does not. Issue: pawrrtal-0dgj.
-        turn_input = ChatTurnInput(
-            conversation_id=request.conversation_id,
-            user_id=user.id,
-            question=request.question,
-            provider=provider,
-            channel=channel,
-            channel_message=channel_message,
-            workspace_root=root,
-            tools=agent_tools,
-            # ``effective_reasoning_effort`` is the resolved value
-            # from the shared backstop: per-turn override wins,
-            # otherwise the conversation's normalized stored effort.
-            reasoning_effort=effective_reasoning_effort,
-            images=image_inputs,
-            history_window=_HISTORY_WINDOW,
-            log_tag="CHAT",
-            log_extras={
-                "rid": rid,
-                "model_id": model_id,
-                "surface": surface,
-            },
-            turn_context_providers=build_turn_context_providers(workspace_root=root),
-            provider_session=provider_session,
-        )
         hooks: list[EventHook] = [_artifact_hook, _drain_send_queue]
 
         # Announce the turn so subscribers can react without coupling to the router.
@@ -434,7 +369,7 @@ def get_chat_router() -> APIRouter:
 
         async def event_stream() -> AsyncGenerator[bytes]:
             """Yield channel-encoded bytes from the shared turn runner."""
-            async for chunk in run_turn(turn_input, event_hooks=hooks):
+            async for chunk in run_prepared_turn(prepared_turn, event_hooks=hooks):
                 yield chunk
 
         return StreamingResponse(

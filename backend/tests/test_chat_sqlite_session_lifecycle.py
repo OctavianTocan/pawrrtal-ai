@@ -53,9 +53,9 @@ async def test_chat_router_does_not_pass_request_session_into_turn_input(
     monkeypatch: pytest.MonkeyPatch,
     seeded_default_workspace: Workspace,
 ) -> None:
-    """Chat router must leave ``ChatTurnInput.db_session`` at its ``None`` default.
+    """Web turn preparation must leave ``ChatTurnInput.db_session`` at its default.
 
-    Capturing the kwargs the router uses to build ``ChatTurnInput`` is the
+    Capturing the kwargs used to build ``ChatTurnInput`` is the
     cheapest way to lock in the SQLite-safe lifecycle: if a future refactor
     re-introduces ``db_session=session``, the streaming generator holds the
     request session past the route handler and aiosqlite fails. See the
@@ -67,14 +67,14 @@ async def test_chat_router_does_not_pass_request_session_into_turn_input(
         json={"title": "SQLite Lifecycle"},
     )
     monkeypatch.setattr(
-        "app.chat.router.resolve_llm",
+        "app.turns.pipeline.prepare.resolve_llm",
         lambda _model_id, **kwargs: _FakeProvider(),
     )
 
     captured: dict[str, Any] = {}
 
-    # The chat router imports ``ChatTurnInput`` from ``app.turns.pipeline``.
-    # Patch the symbol the router actually resolves so we observe the real
+    # Web chat now builds ``ChatTurnInput`` inside Turn Pipeline preparation.
+    # Patch the symbol that module resolves so we observe the real
     # construction call, not a stand-in.
     from app.turns.pipeline import ChatTurnInput as _OriginalChatTurnInput
 
@@ -83,7 +83,10 @@ async def test_chat_router_does_not_pass_request_session_into_turn_input(
         captured.update(kwargs)
         return _OriginalChatTurnInput(**kwargs)
 
-    monkeypatch.setattr("app.chat.router.ChatTurnInput", _capturing_chat_turn_input)
+    monkeypatch.setattr(
+        "app.turns.pipeline.prepare.ChatTurnInput",
+        _capturing_chat_turn_input,
+    )
 
     response = await client.post(
         "/api/v1/chat/",
@@ -124,7 +127,7 @@ async def test_chat_finalizes_assistant_status_on_sqlite(
         json={"title": "Finalize"},
     )
     monkeypatch.setattr(
-        "app.chat.router.resolve_llm",
+        "app.turns.pipeline.prepare.resolve_llm",
         lambda _model_id, **kwargs: _FakeProvider(),
     )
 
@@ -209,7 +212,7 @@ async def test_finalize_turn_leaves_message_complete_on_cost_write_failure(
         json={"title": "Cost Failure"},
     )
     monkeypatch.setattr(
-        "app.chat.router.resolve_llm",
+        "app.turns.pipeline.prepare.resolve_llm",
         lambda _model_id, **kwargs: _FakeProvider(),
     )
 

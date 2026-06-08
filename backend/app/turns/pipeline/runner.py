@@ -27,7 +27,7 @@ from .context_providers import _run_turn_context_providers
 from .finalize import _finalize_turn
 from .history import _load_history_and_persist
 from .state import _register_turn_finalize_task
-from .types import ChatTurnInput, EventHook, _EventCounter
+from .types import ChatTurnInput, EventHook, PreparedTurn, _EventCounter
 
 if TYPE_CHECKING:
     from app.channels.base import ChannelMessage
@@ -116,6 +116,17 @@ async def run_turn(
                 yield chunk
         finally:
             await finalize_once()
+
+
+async def run_prepared_turn(
+    prepared_turn: PreparedTurn,
+    *,
+    event_hooks: list[EventHook] | None = None,
+) -> AsyncIterator[bytes]:
+    """Stream a prepared turn through the existing persisted runner."""
+    hooks = [*prepared_turn.event_hooks, *(event_hooks or [])]
+    async for chunk in run_turn(prepared_turn.turn_input, event_hooks=hooks):
+        yield chunk
 
 
 async def _stream_with_llm_span(
