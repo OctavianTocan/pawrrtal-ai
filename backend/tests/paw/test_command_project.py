@@ -14,6 +14,7 @@ import pytest
 from typer.testing import CliRunner
 
 import app.cli.paw.commands.project.cloudflared as cloudflared_module
+import app.cli.paw.commands.project.preflight as preflight_module
 import app.cli.paw.commands.project.service as service_module
 from app.cli.paw import config as paw_config
 from app.cli.paw.commands.project import cli as project_module
@@ -338,6 +339,38 @@ def test_env_check_json_uses_project_preflight(runner, monkeypatch):
     payload = json.loads(result.stdout.strip().splitlines()[-1])
     assert payload["ok"] is True
     assert payload["checks"][0]["name"] == "bun_available"
+
+
+def test_env_check_json_fails_prod_sqlite_database(
+    runner: CliRunner,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """``paw env check --json`` exposes DB target details and rejects prod SQLite."""
+    monkeypatch.setenv("ENV", "prod")
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///./pawrrtal.db")
+    monkeypatch.setenv("UV_CACHE_DIR", str(tmp_path / "uv"))
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xdg"))
+    monkeypatch.setattr(
+        "app.cli.paw.commands.project.preflight.shutil.which",
+        lambda binary: f"/bin/{binary}",
+    )
+    monkeypatch.setattr(preflight_module, "_bind_error", lambda url: None)
+
+    result = runner.invoke(app, ["env", "check", "--json"])
+
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout.strip().splitlines()[-1])
+    db_check = next(check for check in payload["checks"] if check["name"] == "database_target_safe")
+    assert payload["ok"] is False
+    assert db_check["passed"] is False
+    assert db_check["details"] == {
+        "target": "sqlite:///./pawrrtal.db",
+        "classification": "sqlite-repo-local",
+        "env": "prod",
+        "deployed": "true",
+    }
+    assert "Postgres service URL" in db_check["hint"]
 
 
 def test_project_env_defaults_to_sqlite(monkeypatch):

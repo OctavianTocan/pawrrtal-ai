@@ -15,6 +15,7 @@ from app.cli.paw.commands.project.state import DEFAULT_BACKEND_URL, DEFAULT_FRON
 from app.cli.paw.config import profile_dir
 from app.cli.paw.errors import LocalError
 from app.cli.paw.output import emit_human, emit_json, emit_plain_rows
+from app.infrastructure.database.safety import classify_database_target
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +26,7 @@ class PreflightCheck:
     passed: bool
     message: str
     hint: str | None = None
+    details: dict[str, str] | None = None
 
 
 def run_preflight_checks(*, profile: str) -> list[PreflightCheck]:
@@ -39,6 +41,7 @@ def run_preflight_checks(*, profile: str) -> list[PreflightCheck]:
             _env_path("XDG_CACHE_HOME", cache_root / "xdg"),
         ),
         _writable_dir_check("paw_config_dir_writable", profile_dir(profile)),
+        _database_target_check(),
         _port_available_check("frontend_port_available", DEFAULT_FRONTEND_URL),
         _port_available_check("backend_port_available", DEFAULT_BACKEND_URL),
     ]
@@ -137,6 +140,37 @@ def _writable_dir_check(name: str, path: Path) -> PreflightCheck:
             hint="Set the related environment variable to a writable directory.",
         )
     return PreflightCheck(name=name, passed=True, message=f"{path} is writable.")
+
+
+def _database_target_check() -> PreflightCheck:
+    """Check and describe the DB target the project/runtime will use."""
+    report = classify_database_target(
+        database_url=_effective_database_url(),
+        sqlite_db_filename=os.environ.get("SQLITE_DB_FILENAME", "pawrrtal.db"),
+        env=os.environ.get("ENV", "dev"),
+        repo_root=repo_root(),
+    )
+    message = f"{report.redacted_target} ({report.classification}, ENV={report.env or 'dev'})"
+    return PreflightCheck(
+        name="database_target_safe",
+        passed=report.safe,
+        message=message,
+        hint=report.hint,
+        details={
+            "target": report.redacted_target,
+            "classification": report.classification,
+            "env": report.env or "dev",
+            "deployed": str(report.deployed).lower(),
+        },
+    )
+
+
+def _effective_database_url() -> str:
+    """Return the database URL this preflight should evaluate."""
+    env = os.environ.get("ENV", "dev").strip().lower()
+    if env in {"prod", "production", "staging"}:
+        return os.environ.get("DATABASE_URL", "")
+    return os.environ.get("PAWRRTAL_DEV_DATABASE_URL", "")
 
 
 def _port_available_check(name: str, url: str) -> PreflightCheck:
