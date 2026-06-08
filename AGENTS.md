@@ -9,6 +9,7 @@
 - **Design system (`DESIGN.md`)**: Repo-root [DESIGN.md](https://github.com/google-labs-code/design.md)-format spec describing the Craft Agents-inspired visual identity — colors, typography, spacing, shapes, elevation, and component bindings. Canonical token values live in `frontend/app/globals.css`; `DESIGN.md` mirrors them as machine-readable YAML front matter so coding agents have a persistent, structured understanding of the system. Lint with `bun run design:lint`.
 - **Docs (`docs/`)**: Project documentation, migration plans, and design specs.
 - **Tasks (`.beans/`)**: Markdown-based task tracking. Update the status of `.beans` files as work is completed.
+- **Extension boundaries (`.agents/skills/pawrrtal-extension-boundaries/SKILL.md`)**: Read this skill before touching channels, providers, tools, plugins, subagents, context providers, or turn orchestration. It defines where optional integrations live and how the kernel stays generic.
 - **Rule**: Always use the `beans` CLI (e.g. `beans create`, `beans update`) to manage `.beans` files. Never create or edit them manually.
 - **Rule (bean writing style)**: Write bean bodies so a junior engineer (or a future agent with zero context) can act on them without re-reading the codebase. Plain words over jargon. Use:
     - `## Goal` heading at the top (one sentence on what this step achieves).
