@@ -308,6 +308,38 @@ def test_beans_list_rejects_invalid_status_filter(tmp_path: Path) -> None:
     assert result == "[invalid_path] Unsupported bean status 'inprogress'."
 
 
+def test_beans_list_accepts_workspace_statuses(tmp_path: Path) -> None:
+    root = tmp_path / ".beans"
+    root.mkdir()
+    for bean_id, status in (
+        ("pawrrtal-draft", "draft"),
+        ("pawrrtal-review", "in-review"),
+    ):
+        (root / f"{bean_id}--task.md").write_text(
+            "\n".join(
+                [
+                    "---",
+                    f"# {bean_id}",
+                    f"title: {status} task",
+                    f"status: {status}",
+                    "priority: normal",
+                    "---",
+                    "",
+                    "Body.",
+                    "",
+                ]
+            ),
+            encoding="utf-8",
+        )
+    list_tool = make_beans_list_tool(_ctx(tmp_path))
+
+    draft = asyncio.run(list_tool.execute("call-1", status="draft"))
+    in_review = asyncio.run(list_tool.execute("call-2", status="in-review"))
+
+    assert "pawrrtal-draft [draft/normal] draft task" in draft
+    assert "pawrrtal-review [in-review/normal] in-review task" in in_review
+
+
 def test_beans_list_skips_malformed_frontmatter(tmp_path: Path) -> None:
     root = tmp_path / ".beans"
     root.mkdir()

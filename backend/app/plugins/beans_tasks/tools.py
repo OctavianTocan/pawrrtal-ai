@@ -22,7 +22,7 @@ _BEANS_DIR = ".beans"
 _BEANS_BINARY = "beans"
 _BEANS_TIMEOUT_SECONDS = 5
 _UPDATE_BASE_ARG_COUNT = 2
-_VALID_STATUSES = frozenset({"todo", "in-progress", "completed", "scrapped"})
+_VALID_STATUSES = frozenset({"draft", "todo", "in-progress", "in-review", "completed", "scrapped"})
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ def make_beans_create_tool(ctx: ToolContext) -> AgentTool:
                 "body": {"type": "string", "description": "Optional Markdown body."},
                 "status": {
                     "type": "string",
-                    "description": "todo, in-progress, completed, or scrapped.",
+                    "description": "draft, todo, in-progress, in-review, completed, or scrapped.",
                 },
                 "priority": {
                     "type": "string",
