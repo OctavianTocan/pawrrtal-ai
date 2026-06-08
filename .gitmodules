@@ -7,3 +7,4 @@
 [submodule "backend/vendor/codex"]
 	path = backend/vendor/codex
 	url = https://github.com/openai/codex.git
+	ignore = dirty

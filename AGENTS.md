@@ -10,6 +10,7 @@
 - **Docs (`docs/`)**: Project documentation, migration plans, and design specs.
 - **Tasks (`.beans/`)**: Markdown-based task tracking. Update the status of `.beans` files as work is completed.
 - **Extension boundaries (`.agents/skills/pawrrtal-extension-boundaries/SKILL.md`)**: Read this skill before touching channels, providers, tools, plugins, subagents, context providers, or turn orchestration. It defines where optional integrations live and how the kernel stays generic.
+- **Paw CLI skill (`.agents/skills/paw/SKILL.md`)**: Read this skill before using, changing, or documenting the `paw` CLI. It maps the current command tree, verification suites, lab/dogfood flows, output modes, exit codes, and the rule that end-to-end claims should go through `paw verify` or `paw lab` instead of direct backend imports.
 - **Rule**: Always use the `beans` CLI (e.g. `beans create`, `beans update`) to manage `.beans` files. Never create or edit them manually.
 - **Rule (bean writing style)**: Write bean bodies so a junior engineer (or a future agent with zero context) can act on them without re-reading the codebase. Plain words over jargon. Use:
     - `## Goal` heading at the top (one sentence on what this step achieves).
@@ -284,6 +285,7 @@ Access 85k tokens of past work via get_observations([IDs]) or mem-search skill.
 
 Use project skills before improvising recurring Pawrrtal workflows:
 
+- `paw` — use before using, changing, or documenting the Paw CLI; end-to-end claims should go through `paw verify` or `paw lab` rather than direct backend imports.
 - `retro` — use after a messy or long session to turn failures into durable skills, rules, beans, or memory notes.
 - `pawrrtal-pr-scope-audit` — use before answering whether work is really in a PR, before claiming a long goal is complete, or when repo work and VPS operations were mixed together.
 - `pawrrtal-live-ops` — use for live deployment, Cloudflared, Telegram, database, browser, shutdown, and real integration verification.

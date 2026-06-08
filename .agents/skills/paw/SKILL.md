@@ -31,6 +31,8 @@ just paw lab flows ls --json                   # discover manual/live flow check
 ```
 
 `paw` lives at `backend/app/cli/paw/`. `just paw <args>` forwards to `cd backend && uv run paw <args>`.
+Run `scripts/paw --help` or `paw --help` after `just install-paw` when you need
+the live command parser as the final source of truth.
 
 ## Resource map
 
@@ -39,6 +41,7 @@ Every row reflects a shipped subcommand. Source: `backend/app/cli/paw/commands/`
 | Resource         | Verbs                                                          | Endpoint family                          |
 | ---------------- | -------------------------------------------------------------- | ---------------------------------------- |
 | auth             | `login`, `logout`, `auth status`                               | `/auth/*`, `/api/v1/users/me`            |
+| admin            | `seed-user`                                                    | local trusted operator path              |
 | workspaces       | `ls`, `show`, `use`, `create`, `rename`, `delete`              | `/api/v1/workspaces`                     |
 | workspace        | `status`, `skills`                                             | `/api/v1/workspaces/onboarding-status`, `/{id}/skills` |
 | workspace env    | `get`, `set`, `unset`                                          | `/api/v1/workspaces/{id}/env`            |
@@ -46,27 +49,40 @@ Every row reflects a shipped subcommand. Source: `backend/app/cli/paw/commands/`
 | projects         | `ls`, `create`, `rename`, `delete`                             | `/api/v1/projects`                       |
 | profile          | `get`, `set`                                                   | `/api/v1/personalization`                |
 | appearance       | `get`, `set`, `reset`                                          | `/api/v1/appearance`                     |
-| channels         | `list`/`ls`, `link telegram`, `unlink telegram`                | `/api/v1/channels` + `/{provider}/link`  |
+| channels         | `list`/`ls`, `diagnose-telegram`, `link`, `unlink`, `send`     | `/api/v1/channels` + channel-specific routes |
 | mcp              | `list`/`ls`, `show`, `create`, `update`, `delete`              | `/api/v1/mcp/servers`                    |
+| plugins          | `scaffold`, `spec`, `validate`, `list`, `enable`, `disable`, `doctor`, `graph`, `reload`, `capabilities`, `slots` | dynamic plugin manifests and runtime snapshots |
 | jobs             | `list`/`ls`, `show`, `create`, `delete`                        | `/api/v1/scheduled-jobs`                 |
 | models           | `ls` (envelope: `{"models": [...], "etag": "..."}`)            | `/api/v1/models`                         |
 | completions      | `autocomplete`                                                 | `/api/v1/completions/autocomplete`       |
-| conversations    | `ls`, `show`, `create`, `send`, `rename`, `delete`, `export`   | `/api/v1/conversations`                  |
+| conversations    | `create`, `send`, `ls`, `show`, `rename`, `delete`, `export`   | `/api/v1/conversations`, `/api/v1/chat`  |
 | messages         | `ls`, `get` (by `(conv_id, index)`; no `/messages/{id}` route) | `/api/v1/conversations/{id}/messages`    |
 | cost             | `summary`, `ledger`                                            | `/api/v1/cost`, `/api/v1/cost/ledger`    |
 | audit            | `ls`/`list`, `show`, `summary`                                 | `/api/v1/audit`                          |
 | heartbeat        | `sync`                                                         | `/api/v1/heartbeat/sync`                 |
 | lcm              | `context <conv-id>`                                            | `/api/v1/lcm/conversations/{id}/context` |
-| api (raw)        | `METHOD PATH`, `openapi`, `ls`                                 | any                                      |
-| record / replay  | `record COMMAND…`, `replay --from FILE`                        | local (respx-backed)                     |
+| api (raw)        | `request`, `openapi`, `ls`; root shorthand also accepts `METHOD PATH` | any authenticated backend route      |
+| record / replay  | `record COMMAND…`, `replay --from FILE`                        | local fixture capture/replay             |
 | fanout           | `<N> COMMAND…`                                                 | local orchestrator over N parallel personas |
-| mirror           | `--upstream URL COMMAND…`                                      | local vs remote SSE diff                  |
-| env              | `check`                                                        | local environment preflight               |
-| project          | `up`, `down`, `status`, `logs`, `service ...` plus root `run`/`stop` aliases | local full-stack lifecycle (frontend + backend; pid file at `<PAW_CONFIG_DIR>/<profile>/project.json`) |
-| verify           | `codex`, `chat-roundtrip`, `model-switch`, `telegram`, `all-providers`, `cost`, `lcm`, `all` | end-to-end                   |
-| lab              | `bench model`, `bench providers`, `runs ls/show/export`, `flows ls/show`, `telegram chat`, `telegram media`, `telegram providers` | exploratory benchmarks + dogfood |
+| mirror           | `--upstream URL COMMAND…`                                      | local vs remote SSE diff                 |
+| env              | `check`                                                        | local environment preflight              |
+| project          | `up`, `down`, `status`, `preflight`, `logs`, `cloudflared ...`, `service ...`; root `run`/`stop` aliases | local full-stack lifecycle |
+| verify           | `codex`, `chat-roundtrip`, `model-switch`, `telegram`, `google-chat`, `cost`, `lcm`, `all-providers`, `all` | end-to-end proof suites |
+| lab              | `bench model/providers`, `runs ls/show/export/review`, `flows ls/show`, `telegram chat/media/providers` | exploratory benchmarks + dogfood |
 | doctor           | (no verb)                                                      | local + ping `/api/v1/health` + models   |
 | dev              | `up`, `down`, `status`                                         | local backend lifecycle (pid file at `<PAW_CONFIG_DIR>/<profile>/dev.json`) |
+
+## Command groups at a glance
+
+Top-level `paw` commands are: `run`, `stop`, `login`, `logout`, `record`,
+`replay`, `fanout`, `mirror`, `doctor`, `dev`, `project`, `env`, `auth`,
+`admin`, `projects`, `profile`, `appearance`, `conversations`, `workspaces`,
+`workspace`, `channels`, `mcp`, `plugins`, `jobs`, `models`, `completions`,
+`messages`, `cost`, `audit`, `heartbeat`, `lcm`, `lab`, `api`, and `verify`.
+
+Use `paw api` when the backend route exists but the CLI does not have an
+opinionated command yet. Use `paw plugins` for dynamic plugin manifests,
+capability search, slot preference, and workspace runtime snapshots.
 
 ## Conversation flow (important)
 
@@ -116,6 +132,15 @@ expiry) → re-lists → unlinks → asserts the Telegram binding is gone.
 For bot-side dogfood, enable `TELEGRAM_SIMULATE_ENABLED=true` on the
 target backend, bind the persona's Telegram account once, then use
 `paw lab telegram chat`.
+
+### Verify the Google Chat channel
+
+```bash
+just paw verify google-chat --json | jq '.checks[] | select(.passed == false)'
+```
+
+Checks Google Chat formatting, command parsing, registration, and channel
+runtime assumptions without relying on a generic chat smoke.
 
 ### Verify every available provider host
 
@@ -206,7 +231,26 @@ greppable until those endpoints land.
 just paw verify all --json
 ```
 
-Runs `codex` + `chat-roundtrip` + `model-switch` + `telegram` + `cost` + `lcm` in sequence; aggregate exit code is 6 if any single suite fails.
+Runs the configured proof suites in sequence, including provider/chat suites and
+channel checks such as Telegram and Google Chat. Aggregate exit code is 6 if any
+single suite fails.
+
+### Work with dynamic plugins
+
+```bash
+just paw plugins scaffold demo-tool
+just paw plugins spec --json
+just paw plugins validate /path/to/plugin.json --json
+just paw plugins list --workspace WORKSPACE_ID --json
+just paw plugins enable PLUGIN_ID --workspace WORKSPACE_ID
+just paw plugins doctor --workspace WORKSPACE_ID --json
+just paw plugins capabilities search "notion" --workspace WORKSPACE_ID --json
+just paw plugins slots --workspace WORKSPACE_ID --json
+```
+
+`paw plugins` is the operator surface for workspace CLI/plugin manifests:
+schema inspection, manifest validation, enable/disable state, dependency graph,
+snapshot reload, capability search, and slot preference.
 
 ### Run or stop the whole local project
 
@@ -320,11 +364,13 @@ Every command supports:
 - `backend/app/cli/paw/` — source.
 - `backend/tests/paw/` — unit tests (104 mocked); `backend/tests/e2e_paw/` — live-backend gate (2 tests, `PAW_E2E=1`).
 - `docs/design/codex-oauth-text-provider.md` — Codex provider doc; references `paw verify codex` as the canonical proof.
-- `~/.Codex/plugins/cache/Codex-plugins-official/Notion/9847f2aa1a15/skills/notion/research-documentation/SKILL.md` — design inspiration (ntn).
 
 ## Status
 
-v1 shipped on `development`. v2 surface (`channels`, `mcp`, `cost`, `audit`, `jobs`, `lcm context`, `fanout`, `mirror`, `dev`, `verify telegram`, `verify cost`) shipped May 2026.
+Current `main` ships the broad CLI surface documented above: core resource
+CRUD, local lifecycle, record/replay, fanout/mirror, dynamic plugins,
+verification suites, and lab dogfood/benchmark flows. Treat `paw --help` and
+`backend/app/cli/paw/` as authoritative when this skill and the parser disagree.
 
 **Still blocked on backend work:**
 

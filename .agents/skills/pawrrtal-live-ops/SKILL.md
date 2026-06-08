@@ -1,6 +1,6 @@
 ---
 name: pawrrtal-live-ops
-description: Operate Pawrrtal as a live service: prove the running commit, local origins, Cloudflared public URL, database schema, Telegram channel, and shutdown state. Use when checking whether Pawrrtal is live, deployed, reachable, healthy, broken in Telegram, safe to restart, or safe to take down.
+description: "Operate Pawrrtal as a live service: prove the running commit, local origins, Cloudflared public URL, database schema, Telegram channel, and shutdown state. Use when checking whether Pawrrtal is live, deployed, reachable, healthy, broken in Telegram, safe to restart, or safe to take down."
 stages: [debug, deploy]
 benefits-from: [paw, systematic-debugging, diagnose, cloudflared-tunnel-ops]
 ---
