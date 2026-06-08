@@ -17,7 +17,7 @@ from typing import IO, Any
 import httpx
 
 from app.cli.paw.config import PersonaState, cookies_path
-from app.cli.paw.errors import ApiError, AuthError, BackendUnreachable
+from app.cli.paw.errors import ApiError, AuthError, BackendUnreachableError
 from app.cli.paw.sse import stream_chat_events
 
 DEFAULT_TIMEOUT_SECONDS = 60.0
@@ -64,7 +64,7 @@ class PawClient:
 
     Errors map to paw exit codes:
 
-    - ``httpx.ConnectError`` -> ``BackendUnreachable`` (exit 4)
+    - ``httpx.ConnectError`` -> ``BackendUnreachableError`` (exit 4)
     - HTTP 401              -> ``AuthError`` (exit 3)
     - Other 4xx/5xx         -> ``ApiError`` (exit 5)
     """
@@ -270,7 +270,7 @@ class PawClient:
                 headers=headers,
             )
         except httpx.ConnectError as e:
-            raise BackendUnreachable(
+            raise BackendUnreachableError(
                 f"Cannot reach backend at {self._state.api_base_url}: {e}",
             ) from e
         if resp.status_code == HTTP_UNAUTHORIZED:

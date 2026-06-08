@@ -32,7 +32,7 @@ import typer
 from sqlalchemy import select
 
 from app.cli.paw.config import PersonaState, load_state
-from app.cli.paw.errors import LocalError
+from app.cli.paw.errors import ApiError, LocalError, PawError
 from app.cli.paw.http import PawClient
 from app.cli.paw.output import emit_human, emit_json, emit_plain_rows, require_one_output_mode
 from app.infrastructure.config import settings
@@ -266,9 +266,13 @@ def diagnose_telegram(
 ) -> None:
     """Inspect local Telegram binding and recent persisted turn state."""
     state = load_state(profile)
-    payload = asyncio.run(
-        _diagnose_telegram(state=state, limit=limit, conversation_id=conversation_id)
-    )
+    try:
+        payload = asyncio.run(
+            _diagnose_telegram(state=state, limit=limit, conversation_id=conversation_id)
+        )
+    except PawError as exc:
+        _emit_diagnose_telegram_error(exc, json_out=json_out)
+        raise typer.Exit(exc.exit_code) from exc
     if json_out:
         emit_json(payload)
         return
@@ -327,6 +331,25 @@ def diagnose_telegram(
             )
             for message in trace["messages"]
         )
+    emit_human("\n".join(lines))
+
+
+def _emit_diagnose_telegram_error(exc: PawError, *, json_out: bool) -> None:
+    if json_out:
+        payload: dict[str, Any] = {
+            "ok": False,
+            "error": exc.message,
+            "exit_code": exc.exit_code,
+        }
+        if exc.hint:
+            payload["hint"] = exc.hint
+        if isinstance(exc, ApiError) and exc.status_code is not None:
+            payload["status_code"] = exc.status_code
+        emit_json(payload)
+        return
+    lines = [f"Telegram diagnostic failed: {exc.message}"]
+    if exc.hint:
+        lines.append(f"Hint: {exc.hint}")
     emit_human("\n".join(lines))
 
 

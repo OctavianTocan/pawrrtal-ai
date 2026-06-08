@@ -207,7 +207,7 @@ def status(
 
     Exits 0 when running or untracked, EXIT_DEV_DEAD (7) when the
     persisted PID exists in state but is no longer alive. Exit 7 is
-    distinct from 4 (BackendUnreachable) on purpose: 4 means a network
+    distinct from 4 (BackendUnreachableError) on purpose: 4 means a network
     probe failed, 7 means the tracked process died — different
     operational situations that warrant different remediation.
 

@@ -33,10 +33,10 @@ from app.cli.paw.commands.verify_lazy import (
     run_model_switch_scenario,
     run_telegram_scenario,
 )
+from app.cli.paw.commands.verify_output import emit_and_exit, emit_many_and_exit, emit_runtime_error
 from app.cli.paw.config import PersonaState
-from app.cli.paw.errors import LocalError, VerificationFailed
+from app.cli.paw.errors import LocalError, PawError
 from app.cli.paw.http import PawClient
-from app.cli.paw.output import emit_human, emit_json
 from app.cli.paw.verify.scenarios import ScenarioResult
 
 # Canonical order all-dispatcher walks when no --include flag narrows it.
@@ -89,17 +89,17 @@ def verify_codex(
       paw verify codex --keep-conversation
     """
     state = _load_state(profile)
-    result = asyncio.run(
-        _run_one(
+    result = _run_one_command(
+        state,
+        lambda client: run_codex_scenario(
             state,
-            lambda client: run_codex_scenario(
-                state,
-                client,
-                keep_conversation=keep_conversation,
-            ),
-        )
+            client,
+            keep_conversation=keep_conversation,
+        ),
+        json_out=json_out,
+        label="codex",
     )
-    _emit_and_exit(result, json_out=json_out, label="codex")
+    emit_and_exit(result, json_out=json_out, label="codex")
 
 
 @app.command("chat-roundtrip")
@@ -122,17 +122,17 @@ def verify_chat_roundtrip(
       paw verify chat-roundtrip --model openai-codex:openai/gpt-5.5 --json
     """
     state = _load_state(profile)
-    result = asyncio.run(
-        _run_one(
+    result = _run_one_command(
+        state,
+        lambda client: run_chat_roundtrip_scenario(
             state,
-            lambda client: run_chat_roundtrip_scenario(
-                state,
-                client,
-                model_override=model,
-            ),
-        )
+            client,
+            model_override=model,
+        ),
+        json_out=json_out,
+        label="chat-roundtrip",
     )
-    _emit_and_exit(result, json_out=json_out, label="chat-roundtrip")
+    emit_and_exit(result, json_out=json_out, label="chat-roundtrip")
 
 
 @app.command("model-switch")
@@ -160,18 +160,18 @@ def verify_model_switch(
       paw verify model-switch --from openai-codex:openai/gpt-5.5 --to agent-sdk:anthropic/claude-opus-4-7
     """
     state = _load_state(profile)
-    result = asyncio.run(
-        _run_one(
+    result = _run_one_command(
+        state,
+        lambda client: run_model_switch_scenario(
             state,
-            lambda client: run_model_switch_scenario(
-                state,
-                client,
-                from_override=from_model,
-                to_override=to_model,
-            ),
-        )
+            client,
+            from_override=from_model,
+            to_override=to_model,
+        ),
+        json_out=json_out,
+        label="model-switch",
     )
-    _emit_and_exit(result, json_out=json_out, label="model-switch")
+    emit_and_exit(result, json_out=json_out, label="model-switch")
 
 
 @app.command("telegram")
@@ -179,23 +179,28 @@ def verify_telegram(
     profile: str = typer.Option("default", "--profile"),
     json_out: bool = typer.Option(False, "--json"),
 ) -> None:
-    """Run the Telegram channel link-code lifecycle E2E scenario.
+    """Verify Telegram channel configuration, simulation, and diagnostics.
 
-    Issues a fresh link code, asserts shape + expiry, then unlinks and
-    asserts the binding is gone from ``/api/v1/channels``. Does NOT
-    cover the bot-side redemption hop — see the
-    ``simulate_redemption_endpoint_unavailable`` check.
+    Lists bindings, issues a fresh link code, feeds ``/status`` through
+    ``/api/v1/channels/telegram/simulate`` for the authenticated user's
+    existing binding, and checks the diagnostics endpoint. It does not
+    unlink or modify an existing Telegram binding.
 
-    Exits 6 if any check fails. ``--json`` dumps the full payload +
-    artifacts (link-code envelope, before/after bindings lists).
+    Exits 6 if any check fails. ``--json`` dumps the full payload and
+    artifacts needed to diagnose the failed step.
 
     Examples:
       paw verify telegram
       paw verify telegram --json | jq '.checks[] | select(.passed == false)'
     """
     state = _load_state(profile)
-    result = asyncio.run(_run_one(state, lambda client: run_telegram_scenario(state, client)))
-    _emit_and_exit(result, json_out=json_out, label="telegram")
+    result = _run_one_command(
+        state,
+        lambda client: run_telegram_scenario(state, client),
+        json_out=json_out,
+        label="telegram",
+    )
+    emit_and_exit(result, json_out=json_out, label="telegram")
 
 
 @app.command("google-chat")
@@ -217,8 +222,13 @@ def verify_google_chat(
       paw verify google-chat --json | jq '.checks[] | select(.passed == false)'
     """
     state = _load_state(profile)
-    result = asyncio.run(_run_one(state, lambda client: run_google_chat_scenario(state, client)))
-    _emit_and_exit(result, json_out=json_out, label="google-chat")
+    result = _run_one_command(
+        state,
+        lambda client: run_google_chat_scenario(state, client),
+        json_out=json_out,
+        label="google-chat",
+    )
+    emit_and_exit(result, json_out=json_out, label="google-chat")
 
 
 @app.command("cost")
@@ -245,13 +255,13 @@ def verify_cost(
       paw verify cost --json | jq '.checks[] | select(.passed == false)'
     """
     state = _load_state(profile)
-    result = asyncio.run(
-        _run_one(
-            state,
-            lambda client: run_cost_scenario(state, client, model_override=model),
-        )
+    result = _run_one_command(
+        state,
+        lambda client: run_cost_scenario(state, client, model_override=model),
+        json_out=json_out,
+        label="cost",
     )
-    _emit_and_exit(result, json_out=json_out, label="cost")
+    emit_and_exit(result, json_out=json_out, label="cost")
 
 
 @app.command("lcm")
@@ -278,13 +288,13 @@ def verify_lcm(
       paw verify lcm --json | jq '.checks[] | select(.passed == false)'
     """
     state = _load_state(profile)
-    result = asyncio.run(
-        _run_one(
-            state,
-            lambda client: run_lcm_scenario(state, client, model=model),
-        )
+    result = _run_one_command(
+        state,
+        lambda client: run_lcm_scenario(state, client, model=model),
+        json_out=json_out,
+        label="lcm",
     )
-    _emit_and_exit(result, json_out=json_out, label="lcm")
+    emit_and_exit(result, json_out=json_out, label="lcm")
 
 
 @app.command("all-providers")
@@ -308,18 +318,18 @@ def verify_all_providers(
     it can spend live provider quota across multiple hosts.
     """
     state = _load_state(profile)
-    result = asyncio.run(
-        _run_one(
+    result = _run_one_command(
+        state,
+        lambda client: run_all_providers_scenario(
             state,
-            lambda client: run_all_providers_scenario(
-                state,
-                client,
-                include_hosts=set(include_host),
-                include_paid=include_paid,
-            ),
-        )
+            client,
+            include_hosts=set(include_host),
+            include_paid=include_paid,
+        ),
+        json_out=json_out,
+        label="all-providers",
     )
-    _emit_and_exit(result, json_out=json_out, label="all-providers")
+    emit_and_exit(result, json_out=json_out, label="all-providers")
 
 
 @app.command("all")
@@ -349,16 +359,9 @@ def verify_all(
     """
     state = _load_state(profile)
     selected = _select_suites(include=include, exclude=exclude)
-    results = asyncio.run(_run_many(state, selected))
+    results = _run_many_command(state, selected, json_out=json_out, label="all")
 
-    if json_out:
-        emit_json([r.to_dict() for r in results])
-    else:
-        emit_human(_render_aggregate(results))
-
-    if any(not r.passed for r in results):
-        failed = ",".join(r.name for r in results if not r.passed)
-        raise VerificationFailed(f"verify all failed for suites: {failed}")
+    emit_many_and_exit(results, json_out=json_out)
 
 
 def _select_suites(*, include: str | None, exclude: str | None) -> tuple[str, ...]:
@@ -437,31 +440,29 @@ async def _run_one(state: PersonaState, runner: SuiteRunner) -> ScenarioResult:
         return await runner(client)
 
 
-def _emit_and_exit(result: ScenarioResult, *, json_out: bool, label: str) -> None:
-    """Shared output + exit handling for single-scenario commands."""
-    if json_out:
-        emit_json(result.to_dict())
-    else:
-        emit_human(_render(result))
-    if not result.passed:
-        failed_names = ", ".join(c.name for c in result.checks if not c.passed)
-        raise VerificationFailed(f"{label} scenario failed ({failed_names})")
+def _run_one_command(
+    state: PersonaState,
+    runner: SuiteRunner,
+    *,
+    json_out: bool,
+    label: str,
+) -> ScenarioResult:
+    try:
+        return asyncio.run(_run_one(state, runner))
+    except PawError as exc:
+        emit_runtime_error(label, exc, json_out=json_out)
+        raise typer.Exit(exc.exit_code) from exc
 
 
-def _render(r: ScenarioResult) -> str:
-    """Render a scenario result as one OK/FAIL line per check."""
-    lines = [f"scenario: {r.name}  passed={r.passed}"]
-    for c in r.checks:
-        mark = "OK" if c.passed else "FAIL"
-        line = f"  [{mark}] {c.name}"
-        if not c.passed and c.detail:
-            line += f"   ({c.detail})"
-        lines.append(line)
-    return "\n".join(lines) + "\n"
-
-
-def _render_aggregate(results: list[ScenarioResult]) -> str:
-    """Render the aggregate ``paw verify all`` output."""
-    sections = [_render(r) for r in results]
-    summary_line = f"\n{sum(r.passed for r in results)}/{len(results)} suites passed.\n"
-    return "".join(sections) + summary_line
+def _run_many_command(
+    state: PersonaState,
+    suites: tuple[str, ...],
+    *,
+    json_out: bool,
+    label: str,
+) -> list[ScenarioResult]:
+    try:
+        return asyncio.run(_run_many(state, suites))
+    except PawError as exc:
+        emit_runtime_error(label, exc, json_out=json_out)
+        raise typer.Exit(exc.exit_code) from exc

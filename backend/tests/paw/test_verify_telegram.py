@@ -1,10 +1,4 @@
-"""Tests for ``paw verify telegram`` against a respx-mocked backend.
-
-Covers the happy path + the failure modes for every check the scenario
-emits. The link-code lifecycle is the full scope today; the bot-side
-redemption hop is documented as a passing
-``simulate_redemption_endpoint_unavailable`` check.
-"""
+"""Tests for ``paw verify telegram`` against a respx-mocked backend."""
 
 from __future__ import annotations
 
@@ -65,13 +59,48 @@ def _link_code_payload(
     }
 
 
+def _binding_payload() -> dict[str, Any]:
+    return {
+        "provider": "telegram",
+        "external_user_id": "222",
+        "external_chat_id": "333",
+        "display_handle": "bound",
+        "created_at": "2026-05-27T00:00:00Z",
+    }
+
+
+def _diagnostics_payload() -> dict[str, Any]:
+    return {
+        "configured": True,
+        "mode": "polling",
+        "bindings": [_binding_payload()],
+        "recent_messages": [],
+        "stuck_streaming_messages": [],
+        "conversation_trace": None,
+    }
+
+
 def _mock_happy_path(r: respx.MockRouter) -> None:
     """Wire every endpoint the scenario touches to a success response."""
-    r.get("/api/v1/channels").mock(return_value=httpx.Response(200, json=[]))
+    r.get("/api/v1/channels").mock(return_value=httpx.Response(200, json=[_binding_payload()]))
     r.post("/api/v1/channels/telegram/link").mock(
         return_value=httpx.Response(200, json=_link_code_payload())
     )
-    r.delete("/api/v1/channels/telegram/link").mock(return_value=httpx.Response(204))
+    r.post("/api/v1/channels/telegram/simulate").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "accepted": True,
+                "update_id": 123,
+                "chat_id": "333",
+                "external_user_id": "222",
+                "conversation_id": None,
+            },
+        )
+    )
+    r.get("/api/v1/channels/telegram/diagnose").mock(
+        return_value=httpx.Response(200, json=_diagnostics_payload())
+    )
 
 
 def _check_names(payload: dict[str, Any]) -> list[str]:
@@ -95,15 +124,15 @@ def test_happy_path_passes_every_check(runner: CliRunner, seeded: PersonaState) 
     assert payload["passed"] is True
     assert _check_names(payload) == []
     names = _all_check_names(payload)
-    # Pin every canonical name so a future rename surfaces immediately.
     assert {
         "baseline_channels_listed",
         "link_code_issued",
         "link_code_expiry_future",
         "post_issue_channels_listed",
-        "simulate_redemption_endpoint_unavailable",
-        "telegram_unlinked",
-        "telegram_binding_absent_after_unlink",
+        "telegram_binding_available",
+        "telegram_status_command_simulated",
+        "telegram_simulate_targets_bound_chat",
+        "telegram_diagnostics_available",
     } <= names
 
 
@@ -127,6 +156,10 @@ def test_link_issuance_500_exits_5(runner: CliRunner, seeded: PersonaState) -> N
         result = runner.invoke(app, ["verify", "telegram", "--json"])
 
     assert result.exit_code == 5, result.stdout
+    payload = json.loads(result.stdout)
+    assert payload["scenario"] == "telegram"
+    assert payload["passed"] is False
+    assert "POST /api/v1/channels/telegram/link -> 500" in payload["error"]
 
 
 def test_empty_link_code_fails_issued_check(runner: CliRunner, seeded: PersonaState) -> None:
@@ -157,56 +190,53 @@ def test_past_expiry_fails_expiry_future_check(runner: CliRunner, seeded: Person
     assert "link_code_expiry_future" in _check_names(payload)
 
 
-def test_unlink_checks_skipped_without_simulate_endpoint(
-    runner: CliRunner, seeded: PersonaState
+def test_missing_binding_fails_simulation_checks(
+    runner: CliRunner,
+    seeded: PersonaState,
 ) -> None:
-    """``telegram_unlinked`` + ``..._absent_after_unlink`` ship as skipped passes.
-
-    Without a backend simulate-redemption endpoint there is no way to
-    drive a real channel_bindings row, so the original assertions were
-    no-op proofs (DELETE on nothing is 204; absence of a never-created
-    binding is trivially true). They now pass-but-with-skipped-detail
-    and the names are surfaced in ``artifacts.skipped_checks`` so
-    dashboards can grep for the coverage gap. To prove the gated path
-    is not hit we force DELETE to 500 — if the scenario still ran the
-    DELETE call the test would explode with exit 5.
-    """
     with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
-        _mock_happy_path(r)
-        r.delete("/api/v1/channels/telegram/link").mock(
-            return_value=httpx.Response(500, json={"detail": "boom"})
+        r.get("/api/v1/channels").mock(return_value=httpx.Response(200, json=[]))
+        r.post("/api/v1/channels/telegram/link").mock(
+            return_value=httpx.Response(200, json=_link_code_payload())
+        )
+        r.get("/api/v1/channels/telegram/diagnose").mock(
+            return_value=httpx.Response(200, json=_diagnostics_payload())
         )
         result = runner.invoke(app, ["verify", "telegram", "--json"])
 
-    assert result.exit_code == 0, result.stdout
+    assert result.exit_code == 6, result.stdout
     payload = json.loads(result.stdout)
-    checks = {c["name"]: c for c in payload["checks"]}
-    assert checks["telegram_unlinked"]["passed"] is True
-    assert "skipped" in checks["telegram_unlinked"]["detail"].lower()
-    assert checks["telegram_binding_absent_after_unlink"]["passed"] is True
-    assert "skipped" in checks["telegram_binding_absent_after_unlink"]["detail"].lower()
-    skipped = payload["artifacts"].get("skipped_checks") or []
-    assert "telegram_unlinked" in skipped
-    assert "telegram_binding_absent_after_unlink" in skipped
+    assert "telegram_binding_available" in _check_names(payload)
+    assert "telegram_status_command_simulated" in _check_names(payload)
 
 
-def test_simulate_gap_check_is_recorded_and_passes(runner: CliRunner, seeded: PersonaState) -> None:
-    """The missing-simulate-endpoint check ships as a stable, passing marker.
-
-    Consumers (CI dashboards, agents) grep for the name to spot the gap;
-    the day a simulate endpoint lands, this check should be replaced
-    with real bot-side redemption assertions.
-    """
+def test_disabled_simulate_endpoint_fails_status_command_check(
+    runner: CliRunner,
+    seeded: PersonaState,
+) -> None:
     with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
         _mock_happy_path(r)
+        r.post("/api/v1/channels/telegram/simulate").mock(
+            return_value=httpx.Response(404, json={"detail": "Not Found"})
+        )
         result = runner.invoke(app, ["verify", "telegram", "--json"])
 
-    assert result.exit_code == 0, result.stdout
+    assert result.exit_code == 6, result.stdout
     payload = json.loads(result.stdout)
-    sim_check = next(
-        (c for c in payload["checks"] if c["name"] == "simulate_redemption_endpoint_unavailable"),
-        None,
-    )
-    assert sim_check is not None
-    assert sim_check["passed"] is True
-    assert "simulate" in sim_check["detail"].lower()
+    assert "telegram_status_command_simulated" in _check_names(payload)
+
+
+def test_missing_diagnostics_endpoint_fails_diagnostics_check(
+    runner: CliRunner,
+    seeded: PersonaState,
+) -> None:
+    with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
+        _mock_happy_path(r)
+        r.get("/api/v1/channels/telegram/diagnose").mock(
+            return_value=httpx.Response(404, json={"detail": "Not Found"})
+        )
+        result = runner.invoke(app, ["verify", "telegram", "--json"])
+
+    assert result.exit_code == 6, result.stdout
+    payload = json.loads(result.stdout)
+    assert "telegram_diagnostics_available" in _check_names(payload)

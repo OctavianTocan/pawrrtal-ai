@@ -1,22 +1,11 @@
-"""End-to-end Telegram channel link-and-unlink verification scenario.
+"""End-to-end Telegram channel verification scenario.
 
-Drives the real channels surface (``GET /api/v1/channels`` ->
-``POST /api/v1/channels/telegram/link`` -> ``GET /api/v1/channels`` ->
-``DELETE /api/v1/channels/telegram/link`` -> ``GET /api/v1/channels``)
-and asserts on every observable property of the link-code lifecycle.
-
-Scope note — the bot-side redemption (a Telegram user pasting the code
-into the bot, which then calls ``redeem_link_code`` and lands a
-``channel_bindings`` row) is **not** exercised here. The closest
-backend surface (``POST /api/v1/channels/telegram/webhook``) requires
-the deployment to be running in webhook mode with a real aiogram
-service registered on ``app.state.telegram_service`` and the
-``X-Telegram-Bot-Api-Secret-Token`` header matching the configured
-secret — none of which paw's HTTP transport can synthesize. A future
-``POST /api/v1/channels/{provider}/simulate`` route can be wired in
-later; until then this scenario emits a stable
-``simulate_redemption_endpoint_unavailable`` check so consumers can
-grep for the gap.
+The scenario checks three operator-relevant surfaces without deleting an
+existing binding: channel listing, link-code issuance, and the hidden
+``/api/v1/channels/telegram/simulate`` route that feeds a synthetic
+``/status`` command through the live bot dispatcher. It also verifies
+the read-only diagnostic endpoint so a failed bot smoke has a traceable
+follow-up path.
 """
 
 from __future__ import annotations
@@ -32,6 +21,9 @@ from app.cli.paw.verify.scenarios import ScenarioResult
 # ``/api/v1/channels/{provider}/link`` path segment. Single source so a
 # future Slack/iMessage sibling lands without scattered string literals.
 TELEGRAM_PROVIDER = "telegram"
+HTTP_OK = 200
+HTTP_NOT_FOUND = 404
+STATUS_SIMULATION_TEXT = "/status"
 
 # Minimum chars in the plaintext link code surfaced by the backend. The
 # generator emits the raw base32-ish code well above this; a few chars is
@@ -71,11 +63,12 @@ async def _list_channels(client: PawClient) -> list[dict[str, Any]]:
     return [b for b in body if isinstance(b, dict)]
 
 
-async def _check_baseline(client: PawClient, r: ScenarioResult) -> None:
+async def _check_baseline(client: PawClient, r: ScenarioResult) -> list[dict[str, Any]]:
     """Snapshot the channels list so the scenario has a known starting point."""
     bindings = await _list_channels(client)
     r.artifacts["baseline_bindings"] = bindings
     r.add("baseline_channels_listed", True, detail=f"count={len(bindings)}")
+    return bindings
 
 
 async def _issue_link_code(client: PawClient, r: ScenarioResult) -> dict[str, Any]:
@@ -112,9 +105,8 @@ async def _issue_link_code(client: PawClient, r: ScenarioResult) -> dict[str, An
 async def _check_post_issue_list(client: PawClient, r: ScenarioResult) -> None:
     """After issuing the code the bindings list shape must still be valid.
 
-    The binding row only lands after the bot-side redemption succeeds, so
-    we don't assert ``has_telegram_binding`` here — only that the list
-    endpoint still returns a usable shape.
+    The verifier checks for an existing binding separately because issuing
+    a link code should not mutate the current binding list.
     """
     bindings = await _list_channels(client)
     r.artifacts["post_issue_bindings"] = bindings
@@ -125,90 +117,79 @@ async def _check_post_issue_list(client: PawClient, r: ScenarioResult) -> None:
     )
 
 
-def _record_simulate_gap(r: ScenarioResult) -> None:
-    """Document the missing bot-side redemption surface as a stable check.
-
-    The check passes intentionally — there is nothing for paw to break
-    because the endpoint does not exist. The greppable name lets agents
-    and dashboards key off the gap and flip it to a real assertion the
-    moment ``POST /api/v1/channels/{provider}/simulate`` lands.
-    """
+async def _simulate_status_command(
+    client: PawClient,
+    r: ScenarioResult,
+    *,
+    bindings: list[dict[str, Any]],
+) -> None:
+    """Feed a deterministic Telegram command through the simulate route."""
+    binding_available = _has_telegram_binding(bindings)
     r.add(
-        "simulate_redemption_endpoint_unavailable",
-        True,
-        detail=(
-            "POST /api/v1/channels/telegram/webhook requires webhook-mode "
-            "deployment + bot secret header + real aiogram service; no "
-            "simulate endpoint exists. Scenario covers link-code lifecycle "
-            "only."
-        ),
+        "telegram_binding_available",
+        binding_available,
+        detail=f"telegram_bindings={sum(1 for row in bindings if row.get('provider') == TELEGRAM_PROVIDER)}",
     )
-
-
-SKIPPED_NO_REDEMPTION_DETAIL = (
-    "skipped: requires backend simulate-redemption endpoint to land a real "
-    "channel_bindings row before unlink can be meaningfully verified "
-    "(see pawrrtal-o7xf). Without that precondition, DELETE returns 204 "
-    "even when no binding exists and the post-unlink absence check is "
-    "trivially true — so neither assertion proves anything."
-)
-
-
-async def _unlink_telegram(
-    client: PawClient,
-    r: ScenarioResult,
-    *,
-    link_code_redeemed: bool,
-) -> None:
-    """DELETE the binding and assert the idempotent 204 contract.
-
-    Only runs the unlink HTTP call + assertion when a binding has
-    actually been redeemed by a bot-side flow — without that
-    precondition, DELETE returns 204 even when there is nothing to
-    delete (idempotent contract), so the assertion proves nothing. When
-    redemption is not exercised we instead emit a passing-but-skipped
-    check with a stable detail so dashboards and agents can grep for the
-    coverage gap.
-    """
-    if not link_code_redeemed:
-        r.add("telegram_unlinked", True, detail=SKIPPED_NO_REDEMPTION_DETAIL)
-        r.artifacts.setdefault("skipped_checks", []).append("telegram_unlinked")
-        return
-    await client.request(
-        "DELETE",
-        f"/api/v1/channels/{TELEGRAM_PROVIDER}/link",
-        expect=(204,),
-    )
-    r.add("telegram_unlinked", True, detail="status=204")
-
-
-async def _check_post_unlink_list(
-    client: PawClient,
-    r: ScenarioResult,
-    *,
-    link_code_redeemed: bool,
-) -> None:
-    """After unlink there must be no Telegram binding in the list.
-
-    Gated on ``link_code_redeemed`` for the same reason as
-    :func:`_unlink_telegram` — without a binding ever being created the
-    "absent after unlink" check is trivially true and proves nothing
-    about the DELETE endpoint's correctness.
-    """
-    if not link_code_redeemed:
+    if not binding_available:
         r.add(
-            "telegram_binding_absent_after_unlink",
-            True,
-            detail=SKIPPED_NO_REDEMPTION_DETAIL,
+            "telegram_status_command_simulated",
+            False,
+            detail="No Telegram binding exists for this user.",
         )
-        r.artifacts.setdefault("skipped_checks", []).append("telegram_binding_absent_after_unlink")
         return
-    bindings = await _list_channels(client)
-    r.artifacts["post_unlink_bindings"] = bindings
+
+    response = await client.request(
+        "POST",
+        f"/api/v1/channels/{TELEGRAM_PROVIDER}/simulate",
+        json_body={"text": STATUS_SIMULATION_TEXT},
+        expect=(HTTP_OK, HTTP_NOT_FOUND),
+    )
+    if response.status_code == HTTP_NOT_FOUND:
+        r.add(
+            "telegram_status_command_simulated",
+            False,
+            detail=f"status=404 body={response.text[:200]}",
+        )
+        return
+
+    payload = response.json()
+    body = payload if isinstance(payload, dict) else {}
+    r.artifacts["simulate_status_response"] = body
     r.add(
-        "telegram_binding_absent_after_unlink",
-        not _has_telegram_binding(bindings),
-        detail=f"bindings={bindings}",
+        "telegram_status_command_simulated",
+        body.get("accepted") is True,
+        detail=f"response={body}",
+    )
+    r.add(
+        "telegram_simulate_targets_bound_chat",
+        bool(body.get("chat_id") and body.get("external_user_id")),
+        detail=f"chat_id={body.get('chat_id')!r} external_user_id={body.get('external_user_id')!r}",
+    )
+
+
+async def _check_diagnostics(client: PawClient, r: ScenarioResult) -> None:
+    """Verify the operator diagnostic endpoint returns structured state."""
+    response = await client.request(
+        "GET",
+        f"/api/v1/channels/{TELEGRAM_PROVIDER}/diagnose",
+        params={"limit": 5},
+        expect=(HTTP_OK, HTTP_NOT_FOUND),
+    )
+    if response.status_code == HTTP_NOT_FOUND:
+        r.add(
+            "telegram_diagnostics_available",
+            False,
+            detail=f"status=404 body={response.text[:200]}",
+        )
+        return
+
+    payload = response.json()
+    body = payload if isinstance(payload, dict) else {}
+    r.artifacts["diagnostics"] = body
+    r.add(
+        "telegram_diagnostics_available",
+        {"configured", "mode", "bindings", "recent_messages"}.issubset(body.keys()),
+        detail=f"keys={sorted(body.keys())}",
     )
 
 
@@ -216,31 +197,14 @@ async def run_telegram_scenario(
     state: PersonaState,
     client: PawClient,
 ) -> ScenarioResult:
-    """Drive the Telegram link-code lifecycle and assert on every step.
-
-    Sequence: baseline list -> issue code -> post-issue list ->
-    record simulate-gap -> unlink -> post-unlink list. The bot-side
-    redemption hop is deliberately skipped (see module docstring).
-
-    ``link_code_redeemed`` is wired to ``False`` until a backend
-    simulate-redemption endpoint exists (tracked as ``pawrrtal-o7xf``).
-    The unlink and post-unlink-list checks are gated behind it because
-    DELETE on a never-bound provider is a no-op 204 — so without a real
-    binding the assertions are trivially true and prove nothing.
-    """
+    """Drive Telegram channel checks without mutating existing bindings."""
     r = ScenarioResult(name="telegram")
     del state  # PersonaState carried by ``client``; kept in signature for parity.
 
-    # Today there is no surface paw can hit to drive bot-side redemption,
-    # so link_code_redeemed is always False. When the simulate endpoint
-    # lands this flag flips and the gated checks become real assertions.
-    link_code_redeemed = False
-
-    await _check_baseline(client, r)
+    bindings = await _check_baseline(client, r)
     await _issue_link_code(client, r)
     await _check_post_issue_list(client, r)
-    _record_simulate_gap(r)
-    await _unlink_telegram(client, r, link_code_redeemed=link_code_redeemed)
-    await _check_post_unlink_list(client, r, link_code_redeemed=link_code_redeemed)
+    await _simulate_status_command(client, r, bindings=bindings)
+    await _check_diagnostics(client, r)
 
     return r

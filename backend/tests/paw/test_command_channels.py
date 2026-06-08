@@ -364,6 +364,38 @@ def test_channels_diagnose_telegram_calls_backend_endpoint(
     assert json.loads(result.stdout)["mode"] == "polling"
 
 
+def test_channels_diagnose_telegram_reports_backend_error_json(
+    runner: CliRunner,
+    seeded: PersonaState,
+) -> None:
+    with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
+        r.get("/api/v1/channels/telegram/diagnose").mock(
+            return_value=httpx.Response(404, json={"detail": "Not Found"})
+        )
+        result = runner.invoke(app, ["channels", "diagnose-telegram", "--json"])
+
+    assert result.exit_code == 5
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert payload["status_code"] == 404
+    assert "GET /api/v1/channels/telegram/diagnose -> 404" in payload["error"]
+
+
+def test_channels_diagnose_telegram_reports_backend_error_human(
+    runner: CliRunner,
+    seeded: PersonaState,
+) -> None:
+    with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
+        r.get("/api/v1/channels/telegram/diagnose").mock(
+            return_value=httpx.Response(500, json={"detail": "boom"})
+        )
+        result = runner.invoke(app, ["channels", "diagnose-telegram"])
+
+    assert result.exit_code == 5
+    assert "Telegram diagnostic failed:" in result.stdout
+    assert "GET /api/v1/channels/telegram/diagnose -> 500" in result.stdout
+
+
 def test_admin_seed_user_rejects_partial_telegram_options() -> None:
     """Telegram bootstrap options must include the provider user id."""
     from app.cli.paw.commands.admin import _validate_telegram_options
