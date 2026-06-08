@@ -56,10 +56,8 @@ class ChatTurnInput:
     workspace_root: Path | None = None
     tools: list[AgentTool] | None = None
     reasoning_effort: ReasoningEffort | None = None
-    # PR 09 — multimodal image inputs forwarded to the provider.  Each
-    # entry is ``{"data": <base64>, "media_type": "image/<mime>"}`` —
-    # the same wire shape ``ChatRequest.images`` carries on the API
-    # boundary.  ``None`` (the default) indicates a text-only turn.
+    # Multimodal image inputs in the same wire shape as ChatRequest.images.
+    # None indicates a text-only turn.
     images: list[dict[str, str]] | None = None
     history_window: int = 20
     log_tag: str = "TURN"

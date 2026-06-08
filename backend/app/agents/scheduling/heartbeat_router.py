@@ -1,18 +1,4 @@
-"""Heartbeat HTTP route — workspace HEARTBEAT.md sync.
-
-POST ``/api/v1/heartbeat/sync`` reads the user's default workspace's
-``HEARTBEAT.md``, ensures the heartbeat conversation exists, and
-registers one ``scheduled_jobs`` row per check. From there, the
-existing JobScheduler → EventBus → AgentHandler → NotificationService
-pipeline does all the work — cron fires, the agent runs the prompt,
-the response lands in the heartbeat conversation (web) and, when the
-user has linked Telegram, in their Telegram chat.
-
-The sync is intentionally not run automatically. The user edits the
-file in their workspace, then triggers this endpoint (or the
-Settings UI does it for them). That keeps the file-on-disk the
-single source of truth and avoids a watcher that fights edits.
-"""
+"""Heartbeat HTTP route for workspace HEARTBEAT.md sync."""
 
 from __future__ import annotations
 

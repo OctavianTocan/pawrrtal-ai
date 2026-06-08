@@ -276,14 +276,8 @@ def get_chat_router() -> APIRouter:
                 detail="model_id is required: no model on the request or the conversation",
             )
 
-        # Apply the model switch (if any) and re-normalize the stored
-        # reasoning_effort against the current model in a *single*
-        # transaction (#366). Previously this was two consecutive
-        # ``session.commit`` calls — a crash between them left the row
-        # with a fresh ``model_id`` but a stale ``reasoning_effort``
-        # belonging to the previous model. Catalog validation lives in
-        # ``resolve_reasoning_effort``, the same helper used by the
-        # Telegram /thinking picker and /model command.
+        # Apply the model switch and normalize reasoning effort in the
+        # same transaction as the new user message.
         (
             reasoning_resolution,
             _previous_reasoning_effort,
@@ -311,14 +305,7 @@ def get_chat_router() -> APIRouter:
         workspace_id, root = await _require_workspace(
             user_id=user.id, session=session, request_id=rid
         )
-        # Pre-flight per-user cost gate (PR 04).  Refuses with HTTP
-        # 402 when the user's rolling-window spend + a small reservation
-        # would exceed ``cost_max_per_user_daily_usd``.  This sits
-        # *after* the workspace gate (so an onboarding-incomplete user
-        # never sees a confusing 402) and *before* tool composition /
-        # provider resolution (so a denied request is cheap).  The
-        # Claude SDK enforces the per-request cap natively via
-        # ``max_budget_usd``; this gate enforces the per-user cap.
+        # Refuse over-budget turns before tool composition or provider work.
         await enforce_cost_budget(
             user_id=user.id,
             session=session,
@@ -384,11 +371,7 @@ def get_chat_router() -> APIRouter:
             "model_id": model_id,
             "metadata": {},
         }
-        # PR 09: forward multimodal image inputs from the request body to
-        # the provider via ChatTurnInput.images.  Each provider bridges
-        # these into its native content-block shape — Claude as
-        # messages.content image blocks (PR 05), Gemini as
-        # Part.from_bytes.
+        # Forward multimodal image inputs in the provider-neutral turn input.
         image_inputs = (
             [{"data": img.data, "media_type": img.media_type} for img in request.images]
             if request.images
@@ -441,9 +424,7 @@ def get_chat_router() -> APIRouter:
         )
         hooks: list[EventHook] = [_artifact_hook, _drain_send_queue]
 
-        # PR 10: announce the turn so subscribers (audit, metrics,
-        # webhook delivery) can react.  Fire-and-forget via the global
-        # bus accessor; no-op when the bus is unset.
+        # Announce the turn so subscribers can react without coupling to the router.
         await publish_turn_started(
             user_id=user.id,
             conversation_id=request.conversation_id,
