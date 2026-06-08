@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import logging
 import uuid
-from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from app.infrastructure.database.legacy import async_session_maker
 from app.infrastructure.event_bus.bus import Event
@@ -14,7 +13,6 @@ from app.infrastructure.event_bus.types import (
     ScheduledEvent,
     WebhookEvent,
 )
-from app.providers import first_catalog_model, resolve_llm
 
 logger = logging.getLogger(__name__)
 
@@ -32,17 +30,13 @@ _PAYLOAD_LEAF_PREVIEW_CHARS = 200
 class AgentHandler:
     """Bus subscriber that runs an agent turn for webhook + scheduled events.
 
-    Both event types collapse to the same shape: build a prompt,
-    resolve the default provider, stream a turn (collecting just the
-    text deltas), and publish an :class:`AgentResponseEvent` carrying
-    the rendered text.
+    Targeted events collapse to the same shape: build a prompt, run it
+    through the Turn Pipeline using a system delivery adapter, then
+    publish an :class:`AgentResponseEvent` carrying the rendered text.
 
-    This is intentionally a thin orchestration layer — it does NOT
-    do tool composition, channel delivery, or persistence.  Each of
-    those already lives in a single source of truth elsewhere in
-    the codebase (``agent_tools.build_agent_tools``,
-    ``app.channels``, ``crud.chat_message``).  A more sophisticated
-    handler that persists a conversation row per fire is a follow-on.
+    This stays a thin orchestration layer. Provider resolution, tool
+    composition, provider sessions, context providers, persistence,
+    finalization, and cost accounting belong to the Turn Pipeline.
     """
 
     def __init__(self, *, default_user_id: uuid.UUID | None = None) -> None:
@@ -104,14 +98,12 @@ class AgentHandler:
         target_conversation_id: uuid.UUID | None = None,
         originating_event_id: str,
     ) -> None:
-        """Stream a turn, persist it, publish an AgentResponseEvent.
+        """Run a targeted turn and publish its text as an AgentResponseEvent.
 
-        When ``target_conversation_id`` is provided, the rendered text is
-        written into ``chat_messages`` as a finalised assistant turn
-        *before* Telegram fan-out. The persist step is best-effort: if
-        the conversation has been deleted or the write fails, the
-        delivery to Telegram still happens so the user isn't silently
-        denied the heartbeat output.
+        ``target_conversation_id`` is required because the Turn Pipeline
+        persists the user turn and assistant placeholder against a real
+        conversation. Untargeted webhook traffic is skipped until the
+        product has a deliberate destination for system-originated turns.
         """
         if user_id is None:
             logger.warning(
@@ -119,8 +111,20 @@ class AgentHandler:
                 originating_event_id,
             )
             return
+        if target_conversation_id is None:
+            logger.warning(
+                "AGENT_HANDLER_NO_TARGET_CONVERSATION originating_event_id=%s user_id=%s; skipping",
+                originating_event_id,
+                user_id,
+            )
+            return
         try:
-            text = await _run_agent_turn(prompt=prompt, user_id=user_id)
+            text = await _run_agent_turn(
+                prompt=prompt,
+                user_id=user_id,
+                conversation_id=target_conversation_id,
+                originating_event_id=originating_event_id,
+            )
         except Exception:
             logger.exception(
                 "AGENT_HANDLER_RUN_FAILED originating_event_id=%s user_id=%s",
@@ -135,13 +139,6 @@ class AgentHandler:
                 user_id,
             )
             return
-        if target_conversation_id is not None:
-            await _persist_assistant_response(
-                conversation_id=target_conversation_id,
-                user_id=user_id,
-                text=text,
-                originating_event_id=originating_event_id,
-            )
         # Lazy import — keeps the handler module decoupled from the
         # bus-publish helper to avoid a circular import surface.
         from app.infrastructure.event_bus.global_bus import (  # noqa: PLC0415
@@ -237,110 +234,56 @@ def _flatten_dict(
             lines.append(f"{full}: {_format_leaf(value)}")
 
 
-async def _run_agent_turn(*, prompt: str, user_id: uuid.UUID) -> str:
-    """Stream one provider turn and return the concatenated assistant text.
+async def _run_agent_turn(
+    *,
+    prompt: str,
+    user_id: uuid.UUID,
+    conversation_id: uuid.UUID,
+    originating_event_id: str,
+) -> str:
+    """Run one targeted event through the Turn Pipeline and return text."""
+    from pathlib import Path  # noqa: PLC0415
 
-    Resolves the catalog default model + the user's workspace + the
-    standard tool composition.  Skips workspace tools when the user
-    hasn't completed onboarding (no default workspace) — webhook /
-    scheduled traffic shouldn't be gated on the onboarding flow.
-    """
-    # All imports are lazy so the bus module can be loaded without
-    # pulling in the chat router's heavy dependency tree.
-    from app.agents.tool_surface import build_agent_tools  # noqa: PLC0415
-    from app.governance.workspace_context import (  # noqa: PLC0415
-        load_workspace_context,
-    )
+    from app.conversations.crud import get_conversation  # noqa: PLC0415
+    from app.providers.base import ReasoningEffort  # noqa: PLC0415
+    from app.providers.selection import default_model_id  # noqa: PLC0415
+    from app.turns.pipeline import TurnCommand, prepare_turn, run_prepared_turn  # noqa: PLC0415
+    from app.turns.pipeline.delivery import SystemDeliveryAdapter  # noqa: PLC0415
     from app.workspace.crud import get_default_workspace  # noqa: PLC0415
 
     async with async_session_maker() as session:
         workspace = await get_default_workspace(user_id, session)
+        conversation = await get_conversation(user_id, session, conversation_id)
 
-    workspace_root: Path | None = Path(workspace.path) if workspace is not None else None
-    workspace_ctx = load_workspace_context(workspace_root) if workspace_root is not None else None
-    system_prompt = workspace_ctx.system_prompt if workspace_ctx is not None else None
-    model_id = first_catalog_model().id
-
-    agent_tools = (
-        build_agent_tools(
-            workspace_root=workspace_root,
-            user_id=user_id,
-            workspace_id=workspace.id,
-            send_fn=None,
-            surface="webhook",
-            model_id=model_id,
-        )
-        if workspace is not None and workspace_root is not None
-        else []
-    )
-
-    # resolve_llm does not accept user_id; workspace_root carries the
-    # per-user key resolution upstream. Kept for call-site symmetry.
-    _ = user_id
-    provider = resolve_llm(
-        model_id,
-        workspace_root=workspace_root,
-    )
-
-    accumulated: list[str] = [
-        stream_event.get("content", "")
-        async for stream_event in provider.stream(
-            prompt,
-            uuid.uuid4(),
-            user_id,
-            history=[],
-            tools=agent_tools or None,
-            system_prompt=system_prompt,
-        )
-        if stream_event.get("type") == "delta"
-    ]
-    return "".join(accumulated).strip()
-
-
-async def _persist_assistant_response(
-    *,
-    conversation_id: uuid.UUID,
-    user_id: uuid.UUID,
-    text: str,
-    originating_event_id: str,
-) -> None:
-    """Write the agent's response into a chat conversation as a finalised turn.
-
-    Lazy imports keep ``event_bus.handlers`` from pulling the
-    chat-message CRUD into its module-load graph — the sentrux layer
-    rule wants core code to avoid hard imports of ``app.crud.*``.
-
-    Failures are logged and swallowed: a persistence error must not
-    break the Telegram fan-out that follows in the caller. The row is
-    written via the same helpers the web chat router uses, so the
-    UI's existing ``GET .../messages`` path picks it up immediately.
-    """
-    from app.conversations.messages_crud import (  # noqa: PLC0415
-        append_assistant_placeholder,
-        finalize_assistant_message,
-    )
-
-    try:
-        async with async_session_maker() as session:
-            placeholder = await append_assistant_placeholder(
-                session,
-                conversation_id=conversation_id,
-                user_id=user_id,
-            )
-            await finalize_assistant_message(
-                session,
-                message_id=placeholder.id,
-                content=text,
-                thinking=None,
-                tool_calls=None,
-                timeline=None,
-                thinking_duration_seconds=None,
-                assistant_status="complete",
-            )
-            await session.commit()
-    except Exception:
-        logger.exception(
-            "AGENT_HANDLER_PERSIST_FAILED conversation_id=%s originating_event_id=%s",
+    if conversation is None:
+        logger.warning(
+            "AGENT_HANDLER_TARGET_CONVERSATION_MISSING conversation_id=%s originating_event_id=%s",
             conversation_id,
             originating_event_id,
         )
+        return ""
+
+    workspace_root = Path(workspace.path) if workspace is not None else None
+    delivery = SystemDeliveryAdapter()
+    prepared_turn = await prepare_turn(
+        TurnCommand(
+            conversation_id=conversation_id,
+            user_id=user_id,
+            question=prompt,
+            workspace_root=workspace_root,
+            workspace_id=workspace.id if workspace is not None else None,
+            surface=delivery.surface,
+            model_id=conversation.model_id or default_model_id(),
+            reasoning_effort=cast(ReasoningEffort | None, conversation.reasoning_effort),
+            request_id=originating_event_id,
+            channel_metadata={
+                "originating_event_id": originating_event_id,
+                "source": "event_bus",
+            },
+            delivery_adapter=delivery,
+            verbose_level=conversation.verbose_level,
+        )
+    )
+    async for _chunk in run_prepared_turn(prepared_turn):
+        pass
+    return delivery.final_text

@@ -72,7 +72,7 @@ async def prepare_turn(command: TurnCommand) -> PreparedTurn:
         user_id=command.user_id,
         question=command.question,
         provider=selection.provider,
-        channel=resolve_channel(command.surface),
+        channel=command.delivery_adapter or resolve_channel(command.surface),
         channel_message=channel_message,
         workspace_root=command.workspace_root,
         tools=agent_tools,

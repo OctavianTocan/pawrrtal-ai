@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .delivery import SystemDeliveryAdapter
 from .finalize import _finalize_turn
 from .history import _load_history_and_persist, _workspace_system_prompt
 from .prepare import prepare_turn
@@ -27,6 +28,7 @@ __all__ = [
     "DeliveryAdapter",
     "EventHook",
     "PreparedTurn",
+    "SystemDeliveryAdapter",
     "TurnCommand",
     "TurnResult",
     "_finalize_turn",

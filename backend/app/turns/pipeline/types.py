@@ -44,6 +44,7 @@ class TurnCommand:
     send_fn: SendMessageFn | None = None
     channel_text: str | None = None
     channel_metadata: dict[str, Any] = field(default_factory=dict)
+    delivery_adapter: DeliveryAdapter | None = None
     verbose_level: int | None = None
     provider_selection: ProviderSelection | None = None
     draft_updater: Callable[[str], Awaitable[None]] | None = None

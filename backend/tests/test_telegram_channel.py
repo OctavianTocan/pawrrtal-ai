@@ -26,7 +26,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from app.channels import registered_surfaces, resolve_channel
-from app.channels.base import ChannelMessage
 from app.channels.telegram import SURFACE_TELEGRAM, TelegramChannel
 from app.channels.telegram.bot import (
     _TELEGRAM_COMMANDS,
@@ -60,7 +59,6 @@ from app.channels.telegram.status import (
 )
 from app.conversations.crud import ConversationStatus
 from app.providers.base import StreamEvent
-from app.providers.catalog import first_catalog_model
 from app.providers.selection import ProviderSelection
 
 # ---------------------------------------------------------------------------
@@ -78,7 +76,7 @@ def _make_channel_message(
     chat_id: int = 123,
     message_id: int = 456,
     reply_to_message_id: int | None = None,
-) -> ChannelMessage:
+) -> Any:
     metadata = {
         "bot": bot,
         "chat_id": chat_id,
@@ -86,14 +84,14 @@ def _make_channel_message(
     }
     if reply_to_message_id is not None:
         metadata["reply_to_message_id"] = reply_to_message_id
-    return ChannelMessage(
-        user_id=uuid.uuid4(),
-        conversation_id=uuid.uuid4(),
-        text="hello",
-        surface="telegram",
-        model_id=None,
-        metadata=metadata,
-    )
+    return {
+        "user_id": uuid.uuid4(),
+        "conversation_id": uuid.uuid4(),
+        "text": "hello",
+        "surface": "telegram",
+        "model_id": None,
+        "metadata": metadata,
+    }
 
 
 def _make_bot() -> AsyncMock:
@@ -102,6 +100,12 @@ def _make_bot() -> AsyncMock:
     bot.delete_message = AsyncMock()
     bot.send_message = AsyncMock(return_value=SimpleNamespace(message_id=777))
     return bot
+
+
+def _first_catalog_model_id() -> str:
+    from app.providers.catalog import first_catalog_model
+
+    return first_catalog_model().id
 
 
 @pytest.fixture(autouse=True)
@@ -617,14 +621,14 @@ class TestTelegramChannelDeliver:
 
         bot = _make_bot()
         conversation_id = uuid.uuid4()
-        msg = ChannelMessage(
-            user_id=uuid.uuid4(),
-            conversation_id=conversation_id,
-            text="hi",
-            surface="telegram",
-            model_id=None,
-            metadata={"bot": bot, "chat_id": 1, "message_id": 2},
-        )
+        msg: Any = {
+            "user_id": uuid.uuid4(),
+            "conversation_id": conversation_id,
+            "text": "hi",
+            "surface": "telegram",
+            "model_id": None,
+            "metadata": {"bot": bot, "chat_id": 1, "message_id": 2},
+        }
         channel = TelegramChannel()
         with patch(
             "app.channels.telegram.channel.settings.telegram_regenerate_button_enabled", True
@@ -1161,7 +1165,7 @@ class TestResolveProviderWithAutoClear:
         selection_mock = MagicMock(
             return_value=ProviderSelection(
                 provider=fake_default_provider,
-                effective_model_id=first_catalog_model().id,
+                effective_model_id=_first_catalog_model_id(),
                 warning="model not in catalog",
                 bad_model_id=context.model_id,
             )
@@ -1192,7 +1196,7 @@ class TestResolveProviderWithAutoClear:
         # Warning was produced and mentions the bad ID + the fallback.
         assert warning is not None
         assert "agent-sdk:anthropic/claude-nonexistent" in warning
-        assert first_catalog_model().id in warning
+        assert _first_catalog_model_id() in warning
 
         # Stored model_id was cleared to NULL.
         update_mock.assert_awaited_once()
@@ -1202,24 +1206,24 @@ class TestResolveProviderWithAutoClear:
 
         selection_mock.assert_called_once_with(context.model_id, workspace_root=None)
         assert selection.provider is fake_default_provider
-        assert selection.effective_model_id == first_catalog_model().id
+        assert selection.effective_model_id == _first_catalog_model_id()
 
     async def test_following_turn_uses_catalog_default_after_clear(self) -> None:
         """After the auto-clear, a turn with ``model_id=None`` resolves cleanly.
 
         ``handle_plain_message`` reads ``conversation.model_id`` and falls
-        back to ``first_catalog_model().id`` when it is ``NULL``.  Here we
+        back to ``_first_catalog_model_id()`` when it is ``NULL``.  Here we
         simulate that follow-up turn: the resolved context carries the
         first catalog entry directly, and the helper neither warns nor clears.
         """
-        context = self._make_context(first_catalog_model().id)
+        context = self._make_context(_first_catalog_model_id())
 
         fake_default_provider = MagicMock(name="default_provider")
         update_mock = AsyncMock(return_value=True)
         selection_mock = MagicMock(
             return_value=ProviderSelection(
                 provider=fake_default_provider,
-                effective_model_id=first_catalog_model().id,
+                effective_model_id=_first_catalog_model_id(),
             )
         )
 
@@ -1272,7 +1276,7 @@ class TestRenderStatusMessage:
 
         return ConversationStatus(
             conversation_id=uuid.uuid4(),
-            model_id=first_catalog_model().id,
+            model_id=_first_catalog_model_id(),
             verbose_level=1,
             reasoning_effort=None,
             started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),
@@ -1314,7 +1318,7 @@ class TestRenderStatusMessage:
 
         status = ConversationStatus(
             conversation_id=uuid.uuid4(),
-            model_id=first_catalog_model().id,
+            model_id=_first_catalog_model_id(),
             verbose_level=1,
             reasoning_effort=None,
             started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),
@@ -1346,7 +1350,7 @@ class TestRenderStatusMessage:
 
         status = ConversationStatus(
             conversation_id=uuid.uuid4(),
-            model_id=first_catalog_model().id,
+            model_id=_first_catalog_model_id(),
             verbose_level=1,
             reasoning_effort=None,
             started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),
@@ -1408,7 +1412,7 @@ class TestRenderStatusMessage:
 
         status = ConversationStatus(
             conversation_id=uuid.uuid4(),
-            model_id=first_catalog_model().id,
+            model_id=_first_catalog_model_id(),
             verbose_level=1,
             reasoning_effort=None,
             started_at=_dt(2026, 5, 17, 18, 0),  # tz-naive, matches DB
@@ -1474,7 +1478,7 @@ class TestHandleStatusCommand:
 
         fake_status = ConversationStatus(
             conversation_id=conv_id,
-            model_id=first_catalog_model().id,
+            model_id=_first_catalog_model_id(),
             verbose_level=2,
             reasoning_effort=None,
             started_at=_dt(2026, 5, 17, 18, 0, tzinfo=UTC),
