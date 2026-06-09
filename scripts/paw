@@ -44,6 +44,14 @@ export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/pawrrtal-uv-cache}"
 mkdir -p "${UV_CACHE_DIR}"
 
 cd "${backend_dir}"
+if [[ "${1:-}" == "services" ]]; then
+	shift
+	if [[ -n "${env_file}" ]]; then
+		exec uv run python -m dotenv --file "${env_file}" run -- uv run python -m app.cli.paw.commands.services.cli "$@"
+	fi
+	exec uv run python -m app.cli.paw.commands.services.cli "$@"
+fi
+
 if [[ -n "${env_file}" ]]; then
 	exec uv run python -m dotenv --file "${env_file}" run -- uv run paw "$@"
 fi

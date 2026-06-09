@@ -267,3 +267,7 @@ def _emit_progress(message: str) -> None:
     """Emit progress/status text to stderr."""
     sys.stderr.write(f"{message}\n")
     sys.stderr.flush()
+
+
+if __name__ == "__main__":
+    app()

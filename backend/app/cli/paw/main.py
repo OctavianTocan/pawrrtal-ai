@@ -33,9 +33,9 @@ from app.cli.paw.commands import project as project_cmd
 from app.cli.paw.commands import projects as projects_cmd
 from app.cli.paw.commands import record as record_cmd
 from app.cli.paw.commands import replay as replay_cmd
-from app.cli.paw.commands import services as services_cmd
 from app.cli.paw.commands import verify as verify_cmd
 from app.cli.paw.commands import workspaces as workspaces_cmd
+from app.cli.paw.commands.services.cli import app as services_app
 
 API_OVERRIDE_MARKER = "_PAW_CLI_API_OVERRIDE_ACTIVE"
 
@@ -77,7 +77,7 @@ app.add_typer(
 )
 
 app.add_typer(
-    services_cmd.app,
+    services_app,
     name="services",
     help="Install and operate systemd-managed Pawrrtal services.",
 )
