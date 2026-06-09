@@ -34,11 +34,11 @@ Read the relevant cookbook before acting:
 ## Operating Rules
 
 1. Do not trust memory. Inspect the live service state every time.
-2. Do not print tokens, credential JSON, origin certs, database URLs, service tokens, or bot tokens.
+2. Do not print tokens, credential JSON, origin certs, database URLs, service tokens, bot tokens, generated passwords, or reset passwords. Do not send passwords through Telegram or another chat channel as an ops shortcut.
 3. Prefer `paw` for user-visible verification, but if `paw` fails before HTTP due to local env drift, switch to live process logs and raw HTTP checks.
 4. Compare the live process checkout and commit against the commit you think is deployed.
 5. If the database schema is involved, run migrations against the live service database, not the shell default.
-6. Use real provider/channel/browser proof when the user-visible claim depends on real integrations. Simulated Telegram or mocked provider tests are not enough to claim live behavior.
+6. Use real provider/channel/browser proof when the user-visible claim depends on real integrations. Simulated Telegram, direct outbound sends, or mocked provider tests are not enough to claim live inbound behavior.
 7. After touching self-hosted runners for CI or verification, use `pawrrtal-runner-ops` and prove runner location, labels, processes, services, and disk state.
 
 ## Fast Triage
