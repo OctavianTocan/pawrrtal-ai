@@ -65,7 +65,7 @@ def secret_check_payload(target: ServiceTarget) -> dict[str, object]:
 
 def _load_project_secrets(project_id: str) -> dict[str, str]:
     """Load one Bitwarden project without printing secret values."""
-    result = _run_bws(["bws", "secret", "list", "--project-id", project_id, "--output", "json"])
+    result = _run_bws(["bws", "secret", "list", project_id, "--output", "json"])
     try:
         items = json.loads(result.stdout)
     except json.JSONDecodeError as exc:

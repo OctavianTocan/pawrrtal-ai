@@ -200,7 +200,9 @@ def test_services_secrets_check_filters_shared_keys_and_hides_values(
     monkeypatch.setenv("BWS_ACCESS_TOKEN", "token")
 
     def fake_run_bws(args: list[str]) -> subprocess.CompletedProcess[str]:
-        project_id = args[args.index("--project-id") + 1]
+        assert args[:3] == ["bws", "secret", "list"]
+        project_id = args[3]
+        assert args[4:] == ["--output", "json"]
         if project_id == "shared-project":
             payload = [
                 {"key": "GOOGLE_API_KEY", "value": "shared-google"},
