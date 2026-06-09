@@ -22,7 +22,7 @@ out of scope):
 - CRUD: `crud/channel.py`, `crud/chat_message.py`, `crud/cost.py`,
   `crud/mcp_servers.py`, `crud/memory.py`, `crud/project.py`,
   `crud/workspace.py`, `crud/audit.py`.
-- Tools: every `backend/app/core/tools/*.py` except `external_mcp.py`.
+- Tools: every `backend/app/tools/*.py` except `external_mcp.py`.
 
 Rubric is the decision walk from
 `.claude/skills/returns-for-pawrrtal/SKILL.md`:
@@ -39,7 +39,7 @@ of unrelated patterns; behaviour changes of any kind (annotation only).
 
 ## Annotations by module
 
-### backend/app/core/providers/claude/provider.py
+### backend/app/providers/claude/provider.py
 
 | Site | Verdict | Container | Rationale |
 |---|---|---|---|
@@ -47,14 +47,14 @@ of unrelated patterns; behaviour changes of any kind (annotation only).
 | `stream()` retry loop (lines 343-364) — `_is_retryable_cli_connection` + attempt counter inside the except | MAYBE | `Result` + a `.retry(policy)` combinator | Returns ships a retry combinator. Worth one PR-sized experiment but the bespoke "resume-failure fallback" logic at 343-349 is not generic — it would need a custom step regardless. |
 | `_logged_error_event` (lines 412-416) | NO | — | Side-effect helper, no failure path. Container would add ceremony with no payoff. |
 
-### backend/app/core/providers/gemini/provider.py
+### backend/app/providers/gemini/provider.py
 
 | Site | Verdict | Container | Rationale |
 |---|---|---|---|
 | `make_gemini_stream_fn.stream_fn` line 174-202: single `try / except Exception` over the entire `generate_content_stream` loop | NO | — | Failure is bare `Exception`, flattened into one error text + done event. No caller acts differently on Gemini auth vs rate-limit vs network — the only behaviour is "render the message verbatim into the chat bubble." Wrapping in `FutureResult[…, Exception]` is the anti-pattern flagged in the skill. |
 | `GeminiLLM.stream` lines 332-345: outer `try / except Exception` over `agent_loop` | NO | — | Same shape, same reason. |
 
-### backend/app/core/providers/gemini_cli/provider.py
+### backend/app/providers/gemini_cli/provider.py
 
 | Site | Verdict | Container | Rationale |
 |---|---|---|---|
@@ -63,7 +63,7 @@ of unrelated patterns; behaviour changes of any kind (annotation only).
 | `_spawn_subprocess` lines 289-306: `FileNotFoundError` / `OSError` → return `None` | MAYBE | `Maybe[Process]` | One caller. Already idiomatic with `if proc is None: yield _error_event(...)`. No payoff. |
 | `_shutdown_subprocess` lines 318-334: best-effort terminate/kill | NO | — | Side effects, no result. |
 
-### backend/app/core/providers/xai/provider.py
+### backend/app/providers/xai/provider.py
 
 | Site | Verdict | Container | Rationale |
 |---|---|---|---|
@@ -71,14 +71,14 @@ of unrelated patterns; behaviour changes of any kind (annotation only).
 | `XaiLLM.stream` lines 402-425: blanket `except Exception` over `agent_loop` | NO | — | Same. |
 | `_resolve_xai_api_key` line 142: `return None` on missing key | MAYBE | `Maybe[str]` | One caller, simple `Optional[str]`. Mechanical rename. No payoff. |
 
-### backend/app/core/providers/opencode_go/provider.py
+### backend/app/providers/opencode_go/provider.py
 
 | Site | Verdict | Container | Rationale |
 |---|---|---|---|
 | `make_opencode_go_stream_fn.stream_fn` lines 146-178: blanket `except Exception` | NO | — | Same shape as Gemini/xAI. |
 | `OpenCodeGoLLM.stream` lines 324-345: blanket `except Exception` over `agent_loop` | NO | — | Same. |
 
-### backend/app/core/providers/openai_codex/provider.py
+### backend/app/providers/openai_codex/provider.py
 
 | Site | Verdict | Container | Rationale |
 |---|---|---|---|
@@ -86,7 +86,7 @@ of unrelated patterns; behaviour changes of any kind (annotation only).
 | `OpenAICodexProvider.stream` lines 250-258: `build_codex_run_input` fallback to `TextInput` | NO | — | Pure local recovery, no caller differentiation. |
 | `OpenAICodexProvider.stream` lines 262-279: turn streaming `except Exception` | NO | — | Same blanket-except pattern. |
 
-### backend/app/core/providers/agy_cli/provider.py
+### backend/app/providers/agy_cli/provider.py
 
 | Site | Verdict | Container | Rationale |
 |---|---|---|---|
@@ -152,7 +152,7 @@ of unrelated patterns; behaviour changes of any kind (annotation only).
 |---|---|---|---|
 | All four functions | NO | — | List or aggregate returns. No `Optional`, no error union. |
 
-### backend/app/core/tools/*
+### backend/app/tools/*
 
 Tools already use a **hand-rolled Result equivalent**: `ToolError` carrying
 a `ToolErrorCode` enum (see `tools/errors.py`). Tool bodies either `raise

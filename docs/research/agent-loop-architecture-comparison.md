@@ -455,7 +455,7 @@ It also supports:
 
 For Pawrrtal's Agno-based backend, the most relevant patterns are:
 
-- **Goose's inspector chain** for tool permission (currently Pawrrtal has `backend/app/core/tools/` + `backend/app/core/providers/`)
+- **Goose's inspector chain** for tool permission (currently Pawrrtal has `backend/app/tools/` + `backend/app/providers/`)
 - **SWE-Agent's error requery** pattern for robust tool failure handling
 - **Pydantic AI's typed result** pattern for structured agent outputs
 - **OpenHands' Action/Observation** separation for clean tool dispatch

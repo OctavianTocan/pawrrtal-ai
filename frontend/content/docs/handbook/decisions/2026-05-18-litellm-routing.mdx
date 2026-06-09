@@ -23,7 +23,7 @@ Pawrrtal had two chat providers when this work landed: `ClaudeLLM`
 (via `claude-agent-sdk`) and `GeminiLLM` (via `google-genai`). Both
 sit behind the `AILLM` protocol and are dispatched out of
 `HOST_TO_PROVIDER: dict[Host, type[AILLM]]` in
-`backend/app/core/providers/factory.py`. The
+`backend/app/providers/factory.py`. The
 [canonical model-ID ADR](./2026-05-14-model-id-canonical-format-and-backend-catalog)
 already left room for new hosts to plug into that table without
 touching the chat router or the schemas.
@@ -55,10 +55,10 @@ that wraps `litellm.acompletion` in the agent-loop `StreamFn`
 pattern already used by `GeminiLLM`. Concretely:
 
 - **`Host.litellm`** added to the `Host` enum in
-  `backend/app/core/providers/model_id.py`. `Vendor.openai` (and,
+  `backend/app/providers/model_id.py`. `Vendor.openai` (and,
   initially, `Vendor.xai`) point at it through `CANONICAL_HOST`.
 - **`LiteLLMLLM`** in
-  `backend/app/core/providers/litellm_provider.py` — implements the
+  `backend/app/providers/litellm_provider.py` — implements the
   `AILLM` protocol by composing `make_litellm_stream_fn(...)` with
   the shared `run_model_tool_loop`. Reuses `agent_event_to_stream_event` and
   `identity_convert` from the Gemini provider's translation layer.
@@ -68,7 +68,7 @@ pattern already used by `GeminiLLM`. Concretely:
   same provider can fan out to multiple LiteLLM-routed vendors.
 - **Catalog entries** for the launch models — GPT-4o, GPT-4o mini,
   o1, o1 mini, o3-mini — land in
-  `backend/app/core/providers/catalog.py` under `Host.litellm` +
+  `backend/app/providers/catalog.py` under `Host.litellm` +
   `Vendor.openai`.
 - **API key resolution** mirrors the existing Gemini path:
   `OPENAI_API_KEY` is looked up via `resolve_api_key(workspace_id,

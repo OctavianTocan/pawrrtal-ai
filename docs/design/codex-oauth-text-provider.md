@@ -7,7 +7,7 @@
 ## Summary
 
 We already authenticate to the Codex backend for image generation
-(`backend/app/core/tools/image_gen.py`).  The same auth token, same
+(`backend/app/tools/image_gen.py`).  The same auth token, same
 endpoint, and same Responses API protocol also serve text completions.
 
 This doc is the **canonical reference** for adding text-model support.
@@ -347,7 +347,7 @@ can confuse the model.
 
 ### 1. Lift the auth helper
 
-`backend/app/core/codex_auth.py` (new):
+`backend/app/providers/openai_codex/auth.py` (new):
 
 ```python
 """Codex OAuth token resolution shared by image_gen + text provider."""
@@ -400,7 +400,7 @@ async def refresh_codex_token() -> None:
 
 ### 2. New provider
 
-`backend/app/core/providers/openai_codex_provider.py`:
+`backend/app/providers/openai_codex_provider.py`:
 
 ```python
 class OpenAICodexProvider(LLMProvider):
@@ -440,7 +440,7 @@ class OpenAICodexProvider(LLMProvider):
 
 ### 3. Factory wiring
 
-`backend/app/core/providers/factory.py`:
+`backend/app/providers/factory.py`:
 
 ```python
 def resolve_llm(model_id, user_id=None):
@@ -541,7 +541,7 @@ is the desired, first-class integration path — not the reverse-engineered
 Responses HTTP path documented above.
 
 ### Key Outcomes of This Plan
-- New first-class provider package: `backend/app/core/providers/openai_codex/`
+- New first-class provider package: `backend/app/providers/openai_codex/`
   - `auth.py` — unified, refresh-safe Codex OAuth resolution (lifted from image_gen + this doc)
   - `provider.py` — `OpenAICodexProvider` implementing the full native streaming contract
 - Image generation via Codex agent delivered as a plugin:
@@ -637,13 +637,13 @@ A single future PR will mechanically remove the `# === CODEX-SDK-PLAN` comment b
 
 The first-class native provider is live for text models. Key landing artefacts:
 
-- **Provider package:** `backend/app/core/providers/openai_codex/`
+- **Provider package:** `backend/app/providers/openai_codex/`
   - `provider.py` — `OpenAICodexProvider` (`stream` translates SDK notifications → Pawrrtal `StreamEvent`s; installs a deny-all approval handler on the wrapped sync client before initialize)
   - `_vendor.py` — SDK import shim with opt-in `OPENAI_CODEX_ALLOW_PATH_FALLBACK` for local dev
   - `auth.py` — `OPENAI_CODEX_OAUTH_TOKEN` override resolver (per-workspace injection deferred — bean `pawrrtal-nf6y`)
   - `events.py` — `Notification` → `StreamEvent` mapper
   - `inputs.py` — history + question → `RunInput`
-- **Wiring:** `backend/app/core/providers/factory.py` (lazy via `_load_openai_codex_provider_cls`), `backend/app/core/providers/model_id.py` (`Host.openai_codex`), `backend/app/core/providers/catalog/openai.py` (single row `openai-codex:openai/gpt-5.5`).
+- **Wiring:** `backend/app/providers/factory.py` (lazy via `_load_openai_codex_provider_cls`), `backend/app/providers/model_id.py` (`Host.openai_codex`), `backend/app/providers/catalog/openai.py` (single row `openai-codex:openai/gpt-5.5`).
 - **Persistence:** `Conversation.codex_thread_id` column + migration `027_add_codex_thread_id_to_conversations.py`; `backend/app/channels/turn_runner.py` loads/persists the thread id and listens for the provider's `codex_thread_created` internal event.
 - **Submodule:** `backend/vendor/codex` pinned at upstream `rust-v0.134.0` (whose `sdk/python/pyproject.toml` reports `version = "0.131.0a4"`).
 - **Tests:** `backend/tests/test_openai_codex_provider.py` (strict — auth, discovery, event mapper, provider-contract via SDK-seam mocks; image-plugin tests stay `xfail` until bean `pawrrtal-roi0`) and `backend/tests/test_openai_codex_import_isolation.py` (regression: package imports must not break other providers).

@@ -174,8 +174,8 @@ runs the **device-code flow**:
 
 - Issue [#372](https://github.com/OctavianTocan/Pawrrtal-AI/issues/372)
 - [RFC 8628 — OAuth 2.0 Device Authorization Grant](https://datatracker.ietf.org/doc/html/rfc8628)
-- `backend/app/core/keys.py` — the existing `resolve_api_key`
+- `backend/app/infrastructure/keys.py` — the existing `resolve_api_key`
   surface this design extends
-- `backend/app/core/providers/xai_provider.py:104-113` — current
+- `backend/app/providers/xai_provider.py:104-113` — current
   `_resolve_xai_api_key` helper that `resolve_xai_credentials`
   supersedes

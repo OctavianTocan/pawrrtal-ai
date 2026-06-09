@@ -74,7 +74,7 @@ checks:
 ```
 
 `app.core.heartbeat` owns the pure parser
-(`backend/app/core/heartbeat.py`):
+(`backend/app/agents/scheduling/heartbeat.py`):
 
 - `HeartbeatCheck` validates `name` (non-empty, ≤ 64 chars, no
   whitespace — the value lands in an APScheduler job id), `cron` (5
@@ -247,15 +247,15 @@ opt-in and avoids cascading deletes.
 
 ## References
 
-- `backend/app/core/heartbeat.py` — pure parser, schema, cron
+- `backend/app/agents/scheduling/heartbeat.py` — pure parser, schema, cron
   validation.
-- `backend/app/core/heartbeat_template.py` — seeded
+- `backend/app/agents/scheduling/heartbeat.py` — seeded
   `HEARTBEAT.md` template.
 - `backend/app/crud/heartbeat.py` — sync helper, row reconciliation.
 - `backend/app/api/heartbeat.py` — `POST /api/v1/heartbeat/sync`.
 - `backend/alembic/versions/018_scheduled_jobs_target_conversation_id.py`
   — migration.
-- `backend/app/core/event_bus/handlers.py` — `AgentHandler` persist
+- `backend/app/infrastructure/event_bus/handlers.py` — `AgentHandler` persist
   step.
 - [`features/heartbeat`](../features/heartbeat) — feature doc with
   schema reference and worked examples.

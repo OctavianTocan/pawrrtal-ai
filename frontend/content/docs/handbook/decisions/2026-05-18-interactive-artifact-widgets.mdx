@@ -111,7 +111,7 @@ watches the chat answer instead of staring at the modal.
 ### 4. Surface-aware tool factory
 
 `make_artifact_tool(surface=...)` in
-`backend/app/core/tools/artifact_agent.py` is the gate. The tool
+`backend/app/tools/artifact_agent.py` is the gate. The tool
 description, *not* the execute callback, is what changes per surface:
 
 - Surface in `{"web", "electron"}` → the catalog string sent to the
@@ -199,7 +199,7 @@ This keeps the failure mode "model is asked not to do this" rather than
 ## References
 
 - PR [#265](https://github.com/OctavianTocan/pawrrtal/pull/265) — implementation.
-- `backend/app/core/tools/artifact_agent.py` — surface-aware tool factory.
+- `backend/app/tools/artifact_agent.py` — surface-aware tool factory.
 - `frontend/features/chat/artifacts/catalog.ts` — widget schemas.
 - `frontend/features/chat/artifacts/interaction-context.tsx` — two-layer providers.
 - Feature doc: [`interactive-artifacts`](../features/interactive-artifacts).

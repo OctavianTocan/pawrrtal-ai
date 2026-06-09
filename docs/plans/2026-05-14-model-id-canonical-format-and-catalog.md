@@ -31,7 +31,7 @@ Pure-additive backend modules. No consumers wired up yet; nothing currently runs
 ### Task 1: `model_id` module — types, parser, exceptions
 
 **Files:**
-- Create: `backend/app/core/providers/model_id.py`
+- Create: `backend/app/providers/model_id.py`
 - Test: `backend/tests/test_model_id.py`
 
 **Concrete content for `model_id.py`** (final shape, top to bottom):
@@ -274,7 +274,7 @@ Expected: `ModuleNotFoundError: No module named 'app.core.providers.model_id'`.
 
 - [ ] **Step 4: Create the module.**
 
-Write the full content shown above into `backend/app/core/providers/model_id.py`.
+Write the full content shown above into `backend/app/providers/model_id.py`.
 
 - [ ] **Step 5: Run tests to verify they pass.**
 
@@ -287,9 +287,9 @@ Expected: 12 passed.
 - [ ] **Step 6: Toolchain gate.**
 
 ```bash
-cd backend && uv run ruff format app/core/providers/model_id.py tests/test_model_id.py
-cd backend && uv run ruff check app/core/providers/model_id.py tests/test_model_id.py
-cd backend && uv run mypy app/core/providers/model_id.py
+cd backend && uv run ruff format app/providers/model_id.py tests/test_model_id.py
+cd backend && uv run ruff check app/providers/model_id.py tests/test_model_id.py
+cd backend && uv run mypy app/providers/model_id.py
 ```
 
 Expected: all clean. If mypy flags an unrelated pre-existing error in another file, that's fine — focus on the touched files.
@@ -297,7 +297,7 @@ Expected: all clean. If mypy flags an unrelated pre-existing error in another fi
 - [ ] **Step 7: Commit.**
 
 ```bash
-git add backend/app/core/providers/model_id.py backend/tests/test_model_id.py
+git add backend/app/providers/model_id.py backend/tests/test_model_id.py
 git commit -m "$(cat <<'EOF'
 feat(providers): add canonical model-ID parser
 
@@ -326,7 +326,7 @@ Module landed: Vendor/Host enums, ParsedModelId, parse_model_id, InvalidModelId,
 ### Task 2: `catalog` module — entries, default invariant, lookup
 
 **Files:**
-- Create: `backend/app/core/providers/catalog.py`
+- Create: `backend/app/providers/catalog.py`
 - Test: `backend/tests/test_catalog.py`
 
 **Concrete content for `catalog.py`:**
@@ -654,15 +654,15 @@ Expected: 12 passed.
 - [ ] **Step 6: Toolchain gate.**
 
 ```bash
-cd backend && uv run ruff format app/core/providers/catalog.py tests/test_catalog.py \
-  && uv run ruff check app/core/providers/catalog.py tests/test_catalog.py \
-  && uv run mypy app/core/providers/catalog.py
+cd backend && uv run ruff format app/providers/catalog.py tests/test_catalog.py \
+  && uv run ruff check app/providers/catalog.py tests/test_catalog.py \
+  && uv run mypy app/providers/catalog.py
 ```
 
 - [ ] **Step 7: Commit.**
 
 ```bash
-git add backend/app/core/providers/catalog.py backend/tests/test_catalog.py
+git add backend/app/providers/catalog.py backend/tests/test_catalog.py
 git commit -m "$(cat <<'EOF'
 feat(providers): add backend-owned model catalog
 
@@ -915,7 +915,7 @@ This chunk wires the new modules into existing code paths. Each commit narrows o
 
 **Files:**
 - Modify: `backend/app/schemas.py` (add `CanonicalModelId` Annotated type; apply to `ChatRequest.model_id:226`, `ConversationUpdate.model_id:86`, `ConversationResponse.model_id:69`). `ConversationCreate` (line 44) does NOT carry `model_id` today and stays unchanged.
-- Modify: `backend/app/core/config.py` (add `strict_conversation_read_validation: bool = True`)
+- Modify: `backend/app/infrastructure/config.py` (add `strict_conversation_read_validation: bool = True`)
 - Test: `backend/tests/test_providers_and_schemas.py` (deferred to Task 5 — Task 4 only adds schema-side tests)
 - Test: `backend/tests/test_conversation_read.py` (new — exercises the `ConversationResponse.model_id` read-validator behaviour with the strict / permissive flag)
 
@@ -999,7 +999,7 @@ Replace `model_id: str | None = None` in `ConversationResponse:69` with `model_i
 
 - [ ] **Step 4: Add the feature-flag setting.**
 
-In `backend/app/core/config.py`, add inside the `Settings` class:
+In `backend/app/infrastructure/config.py`, add inside the `Settings` class:
 
 ```python
 strict_conversation_read_validation: bool = True
@@ -1086,15 +1086,15 @@ Expected: 5 passed. The factory-test rewrite that *also* lives in `test_provider
 - [ ] **Step 7: Toolchain gate** the touched files.
 
 ```bash
-cd backend && uv run ruff format app/schemas.py app/core/config.py tests/test_conversation_read.py \
-  && uv run ruff check app/schemas.py app/core/config.py tests/test_conversation_read.py \
-  && uv run mypy app/schemas.py app/core/config.py
+cd backend && uv run ruff format app/schemas.py app/infrastructure/config.py tests/test_conversation_read.py \
+  && uv run ruff check app/schemas.py app/infrastructure/config.py tests/test_conversation_read.py \
+  && uv run mypy app/schemas.py app/infrastructure/config.py
 ```
 
 - [ ] **Step 8: Commit.**
 
 ```bash
-git add backend/app/schemas.py backend/app/core/config.py backend/tests/test_conversation_read.py
+git add backend/app/schemas.py backend/app/infrastructure/config.py backend/tests/test_conversation_read.py
 git commit -m "$(cat <<'EOF'
 feat(schemas): canonicalise model_id at every API boundary
 
@@ -1118,9 +1118,9 @@ EOF
 ### Task 5: Factory rewrite + delete vestigial strip helper
 
 **Files:**
-- Modify: `backend/app/core/providers/factory.py` — replace prefix routing with `HOST_TO_PROVIDER` map; resolve_llm takes `str | ParsedModelId | None`; delete `_strip_provider_segment`, `_GEMINI_PREFIXES`, `_CLAUDE_PREFIXES`, `_PROVIDER_SEGMENTS`, `_DEFAULT_MODEL`
-- Modify: `backend/app/core/providers/claude_provider.py` — no structural change, but factory now passes bare `parsed.model` to constructor (already what `_model_id` stores); document the contract in the docstring
-- Modify: `backend/app/core/providers/agno_provider.py` — same contract update
+- Modify: `backend/app/providers/factory.py` — replace prefix routing with `HOST_TO_PROVIDER` map; resolve_llm takes `str | ParsedModelId | None`; delete `_strip_provider_segment`, `_GEMINI_PREFIXES`, `_CLAUDE_PREFIXES`, `_PROVIDER_SEGMENTS`, `_DEFAULT_MODEL`
+- Modify: `backend/app/providers/claude_provider.py` — no structural change, but factory now passes bare `parsed.model` to constructor (already what `_model_id` stores); document the contract in the docstring
+- Modify: `backend/app/providers/agno_provider.py` — same contract update
 - Test: `backend/tests/test_providers_and_schemas.py` — rewrite from Task 4 lands here
 
 **Concrete content for `factory.py`:**
@@ -1260,9 +1260,9 @@ Expected: all green. If `test_telegram_channel.py` or `test_chat_api.py` fail be
 - [ ] **Step 8: Commit.**
 
 ```bash
-git add backend/app/core/providers/factory.py \
-        backend/app/core/providers/claude_provider.py \
-        backend/app/core/providers/agno_provider.py \
+git add backend/app/providers/factory.py \
+        backend/app/providers/claude_provider.py \
+        backend/app/providers/agno_provider.py \
         backend/tests/test_providers_and_schemas.py
 git commit -m "$(cat <<'EOF'
 refactor(providers): route on Host enum, delete strip helper
@@ -1290,9 +1290,9 @@ EOF
 ### Task 6: Chat router + utility callers source default from catalog
 
 **Files:**
-- Modify: `backend/app/api/chat.py` — delete `_DEFAULT_MODEL`; use `catalog.default_model().id`
-- Modify: `backend/app/core/agents.py` — drop the `gemini-3.1-flash-lite-preview` default; require model from caller
-- Modify: `backend/app/core/gemini_utils.py` — drop `_DEFAULT_MODEL = "gemini-2.0-flash"`; require model from caller (or accept `None` and fetch from catalog)
+- Modify: `backend/app/chat/router.py` — delete `_DEFAULT_MODEL`; use `catalog.default_model().id`
+- Modify: `backend/app/agents/` — drop the `gemini-3.1-flash-lite-preview` default; require model from caller
+- Modify: `backend/app/conversations/title.py` — drop `_DEFAULT_MODEL = "gemini-2.0-flash"`; require model from caller (or accept `None` and fetch from catalog)
 
 > ⚠️ **Heads-up:** the three `_DEFAULT_MODEL` constants currently disagree:
 > `chat.py:50` = `"gemini-3-flash-preview"`,
@@ -1357,7 +1357,7 @@ cd backend && uv run pytest tests/test_chat_api.py tests/test_providers_and_sche
 - [ ] **Step 9: Commit.**
 
 ```bash
-git add backend/app/api/chat.py backend/app/core/agents.py backend/app/core/gemini_utils.py backend/tests/test_chat_api.py
+git add backend/app/chat/router.py backend/app/agents/ backend/app/conversations/title.py backend/tests/test_chat_api.py
 git commit -m "$(cat <<'EOF'
 refactor(api): source default model from catalog everywhere
 

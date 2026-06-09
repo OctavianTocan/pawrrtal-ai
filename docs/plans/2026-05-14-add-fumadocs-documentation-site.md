@@ -1481,10 +1481,10 @@ cd frontend && bunx --bun @biomejs/biome check --write content/docs/product/conv
 
 ```bash
 head -80 frontend/features/chat/components/ModelSelectorPopover.tsx 2>/dev/null
-ls backend/app/core/providers/ 2>/dev/null
+ls backend/app/providers/ 2>/dev/null
 ```
 
-The provider list (which providers Pawrrtal supports) can be inferred from `backend/app/core/providers/`. Common entries: Claude (Anthropic), Gemini (Google), GPT (OpenAI), and others.
+The provider list (which providers Pawrrtal supports) can be inferred from `backend/app/providers/`. Common entries: Claude (Anthropic), Gemini (Google), GPT (OpenAI), and others.
 
 - [ ] **Step 2: Write the file**
 

@@ -164,7 +164,7 @@ cd backend && uv run pytest tests/test_internal_task_slots.py tests/test_convers
 
 Rename the confusing agent-loop packages before more plugin work lands.
 
-1. Rename `backend/app/channels/turn_orchestrator/` to
+1. Rename `backend/app/turns/pipeline/` to
    `backend/app/turns/pipeline/`.
 2. Split it into `input.py`, `history.py`, `streaming.py`, `provider_sessions.py`,
    `context.py`, `finalize.py`, and `delivery.py`.

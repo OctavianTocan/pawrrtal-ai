@@ -14,14 +14,14 @@
 
 You **must** read these before touching code. They are the contracts you're working against.
 
-- `backend/app/core/providers/openai_codex/__init__.py` — package surface, vendor bootstrap, re-exports.
-- `backend/app/core/providers/openai_codex/_vendor.py` — SDK import shim + `discover_vendored_codex_bin`.
-- `backend/app/core/providers/openai_codex/provider.py` — the `OpenAICodexProvider.stream(...)` body (the two bugs live here).
-- `backend/app/core/providers/openai_codex/auth.py` — `build_app_server_config` (currently hands back a dict that the provider reads to construct `AppServerConfig`).
-- `backend/app/core/providers/openai_codex/events.py` — `Notification` → `StreamEvent` mapper.
-- `backend/app/core/providers/openai_codex/inputs.py` — history → `RunInput` translation.
-- `backend/app/core/providers/factory.py:30-40,206` — registration of `Host.openai_codex`.
-- `backend/app/core/providers/catalog/openai.py:79-94` — single catalog row (`openai-codex:openai/gpt-5.5`).
+- `backend/app/providers/openai_codex/__init__.py` — package surface, vendor bootstrap, re-exports.
+- `backend/app/providers/openai_codex/_vendor.py` — SDK import shim + `discover_vendored_codex_bin`.
+- `backend/app/providers/openai_codex/provider.py` — the `OpenAICodexProvider.stream(...)` body (the two bugs live here).
+- `backend/app/providers/openai_codex/auth.py` — `build_app_server_config` (currently hands back a dict that the provider reads to construct `AppServerConfig`).
+- `backend/app/providers/openai_codex/events.py` — `Notification` → `StreamEvent` mapper.
+- `backend/app/providers/openai_codex/inputs.py` — history → `RunInput` translation.
+- `backend/app/providers/factory.py:30-40,206` — registration of `Host.openai_codex`.
+- `backend/app/providers/catalog/openai.py:79-94` — single catalog row (`openai-codex:openai/gpt-5.5`).
 - `backend/app/channels/turn_runner.py:121,371,386,619-658` — codex_thread_id persistence.
 - `backend/tests/test_openai_codex_provider.py:73-80` — the file-scope `xfail` wrapper.
 - `backend/vendor/codex/sdk/python/src/openai_codex/api.py:277-401` — real `AsyncCodex` + `AsyncCodex.thread_start` signatures.
@@ -56,10 +56,10 @@ PyPI status verified 2026-05-27:
 
 | Path | Action | Responsibility |
 |---|---|---|
-| `backend/app/core/providers/openai_codex/provider.py` | Modify | Add approval handler override, lazy ReasoningSummary, drop SDK private call. |
-| `backend/app/core/providers/openai_codex/_vendor.py` | Modify | Add `shutil.which("codex")` fallback (off in production). |
-| `backend/app/core/providers/openai_codex/__init__.py` | Modify | Tolerate vendor-bootstrap failure (don't poison module graph for other providers). |
-| `backend/app/core/providers/factory.py` | Modify | Replace top-level `from .openai_codex import …` with lazy import inside `resolve_llm`. |
+| `backend/app/providers/openai_codex/provider.py` | Modify | Add approval handler override, lazy ReasoningSummary, drop SDK private call. |
+| `backend/app/providers/openai_codex/_vendor.py` | Modify | Add `shutil.which("codex")` fallback (off in production). |
+| `backend/app/providers/openai_codex/__init__.py` | Modify | Tolerate vendor-bootstrap failure (don't poison module graph for other providers). |
+| `backend/app/providers/factory.py` | Modify | Replace top-level `from .openai_codex import …` with lazy import inside `resolve_llm`. |
 | `backend/pyproject.toml` | Modify | Add `openai-codex-cli-bin>=0.134.0,<0.135` dependency. |
 | `backend/vendor/codex` (submodule) | Bump | Move HEAD to the upstream tag matching cli-bin 0.134.0. |
 | `backend/tests/test_openai_codex_provider.py` | Rewrite (significant) | Remove file-scope `xfail`, replace fake-binary tests with `AsyncCodex.thread_start` / `handle.stream` mocks. |
@@ -76,10 +76,10 @@ PyPI status verified 2026-05-27:
 **Why first:** The user reported that Codex-related errors surface when messaging *other* providers. If true, the openai_codex package's import-time side effects are poisoning the chat path for everyone. Fix before anything else, because (a) it's a worse user-visible bug than the Codex provider being broken, and (b) the lazy-import fix changes how Steps 2–6 verify themselves.
 
 **Files:**
-- Read: `backend/app/core/providers/factory.py`, `backend/app/channels/turn_runner.py`, `backend/app/plugins/openai_codex_image_gen/plugin.py`, `backend/app/core/providers/openai_codex/__init__.py`, `backend/app/core/tools/image_gen.py`.
+- Read: `backend/app/providers/factory.py`, `backend/app/channels/turn_runner.py`, `backend/app/plugins/openai_codex_image_gen/plugin.py`, `backend/app/providers/openai_codex/__init__.py`, `backend/app/tools/image_gen.py`.
 - Create (test): `backend/tests/test_openai_codex_import_isolation.py`
-- Modify: `backend/app/core/providers/factory.py:30` (lazy-load openai_codex)
-- Modify: `backend/app/core/providers/openai_codex/__init__.py` (downgrade vendor-bootstrap failure to a logged warning when no caller is asking for OpenAICodexProvider)
+- Modify: `backend/app/providers/factory.py:30` (lazy-load openai_codex)
+- Modify: `backend/app/providers/openai_codex/__init__.py` (downgrade vendor-bootstrap failure to a logged warning when no caller is asking for OpenAICodexProvider)
 
 ### Steps
 
@@ -158,13 +158,13 @@ Expected: **FAIL** because `factory.py:30` does `from .openai_codex import OpenA
 
 - [ ] **Step 0.4: Make `factory.py` import lazy for the Codex provider**
 
-Replace `backend/app/core/providers/factory.py:30`:
+Replace `backend/app/providers/factory.py:30`:
 
 ```python
 from .openai_codex import OpenAICodexProvider
 ```
 
-with a deferred resolver. Edit `backend/app/core/providers/factory.py`:
+with a deferred resolver. Edit `backend/app/providers/factory.py`:
 
 1. Delete the top-level import on line 30.
 2. Replace the `HOST_TO_PROVIDER` table entry `Host.openai_codex: OpenAICodexProvider` (line ~40) with a lazy proxy. Two options — use Option B for least disturbance:
@@ -234,7 +234,7 @@ The current `__init__.py` calls `ensure_openai_codex_available()` at module load
 
 Refactor to a lazy `__getattr__` so the only thing that always runs is the bootstrap *attempt*; symbol resolution happens on first access. This preserves the public surface while letting `factory.py` survive even if codex is unusable.
 
-Edit `backend/app/core/providers/openai_codex/__init__.py`:
+Edit `backend/app/providers/openai_codex/__init__.py`:
 
 ```python
 """Pawrrtal openai_codex provider package."""
@@ -335,8 +335,8 @@ Tests in `test_openai_codex_provider.py` are still `xfail` at file scope at this
 
 ```bash
 cd /Volumes/WorkDriveExternal/Projects/Work/comcom/.gstack/Prs/pawrrtal-ai
-git add backend/app/core/providers/factory.py \
-        backend/app/core/providers/openai_codex/__init__.py \
+git add backend/app/providers/factory.py \
+        backend/app/providers/openai_codex/__init__.py \
         backend/tests/test_openai_codex_import_isolation.py
 git commit -m "fix(openai_codex): make package import lazy so SDK failures don't poison other providers
 
@@ -362,7 +362,7 @@ Regression test in test_openai_codex_import_isolation.py."
 **Why next:** The Codex SDK's default approval handler auto-accepts arbitrary shell exec and file writes against `cwd=workspace_root` (`vendor/codex/sdk/python/src/openai_codex/client.py:597-604`). The async client (`AsyncAppServerClient.__init__` in `async_client.py:46-51`) does not forward an `approval_handler` parameter at all — only the sync client accepts it. We must reach into the sync client and replace the handler with deny-all before any turn runs. Until we do, every fix below makes the security worse.
 
 **Files:**
-- Modify: `backend/app/core/providers/openai_codex/provider.py` (in `_ensure_codex`, install a deny-all handler on `self._codex._client._sync._approval_handler` — explicit private surface poke, with a TODO bean reference).
+- Modify: `backend/app/providers/openai_codex/provider.py` (in `_ensure_codex`, install a deny-all handler on `self._codex._client._sync._approval_handler` — explicit private surface poke, with a TODO bean reference).
 - Modify: `backend/tests/test_openai_codex_provider.py` — add a unit test asserting the deny-all handler is installed before `_ensure_initialized()` is called.
 
 ### Steps
@@ -427,7 +427,7 @@ Expected: **FAIL** with `AttributeError: 'OpenAICodexProvider' object has no att
 
 - [ ] **Step 1.3: Implement the deny-all installer in `provider.py`**
 
-Edit `backend/app/core/providers/openai_codex/provider.py`. Add the helper method to the class and call it from `_ensure_codex` *immediately after* `AsyncCodex(...)` returns, *before* `_ensure_initialized()` is called.
+Edit `backend/app/providers/openai_codex/provider.py`. Add the helper method to the class and call it from `_ensure_codex` *immediately after* `AsyncCodex(...)` returns, *before* `_ensure_initialized()` is called.
 
 ```python
 # Add near the top of the file, with the other helpers:
@@ -498,7 +498,7 @@ Expected: **PASS**.
 
 ```bash
 cd /Volumes/WorkDriveExternal/Projects/Work/comcom/.gstack/Prs/pawrrtal-ai
-git add backend/app/core/providers/openai_codex/provider.py \
+git add backend/app/providers/openai_codex/provider.py \
         backend/tests/test_openai_codex_provider.py
 git commit -m "fix(openai_codex): install deny-all approval handler before first turn
 
@@ -522,7 +522,7 @@ with an agent-loop-aware handler."
 **Why this order:** Smallest, most contained bug, but it must land before the binary works so first-turn smoke succeeds. Lazy resolution (not module-scope) so an SDK version drift can't crash backend startup.
 
 **Files:**
-- Modify: `backend/app/core/providers/openai_codex/provider.py` — replace `ReasoningSummary.auto` with lazy `ReasoningSummary.model_validate("auto")`.
+- Modify: `backend/app/providers/openai_codex/provider.py` — replace `ReasoningSummary.auto` with lazy `ReasoningSummary.model_validate("auto")`.
 - Modify: `backend/tests/test_openai_codex_provider.py` — add a unit test mocking `AsyncCodex.thread_start` and asserting `summary` is a valid SDK value.
 
 ### Steps
@@ -565,7 +565,7 @@ Expected: **FAIL** with `ImportError: cannot import name '_get_default_reasoning
 
 - [ ] **Step 2.3: Implement lazy resolver in `provider.py`**
 
-Add to `backend/app/core/providers/openai_codex/provider.py`, near the top:
+Add to `backend/app/providers/openai_codex/provider.py`, near the top:
 
 ```python
 _DEFAULT_REASONING_SUMMARY: Any | None = None
@@ -626,7 +626,7 @@ Expected: **PASS**.
 
 ```bash
 cd /Volumes/WorkDriveExternal/Projects/Work/comcom/.gstack/Prs/pawrrtal-ai
-git add backend/app/core/providers/openai_codex/provider.py \
+git add backend/app/providers/openai_codex/provider.py \
         backend/tests/test_openai_codex_provider.py
 git commit -m "fix(openai_codex): resolve ReasoningSummary lazily and via model_validate
 
@@ -649,7 +649,7 @@ breaks Codex turns, not the whole backend startup graph."
 **Files:**
 - Modify: `backend/vendor/codex` (submodule, via `git -C`)
 - Modify: `.gitmodules` (verify branch/tag fields; usually no change)
-- Modify: `backend/app/core/providers/openai_codex/_vendor.py:57` — adjust vendored path if the upstream restructured `sdk/python/src`.
+- Modify: `backend/app/providers/openai_codex/_vendor.py:57` — adjust vendored path if the upstream restructured `sdk/python/src`.
 
 ### Steps
 
@@ -713,7 +713,7 @@ After Task 4 installs the wheel you can run the smoke script (Task 6) — but at
 grep -RIn "gpt-5\.5\|model.*='gpt" backend/vendor/codex/sdk/python/docs/ backend/vendor/codex/sdk/python/examples/ 2>&1 | head -10
 ```
 
-If `gpt-5` is the only OpenAI-side model id the examples use, you may need to update `backend/app/core/providers/catalog/openai.py:86` from `model="gpt-5.5"` to whatever the bumped binary actually accepts. **Do not silently change the catalog row** — surface the question and decide explicitly.
+If `gpt-5` is the only OpenAI-side model id the examples use, you may need to update `backend/app/providers/catalog/openai.py:86` from `model="gpt-5.5"` to whatever the bumped binary actually accepts. **Do not silently change the catalog row** — surface the question and decide explicitly.
 
 - [ ] **Step 3.6: Stage the submodule bump**
 
@@ -817,14 +817,14 @@ deploy."
 **Why:** If a developer has the wheel uninstalled (sync race, fresh clone) but has `codex` on PATH (Homebrew, npm `@openai/codex`, etc.), the provider should still work locally. In production we never want this fallback because version skew between PATH-installed and pinned cli-bin would silently misbehave. Guard behind explicit settings flag.
 
 **Files:**
-- Modify: `backend/app/core/providers/openai_codex/_vendor.py` — extend `discover_vendored_codex_bin` with a `shutil.which` arm, gated by `settings.openai_codex_allow_path_fallback` (new bool, default False).
-- Modify: `backend/app/core/config.py` — add the new setting.
+- Modify: `backend/app/providers/openai_codex/_vendor.py` — extend `discover_vendored_codex_bin` with a `shutil.which` arm, gated by `settings.openai_codex_allow_path_fallback` (new bool, default False).
+- Modify: `backend/app/infrastructure/config.py` — add the new setting.
 
 ### Steps
 
 - [ ] **Step 5.1: Add the settings flag**
 
-In `backend/app/core/config.py`, find the `Settings` class. Add:
+In `backend/app/infrastructure/config.py`, find the `Settings` class. Add:
 
 ```python
     openai_codex_allow_path_fallback: bool = Field(
@@ -891,7 +891,7 @@ Expected: **FAIL** (current implementation does not consult any flag and does no
 
 - [ ] **Step 5.4: Implement the fallback**
 
-Edit `backend/app/core/providers/openai_codex/_vendor.py`. Add at the top:
+Edit `backend/app/providers/openai_codex/_vendor.py`. Add at the top:
 
 ```python
 import os
@@ -971,8 +971,8 @@ Expected: **PASS**.
 
 ```bash
 cd /Volumes/WorkDriveExternal/Projects/Work/comcom/.gstack/Prs/pawrrtal-ai
-git add backend/app/core/providers/openai_codex/_vendor.py \
-        backend/app/core/config.py \
+git add backend/app/providers/openai_codex/_vendor.py \
+        backend/app/infrastructure/config.py \
         backend/tests/test_openai_codex_provider.py
 git commit -m "feat(openai_codex): opt-in PATH fallback for local codex binary discovery
 
@@ -1238,7 +1238,7 @@ replace it). Per-workspace OAuth override not yet wired (bean pawrrtal-nf6y).
 
 Add a `## Implementation Notes (2026-05-27)` section near the end pointing to:
 
-  - `backend/app/core/providers/openai_codex/` for the runtime,
+  - `backend/app/providers/openai_codex/` for the runtime,
   - `backend/scripts/smoke_codex_provider.py` for the live check,
   - `backend/tests/test_openai_codex_provider.py` for the strict suite.
 
@@ -1300,9 +1300,9 @@ Follow-up beans:
 ```bash
 beans update --json pawrrtal-t5j8 -s completed --body-append "## Summary of Changes
 
-Root cause: backend/app/core/providers/openai_codex/__init__.py was running
+Root cause: backend/app/providers/openai_codex/__init__.py was running
 ensure_openai_codex_available() at module import time, and
-backend/app/core/providers/factory.py:30 imported OpenAICodexProvider at
+backend/app/providers/factory.py:30 imported OpenAICodexProvider at
 the top level. Together these meant every chat turn (regardless of
 provider) paid the Codex SDK bootstrap cost, and any failure (missing
 codex binary, ReasoningSummary AttributeError) surfaced inside an

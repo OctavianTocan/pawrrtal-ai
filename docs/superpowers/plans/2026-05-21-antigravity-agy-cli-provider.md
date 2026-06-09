@@ -42,27 +42,27 @@ Known gaps versus normal providers:
 
 ## File Structure
 
-- Create: `backend/app/core/providers/agy_cli/__init__.py`
+- Create: `backend/app/providers/agy_cli/__init__.py`
   - Re-export provider and helper functions.
-- Create: `backend/app/core/providers/agy_cli/command.py`
+- Create: `backend/app/providers/agy_cli/command.py`
   - Build command argv, resolve binary, create log paths, hold constants.
-- Create: `backend/app/core/providers/agy_cli/output.py`
+- Create: `backend/app/providers/agy_cli/output.py`
   - Build framed prompts, extract the last final-answer marker, detect timeout/cancel stdout.
-- Create: `backend/app/core/providers/agy_cli/session.py`
+- Create: `backend/app/providers/agy_cli/session.py`
   - Parse Antigravity conversation IDs from logs.
-- Create: `backend/app/core/providers/agy_cli/logs.py`
+- Create: `backend/app/providers/agy_cli/logs.py`
   - Tail `--log-file` and translate known lines into structured logs via `log_provider_stream_event`.
-- Create: `backend/app/core/providers/agy_cli/provider.py`
+- Create: `backend/app/providers/agy_cli/provider.py`
   - Implement `AgyCliLLM` with subprocess lifecycle, continuation, error handling, and stream events.
-- Create: `backend/app/core/providers/_catalog_agy_cli.py`
+- Create: `backend/app/providers/_catalog_agy_cli.py`
   - Catalog row for the local Antigravity CLI provider.
-- Modify: `backend/app/core/providers/model_id.py`
+- Modify: `backend/app/providers/model_id.py`
   - Add `Host.agy_cli = "agy-cli"`.
-- Modify: `backend/app/core/providers/catalog.py`
+- Modify: `backend/app/providers/catalog.py`
   - Include `AGY_CLI_ENTRIES`.
-- Modify: `backend/app/core/providers/factory.py`
+- Modify: `backend/app/providers/factory.py`
   - Route `Host.agy_cli` to `AgyCliLLM`.
-- Modify: `backend/app/core/providers/__init__.py`
+- Modify: `backend/app/providers/__init__.py`
   - Export package if this file exposes provider symbols.
 - Create: `backend/tests/test_agy_cli_provider.py`
   - Unit tests for command building, output framing, timeout detection, log parsing, factory/catalog routing, and subprocess stream behavior with a fake `agy` executable.
@@ -72,9 +72,9 @@ Known gaps versus normal providers:
 ## Task 1: Add Model ID and Catalog Wiring
 
 **Files:**
-- Modify: `backend/app/core/providers/model_id.py`
-- Create: `backend/app/core/providers/_catalog_agy_cli.py`
-- Modify: `backend/app/core/providers/catalog.py`
+- Modify: `backend/app/providers/model_id.py`
+- Create: `backend/app/providers/_catalog_agy_cli.py`
+- Modify: `backend/app/providers/catalog.py`
 - Test: `backend/tests/test_agy_cli_provider.py`
 
 - [ ] **Step 1: Write failing catalog tests**
@@ -121,7 +121,7 @@ Expected: FAIL because `Host.agy_cli` and the catalog entry do not exist.
 
 - [ ] **Step 3: Add host enum**
 
-In `backend/app/core/providers/model_id.py`, add:
+In `backend/app/providers/model_id.py`, add:
 
 ```python
 class Host(StrEnum):
@@ -144,7 +144,7 @@ class Host(StrEnum):
 
 - [ ] **Step 4: Add catalog rows**
 
-Create `backend/app/core/providers/_catalog_agy_cli.py`:
+Create `backend/app/providers/_catalog_agy_cli.py`:
 
 ```python
 """Antigravity agy CLI catalogue rows (``Host.agy_cli``)."""
@@ -173,7 +173,7 @@ AGY_CLI_ENTRIES: tuple[ModelEntry, ...] = (
 )
 ```
 
-In `backend/app/core/providers/catalog.py`, import and include the new entries:
+In `backend/app/providers/catalog.py`, import and include the new entries:
 
 ```python
 from ._catalog_agy_cli import AGY_CLI_ENTRIES
@@ -204,17 +204,17 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add backend/app/core/providers/model_id.py backend/app/core/providers/_catalog_agy_cli.py backend/app/core/providers/catalog.py backend/tests/test_agy_cli_provider.py
+git add backend/app/providers/model_id.py backend/app/providers/_catalog_agy_cli.py backend/app/providers/catalog.py backend/tests/test_agy_cli_provider.py
 git commit -m "feat(providers): add Antigravity CLI catalog entry"
 ```
 
 ## Task 2: Add Command and Output Helpers
 
 **Files:**
-- Create: `backend/app/core/providers/agy_cli/__init__.py`
-- Create: `backend/app/core/providers/agy_cli/command.py`
-- Create: `backend/app/core/providers/agy_cli/output.py`
-- Create: `backend/app/core/providers/agy_cli/session.py`
+- Create: `backend/app/providers/agy_cli/__init__.py`
+- Create: `backend/app/providers/agy_cli/command.py`
+- Create: `backend/app/providers/agy_cli/output.py`
+- Create: `backend/app/providers/agy_cli/session.py`
 - Test: `backend/tests/test_agy_cli_provider.py`
 
 - [ ] **Step 1: Add failing helper tests**
@@ -308,7 +308,7 @@ Expected: FAIL because helper modules do not exist.
 
 - [ ] **Step 3: Implement command helper**
 
-Create `backend/app/core/providers/agy_cli/__init__.py`:
+Create `backend/app/providers/agy_cli/__init__.py`:
 
 ```python
 """Antigravity agy CLI provider package."""
@@ -318,7 +318,7 @@ from .provider import AgyCliLLM, is_agy_cli_available
 __all__ = ["AgyCliLLM", "is_agy_cli_available"]
 ```
 
-Create `backend/app/core/providers/agy_cli/command.py`:
+Create `backend/app/providers/agy_cli/command.py`:
 
 ```python
 """Command construction helpers for the Antigravity ``agy`` CLI."""
@@ -366,7 +366,7 @@ def build_agy_command(
 
 - [ ] **Step 4: Implement output helper**
 
-Create `backend/app/core/providers/agy_cli/output.py`:
+Create `backend/app/providers/agy_cli/output.py`:
 
 ```python
 """Prompt framing and stdout parsing for ``agy --print``."""
@@ -456,7 +456,7 @@ def _render_history_lines(history: list[dict[str, str]] | None) -> str:
 
 - [ ] **Step 5: Implement session parser**
 
-Create `backend/app/core/providers/agy_cli/session.py`:
+Create `backend/app/providers/agy_cli/session.py`:
 
 ```python
 """Conversation ID parsing for Antigravity CLI logs."""
@@ -491,15 +491,15 @@ Expected: PASS for helper tests.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add backend/app/core/providers/agy_cli backend/tests/test_agy_cli_provider.py
+git add backend/app/providers/agy_cli backend/tests/test_agy_cli_provider.py
 git commit -m "feat(providers): add agy CLI subprocess helpers"
 ```
 
 ## Task 3: Implement Provider Subprocess Flow
 
 **Files:**
-- Create: `backend/app/core/providers/agy_cli/provider.py`
-- Modify: `backend/app/core/providers/agy_cli/__init__.py`
+- Create: `backend/app/providers/agy_cli/provider.py`
+- Modify: `backend/app/providers/agy_cli/__init__.py`
 - Test: `backend/tests/test_agy_cli_provider.py`
 
 - [ ] **Step 1: Add failing stream tests with fake subprocess**
@@ -605,7 +605,7 @@ Expected: FAIL because `provider.py` is not implemented.
 
 - [ ] **Step 3: Implement provider**
 
-Create `backend/app/core/providers/agy_cli/provider.py`:
+Create `backend/app/providers/agy_cli/provider.py`:
 
 ```python
 """Antigravity ``agy`` CLI provider.
@@ -775,14 +775,14 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/app/core/providers/agy_cli/provider.py backend/app/core/providers/agy_cli/__init__.py backend/tests/test_agy_cli_provider.py
+git add backend/app/providers/agy_cli/provider.py backend/app/providers/agy_cli/__init__.py backend/tests/test_agy_cli_provider.py
 git commit -m "feat(providers): stream Antigravity CLI subprocess turns"
 ```
 
 ## Task 4: Wire Factory Routing
 
 **Files:**
-- Modify: `backend/app/core/providers/factory.py`
+- Modify: `backend/app/providers/factory.py`
 - Modify: `backend/tests/test_agy_cli_provider.py`
 - Modify: `backend/tests/test_providers_and_schemas.py`
 
@@ -814,7 +814,7 @@ Expected: FAIL because `HOST_TO_PROVIDER` lacks `Host.agy_cli`.
 
 - [ ] **Step 3: Wire factory**
 
-In `backend/app/core/providers/factory.py`, import and route:
+In `backend/app/providers/factory.py`, import and route:
 
 ```python
 from .agy_cli import AgyCliLLM
@@ -850,15 +850,15 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/app/core/providers/factory.py backend/tests/test_agy_cli_provider.py backend/tests/test_providers_and_schemas.py
+git add backend/app/providers/factory.py backend/tests/test_agy_cli_provider.py backend/tests/test_providers_and_schemas.py
 git commit -m "feat(providers): route agy CLI model IDs"
 ```
 
 ## Task 5: Add Structured Log Tailing
 
 **Files:**
-- Create: `backend/app/core/providers/agy_cli/logs.py`
-- Modify: `backend/app/core/providers/agy_cli/provider.py`
+- Create: `backend/app/providers/agy_cli/logs.py`
+- Modify: `backend/app/providers/agy_cli/provider.py`
 - Test: `backend/tests/test_agy_cli_provider.py`
 
 - [ ] **Step 1: Add failing log parser tests**
@@ -903,7 +903,7 @@ Expected: FAIL because `logs.py` does not exist.
 
 - [ ] **Step 3: Implement log classifier**
 
-Create `backend/app/core/providers/agy_cli/logs.py`:
+Create `backend/app/providers/agy_cli/logs.py`:
 
 ```python
 """Structured logging helpers for Antigravity CLI log files."""
@@ -949,7 +949,7 @@ def classify_log_line(line: str) -> AgyLogEvent | None:
 
 - [ ] **Step 4: Add provider log integration**
 
-In `backend/app/core/providers/agy_cli/provider.py`, after `stdout = await _communicate(proc)`, read log lines and emit structured logs:
+In `backend/app/providers/agy_cli/provider.py`, after `stdout = await _communicate(proc)`, read log lines and emit structured logs:
 
 ```python
 from app.core.providers._stream_logging import log_provider_stream_event
@@ -997,15 +997,15 @@ Expected: PASS.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add backend/app/core/providers/agy_cli/logs.py backend/app/core/providers/agy_cli/provider.py backend/tests/test_agy_cli_provider.py
+git add backend/app/providers/agy_cli/logs.py backend/app/providers/agy_cli/provider.py backend/tests/test_agy_cli_provider.py
 git commit -m "feat(providers): log Antigravity CLI activity"
 ```
 
 ## Task 6: Harden Cancellation, Return Codes, and Missing Markers
 
 **Files:**
-- Modify: `backend/app/core/providers/agy_cli/provider.py`
-- Modify: `backend/app/core/providers/agy_cli/output.py`
+- Modify: `backend/app/providers/agy_cli/provider.py`
+- Modify: `backend/app/providers/agy_cli/output.py`
 - Test: `backend/tests/test_agy_cli_provider.py`
 
 - [ ] **Step 1: Add tests for non-zero exit and unframed stdout**
@@ -1092,20 +1092,20 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add backend/app/core/providers/agy_cli/provider.py backend/app/core/providers/agy_cli/output.py backend/tests/test_agy_cli_provider.py
+git add backend/app/providers/agy_cli/provider.py backend/app/providers/agy_cli/output.py backend/tests/test_agy_cli_provider.py
 git commit -m "fix(providers): harden agy CLI subprocess failures"
 ```
 
 ## Task 7: Document Experimental Permission Semantics
 
 **Files:**
-- Modify: `backend/app/core/providers/agy_cli/provider.py`
+- Modify: `backend/app/providers/agy_cli/provider.py`
 - Create: `docs/superpowers/plans/2026-05-21-antigravity-agy-cli-provider.md` if not already committed
 - Optional Modify: `frontend/content/docs/handbook/decisions/2026-05-21-add-antigravity-cli-provider.md`
 
 - [ ] **Step 1: Add provider docstring warning**
 
-Update `backend/app/core/providers/agy_cli/provider.py` module docstring:
+Update `backend/app/providers/agy_cli/provider.py` module docstring:
 
 ```python
 """Antigravity ``agy`` CLI provider.
@@ -1140,7 +1140,7 @@ In `AgyCliLLM.stream`, replace `del user_id, permission_check` with:
 - [ ] **Step 3: Commit**
 
 ```bash
-git add backend/app/core/providers/agy_cli/provider.py docs/superpowers/plans/2026-05-21-antigravity-agy-cli-provider.md
+git add backend/app/providers/agy_cli/provider.py docs/superpowers/plans/2026-05-21-antigravity-agy-cli-provider.md
 git commit -m "docs(providers): document agy CLI permission limits"
 ```
 
@@ -1164,7 +1164,7 @@ Expected: PASS.
 Run:
 
 ```bash
-cd backend && uv run ruff check app/core/providers/agy_cli app/core/providers/_catalog_agy_cli.py app/core/providers/factory.py app/core/providers/model_id.py tests/test_agy_cli_provider.py
+cd backend && uv run ruff check app/providers/agy_cli app/providers/_catalog_agy_cli.py app/providers/factory.py app/providers/model_id.py tests/test_agy_cli_provider.py
 ```
 
 Expected: PASS.
@@ -1200,7 +1200,7 @@ Then run one real chat through the app UI with `agy-cli:google/gemini-3.5-flash-
 - [ ] **Step 5: Commit final fixes**
 
 ```bash
-git add backend/app/core/providers backend/tests docs/superpowers/plans/2026-05-21-antigravity-agy-cli-provider.md
+git add backend/app/providers backend/tests docs/superpowers/plans/2026-05-21-antigravity-agy-cli-provider.md
 git commit -m "feat(providers): add experimental Antigravity CLI provider"
 ```
 

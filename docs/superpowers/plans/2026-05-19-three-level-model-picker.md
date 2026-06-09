@@ -4,7 +4,7 @@
 
 **Goal:** Switch both the web chat model selector and the Telegram `/model` picker from a two-level (vendor → models) UI to a three-level (provider/host → vendor → models) UI, collapsing the vendor step automatically when a host has exactly one vendor. Also fixes the existing title-casing bug that renders "Openai", "Xai", "Zai".
 
-**Architecture:** Add one shared label module per side of the stack — `backend/app/core/providers/labels.py` and `frontend/features/chat/components/model-picker-labels.ts` — that maps `Host` and `Vendor` slugs to display strings. The picker code on each side groups the catalog by host, then by vendor within each host, and renders a one-level menu when a host has a single vendor and a two-level menu when it has multiple. The Telegram callback scheme grows one new shape (`mdl:v:<host>`) and the list shape gains a host segment (`mdl:l:<host>:<vendor>:<page>`); the model-select callback (`mdl:s:<token>:<index>`) is unchanged so in-flight keyboards keep selecting correctly.
+**Architecture:** Add one shared label module per side of the stack — `backend/app/providers/labels.py` and `frontend/features/chat/components/model-picker-labels.ts` — that maps `Host` and `Vendor` slugs to display strings. The picker code on each side groups the catalog by host, then by vendor within each host, and renders a one-level menu when a host has a single vendor and a two-level menu when it has multiple. The Telegram callback scheme grows one new shape (`mdl:v:<host>`) and the list shape gains a host segment (`mdl:l:<host>:<vendor>:<page>`); the model-select callback (`mdl:s:<token>:<index>`) is unchanged so in-flight keyboards keep selecting correctly.
 
 **Tech Stack:** Python 3, FastAPI (backend), aiogram (Telegram), TypeScript, React, Vitest (frontend tests), pytest (backend tests), `@octavian-tocan/react-dropdown` (web menu).
 
@@ -49,7 +49,7 @@ Vendor display labels:
 
 **New files:**
 
-- `backend/app/core/providers/labels.py` — `HOST_LABELS: dict[Host, str]`, `VENDOR_LABELS: dict[Vendor, str]`, plus typed accessors that raise on unknown enum values. Single source of truth on the Python side.
+- `backend/app/providers/labels.py` — `HOST_LABELS: dict[Host, str]`, `VENDOR_LABELS: dict[Vendor, str]`, plus typed accessors that raise on unknown enum values. Single source of truth on the Python side.
 - `backend/tests/test_provider_labels.py` — covers the accessor functions and asserts every `Host`/`Vendor` enum member has a label (so new enum members fail loudly).
 - `frontend/features/chat/components/model-picker-labels.ts` — mirror of the same two maps on the TS side, with typed `hostLabel(slug)` / `vendorLabel(slug)` helpers that fall back to the raw slug on unknown input (the frontend already swallows unknown vendors safely in the picker).
 - `frontend/features/chat/components/model-picker-labels.test.ts` — unit tests for the helpers.
@@ -64,8 +64,8 @@ Vendor display labels:
 
 **Not changed:**
 
-- `backend/app/core/providers/catalog.py` — already has both `host` and `vendor` on every entry.
-- `backend/app/core/providers/model_id.py` — `Host` and `Vendor` enums are reused as-is.
+- `backend/app/providers/catalog.py` — already has both `host` and `vendor` on every entry.
+- `backend/app/providers/model_id.py` — `Host` and `Vendor` enums are reused as-is.
 - `frontend/features/chat/hooks/use-chat-models.ts` — `host` and `vendor` already on `ChatModelOption`.
 - `frontend/lib/react-chat-composer/src/model-selector/*` — the submodule's data helpers are not wired into the live composer picker. Leave them alone.
 - `backend/app/api/models.py` — labels are mirrored on each side rather than wire-driven. Two maps × 6 entries do not need an API contract.
@@ -75,7 +75,7 @@ Vendor display labels:
 ## Task 1: Backend label module (TDD)
 
 **Files:**
-- Create: `backend/app/core/providers/labels.py`
+- Create: `backend/app/providers/labels.py`
 - Test: `backend/tests/test_provider_labels.py`
 
 - [ ] **Step 1: Write the failing tests**
@@ -153,7 +153,7 @@ Expected: ImportError or ModuleNotFoundError on `app.core.providers.labels`.
 
 - [ ] **Step 3: Write the module**
 
-Create `backend/app/core/providers/labels.py`:
+Create `backend/app/providers/labels.py`:
 
 ```python
 """Display labels for ``Host`` and ``Vendor`` enum members.
@@ -263,7 +263,7 @@ Expected: no errors.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add backend/app/core/providers/labels.py backend/tests/test_provider_labels.py
+git add backend/app/providers/labels.py backend/tests/test_provider_labels.py
 git commit -m "feat(providers): add Host and Vendor display-label module"
 ```
 

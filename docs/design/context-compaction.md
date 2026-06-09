@@ -6,7 +6,7 @@
 
 ## What the agent currently sees every turn
 
-In `backend/app/api/chat.py`:
+In `backend/app/chat/router.py`:
 
 1. **System prompt** — full content of `SOUL.md`, `AGENTS.md`,
    `USER.md`, and `PREFERENCES.md` from the user's workspace root
@@ -111,7 +111,7 @@ on top of either.
 1. New column: `Conversation.summary: Text | null`,
    `Conversation.summary_updated_through_ordinal: int | null`
    (so we know how much history is already covered).
-2. New module: `backend/app/core/conversation_summary.py` —
+2. New module: `backend/app/lcm/summarization.py` —
    `maybe_update_summary(session, conversation_id) -> None` that
    decides whether to run, builds the prompt, calls the model,
    writes back.

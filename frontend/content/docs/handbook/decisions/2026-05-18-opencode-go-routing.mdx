@@ -51,7 +51,7 @@ introduce a parallel routing concept.
 
 ### 1. New host: `opencode-go`
 
-```python title="backend/app/core/providers/model_id.py"
+```python title="backend/app/providers/model_id.py"
 class Vendor(StrEnum):
     anthropic = "anthropic"
     google    = "google"
@@ -82,7 +82,7 @@ triple.
 
 ### 2. Provider: `OpencodeGoLLM`
 
-A new `backend/app/core/providers/opencode_go_provider.py` mirrors
+A new `backend/app/providers/opencode_go_provider.py` mirrors
 the `GeminiLLM` shape:
 
 - `make_opencode_go_stream_fn(...)` closes over the system prompt
@@ -106,7 +106,7 @@ cost_per_mtok_out_usd, base_url)` from the catalogue entry, so
 adding a third OpenCode-Go-served model is a one-row catalogue
 edit — no provider change.
 
-```python title="backend/app/core/providers/factory.py"
+```python title="backend/app/providers/factory.py"
 HOST_TO_PROVIDER: dict[Host, type[AILLM]] = {
     Host.agent_sdk:   ClaudeLLM,
     Host.google_ai:   GeminiLLM,
@@ -137,7 +137,7 @@ the May 14 ADR is preserved.
   `https://opencode.ai/zen/go/v1`; override only for a self-hosted
   proxy.
 - `OPENCODE_API_KEY` is added to
-  `backend/app/core/keys.py:OVERRIDABLE_KEYS` and the
+  `backend/app/infrastructure/keys.py:OVERRIDABLE_KEYS` and the
   `_SETTINGS_ATTR_MAP` so per-workspace overrides resolve through
   the same encrypted-env path as `EXA_API_KEY`, `XAI_API_KEY`,
   `OPENAI_API_KEY`. The Settings UI surfaces the new row via the

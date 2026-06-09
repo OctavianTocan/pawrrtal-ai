@@ -30,7 +30,7 @@ same concept**:
 | Telegram default + `/model` | vendor-prefixed `google/gemini-3-flash-preview` | vendor-prefixed | `backend/app/integrations/telegram/handlers.py:55,61` |
 | Backend SDK calls | bare (required) | n/a | google-genai / claude-agent-sdk |
 
-`backend/app/core/providers/factory.py:resolve_llm()` papered over the
+`backend/app/providers/factory.py:resolve_llm()` papered over the
 mismatch by best-effort prefix-routing on `claude-*` / `gemini-*`.
 This morning's fix added `_strip_provider_segment()` to drop the
 `google/` or `anthropic/` prefix at the provider boundary so the SDK
@@ -83,7 +83,7 @@ naming intentionally does *not* change:
 - **Host** — where the model runs (`agent-sdk`, `google-ai`,
   `bedrock`, `vertex`, `copilot`, `openrouter`, `azure`). One vendor's
   model can be served by many hosts.
-- **Provider** — the Python class in `backend/app/core/providers/`
+- **Provider** — the Python class in `backend/app/providers/`
   that talks to one SDK (`ClaudeLLM`, `GeminiLLM`). One host maps to
   one provider class. The directory keeps the `providers/` name; the
   existing `.claude/rules/architecture/no-tools-in-providers.md` is
@@ -97,11 +97,11 @@ shape immediately; the visual weight of `host:` correctly signals
 "routing decision," and `vendor/model` is a stable model identity
 independent of where it runs.
 
-### 2. Backend module: `backend/app/core/providers/model_id.py`
+### 2. Backend module: `backend/app/providers/model_id.py`
 
 Single source of truth for parsing, validation, host resolution.
 
-```python title="backend/app/core/providers/model_id.py"
+```python title="backend/app/providers/model_id.py"
 from enum import StrEnum
 from dataclasses import dataclass
 import re
@@ -175,9 +175,9 @@ the validator is the standing guarantee that a non-canonical value
 in storage either gets rewritten on the next API response or surfaces
 as 500 (preferable to silently shipping garbage to the frontend).
 
-### 3. Backend module: `backend/app/core/providers/catalog.py`
+### 3. Backend module: `backend/app/providers/catalog.py`
 
-```python title="backend/app/core/providers/catalog.py"
+```python title="backend/app/providers/catalog.py"
 from dataclasses import dataclass
 
 @dataclass(frozen=True, slots=True)
@@ -277,7 +277,7 @@ constant.
   `ConversationRead.model_id` use the `CanonicalModelId` annotated
   type from §2a. Inputs are canonicalised on the way in; outputs are
   validated on the way out.
-- `backend/app/core/providers/factory.py` — `resolve_llm` accepts a
+- `backend/app/providers/factory.py` — `resolve_llm` accepts a
   `str | ParsedModelId | None`. If passed a string, calls
   `parse_model_id` internally (so callers in non-FastAPI code paths
   — Telegram, utility scripts — don't have to). Dispatches on
@@ -285,7 +285,7 @@ constant.
   Providers receive the bare `parsed.model` slug. The
   `_strip_provider_segment`, `_GEMINI_PREFIXES`, and
   `_CLAUDE_PREFIXES` symbols are deleted.
-- `backend/app/api/chat.py` — `_DEFAULT_MODEL` constant is removed;
+- `backend/app/chat/router.py` — `_DEFAULT_MODEL` constant is removed;
   the handler uses `catalog.default_model().id` when neither the
   request nor the conversation supplies a model.
 
@@ -296,13 +296,13 @@ also touch model IDs. Each must be considered:
 
 | File | Today | After this ADR |
 |---|---|---|
-| `backend/app/api/chat.py:50,213` | `_DEFAULT_MODEL = "gemini-3-flash-preview"`; `resolve_llm(model_id, user_id)` | Use `catalog.default_model().id`; pass either the canonicalised string or the parsed form. |
+| `backend/app/chat/router.py:50,213` | `_DEFAULT_MODEL = "gemini-3-flash-preview"`; `resolve_llm(model_id, user_id)` | Use `catalog.default_model().id`; pass either the canonicalised string or the parsed form. |
 | `backend/app/integrations/telegram/bot.py:199` | `resolve_llm(context.model_id)` | Same; the canonicalised string flows through from `ConversationRead`. See §7 for `InvalidModelId` handling at the channel boundary. |
-| `backend/app/core/providers/factory.py:18` | `_DEFAULT_MODEL` constant | Deleted; sole owner is `catalog.default_model()`. |
-| `backend/app/core/providers/claude_provider.py:87,422-428` | `_MODEL_MAP: dict[str, str]` keyed on bare slugs (`claude-opus-4-7` → SDK-specific name); `_resolve_sdk_model(self._model_id)` | `self._model_id` stays as a bare slug (provider receives `parsed.model`, not the canonical form). `_MODEL_MAP` keys are unchanged. The factory passes `parsed.model` to the constructor. |
-| `backend/app/core/providers/agno_provider.py:18-32` | `AgnoLLM.__init__(model_id: str)` → `create_agent(..., self._model_id)` | Same shape: receives bare `parsed.model`. The Agno path is itself a candidate for retirement (see §11), but inside this ADR's scope it just receives the unwrapped slug. |
-| `backend/app/core/agents.py:28,58` | `create_agent(..., model_id: str = "gemini-3.1-flash-lite-preview", ...)`; `Gemini(id=model_id, ...)` | Function parameter accepts the bare slug; caller is responsible for passing `parsed.model`. The hardcoded default is deleted; callers must supply a model. |
-| `backend/app/core/gemini_utils.py:10,22-30` | `_DEFAULT_MODEL = "gemini-2.0-flash"`; `generate_text_once(prompt, model_id=_DEFAULT_MODEL)` | Default sourced from the catalog (`catalog.default_model().model` for the bare slug). Title generation and other utility calls share the catalog default. |
+| `backend/app/providers/factory.py:18` | `_DEFAULT_MODEL` constant | Deleted; sole owner is `catalog.default_model()`. |
+| `backend/app/providers/claude_provider.py:87,422-428` | `_MODEL_MAP: dict[str, str]` keyed on bare slugs (`claude-opus-4-7` → SDK-specific name); `_resolve_sdk_model(self._model_id)` | `self._model_id` stays as a bare slug (provider receives `parsed.model`, not the canonical form). `_MODEL_MAP` keys are unchanged. The factory passes `parsed.model` to the constructor. |
+| `backend/app/providers/agno_provider.py:18-32` | `AgnoLLM.__init__(model_id: str)` → `create_agent(..., self._model_id)` | Same shape: receives bare `parsed.model`. The Agno path is itself a candidate for retirement (see §11), but inside this ADR's scope it just receives the unwrapped slug. |
+| `backend/app/agents/:28,58` | `create_agent(..., model_id: str = "gemini-3.1-flash-lite-preview", ...)`; `Gemini(id=model_id, ...)` | Function parameter accepts the bare slug; caller is responsible for passing `parsed.model`. The hardcoded default is deleted; callers must supply a model. |
+| `backend/app/conversations/title.py:10,22-30` | `_DEFAULT_MODEL = "gemini-2.0-flash"`; `generate_text_once(prompt, model_id=_DEFAULT_MODEL)` | Default sourced from the catalog (`catalog.default_model().model` for the bare slug). Title generation and other utility calls share the catalog default. |
 
 **Invariant after this change:** every place a model ID is held in a
 backend variable, it is either (a) the canonical wire string
@@ -523,9 +523,9 @@ expressed are:
 1. `MODEL_CATALOG` entry with `is_default=True` (the data).
 2. `catalog.default_model()` (the function that returns it).
 
-Removed: `backend/app/api/chat.py:_DEFAULT_MODEL`,
+Removed: `backend/app/chat/router.py:_DEFAULT_MODEL`,
 `backend/app/integrations/telegram/handlers.py:_DEFAULT_MODEL`,
-`backend/app/core/providers/factory.py:_DEFAULT_MODEL`,
+`backend/app/providers/factory.py:_DEFAULT_MODEL`,
 `frontend/features/chat/constants.ts:DEFAULT_CHAT_MODEL_ID`.
 
 ## Consequences

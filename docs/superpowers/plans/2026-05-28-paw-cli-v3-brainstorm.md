@@ -77,7 +77,7 @@ where 80% of the safety win lives without paying the ceremony cost.
 **Do consider it for one or two surgical surfaces** where the railway
 pattern shines:
 
-1. **Provider abstraction layer** (`backend/app/core/providers/`).
+1. **Provider abstraction layer** (`backend/app/providers/`).
    Each provider's `stream()` could return `FutureResult[Stream,
    ProviderError]` so the chat router orchestrates failover, retry,
    and fallback declaratively. This is the textbook fit.
@@ -269,7 +269,7 @@ the verify scenarios use a different path than the production code.
 ### Providers shipped
 
 ```
-backend/app/core/providers/
+backend/app/providers/
   agy_cli         (Agentic CLI provider)
   catalog         (catalog metadata, not a runtime provider)
   claude          (Anthropic)

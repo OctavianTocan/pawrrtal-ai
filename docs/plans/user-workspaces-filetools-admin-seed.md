@@ -12,7 +12,7 @@ The Pawrrtal backend currently creates Agno agents with only an MCP tool (docs s
 
 ## Step 1: Add settings to `config.py`
 
-**File**: `backend/app/core/config.py`
+**File**: `backend/app/infrastructure/config.py`
 
 Add to `Settings`:
 ```python
@@ -25,7 +25,7 @@ admin_password: str = "admin1234"
 
 ## Step 2: Create workspace helper
 
-**New file**: `backend/app/core/workspace.py`
+**New file**: `backend/app/workspace/filesystem.py`
 
 ```python
 from pathlib import Path
@@ -42,7 +42,7 @@ def get_user_workspace(user_id: UUID) -> Path:
 
 ## Step 3: Wire FileTools into agent
 
-**File**: `backend/app/core/agents.py`
+**File**: `backend/app/agents/`
 
 - Import `FileTools` from `agno.tools.file`
 - Import `get_user_workspace`
@@ -62,7 +62,7 @@ Also add agent instructions mentioning the workspace so the LLM knows it can use
 
 ## Step 4: Admin seed function
 
-**New file**: `backend/app/core/admin_seed.py`
+**New file**: `backend/app/cli/admin_seed.py`
 
 - **Skip entirely in production** — check `settings.is_production` and return early with a log message
 - Use `async_session_maker` from `app.db` to open a session (no request context at startup)
@@ -160,10 +160,10 @@ ADMIN_PASSWORD=admin1234
 
 ## Critical Files
 
-- `backend/app/core/config.py` — add 3 settings
-- `backend/app/core/agents.py` — add FileTools
-- `backend/app/core/workspace.py` — new, workspace path helper
-- `backend/app/core/admin_seed.py` — new, startup admin seeder
+- `backend/app/infrastructure/config.py` — add 3 settings
+- `backend/app/agents/` — add FileTools
+- `backend/app/workspace/filesystem.py` — new, workspace path helper
+- `backend/app/cli/admin_seed.py` — new, startup admin seeder
 - `backend/main.py` — 2-line lifespan change
 - `backend/app/db.py` — reference for `async_session_maker`, `User`
 - `backend/app/users.py` — reference for `UserManager` pattern

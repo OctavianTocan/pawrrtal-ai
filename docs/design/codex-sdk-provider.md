@@ -13,7 +13,7 @@
 ## Context & Why This Work
 
 Pawrrtal already has partial Codex integration:
-- Image generation (`backend/app/core/tools/image_gen.py`) uses Codex OAuth tokens (from `OPENAI_CODEX_OAUTH_TOKEN` or `~/.codex/auth.json` written by the official `@openai/codex` CLI / OpenClaw). It calls the private `https://chatgpt.com/backend-api/codex/responses` endpoint.
+- Image generation (`backend/app/tools/image_gen.py`) uses Codex OAuth tokens (from `OPENAI_CODEX_OAUTH_TOKEN` or `~/.codex/auth.json` written by the official `@openai/codex` CLI / OpenClaw). It calls the private `https://chatgpt.com/backend-api/codex/responses` endpoint.
 - A detailed design doc (`docs/design/codex-oauth-text-provider.md`) exists for extending that same Responses API path to text models.
 
 The official **Codex Python SDK** (`openai_codex` package) is a fundamentally different and superior surface:
@@ -61,7 +61,7 @@ This rule applies to code, tests, and documentation updates.
 
 Create a dedicated first-class provider package at:
 
-`backend/app/core/providers/openai_codex/`
+`backend/app/providers/openai_codex/`
 
 (following the multi-file package pattern established by `agy_cli/` and `gemini_cli/`).
 
@@ -89,10 +89,10 @@ The image generation plugin is an explicit additional deliverable: it must use t
 All changes must be produced under the commented discipline described above.
 
 **New files (fully commented after writing the intended code):**
-- `backend/app/core/providers/openai_codex/__init__.py`
-- `backend/app/core/providers/openai_codex/provider.py`
-- `backend/app/core/providers/openai_codex/auth.py`
-- `backend/app/core/providers/openai_codex/events.py`
+- `backend/app/providers/openai_codex/__init__.py`
+- `backend/app/providers/openai_codex/provider.py`
+- `backend/app/providers/openai_codex/auth.py`
+- `backend/app/providers/openai_codex/events.py`
 - `backend/app/plugins/openai_codex_image_gen/__init__.py`
 - `backend/app/plugins/openai_codex_image_gen/plugin.py`
 - `backend/app/plugins/openai_codex_image_gen/codex_image_agent.py`
@@ -100,9 +100,9 @@ All changes must be produced under the commented discipline described above.
 - Supporting docs (`docs/codex-sdk-provider.md`, package README, etc.)
 
 **Updates via commented blocks only (original code left untouched):**
-- `backend/app/core/providers/model_id.py` (new `Host.openai_codex`)
-- `backend/app/core/providers/factory.py` (imports, `HOST_TO_PROVIDER`, auth keys, `host_authenticated`)
-- `backend/app/core/providers/catalog/openai.py` (example entries for Codex SDK models)
+- `backend/app/providers/model_id.py` (new `Host.openai_codex`)
+- `backend/app/providers/factory.py` (imports, `HOST_TO_PROVIDER`, auth keys, `host_authenticated`)
+- `backend/app/providers/catalog/openai.py` (example entries for Codex SDK models)
 - `docs/design/codex-oauth-text-provider.md` (SDK vs. Responses comparison + status note)
 - Root `README.md` and developer setup docs (as needed)
 

@@ -19,8 +19,8 @@ This ADR is superseded by [Plugin System V2](./2026-06-06-plugin-system-v2). The
 
 Three drivers point at the same gap:
 
-1. The agent's tool surface (`backend/app/core/agent_tools.py:42`) is one hardcoded function that knows about every tool. Adding a Notion integration today means editing it, editing `OVERRIDABLE_KEYS`, editing the Settings frontend mirror, and editing the chat router. Four touchpoints for one capability.
-2. Workspaces (`backend/app/models.py:269` — `Workspace`) are per-user-many, but workspace `.env` overrides (`backend/app/core/keys.py`) are keyed by `user_id`. A user with two workspaces shares one set of API keys across both, which contradicts the "workspace as isolated agent home" model.
+1. The agent's tool surface (`backend/app/agents/tool_surface.py:42`) is one hardcoded function that knows about every tool. Adding a Notion integration today means editing it, editing `OVERRIDABLE_KEYS`, editing the Settings frontend mirror, and editing the chat router. Four touchpoints for one capability.
+2. Workspaces (`backend/app/models.py:269` — `Workspace`) are per-user-many, but workspace `.env` overrides (`backend/app/infrastructure/keys.py`) are keyed by `user_id`. A user with two workspaces shares one set of API keys across both, which contradicts the "workspace as isolated agent home" model.
 3. We want Notion next. openclaw-notion already proves the shape (18 focused tools, per-agent token routing, SQLite audit log, file-based auth). We want that shape, not its Node runtime — and not its assumption that Notion calls go through `@notionhq/client` (which we'd have to maintain).
 
 The job is therefore: pick the smallest formalization of "plugin" that fits the existing architecture, fix the workspace-keying mismatch on the way through, and ship Notion as proof.
@@ -32,7 +32,7 @@ The job is therefore: pick the smallest formalization of "plugin" that fits the 
 A "plugin" is a Python package under `backend/app/integrations/<plugin_id>/` exporting one `Plugin` object:
 
 ```python
-# backend/app/core/plugins/types.py
+# backend/app/plugins/types.py
 @dataclass(frozen=True)
 class Plugin:
     id: str                                      # "notion"
@@ -52,7 +52,7 @@ class ToolContext:
     send_fn: SendFn | None
 ```
 
-Discovery is `import` — `backend/app/integrations/__init__.py` imports each integration package, and each package appends to a module-level registry in `backend/app/core/plugins/registry.py`. No dynamic loading, no manifest JSON, no hot reload. Same trust model as the current `build_agent_tools`: plugins are first-party Python code.
+Discovery is `import` — `backend/app/integrations/__init__.py` imports each integration package, and each package appends to a module-level registry in `backend/app/plugins/registry.py`. No dynamic loading, no manifest JSON, no hot reload. Same trust model as the current `build_agent_tools`: plugins are first-party Python code.
 
 `build_agent_tools` is left intact for the existing tools (workspace files, Exa, image-gen, artifact, send_message) — they stay hardcoded where they are today. A single new block at the end iterates the plugin registry and appends plugin-contributed tools:
 
@@ -75,7 +75,7 @@ This is deliberate. The plugin registry is **additive** — for capabilities lik
 
 ### 2. Workspace-keyed `.env` migration
 
-`workspace.path` is already the workspace directory (`backend/app/core/workspace.py`). The encrypted env file moves from `{workspace_base_dir}/{user_id}/.env` to `{workspace.path}/.env` — sitting next to `AGENTS.md`, `memory/`, `skills/`.
+`workspace.path` is already the workspace directory (`backend/app/workspace/filesystem.py`). The encrypted env file moves from `{workspace_base_dir}/{user_id}/.env` to `{workspace.path}/.env` — sitting next to `AGENTS.md`, `memory/`, `skills/`.
 
 API surface changes:
 
@@ -147,7 +147,7 @@ Audit log: new `notion_operation_logs` SQLAlchemy table mirroring openclaw-notio
 
 ### 4. Settings UI
 
-`NOTION_API_KEY` is added to `OVERRIDABLE_KEYS` in `backend/app/core/keys.py` and mirrored in `frontend/features/settings/workspace-env/use-workspace-env.ts`. Reuses the existing workspace-env settings form — one labeled row, link to `https://www.notion.so/profile/integrations` for the user to mint the token.
+`NOTION_API_KEY` is added to `OVERRIDABLE_KEYS` in `backend/app/infrastructure/keys.py` and mirrored in `frontend/features/settings/workspace-env/use-workspace-env.ts`. Reuses the existing workspace-env settings form — one labeled row, link to `https://www.notion.so/profile/integrations` for the user to mint the token.
 
 Once the plugin system lands, future plugins extend both lists automatically through `plugin.env_keys`. This is a v1.1 follow-up; for now the Notion key is added explicitly alongside the existing keys.
 

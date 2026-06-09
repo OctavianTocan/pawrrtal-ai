@@ -106,7 +106,7 @@ schema). That lets:
 
 ## Why piggyback on LCM background
 
-`backend/app/core/lcm/background.py` already runs a per-turn
+`backend/app/lcm/background.py` already runs a per-turn
 condense pass with per-conversation concurrency locks. Adding
 "dreaming" as a second job kind on the same scheduler:
 
@@ -177,6 +177,6 @@ proof-of-concept; the full set lands the feature.
 - Issue [#341](https://github.com/OctavianTocan/Pawrrtal-AI/issues/341)
 - Issue [#340](https://github.com/OctavianTocan/Pawrrtal-AI/issues/340)
   (memory write path — dependency)
-- `backend/app/core/lcm/background.py` — the scheduler this rides on
+- `backend/app/lcm/background.py` — the scheduler this rides on
 - OpenClaw's `dreaming.py` and Agentic Stack's `reflect.py` — prior
   art that informed the prompt + output shape

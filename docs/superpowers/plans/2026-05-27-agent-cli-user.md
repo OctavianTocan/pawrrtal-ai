@@ -24,7 +24,7 @@ These three were contradicted by the actual repo. Fix before any code lands.
 
 Smaller corrections rolled into the design below:
 - **Cookie persistence** via `httpx.Cookies` instance serialized to disk, never raw `Set-Cookie` regex parsing (RFC 1123 dates contain commas — `Expires=Wed, 27-May-2026 ...` — and `.split(",")[0]` corrupts them).
-- **SSE events from the chat router** include `type: "message"` (`backend/app/api/chat.py:309`) on top of provider-emitted `delta` / `thinking` / `tool_use` / `tool_result` / `error` / `usage` / `done` / `[DONE]`. Enumerate all of them.
+- **SSE events from the chat router** include `type: "message"` (`backend/app/chat/router.py:309`) on top of provider-emitted `delta` / `thinking` / `tool_use` / `tool_result` / `error` / `usage` / `done` / `[DONE]`. Enumerate all of them.
 - **Auth flow:** `POST /auth/dev-login` may 503/404 in some configs (`backend/app/api/auth.py:28-38`); document and fall back to `POST /auth/jwt/login` (form-encoded). FastAPI-Users uses cookie auth — `cookie_transport` at `backend/app/users.py:65-71` confirms `session_token` HttpOnly cookie.
 - **respx-mocked tests are tautological for the verification claim.** `paw verify codex` must have a **live-backend integration test** (gated on `PAW_E2E=1`) — that's where the "drives the real surface" claim is actually proven. The respx tests cover CLI mechanics only.
 
@@ -138,7 +138,7 @@ justfile                                       # MODIFY: add paw recipe
 ## Pre-flight reading (must read before each task)
 
 - `backend/app/schemas.py:287-340` — `ChatRequest`, `ConversationRead`, `ChatMessageRead` exact field shapes (especially the required `conversation_id`).
-- `backend/app/api/chat.py:165-330` — chat router, including the `type: "message"` synthesis at `:309`.
+- `backend/app/chat/router.py:165-330` — chat router, including the `type: "message"` synthesis at `:309`.
 - `backend/app/api/conversations.py:82-254` — full CRUD; note `POST /{id}` for create (`:242-254`) and the response field-list at `:113-126`/`:191-204`.
 - `backend/app/api/models.py:90-140` — envelope shape `{"models": [...], "etag": "..."}`.
 - `backend/app/api/auth.py:13-60` + `backend/main.py:184-200` + `backend/app/users.py:60-85` — auth flow + cookie config.
@@ -888,7 +888,7 @@ def _parse_frame(frame: bytes) -> dict | None:
   - Event split across two chunks.
   - The `[DONE]` sentinel.
   - Malformed JSON → None (no crash).
-  - All recognized `type:` values from `backend/app/api/chat.py` show up correctly when constructed.
+  - All recognized `type:` values from `backend/app/chat/router.py` show up correctly when constructed.
 
 - [ ] **3.3 Commit:**
 ```
@@ -911,7 +911,7 @@ The headline subcommand. **Mirrors the frontend's UUID-first flow.**
 
 - [ ] **4.2 Implement.** All variants take `--json`, `--plain` (for `ls`), `-v`.
 
-- [ ] **4.3 Confirm the `type: "message"` semantics.** In `backend/app/api/chat.py:309`, find the line emitting `{"type": "message", ...}`. Document: does it duplicate the assistant text, or add new text not in `delta`s? Adjust `final_text` accumulation accordingly. Surface this finding in a comment in `chat.py`-handling code in the CLI.
+- [ ] **4.3 Confirm the `type: "message"` semantics.** In `backend/app/chat/router.py:309`, find the line emitting `{"type": "message", ...}`. Document: does it duplicate the assistant text, or add new text not in `delta`s? Adjust `final_text` accumulation accordingly. Surface this finding in a comment in `chat.py`-handling code in the CLI.
 
 - [ ] **4.4 Tests with respx + a recorded SSE fixture.** Record one real Codex response once (using `paw record` from Task 6) into `backend/tests/paw/recordings/codex_hello.jsonl`. Replay it in respx by setting up a stream of bytes.
 
@@ -1028,7 +1028,7 @@ The respx-mocked tests prove only CLI mechanics. The verification claim needs a 
 
 - [ ] **9.3 `tests/e2e_paw/test_chat_roundtrip_live.py`** — same shape but uses LiteLLM or a deterministic fake provider (gated separately).
 
-- [ ] **9.4 GitHub Action** — new workflow `pawrr-verify.yml` that runs the e2e_paw suite on PRs that touch `backend/app/cli/paw/`, `backend/app/core/providers/`, or `backend/app/api/`. Codex credentials are pulled from a CI secret if available; otherwise the codex scenario skips and the chat-roundtrip + model-switch suites carry the weight.
+- [ ] **9.4 GitHub Action** — new workflow `pawrr-verify.yml` that runs the e2e_paw suite on PRs that touch `backend/app/cli/paw/`, `backend/app/providers/`, or `backend/app/api/`. Codex credentials are pulled from a CI secret if available; otherwise the codex scenario skips and the chat-roundtrip + model-switch suites carry the weight.
 
 - [ ] **9.5 Commit:**
 ```

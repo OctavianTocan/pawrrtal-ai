@@ -510,7 +510,7 @@ Each commit MUST keep CI green. Ordered to minimize intermediate broken state.
 ## Acceptance criteria
 
 - `backend/main.py` ≤ 15 lines.
-- No file in `backend/app/core/` (directory removed).
+- No file remains in the old backend core directory.
 - No file in `backend/app/integrations/` other than `mcp_servers/`.
 - No `from returns` import anywhere in `backend/`.
 - `app/exceptions.py` exists and defines `PawrrtalError → {DomainError, InfrastructureError}`.

@@ -957,9 +957,9 @@ cd backend && rg -l 'from app\.users import' | \
 ### Task 4.3: Move middleware modules
 
 **Files:**
-- `backend/app/core/middleware.py` → `backend/app/infrastructure/middleware/backend_api_key.py`
-- `backend/app/core/rate_limit.py` → `backend/app/infrastructure/middleware/rate_limit.py`
-- `backend/app/core/request_logging.py` → `backend/app/infrastructure/middleware/logging.py`
+- `backend/app/infrastructure/middleware/backend_api_key.py` → `backend/app/infrastructure/middleware/backend_api_key.py`
+- `backend/app/infrastructure/middleware/rate_limit.py` → `backend/app/infrastructure/middleware/rate_limit.py`
+- `backend/app/infrastructure/middleware/logging.py` → `backend/app/infrastructure/middleware/logging.py`
 
 For each, `git mv` + sed-based import repoint. Same pattern as 4.1/4.2.
 
@@ -1209,7 +1209,7 @@ This is the largest mechanical phase. Map per the spec §1 tree.
 mkdir -p backend/app/chat backend/app/chat/completions backend/app/chat/catalog
 
 # Primary
-git mv backend/app/api/chat.py                 backend/app/chat/router.py
+git mv backend/app/[old-api]/chat.py              backend/app/chat/router.py
 # Helper modules (underscore dropped — directory carries the namespace)
 git mv backend/app/api/_chat_cost_budget.py    backend/app/chat/cost_budget.py
 git mv backend/app/api/_chat_permissions.py    backend/app/chat/permissions.py
@@ -1367,12 +1367,12 @@ gh pr checks --watch
 
 ## Phase 10 — `core/*` → top-level domains and infrastructure
 
-The big purge. After this phase, `backend/app/core/` no longer exists.
+The big purge. After this phase, `backend/app/[old-core]/` no longer exists.
 
 ### Task 10.1: Move `core/providers/` → `app/providers/`
 
 ```bash
-git mv backend/app/core/providers backend/app/providers
+git mv backend/app/[old-core]/providers backend/app/providers
 cd backend && rg -l 'from app\.core\.providers' | \
   xargs sed -i '' 's|from app\.core\.providers|from app.providers|g'
 ```
@@ -1380,7 +1380,7 @@ cd backend && rg -l 'from app\.core\.providers' | \
 ### Task 10.2: Move `core/tools/` → `app/tools/`
 
 ```bash
-git mv backend/app/core/tools backend/app/tools
+git mv backend/app/[old-core]/tools backend/app/tools
 cd backend && rg -l 'from app\.core\.tools' | \
   xargs sed -i '' 's|from app\.core\.tools|from app.tools|g'
 ```
@@ -1390,8 +1390,8 @@ cd backend && rg -l 'from app\.core\.tools' | \
 The `core/agent_loop/` content (loop.py, hooks.py, safety.py, types.py, tools.py) lands at the `agents/` package root.
 
 ```bash
-mv backend/app/core/agent_loop/*.py backend/app/agents/
-git rm -r backend/app/core/agent_loop/
+mv backend/app/[old-core]/agent_loop/*.py backend/app/agents/
+git rm -r backend/app/[old-core]/agent_loop/
 git add backend/app/agents/
 cd backend && rg -l 'from app\.core\.agent_loop' | \
   xargs sed -i '' 's|from app\.core\.agent_loop|from app.agents|g'
@@ -1400,7 +1400,7 @@ cd backend && rg -l 'from app\.core\.agent_loop' | \
 ### Task 10.4: Move `core/lcm/` → `app/lcm/`
 
 ```bash
-git mv backend/app/core/lcm backend/app/lcm
+git mv backend/app/[old-core]/lcm backend/app/lcm
 cd backend && rg -l 'from app\.core\.lcm' | xargs sed -i '' 's|from app\.core\.lcm|from app.lcm|g'
 ```
 
@@ -1410,8 +1410,8 @@ cd backend && rg -l 'from app\.core\.lcm' | xargs sed -i '' 's|from app\.core\.l
 
 ```bash
 mkdir -p backend/app/governance/policy
-mv backend/app/core/governance/*.py backend/app/governance/policy/
-git rm -r backend/app/core/governance/
+mv backend/app/[old-core]/governance/*.py backend/app/governance/policy/
+git rm -r backend/app/[old-core]/governance/
 cd backend && rg -l 'from app\.core\.governance' | \
   xargs sed -i '' 's|from app\.core\.governance|from app.governance.policy|g'
 ```
@@ -1419,7 +1419,7 @@ cd backend && rg -l 'from app\.core\.governance' | \
 ### Task 10.6: Move `core/event_bus/` → `infrastructure/event_bus/`
 
 ```bash
-git mv backend/app/core/event_bus backend/app/infrastructure/event_bus_pkg
+git mv backend/app/[old-core]/event_bus backend/app/infrastructure/event_bus_pkg
 # Then merge with existing empty infrastructure/event_bus/:
 mv backend/app/infrastructure/event_bus_pkg/* backend/app/infrastructure/event_bus/
 rm -rf backend/app/infrastructure/event_bus_pkg
@@ -1430,8 +1430,8 @@ cd backend && rg -l 'from app\.core\.event_bus' | \
 ### Task 10.7: Move `core/observability/` → `infrastructure/observability/`
 
 ```bash
-mv backend/app/core/observability/*.py backend/app/infrastructure/observability/
-git rm -r backend/app/core/observability/
+mv backend/app/[old-core]/observability/*.py backend/app/infrastructure/observability/
+git rm -r backend/app/[old-core]/observability/
 cd backend && rg -l 'from app\.core\.observability' | \
   xargs sed -i '' 's|from app\.core\.observability|from app.infrastructure.observability|g'
 ```
@@ -1439,9 +1439,9 @@ cd backend && rg -l 'from app\.core\.observability' | \
 ### Task 10.8: Move `core/scheduler/` → `app/agents/scheduling/scheduler.py`
 
 ```bash
-git mv backend/app/core/scheduler/scheduler.py backend/app/agents/scheduling/scheduler.py
+git mv backend/app/[old-core]/scheduler/scheduler.py backend/app/agents/scheduling/scheduler.py
 # (and any sibling files into agents/scheduling/)
-git rm -r backend/app/core/scheduler/
+git rm -r backend/app/[old-core]/scheduler/
 cd backend && rg -l 'from app\.core\.scheduler' | \
   xargs sed -i '' 's|from app\.core\.scheduler|from app.agents.scheduling.scheduler|g'
 ```
@@ -1449,13 +1449,13 @@ cd backend && rg -l 'from app\.core\.scheduler' | \
 ### Task 10.9: Move `core/plugins/` → `app/agents/plugins/`
 
 ```bash
-git mv backend/app/core/plugins backend/app/agents/plugins
+git mv backend/app/[old-core]/plugins backend/app/agents/plugins
 cd backend && rg -l 'from app\.core\.plugins' | xargs sed -i '' 's|from app\.core\.plugins|from app.agents.plugins|g'
 ```
 
 ### Task 10.10: Move remaining core/* files into appropriate homes
 
-After the above, `backend/app/core/` should contain only:
+After the above, `backend/app/[old-core]/` should contain only:
 - `config.py` → moves to `app/config.py` (root)
 - `chat_aggregator.py` → moves to `app/chat/aggregator.py`
 - `telemetry.py` → moves to `app/infrastructure/observability/telemetry.py`
@@ -1466,8 +1466,8 @@ Move each individually. Repoint imports.
 ### Task 10.11: Move `core/exporters/` → `app/conversations/exports/`
 
 ```bash
-mv backend/app/core/exporters/*.py backend/app/conversations/exports/
-git rm -r backend/app/core/exporters/
+mv backend/app/[old-core]/exporters/*.py backend/app/conversations/exports/
+git rm -r backend/app/[old-core]/exporters/
 cd backend && rg -l 'from app\.core\.exporters' | \
   xargs sed -i '' 's|from app\.core\.exporters|from app.conversations.exports|g'
 ```
@@ -1475,9 +1475,9 @@ cd backend && rg -l 'from app\.core\.exporters' | \
 ### Task 10.12: Confirm `core/` is empty + remove
 
 ```bash
-find backend/app/core -type f | head
+find backend/app/[old-core] -type f | head
 # Expected: empty or only __init__.py + __pycache__
-git rm -r backend/app/core/
+git rm -r backend/app/[old-core]/
 ```
 
 ### Task 10.13: Verify + commit
@@ -2212,7 +2212,7 @@ Update `CLAUDE.md` (project root) and `backend/.claude/CLAUDE.md` to reflect the
 ### Task 16.2: Onboarding docs
 
 ```bash
-rg -l 'app/core/|app/api/|app/integrations/telegram' docs/
+rg -l 'app/[old-core]/|app/[old-api]/|app/integrations/telegram' docs/
 # For each match, update the path to the new home.
 ```
 

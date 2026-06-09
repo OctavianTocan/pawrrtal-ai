@@ -19,7 +19,7 @@ on its vendor's first-party SDK: Claude → `claude-agent-sdk`, Gemini →
 
 ## Context
 
-Pawrrtal's chat-provider abstraction (`backend/app/core/providers/`)
+Pawrrtal's chat-provider abstraction (`backend/app/providers/`)
 hides each vendor behind an `AILLM` class that builds a per-request
 `StreamFn` for `run_model_tool_loop`. Adding Grok meant adding a fourth class
 alongside `ClaudeLLM`, `GeminiLLM`, and `LiteLLMLLM`.
@@ -69,7 +69,7 @@ Concretely:
   `xai-sdk>=1.12.0`. Add an `xai_sdk.*` mypy override (matching the
   `mcp.*` / `markitdown.*` pattern) because the SDK ships generated
   protobuf classes without a `py.typed` marker.
-- `backend/app/core/providers/xai_provider.py` — rebuild on
+- `backend/app/providers/xai_provider.py` — rebuild on
   `xai_sdk.AsyncClient`. Each `stream()` call runs through an
   `async with AsyncClient(api_key=...) as client:` block so the gRPC
   channel closes deterministically after every request and we don't
@@ -108,11 +108,11 @@ Concretely:
   SDK does the conversion. The `UsageAccumulator` consumes a typed
   `UsageRecord` and `XaiLLM.stream` emits the terminal
   `StreamEvent(type="usage")` shape `run_model_tool_loop` already knows how
-  to fold into the cost ledger via `record_turn_cost_if_enabled`.
+  to fold into the cost ledger via `record turn cost helper`.
 
 The provider stays tool-agnostic per
 `.claude/rules/architecture/no-tools-in-providers.md`; tool
-composition lives in `backend/app/api/chat.py` exactly as it does
+composition lives in `backend/app/chat/router.py` exactly as it does
 for Gemini and Claude.
 
 ### Speech-to-text is unaffected

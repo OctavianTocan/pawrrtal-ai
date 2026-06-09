@@ -25,7 +25,7 @@ boundary, not a security perimeter on their own.
 Issue [#358](https://github.com/OctavianTocan/Pawrrtal-AI/issues/358)
 flags an inconsistency that's been latent in the codebase:
 
-- ``backend/app/core/tools/workspace_files`` validates every path
+- ``backend/app/tools/workspace_files`` validates every path
   against the workspace root, refuses to follow symlinks, and rejects
   ``..`` segments. The tests cover the basic escape vectors.
 - The same agent has a Python sandbox tool (issued via ``litellm``
@@ -49,7 +49,7 @@ The codebase already hints at this tension:
   composition centralised so policy gates live above the providers.
 - The Claude SDK's ``can_use_tool`` and Gemini/xAI's
   ``permission_check`` plumbing exists precisely so policy lives in
-  ``backend/app/api/chat.py``, not on each provider's stream loop.
+  ``backend/app/chat/router.py``, not on each provider's stream loop.
 - A containerised runtime for the agent's workspace tools is on the
   longer-term roadmap (out of scope for this issue) and would supply
   the real boundary.
@@ -103,4 +103,4 @@ What we explicitly **don't** do:
 
 - Issue [#358](https://github.com/OctavianTocan/Pawrrtal-AI/issues/358)
 - ``.claude/rules/architecture/no-tools-in-providers.md``
-- ``backend/app/core/tools/workspace_files``
+- ``backend/app/tools/workspace_files``

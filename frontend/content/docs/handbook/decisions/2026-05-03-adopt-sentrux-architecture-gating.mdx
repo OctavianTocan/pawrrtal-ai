@@ -73,7 +73,7 @@ churn hotspots would move every other metric forward indirectly.
    regression detection. Local baseline lives at `.sentrux/baseline.json`
    and is gitignored (per-developer state).
 4. Keep one architectural exception in the rules file:
-   `backend/app/core/admin_seed.py` is layered as `be-entry` rather than
+   `backend/app/cli/admin_seed.py` is layered as `be-entry` rather than
    `be-core` because it does startup wiring that depends on the api layer.
    TODO: relocate to `backend/app/cli/admin_seed.py` and remove the
    exception.
@@ -94,7 +94,7 @@ churn hotspots would move every other metric forward indirectly.
 
 ## Follow-up work (not in this ADR)
 
-- Move `backend/app/core/admin_seed.py` → `backend/app/cli/admin_seed.py`
+- Move `backend/app/cli/admin_seed.py` → `backend/app/cli/admin_seed.py`
   and tighten the rules.
 - Refactor `backend/app/api/conversations.py` (god + hotspot + complex).
 - Refactor `frontend/features/chat/components/ChatComposer.tsx` (god).

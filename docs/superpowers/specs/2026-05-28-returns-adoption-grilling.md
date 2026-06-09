@@ -73,7 +73,7 @@ None of these are true today. The least-far away is "incident traceable to misse
 
 ## 4 — Pilot scope critique
 
-The existing recommendation: pilot on `backend/app/core/providers/*`. Three alternatives worth considering:
+The existing recommendation: pilot on `backend/app/providers/*`. Three alternatives worth considering:
 
 ### 4A — `crud/*` instead of providers
 
@@ -117,7 +117,7 @@ This produces a written signal without writing any `returns` code. Cost: a handf
 ### Phase 1 — Single MCP tool call (Option 4B above), 3 days
 
 If Phase 0 surfaces a consistent win:
-- Pick `backend/app/core/tools/external_mcp.py`'s outermost call.
+- Pick `backend/app/tools/external_mcp.py`'s outermost call.
 - Migrate it to return `IOResult[ToolOutput, McpError]`.
 - Keep the call site exception-bridged (the caller can still `except` to maintain compat).
 - Re-do the reading-glasses on the migrated code for 1 week. Does it feel cleaner? Does anyone trip on it?

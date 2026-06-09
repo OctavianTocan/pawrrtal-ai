@@ -25,7 +25,7 @@ this ADR — see "Implementation plan" below.
 Pawrrtal already has two memory systems:
 
 - **LCM** (per-conversation): summary nodes, ranked lexical search,
-  embeddings. Backed by `backend/app/core/lcm/` and exposed to the
+  embeddings. Backed by `backend/app/lcm/` and exposed to the
   agent as a tool surface today (`lcm_grep`, `lcm_search`,
   `lcm_describe`, `lcm_expand_query`, `lcm_list_summaries`).
 - **Workspace identity files** (`SOUL.md`, `AGENTS.md`, `USER.md`):
@@ -122,7 +122,7 @@ CREATE INDEX ix_memories_user_kind ON memories(user_id, kind);
 ```
 
 Embeddings use the same provider as the LCM pipeline today
-(`backend/app/core/lcm/embeddings.py`).
+(`backend/app/lcm/embeddings.py`).
 
 ## Implementation plan (stacked PRs)
 
@@ -173,7 +173,7 @@ developed.
 - Issue [#340](https://github.com/OctavianTocan/Pawrrtal-AI/issues/340)
 - Issue [#341](https://github.com/OctavianTocan/Pawrrtal-AI/issues/341)
   (dreaming — depends on this schema)
-- `backend/app/core/lcm/background.py` — the post-turn hook pattern
+- `backend/app/lcm/background.py` — the post-turn hook pattern
   to mirror
-- `backend/app/core/agent_tools.py:258-278` — where the
+- `backend/app/agents/tool_surface.py:258-278` — where the
   `memory_query` tool will land alongside the LCM family

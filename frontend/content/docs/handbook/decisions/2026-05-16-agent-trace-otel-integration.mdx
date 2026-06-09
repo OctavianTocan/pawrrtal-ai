@@ -11,7 +11,7 @@ description: ADR — instrument the agent loop and turn runner with Traceloop-sh
 
 <Callout type="info" title="Status: Accepted">
 Add `app/infrastructure/observability/agent_trace.py`, wire it into
-`channels/turn_orchestrator.run_turn` and model tool dispatch, and emit
+`turns/pipeline.run_turn` and model tool dispatch, and emit
 standard OTel spans. Local dev can point `OTEL_EXPORTER_OTLP_ENDPOINT`
 at a collector on `http://localhost:5899`; the same spans route to
 Grafana, Honeycomb, SigNoz, or another OTel backend in deployed
@@ -26,11 +26,11 @@ with **OpenTelemetry GenAI / Traceloop** attributes from the `gen_ai.*`
 semantic-convention family.
 
 Pawrrtal already has the OTel SDK + OTLP/HTTP exporter wired in
-`backend/app/core/telemetry.py` (gated by `OTEL_EXPORTER_OTLP_ENDPOINT`).
+`backend/app/infrastructure/telemetry/` (gated by `OTEL_EXPORTER_OTLP_ENDPOINT`).
 The chat pipeline has three architectural seams that map cleanly to the
 span types:
 
-1. **Turn root** — `channels/turn_orchestrator.run_turn` is the single
+1. **Turn root** — `turns/pipeline.run_turn` is the single
    per-turn entry point shared by all surfaces (HTTP `/api/chat`,
    Telegram, voice).
 2. **LLM call** — same site; `turn_orchestrator` already provides an
@@ -79,7 +79,7 @@ fields where collectors still expect them.
 - `backend/app/infrastructure/observability/agent_trace.py` — public context
   managers (`turn_span`, `llm_span`, `tool_span`) + `agent_event_hook`
   that mirrors `StreamEvent`s onto a recorder via a flat dispatch table.
-- `backend/app/channels/turn_orchestrator/runner.py` — `run_turn` opens
+- `backend/app/turns/pipeline/runner.py` — `run_turn` opens
   `turn_span` + `llm_span`, registers `agent_event_hook` ahead of
   the caller's hooks, stamps usage / stop-reason on the LLM span at
   finalisation.

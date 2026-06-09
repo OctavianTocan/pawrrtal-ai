@@ -198,8 +198,9 @@ async def test_refresh_telegram_commands_best_effort_logs_and_continues(
 
 def test_telegram_polling_lock_allows_one_owner() -> None:
     """Only one process can own polling for a bot token at a time."""
-    first = TelegramPollingLock(token="test-token")
-    second = TelegramPollingLock(token="test-token")
+    token = f"test-token-{uuid.uuid4()}"
+    first = TelegramPollingLock(token=token)
+    second = TelegramPollingLock(token=token)
     try:
         assert first.acquire() is True
         assert second.acquire() is False
