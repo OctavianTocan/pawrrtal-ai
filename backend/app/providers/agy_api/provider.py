@@ -6,6 +6,7 @@ import logging
 import uuid
 from collections.abc import AsyncIterator
 from pathlib import Path
+from typing import Any
 
 from app.agents import (
     DEFAULT_AGENT_SYSTEM_PROMPT as _FALLBACK_SYSTEM_PROMPT,
@@ -28,8 +29,8 @@ from app.providers._stream_logging import log_provider_stream_event
 from app.providers.base import ReasoningEffort, StreamEvent
 from app.providers.events import agent_event_to_stream_event, identity_convert
 
-from .auth import AgyApiAuthError, ensure_agy_api_auth
-from .client import stream_llm_events
+from .auth import AgyApiAuth, AgyApiAuthError, ensure_agy_api_auth
+from .client import AgyApiRemoteAuthError, stream_llm_events
 from .events import AgyApiUsageAccumulator
 from .messages import build_agy_generation_config
 
@@ -60,14 +61,36 @@ async def make_agy_api_stream_fn(
         model_id=model_id,
         reasoning_effort=reasoning_effort,
     )
+    retried_remote_auth = False
 
     async def stream_fn(
         messages: list[AgentMessage],
         tools: list[AgentTool],
     ) -> AsyncIterator[LLMEvent]:
-        async for event in stream_llm_events(
-            auth=auth,
-            model_id=wire_model_id,
+        nonlocal auth, retried_remote_auth
+        try:
+            async for event in _stream_llm_events_with_auth(
+                auth,
+                wire_model_id=wire_model_id,
+                messages=messages,
+                system_prompt=system_prompt,
+                tools=tools,
+                generation_config=generation_config,
+                usage_sink=usage_sink,
+            ):
+                yield event
+            return
+        except AgyApiRemoteAuthError:
+            if retried_remote_auth:
+                raise
+            retried_remote_auth = True
+            logger.info("AGY_API_REMOTE_AUTH_REFRESH_START model=%s", model_id)
+            auth = await ensure_agy_api_auth(workspace_root, force_refresh=True)
+            logger.info("AGY_API_REMOTE_AUTH_REFRESH_DONE model=%s", model_id)
+
+        async for event in _stream_llm_events_with_auth(
+            auth,
+            wire_model_id=wire_model_id,
             messages=messages,
             system_prompt=system_prompt,
             tools=tools,
@@ -77,6 +100,29 @@ async def make_agy_api_stream_fn(
             yield event
 
     return stream_fn
+
+
+async def _stream_llm_events_with_auth(
+    auth: AgyApiAuth,
+    *,
+    wire_model_id: str,
+    messages: list[AgentMessage],
+    system_prompt: str,
+    tools: list[AgentTool],
+    generation_config: dict[str, Any],
+    usage_sink: AgyApiUsageAccumulator,
+) -> AsyncIterator[LLMEvent]:
+    """Stream one AGY API attempt using one auth snapshot."""
+    async for event in stream_llm_events(
+        auth=auth,
+        model_id=wire_model_id,
+        messages=messages,
+        system_prompt=system_prompt,
+        tools=tools,
+        generation_config=generation_config,
+        usage_sink=usage_sink,
+    ):
+        yield event
 
 
 class AgyApiLLM:

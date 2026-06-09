@@ -53,8 +53,21 @@ def has_agy_api_auth(workspace_root: Path | None = None) -> bool:
 _refresh_lock = asyncio.Lock()
 
 
-async def ensure_agy_api_auth(workspace_root: Path | None = None) -> AgyApiAuth:
-    """Load AGY auth, refreshing once through the CLI when the token expired."""
+async def ensure_agy_api_auth(
+    workspace_root: Path | None = None,
+    *,
+    force_refresh: bool = False,
+) -> AgyApiAuth:
+    """Load AGY auth, refreshing through the CLI when needed.
+
+    ``force_refresh`` is used after the remote API rejects a token that
+    still looked valid in the local Antigravity token file.
+    """
+    if force_refresh:
+        async with _refresh_lock:
+            await _run_agy_refresh_probe(workspace_root)
+            return load_agy_api_auth(workspace_root)
+
     try:
         return load_agy_api_auth(workspace_root)
     except AgyApiTokenExpiredError:

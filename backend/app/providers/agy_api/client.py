@@ -21,7 +21,7 @@ from app.agents.types import (
 )
 from app.providers.base import StreamEvent
 
-from .auth import AgyApiAuth
+from .auth import AgyApiAuth, AgyApiAuthError
 from .events import (
     AgyApiStreamState,
     AgyApiUsageAccumulator,
@@ -33,6 +33,8 @@ from .messages import build_agy_contents, build_agy_tool_declarations
 
 _DEFAULT_BASE_URL = "https://daily-cloudcode-pa.googleapis.com"
 _HTTP_TIMEOUT_SECONDS = 60.0
+_HTTP_UNAUTHORIZED = 401
+_HTTP_FORBIDDEN = 403
 _HTTP_BAD_REQUEST = 400
 _HTTP_MAX_CONNECTIONS = 20
 _HTTP_MAX_KEEPALIVE_CONNECTIONS = 10
@@ -41,6 +43,10 @@ _HTTP_MAX_KEEPALIVE_CONNECTIONS = 10
 @dataclass
 class _ClientCache:
     client: httpx.AsyncClient | None = None
+
+
+class AgyApiRemoteAuthError(AgyApiAuthError):
+    """Raised when Cloud Code Assist rejects the current local AGY token."""
 
 
 _CLIENT_CACHE = _ClientCache()
@@ -158,6 +164,7 @@ async def _stream_llm_events_from_body(
             headers=_headers(auth.access_token),
             json=body,
         ) as response:
+            await _raise_for_remote_auth_error(response)
             error_text = await _api_error_text(response)
             if error_text is not None:
                 yield _error_text_delta(error_text)
@@ -190,6 +197,17 @@ async def _api_error_text(response: httpx.Response) -> str | None:
         return None
     text = await response.aread()
     return f"Antigravity API returned {response.status_code}: {text.decode(errors='replace')[:300]}"
+
+
+async def _raise_for_remote_auth_error(response: httpx.Response) -> None:
+    """Raise before a normal auth-refresh case becomes assistant text."""
+    if response.status_code not in {_HTTP_UNAUTHORIZED, _HTTP_FORBIDDEN}:
+        return
+    text = await response.aread()
+    preview = text.decode(errors="replace")[:300]
+    raise AgyApiRemoteAuthError(
+        f"Antigravity API rejected the local token with {response.status_code}: {preview}"
+    )
 
 
 async def _stream_events_from_response(response: httpx.Response) -> AsyncIterator[StreamEvent]:

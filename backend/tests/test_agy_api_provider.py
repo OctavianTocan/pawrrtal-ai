@@ -17,6 +17,7 @@ from app.providers.agy_api.auth import (
     load_agy_api_auth,
 )
 from app.providers.agy_api.client import (
+    AgyApiRemoteAuthError,
     _client,
     _event_from_sse_line,
     build_generate_body,
@@ -163,6 +164,57 @@ async def test_ensure_agy_api_auth_refreshes_expired_token_once(
     monkeypatch.setattr("app.providers.agy_api.auth._run_agy_refresh_probe", refresh_probe)
 
     auth = await ensure_agy_api_auth(workspace)
+
+    assert auth == AgyApiAuth(access_token="fresh-access", project_id="project-1")
+    assert refresh_calls == [workspace]
+
+
+@pytest.mark.anyio
+async def test_ensure_agy_api_auth_force_refreshes_valid_token(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    token_path = tmp_path / "token.json"
+    projects_path = tmp_path / "projects.json"
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    token_path.write_text(
+        json.dumps(
+            {
+                "auth_method": "consumer",
+                "token": {
+                    "access_token": "stale-access",
+                    "refresh_token": "refresh",
+                    "token_type": "Bearer",
+                    "expiry": "2999-01-01T00:00:00Z",
+                },
+            }
+        )
+    )
+    projects_path.write_text(json.dumps({str(workspace): "project-1"}))
+    refresh_calls: list[Path | None] = []
+
+    async def refresh_probe(workspace_root: Path | None) -> None:
+        refresh_calls.append(workspace_root)
+        token_path.write_text(
+            json.dumps(
+                {
+                    "auth_method": "consumer",
+                    "token": {
+                        "access_token": "fresh-access",
+                        "refresh_token": "refresh",
+                        "token_type": "Bearer",
+                        "expiry": "2999-01-01T00:00:00Z",
+                    },
+                }
+            )
+        )
+
+    monkeypatch.setattr("app.providers.agy_api.auth._TOKEN_PATH", token_path)
+    monkeypatch.setattr("app.providers.agy_api.auth._PROJECTS_PATH", projects_path)
+    monkeypatch.setattr("app.providers.agy_api.auth._run_agy_refresh_probe", refresh_probe)
+
+    auth = await ensure_agy_api_auth(workspace, force_refresh=True)
 
     assert auth == AgyApiAuth(access_token="fresh-access", project_id="project-1")
     assert refresh_calls == [workspace]
@@ -387,6 +439,56 @@ async def test_agy_api_provider_uses_refreshing_auth_on_send(
 
     assert ensure_calls == [workspace]
     assert any(e["type"] == "delta" and e.get("content") == "answer" for e in events)
+
+
+@pytest.mark.anyio
+async def test_agy_api_provider_retries_remote_auth_failure_once(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir()
+    provider = AgyApiLLM("gemini-test", workspace_root=workspace)
+    ensure_calls: list[tuple[Path | None, bool]] = []
+    stream_auth_tokens: list[str] = []
+
+    async def ensure_auth(
+        workspace_root: Path | None,
+        *,
+        force_refresh: bool = False,
+    ) -> AgyApiAuth:
+        ensure_calls.append((workspace_root, force_refresh))
+        token = "fresh-access" if force_refresh else "stale-access"
+        return AgyApiAuth(access_token=token, project_id="project-1")
+
+    async def fake_stream_llm_events(**kwargs: object) -> AsyncIterator[LLMEvent]:
+        auth = kwargs["auth"]
+        assert isinstance(auth, AgyApiAuth)
+        stream_auth_tokens.append(auth.access_token)
+        if len(stream_auth_tokens) == 1:
+            raise AgyApiRemoteAuthError("401")
+        yield {"type": "text_delta", "text": "answer"}
+        yield {
+            "type": "done",
+            "stop_reason": "stop",
+            "content": [{"type": "text", "text": "answer"}],
+        }
+
+    monkeypatch.setattr("app.providers.agy_api.provider.ensure_agy_api_auth", ensure_auth)
+    monkeypatch.setattr("app.providers.agy_api.provider.stream_llm_events", fake_stream_llm_events)
+
+    events: list[StreamEvent] = [
+        event
+        async for event in provider.stream(
+            "hello",
+            conversation_id=uuid4(),
+            user_id=uuid4(),
+        )
+    ]
+
+    assert ensure_calls == [(workspace, False), (workspace, True)]
+    assert stream_auth_tokens == ["stale-access", "fresh-access"]
+    assert events == [{"type": "delta", "content": "answer"}]
 
 
 @pytest.mark.anyio
