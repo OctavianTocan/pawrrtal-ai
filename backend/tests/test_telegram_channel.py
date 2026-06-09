@@ -375,7 +375,7 @@ class TestTelegramChannelDeliver:
         )
 
     async def test_tool_use_edits_detailed_trace_message(self) -> None:
-        """``tool_use`` edits the trace with friendly display metadata."""
+        """``tool_use`` edits the trace with Claude Code TUI-style text."""
         bot = _make_bot()
         msg = _make_channel_message(bot)
         channel = TelegramChannel()
@@ -397,12 +397,12 @@ class TestTelegramChannelDeliver:
 
         last_call = bot.edit_message_text.call_args_list[-1]
         trace_text = last_call.kwargs["text"]
-        assert "🔎 Searching files for &quot;TelegramChannel&quot;" in trace_text
-        assert "/data/workspace" not in trace_text
+        assert trace_text == "⏺ search_files(/data/workspace)"
+        assert "🔎 Searching files" not in trace_text
         bot.send_message.assert_awaited_once_with(chat_id=123, text="answer")
 
-    async def test_thinking_event_renders_as_separate_italic_message(self) -> None:
-        """Detailed Telegram verbosity surfaces thinking separately in italics."""
+    async def test_thinking_event_renders_as_separate_tui_message(self) -> None:
+        """Detailed Telegram verbosity surfaces thinking in Claude Code TUI style."""
         bot = _make_bot()
         msg = _make_channel_message(bot)
         channel = TelegramChannel()
@@ -418,7 +418,7 @@ class TestTelegramChannelDeliver:
         bot.edit_message_text.assert_any_call(
             chat_id=123,
             message_id=456,
-            text="💭 <b>Thinking...</b>\n\n<i>checking the workspace</i>",
+            text="✻ checking the workspace",
             reply_markup=None,
         )
         # The final answer is sent as a new message
@@ -456,7 +456,7 @@ class TestTelegramChannelDeliver:
         bot.edit_message_text.assert_any_call(
             chat_id=88,
             message_id=11,
-            text="💭 <b>Thinking...</b>\n\n<i>let me check the workspace</i>",
+            text="✻ let me check the workspace",
             reply_markup=None,
         )
 
@@ -468,7 +468,7 @@ class TestTelegramChannelDeliver:
         sent_texts = [call.kwargs.get("text", "") for call in bot.send_message.await_args_list]
 
         # The second thinking message should be sent as a separate message
-        thinking_sends = [text for text in sent_texts if text.startswith("💭 <b>Thinking...</b>")]
+        thinking_sends = [text for text in sent_texts if text.startswith("✻ ")]
         assert len(thinking_sends) == 1
         assert "now I understand" in thinking_sends[0]
         assert "let me check the workspace" not in thinking_sends[0]
@@ -516,7 +516,7 @@ class TestTelegramChannelDeliver:
         assert any("Partial answer." in text for text in edit_texts)
         assert any("max_iterations" in text for text in edit_texts)
 
-    async def test_thinking_event_renders_markdown_bold_inside_italic(self) -> None:
+    async def test_thinking_event_renders_markdown_bold_inside_tui_line(self) -> None:
         """Thinking deltas with Markdown emphasis render formatted, not literal (#287)."""
         bot = _make_bot()
         msg = _make_channel_message(bot)
@@ -539,8 +539,9 @@ class TestTelegramChannelDeliver:
         first_edit = thinking_edits[0]
         # The literal ``**`` markers must not leak into the rendered
         # thinking message — they should be converted to Telegram's
-        # ``<b>`` tag while the surrounding italic envelope is preserved.
+        # ``<b>`` tag while keeping the Claude Code TUI marker.
         assert "**bold**" not in first_edit
+        assert first_edit.startswith("✻ ")
         assert "<i>" in first_edit and "</i>" in first_edit
         assert "<b>bold</b>" in first_edit
         # The final answer is sent as a new message
@@ -724,7 +725,7 @@ class TestTelegramChannelDeliver:
         bot.edit_message_text.assert_any_call(
             chat_id=42,
             message_id=99,
-            text="💭 <b>Thinking...</b>\n\n<i>thinking content</i>",
+            text="✻ thinking content",
             reply_markup=None,
         )
         # And the placeholder MUST NOT be deleted:
@@ -759,7 +760,7 @@ class TestTelegramChannelDeliver:
         bot.edit_message_text.assert_any_call(
             chat_id=42,
             message_id=99,
-            text="💭 <b>Thinking...</b>\n\n<i>The user said\nhello.</i>",
+            text="✻ The user said\nhello.",
             reply_markup=None,
         )
 

@@ -9,8 +9,8 @@ State machine (used by the content-preview placeholder logic):
   INITIAL  → ``render_initial()``
   STARTING → ``render_starting(model, tool_count)``    (first event, model known)
   WORKING  → ``render_working(preview)``               (first text delta)
-  Tool path uses ``render_tools_in_flight`` + ``render_tool_success``
-  / ``render_tool_error`` rather than the WORKING state.
+  Tool path uses Claude Code TUI-style ``⏺ Tool(detail)`` lines with
+  optional ``⎿`` result previews rather than the WORKING state.
 """
 
 from __future__ import annotations
@@ -90,7 +90,7 @@ def render_working(preview: str) -> str:
 
 
 def render_tools_in_flight(tool_names: list[str]) -> str:
-    """Return HTML for the 'tools running' state — list of tool names.
+    """Return HTML for in-flight tool calls in Claude Code TUI style.
 
     Args:
         tool_names: Display names (already formatted) for in-flight tools.
@@ -99,9 +99,8 @@ def render_tools_in_flight(tool_names: list[str]) -> str:
         Telegram HTML string.
     """
     if not tool_names:
-        return "🔧 <b>Using tools...</b>"
-    esc_names = "\n".join(f"  {html.escape(n)}" for n in tool_names)
-    return f"🔧 <b>Using tools:</b>\n{esc_names}"
+        return "⏺ Tool"
+    return "\n".join(html.escape(n) for n in tool_names)
 
 
 MAX_TOOL_TRACE_CHARS = 3600
@@ -111,7 +110,7 @@ def render_bounded_tools_block(header: str, lines: list[str]) -> str:
     """Join complete Telegram HTML fragments without cutting tags."""
     output = header
     for line in lines:
-        candidate = f"{output}\n\n{line}"
+        candidate = f"{output}\n{line}" if output else line
         if len(candidate) > MAX_TOOL_TRACE_CHARS:
             continue
         output = candidate
@@ -134,21 +133,20 @@ def render_tool_success(
             ``format_tool_use`` in ``telegram_delivery.py`` already produces
             display-safe text).
         elapsed_ms: Wall-clock duration of the tool call in milliseconds.
+            Kept for the call contract; Claude Cage-style rendering does
+            not show timings in chat.
         result_preview: Optional compact stdout/result preview to show under
             the completed tool row.
 
     Returns:
         Telegram HTML string for one tool line.
     """
-    esc = html.escape(tool_display)
-    line = f"✅ <b>{esc}</b> ({elapsed_ms}ms)"
-    preview = (result_preview or "").strip()
+    del elapsed_ms
+    line = html.escape(tool_display)
+    preview = _format_tool_result_preview(result_preview or "")
     if not preview:
         return line
-    if len(preview) > TOOL_RESULT_PREVIEW_MAX_CHARS:
-        preview = preview[:TOOL_RESULT_PREVIEW_MAX_CHARS].rstrip()
-    esc_preview = html.escape(preview)
-    return f"{line}\n\n<code>{esc_preview}</code>"
+    return f"{line}\n{html.escape(preview)}"
 
 
 TOOL_PROGRESS_PREVIEW_MAX_CHARS = 500
@@ -156,14 +154,11 @@ TOOL_PROGRESS_PREVIEW_MAX_CHARS = 500
 
 def render_tool_progress(tool_display: str, result_preview: str) -> str:
     """Return HTML for a still-running tool with a compact progress preview."""
-    esc = html.escape(tool_display)
-    preview = result_preview.strip()
-    if len(preview) > TOOL_PROGRESS_PREVIEW_MAX_CHARS:
-        preview = preview[:TOOL_PROGRESS_PREVIEW_MAX_CHARS].rstrip()
-    esc_preview = html.escape(preview)
-    if not esc_preview:
-        return f"⏳ <b>{esc}</b>"
-    return f"⏳ <b>{esc}</b>\n\n<code>{esc_preview}</code>"
+    line = html.escape(tool_display)
+    preview = _format_tool_result_preview(result_preview, max_chars=TOOL_PROGRESS_PREVIEW_MAX_CHARS)
+    if not preview:
+        return line
+    return f"{line}\n{html.escape(preview)}"
 
 
 # Maximum characters of error text shown in a tool error card.
@@ -180,14 +175,27 @@ def render_tool_error(tool_display: str, error_message: str) -> str:
     Returns:
         Telegram HTML string for one tool line.
     """
-    esc_tool = html.escape(tool_display)
     msg = error_message.strip()
     if len(msg) > TOOL_ERROR_MAX_CHARS:
         msg = msg[:TOOL_ERROR_MAX_CHARS] + "…"
-    esc_msg = html.escape(msg)
-    return f"❌ <b>{esc_tool}</b>\n\n<i>{esc_msg}</i>"
+    return f"{html.escape(tool_display)}\n  ⎿ ✗ {html.escape(msg)}"
 
 
 def render_thinking_in_progress() -> str:
     """Return HTML for the 'thinking' state placeholder."""
-    return "💭 <b>Thinking...</b>"
+    return "✻ thinking"
+
+
+def _format_tool_result_preview(
+    text: str, *, max_chars: int = TOOL_RESULT_PREVIEW_MAX_CHARS
+) -> str:
+    """Return Claude Code TUI-style one-line result preview."""
+    stripped = text.strip()
+    if not stripped:
+        return ""
+    first = stripped.splitlines()[0].strip()
+    if len(first) > max_chars:
+        first = f"{first[: max_chars - 1].rstrip()}…"
+    extra_lines = stripped.count("\n")
+    suffix = f"  (+{extra_lines} lines)" if extra_lines else ""
+    return f"  ⎿ {first}{suffix}"

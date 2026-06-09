@@ -1,5 +1,5 @@
-"""Tests for telegram_progress.py — multi-state progress emoji renderers
-and per-tool success/failure with timing.
+"""Tests for telegram_progress.py — multi-state progress renderers
+and Claude Code TUI-style tool success/failure text.
 
 Covers (Workstreams 3 and 4):
 - render_initial, render_starting, render_working, render_tools_in_flight
@@ -8,7 +8,7 @@ Covers (Workstreams 3 and 4):
 - HTML special chars escaped in model name and preview
 - Tool error message truncated to TOOL_ERROR_MAX_CHARS + ellipsis
 - handle_tool_use populates tool_states dict
-- handle_tool_result updates line to success with timing
+- handle_tool_result updates line to success with a compact result preview
 - handle_tool_result updates line to error with truncated escaped message
 - Multiple tools render in order
 """
@@ -21,6 +21,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from app.channels.telegram.delivery import format_tool_use, thinking_html
 from app.channels.telegram.dispatch import (
     ToolLineState,
     handle_tool_progress,
@@ -120,7 +121,7 @@ class TestRenderToolsInFlight:
     def test_single_tool(self) -> None:
         result = render_tools_in_flight(["read_file"])
         assert "read_file" in result
-        assert "🔧" in result
+        assert "🔧" not in result
 
     def test_multiple_tools(self) -> None:
         result = render_tools_in_flight(["tool_a", "tool_b"])
@@ -129,7 +130,7 @@ class TestRenderToolsInFlight:
 
     def test_empty_list_generic_message(self) -> None:
         result = render_tools_in_flight([])
-        assert "🔧" in result
+        assert result == "⏺ Tool"
 
 
 class TestRenderToolSuccess:
@@ -137,17 +138,21 @@ class TestRenderToolSuccess:
         result = render_tool_success("read_file", 123)
         assert "read_file" in result
 
-    def test_contains_elapsed(self) -> None:
+    def test_omits_elapsed(self) -> None:
         result = render_tool_success("search", 456)
-        assert "456ms" in result
+        assert "456ms" not in result
 
-    def test_check_emoji(self) -> None:
-        assert "✅" in render_tool_success("anything", 1)
+    def test_no_check_emoji(self) -> None:
+        assert "✅" not in render_tool_success("anything", 1)
 
     def test_html_escaped(self) -> None:
         result = render_tool_success("<b>bold</b>", 10)
         # The display value is escaped in the card
         assert "<b>bold</b>" not in result or "&lt;b&gt;" in result
+
+    def test_result_preview_matches_claude_cage_style(self) -> None:
+        result = render_tool_success("⏺ Bash(ls -la /tmp)", 10, "line1\nline2\nline3")
+        assert result == "⏺ Bash(ls -la /tmp)\n  ⎿ line1  (+2 lines)"
 
 
 class TestRenderToolError:
@@ -159,8 +164,8 @@ class TestRenderToolError:
         result = render_tool_error("exa_search", "API key invalid")
         assert "API key invalid" in result
 
-    def test_x_emoji(self) -> None:
-        assert "❌" in render_tool_error("tool", "err")
+    def test_x_marker(self) -> None:
+        assert "  ⎿ ✗ err" in render_tool_error("tool", "err")
 
     def test_error_truncated(self) -> None:
         long_error = "x" * (TOOL_ERROR_MAX_CHARS + 50)
@@ -171,6 +176,43 @@ class TestRenderToolError:
     def test_html_escaped(self) -> None:
         result = render_tool_error("tool", "<script>bad</script>")
         assert "<script>" not in result
+
+
+class TestClaudeCageStyleRenderers:
+    def test_bash_tool_line(self) -> None:
+        result = format_tool_use(
+            {
+                "type": "tool_use",
+                "name": "Bash",
+                "input": {"command": "ls -la /tmp", "description": "list"},
+            }
+        )
+        assert result == "⏺ Bash(ls -la /tmp)"
+
+    def test_read_tool_line(self) -> None:
+        result = format_tool_use(
+            {"type": "tool_use", "name": "Read", "input": {"file_path": "/a/b/c.py"}}
+        )
+        assert result == "⏺ Read(/a/b/c.py)"
+
+    def test_grep_tool_line(self) -> None:
+        result = format_tool_use(
+            {"type": "tool_use", "name": "Grep", "input": {"pattern": "def foo"}}
+        )
+        assert result == "⏺ Grep(def foo)"
+
+    def test_long_tool_line_truncates(self) -> None:
+        result = format_tool_use(
+            {"type": "tool_use", "name": "Bash", "input": {"command": "x" * 200}}
+        )
+        assert "…" in result
+        assert len(result) < 180
+
+    def test_thinking_uses_tui_marker_without_card_heading(self) -> None:
+        result = thinking_html("thinking...")
+        assert result == "✻ thinking..."
+        assert "Thinking" not in result
+        assert "💭" not in result
 
 
 # ---------------------------------------------------------------------------
@@ -292,8 +334,9 @@ class TestHandleToolResult:
         )
         state = tool_states["call_1"]
         assert state.result_line is not None
-        assert "✅" in state.result_line
-        assert "ms" in state.result_line
+        assert state.result_line.startswith("read_file")
+        assert "file contents here" in state.result_line
+        assert "ms" not in state.result_line
 
     async def test_error_result_updates_line(self) -> None:
         bot = _make_bot()
@@ -316,7 +359,7 @@ class TestHandleToolResult:
         )
         state = tool_states["call_2"]
         assert state.result_line is not None
-        assert "❌" in state.result_line
+        assert "  ⎿ ✗ API key expired" in state.result_line
         assert "API key expired" in state.result_line
 
     async def test_error_message_truncated(self) -> None:
@@ -426,7 +469,7 @@ class TestHandleToolProgress:
         bot = _make_bot()
         tool_states = {f"call_{i}": self._make_state(f"call_{i}", f"tool_{i}") for i in range(12)}
         for state in tool_states.values():
-            state.progress_line = f"⏳ <b>{state.display}</b>\n\n<code>{'x' * 600}</code>"
+            state.progress_line = f"{state.display}\n  ⎿ {'x' * 600}"
 
         trace, _, _ = await handle_tool_progress(
             event={
@@ -444,7 +487,7 @@ class TestHandleToolProgress:
         )
 
         assert len(trace) <= 3600
-        assert trace.count("<code>") == trace.count("</code>")
+        assert "<code>" not in trace
         assert "omitted" not in trace
 
     def test_large_tool_result_preview_does_not_render_omitted_marker(self) -> None:

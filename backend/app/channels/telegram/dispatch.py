@@ -61,33 +61,19 @@ __all__ = [
 _EDIT_DEBOUNCE_CHARS = 40
 _MAX_EDIT_INTERVAL_S = 3.0
 _EMPTY_RESPONSE_FALLBACK = "⚠️ The agent finished without producing a reply. Please try again."
-_MAX_IN_FLIGHT_TOOLS = 10
 
 
 def _render_tools_block(
     tool_states: dict[str, ToolLineState],
     in_flight_names: list[str],
 ) -> str:
-    """Render the full tools trace from per-tool state.
-
-    In-flight tools appear in the summary header (HTML-escaped).
-    Completed tools appear as their success/error line below.  We
-    deliberately do NOT also list in-flight tools as raw display lines
-    in the body — that would (a) duplicate the header, and (b) leak
-    unescaped ``display`` text into Telegram's HTML parser.
-    """
+    """Render the full tools trace from per-tool state."""
+    del in_flight_names
     lines: list[str] = []
     for state in tool_states.values():
-        line = state.result_line or state.progress_line
-        if line is not None:
-            lines.append(line)
-    shown_in_flight = in_flight_names[:_MAX_IN_FLIGHT_TOOLS]
-    if len(in_flight_names) > _MAX_IN_FLIGHT_TOOLS:
-        shown_in_flight.append(f"+{len(in_flight_names) - _MAX_IN_FLIGHT_TOOLS} more")
-    header = render_tools_in_flight(shown_in_flight)
-    if lines:
-        return render_bounded_tools_block(header, lines)
-    return header
+        line = state.result_line or state.progress_line or html_lib.escape(state.display)
+        lines.append(line)
+    return render_bounded_tools_block("", lines)
 
 
 async def prepare_tools_block(

@@ -4,9 +4,8 @@ from __future__ import annotations
 
 import html as html_lib
 import logging
+import re
 from typing import TYPE_CHECKING, Any
-
-from app.tools.display import fallback_tool_display
 
 from .html import md_to_telegram_html
 
@@ -23,9 +22,33 @@ logger = logging.getLogger(__name__)
 # remains an optional dependency for non-telegram pytest runs.
 
 MAX_MESSAGE_LEN = 4096
+TOOL_DETAIL_MAX_CHARS = 160
+TOOL_DETAIL_TRUNCATE_CHARS = TOOL_DETAIL_MAX_CHARS - 3
 
 
 _BALANCED_TAGS: tuple[str, ...] = ("pre", "code")
+_GENERIC_TOOL_DETAIL_KEYS = (
+    "command",
+    "file_path",
+    "path",
+    "pattern",
+    "glob",
+    "url",
+    "query",
+    "description",
+)
+_TOOL_DETAIL_KEYS_BY_NAME = {
+    "Bash": ("command",),
+    "Read": ("file_path", "path"),
+    "Edit": ("file_path", "path"),
+    "Write": ("file_path", "path"),
+    "NotebookEdit": ("file_path", "path"),
+    "Grep": ("pattern", "glob"),
+    "Glob": ("pattern", "glob"),
+    "WebFetch": ("url", "query"),
+    "WebSearch": ("url", "query"),
+    "Task": ("description", "subagent_type"),
+}
 
 # Minimum chunks where boundary rebalancing applies. A single chunk has
 # no boundary so the helper short-circuits.
@@ -169,24 +192,30 @@ def _aiogram_errors() -> tuple[type[BaseException], ...]:
 
 
 def format_tool_use(event: StreamEvent, *, state: str = "present") -> str:
-    """Render a tool call with shared display metadata or a safe fallback."""
+    """Render a tool call in Claude Code's TUI style."""
     tool_name = str(event.get("name") or "tool")
-    raw_display = event.get("display")
-    if isinstance(raw_display, dict):
-        icon = str(raw_display.get("icon") or "").strip()
-        val = str(raw_display.get(state) or "").strip()
-        if val:
-            if icon and not val.startswith(icon):
-                val = f"{icon} {val}"
-            return val
     raw_input = event.get("input") or {}
     arguments = raw_input if isinstance(raw_input, dict) else {"input": raw_input}
-    fallback = fallback_tool_display(tool_name, arguments)
-    val = str(fallback.get(state) or tool_name)
-    fallback_icon = str(fallback.get("icon") or "").strip()
-    if fallback_icon and not val.startswith(fallback_icon):
-        val = f"{fallback_icon} {val}"
-    return val
+    detail = _tool_detail(tool_name, arguments)
+    return f"⏺ {tool_name}({detail})" if detail else f"⏺ {tool_name}"
+
+
+def _tool_detail(tool_name: str, arguments: dict[str, Any]) -> str:
+    """Return the single useful argument Claude Code's TUI would surface."""
+    keys = _TOOL_DETAIL_KEYS_BY_NAME.get(tool_name, _GENERIC_TOOL_DETAIL_KEYS)
+    detail = _first_tool_argument(arguments, keys)
+    detail = re.sub(r"\s+", " ", detail).strip()
+    if len(detail) > TOOL_DETAIL_MAX_CHARS:
+        return f"{detail[:TOOL_DETAIL_TRUNCATE_CHARS]}…"
+    return detail
+
+
+def _first_tool_argument(arguments: dict[str, Any], keys: tuple[str, ...]) -> str:
+    """Return the first non-empty argument value among ``keys``."""
+    for key in keys:
+        if arguments.get(key):
+            return str(arguments[key])
+    return ""
 
 
 def final_reply_text(
@@ -211,18 +240,13 @@ def plain_html(text: str) -> str:
 
 
 def thinking_html(text: str) -> str:
-    """Render thinking text as italic Telegram HTML with markdown applied.
+    """Render thinking text in the same plain TUI style as Claude Cage.
 
     The Paw's thinking stream may emit Markdown emphasis (``**bold**``,
-    ``_em_``, fenced code, etc.). Previously this helper only HTML-escaped
-    the text and wrapped it in ``<i>...</i>``, so users saw literal
-    ``**`` / ``_`` markers inside the thinking block. We now route the
-    text through :func:`md_to_telegram_html` first — same pipeline the
-    answer stream uses — then wrap the result in ``<i>`` so the whole
-    block still reads as a thinking aside. Telegram allows ``<b>`` /
-    ``<a>`` / etc. nested inside ``<i>``, so the combination renders
-    correctly even when the model emits formatting mid-trace.
-
+    ``_em_``, fenced code, etc.), so we still route through the same
+    Markdown renderer as answer text. The visible wrapper intentionally
+    stays minimal: Claude Cage surfaces TUI status as ``✻ ...`` rather
+    than a Telegram card.
     """
     rendered = md_to_telegram_html(text)
     # ``md_to_telegram_html`` falls back to the raw text when conversion
@@ -230,7 +254,7 @@ def thinking_html(text: str) -> str:
     # ``<``/``&`` from the model into Telegram's HTML parser.
     if rendered is text:
         rendered = html_lib.escape(text)
-    return f"💭 <b>Thinking...</b>\n\n<i>{rendered}</i>"
+    return f"✻ {rendered}"
 
 
 def optional_int(value: object) -> int | None:
