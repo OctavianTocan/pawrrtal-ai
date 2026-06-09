@@ -18,6 +18,7 @@ def main(argv: list[str] | None = None) -> None:
     target = resolve_target(args.target)
     secrets = load_secret_environment(target)
     child_env = os.environ.copy()
+    child_env.update(target.environment)
     child_env.update(secrets)
     sys.stderr.write(f"loaded {len(secrets)} secret-backed env vars for target {target.name}\n")
     # The service launcher intentionally replaces itself with the trusted

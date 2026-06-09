@@ -40,6 +40,7 @@ class ServiceTarget:
     bws_shared_project_id: str
     shared_keys: tuple[str, ...]
     required_secrets: tuple[str, ...]
+    environment: dict[str, str]
     public_hostname: str = ""
     enable_dev_login: bool = False
 
@@ -79,6 +80,7 @@ def built_in_targets() -> dict[str, ServiceTarget]:
             bws_shared_project_id="",
             shared_keys=SHARED_KEYS,
             required_secrets=REQUIRED_SECRETS,
+            environment={},
         ),
         "dev": ServiceTarget(
             name="dev",
@@ -91,6 +93,7 @@ def built_in_targets() -> dict[str, ServiceTarget]:
             bws_shared_project_id="",
             shared_keys=SHARED_KEYS,
             required_secrets=REQUIRED_SECRETS,
+            environment={},
         ),
     }
 
@@ -174,6 +177,7 @@ def _parse_targets(
                 raw_target.get("required_secrets"),
                 base.required_secrets,
             ),
+            environment=_environment_dict(raw_target.get("environment"), base.environment),
             public_hostname=_string_value(raw_target.get("public_hostname"), base.public_hostname),
             enable_dev_login=_bool_value(
                 raw_target.get("enable_dev_login"),
@@ -210,6 +214,27 @@ def _string_tuple(value: object, default: tuple[str, ...]) -> tuple[str, ...]:
     if not isinstance(value, list):
         return default
     return tuple(item.strip() for item in value if isinstance(item, str) and item.strip())
+
+
+def _environment_dict(value: object, default: dict[str, str]) -> dict[str, str]:
+    """Return target-specific non-secret environment settings."""
+    if not isinstance(value, dict):
+        return dict(default)
+    environment: dict[str, str] = {}
+    for key, item in value.items():
+        if not isinstance(key, str) or not key.strip():
+            continue
+        if isinstance(item, bool):
+            environment[key.strip()] = "true" if item else "false"
+            continue
+        if isinstance(item, int | float):
+            environment[key.strip()] = str(item)
+            continue
+        if isinstance(item, str):
+            stripped = item.strip()
+            if stripped:
+                environment[key.strip()] = stripped
+    return environment
 
 
 def _replace_or_prepend_default(existing: str, target_name: str) -> str:

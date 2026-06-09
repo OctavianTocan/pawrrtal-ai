@@ -62,6 +62,9 @@ def render_unit(target: ServiceTarget) -> str:
         env_lines.append(systemd_env_line("PAWRRTAL_PUBLIC_HOSTNAME", target.public_hostname))
     if target.enable_dev_login:
         env_lines.append(systemd_env_line("PAWRRTAL_ENABLE_DEV_LOGIN", "true"))
+    env_lines.extend(
+        systemd_env_line(key, value) for key, value in sorted(target.environment.items())
+    )
     return "\n".join(
         [
             "[Unit]",

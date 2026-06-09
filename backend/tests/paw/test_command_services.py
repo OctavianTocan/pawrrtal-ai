@@ -33,6 +33,10 @@ bws_project_id = "dev-project"
 bws_shared_project_id = "shared-project"
 frontend_port = 3100
 backend_port = 8100
+
+[targets.dev.environment]
+CORS_ORIGINS = "[\\"http://127.0.0.1:3100\\"]"
+TELEGRAM_MODE = "polling"
 """.strip()
         + "\n",
         encoding="utf-8",
@@ -94,6 +98,8 @@ def test_services_install_dry_run_prints_unit_without_writing(
     assert 'Environment="ENV=dev"' in result.stdout
     assert 'Environment="PORT=3100"' in result.stdout
     assert 'Environment="PAWRRTAL_BACKEND_PORT=8100"' in result.stdout
+    assert 'Environment="CORS_ORIGINS=[\\"http://127.0.0.1:3100\\"]"' in result.stdout
+    assert 'Environment="TELEGRAM_MODE=polling"' in result.stdout
     assert "app.cli.paw.commands.services.launch --target dev" in result.stdout
     assert fake_systemd == []
     assert not (tmp_path / "systemd" / "pawrrtal-dev.service").exists()
