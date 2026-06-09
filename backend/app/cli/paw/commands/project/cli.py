@@ -1,9 +1,8 @@
 """Whole-project dev lifecycle commands for ``paw project``.
 
 ``paw dev`` intentionally manages only the FastAPI backend. This module
-wraps the root ``dev.ts`` orchestrator for local development and exposes
-service helpers for the Cloudflared-facing production loopback server:
-Next.js on ``localhost:3000`` and FastAPI on ``127.0.0.1:8000``.
+wraps the root ``dev.ts`` orchestrator for local development: Next.js on
+``localhost:3000`` and FastAPI on ``127.0.0.1:8000``.
 """
 
 from __future__ import annotations
@@ -27,7 +26,6 @@ from app.cli.paw.commands.project.preflight import (
     raise_if_preflight_failed,
     run_preflight_checks,
 )
-from app.cli.paw.commands.project.service import app as service_app
 from app.cli.paw.commands.project.state import (
     DEFAULT_BACKEND_URL,
     DEFAULT_BOOT_TIMEOUT_S,
@@ -53,7 +51,6 @@ from app.cli.paw.output import emit_human, emit_json, emit_plain_rows, require_o
 app = typer.Typer(no_args_is_help=True)
 env_app = typer.Typer(no_args_is_help=True)
 app.add_typer(cloudflared_app, name="cloudflared", help="Install/manage Cloudflared.")
-app.add_typer(service_app, name="service", help="Install/manage the systemd app service.")
 
 
 def pid_alive(pid: int) -> bool:

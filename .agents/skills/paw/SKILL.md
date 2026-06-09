@@ -22,7 +22,8 @@ just paw env check                             # check cache/config writability,
 just env-check                                 # same check through repo-local writable dirs
 just paw project up                            # start the full local app in the background
 just paw project down                          # stop the CLI-launched full local app
-just paw project service install               # install/start the user systemd dev service
+just paw services install prod --dry-run       # preview the systemd service unit
+just paw services install prod --yes           # install/start the systemd service
 just smoke-dev                                 # preflight + start + status + stop
 just paw login --dev-admin                     # seed the dev persona (cookie + workspace)
 just paw verify codex --json                   # end-to-end Codex proof
@@ -67,7 +68,8 @@ Every row reflects a shipped subcommand. Source: `backend/app/cli/paw/commands/`
 | fanout           | `<N> COMMAND…`                                                 | local orchestrator over N parallel personas |
 | mirror           | `--upstream URL COMMAND…`                                      | local vs remote SSE diff                 |
 | env              | `check`                                                        | local environment preflight              |
-| project          | `up`, `down`, `status`, `preflight`, `logs`, `cloudflared ...`, `service ...`; root `run`/`stop` aliases | local full-stack lifecycle |
+| project          | `up`, `down`, `status`, `preflight`, `logs`, `cloudflared ...`; root `run`/`stop` aliases | local full-stack lifecycle |
+| services         | `targets list/show/use`, `install`, `uninstall`, `start`, `stop`, `restart`, `status`, `logs`, `secrets check` | systemd service targets + Bitwarden-backed launch |
 | verify           | `codex`, `chat-roundtrip`, `model-switch`, `telegram`, `google-chat`, `cost`, `lcm`, `all-providers`, `all` | end-to-end proof suites |
 | lab              | `bench model/providers`, `runs ls/show/export/review`, `flows ls/show`, `telegram chat/media/providers` | exploratory benchmarks + dogfood |
 | doctor           | (no verb)                                                      | local + ping `/api/v1/health` + models   |
@@ -262,10 +264,13 @@ just paw project up
 just paw project status --json
 just paw project logs
 just paw project down
-just paw project service install
-just paw project service status
-just paw project service logs --follow
-just paw project service uninstall
+just paw services targets list
+just paw services secrets check prod --json
+just paw services install prod --dry-run
+just paw services install prod --yes
+just paw services status prod
+just paw services logs prod --follow
+just paw services uninstall prod --yes
 
 # Short aliases:
 just paw run
@@ -274,7 +279,7 @@ just paw stop
 
 `paw project up` launches the same root `dev.ts` orchestrator as `just dev`, but detaches it and stores state in `<PAW_CONFIG_DIR>/<profile>/project.json`. It writes combined output to `<PAW_CONFIG_DIR>/<profile>/project.log`, waits for both Next.js (`http://localhost:53001`) and FastAPI (`http://127.0.0.1:8000`) to respond, and `project down` stops the tracked process group. Use `paw dev up/down/status` only when you need the backend half by itself.
 
-`paw project service install` writes a user systemd unit at `~/.config/systemd/user/pawrrtal-dev.service`, reloads systemd, and enables/starts it with `systemctl --user enable --now`. Use `--linger` when you want the user service to start at machine boot without an interactive login. Manage it with `paw project service start|stop|restart|status|logs|uninstall`.
+`paw services install TARGET --yes` writes a host systemd unit for the selected service target, reloads systemd, and enables/starts it with `systemctl enable --now`. `paw services install TARGET --dry-run` previews the unit without writing. Targets come from `/etc/pawrrtal/services.toml` by default; `BWS_ACCESS_TOKEN` stays in `/etc/pawrrtal/bws.env`, and `paw services secrets check TARGET --json` validates Bitwarden access without printing secret values.
 
 `paw env check` and `paw project preflight` are non-interactive gates for agents. They fail before spawning if required binaries are missing, cache/config directories are not writable, dev ports are already occupied, or the current environment cannot bind local sockets. `just env-check` wraps the same check with repo-local writable state (`.cache/paw`, `.cache/uv`, `.cache/xdg`). `just smoke-dev` is the end-to-end startup gate: preflight, start, status, stop.
 
@@ -337,7 +342,8 @@ Every command supports:
 | `PAW_E2E`        | `1` in pytest → run the live E2E suite (boots a real backend)    |
 | `UV_CACHE_DIR`   | Set by `dev.ts` / `paw project up` to `.cache/uv` when unset     |
 | `XDG_CACHE_HOME` | Set by `dev.ts` / `paw project up` to `.cache/xdg` when unset    |
-| `PAWRRTAL_DEV_DATABASE_URL` | Explicit non-SQLite database URL for `dev.ts` / the user service |
+| `PAWRRTAL_DEV_DATABASE_URL` | Explicit non-SQLite database URL for `dev.ts` local development |
+| `PAWRRTAL_SERVICES_CONFIG` | Path to the local `paw services` target config (default: `/etc/pawrrtal/services.toml`) |
 
 ## Pitfalls
 

@@ -15,12 +15,10 @@ from typer.testing import CliRunner
 
 import app.cli.paw.commands.project.cloudflared as cloudflared_module
 import app.cli.paw.commands.project.preflight as preflight_module
-import app.cli.paw.commands.project.service as service_module
 from app.cli.paw import config as paw_config
 from app.cli.paw.commands.project import cli as project_module
-from app.cli.paw.commands.project.cloudflared_state import CloudflaredState, save_state
 from app.cli.paw.commands.project.preflight import PreflightCheck
-from app.cli.paw.commands.project.state import PROJECT_STATE_SCHEMA_VERSION, repo_root
+from app.cli.paw.commands.project.state import PROJECT_STATE_SCHEMA_VERSION
 from app.cli.paw.errors import LocalError
 from app.cli.paw.main import app
 
@@ -394,109 +392,6 @@ def test_project_env_can_opt_into_external_dev_database(monkeypatch):
 
 
 @pytest.fixture
-def fake_systemd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[list[str]]:
-    """Capture systemctl calls and isolate the generated system unit."""
-    calls: list[list[str]] = []
-    monkeypatch.setenv("PAWRRTAL_SYSTEMD_UNIT_DIR", str(tmp_path / "systemd"))
-    monkeypatch.setattr(service_module, "_require_binary", lambda name: f"/fake/bin/{name}")
-
-    def fake_run(args: list[str], **_: Any) -> subprocess.CompletedProcess[str]:
-        calls.append(args)
-        return subprocess.CompletedProcess(args=args, returncode=0, stdout="ok\n", stderr="")
-
-    monkeypatch.setattr(service_module, "_run", fake_run)
-    return calls
-
-
-def test_project_service_install_writes_system_unit_and_enables_now(
-    runner: CliRunner,
-    fake_systemd: list[list[str]],
-    tmp_path: Path,
-) -> None:
-    """``paw project service install`` installs and starts a production systemd unit."""
-    result = runner.invoke(app, ["project", "service", "install"])
-    assert result.exit_code == 0, result.stdout
-
-    unit_path = tmp_path / "systemd" / "pawrrtal.service"
-    unit = unit_path.read_text()
-    assert f"WorkingDirectory={repo_root()}" in unit
-    assert f"EnvironmentFile=-{repo_root() / 'backend/.env'}" in unit
-    assert "ExecStart=/fake/bin/bun run serve.ts" in unit
-    assert "RestartSec=15" in unit
-    assert "KillMode=control-group" in unit
-    assert "SuccessExitStatus=143 130" in unit
-    assert "StartLimitBurst=3" in unit
-    assert (
-        'Environment="PATH=/fake/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"'
-    ) in unit
-    assert 'Environment="NODE_ENV=production"' in unit
-    assert 'Environment="UV_LINK_MODE=copy"' in unit
-    assert 'Environment="ENV=prod"' in unit
-    assert 'Environment="PAWRRTAL_BACKEND_HOST=127.0.0.1"' in unit
-    assert 'Environment="PAWRRTAL_BACKEND_PORT=8000"' in unit
-    assert 'Environment="BACKEND_INTERNAL_URL=http://127.0.0.1:8000"' in unit
-    assert fake_systemd == [
-        ["systemctl", "is-system-running"],
-        ["systemctl", "daemon-reload"],
-        ["systemctl", "enable", "--now", "pawrrtal.service"],
-    ]
-
-
-def test_project_service_install_can_enable_dev_login(
-    runner: CliRunner,
-    fake_systemd: list[list[str]],
-    tmp_path: Path,
-) -> None:
-    """``--enable-dev-login`` explicitly exposes the shortcut in production."""
-    result = runner.invoke(app, ["project", "service", "install", "--enable-dev-login"])
-    assert result.exit_code == 0, result.stdout
-
-    unit_path = tmp_path / "systemd" / "pawrrtal.service"
-    unit = unit_path.read_text()
-    assert 'Environment="PAWRRTAL_ENABLE_DEV_LOGIN=true"' in unit
-
-
-def test_project_service_install_allows_saved_cloudflared_origin(
-    runner: CliRunner,
-    fake_systemd: list[list[str]],
-    tmp_path: Path,
-) -> None:
-    """The managed service records the saved Cloudflared public hostname."""
-    save_state(
-        CloudflaredState(
-            schema_version=1,
-            tunnel_name="pawrrtal",
-            tunnel_id="tunnel-uuid",
-            hostname="pawrrtal.example.com",
-            public_url="https://pawrrtal.example.com/",
-            config_path="/etc/cloudflared/config.yml",
-            credentials_file="/etc/cloudflared/tunnel-uuid.json",
-            frontend_origin="http://127.0.0.1:3000",
-            backend_origin="http://127.0.0.1:8000",
-            metrics="127.0.0.1:20241",
-            installed_at="2026-06-07T00:00:00+00:00",
-        )
-    )
-
-    result = runner.invoke(app, ["project", "service", "install"])
-    assert result.exit_code == 0, result.stdout
-
-    unit_path = tmp_path / "systemd" / "pawrrtal.service"
-    unit = unit_path.read_text()
-    assert 'Environment="PAWRRTAL_PUBLIC_HOSTNAME=pawrrtal.example.com"' in unit
-
-
-def test_project_service_install_can_start_without_enable(
-    runner: CliRunner,
-    fake_systemd: list[list[str]],
-) -> None:
-    """``--no-enable --now`` starts the unit without enabling boot startup."""
-    result = runner.invoke(app, ["project", "service", "install", "--no-enable", "--now"])
-    assert result.exit_code == 0, result.stdout
-    assert ["systemctl", "start", "pawrrtal.service"] in fake_systemd
-
-
-@pytest.fixture
 def fake_cloudflared(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[list[str]]:
     """Capture cloudflared/systemctl calls and isolate tunnel credentials."""
     calls: list[list[str]] = []
@@ -828,35 +723,3 @@ def test_project_cloudflared_uninstall_removes_saved_config_path(
     assert not config_path.exists()
     assert not credentials_path.exists()
     assert not (paw_config.profile_dir("cloudflared") / "project-service.json").exists()
-
-
-def test_project_service_uninstall_disables_and_removes_unit(
-    runner: CliRunner,
-    fake_systemd: list[list[str]],
-    tmp_path: Path,
-) -> None:
-    """``paw project service uninstall`` disables the unit and removes the file."""
-    unit_dir = tmp_path / "systemd"
-    unit_dir.mkdir(parents=True)
-    unit_path = unit_dir / "pawrrtal.service"
-    unit_path.write_text("[Unit]\nDescription=old\n")
-
-    result = runner.invoke(app, ["project", "service", "uninstall"])
-    assert result.exit_code == 0, result.stdout
-    assert not unit_path.exists()
-    assert fake_systemd == [
-        ["systemctl", "disable", "--now", "pawrrtal.service"],
-        ["systemctl", "daemon-reload"],
-    ]
-
-
-def test_project_service_status_invokes_systemctl(
-    runner: CliRunner,
-    fake_systemd: list[list[str]],
-) -> None:
-    """``paw project service status`` delegates to the systemd service."""
-    result = runner.invoke(app, ["project", "service", "status"])
-    assert result.exit_code == 0, result.stdout
-    assert fake_systemd == [
-        ["systemctl", "status", "pawrrtal.service", "--no-pager"],
-    ]

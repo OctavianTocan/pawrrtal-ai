@@ -32,7 +32,7 @@ setEnvDefault('UV_LINK_MODE', 'copy');
 setEnvDefault('BACKEND_INTERNAL_URL', BACKEND_URL);
 setEnvDefault('HOSTNAME', FRONTEND_BIND_HOST);
 setEnvDefault('PORT', String(FRONTEND_PORT));
-setEnv('ENV', 'prod');
+setEnvDefault('ENV', 'prod');
 
 logInfo('Building frontend production bundle');
 await $`bun --filter pawrrtal build`;

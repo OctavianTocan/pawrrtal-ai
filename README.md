@@ -179,7 +179,6 @@ Placeholder settings sections currently listed in the nav but not fully wired:
 - **Dev login**: `/auth/dev-login` logs in as the seeded admin in non-production when `ADMIN_EMAIL` and `ADMIN_PASSWORD` are configured. It also idempotently ensures a default workspace.
 - **Google OAuth**: Start/callback flow is implemented and gated by `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`.
 - **Apple OAuth**: Start route exists, but callback is currently a stub returning 501.
-- **Backend API key gate**: Optional server-to-server `BACKEND_API_KEY` requires clients to send `X-Pawrrtal-Key`. Leave it unset for the Cloudflared browser app, where Cloudflare Access is the public gate.
 - **Email allowlist**: Optional `ALLOWED_EMAILS` restricts authenticated access.
 - **Demo mode**: `DEMO_MODE=true` disables Telegram and applies demo deployment restrictions.
 
@@ -274,12 +273,13 @@ just paw project logs      # Print the combined detached log path
 just paw project down      # Stop the tracked process group
 just paw env check         # Verify cache/config writability, binaries, and ports
 
-# Optional user systemd service:
-just paw project service install          # Install, enable, and start
-just paw project service install --linger # Also start at machine boot
-just paw project service status
-just paw project service logs --follow
-just paw project service uninstall
+# Optional systemd service:
+just paw services targets list            # Show prod/dev service targets
+just paw services install prod --dry-run  # Preview the generated unit
+just paw services install prod --yes      # Install, enable, and start
+just paw services status prod
+just paw services logs prod --follow
+just paw services uninstall prod --yes
 
 # Cloudflared public deployment profile:
 just paw project cloudflared install --hostname pawrrtal.example.com --tunnel-name pawrrtal
@@ -294,7 +294,7 @@ just paw stop
 
 Before changing startup code, run `just env-check`. It catches missing binaries, unwritable cache/config paths, occupied dev ports, and environments that cannot bind local sockets. Before claiming the local app boots end-to-end, run `just smoke-dev`; it preflights the environment, starts the detached stack, checks status, and stops it.
 
-The service helper writes `~/.config/systemd/user/pawrrtal-dev.service` and manages it through `systemctl --user`. It uses the same `dev.ts` orchestrator as `just dev`, defaults to the local SQLite database, and preserves `PAWRRTAL_DEV_DATABASE_URL` when you intentionally want a non-SQLite dev database.
+The service helper writes a host systemd unit and manages it through `systemctl`. It runs `serve.ts`, keeps public traffic behind Cloudflared, and loads runtime secrets from Bitwarden Secrets Manager through the selected `paw services` target. Keep `BWS_ACCESS_TOKEN` in a root-owned env file such as `/etc/pawrrtal/bws.env`; do not commit it.
 
 The Cloudflared helper writes `/etc/cloudflared/config.yml`, keeps Next.js and FastAPI bound to loopback, routes `/api/v1`, `/auth`, and `/users` to FastAPI, and routes all other paths to Next.js. Public access must be protected by a Cloudflare Access self-hosted app. Browser API calls stay same-origin through the public hostname; server-side Next.js fetches still use `BACKEND_INTERNAL_URL=http://127.0.0.1:8000`.
 
@@ -326,8 +326,6 @@ Required-at-minimum for a useful local app: `AUTH_SECRET`, `WORKSPACE_ENCRYPTION
 # Auth + access
 AUTH_SECRET=
 WORKSPACE_ENCRYPTION_KEY=
-# Optional server-to-server shared secret. Leave unset for the Cloudflared browser app.
-# BACKEND_API_KEY=
 ALLOWED_EMAILS=
 DEMO_MODE=false
 
@@ -658,7 +656,7 @@ just push             # Push with multi-account auth handling
 
 ### Cloudflared VPS
 
-- Run the local project service on loopback.
+- Run the selected `paw services` target on loopback.
 - Publish one hostname with `paw project cloudflared install`.
 - Protect that hostname with Cloudflare Access before users open the app.
 

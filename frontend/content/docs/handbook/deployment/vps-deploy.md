@@ -125,18 +125,21 @@ just paw project status
 For the persistent VPS process, install the systemd service:
 
 ```bash
-just paw project service install --enable-dev-login
-just paw project service status
+just paw services secrets check prod --json
+just paw services install prod --dry-run
+just paw services install prod --yes
+just paw services status prod
 ```
 
 The service runs `serve.ts`: it builds the standalone Next.js bundle,
 starts the production Next server on `127.0.0.1:3000`, and starts
 FastAPI on `127.0.0.1:8000` without reload mode. It does not expose a
-public port. The service loads `backend/.env` through systemd's
-`EnvironmentFile`, and the generated unit only writes non-secret
-runtime settings such as ports, `ENV=prod`, and `BACKEND_INTERNAL_URL`.
-Use `--enable-dev-login` only for an operator deployment protected by
-Cloudflare Access.
+public port. The service loads `BWS_ACCESS_TOKEN` through systemd's
+root-owned env file and resolves app secrets from Bitwarden Secrets
+Manager. The generated unit only writes non-secret runtime settings such
+as ports, `ENV=prod`, and `BACKEND_INTERNAL_URL`.
+Set `enable_dev_login = true` in the target config only for an operator
+deployment protected by Cloudflare Access.
 
 ## Cloudflared Install
 
@@ -239,7 +242,7 @@ just install
 cd backend
 uv run alembic upgrade head
 cd ..
-just paw project service restart
+just paw services restart prod
 just paw project cloudflared verify --hostname pawrrtal.octaviantocan.com
 ```
 
