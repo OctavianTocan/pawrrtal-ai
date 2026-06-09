@@ -98,11 +98,9 @@ OAUTH_POST_LOGIN_REDIRECT=https://<pawrrtal-hostname>/
 GOOGLE_API_KEY=<or another provider key>
 ```
 
-Leave `BACKEND_API_KEY` unset for the Cloudflared browser app. The
-browser now calls same-origin `/api/v1`, `/auth`, and `/users` routes
-directly, and Cloudflare Access is the public transport gate. Use
-`BACKEND_API_KEY` only for server-to-server deployments where every
-caller can inject `X-Pawrrtal-Key`.
+The browser calls same-origin `/api/v1`, `/auth`, and `/users` routes
+directly, and Cloudflare Access is the public transport gate. Pawrrtal no
+longer supports an extra backend transport API key for this deployment path.
 
 Frontend server-side calls use:
 

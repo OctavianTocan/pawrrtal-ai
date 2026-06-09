@@ -10,7 +10,6 @@ from fastapi import FastAPI
 import app.plugins as _plugins
 from app.infrastructure.lifecycle import default_registry
 from app.infrastructure.logging.setup import configure_logging
-from app.infrastructure.middleware.backend_api_key import BackendApiKeyMiddleware
 from app.infrastructure.middleware.cors import with_cors
 from app.infrastructure.middleware.logging import RequestLoggingMiddleware
 from app.infrastructure.middleware.rate_limit import ChatRateLimitMiddleware
@@ -77,7 +76,6 @@ def create_app() -> FastAPI:
     )
     fastapi_app.add_middleware(RequestLoggingMiddleware)
     fastapi_app.add_middleware(ChatRateLimitMiddleware)
-    fastapi_app.add_middleware(BackendApiKeyMiddleware)
     register_routers(fastapi_app)
     return fastapi_app
 

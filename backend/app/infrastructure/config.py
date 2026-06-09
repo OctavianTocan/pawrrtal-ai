@@ -133,14 +133,6 @@ class Settings(BaseSettings):
     # set PAWRRTAL_ENABLE_DEV_LOGIN=true on both frontend and backend.
     pawrrtal_enable_dev_login: bool = False
 
-    # --- Access control ------------------------------------------------------
-    # Optional bearer token all clients must supply in the X-Pawrrtal-Key
-    # request header. When set, any request missing or carrying the wrong
-    # value is rejected with 401 before auth runs. Leave empty to disable
-    # (useful in local dev or for the public demo instance where
-    # ALLOWED_EMAILS is the only gate). Generate with: openssl rand -hex 32
-    backend_api_key: str = ""
-
     # Comma-separated list of email addresses that are allowed to use this
     # backend. When non-empty, authenticated users whose email is not on
     # the list receive a 403 on any authenticated endpoint. Google and Apple

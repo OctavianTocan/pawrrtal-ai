@@ -128,9 +128,8 @@ concern.
 ### Access control
 
 `ALLOWED_EMAILS` (comma-separated email allowlist), `DEMO_MODE` (locks
-down public demo deploys). `BACKEND_API_KEY` is optional and only fits
-server-to-server callers that can inject `X-Pawrrtal-Key`; leave it
-unset for the Cloudflared browser app.
+down public demo deploys). Cloudflare Access and app auth are the
+transport/user gates; the old backend transport API key is not supported.
 
 ### Agent loop safety (defaults work for most deploys)
 

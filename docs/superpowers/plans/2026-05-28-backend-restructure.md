@@ -632,7 +632,6 @@ from typing import TYPE_CHECKING
 
 from fastapi import FastAPI
 
-from app.core.middleware import BackendApiKeyMiddleware
 from app.core.rate_limit import ChatRateLimitMiddleware
 from app.core.request_logging import RequestLoggingMiddleware
 from app.infrastructure.lifecycle import default_registry
@@ -671,7 +670,6 @@ def create_app() -> ASGIApp:
     )
     fastapi_app.add_middleware(RequestLoggingMiddleware)
     fastapi_app.add_middleware(ChatRateLimitMiddleware)
-    fastapi_app.add_middleware(BackendApiKeyMiddleware)
     register_routers(fastapi_app)
     return wrap_cors(fastapi_app)
 ```
@@ -957,7 +955,6 @@ cd backend && rg -l 'from app\.users import' | \
 ### Task 4.3: Move middleware modules
 
 **Files:**
-- `backend/app/infrastructure/middleware/backend_api_key.py` → `backend/app/infrastructure/middleware/backend_api_key.py`
 - `backend/app/infrastructure/middleware/rate_limit.py` → `backend/app/infrastructure/middleware/rate_limit.py`
 - `backend/app/infrastructure/middleware/logging.py` → `backend/app/infrastructure/middleware/logging.py`
 

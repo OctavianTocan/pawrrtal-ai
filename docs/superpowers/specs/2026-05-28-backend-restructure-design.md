@@ -145,7 +145,7 @@ backend/
         codex_persist_drain.py scheduler.py event_bus.py tracing.py
 
       middleware/
-        cors.py logging.py rate_limit.py backend_api_key.py
+        cors.py logging.py rate_limit.py
 
       database/                      # was db.py + db_base.py
         engine.py session.py base.py

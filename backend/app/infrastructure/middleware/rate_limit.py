@@ -110,9 +110,7 @@ class ChatRateLimitMiddleware(BaseHTTPMiddleware):
     """Cap chat requests per user per minute.
 
     Layered above ``RequestLoggingMiddleware`` so 429s still get a
-    request-id stamped log line, and below ``BackendApiKeyMiddleware``
-    so a request without the API key never reaches the limiter (and
-    thus can't be used to enumerate the limit's existence).
+    request-id stamped log line.
     """
 
     async def dispatch(
