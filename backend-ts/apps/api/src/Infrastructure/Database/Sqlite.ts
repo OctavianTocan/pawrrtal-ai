@@ -2,7 +2,7 @@
 // Follow backend/vendor/effect-smol/packages/sql/sqlite-node/src/SqliteClient.ts:
 // SqliteClient.layer or layerConfig for the implementation.
 
-import { SqliteClient } from '@effect/sql-sqlite-node';
+import { SqliteClient } from '@effect/sql-sqlite-bun';
 import { DatabaseConfig } from './Config';
 
 /** The SQLite database layer. */

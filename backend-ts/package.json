@@ -9,7 +9,7 @@
 	"scripts": {
 		"install:deps": "bun install",
 		"typecheck": "bun run --filter '@pawrrtal/*' typecheck",
-		"test": "vitest run --passWithNoTests"
+		"test": "bun --bun vitest run --passWithNoTests"
 	},
 	"devDependencies": {
 		"@effect/language-service": "^0.85.1",

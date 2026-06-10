@@ -8,8 +8,7 @@
  *   Layer.launch(HttpServerLayer).pipe(NodeRuntime.runMain)
  */
 
-import { createServer } from 'node:http';
-import { NodeHttpServer, NodeRuntime } from '@effect/platform-node';
+import { BunHttpServer, BunRuntime } from '@effect/platform-bun';
 import { Layer } from 'effect';
 import { HttpRouter } from 'effect/unstable/http';
 import { AppLive } from './App';
@@ -17,7 +16,7 @@ import { AppLive } from './App';
 const PORT = 8001;
 
 const HttpServerLayer = HttpRouter.serve(AppLive).pipe(
-	Layer.provide(NodeHttpServer.layer(createServer, { port: PORT })),
+	Layer.provide(BunHttpServer.layer({ port: PORT })),
 	Layer.orDie
 );
 
@@ -33,4 +32,4 @@ const HttpServerLayer = HttpRouter.serve(AppLive).pipe(
  */
 const HttpServerLayerClosed = HttpServerLayer as Layer.Layer<never, never, never>;
 
-Layer.launch(HttpServerLayerClosed).pipe(NodeRuntime.runMain);
+Layer.launch(HttpServerLayerClosed).pipe(BunRuntime.runMain);
