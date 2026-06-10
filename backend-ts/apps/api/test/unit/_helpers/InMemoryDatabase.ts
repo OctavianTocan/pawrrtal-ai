@@ -16,7 +16,7 @@
  *
  * Schema mirrors `backend/app/models.py` → `projects` table.
  */
-import { SqliteClient } from '@effect/sql-sqlite-node';
+import { SqliteClient } from '@effect/sql-sqlite-bun';
 import { Context, Effect, Layer, Scope } from 'effect';
 import { Reactivity } from 'effect/unstable/reactivity';
 import { SqlClient } from 'effect/unstable/sql';

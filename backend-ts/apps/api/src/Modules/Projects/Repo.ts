@@ -4,9 +4,6 @@ import { Context, DateTime, Effect, Layer } from 'effect';
 import { SqlClient } from 'effect/unstable/sql';
 import { DatabaseLive } from '@/Infrastructure/Database';
 
-/** SQLite mutation metadata from `sql`…`.raw`. */
-type SqlMutationResult = { readonly changes: number; readonly lastInsertRowid: number };
-
 const asProjects = (rows: ReadonlyArray<unknown>): ReadonlyArray<Project> =>
 	rows as unknown as ReadonlyArray<Project>;
 
@@ -85,14 +82,15 @@ export const ProjectsRepoBody: Layer.Layer<ProjectsRepo, never, SqlClient.SqlCli
 			const now = yield* DateTime.now;
 			const ts = DateTime.formatIso(now);
 
-			const result =
-				(yield* sql`UPDATE projects SET name = ${name}, updated_at = ${ts} WHERE id = ${id} AND user_id = ${userId}`.raw.pipe(
-					Effect.orDie
-				)) as SqlMutationResult;
-
-			if (result.changes === 0) {
-				return null;
-			}
+			// Use the generic `execute` path (returns rows or empty for
+			// non-SELECT). Better-sqlite3's `.raw` exposes `{ changes }`
+			// but bun:sqlite returns the result of `statement.all(...)`
+			// (an array), so cross-driver code should not rely on a
+			// mutation-result shape. We check visibility with a SELECT
+			// after the UPDATE: if the row matches, it was updated.
+			yield* sql`UPDATE projects SET name = ${name}, updated_at = ${ts} WHERE id = ${id} AND user_id = ${userId}`.pipe(
+				Effect.orDie
+			);
 
 			const rows =
 				yield* sql`SELECT id, user_id, name, created_at, updated_at FROM projects WHERE id = ${id} AND user_id = ${userId}`.pipe(
@@ -102,11 +100,20 @@ export const ProjectsRepoBody: Layer.Layer<ProjectsRepo, never, SqlClient.SqlCli
 		});
 
 		const remove = Effect.fn('ProjectsRepo.delete')(function* (id: ProjectId, userId: UserId) {
-			const result =
-				(yield* sql`DELETE FROM projects WHERE id = ${id} AND user_id = ${userId}`.raw.pipe(
+			// Cross-driver delete: do a pre-SELECT to confirm the row
+			// exists for the requesting user, then DELETE. Returns the
+			// visibility-check result, not the raw mutation count.
+			const before =
+				yield* sql`SELECT id FROM projects WHERE id = ${id} AND user_id = ${userId}`.pipe(
 					Effect.orDie
-				)) as SqlMutationResult;
-			return result.changes > 0;
+				);
+			if (before.length === 0) {
+				return false;
+			}
+			yield* sql`DELETE FROM projects WHERE id = ${id} AND user_id = ${userId}`.pipe(
+				Effect.orDie
+			);
+			return true;
 		});
 
 		return { listByUser, insert, update, delete: remove } as const;
