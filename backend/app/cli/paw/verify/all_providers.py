@@ -13,7 +13,6 @@ from app.cli.paw.verify.scenarios import ScenarioResult
 
 DEFAULT_PROVIDER_ALLOWLIST = {
     "agy-api",
-    "gemini-cli",
     "openai-codex",
     "opencode-go",
 }

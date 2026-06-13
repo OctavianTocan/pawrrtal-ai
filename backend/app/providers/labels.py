@@ -15,7 +15,6 @@ HOST_LABELS: dict[Host, str] = {
     Host.claude_code_pty: "Claude Code PTY",
     Host.agy_api: "Antigravity API",
     Host.agy_cli: "Antigravity CLI",
-    Host.gemini_cli: "Gemini CLI",
     Host.google_ai: "Gemini API",
     Host.litellm: "LiteLLM",
     Host.opencode_go: "OpenCode Go",

@@ -187,11 +187,6 @@ def test_is_host_authenticated_reports_gateway_key_presence(
     assert is_host_authenticated(Host.opencode_go.value) is True
 
 
-def test_is_host_authenticated_returns_true_for_hosts_without_gateway_key() -> None:
-    """``gemini-cli`` runs a local subprocess, so it never needs a gateway key."""
-    assert is_host_authenticated(Host.gemini_cli.value) is True
-
-
 def test_host_keyboard_hides_unauthenticated_providers(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -23,7 +23,6 @@ MAX_DEFAULT_WARMUPS = 3
 DEFAULT_BENCH_TIMEOUT_SECONDS = 240.0
 DEFAULT_PROVIDER_ALLOWLIST = {
     "agy-api",
-    "gemini-cli",
     "openai-codex",
     "opencode-go",
 }

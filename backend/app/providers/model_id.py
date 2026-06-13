@@ -48,7 +48,6 @@ class Host(StrEnum):
     claude_code_pty = "claude-code-pty"
     agy_api = "agy-api"
     agy_cli = "agy-cli"
-    gemini_cli = "gemini-cli"
     google_ai = "google-ai"
     litellm = "litellm"
     opencode_go = "opencode-go"

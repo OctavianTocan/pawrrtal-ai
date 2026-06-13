@@ -31,9 +31,7 @@ def is_host_authenticated(host_slug: str) -> bool:
     failing default. When a workspace lands real per-user picker
     filtering, that work threads workspace_root through this seam.
 
-    Hosts absent from :data:`_HOST_AUTH_SETTING` (e.g. ``gemini-cli``,
-    which runs a local subprocess rather than calling out to a managed
-    gateway) are always considered authenticated.
+    Hosts absent from :data:`_HOST_AUTH_SETTING` are always considered authenticated.
     """
     setting_name = _HOST_AUTH_SETTING.get(host_slug)
     if setting_name is None:

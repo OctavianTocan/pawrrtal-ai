@@ -48,7 +48,7 @@ class StreamEvent(TypedDict, total=False):
     # Claude bridge (``_block_to_tool_result``) from
     # ``ToolResultBlock.is_error`` so downstream renderers can mark the turn
     # as failed without re-parsing the content. Other providers (Gemini, xAI,
-    # opencode-go, gemini-cli) currently don't surface error / non-error on
+    # opencode-go) currently don't surface error / non-error on
     # tool results, so consumers should treat a missing key as ``False``.
     is_error: bool
     # Provider-supplied error category on ``type="error"`` events. Currently

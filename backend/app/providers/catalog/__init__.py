@@ -21,7 +21,6 @@ from .entries import (
     XAI_ENTRIES,
     ModelEntry,
 )
-from .gemini_cli import GEMINI_CLI_ENTRIES
 from .openai import OPENAI_ENTRIES
 from .opencode_go import OPENCODE_GO_ENTRIES
 
@@ -40,7 +39,6 @@ __all__ = [
 MODEL_CATALOG: tuple[ModelEntry, ...] = (
     *ANTHROPIC_ENTRIES,
     *GOOGLE_ENTRIES,
-    *GEMINI_CLI_ENTRIES,
     *AGY_API_ENTRIES,
     *XAI_ENTRIES,
     *OPENAI_ENTRIES,

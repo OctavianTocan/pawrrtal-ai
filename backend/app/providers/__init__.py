@@ -10,19 +10,16 @@ if TYPE_CHECKING:
     from .catalog import first_catalog_model
     from .claude_code_pty import ClaudeCodePtyLLM, ClaudeCodePtyLLMConfig
     from .factory import resolve_llm
-    from .gemini_cli import GeminiCliLLM, is_gemini_cli_available
     from .xai import XaiLLM
 
 __all__ = [
     "AILLM",
     "ClaudeCodePtyLLM",
     "ClaudeCodePtyLLMConfig",
-    "GeminiCliLLM",
     "ReasoningEffort",
     "StreamEvent",
     "XaiLLM",
     "first_catalog_model",
-    "is_gemini_cli_available",
     "resolve_llm",
 ]
 
@@ -48,13 +45,6 @@ def __getattr__(name: str) -> object:
         return {
             "ClaudeCodePtyLLM": ClaudeCodePtyLLM,
             "ClaudeCodePtyLLMConfig": ClaudeCodePtyLLMConfig,
-        }[name]
-    if name in {"GeminiCliLLM", "is_gemini_cli_available"}:
-        from .gemini_cli import GeminiCliLLM, is_gemini_cli_available  # noqa: PLC0415
-
-        return {
-            "GeminiCliLLM": GeminiCliLLM,
-            "is_gemini_cli_available": is_gemini_cli_available,
         }[name]
     if name == "XaiLLM":
         from .xai import XaiLLM  # noqa: PLC0415

@@ -11,7 +11,6 @@
 const HOST_LABELS = {
 	'claude-code-pty': 'Claude Code PTY',
 	'agy-api': 'Antigravity API',
-	'gemini-cli': 'Gemini CLI',
 	'google-ai': 'Gemini API',
 	litellm: 'LiteLLM',
 	'opencode-go': 'OpenCode Go',

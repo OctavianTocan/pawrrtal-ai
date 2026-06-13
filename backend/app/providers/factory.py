@@ -22,7 +22,6 @@ from app.infrastructure.config import settings as settings  # noqa: PLC0414
 from .agy_api import AgyApiLLM
 from .base import AILLM
 from .claude_code_pty import ClaudeCodePtyLLM, ClaudeCodePtyLLMConfig
-from .gemini_cli import GeminiCliLLM
 from .litellm_provider import LiteLLMLLM
 from .model_id import Host, InvalidModelId, ParsedModelId, parse_model_id
 from .opencode_go import OpencodeGoLLM, OpencodeGoLLMConfig
@@ -56,7 +55,6 @@ HOST_TO_PROVIDER: dict[Host, type[AILLM] | None] = {
     Host.claude_code_pty: ClaudeCodePtyLLM,
     Host.agy_api: AgyApiLLM,
     Host.agy_cli: None,
-    Host.gemini_cli: GeminiCliLLM,
     Host.google_ai: None,  # resolved lazily in resolve_llm
     Host.litellm: LiteLLMLLM,
     Host.opencode_go: OpencodeGoLLM,
@@ -116,9 +114,6 @@ def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> boo
 
     * ``claude_code_pty`` (Claude): local ``ccpty serve`` bridge.
     * ``agy_api``: local ``agy`` OAuth token + project cache are present.
-    * ``gemini_cli``: the ``gemini`` binary is on ``PATH`` (probed
-      via :func:`is_gemini_cli_available`). Workspace overrides don't
-      apply — the binary is a process-level dependency.
     * ``google_ai`` (native Gemini): non-empty ``GEMINI_API_KEY``.
     * ``litellm``: non-empty ``OPENAI_API_KEY``. LiteLLM in this
       catalog only routes OpenAI models, so the OpenAI key is the
@@ -130,7 +125,7 @@ def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> boo
     Add a new entry to :data:`_HOST_ENV_KEY` when introducing a new
     :class:`Host`.
     """
-    if host in (Host.agy_api, Host.gemini_cli):
+    if host is Host.agy_api:
         return _local_cli_host_authenticated(host, workspace_root=workspace_root)
     keys = _HOST_AUTH_KEYS.get(host)
     if keys is None:
@@ -165,11 +160,7 @@ def _local_cli_host_authenticated(host: Host, *, workspace_root: Path | None) ->
         from .agy_api import has_agy_api_auth  # noqa: PLC0415
 
         return has_agy_api_auth(workspace_root)
-    # Local import: ``gemini_cli`` imports the agent loop which would
-    # re-enter the factory module on a top-level import.
-    from .gemini_cli import is_gemini_cli_available  # noqa: PLC0415
-
-    return is_gemini_cli_available()
+    return False
 
 
 def _xai_workspace_authenticated(workspace_root: Path, env_key: str) -> bool:
@@ -262,7 +253,7 @@ def resolve_llm(
         return _build_opencode_go(parsed, workspace_root)
     if parsed.host is Host.openai_codex:
         return _resolve_cached_openai_codex_provider(provider_cls, parsed, workspace_root)
-    if parsed.host is Host.google_ai or provider_cls in {AgyApiLLM, GeminiCliLLM, XaiLLM}:
+    if parsed.host is Host.google_ai or provider_cls in {AgyApiLLM, XaiLLM}:
         return provider_cls(parsed.model, workspace_root=workspace_root)  # type: ignore[call-arg]
     raise KeyError(f"no provider class registered for host {parsed.host!r}")
 

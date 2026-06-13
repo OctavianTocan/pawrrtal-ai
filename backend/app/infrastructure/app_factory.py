@@ -26,7 +26,6 @@ from app.infrastructure.shutdown import turn_finalize_drain as _turn_finalize_dr
 from app.infrastructure.startup import admin_seed as _admin_seed
 from app.infrastructure.startup import database as _database
 from app.infrastructure.startup import event_bus as _event_bus
-from app.infrastructure.startup import gemini_cli_check as _gemini_cli_check
 from app.infrastructure.startup import plugin_lifespans as _plugin_lifespans
 from app.infrastructure.startup import scheduler as _scheduler
 from app.infrastructure.startup import stale_streaming_messages as _stale_streaming_messages
@@ -37,7 +36,6 @@ configure_logging()
 
 _LIFECYCLE_MODULES = (
     _startup_tracing,
-    _gemini_cli_check,
     _database,
     _admin_seed,
     _workspace_env_migration,

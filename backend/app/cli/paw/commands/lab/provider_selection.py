@@ -9,10 +9,6 @@ PREFERRED_FAST_MODELS_BY_HOST: dict[str, tuple[str, ...]] = {
         "agy-api:google/gemini-3.5-flash-extra-low",
         "agy-api:google/gemini-3.5-flash-low",
     ),
-    "gemini-cli": (
-        "gemini-cli:google/gemini-2.5-flash-lite",
-        "gemini-cli:google/gemini-2.5-flash",
-    ),
     "google-ai": (
         "google-ai:google/gemini-3.5-flash",
         "google-ai:google/gemini-3-flash-preview",

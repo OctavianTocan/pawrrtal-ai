@@ -134,7 +134,7 @@ def get_models_router() -> APIRouter:
                 headers={"ETag": etag},
             )
         # Filter out catalog entries whose host doesn't have credentials
-        # (or, for ``gemini_cli``, doesn't have the binary on PATH). Users
+        # (or the selected local/provider host is unavailable). Users
         # shouldn't see picker rows they can't actually click — issue #370.
         authed_entries = [
             e for e in MODEL_CATALOG if host_authenticated(e.host, workspace_root=workspace_root)
