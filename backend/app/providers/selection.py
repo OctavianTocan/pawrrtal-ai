@@ -6,8 +6,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from app.providers.base import AILLM
-from app.providers.catalog import ModelEntry, find, first_catalog_model, require_known
-from app.providers.factory import resolve_llm
+from app.providers.catalog import (
+    ModelEntry,
+    find,
+    first_authenticated_catalog_model,
+    first_catalog_model,
+    require_known,
+)
+from app.providers.factory import host_authenticated, resolve_llm
 from app.providers.model_id import InvalidModelId, UnknownModelId, parse_model_id
 
 
@@ -24,6 +30,11 @@ class ProviderSelection:
 def default_model_id() -> str:
     """Return the catalog default model ID."""
     return first_catalog_model().id
+
+
+def _authenticated_default_model_id(workspace_root: Path | None = None) -> str:
+    """Return the first model whose host is authenticated for the workspace."""
+    return first_authenticated_catalog_model(workspace_root).id
 
 
 def effective_model_id(*, conversation_model_id: str | None) -> str:
@@ -66,14 +77,38 @@ def provider_or_default(
     *,
     workspace_root: Path | None = None,
 ) -> ProviderSelection:
-    """Resolve ``model_id``, falling back to the catalog default on bad IDs."""
+    """Resolve ``model_id`` or fall back to an authenticated catalog default."""
     try:
-        return require_provider(model_id, workspace_root=workspace_root)
+        entry = require_known(model_id)
     except (InvalidModelId, UnknownModelId) as exc:
-        fallback_id = default_model_id()
-        return ProviderSelection(
-            provider=resolve_llm(fallback_id, workspace_root=workspace_root),
-            effective_model_id=fallback_id,
+        return _fallback_selection(
+            model_id,
             warning=str(exc),
-            bad_model_id=model_id,
+            workspace_root=workspace_root,
         )
+    if host_authenticated(entry.host, workspace_root=workspace_root):
+        return ProviderSelection(
+            provider=resolve_llm(model_id, workspace_root=workspace_root),
+            effective_model_id=model_id,
+        )
+    return _fallback_selection(
+        model_id,
+        warning=f"host not authenticated: {entry.host.value}",
+        workspace_root=workspace_root,
+    )
+
+
+def _fallback_selection(
+    model_id: str,
+    *,
+    warning: str,
+    workspace_root: Path | None,
+) -> ProviderSelection:
+    """Build a provider selection for the authenticated fallback model."""
+    fallback_id = _authenticated_default_model_id(workspace_root)
+    return ProviderSelection(
+        provider=resolve_llm(fallback_id, workspace_root=workspace_root),
+        effective_model_id=fallback_id,
+        warning=warning,
+        bad_model_id=model_id,
+    )
