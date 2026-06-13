@@ -103,6 +103,14 @@ _MUST_HAVE_MODEL_IDS: tuple[str, ...] = (
     # screenshots / docs / status output.
     "opencode-go:zai/glm-5.1",
     "opencode-go:moonshot/kimi-k2.6",
+    # OpenCode Go — rows added from the live Models.dev opencode-go
+    # catalog on 2026-06-13.
+    "opencode-go:moonshot/kimi-k2.7-code",
+    "opencode-go:alibaba/qwen3.7-plus",
+    "opencode-go:alibaba/qwen3.7-max",
+    "opencode-go:minimax/minimax-m3",
+    "opencode-go:xiaomi/mimo-v2-pro",
+    "opencode-go:xiaomi/mimo-v2-omni",
 )
 
 
