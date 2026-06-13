@@ -87,7 +87,7 @@ WORKSPACE_ENCRYPTION_KEY=...         # Fernet key (cryptography.fernet.Fernet.ge
 
 # ── LLM provider — pick ONE, scoped to a demo billing pool ──────
 GOOGLE_API_KEY=...                   # cheapest path; use a key on a separate billing account
-# CLAUDE_CODE_OAUTH_TOKEN=          # leave empty for demo unless you accept the cost
+# CLAUDE_CODE_PTY_BASE_URL=http://127.0.0.1:11435/v1
 
 # ── Demo-mode overlay handles these; DON'T override here ────────
 # DEMO_MODE=true                     # set by docker-compose.demo.yml

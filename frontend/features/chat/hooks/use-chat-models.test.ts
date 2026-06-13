@@ -14,8 +14,8 @@ vi.mock('next/navigation', () => ({
 /** Factory for valid `ChatModelOption` fixtures used across the suite. */
 function makeModel(overrides: Partial<ChatModelOption> = {}): ChatModelOption {
 	return {
-		id: overrides.id ?? 'agent-sdk:anthropic/claude-sonnet-4-6',
-		host: overrides.host ?? 'agent-sdk',
+		id: overrides.id ?? 'claude-code-pty:anthropic/claude-sonnet-4-6',
+		host: overrides.host ?? 'claude-code-pty',
 		vendor: overrides.vendor ?? 'anthropic',
 		model: overrides.model ?? 'claude-sonnet-4-6',
 		display_name: overrides.display_name ?? 'Claude Sonnet 4.6',
@@ -31,7 +31,7 @@ describe('useChatModels', (): void => {
 	});
 
 	it('returns the catalog and the first entry as the default on the happy path', async (): Promise<void> => {
-		const sonnet = makeModel({ id: 'agent-sdk:anthropic/claude-sonnet-4-6' });
+		const sonnet = makeModel({ id: 'claude-code-pty:anthropic/claude-sonnet-4-6' });
 		const gemini = makeModel({
 			id: 'google-ai:google/gemini-3-flash-preview',
 			host: 'google-ai',
@@ -64,7 +64,7 @@ describe('useChatModels', (): void => {
 			display_name: 'Gemini 3 Flash',
 			short_name: 'Gemini 3',
 		});
-		const sonnet = makeModel({ id: 'agent-sdk:anthropic/claude-sonnet-4-6' });
+		const sonnet = makeModel({ id: 'claude-code-pty:anthropic/claude-sonnet-4-6' });
 		vi.mocked(fetch).mockResolvedValue(Response.json({ models: [gemini, sonnet] }));
 
 		const { result } = renderHook(() => useChatModels(), {
@@ -99,8 +99,8 @@ describe('useChatModels', (): void => {
 			Response.json({
 				models: [
 					{
-						id: 'agent-sdk:anthropic/claude-sonnet-4-6',
-						host: 'agent-sdk',
+						id: 'claude-code-pty:anthropic/claude-sonnet-4-6',
+						host: 'claude-code-pty',
 						vendor: 'anthropic',
 						model: 'claude-sonnet-4-6',
 						display_name: 'Claude Sonnet 4.6',

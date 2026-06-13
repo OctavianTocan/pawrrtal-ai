@@ -245,7 +245,7 @@ class TestAgentHandlerRouting:
             title="Heartbeat",
             created_at=now,
             updated_at=now,
-            model_id="agent-sdk:anthropic/claude-opus-4-7",
+            model_id="claude-code-pty:anthropic/claude-opus-4-7",
             reasoning_effort="low",
             verbose_level=2,
         )

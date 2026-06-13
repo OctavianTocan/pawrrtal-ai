@@ -112,12 +112,12 @@ class Vendor(StrEnum):
     openai = "openai"
 
 class Host(StrEnum):
-    agent_sdk = "agent-sdk"
+    agent_sdk = "claude-code-pty"
     google_ai = "google-ai"
     # bedrock, copilot, openrouter, vertex, azure, ... land here as they ship.
 
 CANONICAL_HOST: dict[Vendor, Host] = {
-    Vendor.anthropic: Host.agent_sdk,
+    Vendor.anthropic: Host.claude_code_pty,
     Vendor.google: Host.google_ai,
 }
 
@@ -196,7 +196,7 @@ class ModelEntry:
 
 MODEL_CATALOG: tuple[ModelEntry, ...] = (
     ModelEntry(
-        host=Host.agent_sdk, vendor=Vendor.anthropic, model="claude-opus-4-7",
+        host=Host.claude_code_pty, vendor=Vendor.anthropic, model="claude-opus-4-7",
         display_name="Claude Opus 4.7", short_name="Claude Opus 4.7",
         description="Most capable for ambitious work", is_default=False,
     ),
@@ -237,8 +237,8 @@ constant.
 {
   "models": [
     {
-      "id": "agent-sdk:anthropic/claude-opus-4-7",
-      "host": "agent-sdk",
+      "id": "claude-code-pty:anthropic/claude-opus-4-7",
+      "host": "claude-code-pty",
       "vendor": "anthropic",
       "model": "claude-opus-4-7",
       "display_name": "Claude Opus 4.7",

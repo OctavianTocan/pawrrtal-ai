@@ -26,8 +26,7 @@
  * Prerequisites:
  *   - `EXA_API_KEY` env var on the backend (the provider only
  *     enables the Exa MCP server when this is set).
- *   - `CLAUDE_CODE_OAUTH_TOKEN` env var on the backend (otherwise
- *     the Claude CLI subprocess fails with a different error).
+ *   - a running `ccpty serve` bridge on the backend.
  *
  * Skipped (not failed) when either is missing — surfacing missing
  * config as a noisy red CI failure isn't useful.

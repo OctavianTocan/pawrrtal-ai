@@ -23,7 +23,7 @@ async def test_readiness_returns_200_with_db_and_provider_configured(
     """Both checks pass → status=ready, 200, every check ok."""
     with patch("app.infrastructure.observability.health.router.settings") as mock_settings:
         mock_settings.google_api_key = "test-google-key"
-        mock_settings.claude_code_oauth_token = ""
+        mock_settings.claude_code_pty_base_url = ""
         response = await client.get("/api/v1/health/ready")
 
     assert response.status_code == 200
@@ -41,7 +41,7 @@ async def test_readiness_returns_503_when_no_providers_configured(
     """Empty provider keys → 503 with a clear ``configured: []`` array."""
     with patch("app.infrastructure.observability.health.router.settings") as mock_settings:
         mock_settings.google_api_key = ""
-        mock_settings.claude_code_oauth_token = ""
+        mock_settings.claude_code_pty_base_url = ""
         response = await client.get("/api/v1/health/ready")
 
     assert response.status_code == 503

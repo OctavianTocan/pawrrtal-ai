@@ -13,7 +13,6 @@ from app.infrastructure.config import settings
 # the picker. Hosts that don't require a gateway API key are absent from
 # this map and always shown.
 _HOST_AUTH_SETTING: dict[str, str] = {
-    "agent-sdk": "claude_code_oauth_token",
     "google-ai": "google_api_key",
     "litellm": "openai_api_key",
     "opencode-go": "opencode_api_key",

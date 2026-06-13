@@ -22,7 +22,7 @@ from app.cli.paw.main import app
 MOCK_BACKEND = "http://test-backend"
 FIXED_UUID = "22222222-3333-4444-5555-666666666666"
 MODEL_FROM = "openai-codex:openai/gpt-5.5"
-MODEL_TO = "agent-sdk:anthropic/claude-opus-4-7"
+MODEL_TO = "claude-code-pty:anthropic/claude-opus-4-7"
 
 SSE_OK = b'data: {"type": "delta", "content": "Hi"}\n\ndata: {"type": "done"}\n\n'
 

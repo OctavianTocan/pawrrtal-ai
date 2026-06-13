@@ -87,9 +87,9 @@ def test_etag_is_stable() -> None:
 
 _MUST_HAVE_MODEL_IDS: tuple[str, ...] = (
     # Anthropic Claude — frontier + balanced + fast tiers.
-    "agent-sdk:anthropic/claude-opus-4-7",
-    "agent-sdk:anthropic/claude-sonnet-4-6",
-    "agent-sdk:anthropic/claude-haiku-4-5",
+    "claude-code-pty:anthropic/claude-opus-4-7",
+    "claude-code-pty:anthropic/claude-sonnet-4-6",
+    "claude-code-pty:anthropic/claude-haiku-4-5",
     # Google Gemini — Pro + Flash + Flash Lite preview pipeline.
     "google-ai:google/gemini-3-flash-preview",
     "google-ai:google/gemini-3.5-flash",

@@ -107,7 +107,7 @@ _GROK_4_3_OUT_USD = 2.50
 # don't surface reasoning levels for it through the /thinking picker.
 ANTHROPIC_ENTRIES: tuple[ModelEntry, ...] = (
     ModelEntry(
-        host=Host.agent_sdk,
+        host=Host.claude_code_pty,
         vendor=Vendor.anthropic,
         model="claude-opus-4-7",
         display_name="Claude Opus 4.7",
@@ -118,7 +118,7 @@ ANTHROPIC_ENTRIES: tuple[ModelEntry, ...] = (
         supports_reasoning=("low", "medium", "high"),
     ),
     ModelEntry(
-        host=Host.agent_sdk,
+        host=Host.claude_code_pty,
         vendor=Vendor.anthropic,
         model="claude-sonnet-4-6",
         display_name="Claude Sonnet 4.6",
@@ -129,7 +129,7 @@ ANTHROPIC_ENTRIES: tuple[ModelEntry, ...] = (
         supports_reasoning=("low", "medium", "high"),
     ),
     ModelEntry(
-        host=Host.agent_sdk,
+        host=Host.claude_code_pty,
         vendor=Vendor.anthropic,
         model="claude-haiku-4-5",
         display_name="Claude Haiku 4.5",

@@ -61,7 +61,7 @@ class Vendor(StrEnum):
     zai       = "zai"        # new
 
 class Host(StrEnum):
-    agent_sdk    = "agent-sdk"
+    agent_sdk    = "claude-code-pty"
     google_ai    = "google-ai"
     litellm      = "litellm"
     opencode_go  = "opencode-go"   # new
@@ -108,7 +108,7 @@ edit — no provider change.
 
 ```python title="backend/app/providers/factory.py"
 HOST_TO_PROVIDER: dict[Host, type[AILLM]] = {
-    Host.agent_sdk:   ClaudeLLM,
+    Host.claude_code_pty:   ClaudeLLM,
     Host.google_ai:   GeminiLLM,
     Host.litellm:     LiteLLMLLM,
     Host.opencode_go: OpencodeGoLLM,   # new

@@ -35,9 +35,9 @@ def _model_id_for(host: Host, model: str) -> str:
 @pytest.mark.parametrize(
     ("model_id", "stored"),
     [
-        (_model_id_for(Host.agent_sdk, "claude-opus-4-7"), "low"),
-        (_model_id_for(Host.agent_sdk, "claude-opus-4-7"), "medium"),
-        (_model_id_for(Host.agent_sdk, "claude-opus-4-7"), "high"),
+        (_model_id_for(Host.claude_code_pty, "claude-opus-4-7"), "low"),
+        (_model_id_for(Host.claude_code_pty, "claude-opus-4-7"), "medium"),
+        (_model_id_for(Host.claude_code_pty, "claude-opus-4-7"), "high"),
         # ``extra-high`` isn't in any catalog row (Claude caps at high,
         # OpenAI's xhigh is post-codex-max only) — the resolver's
         # ``adapted`` path covers that case, tested separately.
@@ -62,7 +62,7 @@ def test_supported_stored_value_passes_through(model_id: str, stored: str) -> No
 def test_no_stored_override_on_reasoning_model_is_absent() -> None:
     """No override + model supports reasoning → provider picks default."""
     resolution = resolve_reasoning_effort(
-        model_id=_model_id_for(Host.agent_sdk, "claude-opus-4-7"),
+        model_id=_model_id_for(Host.claude_code_pty, "claude-opus-4-7"),
         stored_effort=None,
     )
     assert resolution.action == "absent"
@@ -146,7 +146,7 @@ def test_garbage_stored_value_is_cleared() -> None:
     override cleared" — honest and idempotent.
     """
     resolution = resolve_reasoning_effort(
-        model_id=_model_id_for(Host.agent_sdk, "claude-opus-4-7"),
+        model_id=_model_id_for(Host.claude_code_pty, "claude-opus-4-7"),
         stored_effort="ridiculously-high",
     )
     assert resolution.action == "cleared"
@@ -162,7 +162,7 @@ def test_garbage_stored_value_is_cleared() -> None:
 def test_unknown_model_id_clears_stored_value() -> None:
     """A model_id not in the catalog is treated as unresolvable."""
     resolution = resolve_reasoning_effort(
-        model_id="agent-sdk:anthropic/claude-i-just-made-up",
+        model_id="claude-code-pty:anthropic/claude-i-just-made-up",
         stored_effort="high",
     )
     assert resolution.action == "cleared"
@@ -192,7 +192,7 @@ def test_none_model_id_clears_stored_value() -> None:
 def test_format_notice_use_returns_none() -> None:
     """Happy path → no notice."""
     resolution = resolve_reasoning_effort(
-        model_id=_model_id_for(Host.agent_sdk, "claude-opus-4-7"),
+        model_id=_model_id_for(Host.claude_code_pty, "claude-opus-4-7"),
         stored_effort="medium",
     )
     assert format_adaptation_notice(resolution, previous_effort="medium") is None
@@ -201,7 +201,7 @@ def test_format_notice_use_returns_none() -> None:
 def test_format_notice_absent_returns_none() -> None:
     """No override → no notice."""
     resolution = resolve_reasoning_effort(
-        model_id=_model_id_for(Host.agent_sdk, "claude-opus-4-7"),
+        model_id=_model_id_for(Host.claude_code_pty, "claude-opus-4-7"),
         stored_effort=None,
     )
     assert format_adaptation_notice(resolution, previous_effort=None) is None
@@ -240,7 +240,7 @@ def test_format_notice_adapted_shows_before_and_after() -> None:
 @pytest.mark.parametrize(
     ("model_id", "stored"),
     [
-        (_model_id_for(Host.agent_sdk, "claude-opus-4-7"), "high"),
+        (_model_id_for(Host.claude_code_pty, "claude-opus-4-7"), "high"),
         (_model_id_for(Host.xai, "grok-4.3"), "extra-high"),  # adapts to high
         (_model_id_for(Host.google_ai, "gemini-3-flash-preview"), "extra-high"),  # adapts to high
         (_model_id_for(Host.litellm, "gpt-4o"), "medium"),  # clears to None

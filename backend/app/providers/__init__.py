@@ -8,15 +8,15 @@ from .base import AILLM, ReasoningEffort, StreamEvent
 
 if TYPE_CHECKING:
     from .catalog import first_catalog_model
-    from .claude import ClaudeLLM, ClaudeLLMConfig
+    from .claude_code_pty import ClaudeCodePtyLLM, ClaudeCodePtyLLMConfig
     from .factory import resolve_llm
     from .gemini_cli import GeminiCliLLM, is_gemini_cli_available
     from .xai import XaiLLM
 
 __all__ = [
     "AILLM",
-    "ClaudeLLM",
-    "ClaudeLLMConfig",
+    "ClaudeCodePtyLLM",
+    "ClaudeCodePtyLLMConfig",
     "GeminiCliLLM",
     "ReasoningEffort",
     "StreamEvent",
@@ -42,10 +42,13 @@ def __getattr__(name: str) -> object:
         from .factory import resolve_llm  # noqa: PLC0415
 
         return resolve_llm
-    if name in {"ClaudeLLM", "ClaudeLLMConfig"}:
-        from .claude import ClaudeLLM, ClaudeLLMConfig  # noqa: PLC0415
+    if name in {"ClaudeCodePtyLLM", "ClaudeCodePtyLLMConfig"}:
+        from .claude_code_pty import ClaudeCodePtyLLM, ClaudeCodePtyLLMConfig  # noqa: PLC0415
 
-        return {"ClaudeLLM": ClaudeLLM, "ClaudeLLMConfig": ClaudeLLMConfig}[name]
+        return {
+            "ClaudeCodePtyLLM": ClaudeCodePtyLLM,
+            "ClaudeCodePtyLLMConfig": ClaudeCodePtyLLMConfig,
+        }[name]
     if name in {"GeminiCliLLM", "is_gemini_cli_available"}:
         from .gemini_cli import GeminiCliLLM, is_gemini_cli_available  # noqa: PLC0415
 

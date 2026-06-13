@@ -36,7 +36,7 @@ _FAKE_USER_ID = uuid.UUID("00000000-0000-0000-0000-0000000000aa")
 
 def _claude_state(*, current: str | None = None) -> ThinkingPickerState:
     return ThinkingPickerState(
-        model_entry=_entry(Host.agent_sdk, "claude-opus-4-7"),
+        model_entry=_entry(Host.claude_code_pty, "claude-opus-4-7"),
         current_effort=current,
         conversation_id=_FAKE_CONVERSATION_ID,
         user_id=_FAKE_USER_ID,
@@ -90,13 +90,13 @@ def test_claude_models_with_adaptive_thinking_expose_three_levels() -> None:
     don't surface a picker for it.
     """
     for model in ("claude-opus-4-7", "claude-sonnet-4-6"):
-        entry = _entry(Host.agent_sdk, model)
+        entry = _entry(Host.claude_code_pty, model)
         assert entry.supports_reasoning == ("low", "medium", "high")
 
 
 def test_claude_haiku_no_adaptive_thinking() -> None:
     """Haiku 4.5 supports extended thinking via budget_tokens only — no picker."""
-    assert _entry(Host.agent_sdk, "claude-haiku-4-5").supports_reasoning == ()
+    assert _entry(Host.claude_code_pty, "claude-haiku-4-5").supports_reasoning == ()
 
 
 def test_grok_exposes_minimal_low_high() -> None:
@@ -334,7 +334,7 @@ def test_parse_returns_none_for_unrelated_callback() -> None:
 
 
 def test_resolve_select_rejects_stale_catalog_token() -> None:
-    entry = _entry(Host.agent_sdk, "claude-opus-4-7")
+    entry = _entry(Host.claude_code_pty, "claude-opus-4-7")
     stale = ThinkingCallback(action="select", catalog_token="deadbeef", effort="medium")
     assert resolve_select(stale, entry=entry) is None
 

@@ -2,9 +2,8 @@
 
 Wraps the official xai-sdk gRPC client (https://docs.x.ai,
 https://github.com/xai-org/xai-sdk-python) so the agent loop can drive
-Grok the same way it drives Gemini (``google-genai``) and Claude
-(``claude-agent-sdk``).  Each provider is self-contained on its
-vendor's first-party SDK — no shared HTTP-compat abstraction.
+Grok the same way it drives Gemini (``google-genai``). Each provider
+is self-contained on its vendor's first-party SDK.
 
 Design parity with :mod:`app.providers.gemini_provider`:
 
@@ -290,8 +289,8 @@ class XaiLLM:
             workspace_root: Absolute path from the ``workspaces.path`` DB
                 column.  When supplied, a per-workspace ``XAI_API_KEY``
                 override is honoured; otherwise the gateway-global key is
-                used.  Optional to match :class:`ClaudeLLM` and
-                :class:`GeminiLLM` for unauthenticated callers.
+                used. Optional to match the shared provider contract
+                for unauthenticated callers.
         """
         self._model_id = model_id
         self._workspace_root = workspace_root

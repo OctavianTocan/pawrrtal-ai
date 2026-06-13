@@ -36,7 +36,7 @@ from app.infrastructure.models.base import Base
 _AUDIT_EVENT_TYPE_LEN = 64
 # Length cap for risk-level strings (`low`/`medium`/`high`/`critical`).
 _AUDIT_RISK_LEVEL_LEN = 16
-# Provider identifier length: comfortably fits `claude-agent-sdk` and
+# Provider identifier length: comfortably fits `claude-code-pty` and
 # common provider slugs without forcing future migrations.
 _COST_PROVIDER_LEN = 64
 # Model-id length matches the existing column on `conversations`.

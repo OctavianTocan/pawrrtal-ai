@@ -55,7 +55,7 @@ def test_turn_span_emits_through_injected_tracer(
         user_id=uuid.uuid4(),
         surface="telegram",
         request_id="req-1",
-        model_id="agent-sdk:anthropic/claude-sonnet-4-6",
+        model_id="claude-code-pty:anthropic/claude-sonnet-4-6",
     ):
         pass
 

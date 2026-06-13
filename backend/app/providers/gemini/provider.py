@@ -98,7 +98,7 @@ def make_gemini_stream_fn(
         workspace_root: Absolute path from the ``workspaces.path`` DB column,
             used to resolve a per-workspace ``GEMINI_API_KEY`` override. When
             ``None`` the gateway-global ``settings.google_api_key`` is used
-            directly, matching ``ClaudeLLM``'s optional ``workspace_root``
+            directly, matching the provider factory's optional ``workspace_root``
             contract for unauthenticated background work (e.g. utility agents).
         system_prompt: The system prompt for this StreamFn.  Captured into the
             returned closure and bound to ``GenerateContentConfig.system_instruction``
@@ -220,7 +220,7 @@ class GeminiLLM:
             workspace_root: Absolute path from the ``workspaces.path`` DB
                 column. When supplied, a per-workspace ``GEMINI_API_KEY``
                 override is honoured; otherwise the gateway-global key is
-                used. Optional to match ``ClaudeLLM``'s contract for
+                used. Optional to match the shared provider contract for
                 unauthenticated callers.
         """
         self._model_id = model_id

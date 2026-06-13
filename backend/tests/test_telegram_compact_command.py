@@ -68,7 +68,7 @@ async def test_returns_nothing_to_compact_when_compactor_returns_false() -> None
         ),
         patch(
             "app.channels.telegram.compact_command.resolve_effective_model_id",
-            Mock(return_value="agent-sdk:anthropic/claude-sonnet-4-6"),
+            Mock(return_value="claude-code-pty:anthropic/claude-sonnet-4-6"),
         ),
         patch(
             "app.channels.telegram.compact_command.compact_leaf_if_needed",
@@ -93,7 +93,7 @@ async def test_returns_compacted_message_on_success() -> None:
 
     fake_user = uuid_mod.uuid4()
     fake_conversation = SimpleNamespace(
-        id=uuid_mod.uuid4(), model_id="agent_sdk:anthropic/claude-opus-4-7"
+        id=uuid_mod.uuid4(), model_id="claude-code-pty:anthropic/claude-opus-4-7"
     )
     fake_settings = SimpleNamespace(
         lcm_enabled=True, lcm_fresh_tail_count=64, lcm_leaf_chunk_tokens=20_000
@@ -114,7 +114,7 @@ async def test_returns_compacted_message_on_success() -> None:
         ),
         patch(
             "app.channels.telegram.compact_command.resolve_effective_model_id",
-            Mock(return_value="agent-sdk:anthropic/claude-sonnet-4-6"),
+            Mock(return_value="claude-code-pty:anthropic/claude-sonnet-4-6"),
         ),
         patch(
             "app.channels.telegram.compact_command.compact_leaf_if_needed",

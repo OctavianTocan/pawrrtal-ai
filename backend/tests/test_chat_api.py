@@ -75,7 +75,7 @@ async def test_chat_returns_412_when_user_has_no_workspace(
         json={
             "question": "hello",
             "conversation_id": str(conversation_id),
-            "model_id": "agent-sdk:anthropic/claude-opus-4-7",
+            "model_id": "claude-code-pty:anthropic/claude-opus-4-7",
         },
     )
 
@@ -102,7 +102,7 @@ async def test_chat_streams_provider_events(
         json={
             "question": "hello",
             "conversation_id": str(conversation_id),
-            "model_id": "agent-sdk:anthropic/claude-opus-4-7",
+            "model_id": "claude-code-pty:anthropic/claude-opus-4-7",
         },
     )
 
@@ -130,7 +130,7 @@ async def test_chat_persists_user_and_finalized_assistant_messages(
         json={
             "question": "hello",
             "conversation_id": str(conversation_id),
-            "model_id": "agent-sdk:anthropic/claude-opus-4-7",
+            "model_id": "claude-code-pty:anthropic/claude-opus-4-7",
         },
     )
     messages_response = await client.get(f"/api/v1/conversations/{conversation_id}/messages")
@@ -194,7 +194,7 @@ async def test_chat_forwards_reasoning_effort(
         json={
             "question": "hello",
             "conversation_id": str(conversation_id),
-            "model_id": "agent-sdk:anthropic/claude-opus-4-7",
+            "model_id": "claude-code-pty:anthropic/claude-opus-4-7",
             "reasoning_effort": "extra-high",
         },
     )
@@ -297,7 +297,7 @@ async def test_chat_stream_converts_provider_exception_to_error_event(
         json={
             "question": "hello",
             "conversation_id": str(conversation_id),
-            "model_id": "agent-sdk:anthropic/claude-opus-4-7",
+            "model_id": "claude-code-pty:anthropic/claude-opus-4-7",
         },
     )
 
@@ -354,7 +354,7 @@ async def test_chat_multi_turn_tool_call_flows_through_full_http_path(
         json={
             "question": "echo test",
             "conversation_id": str(conversation_id),
-            "model_id": "agent-sdk:anthropic/claude-opus-4-7",
+            "model_id": "claude-code-pty:anthropic/claude-opus-4-7",
         },
     )
 
@@ -428,7 +428,7 @@ async def test_chat_safety_layer_fires_and_surfaces_agent_terminated(
         json={
             "question": "go",
             "conversation_id": str(conversation_id),
-            "model_id": "agent-sdk:anthropic/claude-opus-4-7",
+            "model_id": "claude-code-pty:anthropic/claude-opus-4-7",
         },
     )
 

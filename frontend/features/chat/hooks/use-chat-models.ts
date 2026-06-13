@@ -12,9 +12,9 @@ const CHAT_MODELS_QUERY_KEY = 'models' as const;
 
 /** One entry from `GET /api/v1/models`. */
 export interface ChatModelOption {
-	/** Canonical wire form: `host:vendor/model` (e.g. `agent-sdk:anthropic/claude-sonnet-4-6`). */
+	/** Canonical wire form: `host:vendor/model` (e.g. `claude-code-pty:anthropic/claude-sonnet-4-6`). */
 	id: string;
-	/** Where the model runs (e.g. `agent-sdk`, `google-ai`). */
+	/** Where the model runs (e.g. `claude-code-pty`, `google-ai`). */
 	host: string;
 	/** Vendor segment of the canonical ID (e.g. `anthropic`, `google`, `openai`). */
 	vendor: string;

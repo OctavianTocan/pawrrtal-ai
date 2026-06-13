@@ -68,7 +68,7 @@ def test_factory_imports_without_codex_runtime() -> None:
     from app.providers.model_id import Host
 
     # All hosts are still registered…
-    assert Host.agent_sdk in factory.HOST_TO_PROVIDER
+    assert Host.claude_code_pty in factory.HOST_TO_PROVIDER
     assert Host.litellm in factory.HOST_TO_PROVIDER
     assert Host.openai_codex in factory.HOST_TO_PROVIDER
     # …and the codex slot is sentinel-None (lazy resolution happens on demand).

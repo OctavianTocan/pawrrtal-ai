@@ -63,7 +63,7 @@ def test_canonicalises_bare_form_on_input() -> None:
         model_id="anthropic/claude-sonnet-4-6",
         reasoning_effort="extra-high",
     )
-    assert req.model_id == "agent-sdk:anthropic/claude-sonnet-4-6"
+    assert req.model_id == "claude-code-pty:anthropic/claude-sonnet-4-6"
     assert req.reasoning_effort == "extra-high"
 
 

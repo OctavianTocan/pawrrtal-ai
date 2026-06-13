@@ -2,7 +2,7 @@
 
 The factory layer is the only place that reads :mod:`app.infrastructure.config`,
 keeping the providers themselves config-agnostic and trivially testable
-by passing :class:`ClaudeLLMConfig` directly.
+by passing provider-specific config objects directly.
 
 Routing is by :class:`Host` rather than by string prefix: every model
 ID is parsed into a :class:`ParsedModelId` and dispatched via the
@@ -21,7 +21,7 @@ from app.infrastructure.config import settings as settings  # noqa: PLC0414
 
 from .agy_api import AgyApiLLM
 from .base import AILLM
-from .claude import ClaudeLLM, ClaudeLLMConfig
+from .claude_code_pty import ClaudeCodePtyLLM, ClaudeCodePtyLLMConfig
 from .gemini_cli import GeminiCliLLM
 from .litellm_provider import LiteLLMLLM
 from .model_id import Host, InvalidModelId, ParsedModelId, parse_model_id
@@ -53,7 +53,7 @@ def _load_gemini_provider_cls() -> type[AILLM]:
 
 
 HOST_TO_PROVIDER: dict[Host, type[AILLM] | None] = {
-    Host.agent_sdk: ClaudeLLM,
+    Host.claude_code_pty: ClaudeCodePtyLLM,
     Host.agy_api: AgyApiLLM,
     Host.agy_cli: None,
     Host.gemini_cli: GeminiCliLLM,
@@ -83,7 +83,7 @@ this table must always agree.
 #
 # Add a new row when introducing a new :class:`Host` member.
 _HOST_AUTH_KEYS: dict[Host, tuple[str, str]] = {
-    Host.agent_sdk: ("CLAUDE_CODE_OAUTH_TOKEN", "claude_code_oauth_token"),
+    Host.claude_code_pty: ("CLAUDE_CODE_PTY_BASE_URL", "claude_code_pty_base_url"),
     Host.google_ai: ("GEMINI_API_KEY", "google_api_key"),
     Host.litellm: ("OPENAI_API_KEY", "openai_api_key"),
     Host.opencode_go: ("OPENCODE_API_KEY", "opencode_api_key"),
@@ -114,7 +114,7 @@ def host_authenticated(host: Host, *, workspace_root: Path | None = None) -> boo
 
     Mapping:
 
-    * ``agent_sdk`` (Claude): non-empty ``CLAUDE_CODE_OAUTH_TOKEN``.
+    * ``claude_code_pty`` (Claude): local ``ccpty serve`` bridge.
     * ``agy_api``: local ``agy`` OAuth token + project cache are present.
     * ``gemini_cli``: the ``gemini`` binary is on ``PATH`` (probed
       via :func:`is_gemini_cli_available`). Workspace overrides don't
@@ -253,12 +253,9 @@ def resolve_llm(
     # which has no ``__init__`` contract. Construction is concrete: we
     # narrow back to the real classes here so each gets the args its
     # constructor actually accepts.
-    if provider_cls is ClaudeLLM:
-        config = ClaudeLLMConfig(
-            oauth_token=settings.claude_code_oauth_token or None,
-            cwd=str(workspace_root) if workspace_root is not None else None,
-        )
-        return ClaudeLLM(parsed.model, config=config, workspace_root=workspace_root)
+    if provider_cls is ClaudeCodePtyLLM:
+        config = ClaudeCodePtyLLMConfig(base_url=settings.claude_code_pty_base_url)
+        return ClaudeCodePtyLLM(parsed.model, config=config, workspace_root=workspace_root)
     if provider_cls is LiteLLMLLM:
         return LiteLLMLLM(parsed.model, parsed.vendor, workspace_root=workspace_root)
     if provider_cls is OpencodeGoLLM:

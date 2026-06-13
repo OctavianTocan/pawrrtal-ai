@@ -26,8 +26,8 @@ import { ModelSelectorPopover } from './ModelSelectorPopover';
  */
 const FIXTURE_MODELS: ChatModelOption[] = [
 	{
-		id: 'agent-sdk:anthropic/claude-sonnet-4-6',
-		host: 'agent-sdk',
+		id: 'claude-code-pty:anthropic/claude-sonnet-4-6',
+		host: 'claude-code-pty',
 		vendor: 'anthropic',
 		model: 'claude-sonnet-4-6',
 		display_name: 'Claude Sonnet 4.6',
@@ -35,8 +35,8 @@ const FIXTURE_MODELS: ChatModelOption[] = [
 		description: 'Balanced for everyday tasks',
 	},
 	{
-		id: 'agent-sdk:anthropic/claude-opus-4-7',
-		host: 'agent-sdk',
+		id: 'claude-code-pty:anthropic/claude-opus-4-7',
+		host: 'claude-code-pty',
 		vendor: 'anthropic',
 		model: 'claude-opus-4-7',
 		display_name: 'Claude Opus 4.7',
@@ -129,7 +129,7 @@ describe('ModelSelectorPopover', () => {
 		const { container } = render(
 			<ModelSelectorPopover
 				{...DEFAULT_PROPS}
-				selectedModelId="agent-sdk:anthropic/claude-opus-4-7"
+				selectedModelId="claude-code-pty:anthropic/claude-opus-4-7"
 				onSelectModel={vi.fn()}
 			/>
 		);
@@ -157,7 +157,7 @@ describe('ModelSelectorPopover', () => {
 		render(<ModelSelectorPopover {...DEFAULT_PROPS} />);
 		fireEvent.click(screen.getByRole('button', { name: /select model/i }));
 
-		expect(screen.getByText('Anthropic Agent SDK')).toBeTruthy();
+		expect(screen.getByText('Claude Code PTY')).toBeTruthy();
 		expect(screen.getByText('Gemini API')).toBeTruthy();
 		expect(screen.getByText('OpenCode Go')).toBeTruthy();
 	});
@@ -299,7 +299,7 @@ describe('ModelSelectorPopover', () => {
 		render(
 			<ModelSelectorPopover
 				{...DEFAULT_PROPS}
-				selectedModelId="agent-sdk:anthropic/unknown-model"
+				selectedModelId="claude-code-pty:anthropic/unknown-model"
 				onSelectModel={vi.fn()}
 			/>
 		);

@@ -25,7 +25,7 @@ def conversation() -> Conversation:
         is_flagged=False,
         is_unread=False,
         labels=[],
-        model_id="agent-sdk:anthropic/claude-sonnet-4-6",
+        model_id="claude-code-pty:anthropic/claude-sonnet-4-6",
     )
 
 
@@ -115,7 +115,7 @@ class TestJson:
         body = render_json(conversation=conversation, messages=messages)
         payload = json.loads(body)
         assert payload["conversation"]["id"] == str(conversation.id)
-        assert payload["conversation"]["model_id"] == "agent-sdk:anthropic/claude-sonnet-4-6"
+        assert payload["conversation"]["model_id"] == "claude-code-pty:anthropic/claude-sonnet-4-6"
         assert len(payload["messages"]) == 2
         assistant = payload["messages"][1]
         assert assistant["role"] == "assistant"

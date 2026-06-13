@@ -20,13 +20,6 @@ const KEY_METAS: readonly WorkspaceEnvKeyMeta[] = [
 		url: 'https://aistudio.google.com/apikey',
 	},
 	{
-		key: 'CLAUDE_CODE_OAUTH_TOKEN',
-		label: 'Claude OAuth Token',
-		description: 'Run `claude setup-token` while logged in to Claude Code to get this.',
-		placeholder: 'sk-ant-...',
-		url: 'https://docs.anthropic.com/en/docs/claude-code',
-	},
-	{
 		key: 'EXA_API_KEY',
 		label: 'Exa API Key',
 		description: 'Powers web search. Get a key from exa.ai.',

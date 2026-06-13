@@ -9,7 +9,7 @@
 
 /** Map from host wire-slug to user-facing display string. Mirrors backend `app.core.providers.labels.HOST_LABELS`. */
 const HOST_LABELS = {
-	'agent-sdk': 'Anthropic Agent SDK',
+	'claude-code-pty': 'Claude Code PTY',
 	'agy-api': 'Antigravity API',
 	'gemini-cli': 'Gemini CLI',
 	'google-ai': 'Gemini API',
@@ -36,7 +36,7 @@ const VENDOR_LABELS = {
 /**
  * Return the display label for a host wire-slug.
  *
- * @param slug - The host's wire-form slug (e.g. `'agent-sdk'`).
+ * @param slug - The host's wire-form slug (e.g. `'claude-code-pty'`).
  * @returns The display label, or the slug itself when unknown.
  */
 export function hostLabel(slug: string): string {

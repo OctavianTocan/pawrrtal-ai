@@ -104,9 +104,8 @@ class StreamEvent(TypedDict, total=False):
 class AILLM(Protocol):
     """Unified streaming interface for all AI providers.
 
-    GeminiLLM uses ``history`` (read from our Message table) to build
-    multi-turn context.  ClaudeLLM manages its own session continuity
-    via ``resume`` and can ignore ``history``.
+    Providers receive ``history`` (read from our Message table) so they can
+    build multi-turn context consistently.
     """
 
     def stream(
@@ -135,13 +134,9 @@ class AILLM(Protocol):
             user_id: Authenticated user UUID.
             history: Optional list of prior messages oldest-first, each a
                      dict with ``role`` (``"user"``/``"assistant"``) and
-                     ``content`` keys.  Providers that manage their own
-                     history (e.g. ClaudeLLM via ``resume``) may ignore
-                     this.
+                     ``content`` keys.
             tools: Optional workspace-scoped AgentTools (read_file, write_file,
-                     list_dir) to make available this turn.  Providers that
-                     manage their own tool surface (e.g. ClaudeLLM) may ignore
-                     this parameter.
+                     list_dir) to make available this turn.
             system_prompt: Optional override for the provider's default system
                      prompt.  When ``None`` the provider uses its own default.
             reasoning_effort: Optional reasoning-depth knob selected by the

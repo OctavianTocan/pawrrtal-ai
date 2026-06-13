@@ -323,7 +323,7 @@ async def test_apply_model_switch_updates_model_and_bumps_timestamp(
 ) -> None:
     """A real model switch updates both ``model_id`` and ``updated_at``."""
     original_model = _model_id_for(Host.xai, "grok-4.3")
-    new_model = _model_id_for(Host.agent_sdk, "claude-opus-4-7")
+    new_model = _model_id_for(Host.claude_code_pty, "claude-opus-4-7")
     conv = Conversation(
         id=uuid.uuid4(),
         user_id=test_user.id,
@@ -361,7 +361,7 @@ async def test_apply_model_switch_noop_does_not_bump_timestamp(
     actually changed; preserving that semantic prevents every chat
     round from re-ordering the sidebar's recency-sorted list.
     """
-    same_model = _model_id_for(Host.agent_sdk, "claude-opus-4-7")
+    same_model = _model_id_for(Host.claude_code_pty, "claude-opus-4-7")
     conv = Conversation(
         id=uuid.uuid4(),
         user_id=test_user.id,
@@ -397,7 +397,7 @@ async def test_apply_model_switch_normalizes_unsupported_effort(
     belongs to the previous model.
     """
     grok_supports_reasoning = _model_id_for(Host.xai, "grok-4.3")
-    haiku_no_reasoning = _model_id_for(Host.agent_sdk, "claude-haiku-4-5")
+    haiku_no_reasoning = _model_id_for(Host.claude_code_pty, "claude-haiku-4-5")
     conv = Conversation(
         id=uuid.uuid4(),
         user_id=test_user.id,
@@ -430,7 +430,7 @@ async def test_apply_model_switch_persists_after_session_refresh(
 ) -> None:
     """The combined write survives a session refresh (commit happened)."""
     original_model = _model_id_for(Host.xai, "grok-4.3")
-    new_model = _model_id_for(Host.agent_sdk, "claude-opus-4-7")
+    new_model = _model_id_for(Host.claude_code_pty, "claude-opus-4-7")
     conv = Conversation(
         id=uuid.uuid4(),
         user_id=test_user.id,

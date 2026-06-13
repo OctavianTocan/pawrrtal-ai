@@ -147,7 +147,7 @@ describe('useChat', (): void => {
 			result.current.streamMessage(
 				'Hi',
 				'conversation-1',
-				'agent-sdk:anthropic/claude-sonnet-4-6',
+				'claude-code-pty:anthropic/claude-sonnet-4-6',
 				'extra-high'
 			)
 		);
@@ -182,7 +182,7 @@ describe('useChat', (): void => {
 				result.current.streamMessage(
 					'Hi',
 					'conversation-1',
-					'agent-sdk:anthropic/claude-sonnet-4-6',
+					'claude-code-pty:anthropic/claude-sonnet-4-6',
 					'low'
 				)
 			),

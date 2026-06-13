@@ -159,7 +159,7 @@ def test_send_new_with_model_skips_catalog_lookup(
 ) -> None:
     """An explicit --model is forwarded without fetching the catalog."""
     sse_body = b'data: {"type": "delta", "content": "Hi"}\n\ndata: [DONE]\n\n'
-    explicit_model = "agent-sdk:anthropic/claude-opus-4-7"
+    explicit_model = "claude-code-pty:anthropic/claude-opus-4-7"
     with respx.mock(base_url=MOCK_BACKEND, assert_all_called=False) as r:
         models_route = r.get("/api/v1/models").mock(
             return_value=httpx.Response(500, json={"detail": "should not be called"})

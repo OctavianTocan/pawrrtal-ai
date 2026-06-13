@@ -157,7 +157,7 @@ def verify_model_switch(
 
     Examples:
       paw verify model-switch
-      paw verify model-switch --from openai-codex:openai/gpt-5.5 --to agent-sdk:anthropic/claude-opus-4-7
+      paw verify model-switch --from openai-codex:openai/gpt-5.5 --to claude-code-pty:anthropic/claude-opus-4-7
     """
     state = _load_state(profile)
     result = _run_one_command(

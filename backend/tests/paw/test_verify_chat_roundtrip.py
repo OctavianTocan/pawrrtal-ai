@@ -76,7 +76,7 @@ def _models_payload() -> dict[str, Any]:
     return {
         "models": [
             {"model_id": DEFAULT_MODEL, "id": DEFAULT_MODEL},
-            {"model_id": "agent-sdk:anthropic/claude-opus-4-7"},
+            {"model_id": "claude-code-pty:anthropic/claude-opus-4-7"},
         ]
     }
 

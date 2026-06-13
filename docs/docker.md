@@ -23,7 +23,7 @@ Cloudflare Access is the public gate for that hostname.
 ## Prerequisites
 
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine + Compose plugin)
-- At least one of: `GOOGLE_API_KEY`, `CLAUDE_CODE_OAUTH_TOKEN`. Everything else is optional.
+- At least one of: `GOOGLE_API_KEY`, a running `ccpty serve` bridge. Everything else is optional.
 
 ## Quick start
 
@@ -116,7 +116,7 @@ concern.
 | Variable | Description |
 |----------|-------------|
 | `GOOGLE_API_KEY` | Gemini — default model uses it. |
-| `CLAUDE_CODE_OAUTH_TOKEN` | Claude Agent SDK — required for any `claude-*` model. Generate: `claude setup-token`. |
+| `CLAUDE_CODE_PTY_BASE_URL` | Claude Code PTY OpenAI-compatible bridge. Defaults to `http://127.0.0.1:11435/v1`; start it with `ccpty serve`. |
 | `EXA_API_KEY` | Web search via the provider-agnostic `exa_search` tool. |
 | `XAI_API_KEY` | xAI; also powers voice STT when `VOICE_PROVIDER=xai`. |
 

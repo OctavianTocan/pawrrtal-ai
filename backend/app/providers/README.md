@@ -8,7 +8,7 @@ This directory contains the AI provider implementations for Pawrrtal. The provid
 
 The provider system is designed around three main pillars:
 * **Interface Uniformity**: All providers implement the `AILLM` protocol defined in [base.py](base.py), which enforces a single async generator method `stream(...)` returning a sequence of unified `StreamEvent` dictionaries.
-* **Configuration Decoupling**: Provider classes are kept configuration-agnostic and trivially testable. They do not read `app.infrastructure.config.settings` directly. Instead, the provider factory matches hosts, resolves credentials, constructs provider-specific config objects (e.g. `ClaudeLLMConfig`), and injects them.
+* **Configuration Decoupling**: Provider classes are kept configuration-agnostic and trivially testable. They do not read `app.infrastructure.config.settings` directly. Instead, the provider factory matches hosts, resolves credentials, constructs provider-specific config objects, and injects them.
 * **Workspace Isolation**: When a chat starts, the factory accepts a `workspace_root` path. This path is used to resolve workspace-specific API key overrides from local env files and isolates execution directories.
 
 ---
@@ -19,7 +19,7 @@ A model identifier in Pawrrtal is a parsed, structured object. The parsing mecha
 
 ### A. The Wire Format: `[host:]vendor/model`
 Model IDs are represented as strings. The prefix `host:` is optional on input, but internally resolved.
-* **`host`**: Where the model runs / which API client serves it (defined in the `Host` enum). Examples: `agent-sdk`, `google-ai`, `litellm`, `opencode-go`, `xai`.
+* **`host`**: Where the model runs / which API client serves it (defined in the `Host` enum). Examples: `claude-code-pty`, `google-ai`, `litellm`, `opencode-go`, `xai`.
 * **`vendor`**: Who built the model (defined in the `Vendor` enum). Examples: `anthropic`, `google`, `openai`, `xai`, `zai`, `moonshot`.
 * **`model`**: The raw string name of the specific model. Examples: `claude-sonnet-4-6`, `gemini-3-flash-preview`, `gpt-4o`.
 
@@ -28,7 +28,7 @@ To avoid requiring verbose `host:` prefixes everywhere, [model_id.py](model_id.p
 
 ```python
 CANONICAL_HOST: dict[Vendor, Host] = {
-    Vendor.anthropic: Host.agent_sdk,
+    Vendor.anthropic: Host.claude_code_pty,
     Vendor.google: Host.google_ai,
     Vendor.openai: Host.litellm,
     Vendor.xai: Host.xai,

@@ -45,7 +45,7 @@ class Host(StrEnum):
     this single host enum.
     """
 
-    agent_sdk = "agent-sdk"
+    claude_code_pty = "claude-code-pty"
     agy_api = "agy-api"
     agy_cli = "agy-cli"
     gemini_cli = "gemini-cli"
@@ -65,7 +65,7 @@ class Host(StrEnum):
 
 
 CANONICAL_HOST: dict[Vendor, Host] = {
-    Vendor.anthropic: Host.agent_sdk,
+    Vendor.anthropic: Host.claude_code_pty,
     Vendor.google: Host.google_ai,
     # OpenAI is gateway-only — there is no native Host.openai (yet).
     # LiteLLM handles the openai-compat protocol for any GPT model.

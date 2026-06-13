@@ -12,7 +12,7 @@ from __future__ import annotations
 from app.providers.model_id import Host, Vendor
 
 HOST_LABELS: dict[Host, str] = {
-    Host.agent_sdk: "Anthropic Agent SDK",
+    Host.claude_code_pty: "Claude Code PTY",
     Host.agy_api: "Antigravity API",
     Host.agy_cli: "Antigravity CLI",
     Host.gemini_cli: "Gemini CLI",
@@ -71,7 +71,7 @@ def vendor_label(vendor: Vendor) -> str:
 
 
 def host_label_from_slug(slug: str) -> str:
-    """Resolve a host wire-slug (e.g. ``"agent-sdk"``) to its label.
+    """Resolve a host wire-slug (e.g. ``"claude-code-pty"``) to its label.
 
     ``Host(slug)`` raises ``ValueError`` for unknown slugs (StrEnum
     behaviour); this function normalises that to ``KeyError`` so callers

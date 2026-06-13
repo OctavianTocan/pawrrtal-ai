@@ -809,7 +809,7 @@ class TestHandlePlainMessage:
                 "app.channels.telegram.handlers.resolve_effective_model_id",
                 new=MagicMock(
                     side_effect=lambda *, conversation_model_id: (
-                        conversation_model_id or "agent-sdk:anthropic/claude-sonnet-4-6"
+                        conversation_model_id or "claude-code-pty:anthropic/claude-sonnet-4-6"
                     )
                 ),
             ),
@@ -845,7 +845,7 @@ class TestHandlePlainMessage:
                 "app.channels.telegram.handlers.resolve_effective_model_id",
                 new=MagicMock(
                     side_effect=lambda *, conversation_model_id: (
-                        conversation_model_id or "agent-sdk:anthropic/claude-sonnet-4-6"
+                        conversation_model_id or "claude-code-pty:anthropic/claude-sonnet-4-6"
                     )
                 ),
             ),
@@ -881,13 +881,13 @@ class TestHandlePlainMessage:
             ),
             patch(
                 "app.channels.telegram.handlers.resolve_effective_model_id",
-                new=MagicMock(return_value="agent-sdk:anthropic/claude-opus-4-5"),
+                new=MagicMock(return_value="claude-code-pty:anthropic/claude-opus-4-5"),
             ),
         ):
             result = await handle_plain_message(sender=sender, text="hey", session=session)
 
         assert isinstance(result, TelegramTurnContext)
-        assert result.model_id == "agent-sdk:anthropic/claude-opus-4-5"
+        assert result.model_id == "claude-code-pty:anthropic/claude-opus-4-5"
 
 
 # ---------------------------------------------------------------------------
@@ -999,7 +999,7 @@ class TestHandleModelCommand:
     async def test_model_command_stores_canonical_form_for_well_formed_input(
         self,
     ) -> None:
-        """/model anthropic/claude-sonnet-4-6 stores agent-sdk:anthropic/claude-sonnet-4-6.
+        """/model anthropic/claude-sonnet-4-6 stores claude-code-pty:anthropic/claude-sonnet-4-6.
 
         The handler runs ``parse_model_id`` and writes ``parsed.id`` (the
         fully-qualified ``host:vendor/model`` form), regardless of whether
@@ -1037,7 +1037,7 @@ class TestHandleModelCommand:
                 session=session,
             )
 
-        canonical_id = "agent-sdk:anthropic/claude-sonnet-4-6"
+        canonical_id = "claude-code-pty:anthropic/claude-sonnet-4-6"
         assert canonical_id in reply
         assert "✅" in reply
         # The persisted value must be the canonical fully-qualified form.
@@ -1113,11 +1113,11 @@ class TestHandleModelCommand:
         ):
             reply = await handle_model_command(
                 sender=sender,
-                model_arg="agent-sdk:anthropic/claude-haiku-4-5",
+                model_arg="claude-code-pty:anthropic/claude-haiku-4-5",
                 session=session,
             )
 
-        canonical_id = "agent-sdk:anthropic/claude-haiku-4-5"
+        canonical_id = "claude-code-pty:anthropic/claude-haiku-4-5"
         assert canonical_id in reply
         assert "✅" in reply
         update_mock.assert_called_once()
@@ -1160,7 +1160,7 @@ class TestResolveProviderWithAutoClear:
         - it calls ``update_conversation_model`` with ``model_id=None`` so
           the stored row is cleared.
         """
-        context = self._make_context("agent-sdk:anthropic/claude-nonexistent")
+        context = self._make_context("claude-code-pty:anthropic/claude-nonexistent")
 
         fake_default_provider = MagicMock(name="default_provider")
         update_mock = AsyncMock(return_value=True)
@@ -1197,7 +1197,7 @@ class TestResolveProviderWithAutoClear:
 
         # Warning was produced and mentions the bad ID + the fallback.
         assert warning is not None
-        assert "agent-sdk:anthropic/claude-nonexistent" in warning
+        assert "claude-code-pty:anthropic/claude-nonexistent" in warning
         assert _first_catalog_model_id() in warning
 
         # Stored model_id was cleared to NULL.
@@ -1378,7 +1378,7 @@ class TestRenderStatusMessage:
 
         status = ConversationStatus(
             conversation_id=uuid.uuid4(),
-            model_id="agent-sdk:anthropic/claude-removed-from-catalog",
+            model_id="claude-code-pty:anthropic/claude-removed-from-catalog",
             verbose_level=None,
             reasoning_effort=None,
             started_at=_dt(2026, 5, 17, 19, 0, tzinfo=UTC),

@@ -15,18 +15,18 @@ from app.providers.model_id import (
 
 
 def test_parse_fully_qualified_anthropic() -> None:
-    parsed = parse_model_id("agent-sdk:anthropic/claude-sonnet-4-6")
+    parsed = parse_model_id("claude-code-pty:anthropic/claude-sonnet-4-6")
     assert parsed == ParsedModelId(
-        host=Host.agent_sdk,
+        host=Host.claude_code_pty,
         vendor=Vendor.anthropic,
         model="claude-sonnet-4-6",
-        raw="agent-sdk:anthropic/claude-sonnet-4-6",
+        raw="claude-code-pty:anthropic/claude-sonnet-4-6",
     )
 
 
 def test_parse_fills_canonical_host_when_omitted() -> None:
     parsed = parse_model_id("anthropic/claude-sonnet-4-6")
-    assert parsed.host is Host.agent_sdk
+    assert parsed.host is Host.claude_code_pty
     assert parsed.vendor is Vendor.anthropic
     assert parsed.model == "claude-sonnet-4-6"
 
@@ -80,7 +80,7 @@ def test_parse_fully_qualified_litellm_xai_id() -> None:
 
 
 def test_id_property_round_trips_through_parse() -> None:
-    canonical = "agent-sdk:anthropic/claude-sonnet-4-6"
+    canonical = "claude-code-pty:anthropic/claude-sonnet-4-6"
     assert parse_model_id(canonical).id == canonical
     # Bare form canonicalises to the host-prefixed form.
     assert parse_model_id("anthropic/claude-sonnet-4-6").id == canonical

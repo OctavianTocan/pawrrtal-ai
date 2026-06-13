@@ -57,7 +57,6 @@ logger = logging.getLogger(__name__)
 OVERRIDABLE_KEYS: frozenset[str] = frozenset(
     {
         "GEMINI_API_KEY",
-        "CLAUDE_CODE_OAUTH_TOKEN",
         "EXA_API_KEY",
         "XAI_API_KEY",
         "OPENAI_API_KEY",
@@ -84,7 +83,7 @@ OVERRIDABLE_KEYS: frozenset[str] = frozenset(
 # global config. Order doesn't matter; the lookup is by key.
 _SETTINGS_ATTR_MAP: dict[str, str] = {
     "GEMINI_API_KEY": "google_api_key",
-    "CLAUDE_CODE_OAUTH_TOKEN": "claude_code_oauth_token",  # nosec B105 - settings attr name
+    "CLAUDE_CODE_PTY_BASE_URL": "claude_code_pty_base_url",
     "EXA_API_KEY": "exa_api_key",
     "XAI_API_KEY": "xai_api_key",
     "OPENAI_API_KEY": "openai_api_key",

@@ -461,7 +461,7 @@ async def test_turn_context_provider_draft_updater_is_surface_agnostic(
         channel_message={
             "conversation_id": MagicMock(),
             "metadata": {},
-            "model_id": "agent-sdk:anthropic/claude-opus-4-7",
+            "model_id": "claude-code-pty:anthropic/claude-opus-4-7",
             "surface": "web",
             "text": "hi",
             "user_id": MagicMock(),

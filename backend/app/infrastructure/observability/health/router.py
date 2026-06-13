@@ -72,7 +72,7 @@ def get_health_router() -> APIRouter:
         # ── 2. Providers ──
         provider_status: dict[str, bool] = {
             "google": bool(settings.google_api_key),
-            "claude": bool(settings.claude_code_oauth_token),
+            "claude_code_pty": bool(settings.claude_code_pty_base_url),
         }
         configured = [name for name, ok in provider_status.items() if ok]
         checks["providers"] = {

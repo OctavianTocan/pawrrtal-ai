@@ -7,7 +7,7 @@ import { hostLabel, vendorLabel } from './model-picker-labels';
 
 describe('hostLabel', () => {
 	it('returns the canonical label for known host slugs', () => {
-		expect(hostLabel('agent-sdk')).toBe('Anthropic Agent SDK');
+		expect(hostLabel('claude-code-pty')).toBe('Claude Code PTY');
 		expect(hostLabel('google-ai')).toBe('Gemini API');
 		expect(hostLabel('litellm')).toBe('LiteLLM');
 		expect(hostLabel('opencode-go')).toBe('OpenCode Go');

@@ -42,7 +42,7 @@ def _all_providers_authenticated(monkeypatch: pytest.MonkeyPatch) -> None:
     overriding individual settings on top of this fixture.
     """
     monkeypatch.setattr(settings, "google_api_key", "test-google-key")
-    monkeypatch.setattr(settings, "claude_code_oauth_token", "test-claude-token")
+    monkeypatch.setattr(settings, "claude_code_pty_base_url", "http://127.0.0.1:11435/v1")
     monkeypatch.setattr(settings, "xai_api_key", "test-xai-key")
     monkeypatch.setattr(settings, "openai_api_key", "test-openai-key")
     monkeypatch.setattr(settings, "opencode_api_key", "test-opencode-key")
@@ -56,7 +56,7 @@ def test_host_keyboard_lists_all_hosts_with_friendly_labels() -> None:
     buttons = _flatten(build_host_keyboard())
     labels = [button.text for button in buttons]
 
-    assert "Anthropic Agent SDK (3)" in labels
+    assert "Claude Code PTY (3)" in labels
     assert "Gemini API (5)" in labels
     assert "xAI (1)" in labels
     assert "LiteLLM (19)" in labels
@@ -71,13 +71,13 @@ def test_host_keyboard_lists_all_hosts_with_friendly_labels() -> None:
 def test_host_button_for_single_vendor_jumps_to_model_list() -> None:
     """Hosts with exactly one vendor must skip the vendor screen."""
     button = next(
-        b for b in _flatten(build_host_keyboard()) if b.text.startswith("Anthropic Agent SDK")
+        b for b in _flatten(build_host_keyboard()) if b.text.startswith("Claude Code PTY")
     )
     parsed = parse_model_callback_data(button.callback_data)
 
     assert parsed is not None
     assert parsed.action == "list"
-    assert parsed.host == Host.agent_sdk.value
+    assert parsed.host == Host.claude_code_pty.value
     assert parsed.provider == "anthropic"
     assert parsed.page == 1
 
@@ -149,9 +149,9 @@ def test_model_keyboard_back_button_for_multi_vendor_goes_to_vendor_screen() -> 
 
 
 def test_model_keyboard_back_button_for_single_vendor_goes_to_host_screen() -> None:
-    """Anthropic Agent SDK has one vendor — back skips the vendor screen."""
+    """Claude Code PTY has one vendor — back skips the vendor screen."""
     rows = build_models_keyboard(
-        host=Host.agent_sdk.value,
+        host=Host.claude_code_pty.value,
         vendor="anthropic",
         page=1,
         current_model_id="",
@@ -170,7 +170,7 @@ def test_stale_model_selection_is_rejected() -> None:
 
 
 def test_has_host_and_has_vendor_in_host_guards() -> None:
-    assert has_host(Host.agent_sdk.value) is True
+    assert has_host(Host.claude_code_pty.value) is True
     assert has_host("totally-fake") is False
     assert has_vendor_in_host(host=Host.opencode_go.value, vendor="zai") is True
     assert has_vendor_in_host(host=Host.opencode_go.value, vendor="anthropic") is False
@@ -210,7 +210,7 @@ def test_host_keyboard_hides_unauthenticated_providers(
     assert not any(label.startswith("xAI") for label in labels)
     # Hosts that DO have keys configured stay visible.
     assert any("Gemini API" in label for label in labels)
-    assert any("Anthropic Agent SDK" in label for label in labels)
+    assert any("Claude Code PTY" in label for label in labels)
 
 
 def test_host_picker_text_displays_known_model_name() -> None:

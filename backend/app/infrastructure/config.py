@@ -41,10 +41,8 @@ class Settings(BaseSettings):
     # Encryption key for per-user workspace .env files.
     # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     workspace_encryption_key: str
-    # OAuth token used by the Claude Agent SDK to authenticate the bundled
-    # Claude Code CLI subprocess. Optional — only required when a chat
-    # request resolves to a Claude model. Generate with `claude setup-token`.
-    claude_code_oauth_token: str = ""
+    # Local OpenAI-compatible bridge exposed by `ccpty serve`.
+    claude_code_pty_base_url: str = "http://127.0.0.1:11435/v1"
     # API key for Exa (https://exa.ai). Powers the provider-agnostic
     # `exa_search` tool wired into chat providers.
     # Leave empty to disable web search; the tool returns a clear

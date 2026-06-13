@@ -45,7 +45,7 @@ async def test_google_chat_message_event_submits_normalized_turn(
             conversation_id=conversation_id,
             workspace_root=tmp_path,
             workspace_id=workspace_id,
-            model_id="agent-sdk:anthropic/claude-opus-4-7",
+            model_id="claude-code-pty:anthropic/claude-opus-4-7",
             verbose_level=2,
         )
 
@@ -76,7 +76,7 @@ async def test_google_chat_message_event_submits_normalized_turn(
         "provider_or_default",
         lambda model_id, workspace_root: ProviderSelection(
             provider=provider,
-            effective_model_id="agent-sdk:anthropic/claude-opus-4-7",
+            effective_model_id="claude-code-pty:anthropic/claude-opus-4-7",
         ),
     )
     monkeypatch.setattr(ingress, "create_message", create_placeholder)
@@ -112,7 +112,7 @@ async def test_google_chat_message_event_submits_normalized_turn(
         "conversation_id": conversation_id,
         "text": "hello",
         "surface": SURFACE_GOOGLE_CHAT,
-        "model_id": "agent-sdk:anthropic/claude-opus-4-7",
+        "model_id": "claude-code-pty:anthropic/claude-opus-4-7",
         "metadata": {
             "space_name": "spaces/AAA",
             "thread_name": "spaces/AAA/threads/BBB",

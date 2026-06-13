@@ -69,12 +69,12 @@ class Host(StrEnum):
     """Where the model runs. One vendor's model can be served by
     many hosts (e.g. Claude via Agent SDK, Bedrock, Copilot)."""
 
-    agent_sdk = "agent-sdk"
+    agent_sdk = "claude-code-pty"
     google_ai = "google-ai"
 
 
 CANONICAL_HOST: dict[Vendor, Host] = {
-    Vendor.anthropic: Host.agent_sdk,
+    Vendor.anthropic: Host.claude_code_pty,
     Vendor.google: Host.google_ai,
 }
 """Per-vendor canonical host used when the input omits ``host:``.
@@ -190,18 +190,18 @@ from app.core.providers.model_id import (
 
 
 def test_parse_fully_qualified_anthropic() -> None:
-    parsed = parse_model_id("agent-sdk:anthropic/claude-sonnet-4-6")
+    parsed = parse_model_id("claude-code-pty:anthropic/claude-sonnet-4-6")
     assert parsed == ParsedModelId(
-        host=Host.agent_sdk,
+        host=Host.claude_code_pty,
         vendor=Vendor.anthropic,
         model="claude-sonnet-4-6",
-        raw="agent-sdk:anthropic/claude-sonnet-4-6",
+        raw="claude-code-pty:anthropic/claude-sonnet-4-6",
     )
 
 
 def test_parse_fills_canonical_host_when_omitted() -> None:
     parsed = parse_model_id("anthropic/claude-sonnet-4-6")
-    assert parsed.host is Host.agent_sdk
+    assert parsed.host is Host.claude_code_pty
     assert parsed.vendor is Vendor.anthropic
     assert parsed.model == "claude-sonnet-4-6"
 
@@ -212,7 +212,7 @@ def test_parse_google_canonical_host() -> None:
 
 
 def test_id_property_round_trips_through_parse() -> None:
-    canonical = "agent-sdk:anthropic/claude-sonnet-4-6"
+    canonical = "claude-code-pty:anthropic/claude-sonnet-4-6"
     assert parse_model_id(canonical).id == canonical
     # Bare form canonicalises to the host-prefixed form.
     assert parse_model_id("anthropic/claude-sonnet-4-6").id == canonical
@@ -378,7 +378,7 @@ class ModelEntry:
 
 MODEL_CATALOG: tuple[ModelEntry, ...] = (
     ModelEntry(
-        host=Host.agent_sdk,
+        host=Host.claude_code_pty,
         vendor=Vendor.anthropic,
         model="claude-opus-4-7",
         display_name="Claude Opus 4.7",
@@ -387,7 +387,7 @@ MODEL_CATALOG: tuple[ModelEntry, ...] = (
         is_default=False,
     ),
     ModelEntry(
-        host=Host.agent_sdk,
+        host=Host.claude_code_pty,
         vendor=Vendor.anthropic,
         model="claude-sonnet-4-6",
         display_name="Claude Sonnet 4.6",
@@ -396,7 +396,7 @@ MODEL_CATALOG: tuple[ModelEntry, ...] = (
         is_default=False,
     ),
     ModelEntry(
-        host=Host.agent_sdk,
+        host=Host.claude_code_pty,
         vendor=Vendor.anthropic,
         model="claude-haiku-4-5",
         display_name="Claude Haiku 4.5",
@@ -1063,7 +1063,7 @@ def test_canonicalises_bare_form_on_input() -> None:
     from app.schemas import ChatRequest
 
     req = ChatRequest(question="hi", model_id="anthropic/claude-sonnet-4-6")
-    assert req.model_id == "agent-sdk:anthropic/claude-sonnet-4-6"
+    assert req.model_id == "claude-code-pty:anthropic/claude-sonnet-4-6"
 
 
 def test_rejects_bare_on_input() -> None:
@@ -1142,7 +1142,7 @@ from .model_id import Host, ParsedModelId, parse_model_id
 
 
 HOST_TO_PROVIDER: dict[Host, type[AILLM]] = {
-    Host.agent_sdk: ClaudeLLM,
+    Host.claude_code_pty: ClaudeLLM,
     Host.google_ai: GeminiLLM,
 }
 
@@ -1207,7 +1207,7 @@ Replace with parse-based tests:
 
 ```python
 def test_resolve_llm_accepts_canonical_anthropic_id() -> None:
-    provider = resolve_llm("agent-sdk:anthropic/claude-sonnet-4-6")
+    provider = resolve_llm("claude-code-pty:anthropic/claude-sonnet-4-6")
     assert isinstance(provider, ClaudeLLM)
     assert provider._model_id == "claude-sonnet-4-6"
 
@@ -1402,7 +1402,7 @@ async def test_model_command_rejects_malformed_input(...) -> None:
 
 @pytest.mark.anyio
 async def test_model_command_stores_canonical_form_for_well_formed_input(...) -> None:
-    """/model anthropic/claude-sonnet-4-6 stores agent-sdk:anthropic/claude-sonnet-4-6."""
+    """/model anthropic/claude-sonnet-4-6 stores claude-code-pty:anthropic/claude-sonnet-4-6."""
 
 
 @pytest.mark.anyio
@@ -1667,7 +1667,7 @@ import { isCanonicalModelId } from './is-canonical-model-id';
 
 describe('isCanonicalModelId', () => {
 	it('accepts host-prefixed canonical', () => {
-		expect(isCanonicalModelId('agent-sdk:anthropic/claude-sonnet-4-6')).toBe(true);
+		expect(isCanonicalModelId('claude-code-pty:anthropic/claude-sonnet-4-6')).toBe(true);
 	});
 
 	it('accepts vendor-only form', () => {
@@ -1897,7 +1897,7 @@ Keep: `CHAT_STORAGE_KEYS`, reasoning levels, safety modes, `FALLBACK_TITLE_MAX_L
 
 - [ ] **Step 6: Update tests.**
 
-`use-chat.test.ts` — replace `'gpt-5.5'` with a canonical fixture like `'agent-sdk:anthropic/claude-sonnet-4-6'`.
+`use-chat.test.ts` — replace `'gpt-5.5'` with a canonical fixture like `'claude-code-pty:anthropic/claude-sonnet-4-6'`.
 
 - [ ] **Step 7: Smoke the dev server.**
 

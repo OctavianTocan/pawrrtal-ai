@@ -21,7 +21,7 @@ from pydantic import ValidationError
 from app.infrastructure import keys
 from app.infrastructure.config import settings
 from app.providers.base import StreamEvent
-from app.providers.claude import ClaudeLLM
+from app.providers.claude_code_pty import ClaudeCodePtyLLM
 from app.providers.factory import resolve_llm
 from app.providers.gemini import GeminiLLM
 from app.providers.litellm_provider import LiteLLMLLM
@@ -31,15 +31,15 @@ from app.schemas import ConversationCreate, ConversationUpdate, UserCreate
 
 def test_resolve_llm_accepts_canonical_anthropic_id() -> None:
     """A fully-qualified ``host:vendor/model`` ID routes by host."""
-    provider = resolve_llm("agent-sdk:anthropic/claude-sonnet-4-6")
-    assert isinstance(provider, ClaudeLLM)
+    provider = resolve_llm("claude-code-pty:anthropic/claude-sonnet-4-6")
+    assert isinstance(provider, ClaudeCodePtyLLM)
     assert provider._model_id == "claude-sonnet-4-6"
 
 
 def test_resolve_llm_canonicalises_vendor_only_form() -> None:
     """``vendor/model`` (no host prefix) is canonicalised before routing."""
     provider = resolve_llm("anthropic/claude-sonnet-4-6")
-    assert isinstance(provider, ClaudeLLM)
+    assert isinstance(provider, ClaudeCodePtyLLM)
     assert provider._model_id == "claude-sonnet-4-6"
 
 
@@ -153,7 +153,7 @@ def test_resolve_llm_none_uses_catalog_default() -> None:
     provider = resolve_llm(None)
     # Default is currently a Google model, so we get GeminiLLM. The
     # important assertion is that None doesn't raise.
-    assert isinstance(provider, GeminiLLM | ClaudeLLM)
+    assert isinstance(provider, GeminiLLM | ClaudeCodePtyLLM)
 
 
 def test_conversation_create_accepts_optional_client_uuid() -> None:
@@ -209,9 +209,9 @@ def test_resolve_llm_accepts_workspace_root_for_gemini() -> None:
 
 
 def test_resolve_llm_accepts_workspace_root_for_claude() -> None:
-    """resolve_llm with a workspace_root returns a ClaudeLLM instance."""
+    """resolve_llm with a workspace_root returns a ClaudeCodePtyLLM instance."""
     provider = resolve_llm("anthropic/claude-sonnet-4-6", workspace_root=Path(f"/tmp/{uuid4()}"))
-    assert isinstance(provider, ClaudeLLM)
+    assert isinstance(provider, ClaudeCodePtyLLM)
 
 
 def test_resolve_llm_workspace_root_none_is_default() -> None:
@@ -239,44 +239,32 @@ def test_resolve_llm_gemini_accepts_workspace_root_without_error() -> None:
 
 
 def test_resolve_llm_claude_provider_stores_workspace_root() -> None:
-    """The ClaudeLLM instance returned by resolve_llm carries the workspace_root.
-
-    ClaudeLLM stores workspace_root internally as ``_workspace_root`` and uses
-    it during stream() to resolve per-workspace CLAUDE_CODE_OAUTH_TOKEN.
-    """
+    """The ClaudeCodePtyLLM instance returned by resolve_llm carries workspace_root."""
     ws_root = Path(f"/tmp/{uuid4()}")
     provider = resolve_llm("anthropic/claude-sonnet-4-6", workspace_root=ws_root)
-    assert isinstance(provider, ClaudeLLM)
+    assert isinstance(provider, ClaudeCodePtyLLM)
     assert provider._workspace_root == ws_root
 
 
-def test_resolve_llm_claude_propagates_workspace_root_to_cwd(tmp_path: Path) -> None:
-    """``workspace_root`` must flow through to ``ClaudeLLMConfig.cwd``.
-
-    Without this, the Claude SDK subprocess runs in the backend's own
-    cwd and writes transcript files there — and, under any non-empty
-    ``setting_sources``, ingests the host repo's ``CLAUDE.md`` /
-    ``.claude/settings.json`` / ``.mcp.json``. The chat router must
-    be able to isolate every session by passing the per-user workspace.
-    """
+def test_resolve_llm_claude_uses_configured_pty_base_url(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """``resolve_llm`` injects the configured ccpty OpenAI bridge URL."""
+    monkeypatch.setattr(settings, "claude_code_pty_base_url", "http://127.0.0.1:9999/v1")
     provider = resolve_llm(
         "anthropic/claude-sonnet-4-6",
         workspace_root=tmp_path,
     )
-    assert isinstance(provider, ClaudeLLM)
-    assert provider._config.cwd == str(tmp_path)
+    assert isinstance(provider, ClaudeCodePtyLLM)
+    assert provider._config.base_url == "http://127.0.0.1:9999/v1"
 
 
-def test_resolve_llm_claude_workspace_root_none_leaves_cwd_unset() -> None:
-    """Non-chat callers (LCM, event bus) without a workspace_root see ``cwd=None``.
-
-    They rely on the provider's unconditional ``setting_sources=[]`` to
-    keep filesystem sources off — ``cwd`` is just the transcript
-    location for them.
-    """
+def test_resolve_llm_claude_workspace_root_none_is_allowed() -> None:
+    """Non-chat callers without a workspace_root still get a provider."""
     provider = resolve_llm("anthropic/claude-sonnet-4-6")
-    assert isinstance(provider, ClaudeLLM)
-    assert provider._config.cwd is None
+    assert isinstance(provider, ClaudeCodePtyLLM)
+    assert provider._workspace_root is None
 
 
 # ---------------------------------------------------------------------------

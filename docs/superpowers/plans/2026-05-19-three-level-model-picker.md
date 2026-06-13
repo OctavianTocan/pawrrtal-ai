@@ -28,7 +28,7 @@ Host display labels (single source of truth):
 
 | `Host` enum | Slug | Display |
 |---|---|---|
-| `agent_sdk` | `agent-sdk` | `Anthropic Agent SDK` |
+| `agent_sdk` | `agent-sdk` | `Claude Code PTY` |
 | `google_ai` | `google-ai` | `Gemini API` |
 | `litellm` | `litellm` | `LiteLLM` |
 | `opencode_go` | `opencode-go` | `OpenCode Go` |
@@ -111,7 +111,7 @@ def test_every_vendor_enum_has_a_label() -> None:
 
 
 def test_host_label_returns_expected_strings() -> None:
-    assert host_label(Host.agent_sdk) == "Anthropic Agent SDK"
+    assert host_label(Host.claude_code_pty) == "Claude Code PTY"
     assert host_label(Host.google_ai) == "Gemini API"
     assert host_label(Host.litellm) == "LiteLLM"
     assert host_label(Host.opencode_go) == "OpenCode Go"
@@ -131,7 +131,7 @@ def test_host_label_from_slug_helper_round_trip() -> None:
     """``host_label`` accepts both the enum and the wire slug."""
     from app.core.providers.labels import host_label_from_slug
 
-    assert host_label_from_slug("agent-sdk") == "Anthropic Agent SDK"
+    assert host_label_from_slug("claude-code-pty") == "Claude Code PTY"
     assert host_label_from_slug("opencode-go") == "OpenCode Go"
     with pytest.raises(KeyError):
         host_label_from_slug("not-a-host")
@@ -170,7 +170,7 @@ from __future__ import annotations
 from app.core.providers.model_id import Host, Vendor
 
 HOST_LABELS: dict[Host, str] = {
-    Host.agent_sdk: "Anthropic Agent SDK",
+    Host.claude_code_pty: "Claude Code PTY",
     Host.google_ai: "Gemini API",
     Host.litellm: "LiteLLM",
     Host.opencode_go: "OpenCode Go",
@@ -221,7 +221,7 @@ def vendor_label(vendor: Vendor) -> str:
 
 
 def host_label_from_slug(slug: str) -> str:
-    """Resolve a host wire-slug (e.g. ``"agent-sdk"``) to its label.
+    """Resolve a host wire-slug (e.g. ``"claude-code-pty"``) to its label.
 
     Args:
         slug: The host's wire-form slug.
@@ -289,7 +289,7 @@ import { hostLabel, vendorLabel } from './model-picker-labels';
 
 describe('hostLabel', () => {
 	it('returns the canonical label for known host slugs', () => {
-		expect(hostLabel('agent-sdk')).toBe('Anthropic Agent SDK');
+		expect(hostLabel('agent-sdk')).toBe('Claude Code PTY');
 		expect(hostLabel('google-ai')).toBe('Gemini API');
 		expect(hostLabel('litellm')).toBe('LiteLLM');
 		expect(hostLabel('opencode-go')).toBe('OpenCode Go');
@@ -337,7 +337,7 @@ Create `frontend/features/chat/components/model-picker-labels.ts`:
  */
 
 const HOST_LABELS: Readonly<Record<string, string>> = {
-	'agent-sdk': 'Anthropic Agent SDK',
+	'agent-sdk': 'Claude Code PTY',
 	'google-ai': 'Gemini API',
 	litellm: 'LiteLLM',
 	'opencode-go': 'OpenCode Go',
@@ -578,7 +578,7 @@ def test_host_keyboard_lists_all_hosts_with_friendly_labels() -> None:
     buttons = _flatten(build_host_keyboard())
     labels = [button.text for button in buttons]
 
-    assert "Anthropic Agent SDK (3)" in labels
+    assert "Claude Code PTY (3)" in labels
     assert "Gemini API (2)" in labels
     assert "xAI (1)" in labels
     assert "LiteLLM (5)" in labels
@@ -592,12 +592,12 @@ def test_host_keyboard_lists_all_hosts_with_friendly_labels() -> None:
 
 def test_host_button_for_single_vendor_jumps_to_model_list() -> None:
     """Hosts with exactly one vendor must skip the vendor screen."""
-    button = next(b for b in _flatten(build_host_keyboard()) if b.text.startswith("Anthropic Agent SDK"))
+    button = next(b for b in _flatten(build_host_keyboard()) if b.text.startswith("Claude Code PTY"))
     parsed = parse_model_callback_data(button.callback_data)
 
     assert parsed is not None
     assert parsed.action == "list"
-    assert parsed.host == Host.agent_sdk.value
+    assert parsed.host == Host.claude_code_pty.value
     assert parsed.provider == "anthropic"
     assert parsed.page == 1
 
@@ -665,9 +665,9 @@ def test_model_keyboard_back_button_for_multi_vendor_goes_to_vendor_screen() -> 
 
 
 def test_model_keyboard_back_button_for_single_vendor_goes_to_host_screen() -> None:
-    """Anthropic Agent SDK has one vendor — back skips the vendor screen."""
+    """Claude Code PTY has one vendor — back skips the vendor screen."""
     rows = build_models_keyboard(
-        host=Host.agent_sdk.value,
+        host=Host.claude_code_pty.value,
         vendor="anthropic",
         page=1,
         current_model_id="",
@@ -686,7 +686,7 @@ def test_stale_model_selection_is_rejected() -> None:
 
 
 def test_has_host_and_has_vendor_in_host_guards() -> None:
-    assert has_host(Host.agent_sdk.value) is True
+    assert has_host(Host.claude_code_pty.value) is True
     assert has_host("totally-fake") is False
     assert has_vendor_in_host(host=Host.opencode_go.value, vendor="zai") is True
     assert has_vendor_in_host(host=Host.opencode_go.value, vendor="anthropic") is False
@@ -1444,7 +1444,7 @@ Replace the `FIXTURE_MODELS` constant in `frontend/features/chat/components/Mode
  */
 const FIXTURE_MODELS: ChatModelOption[] = [
 	{
-		id: 'agent-sdk:anthropic/claude-sonnet-4-6',
+		id: 'claude-code-pty:anthropic/claude-sonnet-4-6',
 		host: 'agent-sdk',
 		vendor: 'anthropic',
 		model: 'claude-sonnet-4-6',
@@ -1454,7 +1454,7 @@ const FIXTURE_MODELS: ChatModelOption[] = [
 		is_default: false,
 	},
 	{
-		id: 'agent-sdk:anthropic/claude-opus-4-7',
+		id: 'claude-code-pty:anthropic/claude-opus-4-7',
 		host: 'agent-sdk',
 		vendor: 'anthropic',
 		model: 'claude-opus-4-7',
@@ -1513,7 +1513,7 @@ it('renders host rows at the root level with friendly labels', () => {
 	render(<ModelSelectorPopover {...DEFAULT_PROPS} />);
 	fireEvent.click(screen.getByRole('button', { name: /select model/i }));
 
-	expect(screen.getByText('Anthropic Agent SDK')).toBeTruthy();
+	expect(screen.getByText('Claude Code PTY')).toBeTruthy();
 	expect(screen.getByText('Gemini API')).toBeTruthy();
 	expect(screen.getByText('OpenCode Go')).toBeTruthy();
 });
@@ -1815,7 +1815,7 @@ git commit -m "feat(chat): three-level model selector (provider -> vendor -> mod
 
 - [ ] **Step 1: Frontend visual smoke (manual)**
 
-Run: `just dev` (in a separate terminal — leaves servers running). Open `http://localhost:3001/`, open the model picker. Verify the root rows read "Anthropic Agent SDK", "Gemini API", "xAI", "LiteLLM", "OpenCode Go". Hover "OpenCode Go" → vendor row reads "Z.AI" / "Moonshot". Hover each → model rows render. Hover "Anthropic Agent SDK" → models appear directly (no extra "Anthropic" submenu). Reload the page and confirm the persisted-model trigger label is unchanged (still `short_name`).
+Run: `just dev` (in a separate terminal — leaves servers running). Open `http://localhost:3001/`, open the model picker. Verify the root rows read "Claude Code PTY", "Gemini API", "xAI", "LiteLLM", "OpenCode Go". Hover "OpenCode Go" → vendor row reads "Z.AI" / "Moonshot". Hover each → model rows render. Hover "Claude Code PTY" → models appear directly (no extra "Anthropic" submenu). Reload the page and confirm the persisted-model trigger label is unchanged (still `short_name`).
 
 - [ ] **Step 2: Run the dev-console smoke**
 
