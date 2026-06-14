@@ -1,0 +1,37 @@
+backend-ts/packages/api-core/src/Lib/Errors.ts
+  s_bbeb6adbe1235a::t_ef317e26c7fa80 1-8
+backend-ts/packages/api-core/src/Modules/Authentication/Domain.ts
+  s_bbeb6adbe1235a::t_c5ccf437367cc1 1-15,31-37,42-44
+backend-ts/apps/api/src/Modules/System/Http.ts
+  s_bbeb6adbe1235a::t_19f9da7b9df948 1-7,12
+backend-ts/apps/api/scratchpad/print-user.ts
+  s_bbeb6adbe1235a::t_38174462f4c125 1-11
+backend-ts/packages/api-core/src/Modules/Authentication/Api.ts
+  s_bbeb6adbe1235a::t_8fb5af4859bce9 1-15,17,19-23,25
+backend-ts/packages/api-core/src/Api.ts
+  s_bbeb6adbe1235a::t_56cf8121b8204e 1-8
+backend-ts/packages/api-core/src/Modules/System/Api.ts
+  s_bbeb6adbe1235a::t_2994d6696d2cb5 1-8
+backend-ts/apps/api/src/App.ts
+  s_bbeb6adbe1235a::t_16e13a1c8e23a5 1-13,19
+backend-ts/apps/api/src/Modules/Layers.ts
+  s_bbeb6adbe1235a::t_5a0a05ec4098e4 1-8,13-17
+backend-ts/packages/api-core/src/Modules/Authentication/Errors.ts
+  s_bbeb6adbe1235a::t_c55604203803ff 1-9
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "89b378f3b7caddd016fda59c8db6f96a2a4e9d05",
+  "prompts": {},
+  "sessions": {
+    "s_bbeb6adbe1235a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_13f721a32ffeTtzDPjMT9duc1l",
+        "model": "minimax-m3"
+      },
+      "human_author": "Octavian Tocan <contact@octaviantocan.com>"
+    }
+  }
+}
