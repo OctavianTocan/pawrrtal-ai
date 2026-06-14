@@ -42,7 +42,7 @@ export class ProjectsRepo extends Context.Service<
 		) => Effect.Effect<Project | null>;
 		readonly delete: (id: ProjectId, userId: UserId) => Effect.Effect<boolean>;
 	}
->()('@pawrrtal/api/Projects/Repo') {}
+>()('@apps/api/Projects/Repo') {}
 
 /**
  * Repo body with no `SqlClient` source attached. Production wires it
