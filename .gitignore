@@ -22,6 +22,13 @@ node_modules/
 /private
 .private
 
+# Personal Effect-learning scaffolding (teach skill workspace). Not project artefacts.
+/MISSION.md
+/RESOURCES.md
+/NOTES.md
+/learning-records/
+/lessons/
+
 # Generated user workspaces (created by seed_workspace at runtime).
 # Default ``WORKSPACE_BASE_DIR=/data/workspaces`` is overridden in
 # local .env to ``./workspaces``, which lands at the repo root or
