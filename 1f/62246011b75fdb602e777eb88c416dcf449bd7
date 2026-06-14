@@ -1,0 +1,23 @@
+backend/app/infrastructure/config.py
+  s_2da531e6d15600::t_f21fabb1da330a 144,156,166
+backend/app/infrastructure/config_behavior.py
+  s_2da531e6d15600::t_f21fabb1da330a 36,77
+backend-ts/apps/api/src/Modules/Projects/Http.ts
+  s_2da531e6d15600::t_2c55b6bd09febe 6,12-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "1f62246011b75fdb602e777eb88c416dcf449bd7",
+  "prompts": {},
+  "sessions": {
+    "s_2da531e6d15600": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_139360e90ffexw41kxZrsedJIE",
+        "model": "minimax-m3"
+      },
+      "human_author": "Octavian Tocan <contact@octaviantocan.com>"
+    }
+  }
+}
