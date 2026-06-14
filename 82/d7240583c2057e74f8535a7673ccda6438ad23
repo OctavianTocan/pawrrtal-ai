@@ -1,0 +1,18 @@
+backend-ts/packages/api-core/src/Modules/Projects/Domain.ts
+  h_dad53a55d60d3d 14
+backend-ts/apps/api/scratchpad/print-user.ts
+  h_dad53a55d60d3d 1-9
+backend-ts/packages/api-core/src/Modules/Authentication/Domain.ts
+  h_dad53a55d60d3d 1-20,22-27,30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "82d7240583c2057e74f8535a7673ccda6438ad23",
+  "prompts": {},
+  "humans": {
+    "h_dad53a55d60d3d": {
+      "author": "Octavian Tocan <contact@octaviantocan.com>"
+    }
+  }
+}
