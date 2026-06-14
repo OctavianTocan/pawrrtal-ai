@@ -3,13 +3,10 @@
  */
 
 import { Api } from '@pawrrtal/api-core';
-import type { UserId } from '@pawrrtal/api-core/Modules/Projects/Domain';
 import { Effect, Layer } from 'effect';
 import { HttpApiBuilder } from 'effect/unstable/httpapi';
 
 import { ProjectsService, ProjectsServiceLive } from './Service';
-
-const STUB_USER_ID = '00000000-0000-0000-0000-000000000001' as UserId;
 
 /**
  * The live implementation of the ProjectsHttp module. It is used to define the http handlers and their signatures to be used in the Api module.

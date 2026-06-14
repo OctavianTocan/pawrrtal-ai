@@ -11,6 +11,7 @@ import { Ids } from '../../Lib/TypeIds';
 export const ProjectId = Ids.project;
 export type ProjectId = Schema.Schema.Type<typeof ProjectId>;
 
+// TODO: This right here feels like it should be in a different file.
 /**
  * Type alias for project ID.
  */
