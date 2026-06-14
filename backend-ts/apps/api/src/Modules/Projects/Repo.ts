@@ -1,13 +1,32 @@
 import type { ProjectId, UserId } from '@pawrrtal/api-core/Lib/TypeIds';
-import type { Project } from '@pawrrtal/api-core/Modules/Projects/Domain';
+import { Project } from '@pawrrtal/api-core/Modules/Projects/Domain';
 import { Context, DateTime, Effect, Layer } from 'effect';
 import { SqlClient } from 'effect/unstable/sql';
 import { DatabaseLive } from '@/Infrastructure/Database';
 
-const asProjects = (rows: ReadonlyArray<unknown>): ReadonlyArray<Project> =>
-	rows as unknown as ReadonlyArray<Project>;
-
-const asProject = (row: unknown): Project => row as unknown as Project;
+/**
+ * SQL rows are plain objects; the HTTP response layer needs `Project`
+ * instances because `Project` is a `Schema.Class` and the response
+ * encoder validates against the class identity, not just the shape.
+ * The cast keeps the Repo signature honest (`ReadonlyArray<Project>`)
+ * while the constructor is the real bridge from row to class instance.
+ *
+ * Why not `Schema.decodeUnknownSync(Project)(row)`: the Schema.Class
+ * surfaces `DecodingServices = unknown`, so the sync decoder needs an
+ * R-channel and won't fit the sync boundary. Direct construction is
+ * the idiomatic v4 pattern (see `Http.test.ts:39` for the same shape
+ * used in handler-stub tests).
+ */
+const decodeProject = (row: Record<string, unknown>): Project =>
+	new Project({
+		id: row.id as ProjectId,
+		user_id: row.user_id as UserId,
+		name: row.name as string,
+		created_at: DateTime.makeUnsafe(row.created_at as string),
+		updated_at: DateTime.makeUnsafe(row.updated_at as string),
+	});
+const decodeProjects = (rows: ReadonlyArray<Record<string, unknown>>): ReadonlyArray<Project> =>
+	rows.map(decodeProject);
 
 export class ProjectsRepo extends Context.Service<
 	ProjectsRepo,
@@ -47,7 +66,7 @@ export const ProjectsRepoBody: Layer.Layer<ProjectsRepo, never, SqlClient.SqlCli
 				yield* sql`SELECT id, user_id, name, created_at, updated_at FROM projects WHERE user_id = ${userId} ORDER BY created_at ASC`.pipe(
 					Effect.orDie
 				);
-			return asProjects(rows);
+			return decodeProjects(rows);
 		});
 
 		const insert = Effect.fn('ProjectsRepo.insert')(function* (input: {
@@ -71,7 +90,7 @@ export const ProjectsRepoBody: Layer.Layer<ProjectsRepo, never, SqlClient.SqlCli
 				yield* sql`SELECT id, user_id, name, created_at, updated_at FROM projects WHERE id = ${id}`.pipe(
 					Effect.orDie
 				);
-			return asProject(rows[0]);
+			return decodeProject(rows[0] as Record<string, unknown>);
 		});
 
 		const update = Effect.fn('ProjectsRepo.update')(function* (
@@ -96,7 +115,7 @@ export const ProjectsRepoBody: Layer.Layer<ProjectsRepo, never, SqlClient.SqlCli
 				yield* sql`SELECT id, user_id, name, created_at, updated_at FROM projects WHERE id = ${id} AND user_id = ${userId}`.pipe(
 					Effect.orDie
 				);
-			return rows[0] ? asProject(rows[0]) : null;
+			return rows[0] ? decodeProject(rows[0] as Record<string, unknown>) : null;
 		});
 
 		const remove = Effect.fn('ProjectsRepo.delete')(function* (id: ProjectId, userId: UserId) {
