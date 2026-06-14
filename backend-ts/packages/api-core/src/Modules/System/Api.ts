@@ -1,3 +1,11 @@
+/**
+ * `System` API group — liveness/readiness endpoints.
+ *
+ * Currently exposes a single `GET /system/health` that returns 204
+ * No Content. Future endpoints (version, metrics, build SHA) belong
+ * here too.
+ */
+
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from 'effect/unstable/httpapi';
 
 // Top level groups are added to the root of the derived HttpApiClient.

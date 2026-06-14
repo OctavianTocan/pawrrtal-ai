@@ -1,6 +1,18 @@
+/**
+ * `CoreModulesLive` — the merged runtime layer for every non-admin
+ * HttpApi group.
+ *
+ * Add a new module's `Http<Name>Live` here when you ship a new group;
+ * `App.ts` will pick it up automatically via `Layer.provide(CoreModulesLive)`.
+ */
+
 import { Layer } from 'effect';
 import { HttpProjectsLive } from './Projects/Http';
 import { HttpSystemLive } from './System/Http';
 
-// Merged HTTP handler layers, so we don't have to import each one individually.
+/**
+ * Every HttpApi group's runtime implementation, merged into one layer
+ * so `App.ts` only has to provide a single dependency. Admin-only groups
+ * (when they land) belong in a parallel `AdminModulesLive`.
+ */
 export const CoreModulesLive = Layer.mergeAll(HttpSystemLive, HttpProjectsLive);
