@@ -1,0 +1,37 @@
+backend-ts/apps/api/src/Modules/Projects/Repo.ts
+  s_2da531e6d15600::t_191cee70acda41 69
+  s_2da531e6d15600::t_56a0bf97f8baa1 7-24,27
+  s_2da531e6d15600::t_d4ddf84ad5ec02 118
+  s_2da531e6d15600::t_059382804ebedf 25-26
+  s_2da531e6d15600::t_2366daeef5e650 93
+  s_2da531e6d15600::t_b355aa570982a1 2
+  s_2da531e6d15600::t_75675cb1bb5e26 28-29
+backend-ts/apps/api/src/Infrastructure/Database/Sqlite.ts
+  s_2da531e6d15600::t_a5bf1d38bfee20 9-12,15,22-33
+  s_2da531e6d15600::t_1da035b95ec108 1-8,19-20,34
+  s_2da531e6d15600::t_40d72949fceb62 18
+  s_2da531e6d15600::t_d53605f18a01de 21
+backend-ts/apps/api/test/unit/Modules/Projects/Repo.test.ts
+  s_2da531e6d15600::t_7d8a3e11032d6b 30-31,46,60,78-79,90,104-105,116,132
+  s_2da531e6d15600::t_3388d34426f830 66-71
+  s_2da531e6d15600::t_aee61f86c586f6 131
+backend-ts/apps/api/test/Modules/Projects/Repo.test.ts
+  s_2da531e6d15600::t_e684844a14969d 76-81
+  s_2da531e6d15600::t_7d8a3e11032d6b 25,39,55,70,88-89,100,114-115,126
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "204c6200a3debcafab8b6c0408586225f998b869",
+  "prompts": {},
+  "sessions": {
+    "s_2da531e6d15600": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_139360e90ffexw41kxZrsedJIE",
+        "model": "minimax-m3"
+      },
+      "human_author": "Octavian Tocan <contact@octaviantocan.com>"
+    }
+  }
+}
