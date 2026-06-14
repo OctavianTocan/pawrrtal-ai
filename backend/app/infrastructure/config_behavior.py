@@ -33,9 +33,7 @@ class SettingsBehaviorMixin:
         if not self.claude_sandbox_excluded_commands:
             return []
         return [
-            cmd.strip()
-            for cmd in self.claude_sandbox_excluded_commands.split(",")
-            if cmd.strip()
+            cmd.strip() for cmd in self.claude_sandbox_excluded_commands.split(",") if cmd.strip()
         ]
 
     @property
@@ -76,9 +74,7 @@ class SettingsBehaviorMixin:
     @model_validator(mode="after")
     def validate_secure_cookie(self) -> Self:
         """Reject misconfigurations where ``SameSite=none`` is paired with insecure cookies."""
-        secure = (
-            self.cookie_secure if self.cookie_secure is not None else self.is_production
-        )
+        secure = self.cookie_secure if self.cookie_secure is not None else self.is_production
         if self.cookie_samesite == "none" and not secure:
             raise ValueError(
                 "cookie_samesite='none' requires HTTPS (cookie_secure must be True, or run with ENV=prod)."

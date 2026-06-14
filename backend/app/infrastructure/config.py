@@ -141,9 +141,7 @@ class Settings(BaseSettings, SettingsBehaviorMixin):
         if not self.allowed_emails:
             return frozenset()
         return frozenset(
-            addr.strip().lower()
-            for addr in self.allowed_emails.split(",")
-            if addr.strip()
+            addr.strip().lower() for addr in self.allowed_emails.split(",") if addr.strip()
         )
 
     # --- OAuth: Google ---
@@ -155,9 +153,7 @@ class Settings(BaseSettings, SettingsBehaviorMixin):
     google_oauth_client_secret: str = ""
     # Where Google redirects back to after auth. Must be an authorized
     # redirect URI on the OAuth client. Default targets local dev.
-    google_oauth_redirect_uri: str = (
-        "http://localhost:8000/api/v1/auth/oauth/google/callback"
-    )
+    google_oauth_redirect_uri: str = "http://localhost:8000/api/v1/auth/oauth/google/callback"
 
     # --- OAuth: Apple ---
     # Apple Sign In requires four pieces: services ID (acts as client_id),
@@ -167,9 +163,7 @@ class Settings(BaseSettings, SettingsBehaviorMixin):
     apple_oauth_team_id: str = ""
     apple_oauth_key_id: str = ""
     apple_oauth_private_key: str = ""
-    apple_oauth_redirect_uri: str = (
-        "http://localhost:8000/api/v1/auth/oauth/apple/callback"
-    )
+    apple_oauth_redirect_uri: str = "http://localhost:8000/api/v1/auth/oauth/apple/callback"
 
     # Where to send the user after a successful OAuth sign-in. Override in
     # production to point at the deployed frontend (e.g. https://app/...).
