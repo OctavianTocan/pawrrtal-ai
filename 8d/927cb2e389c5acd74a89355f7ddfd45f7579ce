@@ -1,0 +1,21 @@
+backend-ts/apps/api/src/Modules/Projects/Service.ts
+  s_bbeb6adbe1235a::t_c8a5426ea827d6 90
+backend-ts/apps/api/src/Modules/Projects/Repo.ts
+  s_bbeb6adbe1235a::t_740fb47b41dbf0 45
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.6",
+  "base_commit_sha": "8d927cb2e389c5acd74a89355f7ddfd45f7579ce",
+  "prompts": {},
+  "sessions": {
+    "s_bbeb6adbe1235a": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_13f721a32ffeTtzDPjMT9duc1l",
+        "model": "minimax-m3"
+      },
+      "human_author": "Octavian Tocan <contact@octaviantocan.com>"
+    }
+  }
+}
