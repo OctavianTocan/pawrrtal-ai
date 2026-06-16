@@ -2,62 +2,76 @@
  * React bridge for the Effect v4 runtime.
  *
  * `@effect-atom/atom-react` only supports Effect v3, so this app bridges the
- * v4 `ManagedRuntime` to React by hand: `useAppState` subscribes to the
- * store's `changes` stream through `useSyncExternalStore`, and `useRun`
- * dispatches action effects onto the runtime. Reads are synchronous via
- * `SubscriptionRef.getUnsafe`, so there is no loading flicker.
+ * v4 `ManagedRuntime` to React by hand. `makeReactiveHook` turns any service
+ * that exposes `{ getUnsafe, changes }` into a `useSyncExternalStore` hook:
+ * the snapshot is read synchronously (no loading flicker) and a forked fiber
+ * draining the `changes` stream notifies React on every update.
  */
 
 import * as Effect from 'effect/Effect';
 import * as Fiber from 'effect/Fiber';
 import * as Stream from 'effect/Stream';
 import { type ReactNode, useCallback, useSyncExternalStore } from 'react';
-import { type AppState, AppStore, Catalog, type CatalogShape } from '@/services';
+import type { Conversation } from '@/domain';
+import {
+  type AppState,
+  AppStore,
+  Catalog,
+  type CatalogShape,
+  ConversationsStore,
+} from '@/services';
 import type { AppServices } from './layer';
 import { appRuntime } from './runtime';
 
-/** Lazily-resolved singletons (the layer is built once by the runtime). */
-let storeRef: ReturnType<typeof resolveStore> | null = null;
-let catalogRef: CatalogShape | null = null;
+/** A reactive view: a synchronous read plus a stream of changes. */
+interface Reactive<A> {
+  readonly getUnsafe: () => A;
+  readonly changes: Stream.Stream<A>;
+}
 
-/** Resolve the store service synchronously from the runtime. */
-function resolveStore(): { getUnsafe: () => AppState; changes: Stream.Stream<AppState> } {
-  return appRuntime.runSync(
+/**
+ * Build a `useSyncExternalStore` hook from a function that resolves a
+ * {@link Reactive} view off the runtime. The view is resolved once and cached;
+ * subscribe/getSnapshot are stable module-level closures.
+ */
+function makeReactiveHook<A>(resolve: () => Reactive<A>): () => A {
+  let view: Reactive<A> | null = null;
+  const get = (): Reactive<A> => {
+    if (!view) view = resolve();
+    return view;
+  };
+  const subscribe = (onChange: () => void): (() => void) => {
+    const fiber = appRuntime.runFork(Stream.runForEach(get().changes, () => Effect.sync(onChange)));
+    return () => {
+      appRuntime.runFork(Fiber.interrupt(fiber));
+    };
+  };
+  const getSnapshot = (): A => get().getUnsafe();
+  return () => useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+}
+
+/** Subscribe to the transient UI state (home mode, tier, overlay). */
+export const useAppState = makeReactiveHook<AppState>(() =>
+  appRuntime.runSync(
     Effect.gen(function* () {
       const store = yield* AppStore;
       return { getUnsafe: store.getUnsafe, changes: store.changes };
     }),
-  );
-}
+  ),
+);
 
-/** Get (and cache) the resolved store binding. */
-function store(): { getUnsafe: () => AppState; changes: Stream.Stream<AppState> } {
-  if (!storeRef) storeRef = resolveStore();
-  return storeRef;
-}
+/** Subscribe to the conversation history + threads. */
+export const useConversations = makeReactiveHook<readonly Conversation[]>(() =>
+  appRuntime.runSync(
+    Effect.gen(function* () {
+      const store = yield* ConversationsStore;
+      return { getUnsafe: store.getUnsafe, changes: store.changes };
+    }),
+  ),
+);
 
-/**
- * Stable `useSyncExternalStore` subscribe: forks a fiber draining the store's
- * `changes` stream and notifies React on each emission; interrupts on cleanup.
- */
-function subscribe(onChange: () => void): () => void {
-  const fiber = appRuntime.runFork(Stream.runForEach(store().changes, () => Effect.sync(onChange)));
-  return () => {
-    appRuntime.runFork(Fiber.interrupt(fiber));
-  };
-}
-
-/** Stable snapshot getter for `useSyncExternalStore`. */
-function getSnapshot(): AppState {
-  return store().getUnsafe();
-}
-
-/** Subscribe to the full transient UI state; re-renders on any change. */
-export function useAppState(): AppState {
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
-}
-
-/** Resolve the static catalog (models + conversations) once. */
+/** Resolve the static catalog (models) once. */
+let catalogRef: CatalogShape | null = null;
 export function useCatalog(): CatalogShape {
   if (!catalogRef) {
     catalogRef = appRuntime.runSync(

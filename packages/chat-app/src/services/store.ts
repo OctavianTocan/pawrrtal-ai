@@ -24,8 +24,6 @@ export interface AppState {
   readonly homeMode: HomeMode;
   /** Currently selected reasoning tier. */
   readonly selectedTier: ModelTier;
-  /** Draft text in the composer. */
-  readonly composerText: string;
   /** Which overlay is open over the home canvas. */
   readonly overlay: Overlay;
 }
@@ -34,7 +32,6 @@ export interface AppState {
 const INITIAL_STATE: AppState = {
   homeMode: 'ask',
   selectedTier: DEFAULT_MODEL_TIER,
-  composerText: '',
   overlay: 'none',
 };
 
@@ -50,8 +47,6 @@ export interface AppStoreShape {
   readonly setHomeMode: (mode: HomeMode) => Effect.Effect<void>;
   /** Select a reasoning tier and close the model overlay. */
   readonly selectTier: (tier: ModelTier) => Effect.Effect<void>;
-  /** Update the composer draft text. */
-  readonly setComposerText: (text: string) => Effect.Effect<void>;
   /** Present (or dismiss) an overlay. */
   readonly setOverlay: (overlay: Overlay) => Effect.Effect<void>;
 }
@@ -76,7 +71,6 @@ export const AppStoreLive: Layer.Layer<AppStore> = Layer.effect(
       changes: SubscriptionRef.changes(ref),
       setHomeMode: (homeMode) => patch({ homeMode }),
       selectTier: (selectedTier) => patch({ selectedTier, overlay: 'none' }),
-      setComposerText: (composerText) => patch({ composerText }),
       setOverlay: (overlay) => patch({ overlay }),
     });
   }),

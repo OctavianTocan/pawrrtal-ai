@@ -4,10 +4,15 @@
  * its `*Live` layer here; nothing else changes.
  */
 import * as Layer from 'effect/Layer';
-import { AppStoreLive, CatalogLive, NavigationLive } from '@/services';
+import { AppStoreLive, CatalogLive, ConversationsStoreLive, NavigationLive } from '@/services';
 
-/** Root layer providing the store, catalog, and navigation services. */
-export const AppLayer = Layer.mergeAll(AppStoreLive, CatalogLive, NavigationLive);
+/** Root layer providing the store, catalog, conversations, and navigation services. */
+export const AppLayer = Layer.mergeAll(
+  AppStoreLive,
+  CatalogLive,
+  ConversationsStoreLive,
+  NavigationLive,
+);
 
 /** The set of services provided by {@link AppLayer}. */
 export type AppServices = Layer.Success<typeof AppLayer>;

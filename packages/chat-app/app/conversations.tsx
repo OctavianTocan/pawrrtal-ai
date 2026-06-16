@@ -14,11 +14,11 @@ import { colors } from '@/constants/colors';
 import { radii } from '@/constants/radii';
 import { spacing } from '@/constants/spacing';
 import { SEED_ACCOUNT } from '@/data/seed';
-import { actions, useCatalog, useRun } from '@/runtime';
+import { actions, useConversations, useRun } from '@/runtime';
 
 /** The conversation history drawer screen. */
 export default function ConversationsScreen(): React.JSX.Element {
-  const catalog = useCatalog();
+  const conversations = useConversations();
   const run = useRun();
   const insets = useSafeAreaInsets();
 
@@ -59,7 +59,7 @@ export default function ConversationsScreen(): React.JSX.Element {
           Conversations
         </ThemedText>
 
-        {catalog.conversations.map((conversation) => (
+        {conversations.map((conversation) => (
           <ConversationRow conversation={conversation} key={conversation.id} />
         ))}
       </ScrollView>

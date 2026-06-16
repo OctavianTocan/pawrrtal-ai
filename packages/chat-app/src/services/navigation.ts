@@ -32,6 +32,14 @@ export const NavigationLive: Layer.Layer<Navigation> = Layer.succeed(
   Navigation.of({
     push: (href) => Effect.sync(() => router.push(href)),
     replace: (href) => Effect.sync(() => router.replace(href)),
-    back: Effect.sync(() => router.back()),
+    // When opened directly (deep link / refresh / web URL) there is no stack
+    // entry to pop, so fall back to the home route instead of a dead `back()`.
+    back: Effect.sync(() => {
+      if (router.canGoBack()) {
+        router.back();
+      } else {
+        router.replace('/');
+      }
+    }),
   }),
 );

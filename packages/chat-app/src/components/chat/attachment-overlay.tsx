@@ -3,7 +3,7 @@
  * attachment sources (Camera, Gallery, Files) and the tool rows (Skills,
  * Connectors), separated by a hairline divider.
  */
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { Pressable } from '@/components/core/pressable';
 import { ThemedText } from '@/components/core/themed-text';
@@ -39,6 +39,9 @@ const TOOLS: readonly AttachmentItem[] = [
 export function AttachmentOverlay(): React.JSX.Element {
   const run = useRun();
   const dismiss = (): void => run(actions.setOverlay('none'));
+  const { width: screenWidth } = useWindowDimensions();
+  // Clamp so the menu never overflows the right edge on narrow devices.
+  const menuWidth = Math.min(POPOVER_MAX_WIDTH, screenWidth - spacing.lg * 2);
 
   return (
     <View style={StyleSheet.absoluteFill}>
@@ -46,7 +49,7 @@ export function AttachmentOverlay(): React.JSX.Element {
       <Animated.View
         entering={FadeInDown.duration(duration.base)}
         exiting={FadeOutDown.duration(duration.fast)}
-        style={styles.popover}
+        style={[styles.popover, { width: menuWidth }]}
       >
         {SOURCES.map((item) => (
           <AttachmentRow icon={item.icon} key={item.id} label={item.label} onPress={dismiss} />
@@ -78,6 +81,9 @@ function AttachmentRow({
   );
 }
 
+/** Preferred menu width on roomy screens; clamped down on narrow ones. */
+const POPOVER_MAX_WIDTH = 260;
+
 const styles = StyleSheet.create({
   popover: {
     backgroundColor: colors.surfaceElevated,
@@ -87,7 +93,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingVertical: spacing.sm,
     position: 'absolute',
-    width: 260,
   },
   row: {
     alignItems: 'center',

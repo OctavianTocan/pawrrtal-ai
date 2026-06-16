@@ -17,7 +17,7 @@
     "build:web": "expo export --platform web",
     "prebuild": "expo prebuild",
     "prebuild:clean": "expo prebuild --clean",
-    "check": "pnpm lint && pnpm typecheck"
+    "check": "npm run lint && npm run typecheck"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.4.2",

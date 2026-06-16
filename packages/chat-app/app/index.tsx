@@ -6,22 +6,13 @@
  */
 import { KeyboardAvoidingView, Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import {
-  AttachmentOverlay,
-  Composer,
-  HomeHeader,
-  ModelSelectorOverlay,
-  SuggestionChips,
-  VoiceOverlay,
-} from '@/components/chat';
+import { Composer, HomeHeader, Overlays, SuggestionChips } from '@/components/chat';
 import { Logo } from '@/components/icons/logo';
 import { colors } from '@/constants/colors';
 import { spacing } from '@/constants/spacing';
-import { useAppState } from '@/runtime';
 
 /** The home / landing screen. */
 export default function HomeScreen(): React.JSX.Element {
-  const { overlay } = useAppState();
   const insets = useSafeAreaInsets();
 
   return (
@@ -30,7 +21,8 @@ export default function HomeScreen(): React.JSX.Element {
         <HomeHeader />
       </View>
 
-      <View style={styles.watermark}>
+      {/* Decorative only — must not intercept taps meant for the header/composer. */}
+      <View pointerEvents="none" style={styles.watermark}>
         <Logo size={180} />
       </View>
 
@@ -44,9 +36,7 @@ export default function HomeScreen(): React.JSX.Element {
         </View>
       </KeyboardAvoidingView>
 
-      {overlay === 'model' ? <ModelSelectorOverlay /> : null}
-      {overlay === 'attachment' ? <AttachmentOverlay /> : null}
-      {overlay === 'voice' ? <VoiceOverlay /> : null}
+      <Overlays />
     </View>
   );
 }

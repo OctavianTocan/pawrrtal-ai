@@ -8,9 +8,9 @@
  * literal hex in a component (Biome's `noReactNativeLiteralColors` enforces it).
  */
 export const colors = {
-  /** App canvas — pure black. */
-  background: '#000000',
-  /** Input bar / card / popover surface — lifted off black. */
+  /** App canvas — near-black (sampled from the reference home canvas). */
+  background: '#0E0E10',
+  /** Input bar / card / popover surface — lifted off black (≈ composer bar). */
   surface: '#1C1C1E',
   /** Menu rows, selected popover row, raised chips. */
   surfaceElevated: '#2C2C2E',
@@ -22,7 +22,7 @@ export const colors = {
   /** Primary (body) text — white. */
   textPrimary: '#FFFFFF',
   /** Secondary text — muted grey subtitles, timestamps, placeholders. */
-  textSecondary: '#8E8E93',
+  textSecondary: '#98989D',
   /** Tertiary text — faint captions and disabled glyphs. */
   textTertiary: '#636366',
 

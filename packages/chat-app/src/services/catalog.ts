@@ -7,8 +7,8 @@
 import * as Context from 'effect/Context';
 import * as Effect from 'effect/Effect';
 import * as Layer from 'effect/Layer';
-import { SEED_CONVERSATIONS, SEED_MODELS } from '@/data/seed';
-import { type Conversation, type Model, ModelNotFound, type ModelTier } from '@/domain';
+import { SEED_MODELS } from '@/data/seed';
+import { type Model, ModelNotFound, type ModelTier } from '@/domain';
 
 /** Public surface of the catalog service. */
 export interface CatalogShape {
@@ -16,8 +16,6 @@ export interface CatalogShape {
   readonly models: readonly Model[];
   /** Resolve a single model by tier, failing if absent. */
   readonly modelByTier: (tier: ModelTier) => Effect.Effect<Model, ModelNotFound>;
-  /** The conversation history list. */
-  readonly conversations: readonly Conversation[];
 }
 
 /** Service key for the catalog. */
@@ -28,7 +26,6 @@ export const CatalogLive: Layer.Layer<Catalog> = Layer.succeed(
   Catalog,
   Catalog.of({
     models: SEED_MODELS,
-    conversations: SEED_CONVERSATIONS,
     modelByTier: (tier) => {
       const found = SEED_MODELS.find((model) => model.id === tier);
       return found ? Effect.succeed(found) : Effect.fail(new ModelNotFound({ tier }));

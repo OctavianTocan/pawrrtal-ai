@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/core/themed-text';
 import { AppIcon } from '@/components/icons/app-icon';
 import { spacing } from '@/constants/spacing';
 import type { Conversation } from '@/domain';
+import { actions, useRun } from '@/runtime';
 
 /** Props for {@link ConversationRow}. */
 export interface ConversationRowProps {
@@ -15,10 +16,15 @@ export interface ConversationRowProps {
   conversation: Conversation;
 }
 
-/** A single conversation row in the history list. */
+/** A single conversation row in the history list; opens the thread on press. */
 export function ConversationRow({ conversation }: ConversationRowProps): React.JSX.Element {
+  const run = useRun();
   return (
-    <Pressable accessibilityLabel={conversation.title} style={styles.row}>
+    <Pressable
+      accessibilityLabel={conversation.title}
+      onPress={() => run(actions.openConversation(conversation.id))}
+      style={styles.row}
+    >
       <View style={styles.text}>
         <ThemedText numberOfLines={2} variant="bodyStrong">
           {conversation.title}
@@ -27,9 +33,9 @@ export function ConversationRow({ conversation }: ConversationRowProps): React.J
           {conversation.timeLabel}
         </ThemedText>
       </View>
-      <Pressable accessibilityLabel="More options" style={styles.more}>
+      <View style={styles.more}>
         <AppIcon color="textSecondary" name="more" size={20} />
-      </Pressable>
+      </View>
     </Pressable>
   );
 }

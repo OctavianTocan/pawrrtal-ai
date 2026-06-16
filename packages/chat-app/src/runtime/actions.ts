@@ -5,7 +5,7 @@
  */
 import * as Effect from 'effect/Effect';
 import type { HomeMode, ModelTier } from '@/domain';
-import { AppStore, Navigation, type Overlay } from '@/services';
+import { AppStore, ConversationsStore, Navigation, type Overlay } from '@/services';
 
 /** Switch the active home tab. */
 export const setHomeMode = (mode: HomeMode): Effect.Effect<void, never, AppStore> =>
@@ -19,13 +19,6 @@ export const selectTier = (tier: ModelTier): Effect.Effect<void, never, AppStore
   Effect.gen(function* () {
     const store = yield* AppStore;
     yield* store.selectTier(tier);
-  });
-
-/** Update the composer draft text. */
-export const setComposerText = (text: string): Effect.Effect<void, never, AppStore> =>
-  Effect.gen(function* () {
-    const store = yield* AppStore;
-    yield* store.setComposerText(text);
   });
 
 /** Present or dismiss an overlay over the home canvas. */
@@ -47,3 +40,31 @@ export const navigateBack: Effect.Effect<void, never, Navigation> = Effect.gen(f
   const navigation = yield* Navigation;
   yield* navigation.back;
 });
+
+/** Create a conversation from the composer text and open its thread. */
+export const createConversation = (
+  text: string,
+): Effect.Effect<void, never, ConversationsStore | Navigation> =>
+  Effect.gen(function* () {
+    const store = yield* ConversationsStore;
+    const id = yield* store.create(text);
+    const navigation = yield* Navigation;
+    yield* navigation.push(`/conversation/${id}`);
+  });
+
+/** Append a message to an existing conversation thread. */
+export const sendMessage = (
+  conversationId: string,
+  text: string,
+): Effect.Effect<void, never, ConversationsStore> =>
+  Effect.gen(function* () {
+    const store = yield* ConversationsStore;
+    yield* store.send(conversationId, text);
+  });
+
+/** Open an existing conversation's thread. */
+export const openConversation = (conversationId: string): Effect.Effect<void, never, Navigation> =>
+  Effect.gen(function* () {
+    const navigation = yield* Navigation;
+    yield* navigation.push(`/conversation/${conversationId}`);
+  });

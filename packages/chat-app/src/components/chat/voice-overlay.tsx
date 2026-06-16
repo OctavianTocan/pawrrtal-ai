@@ -3,8 +3,10 @@
  * hints ("Swipe up to send", "Swipe left to cancel"), an animated waveform
  * strip, and the cancel (✕) / confirm (✓) controls.
  */
+
 import { StyleSheet, View } from 'react-native';
-import Animated, { FadeIn, FadeInUp, FadeOut } from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { FadeIn, FadeInUp, FadeOut, runOnJS } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Pressable } from '@/components/core/pressable';
 import { ThemedText } from '@/components/core/themed-text';
@@ -16,11 +18,23 @@ import { spacing } from '@/constants/spacing';
 import { actions, useRun } from '@/runtime';
 import { Waveform } from './waveform';
 
+/** Drag distance (px) past which a swipe dismisses the capture surface. */
+const SWIPE_DISMISS_PX = 60;
+
 /** Full-screen voice capture overlay. */
 export function VoiceOverlay(): React.JSX.Element {
   const run = useRun();
   const insets = useSafeAreaInsets();
   const dismiss = (): void => run(actions.setOverlay('none'));
+
+  // Honor the on-screen hints: swiping up (send) or left (cancel) both close
+  // the capture surface — there's no model wired yet, so both just dismiss.
+  const swipe = Gesture.Pan().onEnd((event) => {
+    'worklet';
+    if (event.translationY < -SWIPE_DISMISS_PX || event.translationX < -SWIPE_DISMISS_PX) {
+      runOnJS(dismiss)();
+    }
+  });
 
   return (
     <Animated.View
@@ -28,32 +42,36 @@ export function VoiceOverlay(): React.JSX.Element {
       exiting={FadeOut.duration(duration.fast)}
       style={[StyleSheet.absoluteFill, styles.container]}
     >
-      <View style={styles.hintArea}>
-        <AppIcon color="textSecondary" name="chevron-down" size={20} />
-        <ThemedText color="textSecondary" variant="caption">
-          Swipe up to send
-        </ThemedText>
-      </View>
+      <GestureDetector gesture={swipe}>
+        <View style={styles.gestureArea}>
+          <View style={styles.hintArea}>
+            <AppIcon color="textSecondary" name="chevron-down" size={20} />
+            <ThemedText color="textSecondary" variant="caption">
+              Swipe up to send
+            </ThemedText>
+          </View>
 
-      <Animated.View
-        entering={FadeInUp.duration(duration.base)}
-        style={[styles.captureBar, { marginBottom: insets.bottom + spacing.lg }]}
-      >
-        <Pressable accessibilityLabel="Cancel" onPress={dismiss} style={styles.cancelButton}>
-          <AppIcon name="close" size={22} />
-        </Pressable>
+          <Animated.View
+            entering={FadeInUp.duration(duration.base)}
+            style={[styles.captureBar, { marginBottom: insets.bottom + spacing.lg }]}
+          >
+            <Pressable accessibilityLabel="Cancel" onPress={dismiss} style={styles.cancelButton}>
+              <AppIcon name="close" size={22} />
+            </Pressable>
 
-        <View style={styles.waveArea}>
-          <Waveform />
-          <ThemedText color="textSecondary" style={styles.cancelHint} variant="caption">
-            Swipe left to cancel
-          </ThemedText>
+            <View style={styles.waveArea}>
+              <Waveform />
+              <ThemedText color="textSecondary" style={styles.cancelHint} variant="caption">
+                Swipe left to cancel
+              </ThemedText>
+            </View>
+
+            <Pressable accessibilityLabel="Confirm" onPress={dismiss} style={styles.confirmButton}>
+              <AppIcon color="onAccent" name="check" size={22} />
+            </Pressable>
+          </Animated.View>
         </View>
-
-        <Pressable accessibilityLabel="Confirm" onPress={dismiss} style={styles.confirmButton}>
-          <AppIcon color="onAccent" name="check" size={22} />
-        </Pressable>
-      </Animated.View>
+      </GestureDetector>
     </Animated.View>
   );
 }
@@ -61,6 +79,9 @@ export function VoiceOverlay(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.background,
+  },
+  gestureArea: {
+    flex: 1,
     justifyContent: 'flex-end',
   },
   hintArea: {

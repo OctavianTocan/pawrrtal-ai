@@ -20,18 +20,25 @@ export function Pressable({
   children,
   ...rest
 }: AppPressableProps): React.JSX.Element {
-  const handlePress: PressableProps['onPress'] = (event) => {
-    if (!noHaptic && Platform.OS !== 'web') {
-      void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    }
-    onPress?.(event);
-  };
+  // Only behave interactively when an action is supplied. Without this guard,
+  // placeholder rows (settings entries, chips) would dim and fire haptics on
+  // press while doing nothing, giving false interactive feedback.
+  const interactive = typeof onPress === 'function';
+
+  const handlePress: PressableProps['onPress'] = interactive
+    ? (event) => {
+        if (!noHaptic && Platform.OS !== 'web') {
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        }
+        onPress?.(event);
+      }
+    : undefined;
 
   return (
     <RNPressable
       onPress={handlePress}
       style={(state) => [
-        { opacity: state.pressed ? 0.6 : 1 },
+        interactive && state.pressed ? { opacity: 0.6 } : null,
         typeof style === 'function' ? style(state) : style,
       ]}
       {...rest}

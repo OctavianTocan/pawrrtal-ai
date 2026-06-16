@@ -3,10 +3,11 @@
  * (`+`) button, the model-tier pill, the mic, and the primary action that
  * flips between "Speak" and a send button depending on draft content.
  *
- * All state (draft text, selected tier, which overlay is open) lives in the
- * Effect store; this component reads it via `useAppState` and dispatches
- * mutations via `useRun`.
+ * The draft text is local component state (so the home and thread composers
+ * never share a draft). Submitting either creates a new conversation (home)
+ * or appends to the current thread, dispatched through the Effect runtime.
  */
+import { useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 import { Pressable } from '@/components/core/pressable';
 import { ThemedText } from '@/components/core/themed-text';
@@ -16,26 +17,48 @@ import { radii } from '@/constants/radii';
 import { spacing } from '@/constants/spacing';
 import { actions, useAppState, useCatalog, useRun } from '@/runtime';
 
+/** Props for {@link Composer}. */
+export interface ComposerProps {
+  /**
+   * When set, submitting appends to this conversation's thread. When omitted
+   * (home screen), submitting creates a new conversation and opens it.
+   */
+  conversationId?: string;
+}
+
 /** The bottom composer bar. */
-export function Composer(): React.JSX.Element {
-  const { composerText, selectedTier, overlay } = useAppState();
+export function Composer({ conversationId }: ComposerProps): React.JSX.Element {
+  const [text, setText] = useState('');
+  const { homeMode, selectedTier, overlay } = useAppState();
   const catalog = useCatalog();
   const run = useRun();
   const model = catalog.models.find((m) => m.id === selectedTier);
   const modelName = model?.name ?? 'Auto';
   const modelIcon = model?.icon ?? 'auto';
-  const hasDraft = composerText.trim().length > 0;
+  const hasDraft = text.trim().length > 0;
   const attachmentOpen = overlay === 'attachment';
+  const placeholder = homeMode === 'imagine' ? 'Imagine anything' : 'Ask anything';
+
+  const submit = (): void => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    run(
+      conversationId
+        ? actions.sendMessage(conversationId, trimmed)
+        : actions.createConversation(trimmed),
+    );
+    setText('');
+  };
 
   return (
     <View style={styles.container}>
       <TextInput
         multiline
-        onChangeText={(text) => run(actions.setComposerText(text))}
-        placeholder="Ask anything"
+        onChangeText={setText}
+        placeholder={placeholder}
         placeholderTextColor={colors.textSecondary}
         style={styles.input}
-        value={composerText}
+        value={text}
       />
 
       <View style={styles.controls}>
@@ -71,7 +94,7 @@ export function Composer(): React.JSX.Element {
           </Pressable>
 
           {hasDraft ? (
-            <Pressable accessibilityLabel="Send" style={styles.sendButton}>
+            <Pressable accessibilityLabel="Send" onPress={submit} style={styles.sendButton}>
               <AppIcon color="onAccent" name="send" size={22} />
             </Pressable>
           ) : (

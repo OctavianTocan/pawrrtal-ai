@@ -44,6 +44,7 @@ export default function RootLayout(): React.JSX.Element | null {
           <StatusBar style="light" />
           <Stack screenOptions={SCREEN_OPTIONS}>
             <Stack.Screen name="index" />
+            <Stack.Screen name="conversation/[id]" />
             <Stack.Screen name="conversations" options={{ animation: 'slide_from_left' }} />
             <Stack.Screen name="settings" options={{ animation: 'slide_from_bottom' }} />
           </Stack>

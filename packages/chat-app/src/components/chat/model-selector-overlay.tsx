@@ -3,7 +3,7 @@
  * composer when the model pill is tapped. Lists each tier with its icon,
  * name, and subtitle, and a checkmark on the active tier.
  */
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
 import { Pressable } from '@/components/core/pressable';
 import { ThemedText } from '@/components/core/themed-text';
@@ -20,6 +20,10 @@ export function ModelSelectorOverlay(): React.JSX.Element {
   const { selectedTier } = useAppState();
   const catalog = useCatalog();
   const run = useRun();
+  const { width: screenWidth } = useWindowDimensions();
+  // Clamp to the screen so the popover never runs past the right edge on
+  // narrow devices (e.g. 320dp), where a fixed 320 + left inset would clip.
+  const popoverWidth = Math.min(POPOVER_MAX_WIDTH, screenWidth - spacing.lg * 2);
 
   return (
     <View style={StyleSheet.absoluteFill}>
@@ -27,7 +31,7 @@ export function ModelSelectorOverlay(): React.JSX.Element {
       <Animated.View
         entering={FadeInDown.duration(duration.base)}
         exiting={FadeOutDown.duration(duration.fast)}
-        style={styles.popover}
+        style={[styles.popover, { width: popoverWidth }]}
       >
         {catalog.models.map((model) => {
           const active = model.id === selectedTier;
@@ -54,6 +58,9 @@ export function ModelSelectorOverlay(): React.JSX.Element {
   );
 }
 
+/** Preferred popover width on roomy screens; clamped down on narrow ones. */
+const POPOVER_MAX_WIDTH = 320;
+
 const styles = StyleSheet.create({
   popover: {
     backgroundColor: colors.surfaceElevated,
@@ -63,7 +70,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingVertical: spacing.xs,
     position: 'absolute',
-    width: 320,
   },
   row: {
     alignItems: 'center',
