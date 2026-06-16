@@ -14,6 +14,8 @@ export const colors = {
   surface: '#1C1C1E',
   /** Menu rows, selected popover row, raised chips. */
   surfaceElevated: '#2C2C2E',
+  /** Selected/active row inside an elevated surface — a touch LIGHTER than it. */
+  rowSelected: '#3A3A3C',
   /** Suggestion chips / secondary buttons on the canvas. */
   surfaceMuted: '#161618',
   /** Hairline dividers and input/border outlines. */
@@ -32,7 +34,7 @@ export const colors = {
   onAccent: '#000000',
 
   /** Centered logo watermark on the empty home canvas. */
-  watermark: '#242427',
+  watermark: '#2C2C30',
 
   /** Destructive actions (Sign out). */
   danger: '#FF453A',

@@ -22,7 +22,8 @@ export function MessageBubble({ message }: MessageBubbleProps): React.JSX.Elemen
   return (
     <View style={[styles.row, isUser ? styles.rowUser : styles.rowAssistant]}>
       <View style={[styles.bubble, isUser ? styles.userBubble : styles.assistantBubble]}>
-        <ThemedText color={isUser ? 'onAccent' : 'textPrimary'}>{message.text}</ThemedText>
+        {/* User bubble is a dark elevated surface, so its text stays white. */}
+        <ThemedText color="textPrimary">{message.text}</ThemedText>
       </View>
     </View>
   );

@@ -23,7 +23,7 @@ export function OverlayBackdrop({ onDismiss }: OverlayBackdropProps): React.JSX.
       exiting={FadeOut.duration(duration.fast)}
       style={StyleSheet.absoluteFill}
     >
-      <BlurView intensity={18} style={StyleSheet.absoluteFill} tint="dark" />
+      <BlurView intensity={16} style={StyleSheet.absoluteFill} tint="dark" />
       <Pressable
         accessibilityLabel="Dismiss"
         onPress={onDismiss}
@@ -34,5 +34,5 @@ export function OverlayBackdrop({ onDismiss }: OverlayBackdropProps): React.JSX.
 }
 
 const styles = StyleSheet.create({
-  tint: { backgroundColor: colors.background, opacity: 0.45 },
+  tint: { backgroundColor: colors.background, opacity: 0.28 },
 });

@@ -8,7 +8,7 @@
  * or appends to the current thread, dispatched through the Effect runtime.
  */
 import { useState } from 'react';
-import { StyleSheet, TextInput, View } from 'react-native';
+import { Keyboard, StyleSheet, TextInput, View } from 'react-native';
 import { Pressable } from '@/components/core/pressable';
 import { ThemedText } from '@/components/core/themed-text';
 import { AppIcon } from '@/components/icons/app-icon';
@@ -16,6 +16,7 @@ import { colors } from '@/constants/colors';
 import { radii } from '@/constants/radii';
 import { spacing } from '@/constants/spacing';
 import { actions, useAppState, useCatalog, useRun } from '@/runtime';
+import type { Overlay } from '@/services';
 
 /** Props for {@link Composer}. */
 export interface ComposerProps {
@@ -50,6 +51,13 @@ export function Composer({ conversationId }: ComposerProps): React.JSX.Element {
     setText('');
   };
 
+  // Dismiss the keyboard before presenting an overlay — otherwise on mobile
+  // the keyboard stays on top of the bottom-anchored popovers/capture bar.
+  const openOverlay = (overlay: Overlay): void => {
+    Keyboard.dismiss();
+    run(actions.setOverlay(overlay));
+  };
+
   return (
     <View style={styles.container}>
       <TextInput
@@ -65,7 +73,7 @@ export function Composer({ conversationId }: ComposerProps): React.JSX.Element {
         <View style={styles.leftControls}>
           <Pressable
             accessibilityLabel={attachmentOpen ? 'Close attachments' : 'Add attachment'}
-            onPress={() => run(actions.setOverlay(attachmentOpen ? 'none' : 'attachment'))}
+            onPress={() => openOverlay(attachmentOpen ? 'none' : 'attachment')}
             style={styles.circleButton}
           >
             <AppIcon name={attachmentOpen ? 'close' : 'plus'} size={20} />
@@ -73,7 +81,7 @@ export function Composer({ conversationId }: ComposerProps): React.JSX.Element {
 
           <Pressable
             accessibilityLabel="Choose model"
-            onPress={() => run(actions.setOverlay('model'))}
+            onPress={() => openOverlay('model')}
             style={styles.modelPill}
           >
             <AppIcon name={modelIcon} size={16} />
@@ -87,7 +95,7 @@ export function Composer({ conversationId }: ComposerProps): React.JSX.Element {
         <View style={styles.rightControls}>
           <Pressable
             accessibilityLabel="Dictate"
-            onPress={() => run(actions.setOverlay('voice'))}
+            onPress={() => openOverlay('voice')}
             style={styles.micButton}
           >
             <AppIcon color="textSecondary" name="mic" size={20} />
@@ -100,7 +108,7 @@ export function Composer({ conversationId }: ComposerProps): React.JSX.Element {
           ) : (
             <Pressable
               accessibilityLabel="Speak"
-              onPress={() => run(actions.setOverlay('voice'))}
+              onPress={() => openOverlay('voice')}
               style={styles.speakPill}
             >
               <AppIcon color="onAccent" name="waveform" size={16} />

@@ -35,7 +35,7 @@ export function SuggestionChips(): React.JSX.Element {
     >
       {SUGGESTIONS.map((suggestion) => (
         <Pressable accessibilityLabel={suggestion.label} key={suggestion.id} style={styles.chip}>
-          <AppIcon name={suggestion.icon} size={17} />
+          <AppIcon name={suggestion.icon} size={18} />
           <ThemedText style={styles.label} variant="label">
             {suggestion.label}
           </ThemedText>
@@ -50,13 +50,11 @@ const styles = StyleSheet.create({
   content: { gap: spacing.md, paddingHorizontal: spacing.lg },
   chip: {
     alignItems: 'center',
-    backgroundColor: colors.surfaceMuted,
-    borderColor: colors.border,
-    borderRadius: radii.md,
-    borderWidth: StyleSheet.hairlineWidth,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
     flexDirection: 'row',
     gap: spacing.sm,
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm + 2,
   },
   label: { marginRight: spacing.xxs },

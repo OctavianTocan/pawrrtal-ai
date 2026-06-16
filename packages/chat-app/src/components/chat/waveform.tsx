@@ -9,10 +9,10 @@ import { radii } from '@/constants/radii';
 /** Number of bars in the strip. */
 const BAR_COUNT = 34;
 
-/** Deterministic bar height (px) for a given index — a smooth-ish envelope. */
+/** Deterministic bar height (px) for a given index — a low, smooth envelope. */
 function barHeight(index: number): number {
   const phase = Math.sin(index * 0.9) + Math.sin(index * 0.35);
-  return 6 + Math.abs(phase) * 12;
+  return 3 + Math.abs(phase) * 6;
 }
 
 /** Static amplitude strip used inside the voice capture bar. */
@@ -39,8 +39,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   bar: {
-    backgroundColor: colors.voiceEnd,
+    backgroundColor: colors.voiceMid,
     borderRadius: radii.full,
-    width: 3,
+    width: 2.5,
   },
 });

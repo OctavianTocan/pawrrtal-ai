@@ -59,13 +59,13 @@ export function ModelSelectorOverlay(): React.JSX.Element {
 }
 
 /** Preferred popover width on roomy screens; clamped down on narrow ones. */
-const POPOVER_MAX_WIDTH = 320;
+const POPOVER_MAX_WIDTH = 250;
 
 const styles = StyleSheet.create({
   popover: {
     backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.xl,
-    bottom: 120,
+    borderRadius: radii.xxl,
+    bottom: 140,
     left: spacing.lg,
     overflow: 'hidden',
     paddingVertical: spacing.xs,
@@ -74,10 +74,11 @@ const styles = StyleSheet.create({
   row: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: spacing.lg,
+    gap: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.sm + 2,
   },
-  rowActive: { backgroundColor: colors.surface },
+  // Selected row reads as a subtle LIGHTER band, not a darker sunken one.
+  rowActive: { backgroundColor: colors.rowSelected },
   text: { flex: 1, gap: spacing.xxs },
 });

@@ -87,7 +87,7 @@ const POPOVER_MAX_WIDTH = 260;
 const styles = StyleSheet.create({
   popover: {
     backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.xl,
+    borderRadius: radii.xxl,
     bottom: 120,
     left: spacing.lg,
     overflow: 'hidden',

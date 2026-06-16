@@ -4,6 +4,8 @@ export const radii = {
   md: 12,
   lg: 16,
   xl: 20,
+  /** Large popovers / composer surface. */
+  xxl: 24,
   /** Pills and circular controls. */
   full: 9999,
 } as const;

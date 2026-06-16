@@ -4,6 +4,7 @@
  * strip, and the cancel (✕) / confirm (✓) controls.
  */
 
+import { BlurView } from 'expo-blur';
 import { StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { FadeIn, FadeInUp, FadeOut, runOnJS } from 'react-native-reanimated';
@@ -42,10 +43,14 @@ export function VoiceOverlay(): React.JSX.Element {
       exiting={FadeOut.duration(duration.fast)}
       style={[StyleSheet.absoluteFill, styles.container]}
     >
+      {/* Light scrim — the home stays visible behind the capture bar, matching
+          the reference (not an opaque black takeover). */}
+      <BlurView intensity={20} style={StyleSheet.absoluteFill} tint="dark" />
+      <View pointerEvents="none" style={[StyleSheet.absoluteFill, styles.scrim]} />
       <GestureDetector gesture={swipe}>
         <View style={styles.gestureArea}>
           <View style={styles.hintArea}>
-            <AppIcon color="textSecondary" name="chevron-down" size={20} />
+            <AppIcon color="textSecondary" name="chevron-up" size={20} />
             <ThemedText color="textSecondary" variant="caption">
               Swipe up to send
             </ThemedText>
@@ -78,8 +83,9 @@ export function VoiceOverlay(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.transparent,
   },
+  scrim: { backgroundColor: colors.background, opacity: 0.35 },
   gestureArea: {
     flex: 1,
     justifyContent: 'flex-end',

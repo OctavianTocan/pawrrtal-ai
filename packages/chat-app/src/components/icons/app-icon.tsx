@@ -16,6 +16,7 @@ export type IconName =
   | 'close'
   | 'check'
   | 'chevron-down'
+  | 'chevron-up'
   | 'chevron-right'
   | 'chevron-back'
   | 'search'
@@ -71,6 +72,7 @@ const REGISTRY: Record<IconName, IconSpec> = {
   close: { family: 'feather', glyph: 'x' },
   check: { family: 'feather', glyph: 'check' },
   'chevron-down': { family: 'feather', glyph: 'chevron-down' },
+  'chevron-up': { family: 'feather', glyph: 'chevron-up' },
   'chevron-right': { family: 'feather', glyph: 'chevron-right' },
   'chevron-back': { family: 'feather', glyph: 'chevron-left' },
   search: { family: 'feather', glyph: 'search' },
