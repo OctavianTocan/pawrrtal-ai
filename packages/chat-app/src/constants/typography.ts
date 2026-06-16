@@ -26,19 +26,19 @@ export const MAX_FONT_SIZE_MULTIPLIER = 1.4;
 /** Typography presets mapping variant names to `TextStyle` objects. */
 export const typography = {
   /** Tab labels in the header ("Ask" / "Imagine"). */
-  titleLarge: { fontFamily: fontFamily.bold, fontSize: 22, lineHeight: 28 },
+  titleLarge: { fontFamily: fontFamily.bold, fontSize: 18, lineHeight: 24 },
   /** Screen titles ("Settings"), drawer account name. */
-  title: { fontFamily: fontFamily.bold, fontSize: 20, lineHeight: 26 },
+  title: { fontFamily: fontFamily.bold, fontSize: 17, lineHeight: 22 },
   /** Row titles in menus, conversation titles, model names. */
-  bodyStrong: { fontFamily: fontFamily.semiBold, fontSize: 16, lineHeight: 22 },
+  bodyStrong: { fontFamily: fontFamily.semiBold, fontSize: 15, lineHeight: 20 },
   /** Default body, composer text. */
-  body: { fontFamily: fontFamily.regular, fontSize: 16, lineHeight: 22 },
+  body: { fontFamily: fontFamily.regular, fontSize: 15, lineHeight: 21 },
   /** Button / pill labels. */
-  label: { fontFamily: fontFamily.semiBold, fontSize: 15, lineHeight: 20 },
+  label: { fontFamily: fontFamily.semiBold, fontSize: 14, lineHeight: 18 },
   /** Subtitles ("Powered by ...", timestamps). */
-  caption: { fontFamily: fontFamily.regular, fontSize: 13, lineHeight: 18 },
-  /** Section headers ("App", "Grok", "Conversations"). */
-  overline: { fontFamily: fontFamily.medium, fontSize: 13, lineHeight: 16 },
+  caption: { fontFamily: fontFamily.regular, fontSize: 12.5, lineHeight: 16 },
+  /** Section headers ("App", "Conversations"). */
+  overline: { fontFamily: fontFamily.medium, fontSize: 12, lineHeight: 15 },
 } as const satisfies Record<string, TextStyle>;
 
 /** Union of valid typography variant names. */

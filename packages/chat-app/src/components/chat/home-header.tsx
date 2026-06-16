@@ -31,7 +31,7 @@ export function HomeHeader(): React.JSX.Element {
         onPress={() => run(actions.navigatePush('/conversations'))}
         style={styles.iconButton}
       >
-        <AppIcon name="menu" size={26} />
+        <AppIcon name="menu" size={23} />
       </Pressable>
 
       <View style={styles.tabs}>
@@ -54,7 +54,7 @@ export function HomeHeader(): React.JSX.Element {
       </View>
 
       <Pressable accessibilityLabel="Private chat" style={styles.iconButton}>
-        <AppIcon name="incognito" size={24} />
+        <AppIcon name="incognito" size={22} />
       </Pressable>
     </View>
   );
@@ -70,16 +70,16 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     alignItems: 'center',
-    height: 40,
+    height: 38,
     justifyContent: 'center',
-    width: 40,
+    width: 38,
   },
-  tabs: { alignItems: 'center', flexDirection: 'row', gap: spacing.xl },
-  tab: { alignItems: 'center', gap: spacing.xs },
+  tabs: { alignItems: 'center', flexDirection: 'row', gap: spacing.lg },
+  tab: { alignItems: 'center', gap: spacing.xxs },
   activeUnderline: {
     backgroundColor: colors.textPrimary,
     borderRadius: radii.full,
-    height: 3,
-    width: 18,
+    height: 2.5,
+    width: 14,
   },
 });

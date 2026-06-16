@@ -39,7 +39,7 @@ export function SettingsRow({
 }: SettingsRowProps): React.JSX.Element {
   return (
     <Pressable accessibilityLabel={label} onPress={onPress} style={styles.row}>
-      <AppIcon color={danger ? 'danger' : 'textPrimary'} name={icon} size={22} />
+      <AppIcon color={danger ? 'danger' : 'textPrimary'} name={icon} size={20} />
       <View style={styles.labelArea}>
         <ThemedText color={danger ? 'danger' : 'textPrimary'} variant="bodyStrong">
           {label}
@@ -86,8 +86,8 @@ export function SettingsSection({ title, children }: SettingsSectionProps): Reac
 }
 
 const styles = StyleSheet.create({
-  section: { gap: spacing.sm, marginBottom: spacing.xl },
-  sectionTitle: { marginLeft: spacing.xs, textTransform: 'none' },
+  section: { gap: spacing.xs, marginBottom: spacing.lg },
+  sectionTitle: { marginBottom: spacing.xxs, marginLeft: spacing.xs, textTransform: 'none' },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
@@ -96,14 +96,14 @@ const styles = StyleSheet.create({
   row: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: spacing.lg,
+    gap: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+    paddingVertical: spacing.md + 1,
   },
-  labelArea: { flex: 1, gap: spacing.xxs },
+  labelArea: { flex: 1, gap: 1 },
   divider: {
     backgroundColor: colors.border,
     height: StyleSheet.hairlineWidth,
-    marginLeft: spacing.xxxl + spacing.lg,
+    marginLeft: spacing.xxxl + spacing.md,
   },
 });

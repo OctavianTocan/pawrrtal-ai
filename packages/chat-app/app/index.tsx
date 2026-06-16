@@ -23,7 +23,7 @@ export default function HomeScreen(): React.JSX.Element {
 
       {/* Decorative only — must not intercept taps meant for the header/composer. */}
       <View pointerEvents="none" style={styles.watermark}>
-        <Logo size={180} />
+        <Logo size={128} />
       </View>
 
       <KeyboardAvoidingView

@@ -32,10 +32,9 @@ export default function SettingsScreen(): React.JSX.Element {
           onPress={() => run(actions.navigateBack)}
           style={styles.close}
         >
-          <AppIcon name="close" size={24} />
+          <AppIcon name="close" size={22} />
         </Pressable>
         <ThemedText variant="title">Settings</ThemedText>
-        <View style={styles.close} />
       </View>
 
       <ScrollView
@@ -55,37 +54,37 @@ export default function SettingsScreen(): React.JSX.Element {
         </View>
 
         <SettingsSection>
-          <SettingsRow chevron icon="subscription" label={SEED_ACCOUNT.plan} />
+          <SettingsRow icon="subscription" label={SEED_ACCOUNT.plan} />
         </SettingsSection>
 
         <SettingsSection title="App">
-          <SettingsRow chevron icon="appearance" label="Appearance" value="System" />
-          <SettingsRow chevron icon="haptics" label="Haptics" />
-          <SettingsRow chevron icon="widget" label="Widget" />
-          <SettingsRow chevron icon="advanced" label="Advanced" />
+          <SettingsRow icon="appearance" label="Appearance" value="System" />
+          <SettingsRow icon="haptics" label="Haptics" />
+          <SettingsRow icon="widget" label="Widget" />
+          <SettingsRow icon="advanced" label="Advanced" />
         </SettingsSection>
 
         <SettingsSection title="Assistant">
-          <SettingsRow chevron icon="customize" label="Customize" />
-          <SettingsRow chevron icon="connectors" label="Connectors" />
-          <SettingsRow chevron icon="skills" label="Skills" />
-          <SettingsRow chevron icon="memory" label="Memory" />
-          <SettingsRow chevron icon="kids" label="Kids Mode" />
+          <SettingsRow icon="customize" label="Customize" />
+          <SettingsRow icon="connectors" label="Connectors" />
+          <SettingsRow icon="skills" label="Skills" />
+          <SettingsRow icon="memory" label="Memory" />
+          <SettingsRow icon="kids" label="Kids Mode" />
         </SettingsSection>
 
         <SettingsSection title="Voice">
-          <SettingsRow chevron icon="voice" label="Voice" value="Sal" />
+          <SettingsRow icon="voice" label="Voice" value="Sal" />
         </SettingsSection>
 
         <SettingsSection title="Data & Information">
-          <SettingsRow chevron icon="shared" label="Shared Conversations" />
-          <SettingsRow chevron icon="data" label="Data Controls" />
+          <SettingsRow icon="shared" label="Shared Conversations" />
+          <SettingsRow icon="data" label="Data Controls" />
         </SettingsSection>
 
         <SettingsSection>
-          <SettingsRow chevron icon="licenses" label="Open Source Licenses" />
-          <SettingsRow chevron icon="terms" label="Terms of Use" />
-          <SettingsRow chevron icon="privacy" label="Privacy Policy" />
+          <SettingsRow icon="licenses" label="Open Source Licenses" />
+          <SettingsRow icon="terms" label="Terms of Use" />
+          <SettingsRow icon="privacy" label="Privacy Policy" />
         </SettingsSection>
 
         <SettingsSection>
@@ -109,28 +108,28 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: spacing.xs,
     paddingBottom: spacing.md,
-    paddingHorizontal: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
-  close: { alignItems: 'center', height: 40, justifyContent: 'center', width: 40 },
-  content: { paddingHorizontal: spacing.lg, paddingTop: spacing.md },
+  close: { alignItems: 'center', height: 38, justifyContent: 'center', width: 38 },
+  content: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
   accountCard: {
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
     flexDirection: 'row',
     gap: spacing.md,
-    marginBottom: spacing.xl,
-    padding: spacing.lg,
+    marginBottom: spacing.lg,
+    padding: spacing.md + 2,
   },
   avatar: {
     alignItems: 'center',
     backgroundColor: colors.surfaceElevated,
     borderRadius: radii.full,
-    height: 48,
+    height: 44,
     justifyContent: 'center',
-    width: 48,
+    width: 44,
   },
   accountText: { gap: spacing.xxs },
   version: { marginTop: spacing.md },

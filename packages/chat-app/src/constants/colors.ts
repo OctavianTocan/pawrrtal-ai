@@ -32,7 +32,7 @@ export const colors = {
   onAccent: '#000000',
 
   /** Centered logo watermark on the empty home canvas. */
-  watermark: '#1A1A1C',
+  watermark: '#242427',
 
   /** Destructive actions (Sign out). */
   danger: '#FF453A',

@@ -34,7 +34,7 @@ export default function ConversationScreen(): React.JSX.Element {
           onPress={() => run(actions.navigateBack)}
           style={styles.iconButton}
         >
-          <AppIcon name="chevron-back" size={24} />
+          <AppIcon name="chevron-back" size={23} />
         </Pressable>
         <ThemedText numberOfLines={1} style={styles.title} variant="bodyStrong">
           {conversation?.title ?? 'Conversation'}
@@ -42,26 +42,35 @@ export default function ConversationScreen(): React.JSX.Element {
         <View style={styles.iconButton} />
       </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.body}
-      >
-        <ScrollView
-          contentContainerStyle={styles.listContent}
-          onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
-          ref={scrollRef}
-          showsVerticalScrollIndicator={false}
-          style={styles.list}
+      {conversation ? (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.body}
         >
-          {conversation?.messages.map((message) => (
-            <MessageBubble key={message.id} message={message} />
-          ))}
-        </ScrollView>
+          <ScrollView
+            contentContainerStyle={styles.listContent}
+            onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: true })}
+            ref={scrollRef}
+            showsVerticalScrollIndicator={false}
+            style={styles.list}
+          >
+            {conversation.messages.map((message) => (
+              <MessageBubble key={message.id} message={message} />
+            ))}
+          </ScrollView>
 
-        <View style={[styles.composerWrap, { paddingBottom: insets.bottom + spacing.sm }]}>
-          <Composer conversationId={id} />
+          <View style={[styles.composerWrap, { paddingBottom: insets.bottom + spacing.sm }]}>
+            <Composer conversationId={conversation.id} />
+          </View>
+        </KeyboardAvoidingView>
+      ) : (
+        // No matching conversation (e.g. a deep link / refresh on the SPA, where
+        // the in-memory store is empty). Don't render a composer that would
+        // silently drop the message — show a graceful empty state instead.
+        <View style={styles.empty}>
+          <ThemedText color="textSecondary">This conversation isn't available.</ThemedText>
         </View>
-      </KeyboardAvoidingView>
+      )}
 
       <Overlays />
     </View>
@@ -79,10 +88,11 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
     paddingHorizontal: spacing.lg,
   },
-  iconButton: { alignItems: 'center', height: 40, justifyContent: 'center', width: 40 },
+  iconButton: { alignItems: 'center', height: 38, justifyContent: 'center', width: 38 },
   title: { flex: 1, textAlign: 'center' },
   body: { flex: 1 },
   list: { flex: 1 },
   listContent: { padding: spacing.lg },
   composerWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  empty: { alignItems: 'center', flex: 1, justifyContent: 'center', padding: spacing.xl },
 });

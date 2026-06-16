@@ -1,28 +1,40 @@
 /**
- * `Logo` — the app's brand mark, an original geometric glyph (a ring crossed
- * by a tapered diagonal slash). Lives in its own file so it can be reused as
- * the large home watermark and as a small brand glyph without inlining SVG in
- * feature components.
+ * `Logo` — the app's brand mark: an original "empty set" geometric glyph
+ * (a thin ring crossed by a single diagonal slash that overshoots the ring
+ * slightly at each end). Lives in its own file so it can be reused as the
+ * large home watermark and as a small brand glyph.
  */
-import Svg, { Circle, Path } from 'react-native-svg';
+import Svg, { Circle, Line } from 'react-native-svg';
 import { colors } from '@/constants/colors';
 
 /** Props for {@link Logo}. */
 export interface LogoProps {
   /** Square size in px. */
   size?: number;
-  /** Stroke/fill color (defaults to the watermark token). */
+  /** Stroke color (defaults to the watermark token). */
   color?: string;
+  /** Stroke weight in viewBox units (100×100 space). */
+  strokeWidth?: number;
 }
 
 /** Render the brand glyph at a given size. */
-export function Logo({ size = 160, color = colors.watermark }: LogoProps): React.JSX.Element {
+export function Logo({
+  size = 132,
+  color = colors.watermark,
+  strokeWidth = 4.5,
+}: LogoProps): React.JSX.Element {
   return (
     <Svg fill="none" height={size} viewBox="0 0 100 100" width={size}>
-      <Circle cx={50} cy={50} r={34} stroke={color} strokeWidth={6} />
-      <Path d="M30 70 L70 30" stroke={color} strokeLinecap="round" strokeWidth={8} />
-      <Path d="M68 32 L78 22" stroke={color} strokeLinecap="round" strokeWidth={8} />
-      <Path d="M32 68 L22 78" stroke={color} strokeLinecap="round" strokeWidth={8} />
+      <Circle cx={50} cy={50} r={31} stroke={color} strokeWidth={strokeWidth} />
+      <Line
+        stroke={color}
+        strokeLinecap="round"
+        strokeWidth={strokeWidth}
+        x1={26}
+        x2={74}
+        y1={74}
+        y2={26}
+      />
     </Svg>
   );
 }

@@ -68,7 +68,7 @@ export function Composer({ conversationId }: ComposerProps): React.JSX.Element {
             onPress={() => run(actions.setOverlay(attachmentOpen ? 'none' : 'attachment'))}
             style={styles.circleButton}
           >
-            <AppIcon name={attachmentOpen ? 'close' : 'plus'} size={22} />
+            <AppIcon name={attachmentOpen ? 'close' : 'plus'} size={20} />
           </Pressable>
 
           <Pressable
@@ -76,11 +76,11 @@ export function Composer({ conversationId }: ComposerProps): React.JSX.Element {
             onPress={() => run(actions.setOverlay('model'))}
             style={styles.modelPill}
           >
-            <AppIcon name={modelIcon} size={18} />
-            <ThemedText style={styles.modelLabel} variant="label">
+            <AppIcon name={modelIcon} size={16} />
+            <ThemedText numberOfLines={1} style={styles.modelLabel} variant="label">
               {modelName}
             </ThemedText>
-            <AppIcon color="textSecondary" name="chevron-down" size={16} />
+            <AppIcon color="textSecondary" name="chevron-down" size={15} />
           </Pressable>
         </View>
 
@@ -90,12 +90,12 @@ export function Composer({ conversationId }: ComposerProps): React.JSX.Element {
             onPress={() => run(actions.setOverlay('voice'))}
             style={styles.micButton}
           >
-            <AppIcon color="textSecondary" name="mic" size={22} />
+            <AppIcon color="textSecondary" name="mic" size={20} />
           </Pressable>
 
           {hasDraft ? (
             <Pressable accessibilityLabel="Send" onPress={submit} style={styles.sendButton}>
-              <AppIcon color="onAccent" name="send" size={22} />
+              <AppIcon color="onAccent" name="send" size={20} />
             </Pressable>
           ) : (
             <Pressable
@@ -103,7 +103,7 @@ export function Composer({ conversationId }: ComposerProps): React.JSX.Element {
               onPress={() => run(actions.setOverlay('voice'))}
               style={styles.speakPill}
             >
-              <AppIcon color="onAccent" name="waveform" size={18} />
+              <AppIcon color="onAccent" name="waveform" size={16} />
               <ThemedText color="onAccent" style={styles.speakLabel} variant="label">
                 Speak
               </ThemedText>
@@ -122,56 +122,66 @@ const styles = StyleSheet.create({
     borderRadius: radii.xl,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
+    paddingTop: spacing.sm + 2,
     paddingBottom: spacing.sm,
   },
   input: {
     color: colors.textPrimary,
-    fontSize: 16,
-    lineHeight: 22,
+    fontSize: 15,
+    lineHeight: 20,
     maxHeight: 120,
-    minHeight: 24,
-    paddingVertical: spacing.xs,
+    minHeight: 20,
+    paddingVertical: spacing.xxs,
   },
   controls: {
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
   },
-  leftControls: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
-  rightControls: { alignItems: 'center', flexDirection: 'row', gap: spacing.sm },
+  // Allow the left group (and the model pill within it) to shrink so the row
+  // never overflows / clips controls on narrow (~320dp) phones.
+  leftControls: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    flexShrink: 1,
+    gap: spacing.sm,
+    minWidth: 0,
+  },
+  rightControls: { alignItems: 'center', flexDirection: 'row', flexShrink: 0, gap: spacing.sm },
   circleButton: {
     alignItems: 'center',
     backgroundColor: colors.surfaceElevated,
     borderRadius: radii.full,
-    height: 36,
+    height: 32,
     justifyContent: 'center',
-    width: 36,
+    width: 32,
   },
   modelPill: {
     alignItems: 'center',
     backgroundColor: colors.surfaceElevated,
     borderRadius: radii.full,
     flexDirection: 'row',
+    flexShrink: 1,
     gap: spacing.xs,
-    height: 36,
+    height: 32,
+    minWidth: 0,
     paddingHorizontal: spacing.md,
   },
-  modelLabel: { marginHorizontal: spacing.xxs },
+  modelLabel: { flexShrink: 1, marginHorizontal: spacing.xxs },
   micButton: {
     alignItems: 'center',
-    height: 36,
+    height: 32,
     justifyContent: 'center',
-    width: 36,
+    width: 32,
   },
   sendButton: {
     alignItems: 'center',
     backgroundColor: colors.accent,
     borderRadius: radii.full,
-    height: 40,
+    height: 34,
     justifyContent: 'center',
-    width: 40,
+    width: 34,
   },
   speakPill: {
     alignItems: 'center',
@@ -179,8 +189,8 @@ const styles = StyleSheet.create({
     borderRadius: radii.full,
     flexDirection: 'row',
     gap: spacing.xs,
-    height: 40,
-    paddingHorizontal: spacing.lg,
+    height: 34,
+    paddingHorizontal: spacing.md + 2,
   },
   speakLabel: { marginLeft: spacing.xxs },
 });
