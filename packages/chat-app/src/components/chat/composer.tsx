@@ -53,7 +53,7 @@ export function Composer(): React.JSX.Element {
             onPress={() => run(actions.setOverlay('model'))}
             style={styles.modelPill}
           >
-            <AppIcon name={modelIcon as never} size={18} />
+            <AppIcon name={modelIcon} size={18} />
             <ThemedText style={styles.modelLabel} variant="label">
               {modelName}
             </ThemedText>

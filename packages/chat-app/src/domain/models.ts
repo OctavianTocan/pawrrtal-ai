@@ -23,8 +23,11 @@ export const Model = Schema.Struct({
   name: Schema.String,
   /** Secondary line under the name (e.g. "Chooses Fast or Expert"). */
   subtitle: Schema.String,
-  /** Icon key resolved by the icon registry. */
-  icon: Schema.String,
+  /**
+   * Icon key resolved by the icon registry. Constrained to the tier-icon
+   * names so it is assignable to `AppIcon`'s `IconName` without a cast.
+   */
+  icon: Schema.Literals(['heavy', 'expert', 'fast', 'auto']),
 });
 /** Static shape of a selectable model. */
 export type Model = Schema.Schema.Type<typeof Model>;

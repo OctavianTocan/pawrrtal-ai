@@ -66,7 +66,7 @@ npm run prebuild       # generate native android/ ios projects
 
 Expo 55 pins `react@19.2.0`, while the repo root overrides React to a different
 patch for the Next.js frontend. Joining the root pnpm workspace would force a
-single shared resolution and break Expo's expected React/React-Native versions.
+single shared resolution and break Expo's expected React/React Native versions.
 Keeping this package self-contained (its own `package-lock.json` and `.npmrc`)
 lets it build exactly like `liza-rft`. The root Biome config excludes
 `packages/chat-app` so this package's own toolchain stays authoritative.

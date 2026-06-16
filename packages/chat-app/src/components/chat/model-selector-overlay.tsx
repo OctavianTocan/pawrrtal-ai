@@ -38,7 +38,7 @@ export function ModelSelectorOverlay(): React.JSX.Element {
               onPress={() => run(actions.selectTier(model.id))}
               style={[styles.row, active && styles.rowActive]}
             >
-              <AppIcon name={model.icon as never} size={24} />
+              <AppIcon name={model.icon} size={24} />
               <View style={styles.text}>
                 <ThemedText variant="bodyStrong">{model.name}</ThemedText>
                 <ThemedText color="textSecondary" variant="caption">
