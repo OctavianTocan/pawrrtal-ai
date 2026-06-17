@@ -79,8 +79,8 @@ function AttachmentRow({
 }): React.JSX.Element {
   return (
     <Pressable accessibilityLabel={label} onPress={onPress} style={styles.row}>
-      <AppIcon name={icon} size={22} />
-      <ThemedText variant="bodyStrong">{label}</ThemedText>
+      <AppIcon name={icon} size={24} />
+      <ThemedText variant="title">{label}</ThemedText>
     </Pressable>
   );
 }
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   popover: {
     backgroundColor: colors.surfaceElevated,
     borderRadius: radii.xxl,
-    bottom: 132,
+    bottom: 90,
     left: spacing.lg,
     overflow: 'hidden',
     paddingVertical: spacing.sm,
@@ -103,9 +103,9 @@ const styles = StyleSheet.create({
   row: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: spacing.md,
+    gap: spacing.lg,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
+    paddingVertical: spacing.md + 2,
   },
   divider: {
     backgroundColor: colors.border,

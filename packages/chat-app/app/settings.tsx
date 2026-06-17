@@ -1,18 +1,17 @@
 /**
- * Settings screen — the grouped settings list: account header, subscription
- * row, the App / Assistant / Voice / Data sections, legal links, report, and
- * sign-out, with a version footer.
+ * Settings screen — the grouped settings list: the App / Grok / Voice / Data
+ * sections, legal links, report, and sign-out, with a version footer. Matches
+ * the reference settings screen, which opens directly on the Appearance group
+ * (no account header — the account lives in the conversations drawer).
  */
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { AccountAvatar, SettingsRow, SettingsSection } from '@/components/chat';
+import { SettingsRow, SettingsSection } from '@/components/chat';
 import { Pressable } from '@/components/core/pressable';
 import { ThemedText } from '@/components/core/themed-text';
 import { AppIcon } from '@/components/icons/app-icon';
 import { colors } from '@/constants/colors';
-import { radii } from '@/constants/radii';
 import { spacing } from '@/constants/spacing';
-import { SEED_ACCOUNT } from '@/data/seed';
 import { actions, useRun } from '@/runtime';
 
 /** App version shown in the footer. */
@@ -40,20 +39,6 @@ export default function SettingsScreen(): React.JSX.Element {
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + spacing.xxl }]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.accountCard}>
-          <AccountAvatar size={44} />
-          <View style={styles.accountText}>
-            <ThemedText variant="bodyStrong">{SEED_ACCOUNT.name}</ThemedText>
-            <ThemedText color="textSecondary" variant="caption">
-              {SEED_ACCOUNT.plan}
-            </ThemedText>
-          </View>
-        </View>
-
-        <SettingsSection>
-          <SettingsRow chevron icon="subscription" label={SEED_ACCOUNT.plan} />
-        </SettingsSection>
-
         <SettingsSection>
           <SettingsRow chevron icon="appearance" label="Appearance" value="System" />
           <SettingsRow chevron icon="haptics" label="Haptics" />
@@ -111,15 +96,5 @@ const styles = StyleSheet.create({
   },
   close: { alignItems: 'center', height: 38, justifyContent: 'center', width: 38 },
   content: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
-  accountCard: {
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-    padding: spacing.md + 2,
-  },
-  accountText: { gap: spacing.xxs },
   version: { marginTop: spacing.md },
 });
