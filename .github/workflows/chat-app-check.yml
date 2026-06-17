@@ -8,8 +8,10 @@ name: Chat App Check
 # web build) adapted to this repo's mandatory self-hosted runner + actor gate.
 
 on:
+  # No base-branch filter: chat-app PRs may target feature bases (not just
+  # development/main), so gate on changed paths + the per-job actor gate
+  # rather than the target branch — otherwise the gate never runs on those PRs.
   pull_request:
-    branches: [development, main]
     paths:
       - 'packages/chat-app/**'
       - '.github/workflows/chat-app-check.yml'
