@@ -1,0 +1,88 @@
+name: Chat App Check
+
+# Gates the standalone Expo package at packages/chat-app, which lives outside
+# the root bun workspace and ships its own npm toolchain (Biome + tsc + expo
+# export). The root "Frontend Check" only triggers on frontend/** and
+# backend/**, so without this workflow a chat-app-only PR runs no checks.
+# Mirrors the job shape of liza-rft's Quality workflow (lint / typecheck /
+# web build) adapted to this repo's mandatory self-hosted runner + actor gate.
+
+on:
+  pull_request:
+    branches: [development, main]
+    paths:
+      - 'packages/chat-app/**'
+      - '.github/workflows/chat-app-check.yml'
+  push:
+    branches: [development, main]
+    paths:
+      - 'packages/chat-app/**'
+      - '.github/workflows/chat-app-check.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chat-app-check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: packages/chat-app
+
+jobs:
+  lint:
+    name: Biome lint
+    # Actor gate is mandatory: never let a fork PR or another author trigger
+    # a self-hosted run. See .claude/rules/github-actions.
+    if: >-
+      github.actor == 'OctavianTocan' &&
+      (github.event_name != 'pull_request' ||
+        github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: [self-hosted, pawrrtal, octavian-only]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: packages/chat-app/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run lint
+
+  typecheck:
+    name: TypeScript
+    if: >-
+      github.actor == 'OctavianTocan' &&
+      (github.event_name != 'pull_request' ||
+        github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: [self-hosted, pawrrtal, octavian-only]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: packages/chat-app/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+
+  build-web:
+    name: Web Export
+    if: >-
+      github.actor == 'OctavianTocan' &&
+      (github.event_name != 'pull_request' ||
+        github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: [self-hosted, pawrrtal, octavian-only]
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: packages/chat-app/package-lock.json
+      - run: npm ci --ignore-scripts
+      - run: npm run build:web
