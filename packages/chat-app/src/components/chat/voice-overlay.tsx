@@ -61,7 +61,7 @@ export function VoiceOverlay(): React.JSX.Element {
             style={[styles.captureBar, { marginBottom: insets.bottom + spacing.lg }]}
           >
             <Pressable accessibilityLabel="Cancel" onPress={dismiss} style={styles.cancelButton}>
-              <AppIcon name="close" size={22} />
+              <AppIcon color="onAccent" name="close" size={22} />
             </Pressable>
 
             <View style={styles.waveArea}>
@@ -85,13 +85,14 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.transparent,
   },
-  scrim: { backgroundColor: colors.background, opacity: 0.35 },
+  scrim: { backgroundColor: colors.background, opacity: 0.2 },
   gestureArea: {
     flex: 1,
     justifyContent: 'flex-end',
   },
   hintArea: {
     alignItems: 'center',
+    flexDirection: 'row',
     gap: spacing.xs,
     marginBottom: spacing.xxl,
   },
@@ -113,7 +114,7 @@ const styles = StyleSheet.create({
   cancelHint: { position: 'absolute', bottom: spacing.xs },
   cancelButton: {
     alignItems: 'center',
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: colors.accent,
     borderRadius: radii.full,
     height: 56,
     justifyContent: 'center',

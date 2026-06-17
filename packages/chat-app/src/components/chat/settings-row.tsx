@@ -87,7 +87,7 @@ export function SettingsSection({ title, children }: SettingsSectionProps): Reac
 
 const styles = StyleSheet.create({
   section: { gap: spacing.xs, marginBottom: spacing.lg },
-  sectionTitle: { marginBottom: spacing.xxs, marginLeft: spacing.xs, textTransform: 'none' },
+  sectionTitle: { marginBottom: spacing.sm, marginLeft: spacing.xs, textTransform: 'none' },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,

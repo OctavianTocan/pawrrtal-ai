@@ -54,41 +54,41 @@ export default function SettingsScreen(): React.JSX.Element {
         </View>
 
         <SettingsSection>
-          <SettingsRow icon="subscription" label={SEED_ACCOUNT.plan} />
+          <SettingsRow chevron icon="subscription" label={SEED_ACCOUNT.plan} />
         </SettingsSection>
 
         <SettingsSection title="App">
-          <SettingsRow icon="appearance" label="Appearance" value="System" />
-          <SettingsRow icon="haptics" label="Haptics" />
-          <SettingsRow icon="widget" label="Widget" />
-          <SettingsRow icon="advanced" label="Advanced" />
+          <SettingsRow chevron icon="appearance" label="Appearance" value="System" />
+          <SettingsRow chevron icon="haptics" label="Haptics" />
+          <SettingsRow chevron icon="widget" label="Widget" />
+          <SettingsRow chevron icon="advanced" label="Advanced" />
         </SettingsSection>
 
         <SettingsSection title="Assistant">
-          <SettingsRow icon="customize" label="Customize" />
-          <SettingsRow icon="connectors" label="Connectors" />
-          <SettingsRow icon="skills" label="Skills" />
-          <SettingsRow icon="memory" label="Memory" />
-          <SettingsRow icon="kids" label="Kids Mode" />
+          <SettingsRow chevron icon="customize" label="Customize" />
+          <SettingsRow chevron icon="connectors" label="Connectors" />
+          <SettingsRow chevron icon="skills" label="Skills" />
+          <SettingsRow chevron icon="memory" label="Memory" />
+          <SettingsRow chevron icon="kids" label="Kids Mode" />
         </SettingsSection>
 
         <SettingsSection title="Voice">
-          <SettingsRow icon="voice" label="Voice" value="Sal" />
+          <SettingsRow chevron icon="voice" label="Voice" value="Sal" />
         </SettingsSection>
 
         <SettingsSection title="Data & Information">
-          <SettingsRow icon="shared" label="Shared Conversations" />
-          <SettingsRow icon="data" label="Data Controls" />
+          <SettingsRow chevron icon="shared" label="Shared Conversations" />
+          <SettingsRow chevron icon="data" label="Data Controls" />
         </SettingsSection>
 
         <SettingsSection>
-          <SettingsRow icon="licenses" label="Open Source Licenses" />
-          <SettingsRow icon="terms" label="Terms of Use" />
-          <SettingsRow icon="privacy" label="Privacy Policy" />
+          <SettingsRow chevron icon="licenses" label="Open Source Licenses" />
+          <SettingsRow chevron icon="terms" label="Terms of Use" />
+          <SettingsRow chevron icon="privacy" label="Privacy Policy" />
         </SettingsSection>
 
         <SettingsSection>
-          <SettingsRow icon="report" label="Report a Problem" />
+          <SettingsRow chevron icon="report" label="Report a Problem" />
         </SettingsSection>
 
         <SettingsSection>
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
   header: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: spacing.xs,
+    gap: spacing.md,
     paddingBottom: spacing.md,
     paddingHorizontal: spacing.md,
   },

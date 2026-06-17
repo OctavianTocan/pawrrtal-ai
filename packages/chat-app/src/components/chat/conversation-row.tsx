@@ -48,7 +48,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     flexDirection: 'row',
     gap: spacing.md,
-    paddingVertical: spacing.sm + 2,
+    paddingVertical: spacing.md,
   },
   text: { flex: 1, gap: 1 },
   more: { paddingHorizontal: spacing.xs, paddingTop: spacing.xxs },
