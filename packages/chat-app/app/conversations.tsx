@@ -1,0 +1,164 @@
+/**
+ * Conversations screen — the history drawer: an account header, the
+ * conversation list (which starts directly under the header, matching the
+ * reference), and a footer with search, settings, and a compose button.
+ */
+import { useState } from 'react';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { AccountAvatar, ConversationRow } from '@/components/chat';
+import { Pressable } from '@/components/core/pressable';
+import { ThemedText } from '@/components/core/themed-text';
+import { AppIcon } from '@/components/icons/app-icon';
+import { colors } from '@/constants/colors';
+import { radii } from '@/constants/radii';
+import { spacing } from '@/constants/spacing';
+import { SEED_ACCOUNT } from '@/data/seed';
+import { actions, useConversations, useRun } from '@/runtime';
+
+/** The conversation history drawer screen. */
+export default function ConversationsScreen(): React.JSX.Element {
+  const conversations = useConversations();
+  const run = useRun();
+  const insets = useSafeAreaInsets();
+  const [query, setQuery] = useState('');
+
+  // Filter the history by title as the user types. Derived inline (not stored)
+  // so it can never drift from `query` or the conversation list.
+  const trimmedQuery = query.trim().toLowerCase();
+  const visibleConversations = trimmedQuery
+    ? conversations.filter((conversation) =>
+        conversation.title.toLowerCase().includes(trimmedQuery),
+      )
+    : conversations;
+
+  return (
+    <View style={styles.container}>
+      <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
+        <View style={styles.account}>
+          <AccountAvatar size={44} />
+          <View style={styles.accountText}>
+            <ThemedText variant="title">{SEED_ACCOUNT.name}</ThemedText>
+            <ThemedText color="textSecondary" variant="caption">
+              {SEED_ACCOUNT.plan}
+            </ThemedText>
+          </View>
+        </View>
+        <Pressable
+          accessibilityLabel="Close"
+          onPress={() => run(actions.navigateBack)}
+          style={styles.collapse}
+        >
+          <AppIcon color="textSecondary" name="chevrons-right" size={22} />
+        </Pressable>
+      </View>
+
+      {/* Keep the footer search field above the keyboard when it's focused,
+          matching the home/thread composer screens. The list shrinks while
+          the bar lifts, so the search text and controls stay visible. */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.body}
+      >
+        <ScrollView
+          contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          style={styles.list}
+        >
+          {visibleConversations.map((conversation) => (
+            <ConversationRow conversation={conversation} key={conversation.id} />
+          ))}
+        </ScrollView>
+
+        <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.sm }]}>
+          <View style={styles.search}>
+            <AppIcon color="textSecondary" name="search" size={20} />
+            <TextInput
+              onChangeText={setQuery}
+              placeholder="Search"
+              placeholderTextColor={colors.textSecondary}
+              style={styles.searchInput}
+              value={query}
+            />
+          </View>
+          <Pressable
+            accessibilityLabel="Settings"
+            onPress={() => run(actions.navigatePush('/settings'))}
+            style={styles.footerButton}
+          >
+            <AppIcon name="settings" size={22} />
+          </Pressable>
+          <Pressable
+            accessibilityLabel="New conversation"
+            onPress={() => run(actions.navigateBack)}
+            style={styles.footerButton}
+          >
+            <AppIcon name="compose" size={22} />
+          </Pressable>
+        </View>
+      </KeyboardAvoidingView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { backgroundColor: colors.background, flex: 1 },
+  header: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+  },
+  account: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
+  accountText: { gap: spacing.xxs },
+  body: { flex: 1 },
+  collapse: {
+    alignItems: 'center',
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.full,
+    height: 30,
+    justifyContent: 'center',
+    width: 56,
+  },
+  list: { flex: 1 },
+  listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
+  footer: {
+    alignItems: 'center',
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+  },
+  search: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    flex: 1,
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  searchInput: { color: colors.textPrimary, flex: 1, fontSize: 15, padding: 0 },
+  footerButton: {
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+    borderRadius: radii.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    height: 44,
+    justifyContent: 'center',
+    width: 44,
+  },
+});

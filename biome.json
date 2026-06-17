@@ -29,6 +29,7 @@
 			"!**/test-results",
 			"!frontend/e2e/output",
 			"!frontend/lib",
+			"!packages/chat-app",
 			"!backend/vendor",
 			"!third_party"
 		]
