@@ -56,6 +56,9 @@ export function AttachmentOverlay(): React.JSX.Element {
         {SOURCES.map((item) => (
           <AttachmentRow icon={item.icon} key={item.id} label={item.label} onPress={dismiss} />
         ))}
+        {/* Hairline separating the media sources from the tool rows, matching
+            the reference's two-group layout. */}
+        <View style={styles.divider} />
         {TOOLS.map((item) => (
           <AttachmentRow icon={item.icon} key={item.id} label={item.label} onPress={dismiss} />
         ))}
@@ -103,5 +106,11 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm + 2,
+  },
+  divider: {
+    backgroundColor: colors.border,
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: spacing.lg,
+    marginVertical: spacing.xs,
   },
 });
