@@ -1,7 +1,9 @@
 /**
  * `SettingsRow` and `SettingsSection` — the grouped-list building blocks for
- * the settings screen: an overline section header above a rounded card of
- * icon + label rows, each optionally showing a trailing value or chevron.
+ * the settings screen: an overline section header above a stack of individual
+ * rounded icon + label cards, each optionally showing a trailing value or
+ * chevron. The reference renders each row as its own rounded card with a small
+ * gap between them, not a single container split by dividers.
  */
 import { Children, isValidElement, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -63,7 +65,7 @@ export interface SettingsSectionProps {
   children: ReactNode;
 }
 
-/** A titled card grouping {@link SettingsRow}s, with dividers between them. */
+/** A titled group of individual rounded {@link SettingsRow} cards. */
 export function SettingsSection({ title, children }: SettingsSectionProps): React.JSX.Element {
   const rows = Children.toArray(children).filter(isValidElement);
   return (
@@ -73,10 +75,9 @@ export function SettingsSection({ title, children }: SettingsSectionProps): Reac
           {title}
         </ThemedText>
       ) : null}
-      <View style={styles.card}>
+      <View style={styles.rows}>
         {rows.map((row, index) => (
-          <View key={row.key ?? index}>
-            {index > 0 ? <View style={styles.divider} /> : null}
+          <View key={row.key ?? index} style={styles.card}>
             {row}
           </View>
         ))}
@@ -88,6 +89,9 @@ export function SettingsSection({ title, children }: SettingsSectionProps): Reac
 const styles = StyleSheet.create({
   section: { gap: spacing.xs, marginBottom: spacing.lg },
   sectionTitle: { marginBottom: spacing.sm, marginLeft: spacing.xs, textTransform: 'none' },
+  // Each row is its own rounded card; a small gap separates them (the
+  // reference stacks discrete cards rather than a single divided container).
+  rows: { gap: spacing.sm },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
@@ -101,9 +105,4 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md + 1,
   },
   labelArea: { flex: 1, gap: 1 },
-  divider: {
-    backgroundColor: colors.border,
-    height: StyleSheet.hairlineWidth,
-    marginLeft: spacing.xxxl + spacing.md,
-  },
 });
