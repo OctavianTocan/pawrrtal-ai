@@ -95,7 +95,9 @@ const POPOVER_BOTTOM = 90;
 const styles = StyleSheet.create({
   popover: {
     backgroundColor: colors.surfaceElevated,
+    borderColor: colors.border,
     borderRadius: radii.xxl,
+    borderWidth: StyleSheet.hairlineWidth,
     left: spacing.xs,
     overflow: 'hidden',
     paddingVertical: spacing.sm,

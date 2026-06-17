@@ -141,7 +141,9 @@ const styles = StyleSheet.create({
   search: {
     alignItems: 'center',
     backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: radii.full,
+    borderWidth: StyleSheet.hairlineWidth,
     flex: 1,
     flexDirection: 'row',
     gap: spacing.sm,
@@ -152,7 +154,9 @@ const styles = StyleSheet.create({
   footerButton: {
     alignItems: 'center',
     backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: radii.full,
+    borderWidth: StyleSheet.hairlineWidth,
     height: 44,
     justifyContent: 'center',
     width: 44,

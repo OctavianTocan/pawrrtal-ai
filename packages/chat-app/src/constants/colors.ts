@@ -1,53 +1,48 @@
 /**
- * Color tokens for the chat app DARK theme.
+ * Color tokens for the chat app LIGHT theme.
  *
- * Sampled to match the reference chat UI: a near-black canvas, lifted dark
- * surfaces for the input bar / popovers / menu rows, white body text, muted
- * grey secondary text, and a white "primary action" pill whose foreground
- * flips to black. All UI colors must reference these tokens — never inline a
- * literal hex in a component (Biome's `noReactNativeLiteralColors` enforces it).
+ * New brand identity (replaces the Grok dark clone): a white canvas, soft-blue
+ * elevated surfaces, dark grey body text, a blue primary action, and hairline
+ * borders drawn in 10%-opacity black. All UI colors must reference these
+ * tokens — never inline a literal hex in a component (Biome's
+ * `noReactNativeLiteralColors` enforces it).
  */
 export const colors = {
-  /** App canvas — near-black (sampled from the reference home canvas). */
-  background: '#0E0E10',
-  /** Input bar / card / popover surface — lifted off black (≈ composer bar). */
-  surface: '#1C1C1E',
-  /** Menu rows, selected popover row, raised chips. */
-  surfaceElevated: '#2C2C2E',
-  /** Selected/active row inside an elevated surface — a touch LIGHTER than it. */
-  rowSelected: '#343436',
-  /** Suggestion chips / secondary buttons on the canvas. */
-  surfaceMuted: '#161618',
-  /** Hairline dividers and input/border outlines. */
-  border: '#2A2A2C',
+  /** App canvas — white. */
+  background: '#FFFFFF',
+  /** Input bar / card / popover surface — white, separated by the 10% border. */
+  surface: '#FFFFFF',
+  /** Menu rows, raised chips, popover rows — soft blue. */
+  surfaceElevated: '#F0F6FE',
+  /** Selected/active row inside an elevated surface — a touch deeper blue. */
+  rowSelected: '#E1ECF9',
+  /** Suggestion chips / secondary buttons on the canvas — soft blue. */
+  surfaceMuted: '#F0F6FE',
+  /** Hairline dividers and input/border outlines — black at 10% opacity. */
+  border: 'rgba(0, 0, 0, 0.1)',
 
-  /** Primary (body) text — white. */
-  textPrimary: '#FFFFFF',
-  /** Secondary text — muted grey subtitles, timestamps, placeholders. */
-  textSecondary: '#98989D',
+  /** Primary (body) text — dark grey. */
+  textPrimary: '#383838',
+  /** Secondary text — muted subtitles, timestamps, placeholders. */
+  textSecondary: 'rgba(56, 56, 56, 0.6)',
   /** Tertiary text — faint captions and disabled glyphs. */
-  textTertiary: '#636366',
+  textTertiary: 'rgba(56, 56, 56, 0.4)',
 
-  /** Primary-action pill fill (the "Speak"/send button) — white. */
-  accent: '#FFFFFF',
-  /** Foreground placed ON the white accent fill — stays black for contrast. */
-  onAccent: '#000000',
+  /** Primary-action fill (the "Speak"/send button) — brand blue. */
+  accent: '#447AAC',
+  /** Foreground placed ON the blue accent fill — white for contrast. */
+  onAccent: '#FFFFFF',
 
-  /** Centered logo watermark on the empty home canvas. */
-  watermark: '#2C2C30',
+  /** Centered logo watermark on the empty home canvas — faint blue. */
+  watermark: '#E1ECF9',
 
   /** Destructive actions (Sign out). */
-  danger: '#FF453A',
+  danger: '#E5484D',
 
-  /**
-   * Voice-capture pill tint — a SUBTLE dark sweep, barely lifted off the
-   * canvas (faint indigo edge → neutral slate → faint teal edge). The
-   * reference capture bar is almost black with only a hint of color, not a
-   * saturated teal band.
-   */
-  voiceStart: '#1B1B2A',
-  voiceMid: '#181820',
-  voiceEnd: '#15201E',
+  /** Voice-capture pill tint — a subtle soft-blue sweep. */
+  voiceStart: '#F0F6FE',
+  voiceMid: '#EAF2FC',
+  voiceEnd: '#F0F6FE',
 
   /** Live "recording" status dot. */
   recording: '#34C759',

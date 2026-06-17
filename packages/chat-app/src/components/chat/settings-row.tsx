@@ -99,7 +99,9 @@ const styles = StyleSheet.create({
   rows: { gap: spacing.sm },
   card: {
     backgroundColor: colors.surface,
+    borderColor: colors.border,
     borderRadius: radii.lg,
+    borderWidth: StyleSheet.hairlineWidth,
     overflow: 'hidden',
   },
   row: {

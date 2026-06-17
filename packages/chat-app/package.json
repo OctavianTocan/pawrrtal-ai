@@ -20,9 +20,13 @@
     "check": "npm run lint && npm run typecheck"
   },
   "dependencies": {
+    "@expo-google-fonts/dm-mono": "^0.4.2",
     "@expo-google-fonts/inter": "^0.4.2",
+    "@expo-google-fonts/lora": "^0.4.2",
     "@expo/metro-runtime": "~55.0.11",
     "@expo/vector-icons": "^15.1.1",
+    "@hugeicons/core-free-icons": "^4.2.0",
+    "@hugeicons/react-native": "^1.0.14",
     "effect": "4.0.0-beta.83",
     "expo": "~55.0.26",
     "expo-asset": "~55.0.17",

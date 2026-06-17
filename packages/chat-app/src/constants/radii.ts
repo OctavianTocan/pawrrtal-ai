@@ -1,11 +1,18 @@
-/** Corner-radius scale (in px). */
+/**
+ * Corner-radius scale (in px).
+ *
+ * The brand spec uses a single 4px corner radius across the interface, so the
+ * named steps all resolve to 4 — the scale is kept as distinct tokens so call
+ * sites stay semantic and a future change to one role doesn't touch them all.
+ * `full` stays large for genuinely circular controls (avatars, icon buttons).
+ */
 export const radii = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
+  sm: 4,
+  md: 4,
+  lg: 4,
+  xl: 4,
   /** Large popovers / composer surface. */
-  xxl: 24,
+  xxl: 4,
   /** Pills and circular controls. */
   full: 9999,
 } as const;
