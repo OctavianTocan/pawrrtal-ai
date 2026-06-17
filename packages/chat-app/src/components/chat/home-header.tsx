@@ -44,7 +44,7 @@ export function HomeHeader(): React.JSX.Element {
               onPress={() => run(actions.setHomeMode(tab.mode))}
               style={styles.tab}
             >
-              <ThemedText color={active ? 'textPrimary' : 'textSecondary'} variant="title">
+              <ThemedText color={active ? 'textPrimary' : 'textSecondary'} variant="titleLarge">
                 {tab.label}
               </ThemedText>
               {active ? <View style={styles.activeUnderline} /> : null}
