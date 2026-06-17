@@ -29,7 +29,7 @@ export default function HomeScreen(): React.JSX.Element {
 
       {/* Decorative only — must not intercept taps meant for the header/composer. */}
       <View pointerEvents="none" style={styles.watermark}>
-        <Logo size={150} />
+        <Logo size={156} />
       </View>
 
       {footerHidden ? null : (
@@ -54,13 +54,13 @@ const styles = StyleSheet.create({
   watermark: {
     alignItems: 'center',
     // Bias the optical center upward (reference logo sits ~42% down, not 50%).
-    bottom: 135,
+    bottom: 125,
     justifyContent: 'center',
     left: 0,
     position: 'absolute',
     right: 0,
     top: 0,
   },
-  footer: { gap: spacing.md, marginTop: 'auto' },
-  composerWrap: { paddingHorizontal: spacing.sm, paddingTop: spacing.sm },
+  footer: { gap: spacing.lg, marginTop: 'auto' },
+  composerWrap: { paddingHorizontal: spacing.xs, paddingTop: spacing.sm },
 });

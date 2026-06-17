@@ -74,12 +74,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 38,
   },
-  tabs: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
+  tabs: { alignItems: 'center', flexDirection: 'row', gap: spacing.xxl },
   tab: { alignItems: 'center', gap: spacing.xxs },
   activeUnderline: {
     backgroundColor: colors.textPrimary,
     borderRadius: radii.full,
     height: 2.5,
-    width: 20,
+    width: 16,
   },
 });

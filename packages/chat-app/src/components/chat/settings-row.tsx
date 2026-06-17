@@ -92,8 +92,8 @@ export function SettingsSection({ title, children }: SettingsSectionProps): Reac
 }
 
 const styles = StyleSheet.create({
-  section: { gap: spacing.xs, marginBottom: spacing.lg },
-  sectionTitle: { marginBottom: spacing.sm, marginLeft: spacing.xs, textTransform: 'none' },
+  section: { gap: spacing.xs, marginBottom: spacing.sm },
+  sectionTitle: { marginBottom: spacing.xs, marginLeft: spacing.xs, textTransform: 'none' },
   // Each row is its own rounded card; a small gap separates them (the
   // reference stacks discrete cards rather than a single divided container).
   rows: { gap: spacing.sm },
@@ -107,7 +107,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md + 1,
+    paddingVertical: spacing.lg + 2,
   },
   labelArea: { flex: 1, gap: 1 },
   // Off-state toggle: a dark track with a light knob nudged to the left edge,

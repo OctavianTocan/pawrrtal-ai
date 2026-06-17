@@ -63,30 +63,31 @@ export function ModelSelectorOverlay(): React.JSX.Element {
   );
 }
 
+// Width/left/bottom measured against the real reference popover
+// (ref-v2/screens/model.png): the menu is ~280dp wide, sits flush near the
+// left edge, and floats ~135dp above the screen bottom.
 /** Preferred popover width on roomy screens; clamped down on narrow ones. */
-const POPOVER_MAX_WIDTH = 192;
+const POPOVER_MAX_WIDTH = 280;
 /** Base gap above the composer; the bottom safe-area inset is added on top. */
-const POPOVER_BOTTOM = 96;
+const POPOVER_BOTTOM = 135;
 
 const styles = StyleSheet.create({
   popover: {
     backgroundColor: colors.surfaceElevated,
     borderRadius: radii.xxl,
-    left: spacing.lg,
+    left: spacing.xs,
     overflow: 'hidden',
     paddingVertical: spacing.sm,
     position: 'absolute',
     // Grow from the trigger (model pill) corner, not the popover center.
     transformOrigin: 'bottom left',
   },
-  // Taller rows: the reference tiers span ~35% more height than a compact
-  // list, so each row gets generous vertical padding.
   row: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.lg,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md + 2,
+    paddingVertical: spacing.sm + 2,
   },
   // Selected row reads as a subtle LIGHTER band, not a darker sunken one.
   rowActive: { backgroundColor: colors.rowSelected },
