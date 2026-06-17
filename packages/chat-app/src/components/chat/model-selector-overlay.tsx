@@ -68,20 +68,22 @@ const styles = StyleSheet.create({
   popover: {
     backgroundColor: colors.surfaceElevated,
     borderRadius: radii.xxl,
-    bottom: 112,
+    bottom: 96,
     left: spacing.lg,
     overflow: 'hidden',
-    paddingVertical: spacing.xs,
+    paddingVertical: spacing.sm,
     position: 'absolute',
     // Grow from the trigger (model pill) corner, not the popover center.
     transformOrigin: 'bottom left',
   },
+  // Taller rows: the reference tiers span ~35% more height than a compact
+  // list, so each row gets generous vertical padding.
   row: {
     alignItems: 'center',
     flexDirection: 'row',
     gap: spacing.lg,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md + 2,
   },
   // Selected row reads as a subtle LIGHTER band, not a darker sunken one.
   rowActive: { backgroundColor: colors.rowSelected },
