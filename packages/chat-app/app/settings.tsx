@@ -5,11 +5,10 @@
  */
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { SettingsRow, SettingsSection } from '@/components/chat';
+import { AccountAvatar, SettingsRow, SettingsSection } from '@/components/chat';
 import { Pressable } from '@/components/core/pressable';
 import { ThemedText } from '@/components/core/themed-text';
 import { AppIcon } from '@/components/icons/app-icon';
-import { Logo } from '@/components/icons/logo';
 import { colors } from '@/constants/colors';
 import { radii } from '@/constants/radii';
 import { spacing } from '@/constants/spacing';
@@ -42,13 +41,11 @@ export default function SettingsScreen(): React.JSX.Element {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.accountCard}>
-          <View style={styles.avatar}>
-            <Logo color={colors.textPrimary} size={28} />
-          </View>
+          <AccountAvatar size={44} />
           <View style={styles.accountText}>
             <ThemedText variant="bodyStrong">{SEED_ACCOUNT.name}</ThemedText>
             <ThemedText color="textSecondary" variant="caption">
-              {SEED_ACCOUNT.email}
+              {SEED_ACCOUNT.plan}
             </ThemedText>
           </View>
         </View>
@@ -57,15 +54,15 @@ export default function SettingsScreen(): React.JSX.Element {
           <SettingsRow chevron icon="subscription" label={SEED_ACCOUNT.plan} />
         </SettingsSection>
 
-        <SettingsSection title="App">
+        <SettingsSection>
           <SettingsRow chevron icon="appearance" label="Appearance" value="System" />
           <SettingsRow chevron icon="haptics" label="Haptics" />
           <SettingsRow chevron icon="widget" label="Widget" />
           <SettingsRow chevron icon="advanced" label="Advanced" />
         </SettingsSection>
 
-        <SettingsSection title="Assistant">
-          <SettingsRow chevron icon="customize" label="Customize" />
+        <SettingsSection title="Grok">
+          <SettingsRow chevron icon="customize" label="Customize Grok" />
           <SettingsRow chevron icon="connectors" label="Connectors" />
           <SettingsRow chevron icon="skills" label="Skills" />
           <SettingsRow chevron icon="memory" label="Memory" />
@@ -122,14 +119,6 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     marginBottom: spacing.lg,
     padding: spacing.md + 2,
-  },
-  avatar: {
-    alignItems: 'center',
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.full,
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
   },
   accountText: { gap: spacing.xxs },
   version: { marginTop: spacing.md },

@@ -1,4 +1,5 @@
 /** Barrel for the chat feature components. */
+export { AccountAvatar, type AccountAvatarProps } from './account-avatar';
 export { AttachmentOverlay } from './attachment-overlay';
 export { Composer } from './composer';
 export { ConversationRow, type ConversationRowProps } from './conversation-row';

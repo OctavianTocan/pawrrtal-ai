@@ -13,11 +13,10 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ConversationRow } from '@/components/chat';
+import { AccountAvatar, ConversationRow } from '@/components/chat';
 import { Pressable } from '@/components/core/pressable';
 import { ThemedText } from '@/components/core/themed-text';
 import { AppIcon } from '@/components/icons/app-icon';
-import { Logo } from '@/components/icons/logo';
 import { colors } from '@/constants/colors';
 import { radii } from '@/constants/radii';
 import { spacing } from '@/constants/spacing';
@@ -44,9 +43,7 @@ export default function ConversationsScreen(): React.JSX.Element {
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
         <View style={styles.account}>
-          <View style={styles.avatar}>
-            <Logo color={colors.textPrimary} size={26} />
-          </View>
+          <AccountAvatar size={44} />
           <View style={styles.accountText}>
             <ThemedText variant="title">{SEED_ACCOUNT.name}</ThemedText>
             <ThemedText color="textSecondary" variant="caption">
@@ -131,14 +128,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.md,
   },
   account: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
-  avatar: {
-    alignItems: 'center',
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.full,
-    height: 44,
-    justifyContent: 'center',
-    width: 44,
-  },
   accountText: { gap: spacing.xxs },
   body: { flex: 1 },
   collapse: {

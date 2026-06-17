@@ -8,8 +8,8 @@ import type { Conversation, Model } from '@/domain';
 /** The model tiers shown in the selector popover, in display order. */
 export const SEED_MODELS: readonly Model[] = [
   { id: 'heavy', name: 'Heavy', subtitle: 'Team of Experts', icon: 'heavy' },
-  { id: 'expert', name: 'Expert', subtitle: 'Deepest reasoning', icon: 'expert' },
-  { id: 'fast', name: 'Fast', subtitle: 'Quick everyday answers', icon: 'fast' },
+  { id: 'expert', name: 'Expert', subtitle: 'Powered by Grok 4.3', icon: 'expert' },
+  { id: 'fast', name: 'Fast', subtitle: 'Powered by Grok 4.3', icon: 'fast' },
   { id: 'auto', name: 'Auto', subtitle: 'Chooses Fast or Expert', icon: 'auto' },
 ];
 
@@ -35,6 +35,6 @@ export const SEED_CONVERSATIONS: readonly Conversation[] = [
 /** The account shown in the drawer header and settings. */
 export const SEED_ACCOUNT = {
   name: 'Tavi',
-  plan: 'Pawrrtal Pro',
+  plan: 'X Premium',
   email: 'you@pawrrtal.ai',
 } as const;
