@@ -21,20 +21,22 @@ export interface LogoProps {
 export function Logo({
   size = 132,
   color = colors.watermark,
-  strokeWidth = 3.5,
+  strokeWidth = 4,
 }: LogoProps): React.JSX.Element {
   return (
     <Svg fill="none" height={size} viewBox="0 0 100 100" width={size}>
       <Circle cx={50} cy={50} r={31} stroke={color} strokeWidth={strokeWidth} />
-      {/* Slash overshoots the ring at both ends (an "empty set" ∅ form). */}
+      {/* Slash overshoots the ring well past both ends into sharp points
+          (the "empty set" ∅ form) — the reference extends noticeably beyond
+          the ring at top-right and bottom-left. */}
       <Line
         stroke={color}
         strokeLinecap="round"
         strokeWidth={strokeWidth}
-        x1={22}
-        x2={78}
-        y1={84}
-        y2={14}
+        x1={14}
+        x2={86}
+        y1={90}
+        y2={10}
       />
     </Svg>
   );

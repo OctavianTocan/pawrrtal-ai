@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Pressable } from '@/components/core/pressable';
 import { ThemedText } from '@/components/core/themed-text';
 import { AppIcon } from '@/components/icons/app-icon';
+import { VoiceCaptureGradient } from '@/components/icons/voice-gradient';
 import { colors } from '@/constants/colors';
 import { duration } from '@/constants/motion';
 import { radii } from '@/constants/radii';
@@ -61,14 +62,21 @@ export function VoiceOverlay(): React.JSX.Element {
             style={[styles.captureBar, { marginBottom: insets.bottom + spacing.lg }]}
           >
             <Pressable accessibilityLabel="Cancel" onPress={dismiss} style={styles.cancelButton}>
-              <AppIcon color="onAccent" name="close" size={22} />
+              <AppIcon color="textPrimary" name="close" size={22} />
             </Pressable>
 
             <View style={styles.waveArea}>
-              <Waveform />
-              <ThemedText color="textSecondary" style={styles.cancelHint} variant="caption">
-                Swipe left to cancel
-              </ThemedText>
+              {/* Subtle dark tint fills the pill behind the dotted strip. */}
+              <VoiceCaptureGradient />
+              <View style={styles.waveContent}>
+                <Waveform />
+                <View style={styles.cancelHintRow}>
+                  <AppIcon color="textSecondary" name="chevron-back" size={14} />
+                  <ThemedText color="textSecondary" variant="caption">
+                    Swipe left to cancel
+                  </ThemedText>
+                </View>
+              </View>
             </View>
 
             <Pressable accessibilityLabel="Confirm" onPress={dismiss} style={styles.confirmButton}>
@@ -103,18 +111,28 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.lg,
   },
   waveArea: {
-    alignItems: 'center',
-    backgroundColor: colors.voiceStart,
+    backgroundColor: colors.surfaceMuted,
     borderRadius: radii.full,
     flex: 1,
     height: 56,
-    justifyContent: 'center',
     overflow: 'hidden',
   },
-  cancelHint: { position: 'absolute', bottom: spacing.xs },
+  // Full-width dotted strip toward the top, the cancel hint centered below.
+  waveContent: {
+    flex: 1,
+    justifyContent: 'space-evenly',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.xs,
+  },
+  cancelHintRow: {
+    alignItems: 'center',
+    alignSelf: 'center',
+    flexDirection: 'row',
+    gap: spacing.xxs,
+  },
   cancelButton: {
     alignItems: 'center',
-    backgroundColor: colors.accent,
+    backgroundColor: colors.surfaceElevated,
     borderRadius: radii.full,
     height: 56,
     justifyContent: 'center',

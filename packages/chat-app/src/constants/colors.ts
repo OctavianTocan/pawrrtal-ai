@@ -39,10 +39,15 @@ export const colors = {
   /** Destructive actions (Sign out). */
   danger: '#FF453A',
 
-  /** Voice-capture waveform gradient (teal sweep). */
-  voiceStart: '#0B3B3B',
-  voiceMid: '#0E7C7C',
-  voiceEnd: '#14B8A6',
+  /**
+   * Voice-capture pill tint — a SUBTLE dark sweep, barely lifted off the
+   * canvas (faint indigo edge → neutral slate → faint teal edge). The
+   * reference capture bar is almost black with only a hint of color, not a
+   * saturated teal band.
+   */
+  voiceStart: '#1B1B2A',
+  voiceMid: '#181820',
+  voiceEnd: '#15201E',
 
   /** Live "recording" status dot. */
   recording: '#34C759',

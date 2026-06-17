@@ -10,10 +10,16 @@ import { Composer, HomeHeader, Overlays, SuggestionChips } from '@/components/ch
 import { Logo } from '@/components/icons/logo';
 import { colors } from '@/constants/colors';
 import { spacing } from '@/constants/spacing';
+import { useAppState } from '@/runtime';
 
 /** The home / landing screen. */
 export default function HomeScreen(): React.JSX.Element {
   const insets = useSafeAreaInsets();
+  const { overlay } = useAppState();
+  // The voice capture surface REPLACES the composer + chips (matching the
+  // reference), so hide the home footer while it's open rather than leaving
+  // the chips visible behind the capture bar.
+  const footerHidden = overlay === 'voice';
 
   return (
     <View style={styles.container}>
@@ -23,18 +29,20 @@ export default function HomeScreen(): React.JSX.Element {
 
       {/* Decorative only — must not intercept taps meant for the header/composer. */}
       <View pointerEvents="none" style={styles.watermark}>
-        <Logo size={120} />
+        <Logo size={140} />
       </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.footer}
-      >
-        <SuggestionChips />
-        <View style={[styles.composerWrap, { paddingBottom: insets.bottom + spacing.sm }]}>
-          <Composer />
-        </View>
-      </KeyboardAvoidingView>
+      {footerHidden ? null : (
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.footer}
+        >
+          <SuggestionChips />
+          <View style={[styles.composerWrap, { paddingBottom: insets.bottom + spacing.sm }]}>
+            <Composer />
+          </View>
+        </KeyboardAvoidingView>
+      )}
 
       <Overlays />
     </View>
