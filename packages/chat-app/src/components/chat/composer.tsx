@@ -7,7 +7,7 @@
  * never share a draft). Submitting either creates a new conversation (home)
  * or appends to the current thread, dispatched through the Effect runtime.
  */
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Keyboard, StyleSheet, TextInput, View } from 'react-native';
 import { Pressable } from '@/components/core/pressable';
 import { ThemedText } from '@/components/core/themed-text';
@@ -30,6 +30,11 @@ export interface ComposerProps {
 /** The bottom composer bar. */
 export function Composer({ conversationId }: ComposerProps): React.JSX.Element {
   const [text, setText] = useState('');
+  // Synchronous guard so a double-tap on Send (before React commits the
+  // `setText('')` clear) can't dispatch the same draft twice — which would
+  // create duplicate conversations / duplicate exchanges. Reset on the next
+  // keystroke so the following draft can send normally.
+  const submittedRef = useRef(false);
   const { homeMode, selectedTier, overlay } = useAppState();
   const catalog = useCatalog();
   const run = useRun();
@@ -42,13 +47,20 @@ export function Composer({ conversationId }: ComposerProps): React.JSX.Element {
 
   const submit = (): void => {
     const trimmed = text.trim();
-    if (!trimmed) return;
+    if (!trimmed || submittedRef.current) return;
+    submittedRef.current = true;
     run(
       conversationId
         ? actions.sendMessage(conversationId, trimmed)
         : actions.createConversation(trimmed),
     );
     setText('');
+  };
+
+  // Typing a new draft re-arms the send guard.
+  const handleChangeText = (next: string): void => {
+    submittedRef.current = false;
+    setText(next);
   };
 
   // Dismiss the keyboard before presenting an overlay — otherwise on mobile
@@ -62,7 +74,7 @@ export function Composer({ conversationId }: ComposerProps): React.JSX.Element {
     <View style={styles.container}>
       <TextInput
         multiline
-        onChangeText={setText}
+        onChangeText={handleChangeText}
         placeholder={placeholder}
         placeholderTextColor={colors.textSecondary}
         style={styles.input}

@@ -3,7 +3,14 @@
  * shortcut, the titled conversation list, and a footer with search, settings,
  * and a compose button.
  */
-import { ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ConversationRow } from '@/components/chat';
 import { Pressable } from '@/components/core/pressable';
@@ -45,50 +52,58 @@ export default function ConversationsScreen(): React.JSX.Element {
         </Pressable>
       </View>
 
-      <ScrollView
-        contentContainerStyle={styles.listContent}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        style={styles.list}
+      {/* Keep the footer search field above the keyboard when it's focused,
+          matching the home/thread composer screens. The list shrinks while
+          the bar lifts, so the search text and controls stay visible. */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.body}
       >
-        <Pressable accessibilityLabel="Tasks" style={styles.tasks}>
-          <AppIcon name="tasks" size={22} />
-          <ThemedText variant="bodyStrong">Tasks</ThemedText>
-        </Pressable>
+        <ScrollView
+          contentContainerStyle={styles.listContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          style={styles.list}
+        >
+          <Pressable accessibilityLabel="Tasks" style={styles.tasks}>
+            <AppIcon name="tasks" size={22} />
+            <ThemedText variant="bodyStrong">Tasks</ThemedText>
+          </Pressable>
 
-        <ThemedText color="textSecondary" style={styles.sectionLabel} variant="overline">
-          Conversations
-        </ThemedText>
+          <ThemedText color="textSecondary" style={styles.sectionLabel} variant="overline">
+            Conversations
+          </ThemedText>
 
-        {conversations.map((conversation) => (
-          <ConversationRow conversation={conversation} key={conversation.id} />
-        ))}
-      </ScrollView>
+          {conversations.map((conversation) => (
+            <ConversationRow conversation={conversation} key={conversation.id} />
+          ))}
+        </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.sm }]}>
-        <View style={styles.search}>
-          <AppIcon color="textSecondary" name="search" size={20} />
-          <TextInput
-            placeholder="Search"
-            placeholderTextColor={colors.textSecondary}
-            style={styles.searchInput}
-          />
+        <View style={[styles.footer, { paddingBottom: insets.bottom + spacing.sm }]}>
+          <View style={styles.search}>
+            <AppIcon color="textSecondary" name="search" size={20} />
+            <TextInput
+              placeholder="Search"
+              placeholderTextColor={colors.textSecondary}
+              style={styles.searchInput}
+            />
+          </View>
+          <Pressable
+            accessibilityLabel="Settings"
+            onPress={() => run(actions.navigatePush('/settings'))}
+            style={styles.footerButton}
+          >
+            <AppIcon name="settings" size={22} />
+          </Pressable>
+          <Pressable
+            accessibilityLabel="New conversation"
+            onPress={() => run(actions.navigateBack)}
+            style={styles.footerButton}
+          >
+            <AppIcon name="compose" size={22} />
+          </Pressable>
         </View>
-        <Pressable
-          accessibilityLabel="Settings"
-          onPress={() => run(actions.navigatePush('/settings'))}
-          style={styles.footerButton}
-        >
-          <AppIcon name="settings" size={22} />
-        </Pressable>
-        <Pressable
-          accessibilityLabel="New conversation"
-          onPress={() => run(actions.navigateBack)}
-          style={styles.footerButton}
-        >
-          <AppIcon name="compose" size={22} />
-        </Pressable>
-      </View>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -112,6 +127,7 @@ const styles = StyleSheet.create({
     width: 44,
   },
   accountText: { gap: spacing.xxs },
+  body: { flex: 1 },
   collapse: {
     alignItems: 'center',
     backgroundColor: colors.surfaceElevated,
