@@ -5,6 +5,7 @@
  */
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { Easing, FadeOut, ZoomIn } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Pressable } from '@/components/core/pressable';
 import { ThemedText } from '@/components/core/themed-text';
 import { AppIcon, type IconName } from '@/components/icons/app-icon';
@@ -40,6 +41,7 @@ export function AttachmentOverlay(): React.JSX.Element {
   const run = useRun();
   const dismiss = (): void => run(actions.setOverlay('none'));
   const { width: screenWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   // Clamp so the menu never overflows the right edge on narrow devices.
   const menuWidth = Math.min(POPOVER_MAX_WIDTH, screenWidth - spacing.lg * 2);
 
@@ -51,7 +53,7 @@ export function AttachmentOverlay(): React.JSX.Element {
       <Animated.View
         entering={ZoomIn.duration(duration.attachmentPopover).easing(Easing.out(Easing.cubic))}
         exiting={FadeOut.duration(duration.fast)}
-        style={[styles.popover, { width: menuWidth }]}
+        style={[styles.popover, { bottom: POPOVER_BOTTOM + insets.bottom, width: menuWidth }]}
       >
         {SOURCES.map((item) => (
           <AttachmentRow icon={item.icon} key={item.id} label={item.label} onPress={dismiss} />
@@ -87,12 +89,13 @@ function AttachmentRow({
 
 /** Preferred menu width on roomy screens; clamped down on narrow ones. */
 const POPOVER_MAX_WIDTH = 192;
+/** Base gap above the composer; the bottom safe-area inset is added on top. */
+const POPOVER_BOTTOM = 90;
 
 const styles = StyleSheet.create({
   popover: {
     backgroundColor: colors.surfaceElevated,
     borderRadius: radii.xxl,
-    bottom: 90,
     left: spacing.lg,
     overflow: 'hidden',
     paddingVertical: spacing.sm,

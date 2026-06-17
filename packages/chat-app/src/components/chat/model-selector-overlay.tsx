@@ -5,6 +5,7 @@
  */
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
 import Animated, { Easing, FadeOut, ZoomIn } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Pressable } from '@/components/core/pressable';
 import { ThemedText } from '@/components/core/themed-text';
 import { AppIcon } from '@/components/icons/app-icon';
@@ -21,6 +22,7 @@ export function ModelSelectorOverlay(): React.JSX.Element {
   const catalog = useCatalog();
   const run = useRun();
   const { width: screenWidth } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   // Clamp to the screen so the popover never runs past the right edge on
   // narrow devices (e.g. 320dp), where a fixed 320 + left inset would clip.
   const popoverWidth = Math.min(POPOVER_MAX_WIDTH, screenWidth - spacing.lg * 2);
@@ -34,7 +36,7 @@ export function ModelSelectorOverlay(): React.JSX.Element {
       <Animated.View
         entering={ZoomIn.duration(duration.modelPopover).easing(Easing.out(Easing.cubic))}
         exiting={FadeOut.duration(duration.fast)}
-        style={[styles.popover, { width: popoverWidth }]}
+        style={[styles.popover, { bottom: POPOVER_BOTTOM + insets.bottom, width: popoverWidth }]}
       >
         {catalog.models.map((model) => {
           const active = model.id === selectedTier;
@@ -63,12 +65,13 @@ export function ModelSelectorOverlay(): React.JSX.Element {
 
 /** Preferred popover width on roomy screens; clamped down on narrow ones. */
 const POPOVER_MAX_WIDTH = 192;
+/** Base gap above the composer; the bottom safe-area inset is added on top. */
+const POPOVER_BOTTOM = 96;
 
 const styles = StyleSheet.create({
   popover: {
     backgroundColor: colors.surfaceElevated,
     borderRadius: radii.xxl,
-    bottom: 96,
     left: spacing.lg,
     overflow: 'hidden',
     paddingVertical: spacing.sm,
