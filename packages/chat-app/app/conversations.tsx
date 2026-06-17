@@ -3,6 +3,7 @@
  * shortcut, the titled conversation list, and a footer with search, settings,
  * and a compose button.
  */
+import { useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -28,6 +29,16 @@ export default function ConversationsScreen(): React.JSX.Element {
   const conversations = useConversations();
   const run = useRun();
   const insets = useSafeAreaInsets();
+  const [query, setQuery] = useState('');
+
+  // Filter the history by title as the user types. Derived inline (not stored)
+  // so it can never drift from `query` or the conversation list.
+  const trimmedQuery = query.trim().toLowerCase();
+  const visibleConversations = trimmedQuery
+    ? conversations.filter((conversation) =>
+        conversation.title.toLowerCase().includes(trimmedQuery),
+      )
+    : conversations;
 
   return (
     <View style={styles.container}>
@@ -74,7 +85,7 @@ export default function ConversationsScreen(): React.JSX.Element {
             Conversations
           </ThemedText>
 
-          {conversations.map((conversation) => (
+          {visibleConversations.map((conversation) => (
             <ConversationRow conversation={conversation} key={conversation.id} />
           ))}
         </ScrollView>
@@ -83,9 +94,11 @@ export default function ConversationsScreen(): React.JSX.Element {
           <View style={styles.search}>
             <AppIcon color="textSecondary" name="search" size={20} />
             <TextInput
+              onChangeText={setQuery}
               placeholder="Search"
               placeholderTextColor={colors.textSecondary}
               style={styles.searchInput}
+              value={query}
             />
           </View>
           <Pressable

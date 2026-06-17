@@ -43,7 +43,12 @@ export function Composer({ conversationId }: ComposerProps): React.JSX.Element {
   const modelIcon = model?.icon ?? 'auto';
   const hasDraft = text.trim().length > 0;
   const attachmentOpen = overlay === 'attachment';
-  const placeholder = homeMode === 'imagine' ? 'Imagine anything' : 'Ask anything';
+  // `homeMode` only applies to the home canvas (which has the Ask/Imagine
+  // tabs). A thread composer (conversationId set) always sends normal chat
+  // messages, so it must not inherit the home tab's Imagine placeholder.
+  const isHomeComposer = conversationId === undefined;
+  const placeholder =
+    isHomeComposer && homeMode === 'imagine' ? 'Imagine anything' : 'Ask anything';
 
   const submit = (): void => {
     const trimmed = text.trim();

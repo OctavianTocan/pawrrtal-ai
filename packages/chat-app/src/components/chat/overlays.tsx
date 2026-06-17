@@ -33,6 +33,18 @@ export function Overlays(): React.JSX.Element | null {
     return () => subscription.remove();
   }, [isOpen, run]);
 
+  // The overlay lives in the global store but visually belongs to the screen
+  // that opened it. When this host unmounts — any route change, including the
+  // browser Back button on web (where `BackHandler` never fires) — clear it so
+  // the next screen that renders <Overlays /> doesn't reopen a stale popover
+  // over the wrong route. `run` is stable (useCallback []), so this cleanup
+  // runs only on unmount, never on re-render.
+  useEffect(() => {
+    return () => {
+      run(actions.setOverlay('none'));
+    };
+  }, [run]);
+
   if (overlay === 'model') return <ModelSelectorOverlay />;
   if (overlay === 'attachment') return <AttachmentOverlay />;
   if (overlay === 'voice') return <VoiceOverlay />;
