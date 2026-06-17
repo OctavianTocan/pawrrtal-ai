@@ -44,7 +44,7 @@ export function HomeHeader(): React.JSX.Element {
               onPress={() => run(actions.setHomeMode(tab.mode))}
               style={styles.tab}
             >
-              <ThemedText color={active ? 'textPrimary' : 'textSecondary'} variant="titleLarge">
+              <ThemedText color={active ? 'textPrimary' : 'textSecondary'} variant="title">
                 {tab.label}
               </ThemedText>
               {active ? <View style={styles.activeUnderline} /> : null}
@@ -74,12 +74,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     width: 38,
   },
-  tabs: { alignItems: 'center', flexDirection: 'row', gap: spacing.lg },
+  tabs: { alignItems: 'center', flexDirection: 'row', gap: spacing.md },
   tab: { alignItems: 'center', gap: spacing.xxs },
   activeUnderline: {
     backgroundColor: colors.textPrimary,
     borderRadius: radii.full,
     height: 2.5,
-    width: 14,
+    width: 20,
   },
 });

@@ -23,7 +23,7 @@ export default function HomeScreen(): React.JSX.Element {
 
       {/* Decorative only — must not intercept taps meant for the header/composer. */}
       <View pointerEvents="none" style={styles.watermark}>
-        <Logo size={208} />
+        <Logo size={120} />
       </View>
 
       <KeyboardAvoidingView
@@ -46,7 +46,7 @@ const styles = StyleSheet.create({
   watermark: {
     alignItems: 'center',
     // Bias the optical center upward (reference logo sits ~42% down, not 50%).
-    bottom: 200,
+    bottom: 160,
     justifyContent: 'center',
     left: 0,
     position: 'absolute',
@@ -54,5 +54,5 @@ const styles = StyleSheet.create({
     top: 0,
   },
   footer: { gap: spacing.md, marginTop: 'auto' },
-  composerWrap: { paddingHorizontal: spacing.lg, paddingTop: spacing.sm },
+  composerWrap: { paddingHorizontal: spacing.sm, paddingTop: spacing.sm },
 });

@@ -144,7 +144,7 @@ const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.surface,
     borderColor: colors.border,
-    borderRadius: radii.xl,
+    borderRadius: radii.xxl,
     borderWidth: StyleSheet.hairlineWidth,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm + 2,
@@ -177,7 +177,7 @@ const styles = StyleSheet.create({
   circleButton: {
     alignItems: 'center',
     backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.full,
+    borderRadius: radii.md,
     height: 32,
     justifyContent: 'center',
     width: 32,
@@ -185,7 +185,7 @@ const styles = StyleSheet.create({
   modelPill: {
     alignItems: 'center',
     backgroundColor: colors.surfaceElevated,
-    borderRadius: radii.full,
+    borderRadius: radii.md,
     flexDirection: 'row',
     flexShrink: 1,
     gap: spacing.xs,

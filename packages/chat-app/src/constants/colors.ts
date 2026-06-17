@@ -15,7 +15,7 @@ export const colors = {
   /** Menu rows, selected popover row, raised chips. */
   surfaceElevated: '#2C2C2E',
   /** Selected/active row inside an elevated surface — a touch LIGHTER than it. */
-  rowSelected: '#3A3A3C',
+  rowSelected: '#343436',
   /** Suggestion chips / secondary buttons on the canvas. */
   surfaceMuted: '#161618',
   /** Hairline dividers and input/border outlines. */

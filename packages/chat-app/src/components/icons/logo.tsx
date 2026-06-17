@@ -21,7 +21,7 @@ export interface LogoProps {
 export function Logo({
   size = 132,
   color = colors.watermark,
-  strokeWidth = 5,
+  strokeWidth = 3.5,
 }: LogoProps): React.JSX.Element {
   return (
     <Svg fill="none" height={size} viewBox="0 0 100 100" width={size}>
@@ -31,10 +31,10 @@ export function Logo({
         stroke={color}
         strokeLinecap="round"
         strokeWidth={strokeWidth}
-        x1={18}
-        x2={82}
-        y1={82}
-        y2={18}
+        x1={22}
+        x2={78}
+        y1={84}
+        y2={14}
       />
     </Svg>
   );

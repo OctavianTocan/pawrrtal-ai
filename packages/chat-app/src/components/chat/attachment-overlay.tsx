@@ -56,7 +56,6 @@ export function AttachmentOverlay(): React.JSX.Element {
         {SOURCES.map((item) => (
           <AttachmentRow icon={item.icon} key={item.id} label={item.label} onPress={dismiss} />
         ))}
-        <View style={styles.divider} />
         {TOOLS.map((item) => (
           <AttachmentRow icon={item.icon} key={item.id} label={item.label} onPress={dismiss} />
         ))}
@@ -84,13 +83,13 @@ function AttachmentRow({
 }
 
 /** Preferred menu width on roomy screens; clamped down on narrow ones. */
-const POPOVER_MAX_WIDTH = 260;
+const POPOVER_MAX_WIDTH = 192;
 
 const styles = StyleSheet.create({
   popover: {
     backgroundColor: colors.surfaceElevated,
     borderRadius: radii.xxl,
-    bottom: 120,
+    bottom: 132,
     left: spacing.lg,
     overflow: 'hidden',
     paddingVertical: spacing.sm,
@@ -101,14 +100,8 @@ const styles = StyleSheet.create({
   row: {
     alignItems: 'center',
     flexDirection: 'row',
-    gap: spacing.lg,
+    gap: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-  },
-  divider: {
-    backgroundColor: colors.border,
-    height: StyleSheet.hairlineWidth,
-    marginHorizontal: spacing.lg,
-    marginVertical: spacing.xs,
+    paddingVertical: spacing.sm + 2,
   },
 });

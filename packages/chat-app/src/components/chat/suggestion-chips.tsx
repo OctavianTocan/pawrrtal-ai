@@ -47,11 +47,11 @@ export function SuggestionChips(): React.JSX.Element {
 
 const styles = StyleSheet.create({
   scroll: { flexGrow: 0 },
-  content: { gap: spacing.md, paddingHorizontal: spacing.lg },
+  content: { gap: spacing.md, paddingHorizontal: spacing.md },
   chip: {
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.lg,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radii.md,
     flexDirection: 'row',
     gap: spacing.sm,
     paddingHorizontal: spacing.lg,
