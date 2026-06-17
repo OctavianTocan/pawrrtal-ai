@@ -74,13 +74,18 @@ export const ConversationsStoreLive: Layer.Layer<ConversationsStore> = Layer.eff
       });
 
     const send = (conversationId: string, text: string): Effect.Effect<void> =>
-      SubscriptionRef.update(ref, (prev) =>
-        prev.map((conversation) =>
-          conversation.id === conversationId
-            ? { ...conversation, messages: [...conversation.messages, ...exchange(text)] }
-            : conversation,
-        ),
-      );
+      SubscriptionRef.update(ref, (prev) => {
+        const target = prev.find((conversation) => conversation.id === conversationId);
+        if (!target) return prev;
+        const updated: Conversation = {
+          ...target,
+          timeLabel: 'Now',
+          messages: [...target.messages, ...exchange(text)],
+        };
+        // Move the touched thread to the front so it isn't buried under older
+        // rows, matching how a new conversation surfaces at the top.
+        return [updated, ...prev.filter((conversation) => conversation.id !== conversationId)];
+      });
 
     return ConversationsStore.of({
       list: SubscriptionRef.get(ref),

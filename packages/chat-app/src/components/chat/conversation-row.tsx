@@ -20,23 +20,26 @@ export interface ConversationRowProps {
 export function ConversationRow({ conversation }: ConversationRowProps): React.JSX.Element {
   const run = useRun();
   return (
-    <Pressable
-      accessibilityLabel={conversation.title}
-      onPress={() => run(actions.openConversation(conversation.id))}
-      style={styles.row}
-    >
-      <View style={styles.text}>
+    <View style={styles.row}>
+      {/* Only the text region opens the thread; the ⋮ is a separate, visual-only
+          affordance (no row-actions menu exists yet), so tapping it must not
+          navigate. Keeping it outside the press target avoids that misroute. */}
+      <Pressable
+        accessibilityLabel={conversation.title}
+        onPress={() => run(actions.openConversation(conversation.id))}
+        style={styles.text}
+      >
         <ThemedText numberOfLines={2} variant="bodyStrong">
           {conversation.title}
         </ThemedText>
         <ThemedText color="textSecondary" variant="caption">
           {conversation.timeLabel}
         </ThemedText>
-      </View>
+      </Pressable>
       <View style={styles.more}>
         <AppIcon color="textSecondary" name="more" size={20} />
       </View>
-    </Pressable>
+    </View>
   );
 }
 

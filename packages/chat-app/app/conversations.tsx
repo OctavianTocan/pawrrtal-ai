@@ -47,6 +47,7 @@ export default function ConversationsScreen(): React.JSX.Element {
 
       <ScrollView
         contentContainerStyle={styles.listContent}
+        keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         style={styles.list}
       >
