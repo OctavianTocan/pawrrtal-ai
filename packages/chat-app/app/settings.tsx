@@ -40,37 +40,43 @@ export default function SettingsScreen(): React.JSX.Element {
         showsVerticalScrollIndicator={false}
       >
         <SettingsSection>
-          <SettingsRow chevron icon="appearance" label="Appearance" value="System" />
-          <SettingsRow chevron icon="haptics" label="Haptics" />
-          <SettingsRow chevron icon="widget" label="Widget" />
-          <SettingsRow chevron icon="advanced" label="Advanced" />
+          <SettingsRow icon="appearance" label="Appearance" value="System" />
+          <SettingsRow icon="haptics" label="Haptics" />
+          <SettingsRow icon="widget" label="Widget" />
+          <SettingsRow icon="advanced" label="Advanced" />
         </SettingsSection>
 
         <SettingsSection title="Grok">
-          <SettingsRow chevron icon="customize" label="Customize Grok" />
-          <SettingsRow chevron icon="connectors" label="Connectors" />
-          <SettingsRow chevron icon="skills" label="Skills" />
-          <SettingsRow chevron icon="memory" label="Memory" />
-          <SettingsRow chevron icon="kids" label="Kids Mode" />
+          <SettingsRow icon="customize" label="Customize Grok" />
+          <SettingsRow icon="connectors" label="Connectors" />
+          <SettingsRow icon="skills" label="Skills" />
+          <SettingsRow icon="memory" label="Memory" />
+        </SettingsSection>
+
+        {/* Kids Mode + NSFW sit in their own untitled group below Grok in the
+            reference, not as trailing rows of the Grok group. */}
+        <SettingsSection>
+          <SettingsRow icon="kids" label="Kids Mode" toggle />
+          <SettingsRow icon="nsfw" label="NSFW Preferences" />
         </SettingsSection>
 
         <SettingsSection title="Voice">
-          <SettingsRow chevron icon="voice" label="Voice" value="Sal" />
+          <SettingsRow icon="voice" label="Voice" value="Sal" />
         </SettingsSection>
 
         <SettingsSection title="Data & Information">
-          <SettingsRow chevron icon="shared" label="Shared Conversations" />
-          <SettingsRow chevron icon="data" label="Data Controls" />
+          <SettingsRow icon="shared" label="Shared Conversations" />
+          <SettingsRow icon="data" label="Data Controls" />
         </SettingsSection>
 
         <SettingsSection>
-          <SettingsRow chevron icon="licenses" label="Open Source Licenses" />
-          <SettingsRow chevron icon="terms" label="Terms of Use" />
-          <SettingsRow chevron icon="privacy" label="Privacy Policy" />
+          <SettingsRow icon="licenses" label="Open Source Licenses" />
+          <SettingsRow icon="terms" label="Terms of Use" />
+          <SettingsRow icon="privacy" label="Privacy Policy" />
         </SettingsSection>
 
         <SettingsSection>
-          <SettingsRow chevron icon="report" label="Report a Problem" />
+          <SettingsRow icon="report" label="Report a Problem" />
         </SettingsSection>
 
         <SettingsSection>

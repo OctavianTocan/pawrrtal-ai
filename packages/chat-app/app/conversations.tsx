@@ -1,7 +1,7 @@
 /**
- * Conversations screen — the history drawer: an account header, the Tasks
- * shortcut, the titled conversation list, and a footer with search, settings,
- * and a compose button.
+ * Conversations screen — the history drawer: an account header, the
+ * conversation list (which starts directly under the header, matching the
+ * reference), and a footer with search, settings, and a compose button.
  */
 import { useState } from 'react';
 import {
@@ -56,7 +56,7 @@ export default function ConversationsScreen(): React.JSX.Element {
           onPress={() => run(actions.navigateBack)}
           style={styles.collapse}
         >
-          <AppIcon color="textSecondary" name="chevron-back" size={22} />
+          <AppIcon color="textSecondary" name="chevrons-right" size={22} />
         </Pressable>
       </View>
 
@@ -73,15 +73,6 @@ export default function ConversationsScreen(): React.JSX.Element {
           showsVerticalScrollIndicator={false}
           style={styles.list}
         >
-          <Pressable accessibilityLabel="Tasks" style={styles.tasks}>
-            <AppIcon name="tasks" size={22} />
-            <ThemedText variant="bodyStrong">Tasks</ThemedText>
-          </Pressable>
-
-          <ThemedText color="textSecondary" style={styles.sectionLabel} variant="overline">
-            Conversations
-          </ThemedText>
-
           {visibleConversations.map((conversation) => (
             <ConversationRow conversation={conversation} key={conversation.id} />
           ))}
@@ -140,17 +131,6 @@ const styles = StyleSheet.create({
   },
   list: { flex: 1 },
   listContent: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl },
-  tasks: {
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radii.md,
-    flexDirection: 'row',
-    gap: spacing.md,
-    marginBottom: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md + 4,
-  },
-  sectionLabel: { marginBottom: spacing.xs, marginTop: spacing.sm, textTransform: 'none' },
   footer: {
     alignItems: 'center',
     flexDirection: 'row',

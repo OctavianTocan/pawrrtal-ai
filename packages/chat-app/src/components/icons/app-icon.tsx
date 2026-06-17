@@ -19,6 +19,7 @@ export type IconName =
   | 'chevron-up'
   | 'chevron-right'
   | 'chevron-back'
+  | 'chevrons-right'
   | 'search'
   | 'settings'
   | 'compose'
@@ -51,6 +52,7 @@ export type IconName =
   | 'privacy'
   | 'report'
   | 'kids'
+  | 'nsfw'
   | 'signout'
   | 'subscription';
 
@@ -75,6 +77,7 @@ const REGISTRY: Record<IconName, IconSpec> = {
   'chevron-up': { family: 'feather', glyph: 'chevron-up' },
   'chevron-right': { family: 'feather', glyph: 'chevron-right' },
   'chevron-back': { family: 'feather', glyph: 'chevron-left' },
+  'chevrons-right': { family: 'feather', glyph: 'chevrons-right' },
   search: { family: 'feather', glyph: 'search' },
   settings: { family: 'feather', glyph: 'settings' },
   compose: { family: 'feather', glyph: 'edit' },
@@ -107,6 +110,10 @@ const REGISTRY: Record<IconName, IconSpec> = {
   privacy: { family: 'feather', glyph: 'lock' },
   report: { family: 'feather', glyph: 'life-buoy' },
   kids: { family: 'mci', glyph: 'star-outline' },
+  // The reference shows an "18" age-rating badge; this MDI build has no
+  // numeric-18 glyph, so a shield-alert reads as the closest "restricted
+  // content" proxy without inlining a custom SVG.
+  nsfw: { family: 'mci', glyph: 'shield-alert-outline' },
   signout: { family: 'feather', glyph: 'log-out' },
   subscription: { family: 'mci', glyph: 'flash-outline' },
 };

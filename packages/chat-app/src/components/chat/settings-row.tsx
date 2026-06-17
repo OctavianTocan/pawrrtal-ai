@@ -1,9 +1,10 @@
 /**
  * `SettingsRow` and `SettingsSection` — the grouped-list building blocks for
  * the settings screen: an overline section header above a stack of individual
- * rounded icon + label cards, each optionally showing a trailing value or
- * chevron. The reference renders each row as its own rounded card with a small
- * gap between them, not a single container split by dividers.
+ * rounded icon + label cards, each optionally showing a trailing value or a
+ * toggle. The reference renders each row as its own rounded card with a small
+ * gap between them (not a single container split by dividers) and shows no
+ * trailing chevrons — only the occasional value subtitle or a toggle.
  */
 import { Children, isValidElement, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -22,8 +23,8 @@ export interface SettingsRowProps {
   label: string;
   /** Optional trailing value (e.g. "System", "Sal"). */
   value?: string;
-  /** Render a trailing chevron. */
-  chevron?: boolean;
+  /** Render a trailing toggle (shown in the off state — UI-only). */
+  toggle?: boolean;
   /** Style the row as destructive (red). */
   danger?: boolean;
   /** Press handler. */
@@ -35,7 +36,7 @@ export function SettingsRow({
   icon,
   label,
   value,
-  chevron = false,
+  toggle = false,
   danger = false,
   onPress,
 }: SettingsRowProps): React.JSX.Element {
@@ -52,7 +53,11 @@ export function SettingsRow({
           </ThemedText>
         ) : null}
       </View>
-      {chevron ? <AppIcon color="textSecondary" name="chevron-right" size={20} /> : null}
+      {toggle ? (
+        <View style={styles.toggleTrack}>
+          <View style={styles.toggleKnob} />
+        </View>
+      ) : null}
     </Pressable>
   );
 }
@@ -105,4 +110,20 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md + 1,
   },
   labelArea: { flex: 1, gap: 1 },
+  // Off-state toggle: a dark track with a light knob nudged to the left edge,
+  // matching the reference's Kids Mode switch.
+  toggleTrack: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radii.full,
+    height: 28,
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    width: 48,
+  },
+  toggleKnob: {
+    backgroundColor: colors.textSecondary,
+    borderRadius: radii.full,
+    height: 22,
+    width: 22,
+  },
 });

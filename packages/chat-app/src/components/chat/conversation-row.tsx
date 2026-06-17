@@ -44,12 +44,15 @@ export function ConversationRow({ conversation }: ConversationRowProps): React.J
 }
 
 const styles = StyleSheet.create({
+  // Roomier rows: the reference list pitches each conversation taller than a
+  // compact list, so the row gets generous vertical padding and a small
+  // title-to-time gap.
   row: {
     alignItems: 'flex-start',
     flexDirection: 'row',
     gap: spacing.md,
-    paddingVertical: spacing.md,
+    paddingVertical: spacing.lg + 2,
   },
-  text: { flex: 1, gap: 1 },
+  text: { flex: 1, gap: spacing.xs },
   more: { paddingHorizontal: spacing.xs, paddingTop: spacing.xxs },
 });
