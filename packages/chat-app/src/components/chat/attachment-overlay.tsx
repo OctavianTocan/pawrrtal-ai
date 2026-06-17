@@ -4,7 +4,7 @@
  * Connectors), separated by a hairline divider.
  */
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
-import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
+import Animated, { Easing, FadeOut, ZoomIn } from 'react-native-reanimated';
 import { Pressable } from '@/components/core/pressable';
 import { ThemedText } from '@/components/core/themed-text';
 import { AppIcon, type IconName } from '@/components/icons/app-icon';
@@ -45,10 +45,12 @@ export function AttachmentOverlay(): React.JSX.Element {
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      <OverlayBackdrop onDismiss={dismiss} />
+      <OverlayBackdrop onDismiss={dismiss} variant="plain" />
+      {/* Scale up from the `+` button (bottom-left of the composer), ~250ms
+          ease-out — matching the reference. */}
       <Animated.View
-        entering={FadeInDown.duration(duration.base)}
-        exiting={FadeOutDown.duration(duration.fast)}
+        entering={ZoomIn.duration(duration.attachmentPopover).easing(Easing.out(Easing.cubic))}
+        exiting={FadeOut.duration(duration.fast)}
         style={[styles.popover, { width: menuWidth }]}
       >
         {SOURCES.map((item) => (
@@ -93,6 +95,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingVertical: spacing.sm,
     position: 'absolute',
+    // Grow from the trigger (`+` button) corner, not the popover center.
+    transformOrigin: 'bottom left',
   },
   row: {
     alignItems: 'center',

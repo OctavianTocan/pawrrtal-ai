@@ -4,7 +4,7 @@
  * name, and subtitle, and a checkmark on the active tier.
  */
 import { StyleSheet, useWindowDimensions, View } from 'react-native';
-import Animated, { FadeInDown, FadeOutDown } from 'react-native-reanimated';
+import Animated, { Easing, FadeOut, ZoomIn } from 'react-native-reanimated';
 import { Pressable } from '@/components/core/pressable';
 import { ThemedText } from '@/components/core/themed-text';
 import { AppIcon } from '@/components/icons/app-icon';
@@ -27,10 +27,13 @@ export function ModelSelectorOverlay(): React.JSX.Element {
 
   return (
     <View style={StyleSheet.absoluteFill}>
-      <OverlayBackdrop onDismiss={() => run(actions.setOverlay('none'))} />
+      <OverlayBackdrop onDismiss={() => run(actions.setOverlay('none'))} variant="plain" />
+      {/* Scale up from the model pill (bottom-left of the composer), ~375ms
+          ease-out — matching the reference. `transformOrigin` anchors the
+          scale to the trigger corner rather than the popover center. */}
       <Animated.View
-        entering={FadeInDown.duration(duration.base)}
-        exiting={FadeOutDown.duration(duration.fast)}
+        entering={ZoomIn.duration(duration.modelPopover).easing(Easing.out(Easing.cubic))}
+        exiting={FadeOut.duration(duration.fast)}
         style={[styles.popover, { width: popoverWidth }]}
       >
         {catalog.models.map((model) => {
@@ -70,6 +73,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     paddingVertical: spacing.xs,
     position: 'absolute',
+    // Grow from the trigger (model pill) corner, not the popover center.
+    transformOrigin: 'bottom left',
   },
   row: {
     alignItems: 'center',

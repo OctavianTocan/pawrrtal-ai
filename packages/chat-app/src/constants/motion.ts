@@ -6,6 +6,10 @@ export const duration = {
   fast: 140,
   base: 220,
   slow: 320,
+  /** Model popover scale-up entrance — measured from the reference recording. */
+  modelPopover: 375,
+  /** Attachment menu scale-up entrance — measured from the reference recording. */
+  attachmentPopover: 250,
 } as const;
 
 /** Reanimated spring config for popover / sheet entrances. */
