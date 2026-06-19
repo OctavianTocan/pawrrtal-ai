@@ -24,8 +24,10 @@ const Email = Schema.String.check(Schema.isPattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)
  */
 export class User extends Schema.Class<User>('User')({
 	id: UserId,
-	name: Schema.String.check(Schema.isMinLength(1)),
 	email: Email,
+	isActive: Schema.Boolean,
+	isSuperuser: Schema.Boolean,
+	isVerified: Schema.Boolean,
 }) {}
 
 /**
@@ -47,8 +49,10 @@ export class CurrentUser extends Context.Service<CurrentUser, User>()(
 		CurrentUser,
 		new User({
 			id: UserId.make('00000000-0000-4000-8000-000000000001'),
-			name: 'John Doe',
 			email: 'john@doe.com',
+			isActive: true,
+			isSuperuser: false,
+			isVerified: true,
 		})
 	);
 }

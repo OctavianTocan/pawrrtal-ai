@@ -178,3 +178,5 @@ backend/vendor/effect/
 
 # Docker
 */.env.docker
+
+.antigravitycli/
