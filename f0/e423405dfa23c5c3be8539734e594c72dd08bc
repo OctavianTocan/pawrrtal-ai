@@ -1,0 +1,33 @@
+backend-ts/apps/api/src/Modules/Auth/SessionStore.ts
+  h_dad53a55d60d3d 2-3,5-9,18,27,31-52,54-74,76-78
+.opencode/agents/effect-expert.md
+  s_c7659fc3e37afe::t_1c5385b935f8f2 130
+  s_c7659fc3e37afe::t_589410eef57b36 20,22,31-42,46-47,49,56,58-61,63,65,67,69-82,84,86,88,90-96,98,100,102-105,107,109-129,131-142
+backend-ts/packages/api-core/src/Modules/Auth/Domain.ts
+  h_dad53a55d60d3d 28-30,53-55
+backend-ts/packages/api-core/src/Modules/Auth/Errors.ts
+  h_dad53a55d60d3d 10-20
+.gitignore
+  s_c7659fc3e37afe::t_ee97d454f95eee 166-168
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "f0e423405dfa23c5c3be8539734e594c72dd08bc",
+  "prompts": {},
+  "humans": {
+    "h_dad53a55d60d3d": {
+      "author": "Octavian Tocan <contact@octaviantocan.com>"
+    }
+  },
+  "sessions": {
+    "s_c7659fc3e37afe": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_12046f823ffe1nEYUkFDDV8MR5",
+        "model": "MiniMax-M3"
+      },
+      "human_author": "Octavian Tocan <contact@octaviantocan.com>"
+    }
+  }
+}
