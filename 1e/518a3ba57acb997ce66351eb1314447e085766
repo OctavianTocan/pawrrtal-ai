@@ -1,0 +1,12 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "1e518a3ba57acb997ce66351eb1314447e085766",
+  "prompts": {},
+  "humans": {
+    "h_dad53a55d60d3d": {
+      "author": "Octavian Tocan <contact@octaviantocan.com>"
+    }
+  }
+}
