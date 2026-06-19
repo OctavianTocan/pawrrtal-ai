@@ -1,0 +1,16 @@
+backend-ts/apps/api/src/Modules/Auth/SessionStore.ts
+  h_dad53a55d60d3d 1-23
+.gitignore
+  h_dad53a55d60d3d 181-182
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "b077a2e8411be43e0b8a8a083f7aef11a55367fc",
+  "prompts": {},
+  "humans": {
+    "h_dad53a55d60d3d": {
+      "author": "Octavian Tocan <contact@octaviantocan.com>"
+    }
+  }
+}
