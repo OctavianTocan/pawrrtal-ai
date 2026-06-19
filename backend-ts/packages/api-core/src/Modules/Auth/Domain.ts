@@ -25,9 +25,9 @@ const Email = Schema.String.check(Schema.isPattern(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)
 export class User extends Schema.Class<User>('User')({
 	id: UserId,
 	email: Email,
-	isActive: Schema.Boolean,
-	isSuperuser: Schema.Boolean,
-	isVerified: Schema.Boolean,
+	is_active: Schema.Boolean,
+	is_superuser: Schema.Boolean,
+	is_verified: Schema.Boolean,
 }) {}
 
 /**
@@ -50,9 +50,9 @@ export class CurrentUser extends Context.Service<CurrentUser, User>()(
 		new User({
 			id: UserId.make('00000000-0000-4000-8000-000000000001'),
 			email: 'john@doe.com',
-			isActive: true,
-			isSuperuser: false,
-			isVerified: true,
+			is_active: true,
+			is_superuser: false,
+			is_verified: true,
 		})
 	);
 }

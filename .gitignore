@@ -163,6 +163,9 @@ package-lock.json
 
 # OpenCode internal generated artifacts
 .opencode/package-lock.json
+# effect-expert research scratch cache (per-agent, per-developer). Re-built
+# on demand by the agent; never source-of-truth.
+.opencode/agents/effect-expert.scratch/
 
 # Databases
 *.db

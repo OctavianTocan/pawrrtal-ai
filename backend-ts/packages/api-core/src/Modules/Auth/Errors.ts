@@ -7,3 +7,14 @@
  * `{ httpApiStatus: 403 }`). Until then, callers should treat the file
  * as intentionally blank.
  */
+
+import { Schema } from 'effect';
+
+/** Error raised when the session store fails to lookup a user. */
+export class SessionStoreError extends Schema.TaggedErrorClass<SessionStoreError>()(
+	'SessionStoreError',
+	{
+		message: Schema.String,
+		cause: Schema.Defect,
+	}
+) {}
