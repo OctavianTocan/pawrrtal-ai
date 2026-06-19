@@ -1,0 +1,24 @@
+backend-ts/CONVENTIONS.md
+  s_5c04ba808a0d62::t_e73de9985f71fe 158-341
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.8",
+  "base_commit_sha": "cfda2d63de08ff583d27079a9fc83090b0a01d2d",
+  "prompts": {},
+  "humans": {
+    "h_dad53a55d60d3d": {
+      "author": "Octavian Tocan <contact@octaviantocan.com>"
+    }
+  },
+  "sessions": {
+    "s_5c04ba808a0d62": {
+      "agent_id": {
+        "tool": "cursor",
+        "id": "8383a576-0b63-4c1d-8bc2-03bb6d0425dd",
+        "model": "composer-2.5"
+      },
+      "human_author": "Octavian Tocan <contact@octaviantocan.com>"
+    }
+  }
+}
