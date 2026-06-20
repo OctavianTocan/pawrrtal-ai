@@ -9,6 +9,7 @@
  * Expected output: `User: John Doe (john@doe.com)`.
  */
 
+import { BunRuntime } from '@effect/platform-bun';
 import { CurrentUser } from '@pawrrtal/api-core/Modules/Auth/Domain';
 import { Console, Effect } from 'effect';
 
@@ -17,4 +18,5 @@ const program = Effect.gen(function* () {
 	yield* Console.log(`User: ${user.email} (${user.id})`);
 }).pipe(Effect.provide(CurrentUser.Test));
 
-Effect.runPromise(program);
+// Effect.runPromise(program);
+BunRuntime.runMain(program);
