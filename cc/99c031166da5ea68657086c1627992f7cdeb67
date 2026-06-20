@@ -1,0 +1,16 @@
+backend-ts/apps/api/scratchpad/session-lookup.ts
+  h_dad53a55d60d3d 1,10
+backend-ts/apps/api/scratchpad/print-user.ts
+  h_dad53a55d60d3d 12,21-22
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.9",
+  "base_commit_sha": "cc99c031166da5ea68657086c1627992f7cdeb67",
+  "prompts": {},
+  "humans": {
+    "h_dad53a55d60d3d": {
+      "author": "Octavian Tocan <contact@octaviantocan.com>"
+    }
+  }
+}
