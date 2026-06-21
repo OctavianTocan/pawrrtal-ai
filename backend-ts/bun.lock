@@ -9,7 +9,7 @@
         "@effect/vitest": "4.0.0-beta.74",
         "@types/bun": "latest",
         "typescript": "^5.9.3",
-        "vitest": "^3.0.0",
+        "vitest": "^3.2.6",
       },
     },
     "apps/api": {
@@ -26,7 +26,7 @@
         "@effect/vitest": "4.0.0-beta.74",
         "@types/bun": "latest",
         "typescript": "^5.9.3",
-        "vitest": "^3.0.0",
+        "vitest": "^3.2.6",
       },
     },
     "packages/api-core": {

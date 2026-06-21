@@ -60,7 +60,7 @@ def test_host_keyboard_lists_all_hosts_with_friendly_labels() -> None:
     assert "Gemini API (5)" in labels
     assert "xAI (1)" in labels
     assert "LiteLLM (19)" in labels
-    assert "OpenCode Go (12)" in labels
+    assert "OpenCode Go (18)" in labels
     # Title-casing bug from before: must not contain the broken labels.
     assert "Openai (5)" not in labels
     assert "Xai (1)" not in labels
@@ -97,10 +97,10 @@ def test_vendor_keyboard_lists_vendors_for_a_host() -> None:
     labels = [b.text for b in _flatten(rows)]
 
     assert "Z.AI (2)" in labels
-    assert "Moonshot (2)" in labels
-    assert "Xiaomi (2)" in labels
-    assert "Alibaba (2)" in labels
-    assert "MiniMax (2)" in labels
+    assert "Moonshot (3)" in labels
+    assert "Xiaomi (4)" in labels
+    assert "Alibaba (4)" in labels
+    assert "MiniMax (3)" in labels
     assert "DeepSeek (2)" in labels
 
 

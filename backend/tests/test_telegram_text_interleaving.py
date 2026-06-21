@@ -75,8 +75,11 @@ async def test_text_after_thinking_renders_as_new_message() -> None:
         pass
 
     # Thinking edits the placeholder message (edit_message_text, not send_message).
+    # After PR #14 (Claude Cage stream styling) the thinking block opens with
+    # the ``✻ `` TUI marker; markdown italics still wrap inner emphasis via
+    # ``<i>…</i>`` but the chunk itself isn't italicised end-to-end.
     edits = [call.kwargs.get("text", "") for call in bot.edit_message_text.await_args_list]
-    assert any("<i>let me check</i>" in s for s in edits)
+    assert any("✻ let me check" in s for s in edits)
 
     # The text delta opens a new interleaved message via send_message.
     sends = [call.kwargs.get("text", "") for call in bot.send_message.await_args_list]
