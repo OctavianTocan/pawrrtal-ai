@@ -8,3 +8,7 @@
 	path = backend/vendor/codex
 	url = https://github.com/openai/codex.git
 	ignore = dirty
+[submodule "backend/vendor/effect-smol"]
+	path = backend/vendor/effect-smol
+	url = https://github.com/Effect-TS/effect-smol.git
+	branch = main

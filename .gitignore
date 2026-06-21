@@ -22,6 +22,13 @@ node_modules/
 /private
 .private
 
+# Personal Effect-learning scaffolding (teach skill workspace). Not project artefacts.
+/MISSION.md
+/RESOURCES.md
+/NOTES.md
+/learning-records/
+/lessons/
+
 # Generated user workspaces (created by seed_workspace at runtime).
 # Default ``WORKSPACE_BASE_DIR=/data/workspaces`` is overridden in
 # local .env to ``./workspaces``, which lands at the repo root or
@@ -60,6 +67,17 @@ playwright-report/
 build/
 cache/
 dist/
+
+# Bun runtime transpiler cache (XDG cache dir, *.pile files) — created when
+# running the backend-ts Effect API under `bun run` / `bun --filter ... dev`.
+# Per-developer, regenerated on every boot; never commit.
+.cache/
+
+# Local mirror created by a one-off rsync from `apps/api/test/` while
+# diagnosing the Bun-runtime test fix. The file system has the directory
+# locked (chflags-restored immutable) and the trash can't purge it; git
+# must skip it. The canonical test tree lives next to it in `test/`.
+backend-ts/apps/api/test.bak/
 
 # Next
 .next/
@@ -148,6 +166,15 @@ package-lock.json
 
 # Databases
 *.db
+# SQLite WAL-mode sidecars (created when the backend-ts Effect API opens
+# pawrrtal.db under bun:sqlite). Ephemeral; regenerated alongside the .db.
+*.db-shm
+*.db-wal
+*.db-journal
+
+# Local vendor reference clones (not submodules). See backend/vendor/README.md.
+backend/vendor/comcom/
+backend/vendor/effect/
 
 # Docker
 */.env.docker

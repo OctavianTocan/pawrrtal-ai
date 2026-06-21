@@ -44,6 +44,15 @@ export const DEV_FRONTEND_BIND_HOST = '127.0.0.1';
 export const DEV_BACKEND_PORT = 8000;
 
 /**
+ * Port the Effect TypeScript strangler API listens on locally.
+ *
+ * Started by `dev.ts` (opt out with `PAWRRTAL_SKIP_TS_API=1`). Python
+ * FastAPI remains canonical on {@link DEV_BACKEND_PORT} until route
+ * parity lands on the TS stack.
+ */
+export const DEV_BACKEND_TS_PORT = 8001;
+
+/**
  * URL the desktop shell points at when running against `bun run dev`.
  *
  * Centralised so the dev shell + status log + any future

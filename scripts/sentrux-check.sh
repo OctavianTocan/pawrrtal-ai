@@ -11,7 +11,7 @@ trap cleanup EXIT
 
 should_exclude_from_sentrux() {
 	case "$1" in
-		.agents/* | .claude/* | .cursor/* | .factory/* | .goose/* | .pi/*)
+		.agents/* | .claude/* | .cursor/* | .factory/* | .goose/* | .pi/* | .specify/*)
 			return 0
 			;;
 		# Vendored third-party source trees (zero-native, etc.) are excluded so

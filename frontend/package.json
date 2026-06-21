@@ -15,7 +15,7 @@
 		"lint": "bunx --bun @biomejs/biome lint --write",
 		"format": "bunx --bun @biomejs/biome format --write",
 		"fix": "bunx --bun @biomejs/biome check --write",
-		"check": "bunx --bun @biomejs/biome check && tsc --noEmit && node ../scripts/check-file-lines.mjs && node ../scripts/check-nesting.mjs && node ../scripts/check-view-container.mjs",
+		"check": "bunx --bun @biomejs/biome check && bun run generate:docs && tsc --noEmit && node ../scripts/check-file-lines.mjs && node ../scripts/check-nesting.mjs && node ../scripts/check-view-container.mjs",
 		"generate:docs": "node ../node_modules/.bin/fumadocs-mdx source.config.ts",
 		"arch:check": "bunx dependency-cruiser --config .dependency-cruiser.cjs --validate .dependency-cruiser.cjs app features components lib hooks"
 	},

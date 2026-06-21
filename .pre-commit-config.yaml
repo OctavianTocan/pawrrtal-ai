@@ -108,7 +108,7 @@ repos:
     rev: v2.4.15
     hooks:
       - id: biome-check
-        name: biome check (frontend + scripts)
+        name: biome check (JS/TS)
         # Pin to the same version as frontend/package.json so schema versions match.
         additional_dependencies: ["@biomejs/biome@2.4.15"]
         files: \.(js|jsx|ts|tsx|json|jsonc)$

@@ -1,5 +1,13 @@
 {
 	"$schema": "https://opencode.ai/config.json",
 	"agent": {
+	},
+	"reference": {
+		"effect-smol": {
+			"path": "backend/vendor/effect-smol"
+		},
+		"comcom": {
+			"path": "backend/vendor/comcom"
+		}
 	}
 }

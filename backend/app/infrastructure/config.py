@@ -2,19 +2,14 @@
 
 from pathlib import Path
 from typing import Literal
-from urllib.parse import urlparse
 
-from pydantic import Field, PositiveInt, field_validator, model_validator
+from pydantic import Field, PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-from app.infrastructure.config_urls import (
-    async_database_url,
-    normalize_database_url,
-    sync_database_url,
-)
+from app.infrastructure.config_behavior import SettingsBehaviorMixin
 
 
-class Settings(BaseSettings):
+class Settings(BaseSettings, SettingsBehaviorMixin):
     """Application settings. This class uses Pydantic's BaseSettings to automatically read environment variables and provide type validation."""
 
     # Load environment variables from a .env file in the current directory, with UTF-8 encoding. This allows you to define your settings in a .env file instead of setting them directly in the environment.
@@ -43,15 +38,24 @@ class Settings(BaseSettings):
     workspace_encryption_key: str
     # Local OpenAI-compatible bridge exposed by `ccpty serve`.
     claude_code_pty_base_url: str = "http://127.0.0.1:11435/v1"
+    # OAuth token used by the Claude Agent SDK to authenticate the bundled
+    # Claude Code CLI subprocess. Optional — only required when a chat
+    # request resolves to a Claude model. Generate with `claude setup-token`.
+    claude_code_oauth_token: str = ""
     # API key for Exa (https://exa.ai). Powers the provider-agnostic
     # `exa_search` tool wired into chat providers.
     # Leave empty to disable web search; the tool returns a clear
     # "not configured" error rather than crashing the turn.
     exa_api_key: str = ""
-    # API key for xAI (https://x.ai). Consumed by Grok chat models and
-    # Telegram voice-note transcription via xAI's REST STT endpoint.
+    # API key for xAI (https://x.ai). Consumed by the LiteLLM provider
+    # for Grok chat models. The previous speech-to-text proxy that also
+    # consumed this key (the /api/v1/stt route) was removed during the
+    # backend restructure; this key is no longer wired into any voice path.
     xai_api_key: str = ""
-    # OAuth 2.0 client id for the xAI device-code flow. Empty disables it.
+    # OAuth 2.0 client id for the xAI device-code flow (#372). Set
+    # to the value xAI hands back from registering Pawrrtal as an
+    # OAuth client. When empty the device-code path is disabled
+    # and users must keep using the legacy long-lived ``xai_api_key``.
     xai_oauth_client_id: str = ""
     # API key for OpenAI (https://platform.openai.com).  Consumed by the
     # LiteLLM provider for GPT-4o / o-series chat models.  Leave empty
@@ -95,8 +99,9 @@ class Settings(BaseSettings):
     cookie_secure: bool | None = None
     # The base directory where workspaces will be stored. Each workspace can contain files, configurations, and other resources specific to a user's project or environment.
     workspace_base_dir: str = "/data/workspaces"
+
     # ── Agent loop safety ────────────────────────────────────────────────
-    # See backend/app/core/run_model_tool_loop/types.py::AgentSafetyConfig for the
+    # See backend/app/core/agent_loop/types.py::AgentSafetyConfig for the
     # behavioural contract.  All four caps accept None to opt out of the
     # specific guard (set the matching env var to an empty string in
     # ``.env`` and Pydantic will coerce to None — or pass --None).
@@ -107,7 +112,7 @@ class Settings(BaseSettings):
     agent_max_iterations: int | None = 25
 
     # Wall-clock budget (seconds) for one chat invocation.  Counted from
-    # entry to ``run_model_tool_loop``.  Default 300 (5 min); raise for long-
+    # entry to ``agent_loop``.  Default 300 (5 min); raise for long-
     # running automations.
     agent_max_wall_clock_seconds: float | None = 300.0
 
@@ -130,6 +135,14 @@ class Settings(BaseSettings):
     # Keep false by default; Cloudflare Access-protected operator deploys may
     # set PAWRRTAL_ENABLE_DEV_LOGIN=true on both frontend and backend.
     pawrrtal_enable_dev_login: bool = False
+
+    # --- Access control ------------------------------------------------------
+    # Optional bearer token all clients must supply in the X-Pawrrtal-Key
+    # request header. When set, any request missing or carrying the wrong
+    # value is rejected with 401 before auth runs. Leave empty to disable
+    # (useful in local dev or for the public demo instance where
+    # ALLOWED_EMAILS is the only gate). Generate with: openssl rand -hex 32
+    backend_api_key: str = ""
 
     # Comma-separated list of email addresses that are allowed to use this
     # backend. When non-empty, authenticated users whose email is not on
@@ -172,7 +185,7 @@ class Settings(BaseSettings):
 
     # Where to send the user after a successful OAuth sign-in. Override in
     # production to point at the deployed frontend (e.g. https://app/...).
-    oauth_post_login_redirect: str = "http://localhost:3000/"
+    oauth_post_login_redirect: str = "http://localhost:53001/"
 
     # --- Channels: Telegram --------------------------------------------------
     # Bot token issued by @BotFather. Leaving this empty disables the
@@ -196,6 +209,7 @@ class Settings(BaseSettings):
     # so the receiving FastAPI route can drop forgeries.
     telegram_webhook_secret: str = ""
     telegram_simulate_enabled: bool = False
+
     # When set, inbound Telegram messages from this numeric user_id are
     # auto-linked to the seeded dev-admin user (``ADMIN_EMAIL``) without
     # the manual ``/start <code>`` flow. Lets the developer skip the
@@ -216,7 +230,7 @@ class Settings(BaseSettings):
 
     # When True, ConversationRead 422s on a non-canonical stored
     # model_id. When False (operator escape hatch), the bad value falls
-    # back to ``catalog.first_catalog_model().id`` and the row is logged.
+    # back to ``catalog.default_model().id`` and the row is logged.
     strict_conversation_read_validation: bool = True
 
     # Demo-mode toggle.  When true, the backend refuses to start the
@@ -243,55 +257,65 @@ class Settings(BaseSettings):
     # When False, the audit logger no-ops and the audit API returns 404.
     # The dashboard query still works against historical rows.
     audit_log_enabled: bool = True
-    # Retention for audit rows. Zero disables the purge.
+    # Retention for audit rows. The purge job runs from the scheduler
+    # lifespan (PR 12); zero disables the purge so rows live forever.
     audit_log_retention_days: int = 90
 
-    # Master switch for secret redaction over log lines and persisted tool inputs.
+    # Master switch for the secret-redaction pass over log lines and
+    # persisted tool inputs (PR 02). Off only for adversarial test runs.
     secret_redaction_enabled: bool = True
 
-    # ── Python Shell plugin ──────────────────────────────────────────────
-    # Wall-clock cap (seconds) for one ``python`` tool call exposed by the
-    # disabled-by-default ``python_shell`` bundled plugin. The awaiter is
-    # cancelled at this point; runaway code holds the worker thread until
-    # it returns (see ``app.tools.python_exec``).
+    # ── Tools: in-process Python execution ───────────────────────────────
+    # When True, ``build_agent_tools`` appends the ``python`` tool which
+    # runs LLM-supplied source via ``exec()`` in the FastAPI worker
+    # process.  Off by default: the execution is *not* sandboxed and the
+    # operator opts in explicitly per the threat model documented in
+    # ``app/core/tools/python_exec.py``.
+    virtual_python_enabled: bool = False
+    # Wall-clock cap (seconds) for one ``python`` tool call.  The
+    # awaiter is cancelled at this point; runaway code holds the worker
+    # thread until it returns (see module docstring).
     virtual_python_timeout_seconds: float = 30.0
     # Maximum bytes of captured stdout + stderr returned to the model.
     # Head + tail truncation preserves tracebacks at the tail.
     virtual_python_output_cap_bytes: int = 32_000
 
-    # ── Governance: Claude SDK options ───────────────────────────────────
+    # ── Governance: Claude SDK options (PR 05) ───────────────────────────
     # When True, the Claude provider passes the SDK's ``sandbox`` option
     # to the bundled CLI subprocess. The CLI's macOS Seatbelt sandbox
     # is the strongest containment for the agent's filesystem reach.
     claude_sandbox_enabled: bool = False
     # When True, Bash invocations are auto-allowed inside the sandbox.
-    # The Claude SDK's macOS Seatbelt sandbox is the containment layer;
-    # ``claude_sandbox_excluded_commands`` still carves out commands that
-    # should never be auto-allowed (e.g. ``sudo,ssh``).
+    # Pairs with the can_use_tool gate (PR 03) so we never auto-allow
+    # commands that escape the workspace.
     claude_sandbox_auto_allow_bash: bool = True
     # Comma-separated bash commands the SDK should exclude from the
     # sandbox auto-allow list (e.g. ``sudo,ssh``). Parsed lazily so the
     # env var stays a single-line string.
     claude_sandbox_excluded_commands: str = "sudo,ssh,scp,rsync"
 
-    # ── Governance: retry-with-backoff ───────────────────────────────────
-    # Capped so one turn cannot spend minutes on a flapping network.
+    # ── Governance: retry-with-backoff (PR 05) ───────────────────────────
+    # Mirrors CCT's transient-error retry. Capped to keep a single turn
+    # from spending minutes on a flapping network.
     claude_retry_max_attempts: int = 3
     claude_retry_base_delay_seconds: float = 1.0
     claude_retry_max_delay_seconds: float = 30.0
     claude_retry_backoff_factor: float = 2.0
 
-    # ── Governance: workspace context ────────────────────────────────────
+    # ── Governance: workspace context (PR 06) ────────────────────────────
     # When True, the chat router calls
     # ``governance.workspace_context.load_workspace_context`` to read
     # root prompt files plus the internal ``.agent/`` skills/protocols
     # tree and assemble the unified system prompt.
     workspace_context_enabled: bool = True
-    # Workspace-relative path to the skills directory.
+    # Workspace-relative path to the skills directory. Each subdirectory
+    # is expected to contain a ``SKILL.md`` file.
     workspace_skills_dir_name: str = ".agent/skills"
     # Prompt shape for workspace skills: compact manifest, legacy full, or off.
     workspace_skill_prompt_mode: Literal["manifest", "full", "off"] = "manifest"
-    # Workspace-relative permissions file; parsed as prompt text today.
+    # Workspace-relative path to the permissions file. Today the loader
+    # only treats it as documentation for the agent; a Markdown →
+    # allowlist parser is future work.
     workspace_settings_filename: str = ".agent/protocols/permissions.md"
 
     # ── Workspace seeding: template sources ──────────────────────────────
@@ -301,6 +325,15 @@ class Settings(BaseSettings):
         Path(__file__).resolve().parents[3] / "backend" / "templates" / "workspace"
     )
 
+    # ── Ops platform: webhooks (removed) ─────────────────────────────────
+    # Compatibility placeholders retained so existing .env files still
+    # parse. The backend restructure removed the POST /webhooks routes;
+    # setting these values does not expose a webhook receiver.
+    webhook_api_enabled: bool = False
+    # Shared bearer token for non-GitHub providers.
+    webhook_api_secret: str = ""
+    # HMAC-SHA256 shared secret for GitHub deliveries.
+    github_webhook_secret: str = ""
     # Personal access token for creating GitHub issues via the
     # ``report_issue`` agent tool. Requires ``repo`` scope (or
     # ``public_repo`` for public repos). Leave empty to disable.
@@ -308,7 +341,7 @@ class Settings(BaseSettings):
     # Target repository for agent-reported issues (owner/repo).
     github_issues_repo: str = "octaviantocan/pawrrtal-ai"
 
-    # ── Ops platform: scheduler ──────────────────────────────────────────
+    # ── Ops platform: scheduler (PR 12) ──────────────────────────────────
     # When False the scheduler lifespan task never starts; the API
     # routes still serve historical job rows but disable mutate verbs.
     scheduler_enabled: bool = False
@@ -317,7 +350,7 @@ class Settings(BaseSettings):
     # lost on restart (fine for tests).
     scheduler_persistent_jobstore: bool = True
 
-    # ── Telegram ─────────────────────────────────────────────────────────
+    # ── Telegram polish (PR 07) ──────────────────────────────────────────
     # Default verbose level for new Telegram conversations.
     # 0 = quiet, 1 = normal (tool names live), 2 = detailed (+ thinking).
     telegram_verbose_default: Literal[0, 1, 2] = 1
@@ -327,23 +360,32 @@ class Settings(BaseSettings):
     telegram_typing_refresh_seconds: float = 2.5
 
     # When True, every assistant reply on Telegram carries a "🔄 Regenerate"
-    # inline-keyboard button. Tapping it replays the last user message.
+    # inline-keyboard button (#368). Tapping the button replays the last
+    # user message through the turn pipeline. Off by default so the
+    # rollout is gradual.
     telegram_regenerate_button_enabled: bool = False
     # When True, the Telegram bot uses a per-chat FIFO turn queue
     # (``ChatMessageQueueDispatcher``) instead of the legacy
     # "cancel previous task" behaviour. Mid-turn user messages
-    # queue up and run serially rather than clobbering the in-flight reply.
+    # queue up and run serially rather than clobbering the
+    # in-flight reply (#357). Default off until the dispatcher has
+    # baked in a deployment.
     telegram_chat_queue_enabled: bool = False
+
     # Vision-capable model used to describe Telegram image attachments before
     # the selected Paw agent model runs. The main model receives the resulting
     # text annotation only, so image uploads work even when the selected model
     # is text-only.
     telegram_image_interpreter_model_id: str = "google-ai:google/gemini-3.5-flash"
 
-    # ── Voice transcription ───────────────────────────────────────────────
-    # Telegram voice notes use xAI's REST STT endpoint with XAI_API_KEY.
-    # The remaining voice_* settings are legacy no-op placeholders kept so
-    # deployed environments do not fail on pydantic-settings validation.
+    # ── Voice transcription (removed) ────────────────────────────────────
+    # Voice transcription (the 4-backend transcriber, the /api/v1/stt
+    # route, the Telegram voice-attachment transcription) was removed
+    # during the backend restructure. These settings are kept as
+    # no-op placeholders so deployed environments don't fail to boot
+    # on the next pydantic-settings validation pass; they have no
+    # readers in the current codebase. Drop them once the next
+    # config-cleanup PR lands.
     voice_provider: Literal["xai", "mistral", "openai", "local"] = "xai"
     voice_mistral_api_key: str = ""
     voice_openai_api_key: str = ""
@@ -377,93 +419,8 @@ class Settings(BaseSettings):
 
     # ── Pre-turn hooks ──────────────────────────────────────────────────
     # The timeout in seconds for each pre-turn hook.
+    pre_turn_hook_timeout_seconds: int = 10
     turn_context_provider_timeout_seconds: int = 10
-
-    @property
-    def claude_sandbox_excluded_commands_list(self) -> list[str]:
-        """Parsed view of ``claude_sandbox_excluded_commands``."""
-        if not self.claude_sandbox_excluded_commands:
-            return []
-        return [
-            cmd.strip() for cmd in self.claude_sandbox_excluded_commands.split(",") if cmd.strip()
-        ]
-
-    @property
-    def voice_max_size_bytes(self) -> int:
-        """Voice size cap in bytes (the handler validates against this)."""
-        return self.voice_max_size_mb * 1024 * 1024
-
-    @field_validator("telegram_bot_username", mode="before")
-    @classmethod
-    def _strip_telegram_at_prefix(cls, value: object) -> object:
-        """Forgive a leading ``@`` in ``TELEGRAM_BOT_USERNAME``.
-
-        Telegram deep links are ``https://t.me/<username>``; an ``@``
-        produces ``t.me/@username`` which Telegram redirects to its
-        homepage instead of the bot. Humans frequently paste the
-        ``@``-prefixed handle into ``.env``, so we normalize once at the
-        config boundary instead of forcing every consumer to remember.
-        """
-        if isinstance(value, str):
-            return value.lstrip("@")
-        return value
-
-    @field_validator("telegram_verbose_default", mode="before")
-    @classmethod
-    def _coerce_telegram_verbose_default(cls, value: object) -> object:
-        """Coerce env-file string values before Literal validation."""
-        if isinstance(value, str) and value.strip() in {"0", "1", "2"}:
-            return int(value)
-        return value
-
-    @field_validator("workspace_base_dir", mode="after")
-    @classmethod
-    def _expand_workspace_base_dir(cls, value: str) -> str:
-        """Expand home-relative workspace roots from env files."""
-        return str(Path(value).expanduser())
-
-    @model_validator(mode="after")
-    def validate_secure_cookie(self) -> "Settings":
-        """Reject misconfigurations where ``SameSite=none`` is paired with insecure cookies."""
-        secure = self.cookie_secure if self.cookie_secure is not None else self.is_production
-        if self.cookie_samesite == "none" and not secure:
-            raise ValueError(
-                "cookie_samesite='none' requires HTTPS (cookie_secure must be True, or run with ENV=prod)."
-            )
-        return self
-
-    @property
-    def is_production(self) -> bool:
-        """A convenience property that returns True if the application is running in production mode (i.e., if env is set to "prod")."""
-        return self.env == "prod"
-
-    @property
-    def _normalized_database_url(self) -> str:
-        """Return the configured database URL in a normalized form."""
-        return normalize_database_url(self.database_url, self.sqlite_db_filename)
-
-    @property
-    def is_sqlite(self) -> bool:
-        """Whether the configured database uses SQLite."""
-        return urlparse(self._normalized_database_url).scheme.startswith("sqlite")
-
-    @property
-    def db_url_sync(self) -> str:
-        """Return the database URL formatted for synchronous connections.
-
-        PostgreSQL URLs are normalized to the installed psycopg driver, while
-        SQLite async URLs are converted back to the sync sqlite dialect.
-        """
-        return sync_database_url(self._normalized_database_url)
-
-    @property
-    def db_url_async(self) -> str:
-        """Return the database URL formatted for asynchronous connections.
-
-        PostgreSQL URLs are normalized to the psycopg async dialect and SQLite
-        sync URLs are converted to the aiosqlite dialect.
-        """
-        return async_database_url(self._normalized_database_url)
 
 
 settings = Settings()

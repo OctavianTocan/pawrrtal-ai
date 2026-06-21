@@ -279,6 +279,13 @@ module = "tests.*"
 disallow_untyped_defs = false  # test fixtures are fine without explicit types
 
 [[tool.mypy.overrides]]
+# Vendored Codex Python SDK (``vendor/codex/sdk/python``) is on ``mypy_path``
+# so ``import openai_codex`` resolves, but the generated sources are not held
+# to Pawrrtal's strict gate.
+module = "openai_codex.*"
+follow_imports = "skip"
+
+[[tool.mypy.overrides]]
 # Third-party packages without complete type stubs.
 # xai_sdk ships generated protobuf classes without a ``py.typed`` marker;
 # mypy can't follow the .pyi files the SDK omits.  The provider does its
