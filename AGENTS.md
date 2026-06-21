@@ -303,3 +303,8 @@ Beans uses a flat `status` field (`todo`, `in-progress`, `completed`). No triage
 ### Domain docs
 
 Single-context. One `CONTEXT.md` at the repo root when created. ADRs live in `frontend/content/docs/handbook/decisions/` (not `docs/adr/`). See `frontend/content/docs/handbook/agents/domain.md`.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->
