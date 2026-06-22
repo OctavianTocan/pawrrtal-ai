@@ -1,22 +1,26 @@
 import { User } from '@pawrrtal/api-core/Modules/Auth/Domain';
 import { SessionStoreError } from '@pawrrtal/api-core/Modules/Auth/Errors';
-import type { UserId } from '@pawrrtal/api-core/Modules/Projects/Domain';
 import { Context, Effect, flow, Layer, Schedule } from 'effect';
-import { FetchHttpClient, HttpClient, HttpClientRequest } from 'effect/unstable/http';
+import {
+	FetchHttpClient,
+	HttpClient,
+	HttpClientRequest,
+	HttpClientResponse,
+} from 'effect/unstable/http';
 
 /**
  * Wire JSON from the Python `/users/me` endpoint → validated `User` instance.
  * Direct construction avoids `schemaBodyJson(User)`'s `DecodingServices = unknown`
  * requirement (same pattern as `Projects/Repo.ts`).
  */
-const decodeUser = (json: Record<string, unknown>): User =>
-	new User({
-		id: json.id as UserId,
-		email: json.email as string,
-		is_active: json.is_active as boolean,
-		is_superuser: json.is_superuser as boolean,
-		is_verified: json.is_verified as boolean,
-	});
+// const decodeUser = (json: Record<string, unknown>): User =>
+// 	new User({
+// 		id: json.id as UserId,
+// 		email: json.email as string,
+// 		is_active: json.is_active as boolean,
+// 		is_superuser: json.is_superuser as boolean,
+// 		is_verified: json.is_verified as boolean,
+// 	});
 
 /**
  * The session store is responsible for resolving a session cookie value to a typed User by making an HTTP call to the Python backend API.
@@ -70,28 +74,22 @@ export const SessionStoreBody: Layer.Layer<SessionStore, never, HttpClient.HttpC
 						},
 					})
 					.pipe(
-						Effect.flatMap((response) => response.json),
-						Effect.flatMap((json) =>
-							Effect.try({
-								try: () => decodeUser(json as Record<string, unknown>),
-								catch: (cause) => cause,
-							})
-						),
+						Effect.flatMap(HttpClientResponse.schemaBodyJson(User)),
 						Effect.mapError(
 							(cause) =>
 								new SessionStoreError({
 									message: 'Failed to lookup user',
 									cause,
 								})
-						),
-						Effect.withSpan('SessionStore.lookup')
+						)
 					);
+
 				return user;
 			});
 
 			return SessionStore.of({ lookup });
 		})
-	);
+	).pipe(Layer.provide(FetchHttpClient.layer));
 
 /**
  * Production SessionStore layer. Provides {@link SessionStore} with the default fetch-based HTTP client implementation.
