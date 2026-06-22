@@ -9,11 +9,23 @@
 
 import { Schema } from 'effect';
 
-/** Error raised when the session store fails to lookup a user. */
+/** Error raised when the session store fails. */
 export class SessionStoreError extends Schema.TaggedErrorClass<SessionStoreError>()(
 	'SessionStoreError',
 	{
 		message: Schema.String,
 		cause: Schema.Defect,
+	}
+) {}
+
+/** Error raised when the authentication fails. */
+export class AuthenticationError extends Schema.TaggedErrorClass<AuthenticationError>()(
+	'AuthenticationError',
+	{
+		message: Schema.String,
+		cause: Schema.Defect,
+	},
+	{
+		httpApiStatus: 401,
 	}
 ) {}

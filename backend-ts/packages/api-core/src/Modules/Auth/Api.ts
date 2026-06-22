@@ -13,18 +13,26 @@
  * fixtures/api/Authorization.ts:16-36`.
  */
 
-import { HttpApiMiddleware } from 'effect/unstable/httpapi';
+import { HttpApiMiddleware, HttpApiSecurity } from 'effect/unstable/httpapi';
+import type { CurrentUser } from './Domain';
+import { AuthenticationError } from './Errors';
 
 /**
  * Auth middleware contract. The `provides: CurrentUser` declaration
  * (filled in during Lesson 4) is what makes `yield* CurrentUser` work
  * inside every handler attached to a group via `.middleware(Authentication)`.
  */
-export class Authentication extends HttpApiMiddleware.Service<Authentication>()('Authentication', {
-	// provides: CurrentUser,
-	// error: AuthenticationError,
-	// security: {
-	// 	cookie: HttpApiSecurity.apiKey({ in: 'cookie', key: SESSION_COOKIE }),
-	// 	bearer: HttpApiSecurity.bearer,
-	// },
+export class AuthenticationMiddlewareService extends HttpApiMiddleware.Service<
+	AuthenticationMiddlewareService,
+	{
+		provides: CurrentUser;
+		/** The middleware does not require any other middleware. */
+		requires: never;
+	}
+>()('AuthenticationMiddlewareService', {
+	error: AuthenticationError,
+	requiredForClient: true,
+	security: {
+		cookie: HttpApiSecurity.apiKey({ in: 'cookie', key: 'session_token' }),
+	},
 }) {}

@@ -1,6 +1,6 @@
 import { BunRuntime } from '@effect/platform-bun';
 import { Console, Effect } from 'effect';
-import { SessionStore, SessionStoreLive } from '../src/Modules/Auth/SessionStore';
+import { SessionStore, SessionStoreLive } from '../src/Modules/Authentication/SessionStore';
 
 const program = Effect.gen(function* () {
 	const sessionStore = yield* SessionStore;
