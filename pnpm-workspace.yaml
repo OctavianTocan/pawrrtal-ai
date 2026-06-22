@@ -3,3 +3,6 @@ packages:
   - frontend/lib/react-dropdown
   - frontend/lib/react-overlay
   - frontend/lib/react-chat-composer
+  - backend-ts/packages/api-core
+  - backend-ts/apps/api
+  - packages/ci/skill-gen

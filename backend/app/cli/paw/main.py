@@ -39,6 +39,56 @@ from app.cli.paw.commands.services.cli import app as services_app
 
 API_OVERRIDE_MARKER = "_PAW_CLI_API_OVERRIDE_ACTIVE"
 
+# <skill-gen>
+# ---
+# name: paw-extend
+# description: Extend or maintain the paw CLI (backend/app/cli/paw/). Use when adding a new paw subcommand, a new verify suite, a new output mode, an orchestrator command (like fanout/mirror/dev), or refactoring the shared helpers (http.py, sse.py, output.py, errors.py). The user-facing skill is `paw` -- this one teaches you how the surface is built so the next addition fits the existing patterns instead of inventing parallels.
+# ---
+#
+# ## The three command shapes
+#
+# Every new verb falls into one of these. Pick the shape before writing code.
+#
+# ### Shape A: HTTP wrapper
+#
+# One backend endpoint maps to one verb, such as `paw audit ls`, `paw cost
+# summary`, or `paw workspaces show`.
+#
+# - Read the matching `backend/app/api/<file>.py` first. Backend paths, methods,
+#   and body shapes drift faster than task descriptions.
+# - Use `PawClient.get/post/delete/patch`.
+# - Emit through `emit_human`, `emit_json`, and `emit_plain_rows`.
+# - Raise `PawError` subclasses on failure; `main.py` maps them to exit codes.
+#
+# ### Shape B: verify scenario
+#
+# A sequenced multi-call scenario that asserts on observable state, such as
+# `paw verify codex` or `paw verify telegram`.
+#
+# - Each scenario returns `ScenarioResult(checks=[Check(...)])`.
+# - Check names are stable strings; JSON consumers grep on them.
+# - Scenario signature:
+#   `async def run_<name>_scenario(state: PersonaState, client: PawClient, **kwargs) -> ScenarioResult`.
+# - Register the Typer verb in `commands/verify.py`; add it to
+#   `DEFAULT_SUITES` only when it should run under `paw verify all`.
+# - When a backend endpoint does not exist yet, emit a passed marker Check named
+#   `<thing>_endpoint_unavailable` so the gap is explicit and greppable.
+#
+# ### Shape C: orchestrator
+#
+# A command that spawns or coordinates other paw invocations or external
+# processes. Examples: `paw fanout`, `paw mirror`, `paw dev`, `paw record`, and
+# `paw replay`.
+#
+# - Use `asyncio.create_subprocess_exec(sys.executable, "-m", "app.cli.paw.main", *args, env=...)`.
+# - Isolate child state with distinct `PAW_CONFIG_DIR`, optionally also
+#   `PAW_PROFILE`.
+# - For wrapped command tails, register with
+#   `context_settings={"allow_extra_args": True, "ignore_unknown_options": True}`
+#   so `ctx.args` carries the wrapped command.
+# - Cleanup only directories, files, and processes created by the parent.
+# </skill-gen>
+
 app = typer.Typer(
     name="paw",
     help=(

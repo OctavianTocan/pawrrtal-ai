@@ -29,6 +29,29 @@ HTTP_UNAUTHORIZED = 401
 # Set by `paw record` and inherited by the spawned/in-process command.
 RECORD_ENV_VAR = "PAW_RECORD"
 
+# <skill-gen>
+# ---
+# name: paw-extend
+# description: Extend or maintain the paw CLI (backend/app/cli/paw/). Use when adding a new paw subcommand, a new verify suite, a new output mode, an orchestrator command (like fanout/mirror/dev), or refactoring the shared helpers (http.py, sse.py, output.py, errors.py). The user-facing skill is `paw` -- this one teaches you how the surface is built so the next addition fits the existing patterns instead of inventing parallels.
+# ---
+#
+# ## HTTP and persona conventions
+#
+# `PawClient` is the only HTTP path for commands. It owns the persona cookie jar,
+# base URL, timeout, verbose hooks, and record/replay integration.
+#
+# - Cookie auth uses a real `MozillaCookieJar`. Never regex-parse `Set-Cookie`;
+#   `Expires=...GMT` contains commas and breaks naive splits.
+# - Conversation commands pre-generate a v4 UUID, create the conversation, then
+#   send chat with `conversation_id`. Do not rely on legacy auto-create paths.
+# - Bean descriptions of backend endpoints are often stale. Read
+#   `backend/app/api/<file>.py` before adding or changing a verb.
+# - Heavy SDK/provider modules are kept behind lazy imports elsewhere so the CLI
+#   starts fast and avoids cross-provider warnings.
+# - `paw record` uses `PAW_RECORD` to capture HTTP and SSE fixtures without
+#   threading a record path through every command.
+# </skill-gen>
+
 
 def load_cookies(path: Path) -> http.cookiejar.MozillaCookieJar:
     """Load a Mozilla cookie jar from disk; returns an empty jar if missing.

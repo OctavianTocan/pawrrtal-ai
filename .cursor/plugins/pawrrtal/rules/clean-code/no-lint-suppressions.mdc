@@ -1,0 +1,150 @@
+---
+description: Avoid suppressing linter warnings; fix root causes instead
+globs: **/*.ts,**/*.tsx,**/*.py
+alwaysApply: false
+---
+# Clean Code: No Lint Suppressions
+
+Linter rules exist to catch bugs, enforce best practices, and maintain code quality. Suppressing linter warnings should be extremely rare and always justified.
+
+## Rule
+
+**Do not add inline lint suppressions (`// biome-ignore`, `// eslint-disable`, `// @ts-ignore`, etc.) unless absolutely necessary.**
+
+When suppression is necessary, it must be accompanied by a comment explaining why the code is intentionally correct and why the rule cannot express that.
+
+## Why This Matters
+
+1. **Masks Real Issues**: Suppressions hide potential bugs and code smells
+2. **Technical Debt**: Each suppression is technical debt that accumulates over time
+3. **Precedent**: One suppression encourages others, degrading code quality
+4. **Lost Context**: Future developers won't understand why the suppression exists
+
+## Fix Root Causes First
+
+Before adding a suppression, try these approaches in order:
+
+1. **Refactor the code** to satisfy the linter rule properly
+2. **Extract to a separate function** if complexity is the issue
+3. **Use proper types** instead of `any` or type assertions
+4. **Rename or restructure** to make the code clearer
+5. **Provide unique IDs** instead of suppressing duplicate ID warnings
+
+## Rare Justified Suppressions
+
+Suppressions are only acceptable when ALL of these are true:
+
+1. **The code is intentionally correct** - you're not working around a bug
+2. **The linter cannot express the safety** - the rule is overly conservative for this case
+3. **Refactoring would make code worse** - alternative approaches reduce clarity
+4. **A comment explains why** - future developers understand the decision
+
+### Example of Justified Suppression
+
+```tsx
+// BAD: No explanation, ID should actually be unique
+<div id="user-list">
+  {/* biome-ignore lint/correctness/useUniqueElementIds: */}
+  {users.map(user => <UserCard key={user.id} id="card" />)}
+</div>
+
+// GOOD: Clear explanation of intentional pattern
+<form>
+  {/* biome-ignore lint/suspicious/noDocumentCookie: Sidebar state is a
+       non-sensitive UI preference. Using document.cookie is intentional here
+       for SSR cookie persistence, not security-sensitive data. */}
+  document.cookie = `sidebar_state=${isOpen}`;
+</form>
+```
+
+## Common Suppressions to Avoid
+
+### 1. `@ts-ignore` / `@ts-nocheck`
+
+**Never use these.** They disable all type checking.
+
+```tsx
+// BAD: Completely disables type checking
+// @ts-ignore
+const result = someFunction(wrongType);
+
+// GOOD: Fix the type properly
+const result = someFunction(correctType);
+```
+
+### 2. Duplicate IDs
+
+**Always use unique IDs.** If IDs must be dynamic, generate them properly.
+
+```tsx
+// BAD: Suppressing duplicate ID warning
+{/* biome-ignore lint/correctness/useUniqueElementIds: */}
+<div id="panel">...</div>
+
+// GOOD: Use unique, descriptive IDs
+<div id="user-settings-panel">...</div>
+<div id="notification-settings-panel">...</div>
+
+// GOOD: Generate unique IDs when needed
+<div id={`panel-${panelId}`}>...</div>
+```
+
+### 3. `no-explicit-any`
+
+**Never suppress this.** Use proper types instead.
+
+```tsx
+// BAD: any with suppression
+{/* biome-ignore lint/suspicious/noExplicitAny: */}
+function process(data: any) { }
+
+// GOOD: Use proper types
+function process(data: UserData) { }
+
+// GOOD: Use unknown if type is truly unknown, then narrow
+function process(data: unknown) {
+  if (isUserData(data)) {
+    // Now data is UserData
+  }
+}
+```
+
+## Pattern: Refactor Instead
+
+```tsx
+// BAD: Suppressing complexity warning
+{/* biome-ignore lint/complexity/noExcessiveCognitiveComplexity: */}
+function processUser(user: User) {
+  if (user.isActive) {
+    if (user.role === 'admin') {
+      if (user.permissions.includes('write')) {
+        // ... 50 more lines of nested logic
+      }
+    }
+  }
+}
+
+// GOOD: Extract helper functions to reduce complexity
+function processUser(user: User) {
+  if (!user.isActive) return;
+
+  if (isAdminWithWriteAccess(user)) {
+    handleAdminWrite(user);
+  }
+}
+
+function isAdminWithWriteAccess(user: User): boolean {
+  return user.role === 'admin' && user.permissions.includes('write');
+}
+
+function handleAdminWrite(user: User) {
+  // Extracted logic
+}
+```
+
+## Enforcement
+
+- Code reviews must challenge every lint suppression
+- PRs with suppressions require explicit justification
+- Periodic audits to remove unnecessary suppressions
+- Consider suppressions as technical debt items to be resolved

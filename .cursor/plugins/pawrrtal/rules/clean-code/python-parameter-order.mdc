@@ -1,0 +1,77 @@
+---
+description: Canonical positional-parameter order for related backend Python helpers — session last, identity first.
+globs: backend/app/crud/**/*.py,backend/app/api/**/*.py,backend/app/services/**/*.py
+alwaysApply: false
+---
+# Python Parameter Order
+
+Related helpers that share conceptual arguments must declare them in
+the same positional order. Inconsistency creates a constant low-grade
+tax: every reader looks up the signature before calling, refactors
+silently swap argument order, and reviews miss bugs because two
+adjacent calls look the same but aren't.
+
+## Canonical order
+
+For backend CRUD / service helpers that take a session + identity +
+domain arguments:
+
+```python
+async def helper(
+    session: AsyncSession,  # plumbing first — mirrors SQLAlchemy idioms
+    user_id: UUID,           # the resource-owning identity
+    # ...                    # domain-specific args
+) -> ReturnType:
+    ...
+```
+
+Rationale: `session` first matches how every SQLAlchemy tutorial,
+docstring, and example positions the parameter. `user_id` (or the
+analogous owning identity — `workspace_id`, `conversation_id`) comes
+next so authorization arguments cluster together. Domain-specific
+arguments trail. Keyword-only arguments (`*, optional_flag: bool =
+False`) follow the positional block.
+
+## When to deviate
+
+- **FastAPI route handlers** are dependency-injected (`session:
+  AsyncSession = Depends(get_async_session)`, `user: User =
+  Depends(current_active_user)`). Order is dictated by what reads
+  cleanly top-down with `Depends(...)`, not by this rule.
+- **`AgentTool.execute`** signatures take `tool_call_id: str` first
+  and the rest via `**kwargs` per the agent-loop contract; this rule
+  doesn't apply.
+- **Tests** can reorder as the fixture chain requires.
+
+## Why
+
+Repeated friction in code review of `backend/app/crud/conversation.py`
++ `backend/app/crud/channel.py` (and elsewhere). The order has drifted
+into `(user_id, ..., session)` vs `(session, user_id, ...)` between
+sibling files, costing every reader a signature lookup.
+
+## Verify
+
+"For any new helper I'm adding to `backend/app/crud/` or
+`backend/app/services/`: does the positional order start with
+`session` and follow with the owning identity (`user_id`,
+`workspace_id`, `conversation_id`)?"
+
+## Patterns
+
+Bad — sibling helpers disagree on argument order:
+
+```python
+# crud/conversation.py
+async def fetch(session: AsyncSession, user_id: UUID, conversation_id: UUID) -> ...
+
+# crud/channel.py — same conceptual args, different order
+async def list_for_user(user_id: UUID, session: AsyncSession) -> ...
+```
+
+Good — every CRUD helper declares `session` first, then identity:
+
+```python
+async def fetch(session: AsyncSession, user_id: UUID, conversation_id: UUID) -> ...
+async def list_for_user(session: AsyncSession, user_id: UUID) -> ...
+```

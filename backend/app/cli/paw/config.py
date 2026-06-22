@@ -15,6 +15,48 @@ from app.cli.paw.errors import LocalError
 DEFAULT_PROFILE = "default"
 SCHEMA_VERSION = 1
 
+# <skill-gen>
+# ---
+# name: paw-extend
+# description: Extend or maintain the paw CLI (backend/app/cli/paw/). Use when adding a new paw subcommand, a new verify suite, a new output mode, an orchestrator command (like fanout/mirror/dev), or refactoring the shared helpers (http.py, sse.py, output.py, errors.py). The user-facing skill is `paw` -- this one teaches you how the surface is built so the next addition fits the existing patterns instead of inventing parallels.
+# paths:
+#   - "backend/app/cli/paw/**/*.py"
+#   - "backend/tests/paw/**/*.py"
+#   - "backend/tests/e2e_paw/**/*.py"
+#   - ".cursor/plugins/pawrrtal/skills/paw/SKILL.md"
+# ---
+#
+# # paw-extend -- how to add to the paw CLI
+#
+# The operational skill (`paw`) covers how to use paw. This one covers how to
+# build on it. Read both when adding a new command, verify suite, or shared
+# helper.
+#
+# ## File layout
+#
+# ```text
+# backend/app/cli/paw/
+# |-- __init__.py              version + public surface
+# |-- main.py                  top-level Typer app; every command registers here
+# |-- config.py                PersonaState, PAW_CONFIG_DIR, profile resolution
+# |-- errors.py                PawError hierarchy -> exit codes
+# |-- http.py                  PawClient, cookie jar, record hooks, retry
+# |-- ids.py                   new_conversation_id() v4 UUID helper
+# |-- output.py                emit_human / emit_json / emit_plain_rows
+# |-- sse.py                   byte-level SSE framer + raw-frame tap
+# |-- commands/                one file or package per top-level verb/group
+# `-- verify/                  one file per verification scenario
+# ```
+#
+# Tests sit at `backend/tests/paw/test_command_<name>.py` (mocked, fast) and
+# `backend/tests/e2e_paw/` (live-backend gated on `PAW_E2E=1`).
+#
+# `PersonaState` is the shared per-profile state. New commands should accept
+# `--profile`, load state with `PersonaState.load(profile)`, and respect
+# `PAW_BACKEND_URL`/API override behavior instead of inventing a parallel config
+# path.
+# </skill-gen>
+
 
 def config_root() -> Path:
     """Return ~/.config/pawrrtal (or PAW_CONFIG_DIR if set)."""

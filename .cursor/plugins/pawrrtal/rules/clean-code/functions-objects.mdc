@@ -1,0 +1,24 @@
+---
+description: Ensure code adheres to Clean Code Functions and Objects rules
+globs: **/*.ts,**/*.tsx,**/*.py
+alwaysApply: false
+---
+# Clean Code: Functions, Objects, & Data Structures
+
+Clean code is built from small, focused, side-effect-free functions and well-designed data structures.
+
+## Functions Rules
+1. **Small:** Functions should be small, usually less than 20 lines.
+2. **Do one thing:** A function should only execute tasks that are one level of abstraction below the stated name of the function.
+3. **Use descriptive names:** The name should state exactly what it does.
+4. **Prefer fewer arguments:** Zero is best, one is fine, two is acceptable, three should be avoided, and more require justification.
+5. **Have no side effects:** Do not lie to the caller by modifying global state or hidden references.
+6. **Don't use flag arguments:** Passing booleans (e.g. `doThing(true)`) indicates a function does more than one thing. Split the method into two independent methods.
+
+## Objects and Data Structures
+1. **Hide internal structure:** Objects should hide their data and expose behavior.
+2. **Prefer data structures for flat data:** Expose data with no meaningful behavior.
+3. **Avoid hybrid structures:** Code should not be half-object (behavior) and half-data (public fields).
+4. **Small number of instance variables:** Keep classes focused on one responsibility.
+5. **Prefer non-static methods to static methods** unless the function does not operate on instance state.
+6. **Better to have many functions** than to pass some code/flag into a function to select a behavior.

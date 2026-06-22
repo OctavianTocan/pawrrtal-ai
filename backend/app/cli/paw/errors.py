@@ -17,6 +17,29 @@ import typer
 
 EXIT_DEV_DEAD = 7
 
+# <skill-gen>
+# ---
+# name: paw-extend
+# description: Extend or maintain the paw CLI (backend/app/cli/paw/). Use when adding a new paw subcommand, a new verify suite, a new output mode, an orchestrator command (like fanout/mirror/dev), or refactoring the shared helpers (http.py, sse.py, output.py, errors.py). The user-facing skill is `paw` -- this one teaches you how the surface is built so the next addition fits the existing patterns instead of inventing parallels.
+# ---
+#
+# ## Exit codes
+#
+# | Code | Meaning | Source |
+# | --- | --- | --- |
+# | `0` | success | normal return |
+# | `1` | local error (fs, parse, config) | `LocalError` |
+# | `2` | missing argument / Typer usage | Typer or explicit usage failure |
+# | `3` | auth error | `AuthError` |
+# | `4` | backend unreachable | `BackendUnreachableError` |
+# | `5` | provider/API error | `ApiError` |
+# | `6` | verification failed | `VerificationFailedError` |
+# | `7` | tracked dev backend PID is dead | `EXIT_DEV_DEAD` |
+#
+# Catch HTTP/client exceptions inside the verb, raise the right `PawError`, and
+# let the Typer exception handler in `main.py` translate to the exit code.
+# </skill-gen>
+
 
 class PawError(typer.Exit):
     """Base class with a hint and an explicit exit code."""

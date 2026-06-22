@@ -44,6 +44,47 @@ COMMENT_PREFIX = ":"
 # the wire bytes of an SSE stream alongside the structured HTTP record.
 RawFrameTap = Callable[[bytes], None]
 
+# <skill-gen>
+# ---
+# name: paw-extend
+# description: Extend or maintain the paw CLI (backend/app/cli/paw/). Use when adding a new paw subcommand, a new verify suite, a new output mode, an orchestrator command (like fanout/mirror/dev), or refactoring the shared helpers (http.py, sse.py, output.py, errors.py). The user-facing skill is `paw` -- this one teaches you how the surface is built so the next addition fits the existing patterns instead of inventing parallels.
+# ---
+#
+# ## SSE, tests, and skill hygiene
+#
+# The chat stream parser intentionally mirrors the frontend's manual
+# `data: <json>\n\n` framing plus `[DONE]` sentinel. Preserve that shape when
+# changing chat, record/replay, or verify suites so CLI and UI bugs stay shared.
+#
+# Test expectations:
+#
+# - Mocked tests live at `backend/tests/paw/test_command_<name>.py`.
+# - Use `respx.mock` for HTTP wrappers and assert every error class (401, 404,
+#   500) plus flag combinations.
+# - For orchestrators, mock `asyncio.create_subprocess_exec`; never spawn real
+#   paw subprocesses in unit tests.
+# - For verify scenarios, assert on `ScenarioResult.checks`; each named Check
+#   should have a failure-mode test.
+# - Live backend tests live under `backend/tests/e2e_paw/` and are gated on
+#   `PAW_E2E=1`.
+#
+# When shipping a new user-visible verb, update
+# `.cursor/plugins/pawrrtal/skills/paw/SKILL.md`:
+#
+# - Add a row to the resource map.
+# - Add a common workflow if the verb has a multi-step use case.
+# - Add a pitfall if the verb exposes a backend quirk worth remembering.
+#
+# Anti-patterns:
+#
+# - Direct `print` from command modules.
+# - Inventing a parallel auth or backend URL path.
+# - Skipping `--plain` for list-style commands.
+# - Claiming end-to-end behavior from a direct Python snippet instead of
+#   `paw verify <suite>`.
+# - Fabricating endpoints instead of emitting a stable unavailable marker Check.
+# </skill-gen>
+
 KNOWN_EVENT_TYPES: frozenset[str] = frozenset(
     {
         "delta",

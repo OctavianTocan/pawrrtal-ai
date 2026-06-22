@@ -11,6 +11,35 @@ from app.cli.paw.config import PersonaState
 from app.cli.paw.http import PawClient
 from app.cli.paw.verify.scenarios import ScenarioResult
 
+# <skill-gen>
+# ---
+# name: paw
+# description: Pawrrtal Agent CLI. Use when you need to test the backend end-to-end as a real user -- auth, workspaces, chat with SSE streaming, conversation CRUD, provider verification. Prefer this over importing `app.*` modules in ad-hoc Python scripts; `paw` exercises the same HTTP surface the React frontend uses, so any bug visible in the UI is visible to `paw`.
+# ---
+#
+# ## Verification workflows
+#
+# ```bash
+# just paw verify codex --json
+# just paw verify chat-roundtrip --model litellm:openai/gpt-4o-mini --json
+# just paw verify model-switch --from litellm:openai/gpt-4o-mini --to litellm:anthropic/Codex-3-5-sonnet --json
+# just paw verify telegram --json
+# just paw verify google-chat --json
+# just paw verify cost --json
+# just paw verify lcm --json
+# just paw verify all-providers --json
+# just paw verify all --json
+# ```
+#
+# Use `jq '.checks[] | select(.passed == false)'` on JSON output to focus on
+# failing assertions. `paw verify all` runs the shippable suites in sequence and
+# exits 6 if any suite fails.
+#
+# `paw verify lcm` currently emits stable marker checks for blocked active-recall
+# endpoints (`memory_seeding_endpoint_unavailable` and
+# `dreaming_trigger_endpoint_unavailable`) until `pawrrtal-x9u4` lands.
+# </skill-gen>
+
 
 async def run_codex_scenario(
     state: PersonaState,
@@ -46,7 +75,9 @@ async def run_model_switch_scenario(
     to_override: str | None = None,
 ) -> ScenarioResult:
     """Import and run the model-switch scenario lazily."""
-    from app.cli.paw.verify.model_switch import run_model_switch_scenario as run  # noqa: PLC0415
+    from app.cli.paw.verify.model_switch import (  # noqa: PLC0415
+        run_model_switch_scenario as run,
+    )
 
     return await run(
         state,
@@ -58,14 +89,18 @@ async def run_model_switch_scenario(
 
 async def run_telegram_scenario(state: PersonaState, client: PawClient) -> ScenarioResult:
     """Import and run the Telegram scenario lazily."""
-    from app.cli.paw.verify.telegram import run_telegram_scenario as run  # noqa: PLC0415
+    from app.cli.paw.verify.telegram import (  # noqa: PLC0415
+        run_telegram_scenario as run,
+    )
 
     return await run(state, client)
 
 
 async def run_google_chat_scenario(state: PersonaState, client: PawClient) -> ScenarioResult:
     """Import and run the Google Chat scenario lazily."""
-    from app.cli.paw.verify.google_chat import run_google_chat_scenario as run  # noqa: PLC0415
+    from app.cli.paw.verify.google_chat import (  # noqa: PLC0415
+        run_google_chat_scenario as run,
+    )
 
     return await run(state, client)
 
@@ -102,7 +137,9 @@ async def run_all_providers_scenario(
     include_paid: bool,
 ) -> ScenarioResult:
     """Import and run the all-providers scenario lazily."""
-    from app.cli.paw.verify.all_providers import run_all_providers_scenario as run  # noqa: PLC0415
+    from app.cli.paw.verify.all_providers import (  # noqa: PLC0415
+        run_all_providers_scenario as run,
+    )
 
     return await run(
         state,

@@ -6,7 +6,7 @@ import { Api } from '@pawrrtal/api-core';
 import type { UserId } from '@pawrrtal/api-core/Lib/TypeIds';
 import { Effect, Layer } from 'effect';
 import { HttpApiBuilder } from 'effect/unstable/httpapi';
-
+import { HttpAuthLive } from '../Authentication/Http';
 import { ProjectsService, ProjectsServiceLive } from './Service';
 
 /**
@@ -40,4 +40,4 @@ export const HttpProjectsLive = HttpApiBuilder.group(
 				service.deleteForUser({ userId: STUB_USER_ID, projectId: params.project_id })
 			);
 	})
-).pipe(Layer.provide(ProjectsServiceLive));
+).pipe(Layer.provide([ProjectsServiceLive, HttpAuthLive]));

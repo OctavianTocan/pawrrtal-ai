@@ -1,0 +1,86 @@
+---
+description: Python module privacy — single-leading-underscore names are private. Never import them across module boundaries.
+globs: backend/**/*.py,scripts/**/*.py
+alwaysApply: false
+---
+# Python Module Privacy
+
+Leading underscore = private to the module. No underscore = public API.
+
+## Rule
+
+- Private names (`_hash_code`, `_CODE_ALPHABET`, `_MyHelper`) **may be
+  renamed, deleted, or resignatured at any time**. Never import them
+  from another module — that includes both `from app.x import _y`
+  and `from .x import _y`.
+- Public names are contracts. Changing them is a breaking change for
+  every other module in the codebase.
+- Default new helpers to private. Promote to public only when a
+  second module needs them — and pick a public name at that moment
+  (rename to drop the underscore, document the new contract).
+- If you find yourself wanting to import `_foo` from elsewhere, ask
+  the owning module to expose a public function (or move `_foo` into
+  a shared helper module) instead of reaching across the privacy
+  boundary.
+
+Same rule for class attributes: `self._cache` is internal,
+`self.user_id` is part of the contract. Don't use double-leading
+underscore at module level — that's class-scope name mangling, a
+different feature.
+
+## Why
+
+The convention is already idiomatic Python, but it's been
+informal in this repo. Codifying + enforcing it stops the slow
+drift where a `_helper` in one module gets imported by three
+others, then can't be renamed without a multi-PR sweep. It also
+gives reviewers a single sentence to point at when they want a
+helper kept private.
+
+## Enforcement
+
+The rule is reviewed manually for now. Ruff's `PLC2701`
+(`Private name import ...`) is the mechanical gate; it lives in
+the Pylint preview catalogue and would catch every cross-module
+`from x import _y`. We haven't enabled it yet because the existing
+codebase has ~124 violations (mostly tests reaching into module-
+local helpers) — a focused sweep PR will land that work before
+flipping the switch. The rule's `select` opt-in is documented in
+`backend/pyproject.toml` so the next pass knows where to land.
+
+## Verify
+
+"Am I about to import a name starting with `_` from another module?
+If so: should I promote that name to public on the owning module,
+or move it to a shared helper, instead of reaching past the privacy
+boundary?"
+
+## Patterns
+
+Bad — reaches into another module's private surface:
+
+```python
+# Module B
+from app.crud.conversation import _normalize_title  # ❌
+```
+
+Good — owning module exposes a public name:
+
+```python
+# Module A (app/crud/conversation.py)
+def normalize_title(title: str) -> str:
+    ...
+
+# Module B
+from app.crud.conversation import normalize_title  # ✅
+```
+
+Good — shared helper module for cross-cutting concerns:
+
+```python
+# app/core/text.py — shared, public-by-convention
+def normalize_title(title: str) -> str: ...
+
+# Both crud/conversation.py and crud/message.py:
+from app.core.text import normalize_title
+```

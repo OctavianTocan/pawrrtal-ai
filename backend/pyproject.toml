@@ -138,7 +138,7 @@ select = [
 ]
 # Ruff's ``PLC2701`` (Pylint preview) would catch the cross-module
 # private-import pattern described in
-# ``.claude/rules/clean-code/python-module-privacy.md`` (issue #283).
+# ``.cursor/plugins/pawrrtal/rules/clean-code/python-module-privacy.mdc`` (issue #283).
 # Today the codebase has ~124 existing violations (mostly tests
 # importing module-level test helpers) so enabling the rule would
 # fail CI on every PR.  The rule is documented for human + agent

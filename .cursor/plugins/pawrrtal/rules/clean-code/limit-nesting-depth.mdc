@@ -1,0 +1,287 @@
+---
+description: Limit nesting depth to improve code readability and maintainability
+globs: **/*.ts,**/*.tsx,**/*.py
+alwaysApply: false
+---
+# Clean Code: Limit Nesting Depth
+
+Deep nesting makes code harder to read, understand, and maintain. Functions with excessive nesting depth (more than 2-3 levels) should be refactored.
+
+## Rule
+
+**Keep nesting depth to a maximum of 3 levels. Prefer 1-2 levels when possible.**
+
+Use early returns, guard clauses, and extracted functions to reduce nesting.
+
+## Why This Matters
+
+1. **Cognitive Load**: Each nesting level requires tracking more context in working memory
+2. **Readability**: Deeply nested code is harder to scan and understand
+3. **Error-Prone**: Nested conditions are more likely to contain logic errors
+4. **Testing**: Deeply nested code has more execution paths to test
+
+## Techniques to Reduce Nesting
+
+### 1. Early Returns (Guard Clauses)
+
+Return early for edge cases instead of wrapping the main logic in conditions.
+
+```tsx
+// BAD: Nested conditions (3+ levels)
+function loadDesktopSidebarWidth(): number {
+  if (typeof window !== "undefined") {
+    try {
+      const storedWidth = window.localStorage.getItem(STORAGE_KEY);
+      if (storedWidth) {
+        const parsedWidth = Number.parseInt(storedWidth, 10);
+        if (Number.isFinite(parsedWidth)) {
+          return clampSidebarWidth(parsedWidth);
+        }
+      }
+    } catch {
+      return DEFAULT_WIDTH;
+    }
+  }
+  return DEFAULT_WIDTH;
+}
+
+// GOOD: Early returns (1-2 levels max)
+function loadDesktopSidebarWidth(): number {
+  if (typeof window === "undefined") return DEFAULT_WIDTH;
+
+  const storedWidth = window.localStorage.getItem(STORAGE_KEY);
+  if (!storedWidth) return DEFAULT_WIDTH;
+
+  const parsedWidth = Number.parseInt(storedWidth, 10);
+  if (!Number.isFinite(parsedWidth)) return DEFAULT_WIDTH;
+
+  return clampSidebarWidth(parsedWidth);
+}
+```
+
+### 2. Extract Functions
+
+Break complex nested logic into smaller, named functions.
+
+```tsx
+// BAD: Deep nesting with complex logic
+function processOrder(order: Order) {
+  if (order.status === 'pending') {
+    if (order.items.length > 0) {
+      if (order.customer.verified) {
+        if (order.total > 0) {
+          // Process payment
+          if (payment.success) {
+            // Update inventory
+            if (inventory.available) {
+              // Ship order
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// GOOD: Extracted functions with descriptive names
+function processOrder(order: Order) {
+  if (!canProcessOrder(order)) return;
+
+  const payment = processPayment(order);
+  if (!payment.success) return;
+
+  if (!updateInventory(order)) return;
+
+  shipOrder(order);
+}
+
+function canProcessOrder(order: Order): boolean {
+  return (
+    order.status === 'pending' &&
+    order.items.length > 0 &&
+    order.customer.verified &&
+    order.total > 0
+  );
+}
+```
+
+### 3. Invert Conditions
+
+Check for failure conditions first and return early.
+
+```tsx
+// BAD: Nested success path
+function validateUser(user: User) {
+  if (user) {
+    if (user.email) {
+      if (user.email.includes('@')) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// GOOD: Early returns for failure cases
+function validateUser(user: User): boolean {
+  if (!user) return false;
+  if (!user.email) return false;
+  if (!user.email.includes('@')) return false;
+
+  return true;
+}
+
+// EVEN BETTER: Combined condition when appropriate
+function validateUser(user: User): boolean {
+  return Boolean(user?.email?.includes('@'));
+}
+```
+
+### 4. Replace Nested Conditionals with Polymorphism
+
+For complex branching logic, consider using polymorphism or strategy pattern.
+
+```tsx
+// BAD: Deep nesting with type checks
+function getDiscount(customer: Customer, order: Order) {
+  if (customer.type === 'gold') {
+    if (order.total > 1000) {
+      return 0.20;
+    } else {
+      return 0.15;
+    }
+  } else if (customer.type === 'silver') {
+    if (order.total > 500) {
+      return 0.10;
+    } else {
+      return 0.05;
+    }
+  }
+  return 0;
+}
+
+// GOOD: Strategy pattern
+const DISCOUNT_STRATEGIES = {
+  gold: (total: number) => total > 1000 ? 0.20 : 0.15,
+  silver: (total: number) => total > 500 ? 0.10 : 0.05,
+  bronze: () => 0,
+} as const;
+
+function getDiscount(customer: Customer, order: Order): number {
+  const strategy = DISCOUNT_STRATEGIES[customer.type];
+  return strategy(order.total);
+}
+```
+
+### 5. Flatten Loops with Continue
+
+Use `continue` to avoid nesting inside loops.
+
+```tsx
+// BAD: Nested loop conditions
+for (const item of items) {
+  if (item.active) {
+    if (item.price > 0) {
+      if (!item.deleted) {
+        process(item);
+      }
+    }
+  }
+}
+
+// GOOD: Guard clauses with continue
+for (const item of items) {
+  if (!item.active) continue;
+  if (item.price <= 0) continue;
+  if (item.deleted) continue;
+
+  process(item);
+}
+```
+
+## React-Specific Patterns
+
+### Early Return in Components
+
+```tsx
+// BAD: Nested JSX conditionals
+function UserProfile({ user }: Props) {
+  return (
+    <div>
+      {user ? (
+        user.verified ? (
+          user.active ? (
+            <ProfileCard user={user} />
+          ) : (
+            <InactiveMessage />
+          )
+        ) : (
+          <VerificationPrompt />
+        )
+      ) : (
+        <LoginPrompt />
+      )}
+    </div>
+  );
+}
+
+// GOOD: Early returns
+function UserProfile({ user }: Props) {
+  if (!user) return <LoginPrompt />;
+  if (!user.verified) return <VerificationPrompt />;
+  if (!user.active) return <InactiveMessage />;
+
+  return <ProfileCard user={user} />;
+}
+```
+
+## Measuring Nesting Depth
+
+Count the indentation levels:
+
+```tsx
+function example() {           // Level 0
+  if (condition) {             // Level 1
+    for (const item of items) { // Level 2
+      if (item.valid) {        // Level 3 - TOO DEEP!
+        // ...
+      }
+    }
+  }
+}
+```
+
+## Checklist
+
+When you see nesting beyond 2-3 levels:
+
+- [ ] Can I use an early return / guard clause?
+- [ ] Can I extract a helper function?
+- [ ] Can I invert the condition?
+- [ ] Can I combine conditions with logical operators?
+- [ ] Can I use a strategy pattern or lookup table?
+
+## Enforcement
+
+This rule is enforced for Python sources by `scripts/check-nesting.py`,
+which runs in the backend pytest CI workflow before tests start.
+
+Default budget: **depth 3** (override via `MAX_DEPTH` env or first CLI arg).
+
+```sh
+python3 scripts/check-nesting.py        # default
+MAX_DEPTH=2 python3 scripts/check-nesting.py   # tighter
+```
+
+Any new function exceeding the budget will fail CI.  A small
+`EXEMPT_FUNCTIONS` allowlist at the top of the script holds
+pre-existing offenders, each tagged with a TODO; do **not** add new
+entries there as a workaround — fix the function instead.
+
+TypeScript / TSX is covered by Biome's cognitive-complexity family
+and the file-length budget enforced by `scripts/check-file-lines.mjs`.
+
+## References
+
+- Clean Code by Robert C. Martin, Chapter 3: Functions
+- Code Complete by Steve McConnell, Chapter 19: General Control Issues

@@ -15,4 +15,4 @@ checks:
   - "The run log captures enough timing and event evidence to compare alternatives."
   - "The review packet includes the prompt, model, Telegram-visible transcript, timing, media summary, run path, and the specific taste question for the user."
   - "Text, image, and voice-note paths are checked before a Telegram-facing rendering change is treated as polished."
-  - "Any accepted taste lesson is recorded in .agents/skills/pawrrtal-taste/SKILL.md, DESIGN.md, or a flow checklist."
+  - "Any accepted taste lesson is recorded in .agents/skills/taste/SKILL.md, DESIGN.md, or a flow checklist."

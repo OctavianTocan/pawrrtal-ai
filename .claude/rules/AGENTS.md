@@ -62,8 +62,8 @@ Rules are organized by the domain they protect, not by the technology they menti
 - **`sweep/`** — Sweep AI code review integration
 - **`testing/`** — Test patterns, mocking strategies, test infrastructure (tool-specific rules go in their own folder, e.g. Playwright)
 - **`typescript/`** — Type system patterns, inference, narrowing, declarations
-- **`clean-code/`** — Function design, naming, named constants, Python logging/exception narrowing (pawrrtal-specific)
-- **`github-actions/`** — Strict context and design patterns for CI/CD workflows (pawrrtal-specific)
+- **`clean-code/`** — Function design, naming, named constants, Python logging/exception narrowing (pawrrtal-specific; relocated to `.cursor/plugins/pawrrtal/rules/clean-code/`)
+- **`github-actions/`** — Strict context and design patterns for CI/CD workflows (pawrrtal-specific; relocated to `.cursor/plugins/pawrrtal/rules/github-actions/`)
 - **`general/`** — Cross-cutting principles that don't belong to one domain. "Diagnose before workaround." "Verify locally before blaming CI." Rules that apply everywhere because they're about how to think, not what to type.
   Example: `prefer-semantic-code-search.md` tells agents to try semantic code lookup before raw text search when CodeGraph, Serena, or an equivalent tool is available.
 

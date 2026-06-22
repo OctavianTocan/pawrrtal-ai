@@ -140,6 +140,14 @@ arch: sentrux arch-be arch-fe
 check-docs *ARGS:
     bun run scripts/check-docs.ts {{ARGS}}
 
+# Generate Pawrrtal plugin skills from source-embedded skill-gen fragments.
+skill-gen-generate:
+    bun run skill-gen:generate
+
+# Verify generated plugin skills are in sync with source fragments.
+skill-gen-check:
+    bun run skill-gen:check
+
 # Run backend pytest suite
 test-backend:
     uv run --project backend pytest backend/tests

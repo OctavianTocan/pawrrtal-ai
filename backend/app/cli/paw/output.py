@@ -9,6 +9,27 @@ from typing import Any
 
 from app.cli.paw.errors import LocalError
 
+# <skill-gen>
+# ---
+# name: paw-extend
+# description: Extend or maintain the paw CLI (backend/app/cli/paw/). Use when adding a new paw subcommand, a new verify suite, a new output mode, an orchestrator command (like fanout/mirror/dev), or refactoring the shared helpers (http.py, sse.py, output.py, errors.py). The user-facing skill is `paw` -- this one teaches you how the surface is built so the next addition fits the existing patterns instead of inventing parallels.
+# ---
+#
+# ## Output modes
+#
+# Every new list-style verb must support:
+#
+# 1. Default human text: one line per row or a compact table. It may be lossy,
+#    but it should be readable.
+# 2. `--json`: full machine-readable payload. Failed commands emit
+#    `{"error": "...", "code": <int>, "hint": "..."}` and exit non-zero.
+# 3. `--plain`: TSV without headers for pipes. Skip only when the verb returns
+#    a scalar or a single object's body.
+#
+# Use `emit_human`, `emit_json`, and `emit_plain_rows`. Do not print directly
+# from command modules, because direct prints leak into `--json` output.
+# </skill-gen>
+
 
 def require_one_output_mode(*, json_out: bool, plain: bool) -> None:
     """Reject simultaneous --json + --plain. Mutually exclusive by design."""

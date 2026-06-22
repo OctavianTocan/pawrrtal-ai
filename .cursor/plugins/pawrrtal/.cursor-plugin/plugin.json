@@ -1,0 +1,15 @@
+{
+  "name": "pawrrtal",
+  "description": "Pawrrtal's project-specific agent skills and architecture rules, bundled as one installable plugin instead of scattered across .agents/.claude.",
+  "version": "1.0.0",
+  "author": { "name": "Pawrrtal" },
+  "keywords": [
+    "pawrrtal",
+    "paw",
+    "skills",
+    "rules",
+    "effect",
+    "fastapi",
+    "nextjs"
+  ]
+}

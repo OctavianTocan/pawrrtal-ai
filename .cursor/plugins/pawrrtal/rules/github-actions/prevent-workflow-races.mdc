@@ -1,0 +1,14 @@
+---
+description: Ensure GitHub Actions workflows are safe from concurrency and race conditions
+globs: .github/workflows/**/*.yml,.github/workflows/**/*.yaml
+alwaysApply: false
+---
+# Prevent Workflow Races
+
+Workflows that can be triggered by rapid external events (like `pull_request_target: [labeled]`, `issue_comment`, or `push`) must prevent race conditions caused by multiple identical jobs executing concurrently against the same branch.
+
+When implementing or modifying a GitHub Actions workflow, follow these constraints:
+1. **Concurrency Grouping:** Always apply a `concurrency: group:` block to the workflow or job if the workflow modifies code, force-pushes, or runs complex stateful side-effects.
+   - Example: `concurrency: group: auto-rebase-${{ github.event.pull_request.number || github.run_id }}`
+2. **Empty Payload Guards:** When handling webhook event data (like `github.event.pull_request.number`), always implement hard checks (`if [[ -z "$PR_NUMBER" ]]; then exit 1; fi`) and fail loudly rather than silently executing logic on empty/null strings.
+3. **Cancel-in-Progress:** Specify `cancel-in-progress: true` when newer triggers (like a recent push) invalidate the need for an older, currently running job on the same PR. Specify `false` if the job executes critical transactional steps that should not be interrupted.

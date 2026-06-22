@@ -1,0 +1,60 @@
+---
+description: Restrict CI to OctavianTocan and use the openclaw-vps self-hosted runner
+globs: .github/workflows/**/*.yml,.github/workflows/**/*.yaml
+alwaysApply: false
+---
+# OctavianTocan-only CI + Self-Hosted Runner
+
+This is a public repository wired up to a self-hosted GitHub Actions
+runner pool on Octavian's VPS (`openclaw-vps-NN`, label
+`self-hosted, openclaw-mini, pawrrtal`). Self-hosted runners on a public
+repo are dangerous unless every workflow refuses untrusted PRs *before*
+any step runs. When creating or modifying a workflow under
+`.github/workflows/`, follow these constraints:
+
+1. **Always gate every job on the OctavianTocan + same-repo `if:`
+   clause.** Even when `runs-on: ubuntu-latest`, never let a fork PR or
+   another author trigger a workflow against this repo's secrets or
+   automation:
+
+   ```yaml
+   jobs:
+     <name>:
+       if: >-
+         github.actor == 'OctavianTocan' &&
+         (github.event_name != 'pull_request' ||
+           github.event.pull_request.head.repo.full_name == github.repository)
+       runs-on: ...
+   ```
+
+   Drop the `event_name != 'pull_request'` half only when the workflow
+   is explicitly PR-only (no `push`, no `schedule`, no `workflow_dispatch`).
+
+2. **Default to the self-hosted runner.** New workflows should target
+   `runs-on: [self-hosted, openclaw-mini, pawrrtal]` unless there's a
+   specific reason GitHub-hosted is the better home (macOS, Windows,
+   GPU, untrusted external code that you've already gated separately).
+   The runner is faster than `ubuntu-latest` and free at the margin.
+
+3. **`pull_request_target` workflows are the documented exception.**
+   `rebase.yml` uses `pull_request_target` because it never executes
+   PR code; it has its own `author_association` gates. If you add or
+   modify a `pull_request_target` workflow, see
+   `.cursor/plugins/pawrrtal/rules/github-actions/safe-pull-request-target.mdc` *and*
+   either keep the existing `author_association` gate or add the
+   `OctavianTocan` actor gate above. Never both relax the safe-target
+   rules and remove the actor gate in the same change.
+
+4. **Never use `pull_request_target` to escape the actor gate.** If a
+   workflow needs repo secrets but isn't safe under
+   `pull_request_target`, gate it with the actor + same-repo clause and
+   keep using `pull_request`. Trying to "make it work for forks" is the
+   wrong fix.
+
+5. **Document any opt-out.** If a job genuinely needs to run for an
+   external author or a fork PR (e.g. an automated welcome bot, a
+   triage label workflow), call it out in the PR description, link to
+   this rule, and explain why the gate is safe to drop for that
+   specific job.
+
+Layout / install / removal: see `frontend/content/docs/handbook/ci/self-hosted-runner.md`.

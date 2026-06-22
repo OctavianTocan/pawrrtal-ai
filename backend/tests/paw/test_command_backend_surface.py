@@ -182,7 +182,7 @@ def test_workspace_skills_lists_default_workspace_skills(runner: CliRunner) -> N
     _seed_persona()
     payload = [
         {
-            "name": "pawrrtal-taste",
+            "name": "taste",
             "trigger": "polish",
             "summary": "Clean modern Pawrrtal UX rules.",
             "has_skill_md": True,
@@ -195,7 +195,7 @@ def test_workspace_skills_lists_default_workspace_skills(runner: CliRunner) -> N
         result = runner.invoke(app, ["workspace", "skills", "--json"])
 
     assert result.exit_code == 0, result.stdout
-    assert json.loads(result.stdout)[0]["name"] == "pawrrtal-taste"
+    assert json.loads(result.stdout)[0]["name"] == "taste"
 
 
 def test_audit_summary_fetches_dashboard_aggregate(runner: CliRunner) -> None:

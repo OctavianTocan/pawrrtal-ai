@@ -1,0 +1,23 @@
+---
+description: Ensure code adheres to Clean Code Understandability and Naming conventions
+globs: **/*.ts,**/*.tsx,**/*.py
+alwaysApply: false
+---
+# Clean Code: Understandability & Naming
+
+Code is read far more often than it is written. Optimize for readability over cleverness or brevity.
+
+## Naming Rules
+1. **Choose descriptive and unambiguous names:** Never sacrifice clarity for brevity.
+2. **Make meaningful distinction:** Names should distinguish behavior, not just appease the compiler.
+3. **Use pronounceable and searchable names.**
+4. **Replace magic numbers with named constants:** Never leave isolated `2`, `86400`, or strings in logic logic—extract them to expressive constants.
+5. **Avoid encodings:** Do not append prefixes or type information to names (e.g., no Hungarian notation).
+
+## Understandability Tips
+1. **Be consistent:** If you do something a certain way, do all similar things in the same way.
+2. **Use explanatory variables:** Break complex conditionals into well-named boolean variables.
+3. **Encapsulate boundary conditions:** Boundary conditions are hard to keep track of. Put the processing for them in one place.
+4. **Prefer dedicated value objects to primitive types:** Encapsulate related concepts.
+5. **Avoid logical dependency:** Don't write methods which work correctly depending on something else in the same class.
+6. **Avoid negative conditionals:** `if (isValid)` is much easier to read than `if (!isInvalid)`.

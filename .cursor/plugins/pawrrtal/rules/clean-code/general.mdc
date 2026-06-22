@@ -1,0 +1,22 @@
+---
+description: Ensure code adheres to General Clean Code principles
+globs: **/*.ts,**/*.tsx,**/*.py
+alwaysApply: false
+---
+# Clean Code: General & Design Rules
+
+Code is clean if it can be understood easily – by everyone on the team. Clean code can be read and enhanced by a developer other than its original author. With understandability comes readability, changeability, extensibility, and maintainability.
+
+## General Rules
+1. **Follow standard conventions:** Adhere strictly to language idioms and project patterns.
+2. **Keep it simple stupid (KISS):** Simpler is always better. Reduce complexity as much as possible.
+3. **Boy Scout Rule:** Leave the campground cleaner than you found it. Refactor local technical debt when touching files.
+4. **Find Root Cause:** Always look for the root cause of a problem, do not patch symptoms.
+
+## Design Rules
+1. Keep configurable data at high levels.
+2. Prefer polymorphism to if/else or switch/case logic.
+3. Separate multi-threading and async code from core logic.
+4. Prevent over-configurability.
+5. Use dependency injection where applicable.
+6. **Follow Law of Demeter:** A class or function should know only its direct dependencies.

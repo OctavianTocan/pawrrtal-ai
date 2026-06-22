@@ -32,7 +32,7 @@ established API endpoints, authenticated fetch helpers, or TanStack Query flows.
 Backend work MUST preserve the FastAPI layer boundaries in `backend/app/`.
 Optional integrations MUST stay outside the generic kernel: channels, providers,
 tools, plugins, subagents, context providers, and turn orchestration changes must
-follow `.agents/skills/pawrrtal-extension-boundaries/SKILL.md`.
+follow `.agents/skills/extension-boundaries/SKILL.md`.
 
 ### III. Design System Consistency
 
@@ -69,7 +69,7 @@ plan's complexity section. Existing user work in the git tree MUST be preserved.
   `just test`, `just arch`, `bun run design:lint`, and scoped variants already
   documented in `AGENTS.md`.
 - CI and workflow plans MUST follow the Octavian-only actor gate and self-hosted
-  runner policy documented in `AGENTS.md` and `.claude/rules/github-actions/`.
+  runner policy documented in `AGENTS.md` and `.cursor/plugins/pawrrtal/rules/github-actions/`.
 - Task tracking in `.beans/` MUST be managed through the `beans` CLI only.
 - Public or user-facing URLs MUST be verified before sharing.
 

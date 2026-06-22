@@ -1,0 +1,19 @@
+---
+description: Python-specific clean code rules (Pydantic, typing)
+globs: **/*.py
+alwaysApply: false
+---
+# Clean Code: Python
+
+## Pydantic Settings & Enums
+
+1. **Use `Literal` instead of `str` for constrained values.**
+   If a setting or payload field only accepts a specific set of strings (e.g. `"lax" | "strict" | "none"`), type it as `Literal["lax", "strict", "none"]`. Do not use `str` and rely on manual string checking.
+
+2. **Enforce cross-field security invariants at startup.**
+   If one setting depends on another for security (e.g. `SameSite=none` requires `Secure=True` or `is_production=True`), enforce it immediately in a `@model_validator(mode="after")`. Do not let the app boot in an insecure or broken state.
+
+## Typing
+
+1. **Do not use `cast(Any, ...)`.**
+   This is a type-suppression pattern that violates the project's strict typing rules. If you find yourself needing to cast to `Any` to make a library happy, your underlying types are usually wrong (e.g., using `str` instead of `Literal`). Fix the source type.

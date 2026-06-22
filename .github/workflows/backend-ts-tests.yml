@@ -33,8 +33,8 @@ concurrency:
 jobs:
   vitest:
     name: backend-ts Vitest
-    # OctavianTocan-only gate (see .claude/rules/github-actions/
-    # octaviantocan-only-and-self-hosted-runner.md). The runner is
+    # OctavianTocan-only gate (see .cursor/plugins/pawrrtal/rules/github-actions/
+    # octaviantocan-only-and-self-hosted-runner.mdc). The runner is
     # self-hosted on Octavian's VPS and already has bun + the
     # backend-ts workspace installed (no per-run install of Node
     # devDeps — that runs in the `Install dependencies` step).

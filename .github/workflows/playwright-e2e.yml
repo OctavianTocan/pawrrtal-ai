@@ -44,7 +44,7 @@ jobs:
       (github.event_name != 'pull_request' ||
         github.event.pull_request.head.repo.full_name == github.repository)
     # Documented exception to the self-hosted-runner default per
-    # ``.claude/rules/github-actions/octaviantocan-only-and-self-hosted-runner.md``:
+    # ``.cursor/plugins/pawrrtal/rules/github-actions/octaviantocan-only-and-self-hosted-runner.mdc``:
     # Playwright's Chromium needs nss/dbus/asound system libraries that
     # ``playwright install --with-deps`` installs via ``sudo apt-get``.
     # The self-hosted runner has no passwordless sudo, so Chromium crashes

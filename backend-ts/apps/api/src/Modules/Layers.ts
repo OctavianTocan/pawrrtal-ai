@@ -7,7 +7,6 @@
  */
 
 import { Layer } from 'effect';
-import { HttpAuthLive } from './Authentication/Http';
 import { HttpProjectsLive } from './Projects/Http';
 import { HttpSystemLive } from './System/Http';
 /**
@@ -15,4 +14,4 @@ import { HttpSystemLive } from './System/Http';
  * so `App.ts` only has to provide a single dependency. Admin-only groups
  * (when they land) belong in a parallel `AdminModulesLive`.
  */
-export const CoreModulesLive = Layer.mergeAll(HttpSystemLive, HttpProjectsLive, HttpAuthLive);
+export const CoreModulesLive = Layer.mergeAll(HttpSystemLive, HttpProjectsLive);

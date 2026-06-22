@@ -8,7 +8,7 @@ from ``commands.py``.
 
 Functions used across the package (``pid_alive``, ``probe_health``,
 ``spawn_uvicorn``, etc.) carry no leading underscore so the privacy
-rule (``.claude/rules/clean-code/python-module-privacy.md``) holds —
+rule (``.cursor/plugins/pawrrtal/rules/clean-code/python-module-privacy.mdc``) holds —
 the underscore is reserved for truly module-local helpers.
 """
 

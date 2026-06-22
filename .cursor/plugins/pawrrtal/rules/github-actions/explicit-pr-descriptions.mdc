@@ -1,0 +1,12 @@
+---
+description: Ensure Pull Request descriptions are honest and accurate
+globs: .github/workflows/**/*.yml,.github/workflows/**/*.yaml
+alwaysApply: false
+---
+# Explicit Pull Request Descriptions
+
+When creating, updating, or reviewing a Pull Request that introduces workflow automation or other changes:
+1. **Never Make Undocumented Scope Creeps:** Never silently bundle new features, new triggers, or architectural shifts inside a PR without explicitly stating them in the PR title and description.
+2. **Always Update PR Descriptions on Code Changes:** If you push new commits to an existing PR that change how the feature works, you MUST immediately run `gh pr edit <number> --title "..." --body "..."` to update the PR title and description so it matches the new reality. Do not let the PR description drift from the actual implementation.
+3. **Accurate Execution Context:** Ensure the PR accurately reflects the execution trigger (e.g. `on: push` vs `on: pull_request_target`). Do not copy-paste testing instructions or summaries from other sources if they contradict the actual implementation in the diff.
+4. **If You Touch It, Describe It:** If you change an action's trigger, modify its target, or update its permissions from what was originally documented, rewrite the PR description to match reality before merging.

@@ -1,0 +1,14 @@
+---
+description: Ensure safe usage of elevated pull_request_target permissions
+globs: .github/workflows/**/*.yml,.github/workflows/**/*.yaml
+alwaysApply: false
+---
+# Safe pull_request_target Usage
+
+The `pull_request_target` event runs workflows in the context of the **base repository**, meaning it has access to write tokens and repository secrets even when triggered by an untrusted fork PR.
+
+When implementing or modifying a workflow using `pull_request_target`, follow these strict constraints:
+1. **Never Checkout the PR Head:** By default, `actions/checkout` checks out the *base branch* on `pull_request_target`. Never override this with `ref: ${{ github.event.pull_request.head.sha }}` unless you are explicitly running isolated code. Doing so allows malicious code from an untrusted fork to execute with elevated privileges.
+2. **Never Execute Untrusted Code:** Do not run `npm install`, build scripts, test suites, or any arbitrary code located within the PR branch during a `pull_request_target` run.
+3. **Explicit Base Ref Guarding:** Always guard the execution by explicitly checking the target branch (e.g., `if: github.event.pull_request.base.ref == 'development'`) to avoid accidentally acting on PRs targeting arbitrary feature or release branches.
+4. **Document Intent:** Add explicit comments above the `pull_request_target` trigger outlining why it is necessary and confirming the safety assumptions (e.g., that no PR code is executed).
