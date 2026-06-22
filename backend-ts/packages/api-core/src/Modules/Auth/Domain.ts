@@ -3,8 +3,8 @@
  *
  * The `CurrentUser` service is the *contract* for "the authenticated
  * user who hit this request." It is *populated* by the auth middleware
- * (Lesson 3, see `Authentication/Api.ts`) and *consumed* by every
- * handler that needs the request's user identity (Lesson 4, e.g.
+ * (Lesson 4, see `Auth/Api.ts`) and *consumed* by every
+ * handler that needs the request's user identity (Lesson 5, e.g.
  * `Projects/Http.ts` swapping its `STUB_USER_ID` for `yield* CurrentUser`).
  *
  * Comcom (v3) ancestor: `backend/vendor/comcom/packages/comcom/api-core/

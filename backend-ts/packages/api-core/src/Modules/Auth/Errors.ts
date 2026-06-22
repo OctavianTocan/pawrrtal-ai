@@ -2,10 +2,9 @@
  * Authentication module — typed errors raised by the auth middleware
  * and consumed by the HTTP layer for status mapping.
  *
- * **Status: empty.** Lesson 3 introduces `AuthenticationError` (with
- * `{ httpApiStatus: 401 }`) and possibly `AuthorizationError` (with
- * `{ httpApiStatus: 403 }`). Until then, callers should treat the file
- * as intentionally blank.
+ * **Status: `SessionStoreError` shipped (Lesson 2).** Lesson 4
+ * introduces `AuthenticationError` (with `{ httpApiStatus: 401 }`).
+ * `AuthorizationError` (403) is out of scope for this arc.
  */
 
 import { Schema } from 'effect';

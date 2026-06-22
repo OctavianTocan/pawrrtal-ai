@@ -81,7 +81,8 @@ export const SessionStoreBody: Layer.Layer<SessionStore, never, HttpClient.HttpC
 									message: 'Failed to lookup user',
 									cause,
 								})
-						)
+						),
+						Effect.withSpan('SessionStore.lookup')
 					);
 
 				return user;
@@ -89,7 +90,7 @@ export const SessionStoreBody: Layer.Layer<SessionStore, never, HttpClient.HttpC
 
 			return SessionStore.of({ lookup });
 		})
-	).pipe(Layer.provide(FetchHttpClient.layer));
+	);
 
 /**
  * Production SessionStore layer. Provides {@link SessionStore} with the default fetch-based HTTP client implementation.
