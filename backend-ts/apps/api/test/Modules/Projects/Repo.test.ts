@@ -22,7 +22,7 @@ import { Effect, Layer } from 'effect';
 import { ProjectsRepo, ProjectsRepoBody } from '@/Modules/Projects/Repo';
 import { makeInMemoryDatabase } from '../../fixtures/in-memory-db';
 
-const ME = '00000000-0000-0000-0000-000000000001' as UserId;
+const ME = '00000000-0000-4000-8000-000000000001' as UserId;
 
 // `ProjectsRepoBody` requires `SqlClient`; pre-provide it from
 // the in-memory DB so the suite shares one client + one schema. We
@@ -36,7 +36,7 @@ layer(RepoLayer)('ProjectsRepo (in-memory SQLite)', (it) => {
 		Effect.gen(function* () {
 			const repo = yield* ProjectsRepo;
 			const userA = ME;
-			const userB = '00000000-0000-0000-0000-aaaaaaaaaaaa' as UserId;
+			const userB = '00000000-0000-4000-8000-aaaaaaaaaaaa' as UserId;
 			yield* repo.insert({ name: 'mine', user_id: userA });
 			yield* repo.insert({ name: 'theirs', user_id: userB });
 
@@ -52,7 +52,7 @@ layer(RepoLayer)('ProjectsRepo (in-memory SQLite)', (it) => {
 		Effect.gen(function* () {
 			const repo = yield* ProjectsRepo;
 			// Use a fresh user id so the count is deterministic.
-			const user = '00000000-0000-0000-0000-bbbbbbbbbbbb' as UserId;
+			const user = '00000000-0000-4000-8000-bbbbbbbbbbbb' as UserId;
 			yield* repo.insert({ name: 'one', user_id: user });
 			yield* repo.insert({ name: 'two', user_id: user });
 
@@ -67,24 +67,26 @@ layer(RepoLayer)('ProjectsRepo (in-memory SQLite)', (it) => {
 	it.effect('insert round-trips all five fields', () =>
 		Effect.gen(function* () {
 			const repo = yield* ProjectsRepo;
-			const user = '00000000-0000-0000-0000-cccccccccccc' as UserId;
+			const user = '00000000-0000-4000-8000-cccccccccccc' as UserId;
 			const created = yield* repo.insert({ name: 'persisted', user_id: user });
 
 			assert.strictEqual(created.name, 'persisted');
 			assert.strictEqual(created.user_id, user);
 			assert.isDefined(created.id);
-			// `created_at` / `updated_at` are ISO-8601 strings — match
-			// a permissive regex to assert the shape.
-			assert.match(created.created_at, /^\d{4}-\d{2}-\d{2}T/);
-			assert.match(created.updated_at, /^\d{4}-\d{2}-\d{2}T/);
+			// `created_at` / `updated_at` round-trip as `DateTime.Utc`
+			// (Project's `Schema.DateTimeUtcFromString` decoder) and
+			// serialize back to ISO-8601 via `toJSON()`. Match a
+			// permissive regex to assert the shape.
+			assert.match(String(created.created_at.toJSON()), /^\d{4}-\d{2}-\d{2}T/);
+			assert.match(String(created.updated_at.toJSON()), /^\d{4}-\d{2}-\d{2}T/);
 		})
 	);
 
 	it.effect('update with mismatched userId returns null', () =>
 		Effect.gen(function* () {
 			const repo = yield* ProjectsRepo;
-			const owner = '00000000-0000-0000-0000-dddddddddddd' as UserId;
-			const other = '00000000-0000-0000-0000-eeeeeeeeeeee' as UserId;
+			const owner = '00000000-0000-4000-8000-dddddddddddd' as UserId;
+			const other = '00000000-0000-4000-8000-eeeeeeeeeeee' as UserId;
 			const created = yield* repo.insert({ name: 'mine', user_id: owner });
 
 			const result = yield* repo.update(created.id, other, 'hijack');
@@ -95,7 +97,7 @@ layer(RepoLayer)('ProjectsRepo (in-memory SQLite)', (it) => {
 	it.effect('update with matching userId returns the renamed row', () =>
 		Effect.gen(function* () {
 			const repo = yield* ProjectsRepo;
-			const user = '00000000-0000-0000-0000-ffffffffffff' as UserId;
+			const user = '00000000-0000-4000-8000-ffffffffffff' as UserId;
 			const created = yield* repo.insert({ name: 'Old', user_id: user });
 
 			const updated = yield* repo.update(created.id, user, 'New');
@@ -109,8 +111,8 @@ layer(RepoLayer)('ProjectsRepo (in-memory SQLite)', (it) => {
 	it.effect('delete with mismatched userId returns false', () =>
 		Effect.gen(function* () {
 			const repo = yield* ProjectsRepo;
-			const owner = '00000000-0000-0000-0000-111111111111' as UserId;
-			const other = '00000000-0000-0000-0000-222222222222' as UserId;
+			const owner = '00000000-0000-4000-8000-111111111111' as UserId;
+			const other = '00000000-0000-4000-8000-222222222222' as UserId;
 			const created = yield* repo.insert({ name: 'mine', user_id: owner });
 
 			const result = yield* repo.delete(created.id, other);
@@ -121,7 +123,7 @@ layer(RepoLayer)('ProjectsRepo (in-memory SQLite)', (it) => {
 	it.effect('delete with matching userId removes the row', () =>
 		Effect.gen(function* () {
 			const repo = yield* ProjectsRepo;
-			const user = '00000000-0000-0000-0000-333333333333' as UserId;
+			const user = '00000000-0000-4000-8000-333333333333' as UserId;
 			const created = yield* repo.insert({ name: 'gone', user_id: user });
 
 			const result = yield* repo.delete(created.id, user);

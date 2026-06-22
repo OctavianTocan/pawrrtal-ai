@@ -87,7 +87,7 @@ export class ProjectsService extends Context.Service<
 			projectId: ProjectId;
 		}) => Effect.Effect<void, ProjectNotFoundError>;
 	}
->()('@pawrrtal/api/Projects/Service') {}
+>()('@apps/api/Projects/Service') {}
 
 /**
  * Resolve the next name for a project update. Returns the next name to use, or null if the project is not found.

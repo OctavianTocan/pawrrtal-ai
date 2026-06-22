@@ -1,3 +1,11 @@
+/**
+ * Root HttpApi definition. Wires every `HttpApiGroup` (System, Projects,
+ * …) under a single `/api/v1` prefix and stamps OpenAPI metadata.
+ *
+ * Handlers and runtime wiring live in `apps/api`; this file is the
+ * single source of truth for the public API surface.
+ */
+
 import { HttpApi, OpenApi } from 'effect/unstable/httpapi';
 import { ProjectsApi } from './Modules/Projects/Api';
 import { SystemApi } from './Modules/System/Api';
