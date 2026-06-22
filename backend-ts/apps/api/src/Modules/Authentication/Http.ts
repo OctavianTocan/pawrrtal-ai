@@ -2,16 +2,10 @@ import { AuthenticationMiddlewareService } from '@pawrrtal/api-core/Modules/Auth
 import { CurrentUser } from '@pawrrtal/api-core/Modules/Auth/Domain';
 import { AuthenticationError } from '@pawrrtal/api-core/Modules/Auth/Errors';
 import { Effect, Layer, Redacted } from 'effect';
-import { SessionStore } from './SessionStore';
+import { SessionStore, SessionStoreLive } from './SessionStore';
 
 // What is the AuthenticationLayer?
 // It is an Effect layer that implements the Authentication middleware service at runtime.
-
-// What is it supposed to do?
-// - It
-
-// How does Authentication.of({}) work?
-
 export const AuthenticationLayer = Layer.effect(
 	AuthenticationMiddlewareService,
 	Effect.gen(function* () {
@@ -37,3 +31,5 @@ export const AuthenticationLayer = Layer.effect(
 		});
 	})
 );
+
+export const HttpAuthLive = AuthenticationLayer.pipe(Layer.provide(SessionStoreLive));

@@ -1,5 +1,6 @@
 import { Schema } from 'effect';
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from 'effect/unstable/httpapi';
+import { AuthenticationMiddlewareService } from '../Auth/Api';
 import { Project, ProjectCreateInput, ProjectId, ProjectUpdateInput } from './Domain';
 import { ProjectNotFoundError } from './Errors';
 
@@ -55,4 +56,5 @@ export class ProjectsApi extends HttpApiGroup.make('projects')
 				'Delete a project; linked conversations are unlinked, not deleted'
 			)
 	)
+	.middleware(AuthenticationMiddlewareService)
 	.prefix('/projects') {}

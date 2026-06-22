@@ -7,12 +7,12 @@
  */
 
 import { Layer } from 'effect';
+import { HttpAuthLive } from './Authentication/Http';
 import { HttpProjectsLive } from './Projects/Http';
 import { HttpSystemLive } from './System/Http';
-
 /**
  * Every HttpApi group's runtime implementation, merged into one layer
  * so `App.ts` only has to provide a single dependency. Admin-only groups
  * (when they land) belong in a parallel `AdminModulesLive`.
  */
-export const CoreModulesLive = Layer.mergeAll(HttpSystemLive, HttpProjectsLive);
+export const CoreModulesLive = Layer.mergeAll(HttpSystemLive, HttpProjectsLive, HttpAuthLive);
