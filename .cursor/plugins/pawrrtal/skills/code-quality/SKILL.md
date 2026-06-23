@@ -29,6 +29,7 @@ Hard gates (explicit return types, no unsafe casts, sentrux layers, 500-line fil
 | Files | One concept per file. CI hard-stops at **500** lines; split earlier when the name needs "and". |
 | Type declarations | Prefer `type`; `interface` for `extends`/declaration merging or `declare module`. |
 | Errors | Never fire-and-forget. Handle the specific failure; surface user-facing copy via `user-facing-text`. |
+| Docstrings | Contract only — brief. No architecture essays, tables, or roadmaps in comments. |
 | Verify | `just check` + scoped typecheck/tests. Gate on **exit codes**, not grepped output. |
 
 ## Naming
@@ -134,6 +135,35 @@ Every function — exports **and** private helpers — gets a doc block that des
 
 Placement: directly above the declaration. Preserve existing docstrings when editing — update or delete only when the documented code changes. See `.cursor/plugins/pawrrtal/rules/clean-code/preserve-documentation.mdc`.
 
+### Brevity
+
+Docstrings state the **caller contract** — what to pass and what comes back. They are not design docs, lesson notes, or commit messages.
+
+**Length budget**
+
+| Surface | Max |
+|---------|-----|
+| Private helper | 1 line |
+| Export (function, layer, class) | 1–3 lines |
+| File-level (only when the file is the public entry) | 1 sentence |
+| Test file | 1 line |
+
+**Do not put in docstrings**
+
+- Architecture diagrams, layer stack walkthroughs, or ASCII trees
+- Tables that duplicate endpoints, method lists, or signatures the types already express
+- Implementation roadmaps ("what to implement next"), lesson numbers, or phase labels
+- Vendor file paths, line numbers, bean ids, or PR references
+- Python-parity essays (link the source file in an ADR or test name if parity matters)
+- Duplicate docs on the same symbol (pick file-level **or** export-level, not both)
+
+**When a longer note is justified**
+
+- A single non-obvious constraint the type system cannot express (e.g. "empty name becomes Untitled Project in service") — still cap at one sentence; put algorithmic WHY in a 1–2 line inline comment at the site, not a block above the function.
+- OpenAPI `description` / `summary` on HttpApi endpoints — those are user-facing API docs, not code docstrings.
+
+If deleting a docstring leaves nothing useful to say, delete it. Types and names are the default documentation.
+
 ### Python docstrings
 
 Public classes and functions get docstrings describing caller contract. Type hints on every function. Narrow `except` to specific types; log with context. See `.cursor/plugins/pawrrtal/rules/clean-code/python-logging-exceptions.mdc`.
@@ -141,6 +171,10 @@ Public classes and functions get docstrings describing caller contract. Type hin
 ### Inline comments
 
 Explain non-obvious **WHY**, never restate **WHAT**. If the code already reads clearly, delete the comment. Cap at 1–2 lines. No PR/ticket references — that belongs in the commit message.
+
+**Worth a comment:** layer composition order that differs from sibling `Effect.provide`, duplicate-package hazards, vitest bundler workarounds, driver/SQL quirks, business rules the type system cannot express.
+
+**Not worth a comment:** "provides auth middleware", "returns the list", anything the function name or type already states.
 
 ## Type Declarations
 
@@ -198,7 +232,7 @@ Test through public interfaces — behavior that should survive refactors. Every
 |---|---|---|
 | Frontend | colocated `*.test.ts(x)` under `frontend/` | `cd frontend && bun run test -- <pattern>` |
 | Python | `backend/tests/` | `cd backend && uv run pytest <path>` |
-| Effect TS | `backend-ts/apps/api/test/unit/` mirroring `src/` | follow `domain-effect` |
+| Effect TS | `backend-ts/apps/api/test/unit/` mirroring `src/` | `cd backend-ts && bun run test` |
 
 Agent-loop backend tests use scripted stream fns. Vitest strips types at runtime; run the suite after changing assertions.
 
@@ -207,7 +241,8 @@ Agent-loop backend tests use scripted stream fns. Vitest strips types at runtime
 A check counts only when its **exit code** proves the thing.
 
 ```bash
-just check                              # Biome repo-wide
+just check                              # Biome repo-wide (VCS-scoped — changed files only)
+cd backend-ts && bun run check          # Biome on all backend-ts files (see Effect TS below)
 cd frontend && bun run typecheck        # TS frontend
 cd backend-ts && bun run typecheck      # Effect strangler (when touched)
 just sentrux                            # architecture layers (when structure changes)
@@ -218,6 +253,35 @@ just sentrux                            # architecture layers (when structure ch
 - **Lint changed files on the PR that introduces them.** A violation can hide until the file is touched.
 - **Fix warnings in files you edit.** Biome warnings and console warnings are latent errors — do not label them "pre-existing."
 - When local and CI disagree, the clean CI run on the self-hosted runner is ground truth.
+
+### Effect TS (`backend-ts/`)
+
+Repo-root `just check` runs Biome with **VCS enabled**, so it only lints **git-changed** files under `backend-ts/`. That can hide dozens of warnings in untouched files. Always run the workspace-local gate before claiming Effect TS is clean:
+
+```bash
+cd backend-ts && bun run check && bun run typecheck && bun run test
+```
+
+`backend-ts/biome.json` scopes Biome to the workspace (`vcs.enabled: false`) and relaxes two rules that conflict with our module layout:
+
+| Rule | Why off |
+|------|---------|
+| `useFilenamingConvention` | Role-named modules (`Http.ts`, `Repo.ts`, `Service.ts`) match comcom / `domain-effect` — not `http.ts`. |
+| `useImportExtensions` | `moduleResolution: bundler` — no `.ts` suffix on relative imports. |
+
+**Single `effect` install.** `Context.Service` tags compare by reference. Nested `node_modules/effect` copies (e.g. `api-core` + `apps/api` each bundling their own) break HttpApi middleware wiring with `Service not found: AuthenticationMiddlewareService`. Fix:
+
+- Hoist `effect` + `@effect/*` at `backend-ts/package.json` with `overrides`.
+- Declare `effect` as a **peer** (plus dev) in `@pawrrtal/api-core`, not a runtime dependency.
+- Vitest `resolve.dedupe` for Effect packages; `ssr.noExternal: ['@effect/vitest']` so suite registration works under `bun --bun vitest`.
+
+**HttpApi test auth.** Mirror production: pipe auth onto the handler layer (`handlerLayer.pipe(Layer.provide(AuthMiddlewareStubLive))`), same as `HttpProjectsLive.pipe(Layer.provide([..., HttpAuthLive]))`. Sibling `Effect.provide([auth, handler])` leaves middleware missing at route build time.
+
+**Test fixtures.** Use `new Project({...})` with **UUID v4** ids (`00000000-0000-4000-8000-…`) — `Schema` rejects non-v4. Assert failures with `Effect.exit` + `Cause.isFailReason`, not `Either` (removed in Effect v4).
+
+**Inline comments (Effect TS).** Add 1-line **WHY** only where the code diverges from the obvious pattern: duplicate-package hazards, layer composition order, vitest bundler quirks, SQL/driver workarounds. Do not narrate what `Layer.provide` does when the line already says it.
+
+**File layout.** Tests live in `apps/api/test/unit/**` mirroring `src/`. No parallel `test/Modules/` tree — it drifts and confuses typecheck scope.
 
 ## Error Handling
 

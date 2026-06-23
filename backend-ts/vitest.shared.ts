@@ -1,5 +1,8 @@
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { ViteUserConfig } from 'vitest/config';
+
+const rootDir = path.dirname(fileURLToPath(import.meta.url));
 
 const config: ViteUserConfig = {
 	esbuild: {
@@ -8,13 +11,22 @@ const config: ViteUserConfig = {
 	optimizeDeps: {
 		exclude: ['bun:sqlite'],
 	},
+	ssr: {
+		// Vitest must bundle @effect/vitest; a separate vitest copy breaks suite registration.
+		noExternal: ['@effect/vitest'],
+	},
 	resolve: {
-		// Mirror the apps/api tsconfig `@/*` alias so test fixtures can
-		// `import { DatabaseLive } from '@/Infrastructure/Database'` like
-		// production code does. The root tsconfig is consumed by `tsc`;
-		// vitest's resolver is vite, so it needs the alias too.
+		// One physical `effect` install — duplicate copies break Context.Service identity in tests.
+		dedupe: [
+			'effect',
+			'@effect/platform-bun',
+			'@effect/platform-node',
+			'@effect/sql-sqlite-bun',
+			'@effect/vitest',
+		],
 		alias: {
-			'@': path.resolve(__dirname, 'apps/api/src'),
+			'@': path.resolve(rootDir, 'apps/api/src'),
+			vitest: path.resolve(rootDir, 'node_modules/vitest'),
 		},
 	},
 };

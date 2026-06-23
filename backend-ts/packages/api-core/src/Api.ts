@@ -1,18 +1,8 @@
-/**
- * Root HttpApi definition. Wires every `HttpApiGroup` (System, Projects,
- * …) under a single `/api/v1` prefix and stamps OpenAPI metadata.
- *
- * Handlers and runtime wiring live in `apps/api`; this file is the
- * single source of truth for the public API surface.
- */
-
 import { HttpApi, OpenApi } from 'effect/unstable/httpapi';
 import { ProjectsApi } from './Modules/Projects/Api';
 import { SystemApi } from './Modules/System/Api';
 
-/**
- * The root API class for the Pawrrtal API. It is used to define the root API and its groups.
- */
+/** Root HttpApi at `/api/v1`; handlers live in `apps/api`. */
 export class Api extends HttpApi.make('api')
 	.add(SystemApi)
 	.add(ProjectsApi)

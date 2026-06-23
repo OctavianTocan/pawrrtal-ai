@@ -1,20 +1,5 @@
-/**
- * SQL integration tests for `ProjectsRepo`.
- *
- * Uses a fresh `:memory:` SQLite database per test file via
- * `_helpers/InMemoryDatabase`. Catches SQL regressions the Service
- * unit tests miss: typed columns, `WHERE id = ? AND user_id = ?`
- * clause, `INSERT` round-trip, ISO-8601 round-trip.
- *
- * Pattern: `backend/vendor/effect-smol/packages/sql/sqlite-node/test/
- * Resolver.test.ts:9-15` for the per-suite in-memory client.
- *
- * **Shared-state note:** `layer(...)` builds the layer once and
- * reuses it across the suite (the `ai-docs` recommendation). The
- * `:memory:` DB is therefore shared, so tests that assert an exact
- * count use a unique `UserId` per test and look at *visibility* (is
- * this row there?) rather than absolute counts.
- */
+/** `ProjectsRepo` SQL tests against `:memory:` SQLite. */
+
 import { assert, layer } from '@effect/vitest';
 import type { ProjectId, UserId } from '@pawrrtal/api-core/Modules/Projects/Domain';
 import { Effect, Layer } from 'effect';

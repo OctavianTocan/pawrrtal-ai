@@ -1,15 +1,6 @@
-/**
- * Authentication module — typed errors raised by the auth middleware
- * and consumed by the HTTP layer for status mapping.
- *
- * **Status: `SessionStoreError` shipped (Lesson 2).** Lesson 4
- * introduces `AuthenticationError` (with `{ httpApiStatus: 401 }`).
- * `AuthorizationError` (403) is out of scope for this arc.
- */
-
 import { Schema } from 'effect';
 
-/** Error raised when the session store fails. */
+/** Session store lookup failure. */
 export class SessionStoreError extends Schema.TaggedErrorClass<SessionStoreError>()(
 	'SessionStoreError',
 	{
@@ -18,7 +9,7 @@ export class SessionStoreError extends Schema.TaggedErrorClass<SessionStoreError
 	}
 ) {}
 
-/** Error raised when the authentication fails. */
+/** Missing or invalid session (HTTP 401). */
 export class AuthenticationError extends Schema.TaggedErrorClass<AuthenticationError>()(
 	'AuthenticationError',
 	{

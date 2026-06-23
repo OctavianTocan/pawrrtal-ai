@@ -4,16 +4,7 @@ import { AuthenticationMiddlewareService } from '../Auth/Api';
 import { Project, ProjectCreateInput, ProjectId, ProjectUpdateInput } from './Domain';
 import { ProjectNotFoundError } from './Errors';
 
-/**
- * Projects API group.
- *
- * | Endpoint name | Method | Path (under group) | Success        | HTTP status |
- * |---------------|--------|--------------------|----------------|-------------|
- * | `list`        | GET    | `/`                | `Project[]`    | 200         |
- * | `create`      | POST   | `/`                | `Project`      | 201         |
- * | `update`      | PATCH  | `/:project_id`     | `Project`      | 200         |
- * | `delete`      | DELETE | `/:project_id`     | no body        | 204         |
- */
+/** Authenticated CRUD for `/api/v1/projects`. */
 export class ProjectsApi extends HttpApiGroup.make('projects')
 	.add(
 		HttpApiEndpoint.get('list', '/', {

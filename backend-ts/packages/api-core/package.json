@@ -10,10 +10,12 @@
 	"scripts": {
 		"typecheck": "tsc --noEmit"
 	},
-	"dependencies": {
+	"dependencies": {},
+	"peerDependencies": {
 		"effect": "4.0.0-beta.74"
 	},
 	"devDependencies": {
+		"effect": "4.0.0-beta.74",
 		"typescript": "^5.9.3"
 	}
 }

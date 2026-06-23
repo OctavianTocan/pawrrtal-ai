@@ -4,13 +4,10 @@ import { AuthenticationError } from '@pawrrtal/api-core/Modules/Auth/Errors';
 import { Effect, Layer, Redacted } from 'effect';
 import { SessionStore, SessionStoreLive } from './SessionStore';
 
-// What is the AuthenticationLayer?
-// It is an Effect layer that implements the Authentication middleware service at runtime.
+/** Auth middleware: cookie → {@link SessionStore} → inject {@link CurrentUser}. */
 export const AuthenticationLayer = Layer.effect(
 	AuthenticationMiddlewareService,
 	Effect.gen(function* () {
-		// Here you could access services required by the middleware, like a
-		// database or an external auth provider.
 		yield* Effect.logInfo('Starting Authorization middleware');
 		const sessionStore = yield* SessionStore;
 
@@ -32,4 +29,5 @@ export const AuthenticationLayer = Layer.effect(
 	})
 );
 
+/** Production auth middleware with {@link SessionStoreLive}. */
 export const HttpAuthLive = AuthenticationLayer.pipe(Layer.provide(SessionStoreLive));

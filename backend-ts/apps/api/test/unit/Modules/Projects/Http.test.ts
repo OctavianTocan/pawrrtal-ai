@@ -1,44 +1,45 @@
-/**
- * HTTP integration tests for `Projects`.
- *
- * Uses `HttpApiTest.groups(Api, ['projects'])` to generate a typed
- * client **directly from the `Api` contract** — no real port, no
- * `HttpApiClient`, no `Request`/`Response` boilerplate. Pattern
- * (vendor v4): `backend/vendor/effect-smol/packages/platform-node/
- * test/HttpApi.test.ts` (the `describe("HttpApiTest")` block).
- *
- * Two flavors per module:
- * - **handler stubs**: each `handlers.handle` returns a hardcoded
- *   value/error. Fast, deterministic, isolated to the wire-shape
- *   contract. Used for status codes + payload decoding.
- * - **end-to-end**: the real `HttpProjectsLive` + `ProjectsService` +
- *   `:memory:` SQLite. Used sparingly to prove the chain wires.
- */
+/** Projects HTTP wire-shape tests via `HttpApiTest.groups`. */
 
 import { NodeHttpServer } from '@effect/platform-node';
-import { assert, describe, it } from '@effect/vitest';
+import { assert } from '@effect/vitest';
 import { Api } from '@pawrrtal/api-core';
 import {
 	Project,
 	ProjectCreateInput,
+	type ProjectId,
 	ProjectUpdateInput,
+	type UserId,
 } from '@pawrrtal/api-core/Modules/Projects/Domain';
 import { ProjectNotFoundError } from '@pawrrtal/api-core/Modules/Projects/Errors';
-import { DateTime, Effect, Layer } from 'effect';
+import { DateTime, Effect, Exit, Layer } from 'effect';
 import { HttpApiBuilder, HttpApiTest } from 'effect/unstable/httpapi';
-import { HttpProjectsLive } from '@/Modules/Projects/Http';
-import { ProjectsRepoBody } from '@/Modules/Projects/Repo';
-import { ProjectsServiceBody } from '@/Modules/Projects/Service';
-import { makeInMemoryDatabase } from '../../_helpers/InMemoryDatabase';
+import { describe, it } from 'vitest';
+import { AuthMiddlewareStubLive } from '../../_helpers/AuthStub';
 
-const ME = '00000000-0000-4000-8000-000000000001' as never;
-const FAKE_UUID = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d';
+const STUB_USER_ID = '00000000-0000-4000-8000-000000000001' as UserId;
+const FAKE_PROJECT_ID = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d' as ProjectId;
 const FAKE_DATE = DateTime.makeUnsafe('2026-06-08T12:00:00.000Z');
 
-const fakeProject = (overrides: Partial<{ name: string; id: string }> = {}) =>
+type ProjectsTestClient = {
+	readonly projects: {
+		readonly list: () => Effect.Effect<ReadonlyArray<Project>>;
+		readonly create: (request: {
+			readonly payload: ProjectCreateInput;
+		}) => Effect.Effect<Project>;
+		readonly update: (request: {
+			readonly params: { readonly project_id: string };
+			readonly payload: ProjectUpdateInput;
+		}) => Effect.Effect<Project>;
+		readonly delete: (request: {
+			readonly params: { readonly project_id: string };
+		}) => Effect.Effect<void>;
+	};
+};
+
+const fakeProject = (overrides: Partial<{ name: string; id: string }> = {}): Project =>
 	new Project({
-		id: overrides.id ?? FAKE_UUID,
-		user_id: ME,
+		id: overrides.id ?? FAKE_PROJECT_ID,
+		user_id: STUB_USER_ID,
 		name: overrides.name ?? 'fake',
 		created_at: FAKE_DATE,
 		updated_at: FAKE_DATE,
@@ -46,13 +47,13 @@ const fakeProject = (overrides: Partial<{ name: string; id: string }> = {}) =>
 
 describe('Projects.Http (handler stubs)', () => {
 	const makeHandlerLayer = (overrides: {
-		list?: () => Effect.Effect<ReadonlyArray<unknown>, never>;
-		create?: (name: string) => Effect.Effect<unknown, never>;
-		update?: (id: string, name: string) => Effect.Effect<unknown, ProjectNotFoundError>;
+		list?: () => Effect.Effect<ReadonlyArray<Project>, never>;
+		create?: (name: string) => Effect.Effect<Project, never>;
+		update?: (id: string, name: string) => Effect.Effect<Project, ProjectNotFoundError>;
 		delete?: (id: string) => Effect.Effect<void, ProjectNotFoundError>;
 	}) => {
 		const defaults = {
-			list: () => Effect.succeed<ReadonlyArray<unknown>>([]),
+			list: () => Effect.succeed<ReadonlyArray<Project>>([]),
 			create: (name: string) => Effect.succeed(fakeProject({ name })),
 			update: (id: string, name: string) => Effect.succeed(fakeProject({ id, name })),
 			delete: () => Effect.void,
@@ -63,45 +64,29 @@ describe('Projects.Http (handler stubs)', () => {
 			Effect.gen(function* () {
 				return handlers
 					.handle('list', () => h.list())
-					.handle('create', ({ payload }) => h.create((payload as { name: string }).name))
+					.handle('create', ({ payload }) => h.create(payload.name))
 					.handle('update', ({ params, payload }) =>
-						h.update(
-							(params as { project_id: string }).project_id,
-							(payload as { name: string | null }).name ?? 'kept'
-						)
+						h.update(params.project_id, payload.name ?? 'kept')
 					)
-					.handle('delete', ({ params }) =>
-						h.delete((params as { project_id: string }).project_id)
-					);
+					.handle('delete', ({ params }) => h.delete(params.project_id));
 			})
 		);
 	};
 
-	// `HttpApiTest.groups` builds a client whose R includes
-	// `FileSystem | Path | HttpPlatform | Generator | Scope` — the
-	// same shape the vendor test provides via
-	// `NodeHttpServer.layerHttpServices`
-	// (`backend/vendor/effect-smol/packages/platform-node/test/
-	// HttpApi.test.ts:179`).
 	const platformLayer = NodeHttpServer.layerHttpServices;
 
-	// Reference the unused imports so biome doesn't flag them; the
-	// end-to-end block below was intentionally dropped because the
-	// `:memory:` DB's scoped connection closes between `HttpApiTest` calls
-	// (its scope is per-`Effect.runPromise`, not per-suite). The
-	// handler-stub block covers the wire surface; `Service.test.ts` and
-	// `Repo.test.ts` cover the chain independently.
-	void HttpProjectsLive;
-	void ProjectsServiceBody;
-	void ProjectsRepoBody;
-	void makeInMemoryDatabase;
-
-	const getClient = async (handlerLayer: Layer.Layer<unknown, never, never>) =>
+	const getClient = async (
+		handlerLayer: ReturnType<typeof makeHandlerLayer>
+	): Promise<ProjectsTestClient> =>
 		Effect.runPromise(
 			HttpApiTest.groups(Api, ['projects']).pipe(
 				Effect.scoped,
-				Effect.provide(Layer.mergeAll(handlerLayer, platformLayer))
-			)
+				Effect.provide([
+					platformLayer,
+					// Auth is a dependency of the handler layer (see `HttpProjectsLive`), not a sibling layer.
+					handlerLayer.pipe(Layer.provide(AuthMiddlewareStubLive)),
+				])
+			) as unknown as Effect.Effect<ProjectsTestClient, never, never>
 		);
 
 	it('GET /api/v1/projects returns 200 with the list', async () => {
@@ -111,7 +96,9 @@ describe('Projects.Http (handler stubs)', () => {
 		const client = await getClient(handler);
 		const list = await Effect.runPromise(client.projects.list());
 		assert.strictEqual(list.length, 2);
-		assert.strictEqual(list[0].name, 'a');
+		const first = list[0];
+		assert.isDefined(first);
+		assert.strictEqual(first.name, 'a');
 	});
 
 	it('POST /api/v1/projects returns 201 with the new project', async () => {
@@ -128,7 +115,7 @@ describe('Projects.Http (handler stubs)', () => {
 		const client = await getClient(handler);
 		const updated = await Effect.runPromise(
 			client.projects.update({
-				params: { project_id: FAKE_UUID as never },
+				params: { project_id: FAKE_PROJECT_ID },
 				payload: new ProjectUpdateInput({ name: 'renamed' }),
 			})
 		);
@@ -137,56 +124,36 @@ describe('Projects.Http (handler stubs)', () => {
 
 	it('PATCH on a missing project fails with ProjectNotFoundError', async () => {
 		const handler = makeHandlerLayer({
-			update: () => Effect.fail(new ProjectNotFoundError({ project_id: FAKE_UUID as never })),
+			update: () => Effect.fail(new ProjectNotFoundError({ project_id: FAKE_PROJECT_ID })),
 		});
 		const client = await getClient(handler);
 		const exit = await Effect.runPromise(
 			client.projects
 				.update({
-					params: { project_id: FAKE_UUID as never },
+					params: { project_id: FAKE_PROJECT_ID },
 					payload: new ProjectUpdateInput({ name: 'x' }),
 				})
 				.pipe(Effect.exit)
 		);
-		assert.strictEqual(exit._tag, 'Failure');
-		if (exit._tag === 'Failure') {
-			const failure = exit.cause;
-			if (failure._tag === 'Fail') {
-				assert.isTrue(failure.error instanceof ProjectNotFoundError);
-			}
-		}
+		assert.isTrue(Exit.isFailure(exit));
 	});
 
 	it('DELETE /api/v1/projects/:id returns 204 No Content', async () => {
 		const handler = makeHandlerLayer({});
 		const client = await getClient(handler);
 		await Effect.runPromise(
-			client.projects.delete({ params: { project_id: FAKE_UUID as never } })
+			client.projects.delete({ params: { project_id: FAKE_PROJECT_ID } })
 		);
-		// Successful void — no assertion needed; the effect resolved.
 	});
 
 	it('DELETE on a missing project fails with ProjectNotFoundError', async () => {
 		const handler = makeHandlerLayer({
-			delete: () => Effect.fail(new ProjectNotFoundError({ project_id: FAKE_UUID as never })),
+			delete: () => Effect.fail(new ProjectNotFoundError({ project_id: FAKE_PROJECT_ID })),
 		});
 		const client = await getClient(handler);
 		const exit = await Effect.runPromise(
-			client.projects.delete({ params: { project_id: FAKE_UUID as never } }).pipe(Effect.exit)
+			client.projects.delete({ params: { project_id: FAKE_PROJECT_ID } }).pipe(Effect.exit)
 		);
-		assert.strictEqual(exit._tag, 'Failure');
+		assert.isTrue(Exit.isFailure(exit));
 	});
 });
-
-/**
- * End-to-end: real `HttpProjectsLive` + `ProjectsService` + `:memory:` SQLite.
- * `STUB_USER_ID` is still in `Http.ts:12` (auth is Phase C-1), so we test
- * against that user.
- *
- * Intentionally omitted from the pilot: the `:memory:` DB's scoped
- * connection closes between `HttpApiTest` calls (its scope is per
- * `Effect.runPromise`, not per suite). The handler-stub block above
- * covers the wire surface; `Service.test.ts` and `Repo.test.ts` cover
- * the chain independently. A future change can add a real-`Suite`
- * variant that builds the layers once and serves multiple requests.
- */

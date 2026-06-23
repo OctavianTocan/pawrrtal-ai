@@ -1,25 +1,11 @@
-/**
- * Projects — live HTTP handlers (runtime). Wires `ProjectsApi` contract to Service/Repo.
- */
-
 import { Api } from '@pawrrtal/api-core';
-import type { UserId } from '@pawrrtal/api-core/Lib/TypeIds';
+import { CurrentUser } from '@pawrrtal/api-core/Modules/Auth/Domain';
 import { Effect, Layer } from 'effect';
 import { HttpApiBuilder } from 'effect/unstable/httpapi';
 import { HttpAuthLive } from '../Authentication/Http';
 import { ProjectsService, ProjectsServiceLive } from './Service';
 
-/**
- * Phase C-1 placeholder for the real `CurrentUser` service that auth
- * middleware will provide. Phase C-1 lands when the cookie → JWT →
- * CurrentUser chain is wired; until then every handler scopes to this
- * fixed id so the Projects slice is exercisable end-to-end.
- */
-const STUB_USER_ID: UserId = '00000000-0000-4000-8000-000000000001' as UserId;
-
-/**
- * The live implementation of the ProjectsHttp module. It is used to define the http handlers and their signatures to be used in the Api module.
- */
+/** Live `projects` handlers — auth provides `CurrentUser`, service scopes by `user.id`. */
 export const HttpProjectsLive = HttpApiBuilder.group(
 	Api,
 	'projects',
@@ -27,17 +13,41 @@ export const HttpProjectsLive = HttpApiBuilder.group(
 		const service = yield* ProjectsService;
 
 		return handlers
-			.handle('list', () => service.listForUser(STUB_USER_ID))
-			.handle('create', ({ payload }) => service.createForUser(STUB_USER_ID, payload))
-			.handle('update', ({ params, payload }) =>
-				service.updateForUser({
-					userId: STUB_USER_ID,
-					projectId: params.project_id,
-					payload,
+			.handle(
+				'list',
+				Effect.fn(function* () {
+					const user = yield* CurrentUser;
+					return yield* service.listForUser(user.id);
 				})
 			)
-			.handle('delete', ({ params }) =>
-				service.deleteForUser({ userId: STUB_USER_ID, projectId: params.project_id })
+			.handle(
+				'create',
+				Effect.fn(function* ({ payload }) {
+					const user = yield* CurrentUser;
+					return yield* service.createForUser(user.id, payload);
+				})
+			)
+			.handle(
+				'update',
+				Effect.fn(function* ({ params, payload }) {
+					const user = yield* CurrentUser;
+					return yield* service.updateForUser({
+						userId: user.id,
+						projectId: params.project_id,
+						payload,
+					});
+				})
+			)
+			.handle(
+				'delete',
+				Effect.fn(function* ({ params }) {
+					const user = yield* CurrentUser;
+					return yield* service.deleteForUser({
+						userId: user.id,
+						projectId: params.project_id,
+					});
+				})
 			);
 	})
+	// Auth middleware is a handler-layer dependency, not a sibling in `Effect.provide`.
 ).pipe(Layer.provide([ProjectsServiceLive, HttpAuthLive]));

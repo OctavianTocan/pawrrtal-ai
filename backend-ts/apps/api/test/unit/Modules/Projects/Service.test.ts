@@ -1,23 +1,15 @@
-/**
- * Service unit tests for `ProjectsService`.
- *
- * Mirrors `backend/tests/test_project_crud.py:1-169` (Python parity).
- * Uses a `Ref<ReadonlyArray<Project>>`-backed stub of `ProjectsRepo`
- * so we can assert Service business rules without touching SQL.
- *
- * Pattern: `backend/vendor/effect-smol/ai-docs/src/09_testing/
- * 20_layer-tests.ts:97` (layer + it.effect, shared layer per suite).
- */
+/** `ProjectsService` unit tests with a `Ref`-backed repo stub. */
+
 import { assert, layer } from '@effect/vitest';
 import type {
-	Project,
 	ProjectCreateInput,
 	ProjectId,
 	ProjectUpdateInput,
 	UserId,
 } from '@pawrrtal/api-core/Modules/Projects/Domain';
+import { Project } from '@pawrrtal/api-core/Modules/Projects/Domain';
 import { ProjectNotFoundError } from '@pawrrtal/api-core/Modules/Projects/Errors';
-import { Context, DateTime, Effect, Layer, Ref } from 'effect';
+import { Cause, Context, DateTime, Effect, Exit, Layer, Ref } from 'effect';
 import { ProjectsRepo } from '@/Modules/Projects/Repo';
 import { ProjectsService, ProjectsServiceBody } from '@/Modules/Projects/Service';
 
@@ -44,14 +36,14 @@ const ProjectsRepoTest: Layer.Layer<ProjectsRepo, never, ProjectsRepoTestRef> = 
 			user_id: UserId;
 		}) {
 			const now = yield* DateTime.now;
-			const ts = DateTime.toDateUtc(now);
-			const project: Project = {
+			const ts = DateTime.formatIso(now);
+			const project = new Project({
 				id: crypto.randomUUID() as ProjectId,
 				user_id: input.user_id,
 				name: input.name,
-				created_at: ts,
-				updated_at: ts,
-			};
+				created_at: DateTime.makeUnsafe(ts),
+				updated_at: DateTime.makeUnsafe(ts),
+			});
 			yield* Ref.update(store, (xs) => [...xs, project]);
 			return project;
 		});
@@ -62,13 +54,26 @@ const ProjectsRepoTest: Layer.Layer<ProjectsRepo, never, ProjectsRepoTestRef> = 
 			name: string
 		) {
 			const now = yield* DateTime.now;
-			const ts = DateTime.toDateUtc(now);
+			const ts = DateTime.formatIso(now);
 			const all = yield* Ref.get(store);
 			const idx = all.findIndex((p) => p.id === id && p.user_id === userId);
-			if (idx === -1) return null;
-			const next = all.map((p, i) => (i === idx ? { ...p, name, updated_at: ts } : p));
+			if (idx === -1) {
+				return null;
+			}
+			const current = all[idx];
+			if (!current) {
+				return null;
+			}
+			const updated = new Project({
+				id: current.id,
+				user_id: current.user_id,
+				name,
+				created_at: current.created_at,
+				updated_at: DateTime.makeUnsafe(ts),
+			});
+			const next = all.map((p, i) => (i === idx ? updated : p));
 			yield* Ref.set(store, next);
-			return next[idx];
+			return updated;
 		});
 
 		const remove = Effect.fn('ProjectsRepoTest.delete')(function* (
@@ -86,9 +91,7 @@ const ProjectsRepoTest: Layer.Layer<ProjectsRepo, never, ProjectsRepoTestRef> = 
 	})
 );
 
-// Wire the real `ProjectsService` body to the test `ProjectsRepo`. The
-// test exercises production code (`ProjectsServiceBody`) — no
-// copy-paste of the service implementation.
+// Real `ProjectsServiceBody` wired to the in-memory test repo.
 const TestServiceLive = Layer.provide(ProjectsServiceBody, [ProjectsRepoTest]).pipe(
 	Layer.provideMerge(ProjectsRepoTestRef.layer)
 );
@@ -190,12 +193,12 @@ layer(TestServiceLive)('ProjectsService', (it) => {
 				})
 				.pipe(Effect.exit);
 
-			assert.strictEqual(exit._tag, 'Failure');
-			if (exit._tag === 'Failure') {
-				const failure = exit.cause;
-				if (failure._tag === 'Fail') {
-					assert.isTrue(failure.error instanceof ProjectNotFoundError);
-				}
+			assert.isTrue(Exit.isFailure(exit));
+			if (Exit.isFailure(exit)) {
+				const errors = exit.cause.reasons
+					.filter(Cause.isFailReason)
+					.map((reason) => reason.error);
+				assert.isTrue(errors.some((error) => error instanceof ProjectNotFoundError));
 			}
 		})
 	);
@@ -206,12 +209,12 @@ layer(TestServiceLive)('ProjectsService', (it) => {
 			const exit = yield* service
 				.updateForUser({
 					userId: testUserJ,
-					projectId: '00000000-0000-0000-0000-deadbeef0000' as ProjectId,
+					projectId: '00000000-0000-4000-8000-deadbeef0000' as ProjectId,
 					payload: { name: 'X' } as ProjectUpdateInput,
 				})
 				.pipe(Effect.exit);
 
-			assert.strictEqual(exit._tag, 'Failure');
+			assert.isTrue(Exit.isFailure(exit));
 		})
 	);
 
@@ -235,27 +238,25 @@ layer(TestServiceLive)('ProjectsService', (it) => {
 			const exit = yield* service
 				.deleteForUser({
 					userId: testUserL,
-					projectId: '00000000-0000-0000-0000-deadbeef0001' as ProjectId,
+					projectId: '00000000-0000-4000-8000-deadbeef0001' as ProjectId,
 				})
 				.pipe(Effect.exit);
 
-			assert.strictEqual(exit._tag, 'Failure');
+			assert.isTrue(Exit.isFailure(exit));
 		})
 	);
 });
 
-// Per-test user ids. The `Ref` is shared across the suite (the
-// `layer(...)` pattern), so we use a distinct UUID per test rather
-// than relying on a clean store.
-const testUserA = '00000000-0000-0000-0000-00000000000a' as UserId;
-const testUserB = '00000000-0000-0000-0000-00000000000b' as UserId;
-const testUserC = '00000000-0000-0000-0000-00000000000c' as UserId;
-const testUserD = '00000000-0000-0000-0000-00000000000d' as UserId;
-const testUserE = '00000000-0000-0000-0000-00000000000e' as UserId;
-const testUserF = '00000000-0000-0000-0000-00000000000f' as UserId;
-const testUserG = '00000000-0000-0000-0000-000000000010' as UserId;
-const testUserH = '00000000-0000-0000-0000-000000000011' as UserId;
-const testUserI = '00000000-0000-0000-0000-000000000012' as UserId;
-const testUserJ = '00000000-0000-0000-0000-000000000013' as UserId;
-const testUserK = '00000000-0000-0000-0000-000000000014' as UserId;
-const testUserL = '00000000-0000-0000-0000-000000000015' as UserId;
+// Distinct `userId` per test — the shared `Ref` survives across the suite.
+const testUserA = '00000000-0000-4000-8000-00000000000a' as UserId;
+const testUserB = '00000000-0000-4000-8000-00000000000b' as UserId;
+const testUserC = '00000000-0000-4000-8000-00000000000c' as UserId;
+const testUserD = '00000000-0000-4000-8000-00000000000d' as UserId;
+const testUserE = '00000000-0000-4000-8000-00000000000e' as UserId;
+const testUserF = '00000000-0000-4000-8000-00000000000f' as UserId;
+const testUserG = '00000000-0000-4000-8000-000000000010' as UserId;
+const testUserH = '00000000-0000-4000-8000-000000000011' as UserId;
+const testUserI = '00000000-0000-4000-8000-000000000012' as UserId;
+const testUserJ = '00000000-0000-4000-8000-000000000013' as UserId;
+const testUserK = '00000000-0000-4000-8000-000000000014' as UserId;
+const testUserL = '00000000-0000-4000-8000-000000000015' as UserId;
