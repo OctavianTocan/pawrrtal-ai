@@ -1,14 +1,15 @@
 <!--
 Sync Impact Report
-Version change: N/A -> 1.0.0
-Modified principles: placeholder set -> Pawrrtal operating principles
-Added sections: Pawrrtal Constraints, SpecKit Workflow
-Removed sections: placeholder sections only
+Version change: 1.0.0 -> 1.1.0
+Modified principles: none
+Added sections: none
+Expanded policy: Pawrrtal Constraints — added Hatchet (self-hosted, Tailscale-only)
+  as the mandated durable automation/workflow orchestration substrate.
 Templates requiring updates:
-- updated: .specify/templates/plan-template.md
-- updated: .specify/templates/tasks-template.md
-- reviewed: .specify/templates/spec-template.md
-- reviewed: .specify/templates/checklist-template.md
+- reviewed (no change needed): .specify/templates/plan-template.md
+- reviewed (no change needed): .specify/templates/tasks-template.md
+- reviewed (no change needed): .specify/templates/spec-template.md
+- reviewed (no change needed): .specify/templates/checklist-template.md
 Follow-up TODOs: none
 -->
 
@@ -72,6 +73,11 @@ plan's complexity section. Existing user work in the git tree MUST be preserved.
   runner policy documented in `AGENTS.md` and `.cursor/plugins/pawrrtal/rules/github-actions/`.
 - Task tracking in `.beans/` MUST be managed through the `beans` CLI only.
 - Public or user-facing URLs MUST be verified before sharing.
+- Durable automation and workflow orchestration MUST run on the self-hosted
+  **Hatchet** instance (private, Tailscale-only — never publicly exposed; see the
+  "Hatchet (self-hosted, Tailscale-only)" plan in Agent Plans), not ad-hoc inline
+  or cron orchestration. Rationale: Hatchet provides durable, retryable, observable
+  workflows, which is materially more robust as Pawrrtal's automations grow.
 
 ## SpecKit Workflow
 
@@ -98,4 +104,4 @@ redefined principles, MINOR for new principles or materially expanded policy,
 and PATCH for wording clarifications. Every `/speckit-plan` output MUST include
 a Constitution Check before Phase 0 research and re-check after Phase 1 design.
 
-**Version**: 1.0.0 | **Ratified**: 2026-06-15 | **Last Amended**: 2026-06-15
+**Version**: 1.1.0 | **Ratified**: 2026-06-15 | **Last Amended**: 2026-06-22
