@@ -173,7 +173,7 @@ package-lock.json
 *.db-journal
 
 # Local vendor reference clones (not submodules). See backend/vendor/README.md.
-backend/vendor/comcom/
+backend/vendor/effect-api-layout/
 backend/vendor/effect/
 
 # Docker

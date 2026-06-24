@@ -20,3 +20,15 @@ export class AuthenticationError extends Schema.TaggedErrorClass<AuthenticationE
 		httpApiStatus: 401,
 	}
 ) {}
+
+/** Authorization failure (HTTP 403). */
+export class AuthorizationError extends Schema.TaggedErrorClass<AuthorizationError>()(
+	'AuthorizationError',
+	{
+		message: Schema.String,
+		cause: Schema.Defect,
+	},
+	{
+		httpApiStatus: 403,
+	}
+) {}

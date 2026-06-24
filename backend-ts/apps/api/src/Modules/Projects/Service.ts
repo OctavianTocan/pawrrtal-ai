@@ -109,6 +109,7 @@ export const ProjectsServiceBody: Layer.Layer<ProjectsService, never, ProjectsRe
 );
 
 /** Production `ProjectsService` with file-backed {@link ProjectsRepoLive}. */
+// TODO: No using 'as'.
 export const ProjectsServiceLive: Layer.Layer<ProjectsService, never, never> = Layer.provide(
 	ProjectsServiceBody,
 	[ProjectsRepoLive]

@@ -145,7 +145,7 @@ _Avoid_: re-declaring `UserId` per-module (drift).
 
 **`'@apps/api/<Name>'`**
 : The Pawrrtal identifier form for `Context.Service` and
-`HttpApiMiddleware.Service` instances. Matches comcom's
+`HttpApiMiddleware.Service` instances. Matches the architecture-reference
 `'<scope>/<pkg>/<Module>'` rule. Locked in LR-0007.
 _Avoid_: bare v4 form (`"acme/HttpApi/Authorization"`); npm-scope
 form (`'@pawrrtal/api/...'`).
@@ -160,5 +160,5 @@ _Not_ the production implementation.
 **`Live` layer**
 : The runtime layer that talks to real I/O. Lands in `apps/api/...`,
 not in `api-core` (api-core is contract-only).
-_Avoid_: comcom's `Default`; smol's generic `layer` — Pawrrtal
+_Avoid_: architecture reference's `Default`; smol's generic `layer` — Pawrrtal
 pinned to `Live` (per LR-0002).

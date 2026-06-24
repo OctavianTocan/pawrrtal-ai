@@ -6,7 +6,7 @@ Reference and dependency sources for the Python backend and the planned Effect T
 |------|------------|-----------------|
 | `effect-smol/` | **Effect v4** ([Effect-TS/effect-smol](https://github.com/Effect-TS/effect-smol)), git submodule on `main` | **Source of truth** for new Effect TS code. API docs and walkthroughs live under `effect-smol/ai-docs/`. Pawrrtal wires packages via `file:` deps in `backend-ts/`. |
 | `effect/` | Effect **v3** copy (`effect@3.21.2`), not a submodule | Do **not** use for v4 work. Historical / local reference only. |
-| `comcom/` | Adaptive Thinking monorepo (Effect **v3** + layout patterns) | **Folder layout** reference (`packages/api-core`, `apps/api`). Do not copy v3 `@effect/platform` imports into Pawrrtal v4 code. |
+| `effect-api-layout/` | Local gitignored clone of a production Effect monorepo (Effect **v3** + layout patterns) | **Folder layout** reference (`packages/api-core`, `apps/api`). Do not copy v3 `@effect/platform` imports into Pawrrtal v4 code. Populate with `scripts/setup-vendor-effect-api-layout.sh`. |
 | `codex/` | OpenAI Codex CLI submodule | Agent tooling, unrelated to Effect. |
 
 ## Pinning `effect-smol`
@@ -19,6 +19,16 @@ cd ../../.. && git add backend/vendor/effect-smol
 ```
 
 Record the pinned commit in `backend-ts/README.md` when you bump the vendor tree.
+
+## Architecture reference clone (`effect-api-layout`)
+
+Not tracked in git. Run from repo root:
+
+```bash
+./scripts/setup-vendor-effect-api-layout.sh
+```
+
+Uses `ARCH_REF_SRC` (local directory to rsync) or `ARCH_REF_REPO_URL` (shallow clone). See the script for defaults.
 
 ## Canonical v4 HTTP walkthrough
 

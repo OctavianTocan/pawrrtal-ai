@@ -21,7 +21,7 @@ Hard gates (explicit return types, no unsafe casts, sentrux layers, 500-line fil
 |---|---|
 | Booleans | Verb prefix: `is*`, `has*`, `can*`, `should*`. Never negative. No boolean positional params — use an options object. |
 | React callbacks | Props: `on*`. Implementations: `handle*`. |
-| Constants | `UPPER_SNAKE_CASE` for env/config/fixed domain limits; else `camelCase`. |
+| Constants | See [Constants](#constants) — env string literals and domain defaults use `UPPER_SNAKE`; Effect `Config` descriptor bindings use `camelCase`. |
 | Parameters | Max **3** positional. Fourth+ goes in an options object. `(id, input)` or `(id, options?)`. |
 | Return types | **Every** function — exported or not — gets an explicit return type. |
 | Immutability | Default `readonly` for array/object params the function does not mutate. |
@@ -61,7 +61,34 @@ Match repo React rules: callback **props** are `onSomething`, local **handlers**
 
 ### Constants
 
-`UPPER_SNAKE_CASE` for environment variables, config keys, and fixed domain limits (`MAX_RETRIES`, `DEFAULT_PAGE_SIZE`). `camelCase` for everything else. See `.cursor/plugins/pawrrtal/rules/clean-code/named-constants.mdc`.
+`UPPER_SNAKE_CASE` vs `camelCase` depends on **what the binding holds**, not whether it is "config-related." See `.cursor/plugins/pawrrtal/rules/clean-code/named-constants.mdc` for magic-number extraction.
+
+| Binding | Case | Example |
+|---------|------|---------|
+| Env var **name** (string passed to `Config.string`, `process.env`, Pydantic field source) | `UPPER_SNAKE` | `'DATABASE_URL'`, `'SQLITE_DB_FILENAME'` |
+| Fixed domain literal at module scope (`DEFAULT_*`, `MAX_*`, tuning limits) | `UPPER_SNAKE` | `DEFAULT_SQLITE_DB_FILENAME`, `MAX_RETRIES` |
+| Effect `Config` **descriptor** (`Config.string(...).pipe(...)`, passed to `Config.all`) | `camelCase` | `databaseUrl`, `sqliteDbFilename` |
+| Exported config surface (`Config.Wrap`, settings object, layer config) | `PascalCase` | `DatabaseConfig` |
+| Everything else (locals, resolved runtime values, functions) | `camelCase` | `sqliteFilename`, `resolveFilename` |
+
+Descriptor names mirror the env setting in TypeScript style (Python `database_url` → `databaseUrl`). Keys in `Config.all({ databaseUrl, sqliteDbFilename })` must match the descriptor const names. Add a `Config` suffix only when the bare name collides with a resolved value in the same scope.
+
+```typescript
+const DEFAULT_SQLITE_DB_FILENAME = 'pawrrtal.db';
+
+const databaseUrl = Config.string('DATABASE_URL').pipe(Config.withDefault(''));
+const sqliteDbFilename = Config.string('SQLITE_DB_FILENAME').pipe(
+  Config.withDefault(DEFAULT_SQLITE_DB_FILENAME),
+);
+
+export const DatabaseConfig: Config.Wrap<{ readonly filename: string }> = {
+  filename: Config.all({ databaseUrl, sqliteDbFilename }).pipe(
+    Config.map(({ databaseUrl: url, sqliteDbFilename: filename }) =>
+      resolveFilename(url, filename),
+    ),
+  ),
+};
+```
 
 ### User-facing strings
 
@@ -278,6 +305,8 @@ cd backend-ts && bun run check && bun run typecheck && bun run test
 **HttpApi test auth.** Mirror production: pipe auth onto the handler layer (`handlerLayer.pipe(Layer.provide(AuthMiddlewareStubLive))`), same as `HttpProjectsLive.pipe(Layer.provide([..., HttpAuthLive]))`. Sibling `Effect.provide([auth, handler])` leaves middleware missing at route build time.
 
 **Test fixtures.** Use `new Project({...})` with **UUID v4** ids (`00000000-0000-4000-8000-…`) — `Schema` rejects non-v4. Assert failures with `Effect.exit` + `Cause.isFailReason`, not `Either` (removed in Effect v4).
+
+**Config naming (Effect TS).** Env strings inside `Config.string('…')` are `UPPER_SNAKE`; descriptor consts and `Config.all` keys are `camelCase`; shared literal defaults are `DEFAULT_*` / `MAX_*`. See [Constants](#constants).
 
 **Inline comments (Effect TS).** Add 1-line **WHY** only where the code diverges from the obvious pattern: duplicate-package hazards, layer composition order, vitest bundler quirks, SQL/driver workarounds. Do not narrate what `Layer.provide` does when the line already says it.
 

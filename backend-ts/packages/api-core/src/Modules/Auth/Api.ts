@@ -1,6 +1,7 @@
+import type { Never } from 'effect/Schema';
 import { HttpApiMiddleware, HttpApiSecurity } from 'effect/unstable/httpapi';
 import type { CurrentUser } from './Domain';
-import { AuthenticationError } from './Errors';
+import { AuthenticationError, AuthorizationError } from './Errors';
 
 /** Cookie auth middleware contract; runtime in `apps/api/.../Authentication/Http.ts`. */
 export class AuthenticationMiddlewareService extends HttpApiMiddleware.Service<
@@ -15,4 +16,17 @@ export class AuthenticationMiddlewareService extends HttpApiMiddleware.Service<
 	security: {
 		cookie: HttpApiSecurity.apiKey({ in: 'cookie', key: 'session_token' }),
 	},
+}) {}
+
+/** Middleware to check if the user is allowed to access the resource. */
+export class AllowedUserMiddlewareService extends HttpApiMiddleware.Service<
+	AllowedUserMiddlewareService,
+	{
+		requires: CurrentUser;
+		provides: Never;
+	}
+>()('AllowedUserMiddlewareService', {
+	error: AuthorizationError,
+	// Nothing to send to this one.
+	requiredForClient: false,
 }) {}
