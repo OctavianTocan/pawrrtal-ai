@@ -1,4 +1,3 @@
-import type { Never } from 'effect/Schema';
 import { HttpApiMiddleware, HttpApiSecurity } from 'effect/unstable/httpapi';
 import type { CurrentUser } from './Domain';
 import { AuthenticationError, AuthorizationError } from './Errors';
@@ -23,7 +22,7 @@ export class AllowedUserMiddlewareService extends HttpApiMiddleware.Service<
 	AllowedUserMiddlewareService,
 	{
 		requires: CurrentUser;
-		provides: Never;
+		provides: never;
 	}
 >()('AllowedUserMiddlewareService', {
 	error: AuthorizationError,

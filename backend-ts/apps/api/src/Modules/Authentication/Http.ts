@@ -33,28 +33,27 @@ export const AuthenticationLayer = Layer.effect(
 	})
 );
 
-/** Middleware to check if the user is allowed to access the resource. */
-export const AllowedUserLayer = Layer.effect(
+/* This is the correct way to implement the AllowedUserMiddlewareService. */
+const AllowedUserLayer = Layer.effect(
 	AllowedUserMiddlewareService,
 	Effect.gen(function* () {
 		yield* Effect.logInfo('Starting Allowed User middleware');
+		// Yield the AuthenticationConfig service.
 		const authenticationConfig = yield* AuthenticationConfig;
 		const allowedEmails = authenticationConfig.allowedEmails;
 
-		return AllowedUserMiddlewareService.of((httpEffect, _options) =>
+		// Return a function that will be used as the middleware.
+		return (httpEffect) =>
 			Effect.gen(function* () {
 				const user = yield* CurrentUser;
-				if (allowedEmails.size > 0 && !allowedEmails.has(user.email.toLowerCase())) {
-					return yield* Effect.fail(
-						new AuthorizationError({
-							message: 'This Pawrrtal deployment is private.',
-							cause: new Error('email not on allowlist'),
-						})
-					);
+				if (!allowedEmails.has(user.email)) {
+					return yield* new AuthorizationError({
+						message: 'User is not allowed to access this resource',
+						cause: new Error('User is not allowed to access this resource'),
+					});
 				}
 				return yield* httpEffect;
-			})
-		);
+			});
 	})
 );
 
