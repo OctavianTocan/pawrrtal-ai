@@ -14,7 +14,7 @@ import { ProjectNotFoundError } from '@pawrrtal/api-core/Modules/Projects/Errors
 import { DateTime, Effect, Exit, Layer } from 'effect';
 import { HttpApiBuilder, HttpApiTest } from 'effect/unstable/httpapi';
 import { describe, it } from 'vitest';
-import { AuthMiddlewareStubLive } from '../../_helpers/AuthStub';
+import { AllowedUserMiddlewareStubLive, AuthMiddlewareStubLive } from '../../_helpers/AuthStub';
 
 const STUB_USER_ID = '00000000-0000-4000-8000-000000000001' as UserId;
 const FAKE_PROJECT_ID = 'a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d' as ProjectId;
@@ -84,7 +84,11 @@ describe('Projects.Http (handler stubs)', () => {
 				Effect.provide([
 					platformLayer,
 					// Auth is a dependency of the handler layer (see `HttpProjectsLive`), not a sibling layer.
-					handlerLayer.pipe(Layer.provide(AuthMiddlewareStubLive)),
+					handlerLayer.pipe(
+						Layer.provide(
+							Layer.mergeAll(AuthMiddlewareStubLive, AllowedUserMiddlewareStubLive)
+						)
+					),
 				])
 			) as unknown as Effect.Effect<ProjectsTestClient, never, never>
 		);

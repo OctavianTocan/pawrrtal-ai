@@ -1,4 +1,7 @@
-import { AuthenticationMiddlewareService } from '@pawrrtal/api-core/Modules/Auth/Api';
+import {
+	AllowedUserMiddlewareService,
+	AuthenticationMiddlewareService,
+} from '@pawrrtal/api-core/Modules/Auth/Api';
 import { CurrentUser, User } from '@pawrrtal/api-core/Modules/Auth/Domain';
 import type { UserId } from '@pawrrtal/api-core/Modules/Projects/Domain';
 import { Effect, Layer } from 'effect';
@@ -16,3 +19,9 @@ export const AuthMiddlewareStubLive = Layer.succeed(AuthenticationMiddlewareServ
 	// Match production `AuthenticationLayer` shape; skip cookie → SessionStore lookup in unit tests.
 	cookie: (httpEffect) => Effect.provideService(httpEffect, CurrentUser, stubUser),
 });
+
+/** Injects a fixed `CurrentUser` for HttpApi groups that require allowed user middleware. */
+export const AllowedUserMiddlewareStubLive = Layer.succeed(
+	AllowedUserMiddlewareService,
+	(httpEffect) => Effect.provideService(httpEffect, CurrentUser, stubUser)
+);
