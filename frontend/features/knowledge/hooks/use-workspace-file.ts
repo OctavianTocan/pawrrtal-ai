@@ -17,16 +17,16 @@ import { API_ENDPOINTS } from '@/lib/api';
 import type { WorkspaceFileApiResponse } from '../types';
 
 export interface WorkspaceFileResult {
-	/**
-	 * File content as a UTF-8 string, or `null` while loading / on error.
-	 * Consumers should render a loading state when `isLoading` is true and
-	 * `content` is null.
-	 */
-	content: string | null;
-	/** True while the file fetch is in-flight. */
-	isLoading: boolean;
-	/** True if the fetch failed (file not found, permission error, etc.). */
-	isError: boolean;
+  /**
+   * File content as a UTF-8 string, or `null` while loading / on error.
+   * Consumers should render a loading state when `isLoading` is true and
+   * `content` is null.
+   */
+  content: string | null;
+  /** True while the file fetch is in-flight. */
+  isLoading: boolean;
+  /** True if the fetch failed (file not found, permission error, etc.). */
+  isError: boolean;
 }
 
 /**
@@ -36,33 +36,30 @@ export interface WorkspaceFileResult {
  * @param filePath    - Workspace-relative POSIX path, e.g. `memory/note.md`.
  *                      Pass `null` when no file is open.
  */
-export function useWorkspaceFile(
-	workspaceId: string | null,
-	filePath: string | null
-): WorkspaceFileResult {
-	const authedFetch = useAuthedFetch();
+export function useWorkspaceFile(workspaceId: string | null, filePath: string | null): WorkspaceFileResult {
+  const authedFetch = useAuthedFetch();
 
-	// Both IDs must be present; otherwise the hook is idle.
-	const enabled = !!workspaceId && !!filePath;
+  // Both IDs must be present; otherwise the hook is idle.
+  const enabled = !!workspaceId && !!filePath;
 
-	const query = useQuery<WorkspaceFileApiResponse>({
-		queryKey: ['workspace-file', workspaceId ?? '', filePath ?? ''],
-		queryFn: async () => {
-			// `enabled` above guarantees both are non-null when this runs.
-			const wsId = workspaceId ?? '';
-			const fp = filePath ?? '';
-			const res = await authedFetch(API_ENDPOINTS.workspaces.file(wsId, fp));
-			return res.json() as Promise<WorkspaceFileApiResponse>;
-		},
-		enabled,
-		// Cache file content for 60 seconds — aggressive enough to stay fresh
-		// while the user edits, conservative enough to avoid staleness.
-		staleTime: 60 * 1000,
-	});
+  const query = useQuery<WorkspaceFileApiResponse>({
+    queryKey: ['workspace-file', workspaceId ?? '', filePath ?? ''],
+    queryFn: async () => {
+      // `enabled` above guarantees both are non-null when this runs.
+      const wsId = workspaceId ?? '';
+      const fp = filePath ?? '';
+      const res = await authedFetch(API_ENDPOINTS.workspaces.file(wsId, fp));
+      return res.json() as Promise<WorkspaceFileApiResponse>;
+    },
+    enabled,
+    // Cache file content for 60 seconds — aggressive enough to stay fresh
+    // while the user edits, conservative enough to avoid staleness.
+    staleTime: 60 * 1000,
+  });
 
-	return {
-		content: query.data?.content ?? null,
-		isLoading: enabled && query.isLoading,
-		isError: query.isError,
-	};
+  return {
+    content: query.data?.content ?? null,
+    isLoading: enabled && query.isLoading,
+    isError: query.isError,
+  };
 }

@@ -20,43 +20,43 @@ import type { CalendarEventInfo, MemoryResultInfo, WebSourceInfo } from './tool-
 
 /** Plain text chunk from the assistant's main response. */
 export interface ChatDeltaEvent {
-	type: 'delta';
-	content: string;
+  type: 'delta';
+  content: string;
 }
 
 /** Reasoning / thinking chunk emitted before (or alongside) the answer. */
 export interface ChatThinkingEvent {
-	type: 'thinking';
-	content: string;
+  type: 'thinking';
+  content: string;
 }
 
 /** Assistant invoking a tool. */
 export interface ChatToolUseEvent {
-	type: 'tool_use';
-	tool_use_id: string;
-	name: string;
-	input: Record<string, unknown>;
-	display?: ToolDisplayPayload;
+  type: 'tool_use';
+  tool_use_id: string;
+  name: string;
+  input: Record<string, unknown>;
+  display?: ToolDisplayPayload;
 }
 
 /** Result returned for a previously emitted tool use. */
 export interface ChatToolResultEvent {
-	type: 'tool_result';
-	tool_use_id: string;
-	content: string;
+  type: 'tool_result';
+  tool_use_id: string;
+  content: string;
 }
 
 /** Non-terminal progress for a previously emitted tool use. */
 export interface ChatToolProgressEvent {
-	type: 'tool_progress';
-	tool_use_id: string;
-	content: string;
+  type: 'tool_progress';
+  tool_use_id: string;
+  content: string;
 }
 
 /** Backend-surfaced stream-level error (provider failure, rate limit, etc.). */
 export interface ChatErrorEvent {
-	type: 'error';
-	content: string;
+  type: 'error';
+  content: string;
 }
 
 /**
@@ -68,26 +68,26 @@ export interface ChatErrorEvent {
  * explanation of why the agent stopped.
  */
 export interface ChatAgentTerminatedEvent {
-	type: 'agent_terminated';
-	content: string;
+  type: 'agent_terminated';
+  content: string;
 }
 
 /** Sibling event emitted whenever the agent calls `render_artifact`. */
 export interface ChatArtifactEvent {
-	type: 'artifact';
-	artifact: ChatArtifactPayload;
+  type: 'artifact';
+  artifact: ChatArtifactPayload;
 }
 
 /** Discriminated union of every event the backend chat stream can emit. */
 export type ChatStreamEvent =
-	| ChatDeltaEvent
-	| ChatThinkingEvent
-	| ChatToolUseEvent
-	| ChatToolProgressEvent
-	| ChatToolResultEvent
-	| ChatArtifactEvent
-	| ChatErrorEvent
-	| ChatAgentTerminatedEvent;
+  | ChatDeltaEvent
+  | ChatThinkingEvent
+  | ChatToolUseEvent
+  | ChatToolProgressEvent
+  | ChatToolResultEvent
+  | ChatArtifactEvent
+  | ChatErrorEvent
+  | ChatAgentTerminatedEvent;
 
 /**
  * A tool invocation captured during streaming, enriched with pre-parsed
@@ -98,10 +98,10 @@ export type ChatStreamEvent =
  * while the chat reducer and renderer keep using the richer fields.
  */
 export interface ChatToolCall extends ChatToolCallBase {
-	/** Web result chips parsed from `result` for `web_search`. */
-	webSources?: WebSourceInfo[];
-	/** Calendar event chips parsed from `result` for `calendar_search`. */
-	calendarEvents?: CalendarEventInfo[];
-	/** Memory chips parsed from `result` for memory-flavoured tools. */
-	memoryResults?: MemoryResultInfo[];
+  /** Web result chips parsed from `result` for `web_search`. */
+  webSources?: WebSourceInfo[];
+  /** Calendar event chips parsed from `result` for `calendar_search`. */
+  calendarEvents?: CalendarEventInfo[];
+  /** Memory chips parsed from `result` for memory-flavoured tools. */
+  memoryResults?: MemoryResultInfo[];
 }

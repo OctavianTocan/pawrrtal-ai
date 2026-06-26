@@ -31,12 +31,12 @@ export type ChatReasoningLevel = (typeof CHAT_REASONING_LEVELS)[number];
  * the full set of persisted keys is visible at a glance.
  */
 export const CHAT_STORAGE_KEYS = {
-	/** User's most recently selected reasoning level. */
-	selectedReasoning: 'chat-composer:selected-reasoning-level',
-	/** Whether the Plan-mode toggle is currently visible in the toolbar. */
-	planModeVisible: 'chat-composer:plan-mode-visible',
-	/** Active safety / auto-review permission mode. */
-	safetyMode: 'chat-composer:safety-mode',
+  /** User's most recently selected reasoning level. */
+  selectedReasoning: 'chat-composer:selected-reasoning-level',
+  /** Whether the Plan-mode toggle is currently visible in the toolbar. */
+  planModeVisible: 'chat-composer:plan-mode-visible',
+  /** Active safety / auto-review permission mode. */
+  safetyMode: 'chat-composer:safety-mode',
 } as const;
 
 /** Union of every recognized chat `localStorage` key. */
@@ -70,12 +70,7 @@ export const DEFAULT_PLAN_MODE_VISIBLE = false;
  * composer toolbar. `as const` so the {@link SafetyMode} union and the
  * runtime guard are derived from one source of truth.
  */
-export const SAFETY_MODES = [
-	'default-permissions',
-	'auto-review',
-	'full-access',
-	'custom',
-] as const;
+export const SAFETY_MODES = ['default-permissions', 'auto-review', 'full-access', 'custom'] as const;
 
 /** Available safety / auto-review permission modes. */
 export type SafetyMode = (typeof SAFETY_MODES)[number];
@@ -87,21 +82,13 @@ export const DEFAULT_SAFETY_MODE: SafetyMode = 'auto-review';
  * Display order for the safety-mode dropdown (top → bottom).
  * Mirrors SAFETY_MODES but is explicit so future reorders are intentional.
  */
-export const SAFETY_MODE_ORDER: SafetyMode[] = [
-	'default-permissions',
-	'auto-review',
-	'full-access',
-	'custom',
-];
+export const SAFETY_MODE_ORDER: SafetyMode[] = ['default-permissions', 'auto-review', 'full-access', 'custom'];
 
 /**
  * "Advanced" modes — the dropdown renders a separator ABOVE the first item in
  * this set so users see a clear boundary between safe and dangerous choices.
  */
-export const SAFETY_MODE_ADVANCED: ReadonlySet<SafetyMode> = new Set<SafetyMode>([
-	'full-access',
-	'custom',
-]);
+export const SAFETY_MODE_ADVANCED: ReadonlySet<SafetyMode> = new Set<SafetyMode>(['full-access', 'custom']);
 
 // ─── miscellaneous chat-container constants ────────────────────────────────
 

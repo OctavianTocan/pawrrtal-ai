@@ -19,10 +19,10 @@ import { cn } from '@/lib/utils';
 import { sidebarNavRowSurfaceClassName } from './sidebar-nav-row-surface';
 
 export interface SidebarNavRowProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-	isSelected?: boolean;
-	density?: 'comfortable' | 'compact';
-	align?: 'start' | 'center';
-	ref?: React.Ref<HTMLButtonElement>;
+  isSelected?: boolean;
+  density?: 'comfortable' | 'compact';
+  align?: 'start' | 'center';
+  ref?: React.Ref<HTMLButtonElement>;
 }
 
 /**
@@ -31,23 +31,20 @@ export interface SidebarNavRowProps extends React.ButtonHTMLAttributes<HTMLButto
  * @returns A button element suitable for **`&lt;li&gt;`** children.
  */
 export function SidebarNavRow({
-	isSelected = false,
-	density = 'comfortable',
-	align = 'center',
-	className,
-	type = 'button',
-	ref,
-	...props
+  isSelected = false,
+  density = 'comfortable',
+  align = 'center',
+  className,
+  type = 'button',
+  ref,
+  ...props
 }: SidebarNavRowProps): React.JSX.Element {
-	return (
-		<button
-			ref={ref}
-			type={type}
-			className={cn(
-				sidebarNavRowSurfaceClassName({ selected: isSelected, density, align }),
-				className
-			)}
-			{...props}
-		/>
-	);
+  return (
+    <button
+      ref={ref}
+      type={type}
+      className={cn(sidebarNavRowSurfaceClassName({ selected: isSelected, density, align }), className)}
+      {...props}
+    />
+  );
 }

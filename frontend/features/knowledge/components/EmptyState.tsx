@@ -12,13 +12,13 @@ import type { ComponentType, ReactNode, SVGProps } from 'react';
 import { AppEmptyState } from '@/components/ui/app-empty-state';
 
 interface EmptyStateProps {
-	icon: ComponentType<SVGProps<SVGSVGElement>>;
-	title: string;
-	description: string;
-	action?: {
-		label: string;
-		onClick: () => void;
-	};
+  icon: ComponentType<SVGProps<SVGSVGElement>>;
+  title: string;
+  description: string;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 /**
@@ -26,13 +26,13 @@ interface EmptyStateProps {
  * this component never reads any state of its own.
  */
 export function EmptyState({ icon: Icon, title, description, action }: EmptyStateProps): ReactNode {
-	return (
-		<AppEmptyState
-			action={action}
-			description={description}
-			icon={<Icon aria-hidden="true" className="size-5" />}
-			title={title}
-			tone="card"
-		/>
-	);
+  return (
+    <AppEmptyState
+      action={action}
+      description={description}
+      icon={<Icon aria-hidden="true" className="size-5" />}
+      title={title}
+      tone="card"
+    />
+  );
 }

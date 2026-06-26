@@ -15,32 +15,32 @@ import type { ChatArtifactPayload } from '@/lib/types';
 import { ArtifactDialog } from './ArtifactDialog';
 
 interface ArtifactCardProps {
-	artifact: ChatArtifactPayload;
+  artifact: ChatArtifactPayload;
 }
 
 export function ArtifactCard({ artifact }: ArtifactCardProps): ReactNode {
-	const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(false);
 
-	return (
-		<>
-			<button
-				type="button"
-				onClick={() => setOpen(true)}
-				className="artifact-preview-card"
-				aria-label={`Open artifact "${artifact.title}"`}
-			>
-				<div className="artifact-preview-card-icon" aria-hidden="true">
-					<FileTextIcon className="size-4" />
-				</div>
-				<div className="artifact-preview-card-body">
-					<div className="artifact-preview-card-title">{artifact.title}</div>
-					<div className="artifact-preview-card-sub">Click to expand</div>
-				</div>
-				<div className="artifact-preview-card-chev" aria-hidden="true">
-					<ExpandIcon className="size-4" />
-				</div>
-			</button>
-			{open ? <ArtifactDialog artifact={artifact} onClose={() => setOpen(false)} /> : null}
-		</>
-	);
+  return (
+    <>
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="artifact-preview-card"
+        aria-label={`Open artifact "${artifact.title}"`}
+      >
+        <div className="artifact-preview-card-icon" aria-hidden="true">
+          <FileTextIcon className="size-4" />
+        </div>
+        <div className="artifact-preview-card-body">
+          <div className="artifact-preview-card-title">{artifact.title}</div>
+          <div className="artifact-preview-card-sub">Click to expand</div>
+        </div>
+        <div className="artifact-preview-card-chev" aria-hidden="true">
+          <ExpandIcon className="size-4" />
+        </div>
+      </button>
+      {open ? <ArtifactDialog artifact={artifact} onClose={() => setOpen(false)} /> : null}
+    </>
+  );
 }

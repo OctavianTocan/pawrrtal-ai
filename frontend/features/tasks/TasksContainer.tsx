@@ -33,9 +33,9 @@ import { useTasksHandlers } from './use-tasks-handlers';
  * id and resolved against the project list at render time.
  */
 function isTaskViewId(value: string | null): value is TaskViewId {
-	if (!value) return false;
-	const allowed: readonly string[] = Object.values(TASK_VIEWS);
-	return allowed.includes(value);
+  if (!value) return false;
+  const allowed: readonly string[] = Object.values(TASK_VIEWS);
+  return allowed.includes(value);
 }
 
 /**
@@ -44,7 +44,7 @@ function isTaskViewId(value: string | null): value is TaskViewId {
  * Set inside {@link useCollapsedSections}.
  */
 function isStringArray(value: unknown): value is readonly string[] {
-	return Array.isArray(value) && value.every((item) => typeof item === 'string');
+  return Array.isArray(value) && value.every((item) => typeof item === 'string');
 }
 
 /**
@@ -53,33 +53,33 @@ function isStringArray(value: unknown): value is readonly string[] {
  * for the consumer.
  */
 function useCollapsedSections(storageKey: string): {
-	value: ReadonlySet<string>;
-	toggle: (id: string) => void;
+  value: ReadonlySet<string>;
+  toggle: (id: string) => void;
 } {
-	const [array, setArray] = usePersistedState<readonly string[]>({
-		storageKey,
-		defaultValue: [],
-		validate: isStringArray,
-	});
+  const [array, setArray] = usePersistedState<readonly string[]>({
+    storageKey,
+    defaultValue: [],
+    validate: isStringArray,
+  });
 
-	const value = useMemo(() => new Set(array), [array]);
+  const value = useMemo(() => new Set(array), [array]);
 
-	const toggle = useCallback(
-		(id: string) => {
-			setArray((current) => {
-				const next = new Set(current);
-				if (next.has(id)) {
-					next.delete(id);
-				} else {
-					next.add(id);
-				}
-				return Array.from(next);
-			});
-		},
-		[setArray]
-	);
+  const toggle = useCallback(
+    (id: string) => {
+      setArray((current) => {
+        const next = new Set(current);
+        if (next.has(id)) {
+          next.delete(id);
+        } else {
+          next.add(id);
+        }
+        return Array.from(next);
+      });
+    },
+    [setArray]
+  );
 
-	return { value, toggle };
+  return { value, toggle };
 }
 
 /**
@@ -88,117 +88,113 @@ function useCollapsedSections(storageKey: string): {
  * component because it needs `useSearchParams` and local mock state.
  */
 function TasksContainerContent(): ReactNode {
-	const router = useRouter();
-	const searchParams = useSearchParams();
-	const { get } = searchParams;
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { get } = searchParams;
 
-	// ─── URL state ────────────────────────────────────────────────────────
-	const rawView = get(TASK_QUERY_KEYS.view);
-	const knownView = isTaskViewId(rawView) ? rawView : null;
-	const knownProject = useMemo(
-		() => (rawView ? (TASK_PROJECTS.find((project) => project.id === rawView) ?? null) : null),
-		[rawView]
-	);
-	const activeProjectId = knownProject?.id ?? null;
-	const activeView: TaskViewId =
-		knownView ?? (activeProjectId ? TASK_VIEWS.today : DEFAULT_TASK_VIEW);
+  // ─── URL state ────────────────────────────────────────────────────────
+  const rawView = get(TASK_QUERY_KEYS.view);
+  const knownView = isTaskViewId(rawView) ? rawView : null;
+  const knownProject = useMemo(
+    () => (rawView ? (TASK_PROJECTS.find((project) => project.id === rawView) ?? null) : null),
+    [rawView]
+  );
+  const activeProjectId = knownProject?.id ?? null;
+  const activeView: TaskViewId = knownView ?? (activeProjectId ? TASK_VIEWS.today : DEFAULT_TASK_VIEW);
 
-	// ─── Mock state (locally toggled completion + selection) ──────────────
-	const [completedIds, setCompletedIds] = usePersistedState<readonly string[]>({
-		storageKey: TASK_STORAGE_KEYS.completedTaskIds,
-		defaultValue: [],
-		validate: isStringArray,
-	});
-	const completedSet = useMemo(() => new Set(completedIds), [completedIds]);
+  // ─── Mock state (locally toggled completion + selection) ──────────────
+  const [completedIds, setCompletedIds] = usePersistedState<readonly string[]>({
+    storageKey: TASK_STORAGE_KEYS.completedTaskIds,
+    defaultValue: [],
+    validate: isStringArray,
+  });
+  const completedSet = useMemo(() => new Set(completedIds), [completedIds]);
 
-	const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
-	// Per-view collapsed sections — keyed by view so each view remembers
-	// its own state independently.
-	const collapsedKey = `${TASK_STORAGE_KEYS.collapsedSections}:${activeProjectId ?? activeView}`;
-	const collapsedSections = useCollapsedSections(collapsedKey);
+  // Per-view collapsed sections — keyed by view so each view remembers
+  // its own state independently.
+  const collapsedKey = `${TASK_STORAGE_KEYS.collapsedSections}:${activeProjectId ?? activeView}`;
+  const collapsedSections = useCollapsedSections(collapsedKey);
 
-	// ─── Compose the working task list with mock completion overrides ────
-	const workingTasks = useMemo(
-		() =>
-			TASK_SEED.map((task) =>
-				completedSet.has(task.id) ? { ...task, completed: true } : task
-			),
-		[completedSet]
-	);
+  // ─── Compose the working task list with mock completion overrides ────
+  const workingTasks = useMemo(
+    () => TASK_SEED.map((task) => (completedSet.has(task.id) ? { ...task, completed: true } : task)),
+    [completedSet]
+  );
 
-	const projectsById = useMemo(() => new Map(TASK_PROJECTS.map((p) => [p.id, p])), []);
+  const projectsById = useMemo(() => new Map(TASK_PROJECTS.map((p) => [p.id, p])), []);
 
-	// `now` is captured once at render so all binning + label formatting
-	// stays consistent across the same render — keeps DST / timezone edges
-	// from drifting between the Overdue and Today sections.
-	const now = useMemo(() => new Date(), []);
+  // `now` is captured once at render so all binning + label formatting
+  // stays consistent across the same render — keeps DST / timezone edges
+  // from drifting between the Overdue and Today sections.
+  const now = useMemo(() => new Date(), []);
 
-	const handleReschedule = useCallback(() => {
-		// Mock — clear all overdue rows so the "Reschedule" affordance has
-		// a satisfying outcome. Real implementation would batch-update due
-		// dates server-side.
-		setCompletedIds((current) => {
-			const next = new Set(current);
-			for (const task of workingTasks) {
-				if (!task.dueAt) continue;
-				if (isOverdue(task.dueAt, now) && !task.completed) {
-					next.add(task.id);
-				}
-			}
-			return Array.from(next);
-		});
-	}, [now, setCompletedIds, workingTasks]);
+  const handleReschedule = useCallback(() => {
+    // Mock — clear all overdue rows so the "Reschedule" affordance has
+    // a satisfying outcome. Real implementation would batch-update due
+    // dates server-side.
+    setCompletedIds((current) => {
+      const next = new Set(current);
+      for (const task of workingTasks) {
+        if (!task.dueAt) continue;
+        if (isOverdue(task.dueAt, now) && !task.completed) {
+          next.add(task.id);
+        }
+      }
+      return Array.from(next);
+    });
+  }, [now, setCompletedIds, workingTasks]);
 
-	const derivations = useTasksDerivations({
-		workingTasks,
-		activeView,
-		activeProjectId,
-		knownProject,
-		now,
-		onReschedule: handleReschedule,
-	});
+  const derivations = useTasksDerivations({
+    workingTasks,
+    activeView,
+    activeProjectId,
+    knownProject,
+    now,
+    onReschedule: handleReschedule,
+  });
 
-	// ─── Active task resolution ──────────────────────────────────────────
-	const activeTask = useMemo<Task | null>(() => {
-		if (!selectedTaskId) return null;
-		return workingTasks.find((task) => task.id === selectedTaskId) ?? null;
-	}, [selectedTaskId, workingTasks]);
+  // ─── Active task resolution ──────────────────────────────────────────
+  const activeTask = useMemo<Task | null>(() => {
+    if (!selectedTaskId) return null;
+    return workingTasks.find((task) => task.id === selectedTaskId) ?? null;
+  }, [selectedTaskId, workingTasks]);
 
-	const activeDueLabel = activeTask?.dueAt ? formatDueLabel(activeTask.dueAt, now) : null;
-	const activeIsOverdue = activeTask?.dueAt ? isOverdue(activeTask.dueAt, now) : false;
+  const activeDueLabel = activeTask?.dueAt ? formatDueLabel(activeTask.dueAt, now) : null;
+  const activeIsOverdue = activeTask?.dueAt ? isOverdue(activeTask.dueAt, now) : false;
 
-	// ─── Event handlers ──────────────────────────────────────────────────
-	const handlers = useTasksHandlers({ router, setSelectedTaskId, setCompletedIds });
+  // ─── Event handlers ──────────────────────────────────────────────────
+  const handlers = useTasksHandlers({ router, setSelectedTaskId, setCompletedIds });
 
-	return (
-		<TasksView
-			activeView={activeView}
-			activeProjectId={activeProjectId}
-			onSelectView={handlers.handleSelectView}
-			onSelectProject={handlers.handleSelectProject}
-			title={derivations.pageMeta.title}
-			subtitle={derivations.pageMeta.subtitle}
-			sections={derivations.sections}
-			collapsedSectionIds={collapsedSections.value}
-			onToggleCollapsed={collapsedSections.toggle}
-			projectsById={projectsById}
-			projects={TASK_PROJECTS}
-			listCounts={derivations.listCounts}
-			projectCounts={derivations.projectCounts}
-			activeTask={activeTask}
-			activeDueLabel={activeDueLabel}
-			activeIsOverdue={activeIsOverdue}
-			dueLabels={derivations.dueLabels}
-			overdueIds={derivations.overdueIds}
-			onToggleComplete={handlers.handleToggleComplete}
-			onSelectTask={handlers.handleSelectTask}
-			onCloseDetail={handlers.handleCloseDetail}
-			onOpenRowMenu={handlers.handleOpenRowMenu}
-			onAddTask={handlers.handleAddTask}
-			onNew={handlers.handleNew}
-		/>
-	);
+  return (
+    <TasksView
+      activeView={activeView}
+      activeProjectId={activeProjectId}
+      onSelectView={handlers.handleSelectView}
+      onSelectProject={handlers.handleSelectProject}
+      title={derivations.pageMeta.title}
+      subtitle={derivations.pageMeta.subtitle}
+      sections={derivations.sections}
+      collapsedSectionIds={collapsedSections.value}
+      onToggleCollapsed={collapsedSections.toggle}
+      projectsById={projectsById}
+      projects={TASK_PROJECTS}
+      listCounts={derivations.listCounts}
+      projectCounts={derivations.projectCounts}
+      activeTask={activeTask}
+      activeDueLabel={activeDueLabel}
+      activeIsOverdue={activeIsOverdue}
+      dueLabels={derivations.dueLabels}
+      overdueIds={derivations.overdueIds}
+      onToggleComplete={handlers.handleToggleComplete}
+      onSelectTask={handlers.handleSelectTask}
+      onCloseDetail={handlers.handleCloseDetail}
+      onOpenRowMenu={handlers.handleOpenRowMenu}
+      onAddTask={handlers.handleAddTask}
+      onNew={handlers.handleNew}
+    />
+  );
 }
 
 /**
@@ -207,9 +203,9 @@ function TasksContainerContent(): ReactNode {
  * outside the route entry.
  */
 export function TasksContainer(): ReactNode {
-	return (
-		<Suspense fallback={null}>
-			<TasksContainerContent />
-		</Suspense>
-	);
+  return (
+    <Suspense fallback={null}>
+      <TasksContainerContent />
+    </Suspense>
+  );
 }

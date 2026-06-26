@@ -14,13 +14,12 @@
  * them would orphan every user's collapsed-group preferences.
  */
 export const NAV_CHATS_STORAGE_KEYS = {
-	/** Set of date-group keys the user has manually collapsed in the sidebar list. */
-	collapsedGroups: 'nav-chats-collapsed-groups',
+  /** Set of date-group keys the user has manually collapsed in the sidebar list. */
+  collapsedGroups: 'nav-chats-collapsed-groups',
 } as const;
 
 /** Union of every recognized nav-chats `localStorage` key. */
-export type NavChatsStorageKey =
-	(typeof NAV_CHATS_STORAGE_KEYS)[keyof typeof NAV_CHATS_STORAGE_KEYS];
+export type NavChatsStorageKey = (typeof NAV_CHATS_STORAGE_KEYS)[keyof typeof NAV_CHATS_STORAGE_KEYS];
 
 /**
  * Stable group key for the Archived bucket rendered at the bottom of the
@@ -44,16 +43,16 @@ export const ARCHIVED_GROUP_KEY = '__archived__';
  * conversation row's JSON `labels` array.
  */
 export const NAV_CHATS_LABELS = [
-	{ id: 'bug', name: 'Bug', color: '#ef4444' },
-	{ id: 'feature', name: 'Feature', color: '#3b82f6' },
-	{ id: 'idea', name: 'Idea', color: '#a855f7' },
-	{ id: 'question', name: 'Question', color: '#eab308' },
-	{ id: 'reference', name: 'Reference', color: '#10b981' },
-	// Auto-applied by the backend when the user's heartbeat
-	// conversation is lazy-created on first `/api/v1/heartbeat/sync`.
-	// The row is undeletable server-side; pinning above the date
-	// groups in the sidebar is a frontend follow-up.
-	{ id: 'heartbeat', name: 'Heartbeat', color: '#ec4899' },
+  { id: 'bug', name: 'Bug', color: '#ef4444' },
+  { id: 'feature', name: 'Feature', color: '#3b82f6' },
+  { id: 'idea', name: 'Idea', color: '#a855f7' },
+  { id: 'question', name: 'Question', color: '#eab308' },
+  { id: 'reference', name: 'Reference', color: '#10b981' },
+  // Auto-applied by the backend when the user's heartbeat
+  // conversation is lazy-created on first `/api/v1/heartbeat/sync`.
+  // The row is undeletable server-side; pinning above the date
+  // groups in the sidebar is a frontend follow-up.
+  { id: 'heartbeat', name: 'Heartbeat', color: '#ec4899' },
 ] as const satisfies ReadonlyArray<{ id: string; name: string; color: string }>;
 
 /** Union of every pre-defined label ID. Use as the storage shape on conversations. */
@@ -61,5 +60,5 @@ export type NavChatsLabelId = (typeof NAV_CHATS_LABELS)[number]['id'];
 
 /** Look up a label's display metadata by ID, returning undefined for unknown IDs. */
 export function getLabelById(id: string): (typeof NAV_CHATS_LABELS)[number] | undefined {
-	return NAV_CHATS_LABELS.find((label) => label.id === id);
+  return NAV_CHATS_LABELS.find((label) => label.id === id);
 }

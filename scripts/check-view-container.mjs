@@ -64,25 +64,25 @@ const SCAN_ROOTS = ['frontend/features', 'frontend/components'];
 
 /** Directory names we never descend into. */
 const SKIP_DIRECTORIES = new Set([
-	'node_modules',
-	'.next',
-	'dist',
-	'build',
-	'.venv',
-	'__pycache__',
-	'.beans',
-	'.claude',
-	'.cursor',
-	'.agents',
-	'.codex',
-	'.opencode',
-	'.crush',
-	'.zed',
-	'.vscode',
-	'.sentrux',
-	'.private',
-	'tests',
-	'__tests__',
+  'node_modules',
+  '.next',
+  'dist',
+  'build',
+  '.venv',
+  '__pycache__',
+  '.beans',
+  '.claude',
+  '.cursor',
+  '.agents',
+  '.codex',
+  '.opencode',
+  '.crush',
+  '.zed',
+  '.vscode',
+  '.sentrux',
+  '.private',
+  'tests',
+  '__tests__',
 ]);
 
 /** Only `.tsx` files declare components — `.ts` is plumbing. */
@@ -92,13 +92,7 @@ const TARGET_EXTENSIONS = new Set(['.tsx']);
 const EXEMPT_SUFFIXES = ['.test.tsx', '.spec.tsx', '.stories.tsx', '.d.ts'];
 
 /** Bare filenames (no leading directory) that are always exempt. */
-const EXEMPT_FILENAMES = new Set([
-	'page.tsx',
-	'layout.tsx',
-	'loading.tsx',
-	'error.tsx',
-	'not-found.tsx',
-]);
+const EXEMPT_FILENAMES = new Set(['page.tsx', 'layout.tsx', 'loading.tsx', 'error.tsx', 'not-found.tsx']);
 
 /**
  * Repo-relative path fragments exempt from scanning entirely.
@@ -108,12 +102,12 @@ const EXEMPT_FILENAMES = new Set([
  * split rules.
  */
 const EXEMPT_PATH_FRAGMENTS = [
-	'frontend/components/ui/', // shadcn-generated primitives
-	'frontend/components/ai-elements/', // vendored upstream AI Elements
-	'frontend/lib/react-dropdown/', // vendored sibling package
-	'frontend/lib/react-overlay/', // vendored sibling package
-	'frontend/lib/react-chat-composer/', // vendored sibling package
-	'routeTree.gen.ts', // TanStack Router generated
+  'frontend/components/ui/', // shadcn-generated primitives
+  'frontend/components/ai-elements/', // vendored upstream AI Elements
+  'frontend/lib/react-dropdown/', // vendored sibling package
+  'frontend/lib/react-overlay/', // vendored sibling package
+  'frontend/lib/react-chat-composer/', // vendored sibling package
+  'routeTree.gen.ts', // TanStack Router generated
 ];
 
 /**
@@ -135,34 +129,34 @@ const EXEMPT_PATH_FRAGMENTS = [
  * Container split. Remove each entry from the set as its split lands.
  */
 const EXEMPT_FILES = new Set([
-	// IMPURE_VIEW — views that still reach for hooks beyond the allowlist.
-	'frontend/features/chat/ChatView.tsx',
-	'frontend/features/nav-chats/components/NavChatsView.tsx',
-	'frontend/features/nav-chats/components/ConversationSidebarItemView.tsx',
-	// MONOLITH — non-view components big enough to warrant a split. Sorted by
-	// score descending to match the audit output the day this list was seeded.
-	'frontend/features/settings/sections/AppearanceSection.tsx',
-	'frontend/features/chat/ChatContainer.tsx',
-	'frontend/features/knowledge/components/DocumentViewer.tsx',
-	'frontend/features/tasks/TasksContainer.tsx',
-	'frontend/features/nav-chats/context/sidebar-focus.tsx',
-	'frontend/features/settings/sections/AppearanceRows.tsx',
-	'frontend/features/nav-chats/NavChats.tsx',
-	'frontend/features/onboarding/v2/OnboardingFlow.tsx',
-	'frontend/features/projects/components/ProjectsList.tsx',
-	'frontend/features/settings/primitives.tsx',
-	'frontend/features/onboarding/OnboardingModal.tsx',
-	'frontend/components/signup-form.tsx',
-	'frontend/components/nav-user.tsx',
-	'frontend/features/channels/TelegramConnectDialog.tsx',
-	'frontend/features/auth/LoginForm.tsx',
-	'frontend/features/chat/components/AssistantMessage.tsx',
-	'frontend/features/knowledge/components/MyFilesPanel.tsx',
-	'frontend/features/settings/sections/PersonalizationSection.tsx',
-	'frontend/features/knowledge/KnowledgeContainer.tsx',
-	'frontend/features/projects/components/CreateProjectModal.tsx',
-	'frontend/features/settings/SettingsLayout.tsx',
-	'frontend/features/nav-chats/context/chat-activity-context.tsx',
+  // IMPURE_VIEW — views that still reach for hooks beyond the allowlist.
+  'frontend/features/chat/ChatView.tsx',
+  'frontend/features/nav-chats/components/NavChatsView.tsx',
+  'frontend/features/nav-chats/components/ConversationSidebarItemView.tsx',
+  // MONOLITH — non-view components big enough to warrant a split. Sorted by
+  // score descending to match the audit output the day this list was seeded.
+  'frontend/features/settings/sections/AppearanceSection.tsx',
+  'frontend/features/chat/ChatContainer.tsx',
+  'frontend/features/knowledge/components/DocumentViewer.tsx',
+  'frontend/features/tasks/TasksContainer.tsx',
+  'frontend/features/nav-chats/context/sidebar-focus.tsx',
+  'frontend/features/settings/sections/AppearanceRows.tsx',
+  'frontend/features/nav-chats/NavChats.tsx',
+  'frontend/features/onboarding/v2/OnboardingFlow.tsx',
+  'frontend/features/projects/components/ProjectsList.tsx',
+  'frontend/features/settings/primitives.tsx',
+  'frontend/features/onboarding/OnboardingModal.tsx',
+  'frontend/components/signup-form.tsx',
+  'frontend/components/nav-user.tsx',
+  'frontend/features/channels/TelegramConnectDialog.tsx',
+  'frontend/features/auth/LoginForm.tsx',
+  'frontend/features/chat/components/AssistantMessage.tsx',
+  'frontend/features/knowledge/components/MyFilesPanel.tsx',
+  'frontend/features/settings/sections/PersonalizationSection.tsx',
+  'frontend/features/knowledge/KnowledgeContainer.tsx',
+  'frontend/features/projects/components/CreateProjectModal.tsx',
+  'frontend/features/settings/SettingsLayout.tsx',
+  'frontend/features/nav-chats/context/chat-activity-context.tsx',
 ]);
 
 /**
@@ -178,7 +172,7 @@ const ts = require_('typescript');
 
 /** Names that fit the React hook convention: `use<Uppercase>`. */
 function isHookName(name) {
-	return typeof name === 'string' && /^use[A-Z]/.test(name);
+  return typeof name === 'string' && /^use[A-Z]/.test(name);
 }
 
 /**
@@ -189,50 +183,50 @@ function isHookName(name) {
  *     module with hooks isn't a component)
  */
 function analyseFile(sourceFile) {
-	const hookCalls = [];
-	let hasJsx = false;
+  const hookCalls = [];
+  let hasJsx = false;
 
-	function visit(node) {
-		// JSX detection covers both `<div />` and `<Frag>`.
-		if (
-			node.kind === ts.SyntaxKind.JsxElement ||
-			node.kind === ts.SyntaxKind.JsxSelfClosingElement ||
-			node.kind === ts.SyntaxKind.JsxFragment
-		) {
-			hasJsx = true;
-		}
+  function visit(node) {
+    // JSX detection covers both `<div />` and `<Frag>`.
+    if (
+      node.kind === ts.SyntaxKind.JsxElement ||
+      node.kind === ts.SyntaxKind.JsxSelfClosingElement ||
+      node.kind === ts.SyntaxKind.JsxFragment
+    ) {
+      hasJsx = true;
+    }
 
-		if (node.kind === ts.SyntaxKind.CallExpression) {
-			const callee = node.expression;
-			let name;
-			if (callee.kind === ts.SyntaxKind.Identifier) {
-				name = String(callee.escapedText ?? callee.text ?? '');
-			} else if (
-				callee.kind === ts.SyntaxKind.PropertyAccessExpression &&
-				callee.name &&
-				callee.name.kind === ts.SyntaxKind.Identifier
-			) {
-				// Matches `React.useState()`, `something.useFoo()`.
-				name = String(callee.name.escapedText ?? callee.name.text ?? '');
-			}
-			if (name && isHookName(name)) {
-				const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
-				hookCalls.push({ name, line: line + 1 });
-			}
-		}
+    if (node.kind === ts.SyntaxKind.CallExpression) {
+      const callee = node.expression;
+      let name;
+      if (callee.kind === ts.SyntaxKind.Identifier) {
+        name = String(callee.escapedText ?? callee.text ?? '');
+      } else if (
+        callee.kind === ts.SyntaxKind.PropertyAccessExpression &&
+        callee.name &&
+        callee.name.kind === ts.SyntaxKind.Identifier
+      ) {
+        // Matches `React.useState()`, `something.useFoo()`.
+        name = String(callee.name.escapedText ?? callee.name.text ?? '');
+      }
+      if (name && isHookName(name)) {
+        const { line } = sourceFile.getLineAndCharacterOfPosition(node.getStart());
+        hookCalls.push({ name, line: line + 1 });
+      }
+    }
 
-		ts.forEachChild(node, visit);
-	}
+    ts.forEachChild(node, visit);
+  }
 
-	ts.forEachChild(sourceFile, visit);
-	return { hookCalls, hasJsx };
+  ts.forEachChild(sourceFile, visit);
+  return { hookCalls, hasJsx };
 }
 
 function countLines(source) {
-	if (source.length === 0) return 0;
-	// `split('\n').length` is one off when the file lacks a trailing newline,
-	// but the difference of 1 is irrelevant against the LOC threshold.
-	return source.split('\n').length;
+  if (source.length === 0) return 0;
+  // `split('\n').length` is one off when the file lacks a trailing newline,
+  // but the difference of 1 is irrelevant against the LOC threshold.
+  return source.split('\n').length;
 }
 
 /**
@@ -242,145 +236,141 @@ function countLines(source) {
  * how many hooks it calls. (Containers are *expected* to call hooks.)
  */
 async function hasPairedView(filePath) {
-	const dir = path.dirname(filePath);
-	const baseName = path.basename(filePath, '.tsx');
-	// Views don't pair with themselves; only checked for non-View files.
-	if (baseName.endsWith('View')) return false;
-	const candidate = path.join(dir, `${baseName}View.tsx`);
-	try {
-		await fs.access(candidate);
-		return true;
-	} catch {
-		return false;
-	}
+  const dir = path.dirname(filePath);
+  const baseName = path.basename(filePath, '.tsx');
+  // Views don't pair with themselves; only checked for non-View files.
+  if (baseName.endsWith('View')) return false;
+  const candidate = path.join(dir, `${baseName}View.tsx`);
+  try {
+    await fs.access(candidate);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Returns the list of offenders found in `filePath`. */
 async function checkFile(filePath, repoRelative) {
-	const source = await fs.readFile(filePath, 'utf8');
-	const sourceFile = ts.createSourceFile(
-		filePath,
-		source,
-		ts.ScriptTarget.Latest,
-		/* setParentNodes */ true,
-		ts.ScriptKind.TSX
-	);
-	const { hookCalls, hasJsx } = analyseFile(sourceFile);
-	const lineCount = countLines(source);
-	const baseName = path.basename(filePath);
-	const isView = baseName.endsWith('View.tsx');
+  const source = await fs.readFile(filePath, 'utf8');
+  const sourceFile = ts.createSourceFile(
+    filePath,
+    source,
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ true,
+    ts.ScriptKind.TSX
+  );
+  const { hookCalls, hasJsx } = analyseFile(sourceFile);
+  const lineCount = countLines(source);
+  const baseName = path.basename(filePath);
+  const isView = baseName.endsWith('View.tsx');
 
-	const offenders = [];
+  const offenders = [];
 
-	if (isView) {
-		// IMPURE_VIEW: any hook outside the pure-derivation allowlist.
-		const impureHooks = hookCalls.filter((hook) => !PURE_VIEW_HOOK_ALLOWLIST.has(hook.name));
-		if (impureHooks.length > 0) {
-			offenders.push({
-				severity: 'IMPURE_VIEW',
-				path: repoRelative,
-				score: impureHooks.length,
-				summary: `${impureHooks.length} disallowed hook call(s): ${impureHooks
-					.slice(0, 4)
-					.map((hook) => `${hook.name}() @ L${hook.line}`)
-					.join(', ')}${impureHooks.length > 4 ? ', …' : ''}`,
-				detail: { hookCount: hookCalls.length, lineCount, impureHooks },
-			});
-		}
-		return offenders;
-	}
+  if (isView) {
+    // IMPURE_VIEW: any hook outside the pure-derivation allowlist.
+    const impureHooks = hookCalls.filter((hook) => !PURE_VIEW_HOOK_ALLOWLIST.has(hook.name));
+    if (impureHooks.length > 0) {
+      offenders.push({
+        severity: 'IMPURE_VIEW',
+        path: repoRelative,
+        score: impureHooks.length,
+        summary: `${impureHooks.length} disallowed hook call(s): ${impureHooks
+          .slice(0, 4)
+          .map((hook) => `${hook.name}() @ L${hook.line}`)
+          .join(', ')}${impureHooks.length > 4 ? ', …' : ''}`,
+        detail: { hookCount: hookCalls.length, lineCount, impureHooks },
+      });
+    }
+    return offenders;
+  }
 
-	// MONOLITH path: only relevant for files that actually render JSX.
-	if (!hasJsx) return offenders;
-	if (lineCount < MONOLITH_LOC_THRESHOLD) return offenders;
-	if (hookCalls.length < MONOLITH_MIN_HOOKS) return offenders;
-	// A file with a paired `*View.tsx` sibling has already been split — it's a
-	// container, and containers are expected to call hooks. Don't flag.
-	if (await hasPairedView(filePath)) return offenders;
+  // MONOLITH path: only relevant for files that actually render JSX.
+  if (!hasJsx) return offenders;
+  if (lineCount < MONOLITH_LOC_THRESHOLD) return offenders;
+  if (hookCalls.length < MONOLITH_MIN_HOOKS) return offenders;
+  // A file with a paired `*View.tsx` sibling has already been split — it's a
+  // container, and containers are expected to call hooks. Don't flag.
+  if (await hasPairedView(filePath)) return offenders;
 
-	const score = hookCalls.length * Math.ceil(lineCount / 100);
-	offenders.push({
-		severity: 'MONOLITH',
-		path: repoRelative,
-		score,
-		summary: `score=${score} hooks=${hookCalls.length} loc=${lineCount} — candidate for View/Container split`,
-		detail: { hookCount: hookCalls.length, lineCount },
-	});
-	return offenders;
+  const score = hookCalls.length * Math.ceil(lineCount / 100);
+  offenders.push({
+    severity: 'MONOLITH',
+    path: repoRelative,
+    score,
+    summary: `score=${score} hooks=${hookCalls.length} loc=${lineCount} — candidate for View/Container split`,
+    detail: { hookCount: hookCalls.length, lineCount },
+  });
+  return offenders;
 }
 
 async function* walkDir(dir) {
-	let entries;
-	try {
-		entries = await fs.readdir(dir, { withFileTypes: true });
-	} catch {
-		return;
-	}
-	for (const entry of entries) {
-		if (entry.isDirectory()) {
-			if (SKIP_DIRECTORIES.has(entry.name)) continue;
-			yield* walkDir(path.join(dir, entry.name));
-			continue;
-		}
-		if (!entry.isFile()) continue;
-		const ext = path.extname(entry.name);
-		if (!TARGET_EXTENSIONS.has(ext)) continue;
-		if (EXEMPT_SUFFIXES.some((suffix) => entry.name.endsWith(suffix))) continue;
-		if (EXEMPT_FILENAMES.has(entry.name)) continue;
-		yield path.join(dir, entry.name);
-	}
+  let entries;
+  try {
+    entries = await fs.readdir(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      if (SKIP_DIRECTORIES.has(entry.name)) continue;
+      yield* walkDir(path.join(dir, entry.name));
+      continue;
+    }
+    if (!entry.isFile()) continue;
+    const ext = path.extname(entry.name);
+    if (!TARGET_EXTENSIONS.has(ext)) continue;
+    if (EXEMPT_SUFFIXES.some((suffix) => entry.name.endsWith(suffix))) continue;
+    if (EXEMPT_FILENAMES.has(entry.name)) continue;
+    yield path.join(dir, entry.name);
+  }
 }
 
 async function main() {
-	const offenders = [];
-	for (const root of SCAN_ROOTS) {
-		const absoluteRoot = path.join(REPO_ROOT, root);
-		try {
-			await fs.access(absoluteRoot);
-		} catch {
-			continue;
-		}
-		for await (const filePath of walkDir(absoluteRoot)) {
-			const relative = path.relative(REPO_ROOT, filePath);
-			if (EXEMPT_PATH_FRAGMENTS.some((fragment) => relative.includes(fragment))) continue;
-			if (EXEMPT_FILES.has(relative)) continue;
-			const fileOffenders = await checkFile(filePath, relative);
-			offenders.push(...fileOffenders);
-		}
-	}
+  const offenders = [];
+  for (const root of SCAN_ROOTS) {
+    const absoluteRoot = path.join(REPO_ROOT, root);
+    try {
+      await fs.access(absoluteRoot);
+    } catch {
+      continue;
+    }
+    for await (const filePath of walkDir(absoluteRoot)) {
+      const relative = path.relative(REPO_ROOT, filePath);
+      if (EXEMPT_PATH_FRAGMENTS.some((fragment) => relative.includes(fragment))) continue;
+      if (EXEMPT_FILES.has(relative)) continue;
+      const fileOffenders = await checkFile(filePath, relative);
+      offenders.push(...fileOffenders);
+    }
+  }
 
-	if (offenders.length === 0) {
-		console.log('check-view-container: OK (no IMPURE_VIEW or MONOLITH offenders)');
-		return;
-	}
+  if (offenders.length === 0) {
+    console.log('check-view-container: OK (no IMPURE_VIEW or MONOLITH offenders)');
+    return;
+  }
 
-	// IMPURE_VIEW is more severe than MONOLITH (the rule was explicitly broken
-	// rather than a soft signal that a file is growing). Sort by severity, then
-	// score descending, then path for stability.
-	const severityRank = { IMPURE_VIEW: 0, MONOLITH: 1 };
-	offenders.sort(
-		(left, right) =>
-			severityRank[left.severity] - severityRank[right.severity] ||
-			right.score - left.score ||
-			left.path.localeCompare(right.path)
-	);
+  // IMPURE_VIEW is more severe than MONOLITH (the rule was explicitly broken
+  // rather than a soft signal that a file is growing). Sort by severity, then
+  // score descending, then path for stability.
+  const severityRank = { IMPURE_VIEW: 0, MONOLITH: 1 };
+  offenders.sort(
+    (left, right) =>
+      severityRank[left.severity] - severityRank[right.severity] ||
+      right.score - left.score ||
+      left.path.localeCompare(right.path)
+  );
 
-	const impureCount = offenders.filter((o) => o.severity === 'IMPURE_VIEW').length;
-	const monolithCount = offenders.filter((o) => o.severity === 'MONOLITH').length;
-	const mode = IS_STRICT ? 'STRICT' : 'advisory';
-	console.error(
-		`check-view-container [${mode}]: ${impureCount} IMPURE_VIEW, ${monolithCount} MONOLITH offender(s):\n`
-	);
-	for (const offender of offenders) {
-		console.error(
-			`  ${offender.severity.padEnd(12)}  ${offender.path}\n      ${offender.summary}`
-		);
-	}
-	console.error(
-		'\nIMPURE_VIEW: move the disallowed hooks into the paired container component.\nMONOLITH: split into a `<Name>Container.tsx` (hooks + state) + `<Name>View.tsx` (pure presentation).\nSee `.claude/rules/react/view-container-split.md` for the pattern.'
-	);
+  const impureCount = offenders.filter((o) => o.severity === 'IMPURE_VIEW').length;
+  const monolithCount = offenders.filter((o) => o.severity === 'MONOLITH').length;
+  const mode = IS_STRICT ? 'STRICT' : 'advisory';
+  console.error(`check-view-container [${mode}]: ${impureCount} IMPURE_VIEW, ${monolithCount} MONOLITH offender(s):\n`);
+  for (const offender of offenders) {
+    console.error(`  ${offender.severity.padEnd(12)}  ${offender.path}\n      ${offender.summary}`);
+  }
+  console.error(
+    '\nIMPURE_VIEW: move the disallowed hooks into the paired container component.\nMONOLITH: split into a `<Name>Container.tsx` (hooks + state) + `<Name>View.tsx` (pure presentation).\nSee `.claude/rules/react/view-container-split.md` for the pattern.'
+  );
 
-	if (IS_STRICT) process.exitCode = 1;
+  if (IS_STRICT) process.exitCode = 1;
 }
 
 await main();

@@ -44,23 +44,23 @@ import { useKnowledgeUrlState } from './use-knowledge-url-state';
 
 /** Spinner shown while the workspace tree loads. */
 function TreeLoadingState(): ReactNode {
-	return (
-		<div className="flex h-full items-center justify-center text-muted-foreground">
-			<LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-			<span className="ml-2 text-[13px]">Loading workspace&hellip;</span>
-		</div>
-	);
+  return (
+    <div className="flex h-full items-center justify-center text-muted-foreground">
+      <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+      <span className="ml-2 text-[13px]">Loading workspace&hellip;</span>
+    </div>
+  );
 }
 
 /** Error banner shown when the workspace tree fetch fails. */
 function TreeErrorState({ message }: { message: string }): ReactNode {
-	return (
-		<div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center text-muted-foreground">
-			<AlertCircleIcon className="size-5 text-destructive" aria-hidden="true" />
-			<p className="text-[13px] font-medium text-foreground">Couldn't load your workspace</p>
-			<p className="max-w-[340px] text-[12px]">{message}</p>
-		</div>
-	);
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center text-muted-foreground">
+      <AlertCircleIcon className="size-5 text-destructive" aria-hidden="true" />
+      <p className="text-[13px] font-medium text-foreground">Couldn't load your workspace</p>
+      <p className="max-w-[340px] text-[12px]">{message}</p>
+    </div>
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -73,81 +73,69 @@ function TreeErrorState({ message }: { message: string }): ReactNode {
  * component because the underlying hooks need `useSearchParams`.
  */
 export function KnowledgeContainer(): ReactNode {
-	const {
-		activeView,
-		folderSegments,
-		currentNode,
-		crumbs,
-		openFile,
-		tree,
-		workspaceId,
-		openFilePath,
-	} = useKnowledgeUrlState();
-	const handlers = useKnowledgeNavigation(folderSegments);
+  const { activeView, folderSegments, currentNode, crumbs, openFile, tree, workspaceId, openFilePath } =
+    useKnowledgeUrlState();
+  const handlers = useKnowledgeNavigation(folderSegments);
 
-	// File-write mutation. The hook is always called (Rules of Hooks); when
-	// `workspaceId` is null the mutation rejects, which is surfaced as an
-	// inline banner inside the DocumentViewer.
-	const writeFile = useWriteWorkspaceFile(workspaceId);
+  // File-write mutation. The hook is always called (Rules of Hooks); when
+  // `workspaceId` is null the mutation rejects, which is surfaced as an
+  // inline banner inside the DocumentViewer.
+  const writeFile = useWriteWorkspaceFile(workspaceId);
 
-	// Save handler: only constructed when there's an open file path so the
-	// `Edit` button stays hidden on folder views (the viewer hides it when
-	// `onSave` is undefined).
-	const handleSaveFile = useCallback(
-		async (newContent: string) => {
-			if (!openFilePath) {
-				throw new Error('No file is open — cannot save.');
-			}
-			await writeFile.mutateAsync({ filePath: openFilePath, content: newContent });
-		},
-		[openFilePath, writeFile]
-	);
-	const onSaveFile = openFilePath ? handleSaveFile : undefined;
+  // Save handler: only constructed when there's an open file path so the
+  // `Edit` button stays hidden on folder views (the viewer hides it when
+  // `onSave` is undefined).
+  const handleSaveFile = useCallback(
+    async (newContent: string) => {
+      if (!openFilePath) {
+        throw new Error('No file is open — cannot save.');
+      }
+      await writeFile.mutateAsync({ filePath: openFilePath, content: newContent });
+    },
+    [openFilePath, writeFile]
+  );
+  const onSaveFile = openFilePath ? handleSaveFile : undefined;
 
-	// Surface tree loading / error inline so the sub-sidebar stays
-	// visible (the user can still switch to Memory / Brain Access while
-	// files load).
-	if (tree.isLoading && activeView === KNOWLEDGE_VIEWS.myFiles) {
-		return (
-			<KnowledgeView
-				activeView={activeView}
-				currentNode={null}
-				crumbs={crumbs}
-				openFile={null}
-				memoryCards={KNOWLEDGE_MEMORY_CARDS}
-				contentOverride={<TreeLoadingState />}
-				{...handlers}
-			/>
-		);
-	}
+  // Surface tree loading / error inline so the sub-sidebar stays
+  // visible (the user can still switch to Memory / Brain Access while
+  // files load).
+  if (tree.isLoading && activeView === KNOWLEDGE_VIEWS.myFiles) {
+    return (
+      <KnowledgeView
+        activeView={activeView}
+        currentNode={null}
+        crumbs={crumbs}
+        openFile={null}
+        memoryCards={KNOWLEDGE_MEMORY_CARDS}
+        contentOverride={<TreeLoadingState />}
+        {...handlers}
+      />
+    );
+  }
 
-	if (tree.isError && activeView === KNOWLEDGE_VIEWS.myFiles) {
-		return (
-			<KnowledgeView
-				activeView={activeView}
-				currentNode={null}
-				crumbs={crumbs}
-				openFile={null}
-				memoryCards={KNOWLEDGE_MEMORY_CARDS}
-				contentOverride={
-					<TreeErrorState
-						message={tree.error?.message ?? 'Unknown error — check the backend.'}
-					/>
-				}
-				{...handlers}
-			/>
-		);
-	}
+  if (tree.isError && activeView === KNOWLEDGE_VIEWS.myFiles) {
+    return (
+      <KnowledgeView
+        activeView={activeView}
+        currentNode={null}
+        crumbs={crumbs}
+        openFile={null}
+        memoryCards={KNOWLEDGE_MEMORY_CARDS}
+        contentOverride={<TreeErrorState message={tree.error?.message ?? 'Unknown error — check the backend.'} />}
+        {...handlers}
+      />
+    );
+  }
 
-	return (
-		<KnowledgeView
-			activeView={activeView}
-			currentNode={currentNode}
-			crumbs={crumbs}
-			openFile={openFile}
-			onSaveFile={onSaveFile}
-			memoryCards={KNOWLEDGE_MEMORY_CARDS}
-			{...handlers}
-		/>
-	);
+  return (
+    <KnowledgeView
+      activeView={activeView}
+      currentNode={currentNode}
+      crumbs={crumbs}
+      openFile={openFile}
+      onSaveFile={onSaveFile}
+      memoryCards={KNOWLEDGE_MEMORY_CARDS}
+      {...handlers}
+    />
+  );
 }

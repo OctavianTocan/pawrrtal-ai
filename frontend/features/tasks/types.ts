@@ -43,14 +43,14 @@ export type TaskProjectTone = (typeof TASK_PROJECT_TONES)[number];
  * accepts so projects render consistently across the surface.
  */
 export interface TaskProject {
-	/** Stable identifier — used as the React key, the URL slug, and the chip key. */
-	id: string;
-	/** Display label rendered in the chip and the sub-sidebar row. */
-	name: string;
-	/** Optional emoji glyph rendered to the left of the chip label. Survival-mode badges use this. */
-	emoji?: string;
-	/** Tint mapping for the chip's background and text color. */
-	tone: TaskProjectTone;
+  /** Stable identifier — used as the React key, the URL slug, and the chip key. */
+  id: string;
+  /** Display label rendered in the chip and the sub-sidebar row. */
+  name: string;
+  /** Optional emoji glyph rendered to the left of the chip label. Survival-mode badges use this. */
+  emoji?: string;
+  /** Tint mapping for the chip's background and text color. */
+  tone: TaskProjectTone;
 }
 
 /**
@@ -61,24 +61,24 @@ export interface TaskProject {
  * without breaking existing rows.
  */
 export interface Task {
-	/** Stable identifier — used as the React key and any future routing slug. */
-	id: string;
-	/** One-line title shown in the row's primary text slot. */
-	title: string;
-	/** Optional one-line description rendered under the title (clamped to one line). */
-	description?: string;
-	/** Due moment — `null` means "no due date" (only valid in the Inbox view). */
-	dueAt: Date | null;
-	/** Mock completion state — toggled locally, never persisted. */
-	completed: boolean;
-	/** Priority bucket controlling checkbox ring and section sort weight. */
-	priority: TaskPriority;
-	/** Foreign key to {@link TaskProject.id}. */
-	projectId: string;
-	/** Lower-cased tag list rendered as `#tag` chips in the metadata strip. */
-	tags: readonly string[];
-	/** Optional flag set — the only currently-supported value is `survival-mode`. */
-	flags?: readonly TaskFlag[];
+  /** Stable identifier — used as the React key and any future routing slug. */
+  id: string;
+  /** One-line title shown in the row's primary text slot. */
+  title: string;
+  /** Optional one-line description rendered under the title (clamped to one line). */
+  description?: string;
+  /** Due moment — `null` means "no due date" (only valid in the Inbox view). */
+  dueAt: Date | null;
+  /** Mock completion state — toggled locally, never persisted. */
+  completed: boolean;
+  /** Priority bucket controlling checkbox ring and section sort weight. */
+  priority: TaskPriority;
+  /** Foreign key to {@link TaskProject.id}. */
+  projectId: string;
+  /** Lower-cased tag list rendered as `#tag` chips in the metadata strip. */
+  tags: readonly string[];
+  /** Optional flag set — the only currently-supported value is `survival-mode`. */
+  flags?: readonly TaskFlag[];
 }
 
 /**
@@ -96,25 +96,25 @@ export type TaskFlag = 'survival-mode' | 'flagged';
  * from its `dueAt` relative to "now"; the view never re-bins.
  */
 export interface TaskSectionData {
-	/** Stable section key used for collapse persistence and React keys. */
-	id: string;
-	/** Heading label rendered in the section header (e.g. `Overdue`, `Today`). */
-	label: string;
-	/** Optional subtitle to the right of the heading (e.g. `Mon 5 May`). */
-	subtitle?: string;
-	/** Tasks belonging to this section, already sorted in display order. */
-	tasks: readonly Task[];
-	/**
-	 * When set, the section header renders this affordance to the right of
-	 * the title (e.g. an Overdue section showing a "Reschedule" link).
-	 */
-	rightAction?: {
-		label: string;
-		onClick: () => void;
-	};
-	/**
-	 * Optional tone for the section header text. Defaults to neutral — only
-	 * Overdue uses `destructive` so the urgency reads at a glance.
-	 */
-	tone?: 'neutral' | 'destructive';
+  /** Stable section key used for collapse persistence and React keys. */
+  id: string;
+  /** Heading label rendered in the section header (e.g. `Overdue`, `Today`). */
+  label: string;
+  /** Optional subtitle to the right of the heading (e.g. `Mon 5 May`). */
+  subtitle?: string;
+  /** Tasks belonging to this section, already sorted in display order. */
+  tasks: readonly Task[];
+  /**
+   * When set, the section header renders this affordance to the right of
+   * the title (e.g. an Overdue section showing a "Reschedule" link).
+   */
+  rightAction?: {
+    label: string;
+    onClick: () => void;
+  };
+  /**
+   * Optional tone for the section header text. Defaults to neutral — only
+   * Overdue uses `destructive` so the urgency reads at a glance.
+   */
+  tone?: 'neutral' | 'destructive';
 }

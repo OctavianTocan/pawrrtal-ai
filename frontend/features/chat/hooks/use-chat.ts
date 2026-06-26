@@ -22,22 +22,22 @@ const STREAM_DONE = Symbol('STREAM_DONE');
  * bridge translates into a multimodal content block.
  */
 export type ChatImageInput = {
-	/** Base64-encoded image bytes, with the `data:<mime>;base64,` prefix stripped. */
-	data: string;
-	/** Allowed image MIME types — must match the backend `ChatImageInput.media_type` literal union. */
-	media_type: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
+  /** Base64-encoded image bytes, with the `data:<mime>;base64,` prefix stripped. */
+  data: string;
+  /** Allowed image MIME types — must match the backend `ChatImageInput.media_type` literal union. */
+  media_type: 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp';
 };
 
 /** Allowed `type` field values for chat SSE events. */
 const CHAT_EVENT_TYPES = [
-	'delta',
-	'thinking',
-	'tool_use',
-	'tool_progress',
-	'tool_result',
-	'artifact',
-	'error',
-	'agent_terminated',
+  'delta',
+  'thinking',
+  'tool_use',
+  'tool_progress',
+  'tool_result',
+  'artifact',
+  'error',
+  'agent_terminated',
 ] as const;
 
 /**
@@ -49,11 +49,11 @@ const CHAT_EVENT_TYPES = [
  * passed JSON.parse and originate from our own backend contract.
  */
 function asChatStreamEvent(value: unknown): ChatStreamEvent | null {
-	if (!value || typeof value !== 'object') return null;
-	const candidate = value as { type?: unknown };
-	if (typeof candidate.type !== 'string') return null;
-	if (!(CHAT_EVENT_TYPES as readonly string[]).includes(candidate.type)) return null;
-	return value as ChatStreamEvent;
+  if (!value || typeof value !== 'object') return null;
+  const candidate = value as { type?: unknown };
+  if (typeof candidate.type !== 'string') return null;
+  if (!(CHAT_EVENT_TYPES as readonly string[]).includes(candidate.type)) return null;
+  return value as ChatStreamEvent;
 }
 
 /**
@@ -63,18 +63,18 @@ function asChatStreamEvent(value: unknown): ChatStreamEvent | null {
  *   unparseable frames (e.g., comment lines, partial frames).
  */
 function parseSseFrame(raw: string): ChatStreamEvent | typeof STREAM_DONE | null {
-	if (!raw.startsWith('data: ')) return null;
+  if (!raw.startsWith('data: ')) return null;
 
-	const data = raw.slice(6);
+  const data = raw.slice(6);
 
-	if (data.includes('[DONE]')) return STREAM_DONE;
+  if (data.includes('[DONE]')) return STREAM_DONE;
 
-	try {
-		return asChatStreamEvent(JSON.parse(data));
-	} catch {
-		// Ignore parse errors from incomplete SSE frames.
-		return null;
-	}
+  try {
+    return asChatStreamEvent(JSON.parse(data));
+  } catch {
+    // Ignore parse errors from incomplete SSE frames.
+    return null;
+  }
 }
 
 /**
@@ -85,19 +85,19 @@ function parseSseFrame(raw: string): ChatStreamEvent | typeof STREAM_DONE | null
  * `error` events so the outer transport can fail the request.
  */
 function* parseFrameBatch(frames: string[]): Generator<ChatStreamEvent, 'done' | 'continue'> {
-	for (const frame of frames) {
-		const parsed = parseSseFrame(frame);
-		if (parsed === null) continue;
-		if (parsed === STREAM_DONE) return 'done';
-		if (parsed.type === 'error') {
-			throw new Error(parsed.content || 'Chat stream failed.');
-		}
-		// agent_terminated is a controlled stop, not an exception — yield it
-		// to the reducer so the UI can display a distinct notice rather than
-		// a generic error banner.
-		yield parsed;
-	}
-	return 'continue';
+  for (const frame of frames) {
+    const parsed = parseSseFrame(frame);
+    if (parsed === null) continue;
+    if (parsed === STREAM_DONE) return 'done';
+    if (parsed.type === 'error') {
+      throw new Error(parsed.content || 'Chat stream failed.');
+    }
+    // agent_terminated is a controlled stop, not an exception — yield it
+    // to the reducer so the UI can display a distinct notice rather than
+    // a generic error banner.
+    yield parsed;
+  }
+  return 'continue';
 }
 
 /**
@@ -108,11 +108,11 @@ function* parseFrameBatch(frames: string[]): Generator<ChatStreamEvent, 'done' |
  * keeps propagating.
  */
 function safeReleaseLock(reader: { releaseLock: () => void }): void {
-	try {
-		reader.releaseLock();
-	} catch {
-		// Stream already errored — nothing to release.
-	}
+  try {
+    reader.releaseLock();
+  } catch {
+    // Stream already errored — nothing to release.
+  }
 }
 
 /**
@@ -124,69 +124,69 @@ function safeReleaseLock(reader: { releaseLock: () => void }): void {
  *   failed assistant message.
  */
 export function useChat(): {
-	streamMessage: (
-		message: string,
-		conversationId: string,
-		modelId: string,
-		reasoningEffort: ChatReasoningLevel,
-		images?: readonly ChatImageInput[]
-	) => AsyncGenerator<ChatStreamEvent>;
+  streamMessage: (
+    message: string,
+    conversationId: string,
+    modelId: string,
+    reasoningEffort: ChatReasoningLevel,
+    images?: readonly ChatImageInput[]
+  ) => AsyncGenerator<ChatStreamEvent>;
 } {
-	const fetcher = useAuthedFetch();
+  const fetcher = useAuthedFetch();
 
-	async function* streamMessage(
-		message: string,
-		conversationId: string,
-		modelId: string,
-		reasoningEffort: ChatReasoningLevel,
-		images?: readonly ChatImageInput[]
-	): AsyncGenerator<ChatStreamEvent> {
-		const response = await fetcher(API_ENDPOINTS.chat.messages, {
-			method: 'POST',
-			body: JSON.stringify({
-				question: message,
-				conversation_id: conversationId,
-				model_id: modelId,
-				reasoning_effort: reasoningEffort,
-				// Only include `images` when the user actually attached one — keeps
-				// the wire payload identical to the pre-multimodal contract for
-				// the common text-only path.
-				...(images && images.length > 0 ? { images } : {}),
-			}),
-			headers: {
-				'Content-Type': 'application/json',
-				Accept: 'text/event-stream',
-			},
-		});
+  async function* streamMessage(
+    message: string,
+    conversationId: string,
+    modelId: string,
+    reasoningEffort: ChatReasoningLevel,
+    images?: readonly ChatImageInput[]
+  ): AsyncGenerator<ChatStreamEvent> {
+    const response = await fetcher(API_ENDPOINTS.chat.messages, {
+      method: 'POST',
+      body: JSON.stringify({
+        question: message,
+        conversation_id: conversationId,
+        model_id: modelId,
+        reasoning_effort: reasoningEffort,
+        // Only include `images` when the user actually attached one — keeps
+        // the wire payload identical to the pre-multimodal contract for
+        // the common text-only path.
+        ...(images && images.length > 0 ? { images } : {}),
+      }),
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
+    });
 
-		if (!response.body) throw new Error('Failed to get response body from chat API');
+    if (!response.body) throw new Error('Failed to get response body from chat API');
 
-		// Pipe raw bytes through a text decoder so we can read string chunks.
-		const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
+    // Pipe raw bytes through a text decoder so we can read string chunks.
+    const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
 
-		// SSE frames can arrive split across chunks — buffer partial frames here.
-		let buffer = '';
+    // SSE frames can arrive split across chunks — buffer partial frames here.
+    let buffer = '';
 
-		try {
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) break;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-				buffer += value;
+        buffer += value;
 
-				// SSE events are delimited by double newlines.
-				const frames = buffer.split('\n\n');
+        // SSE events are delimited by double newlines.
+        const frames = buffer.split('\n\n');
 
-				// The last element is either empty or a partial frame — keep it buffered.
-				buffer = frames.pop() ?? '';
+        // The last element is either empty or a partial frame — keep it buffered.
+        buffer = frames.pop() ?? '';
 
-				const status = yield* parseFrameBatch(frames);
-				if (status === 'done') return;
-			}
-		} finally {
-			safeReleaseLock(reader);
-		}
-	}
+        const status = yield* parseFrameBatch(frames);
+        if (status === 'done') return;
+      }
+    } finally {
+      safeReleaseLock(reader);
+    }
+  }
 
-	return { streamMessage };
+  return { streamMessage };
 }

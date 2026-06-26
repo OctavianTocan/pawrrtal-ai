@@ -24,52 +24,52 @@ import { TASK_VIEWS } from './constants';
 import type { Task, TaskProject, TaskSectionData, TaskViewId } from './types';
 
 export interface TasksViewProps {
-	activeView: TaskViewId;
-	onSelectView: (view: TaskViewId) => void;
-	onSelectProject: (projectId: string) => void;
+  activeView: TaskViewId;
+  onSelectView: (view: TaskViewId) => void;
+  onSelectProject: (projectId: string) => void;
 
-	/** Active project id when the container is showing `?view=<projectId>`. */
-	activeProjectId: string | null;
+  /** Active project id when the container is showing `?view=<projectId>`. */
+  activeProjectId: string | null;
 
-	/** Title rendered in the editorial page header. */
-	title: string;
-	/** Secondary line under the title (e.g. `22 tasks`). */
-	subtitle: string;
+  /** Title rendered in the editorial page header. */
+  title: string;
+  /** Secondary line under the title (e.g. `22 tasks`). */
+  subtitle: string;
 
-	/** Sections already binned + sorted by the container. */
-	sections: readonly TaskSectionData[];
+  /** Sections already binned + sorted by the container. */
+  sections: readonly TaskSectionData[];
 
-	/** Set of section IDs the user has collapsed in this view. */
-	collapsedSectionIds: ReadonlySet<string>;
-	onToggleCollapsed: (sectionId: string) => void;
+  /** Set of section IDs the user has collapsed in this view. */
+  collapsedSectionIds: ReadonlySet<string>;
+  onToggleCollapsed: (sectionId: string) => void;
 
-	/** Project lookup used by both rows and the detail pane. */
-	projectsById: ReadonlyMap<string, TaskProject>;
-	/** Full project list for the sub-sidebar. */
-	projects: readonly TaskProject[];
-	/** Per-list open task counts (for the sidebar). */
-	listCounts: Readonly<Partial<Record<TaskViewId, number>>>;
-	/** Per-project open task counts (for the sidebar). */
-	projectCounts: Readonly<Record<string, number>>;
+  /** Project lookup used by both rows and the detail pane. */
+  projectsById: ReadonlyMap<string, TaskProject>;
+  /** Full project list for the sub-sidebar. */
+  projects: readonly TaskProject[];
+  /** Per-list open task counts (for the sidebar). */
+  listCounts: Readonly<Partial<Record<TaskViewId, number>>>;
+  /** Per-project open task counts (for the sidebar). */
+  projectCounts: Readonly<Record<string, number>>;
 
-	/** Active task — opens the detail pane when set. */
-	activeTask: Task | null;
-	/** Pre-formatted due-date label for the active task. */
-	activeDueLabel: string | null;
-	/** Whether the active task is overdue. */
-	activeIsOverdue: boolean;
+  /** Active task — opens the detail pane when set. */
+  activeTask: Task | null;
+  /** Pre-formatted due-date label for the active task. */
+  activeDueLabel: string | null;
+  /** Whether the active task is overdue. */
+  activeIsOverdue: boolean;
 
-	/** Per-task pre-formatted due labels for the row strip. */
-	dueLabels: ReadonlyMap<string, string>;
-	/** Per-task overdue flags. */
-	overdueIds: ReadonlySet<string>;
+  /** Per-task pre-formatted due labels for the row strip. */
+  dueLabels: ReadonlyMap<string, string>;
+  /** Per-task overdue flags. */
+  overdueIds: ReadonlySet<string>;
 
-	onToggleComplete: (taskId: string) => void;
-	onSelectTask: (taskId: string) => void;
-	onCloseDetail: () => void;
-	onOpenRowMenu: (taskId: string) => void;
-	onAddTask: (title: string) => void;
-	onNew: () => void;
+  onToggleComplete: (taskId: string) => void;
+  onSelectTask: (taskId: string) => void;
+  onCloseDetail: () => void;
+  onOpenRowMenu: (taskId: string) => void;
+  onAddTask: (title: string) => void;
+  onNew: () => void;
 }
 
 /**
@@ -78,114 +78,108 @@ export interface TasksViewProps {
  * provided by `AppShell`.
  */
 export function TasksView(props: TasksViewProps): ReactNode {
-	const {
-		activeView,
-		onSelectView,
-		onSelectProject,
-		activeProjectId,
-		title,
-		subtitle,
-		sections,
-		collapsedSectionIds,
-		onToggleCollapsed,
-		projectsById,
-		projects,
-		listCounts,
-		projectCounts,
-		activeTask,
-		activeDueLabel,
-		activeIsOverdue,
-		dueLabels,
-		overdueIds,
-		onToggleComplete,
-		onSelectTask,
-		onCloseDetail,
-		onOpenRowMenu,
-		onAddTask,
-		onNew,
-	} = props;
+  const {
+    activeView,
+    onSelectView,
+    onSelectProject,
+    activeProjectId,
+    title,
+    subtitle,
+    sections,
+    collapsedSectionIds,
+    onToggleCollapsed,
+    projectsById,
+    projects,
+    listCounts,
+    projectCounts,
+    activeTask,
+    activeDueLabel,
+    activeIsOverdue,
+    dueLabels,
+    overdueIds,
+    onToggleComplete,
+    onSelectTask,
+    onCloseDetail,
+    onOpenRowMenu,
+    onAddTask,
+    onNew,
+  } = props;
 
-	return (
-		// Match the chat home panel: `rounded-surface-lg`, `shadow-panel-floating`,
-		// background = `--background-elevated`. Inline style mirrors `ChatView` —
-		// the Tailwind `bg-background-elevated` utility was observed to skip
-		// hot-reload re-derivations during preset switching, so we anchor the
-		// var directly. See `frontend/features/chat/ChatView.tsx`.
-		<div
-			className="relative flex h-full min-h-0 w-full min-w-0 overflow-hidden rounded-surface-lg shadow-panel-floating"
-			style={{ backgroundColor: 'var(--background-elevated)' }}
-		>
-			<TasksSubSidebar
-				activeView={activeView}
-				activeProjectId={activeProjectId}
-				onSelectView={onSelectView}
-				onSelectProject={onSelectProject}
-				onNew={onNew}
-				listCounts={listCounts}
-				projects={projects}
-				projectCounts={projectCounts}
-			/>
+  return (
+    // Match the chat home panel: `rounded-surface-lg`, `shadow-panel-floating`,
+    // background = `--background-elevated`. Inline style mirrors `ChatView` —
+    // the Tailwind `bg-background-elevated` utility was observed to skip
+    // hot-reload re-derivations during preset switching, so we anchor the
+    // var directly. See `frontend/features/chat/ChatView.tsx`.
+    <div
+      className="relative flex h-full min-h-0 w-full min-w-0 overflow-hidden rounded-surface-lg shadow-panel-floating"
+      style={{ backgroundColor: 'var(--background-elevated)' }}
+    >
+      <TasksSubSidebar
+        activeView={activeView}
+        activeProjectId={activeProjectId}
+        onSelectView={onSelectView}
+        onSelectProject={onSelectProject}
+        onNew={onNew}
+        listCounts={listCounts}
+        projects={projects}
+        projectCounts={projectCounts}
+      />
 
-			<section className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-				<TasksHeader title={title} subtitle={subtitle} />
+      <section className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+        <TasksHeader title={title} subtitle={subtitle} />
 
-				<div className="min-h-0 flex-1 overflow-y-auto px-6 pb-10">
-					{sections.length === 0 ? (
-						<TasksEmptyView activeView={activeView} onSelectView={onSelectView} />
-					) : (
-						<div className="flex flex-col gap-4">
-							<TaskQuickAdd onAdd={onAddTask} />
-							<div className="flex flex-col">
-								{sections.map((section) => (
-									<TaskSection
-										key={section.id}
-										section={section}
-										collapsed={collapsedSectionIds.has(section.id)}
-										onToggleCollapsed={() => onToggleCollapsed(section.id)}
-									>
-										<ul className="flex flex-col">
-											{section.tasks.map((task) => {
-												const project = projectsById.get(task.projectId);
-												if (!project) return null;
-												return (
-													<li key={task.id}>
-														<TaskRow
-															task={task}
-															project={project}
-															dueLabel={
-																dueLabels.get(task.id) ?? null
-															}
-															isOverdue={overdueIds.has(task.id)}
-															isActive={activeTask?.id === task.id}
-															onToggleComplete={() =>
-																onToggleComplete(task.id)
-															}
-															onSelect={() => onSelectTask(task.id)}
-															onOpenMenu={() =>
-																onOpenRowMenu(task.id)
-															}
-														/>
-													</li>
-												);
-											})}
-										</ul>
-									</TaskSection>
-								))}
-							</div>
-						</div>
-					)}
-				</div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-10">
+          {sections.length === 0 ? (
+            <TasksEmptyView activeView={activeView} onSelectView={onSelectView} />
+          ) : (
+            <div className="flex flex-col gap-4">
+              <TaskQuickAdd onAdd={onAddTask} />
+              <div className="flex flex-col">
+                {sections.map((section) => (
+                  <TaskSection
+                    key={section.id}
+                    section={section}
+                    collapsed={collapsedSectionIds.has(section.id)}
+                    onToggleCollapsed={() => onToggleCollapsed(section.id)}
+                  >
+                    <ul className="flex flex-col">
+                      {section.tasks.map((task) => {
+                        const project = projectsById.get(task.projectId);
+                        if (!project) return null;
+                        return (
+                          <li key={task.id}>
+                            <TaskRow
+                              task={task}
+                              project={project}
+                              dueLabel={dueLabels.get(task.id) ?? null}
+                              isOverdue={overdueIds.has(task.id)}
+                              isActive={activeTask?.id === task.id}
+                              onToggleComplete={() => onToggleComplete(task.id)}
+                              onSelect={() => onSelectTask(task.id)}
+                              onOpenMenu={() => onOpenRowMenu(task.id)}
+                            />
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </TaskSection>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
 
-				<TaskDetailPane
-					task={activeTask}
-					project={activeTask ? (projectsById.get(activeTask.projectId) ?? null) : null}
-					dueLabel={activeDueLabel}
-					isOverdue={activeIsOverdue}
-					onClose={onCloseDetail}
-				/>
-			</section>
-		</div>
-	);
+        <TaskDetailPane
+          task={activeTask}
+          project={activeTask ? (projectsById.get(activeTask.projectId) ?? null) : null}
+          dueLabel={activeDueLabel}
+          isOverdue={activeIsOverdue}
+          onClose={onCloseDetail}
+        />
+      </section>
+    </div>
+  );
 }
 
 /**
@@ -196,39 +190,39 @@ export function TasksView(props: TasksViewProps): ReactNode {
  * not "404."
  */
 function TasksEmptyView({
-	activeView,
-	onSelectView,
+  activeView,
+  onSelectView,
 }: {
-	activeView: TaskViewId;
-	onSelectView: (view: TaskViewId) => void;
+  activeView: TaskViewId;
+  onSelectView: (view: TaskViewId) => void;
 }): ReactNode {
-	if (activeView === TASK_VIEWS.today) {
-		return (
-			<TasksEmptyState
-				icon={CalendarCheck2Icon}
-				title="All clear for today."
-				description="Nothing on the docket. Take the breather, or pull a few from Upcoming."
-				action={{
-					label: 'Plan tomorrow',
-					onClick: () => onSelectView(TASK_VIEWS.upcoming),
-				}}
-			/>
-		);
-	}
-	if (activeView === TASK_VIEWS.inbox) {
-		return (
-			<TasksEmptyState
-				icon={InboxIcon}
-				title="Inbox at zero."
-				description="Stash undated ideas here — they’ll wait for you to triage."
-			/>
-		);
-	}
-	return (
-		<TasksEmptyState
-			icon={CalendarCheck2Icon}
-			title="Nothing here yet."
-			description="Switch lists, or add a task using the bar above."
-		/>
-	);
+  if (activeView === TASK_VIEWS.today) {
+    return (
+      <TasksEmptyState
+        icon={CalendarCheck2Icon}
+        title="All clear for today."
+        description="Nothing on the docket. Take the breather, or pull a few from Upcoming."
+        action={{
+          label: 'Plan tomorrow',
+          onClick: () => onSelectView(TASK_VIEWS.upcoming),
+        }}
+      />
+    );
+  }
+  if (activeView === TASK_VIEWS.inbox) {
+    return (
+      <TasksEmptyState
+        icon={InboxIcon}
+        title="Inbox at zero."
+        description="Stash undated ideas here — they’ll wait for you to triage."
+      />
+    );
+  }
+  return (
+    <TasksEmptyState
+      icon={CalendarCheck2Icon}
+      title="Nothing here yet."
+      description="Switch lists, or add a task using the bar above."
+    />
+  );
 }

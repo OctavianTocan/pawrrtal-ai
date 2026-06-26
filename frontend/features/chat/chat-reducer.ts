@@ -15,16 +15,16 @@ import type { ChatStreamEvent, ChatToolCall } from './types';
  * via this helper so React can short-circuit unrelated rows.
  */
 export function updateLastAssistantMessage(
-	messages: Array<ChatMessage>,
-	update: (current: ChatMessage) => ChatMessage
+  messages: Array<ChatMessage>,
+  update: (current: ChatMessage) => ChatMessage
 ): Array<ChatMessage> {
-	const lastIndex = messages.length - 1;
-	const last = messages[lastIndex];
-	if (last?.role !== 'assistant') return messages;
+  const lastIndex = messages.length - 1;
+  const last = messages[lastIndex];
+  if (last?.role !== 'assistant') return messages;
 
-	const updated = [...messages];
-	updated[lastIndex] = update(last);
-	return updated;
+  const updated = [...messages];
+  updated[lastIndex] = update(last);
+  return updated;
 }
 
 /**
@@ -33,8 +33,8 @@ export function updateLastAssistantMessage(
  * for Xs" affordance even across separate SSE bursts.
  */
 function markStartedAt(message: ChatMessage): ChatMessage {
-	if (message.thinking_started_at !== undefined) return message;
-	return { ...message, thinking_started_at: Date.now() };
+  if (message.thinking_started_at !== undefined) return message;
+  return { ...message, thinking_started_at: Date.now() };
 }
 
 /**
@@ -46,16 +46,13 @@ function markStartedAt(message: ChatMessage): ChatMessage {
  * the merge: the trailing thinking is no longer the last entry.
  */
 function pushThinkingTimelineEntry(message: ChatMessage, text: string): ChatMessage {
-	const timeline = message.timeline ?? [];
-	const last = timeline[timeline.length - 1];
-	if (last?.kind === 'thinking') {
-		const merged: ChatMessage['timeline'] = [
-			...timeline.slice(0, -1),
-			{ kind: 'thinking', text: last.text + text },
-		];
-		return { ...message, timeline: merged };
-	}
-	return { ...message, timeline: [...timeline, { kind: 'thinking', text }] };
+  const timeline = message.timeline ?? [];
+  const last = timeline[timeline.length - 1];
+  if (last?.kind === 'thinking') {
+    const merged: ChatMessage['timeline'] = [...timeline.slice(0, -1), { kind: 'thinking', text: last.text + text }];
+    return { ...message, timeline: merged };
+  }
+  return { ...message, timeline: [...timeline, { kind: 'thinking', text }] };
 }
 
 /**
@@ -66,86 +63,79 @@ function pushThinkingTimelineEntry(message: ChatMessage, text: string): ChatMess
  * the catch block in `runAssistantTurn` writes the error into `content`.
  */
 export function applyChatEvent(message: ChatMessage, event: ChatStreamEvent): ChatMessage {
-	switch (event.type) {
-		case 'delta':
-			return markStartedAt({
-				...message,
-				content: message.content + event.content,
-				assistant_status: 'streaming',
-			});
-		case 'thinking': {
-			const stamped = markStartedAt(message);
-			const withText: ChatMessage = {
-				...stamped,
-				thinking: (stamped.thinking ?? '') + event.content,
-				assistant_status: 'streaming',
-			};
-			return pushThinkingTimelineEntry(withText, event.content);
-		}
-		case 'tool_use': {
-			const stamped = markStartedAt(message);
-			const newCall: ChatToolCall = {
-				id: event.tool_use_id,
-				name: event.name,
-				input: event.input,
-				display: event.display,
-				status: 'pending',
-			};
-			return {
-				...stamped,
-				assistant_status: 'streaming',
-				tool_calls: [...(stamped.tool_calls ?? []), newCall],
-				timeline: [
-					...(stamped.timeline ?? []),
-					{ kind: 'tool', toolCallId: event.tool_use_id },
-				],
-			};
-		}
-		case 'tool_result': {
-			const calls = message.tool_calls ?? [];
-			const updated = calls.map((call) =>
-				call.id === event.tool_use_id
-					? { ...call, result: event.content, status: 'completed' as const }
-					: call
-			);
-			return { ...message, tool_calls: updated };
-		}
-		case 'tool_progress': {
-			const calls = message.tool_calls ?? [];
-			const updated = calls.map((call) =>
-				call.id === event.tool_use_id ? { ...call, result: event.content } : call
-			);
-			return { ...message, tool_calls: updated };
-		}
-		case 'artifact': {
-			// The matching `tool_use` for `render_artifact` arrives just
-			// before this event and is already in `tool_calls` — we keep
-			// the artifact as a separate first-class field rather than
-			// stuffing it into the tool-call slot, so the renderer can
-			// treat artifacts as their own surface (preview card +
-			// expandable dialog) without picking apart tool metadata.
-			const stamped = markStartedAt(message);
-			return {
-				...stamped,
-				artifacts: [...(stamped.artifacts ?? []), event.artifact],
-			};
-		}
-		case 'error':
-			// Should be unreachable — the transport surfaces errors by throwing.
-			return { ...message, content: `Error: ${event.content}`, assistant_status: 'failed' };
-		case 'agent_terminated':
-			// Safety layer fired a controlled stop (iteration cap, wall-clock
-			// budget, or consecutive-error threshold).  Append the explanation
-			// to whatever content the model produced before stopping, and mark
-			// the message complete so it doesn’t linger in a streaming state.
-			return {
-				...message,
-				content: `${message.content ? `${message.content}\n\n` : ''}⚠️ ${event.content}`,
-				assistant_status: 'complete',
-			};
-		default:
-			return message;
-	}
+  switch (event.type) {
+    case 'delta':
+      return markStartedAt({
+        ...message,
+        content: message.content + event.content,
+        assistant_status: 'streaming',
+      });
+    case 'thinking': {
+      const stamped = markStartedAt(message);
+      const withText: ChatMessage = {
+        ...stamped,
+        thinking: (stamped.thinking ?? '') + event.content,
+        assistant_status: 'streaming',
+      };
+      return pushThinkingTimelineEntry(withText, event.content);
+    }
+    case 'tool_use': {
+      const stamped = markStartedAt(message);
+      const newCall: ChatToolCall = {
+        id: event.tool_use_id,
+        name: event.name,
+        input: event.input,
+        display: event.display,
+        status: 'pending',
+      };
+      return {
+        ...stamped,
+        assistant_status: 'streaming',
+        tool_calls: [...(stamped.tool_calls ?? []), newCall],
+        timeline: [...(stamped.timeline ?? []), { kind: 'tool', toolCallId: event.tool_use_id }],
+      };
+    }
+    case 'tool_result': {
+      const calls = message.tool_calls ?? [];
+      const updated = calls.map((call) =>
+        call.id === event.tool_use_id ? { ...call, result: event.content, status: 'completed' as const } : call
+      );
+      return { ...message, tool_calls: updated };
+    }
+    case 'tool_progress': {
+      const calls = message.tool_calls ?? [];
+      const updated = calls.map((call) => (call.id === event.tool_use_id ? { ...call, result: event.content } : call));
+      return { ...message, tool_calls: updated };
+    }
+    case 'artifact': {
+      // The matching `tool_use` for `render_artifact` arrives just
+      // before this event and is already in `tool_calls` — we keep
+      // the artifact as a separate first-class field rather than
+      // stuffing it into the tool-call slot, so the renderer can
+      // treat artifacts as their own surface (preview card +
+      // expandable dialog) without picking apart tool metadata.
+      const stamped = markStartedAt(message);
+      return {
+        ...stamped,
+        artifacts: [...(stamped.artifacts ?? []), event.artifact],
+      };
+    }
+    case 'error':
+      // Should be unreachable — the transport surfaces errors by throwing.
+      return { ...message, content: `Error: ${event.content}`, assistant_status: 'failed' };
+    case 'agent_terminated':
+      // Safety layer fired a controlled stop (iteration cap, wall-clock
+      // budget, or consecutive-error threshold).  Append the explanation
+      // to whatever content the model produced before stopping, and mark
+      // the message complete so it doesn’t linger in a streaming state.
+      return {
+        ...message,
+        content: `${message.content ? `${message.content}\n\n` : ''}⚠️ ${event.content}`,
+        assistant_status: 'complete',
+      };
+    default:
+      return message;
+  }
 }
 
 /**
@@ -154,7 +144,7 @@ export function applyChatEvent(message: ChatMessage, event: ChatStreamEvent): Ch
  * arrived (e.g. the stream errored before producing anything).
  */
 export function computeThinkingDuration(message: ChatMessage): number {
-	if (message.thinking_started_at === undefined) return 0;
-	const elapsedMs = Date.now() - message.thinking_started_at;
-	return Math.max(0, Math.round(elapsedMs / 1000));
+  if (message.thinking_started_at === undefined) return 0;
+  const elapsedMs = Date.now() - message.thinking_started_at;
+  return Math.max(0, Math.round(elapsedMs / 1000));
 }

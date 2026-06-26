@@ -13,14 +13,14 @@ import { Input } from '@/components/ui/input';
 
 /** Props for {@link CreateProjectModal}. */
 export interface CreateProjectModalProps {
-	/** Whether the modal is currently visible. */
-	open: boolean;
-	/** True while the create mutation is in flight; disables the submit button. */
-	isPending: boolean;
-	/** Called when the user dismisses the modal (Cancel, ESC, backdrop). */
-	onDismiss: () => void;
-	/** Called with the trimmed project name when the user submits. */
-	onSubmit: (name: string) => void;
+  /** Whether the modal is currently visible. */
+  open: boolean;
+  /** True while the create mutation is in flight; disables the submit button. */
+  isPending: boolean;
+  /** Called when the user dismisses the modal (Cancel, ESC, backdrop). */
+  onDismiss: () => void;
+  /** Called with the trimmed project name when the user submits. */
+  onSubmit: (name: string) => void;
 }
 
 /**
@@ -37,92 +37,74 @@ export interface CreateProjectModalProps {
  * the sidebar). Submit fires via **`form`** association from the footer.
  */
 export function CreateProjectModal({
-	open,
-	isPending,
-	onDismiss,
-	onSubmit,
+  open,
+  isPending,
+  onDismiss,
+  onSubmit,
 }: CreateProjectModalProps): React.JSX.Element | null {
-	const formId = useId();
-	const inputId = useId();
-	const [draft, setDraft] = useState('');
+  const formId = useId();
+  const inputId = useId();
+  const [draft, setDraft] = useState('');
 
-	if (!open) return null;
+  if (!open) return null;
 
-	const trimmed = draft.trim();
-	const canSubmit = trimmed.length > 0 && !isPending;
+  const trimmed = draft.trim();
+  const canSubmit = trimmed.length > 0 && !isPending;
 
-	const handleClose = (): void => {
-		setDraft('');
-		onDismiss();
-	};
+  const handleClose = (): void => {
+    setDraft('');
+    onDismiss();
+  };
 
-	const handleSubmit = (event: React.FormEvent<HTMLFormElement>): void => {
-		event.preventDefault();
-		if (!canSubmit) return;
-		onSubmit(trimmed);
-		setDraft('');
-	};
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>): void => {
+    event.preventDefault();
+    if (!canSubmit) return;
+    onSubmit(trimmed);
+    setDraft('');
+  };
 
-	const header = (
-		<ModalHeader
-			icon={<FolderPlus aria-hidden className="size-4 text-white" />}
-			title="Create project"
-		/>
-	);
+  const header = <ModalHeader icon={<FolderPlus aria-hidden className="size-4 text-white" />} title="Create project" />;
 
-	const footer = (
-		<AppDialogFooter>
-			<Button
-				className="cursor-pointer"
-				disabled={isPending}
-				onClick={handleClose}
-				type="button"
-				variant="outline"
-			>
-				Cancel
-			</Button>
-			<Button className="cursor-pointer" disabled={!canSubmit} form={formId} type="submit">
-				{isPending ? 'Creating...' : 'Create project'}
-			</Button>
-		</AppDialogFooter>
-	);
+  const footer = (
+    <AppDialogFooter>
+      <Button className="cursor-pointer" disabled={isPending} onClick={handleClose} type="button" variant="outline">
+        Cancel
+      </Button>
+      <Button className="cursor-pointer" disabled={!canSubmit} form={formId} type="submit">
+        {isPending ? 'Creating...' : 'Create project'}
+      </Button>
+    </AppDialogFooter>
+  );
 
-	return (
-		<AppDialog
-			ariaLabel="Create project"
-			footer={footer}
-			header={header}
-			onDismiss={handleClose}
-			open={open}
-			showDismissButton
-			sheetTitle="Create project"
-			size="md"
-		>
-			<form
-				className="flex flex-col gap-5 text-foreground"
-				id={formId}
-				onSubmit={handleSubmit}
-			>
-				<AppFormRow htmlFor={inputId} label="Project name">
-					<Input
-						id={inputId}
-						maxLength={255}
-						onChange={(event) => setDraft(event.target.value)}
-						placeholder="Copenhagen Trip"
-						value={draft}
-					/>
-				</AppFormRow>
+  return (
+    <AppDialog
+      ariaLabel="Create project"
+      footer={footer}
+      header={header}
+      onDismiss={handleClose}
+      open={open}
+      showDismissButton
+      sheetTitle="Create project"
+      size="md"
+    >
+      <form className="flex flex-col gap-5 text-foreground" id={formId} onSubmit={handleSubmit}>
+        <AppFormRow htmlFor={inputId} label="Project name">
+          <Input
+            id={inputId}
+            maxLength={255}
+            onChange={(event) => setDraft(event.target.value)}
+            placeholder="Copenhagen Trip"
+            value={draft}
+          />
+        </AppFormRow>
 
-				<AppDialogCallout
-					icon={<Lightbulb aria-hidden className="size-4 text-info" />}
-					tone="info"
-				>
-					<p className="leading-snug">
-						Projects keep chats, files, and custom instructions in one place. Use them
-						for ongoing work, or just to keep things tidy.
-					</p>
-				</AppDialogCallout>
-			</form>
-		</AppDialog>
-	);
+        <AppDialogCallout icon={<Lightbulb aria-hidden className="size-4 text-info" />} tone="info">
+          <p className="leading-snug">
+            Projects keep chats, files, and custom instructions in one place. Use them for ongoing work, or just to keep
+            things tidy.
+          </p>
+        </AppDialogCallout>
+      </form>
+    </AppDialog>
+  );
 }

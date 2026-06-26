@@ -14,18 +14,18 @@
  * brain-access / shared-with-me / shared-by-me).
  */
 export const KNOWLEDGE_VIEWS = {
-	myFiles: 'my-files',
-	memory: 'memory',
-	skills: 'skills',
-	brainAccess: 'brain-access',
-	sharedWithMe: 'shared-with-me',
-	sharedByMe: 'shared-by-me',
+  myFiles: 'my-files',
+  memory: 'memory',
+  skills: 'skills',
+  brainAccess: 'brain-access',
+  sharedWithMe: 'shared-with-me',
+  sharedByMe: 'shared-by-me',
 } as const;
 
 /** Keys used on the `/knowledge` route to encode the current view + path. */
 export const KNOWLEDGE_QUERY_KEYS = {
-	view: 'view',
-	path: 'path',
+  view: 'view',
+  path: 'path',
 } as const;
 
 /** Default sub-view when `?view=` is absent or unrecognised. */

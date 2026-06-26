@@ -15,5 +15,5 @@
 
 /** Return a fixed success response; a placeholder body for the fixture. */
 export function handleRequest() {
-	return { status: 200 };
+  return { status: 200 };
 }

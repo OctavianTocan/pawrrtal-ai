@@ -34,29 +34,29 @@ const REPLY_POLL_MS = 2_500;
  * @param text - The message content to send.
  */
 export async function typeAndSendChatMessage(page: Page, text: string): Promise<void> {
-	const textarea = page.locator('textarea[name="message"]');
-	await textarea.fill(text);
-	// One frame for React to flush the controlled state update from
-	// the input event before we submit. Without this gap the form
-	// reads stale (empty) state and sends an empty user message.
-	await page.waitForTimeout(150);
-	await page.evaluate(() => {
-		const ta = document.querySelector<HTMLTextAreaElement>('textarea[name="message"]');
-		const form = ta?.closest('form');
-		if (form === null || form === undefined) {
-			throw new Error('Could not find chat composer form to submit');
-		}
-		form.requestSubmit();
-	});
-	// Settle wait so subsequent polling doesn't race the just-sent
-	// state machine before the user message renders.
-	await page.waitForTimeout(300);
+  const textarea = page.locator('textarea[name="message"]');
+  await textarea.fill(text);
+  // One frame for React to flush the controlled state update from
+  // the input event before we submit. Without this gap the form
+  // reads stale (empty) state and sends an empty user message.
+  await page.waitForTimeout(150);
+  await page.evaluate(() => {
+    const ta = document.querySelector<HTMLTextAreaElement>('textarea[name="message"]');
+    const form = ta?.closest('form');
+    if (form === null || form === undefined) {
+      throw new Error('Could not find chat composer form to submit');
+    }
+    form.requestSubmit();
+  });
+  // Settle wait so subsequent polling doesn't race the just-sent
+  // state machine before the user message renders.
+  await page.waitForTimeout(300);
 }
 
 /** Schema returned by `readChatTranscript`. */
 const TranscriptRowSchema = z.object({
-	role: z.enum(['user', 'assistant']),
-	snippet: z.string(),
+  role: z.enum(['user', 'assistant']),
+  snippet: z.string(),
 });
 export type ChatTranscriptRow = z.infer<typeof TranscriptRowSchema>;
 
@@ -74,13 +74,13 @@ export type ChatTranscriptRow = z.infer<typeof TranscriptRowSchema>;
  * @returns Array of `{ role, snippet }` rows in DOM order.
  */
 export async function readChatTranscript(page: Page): Promise<ChatTranscriptRow[]> {
-	return await page.evaluate(() => {
-		const rows = Array.from(document.querySelectorAll<HTMLElement>('.is-user, .is-assistant'));
-		return rows.map((row) => ({
-			role: row.classList.contains('is-user') ? ('user' as const) : ('assistant' as const),
-			snippet: (row.textContent ?? '').trim().slice(0, 500),
-		}));
-	});
+  return await page.evaluate(() => {
+    const rows = Array.from(document.querySelectorAll<HTMLElement>('.is-user, .is-assistant'));
+    return rows.map((row) => ({
+      role: row.classList.contains('is-user') ? ('user' as const) : ('assistant' as const),
+      snippet: (row.textContent ?? '').trim().slice(0, 500),
+    }));
+  });
 }
 
 /**
@@ -102,26 +102,26 @@ export async function readChatTranscript(page: Page): Promise<ChatTranscriptRow[
  * @throws Error when the budget elapses without a reply.
  */
 export async function pollForAssistantReply(
-	stagehand: Stagehand,
-	options: { budgetMs: number; minAssistantCount?: number }
+  stagehand: Stagehand,
+  options: { budgetMs: number; minAssistantCount?: number }
 ): Promise<ChatTranscriptRow[]> {
-	const minAssistantCount = options.minAssistantCount ?? 1;
-	const deadline = Date.now() + options.budgetMs;
-	const page = stagehand.context.pages()[0];
-	if (page === undefined) throw new Error('No active Stagehand page');
+  const minAssistantCount = options.minAssistantCount ?? 1;
+  const deadline = Date.now() + options.budgetMs;
+  const page = stagehand.context.pages()[0];
+  if (page === undefined) throw new Error('No active Stagehand page');
 
-	let lastTranscript: ChatTranscriptRow[] = [];
-	while (Date.now() < deadline) {
-		lastTranscript = await readChatTranscript(page);
-		const assistantTurns = lastTranscript.filter((m) => m.role === 'assistant');
-		const latestAssistantSnippet = assistantTurns[assistantTurns.length - 1]?.snippet ?? '';
-		const trimmedSnippet = latestAssistantSnippet.replace(/^[^A-Za-z]+/, '').trim();
-		const isStillThinking = /^thinking/i.test(trimmedSnippet);
-		const hasMinAssistant = assistantTurns.length >= minAssistantCount && !isStillThinking;
-		if (hasMinAssistant) return lastTranscript;
-		await page.waitForTimeout(REPLY_POLL_MS);
-	}
-	throw new Error(
-		`No assistant reply within ${options.budgetMs / 1000}s budget. Last transcript: ${JSON.stringify(lastTranscript)}`
-	);
+  let lastTranscript: ChatTranscriptRow[] = [];
+  while (Date.now() < deadline) {
+    lastTranscript = await readChatTranscript(page);
+    const assistantTurns = lastTranscript.filter((m) => m.role === 'assistant');
+    const latestAssistantSnippet = assistantTurns[assistantTurns.length - 1]?.snippet ?? '';
+    const trimmedSnippet = latestAssistantSnippet.replace(/^[^A-Za-z]+/, '').trim();
+    const isStillThinking = /^thinking/i.test(trimmedSnippet);
+    const hasMinAssistant = assistantTurns.length >= minAssistantCount && !isStillThinking;
+    if (hasMinAssistant) return lastTranscript;
+    await page.waitForTimeout(REPLY_POLL_MS);
+  }
+  throw new Error(
+    `No assistant reply within ${options.budgetMs / 1000}s budget. Last transcript: ${JSON.stringify(lastTranscript)}`
+  );
 }

@@ -13,73 +13,73 @@ import { cn } from '@/lib/utils';
 
 /** Backend OAuth start URLs the SSO buttons navigate to. */
 const OAUTH_START_URLS = {
-	google: '/api/v1/auth/oauth/google/start',
-	apple: '/api/v1/auth/oauth/apple/start',
+  google: '/api/v1/auth/oauth/google/start',
+  apple: '/api/v1/auth/oauth/apple/start',
 } as const;
 
 type OAuthProvider = keyof typeof OAUTH_START_URLS;
 
 interface SsoButtonProps {
-	disabled: boolean;
-	icon: React.ReactNode;
-	label: string;
-	provider: OAuthProvider;
+  disabled: boolean;
+  icon: React.ReactNode;
+  label: string;
+  provider: OAuthProvider;
 }
 
 function SsoButton({ disabled, icon, label, provider }: SsoButtonProps): React.JSX.Element {
-	return (
-		<Button
-			className="cursor-pointer gap-2"
-			disabled={disabled}
-			onClick={() => {
-				window.location.href = getBrowserApiUrl(OAUTH_START_URLS[provider]);
-			}}
-			type="button"
-			variant="outline"
-		>
-			{icon}
-			{label}
-		</Button>
-	);
+  return (
+    <Button
+      className="cursor-pointer gap-2"
+      disabled={disabled}
+      onClick={() => {
+        window.location.href = getBrowserApiUrl(OAUTH_START_URLS[provider]);
+      }}
+      type="button"
+      variant="outline"
+    >
+      {icon}
+      {label}
+    </Button>
+  );
 }
 
 function buildDevLoginFormAction(postLoginTarget: string): string {
-	const base = getBrowserApiUrl(API_ENDPOINTS.auth.devLoginBrowser);
-	return `${base}?redirect_to=${encodeURIComponent(postLoginTarget)}`;
+  const base = getBrowserApiUrl(API_ENDPOINTS.auth.devLoginBrowser);
+  return `${base}?redirect_to=${encodeURIComponent(postLoginTarget)}`;
 }
 
 export interface DevAdminLoginHandlers {
-	onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
-	onTouchEnd: (event: React.TouchEvent<HTMLButtonElement>) => void;
+  onClick: (event: React.MouseEvent<HTMLButtonElement>) => void;
+  onTouchEnd: (event: React.TouchEvent<HTMLButtonElement>) => void;
 }
 
 export interface LoginFormViewProps extends Omit<React.ComponentProps<'div'>, 'onSubmit'> {
-	/** Unique ID prefix for form field elements. */
-	emailId: string;
-	/** Unique ID prefix for the password field. */
-	passwordId: string;
-	/** Current email input value. */
-	email: string;
-	/** Called on every email keystroke. */
-	onEmailChange: (value: string) => void;
-	/** Current password input value. */
-	password: string;
-	/** Called on every password keystroke. */
-	onPasswordChange: (value: string) => void;
-	/** Error message to display, or empty string for none. */
-	errorMessage: string;
-	/** Whether a login request is in-flight (disables buttons). */
-	isLoading: boolean;
-	/** Whether the dev-only admin shortcut is available. */
-	canUseDevAdminLogin: boolean;
-	/** ID of the browser fallback form submitted before hydration. */
-	devAdminFormId: string;
-	/** Hydrated button handlers for the dev-admin shortcut. */
-	devAdminLoginHandlers: DevAdminLoginHandlers;
-	/** Safe relative path to load after a successful login. */
-	postLoginTarget: string;
-	/** Called when the form is submitted. */
-	onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
+  /** Unique ID prefix for form field elements. */
+  emailId: string;
+  /** Unique ID prefix for the password field. */
+  passwordId: string;
+  /** Current email input value. */
+  email: string;
+  /** Called on every email keystroke. */
+  onEmailChange: (value: string) => void;
+  /** Current password input value. */
+  password: string;
+  /** Called on every password keystroke. */
+  onPasswordChange: (value: string) => void;
+  /** Error message to display, or empty string for none. */
+  errorMessage: string;
+  /** Whether a login request is in-flight (disables buttons). */
+  isLoading: boolean;
+  /** Whether the dev-only admin shortcut is available. */
+  canUseDevAdminLogin: boolean;
+  /** ID of the browser fallback form submitted before hydration. */
+  devAdminFormId: string;
+  /** Hydrated button handlers for the dev-admin shortcut. */
+  devAdminLoginHandlers: DevAdminLoginHandlers;
+  /** Safe relative path to load after a successful login. */
+  postLoginTarget: string;
+  /** Called when the form is submitted. */
+  onSubmit: (event: React.FormEvent<HTMLFormElement>) => void;
 }
 
 /**
@@ -90,133 +90,118 @@ export interface LoginFormViewProps extends Omit<React.ComponentProps<'div'>, 'o
  * live in the container (`LoginForm`).
  */
 export function LoginFormView({
-	className,
-	emailId,
-	passwordId,
-	email,
-	onEmailChange,
-	password,
-	onPasswordChange,
-	errorMessage,
-	isLoading,
-	canUseDevAdminLogin,
-	devAdminFormId,
-	devAdminLoginHandlers,
-	postLoginTarget,
-	onSubmit,
-	...props
+  className,
+  emailId,
+  passwordId,
+  email,
+  onEmailChange,
+  password,
+  onPasswordChange,
+  errorMessage,
+  isLoading,
+  canUseDevAdminLogin,
+  devAdminFormId,
+  devAdminLoginHandlers,
+  postLoginTarget,
+  onSubmit,
+  ...props
 }: LoginFormViewProps): React.JSX.Element {
-	return (
-		<div className={cn('flex flex-col gap-6', className)} {...props}>
-			<Card>
-				<CardHeader>
-					<CardTitle>Login to your account</CardTitle>
-					<CardDescription>
-						Enter your email below to login to your account
-					</CardDescription>
-				</CardHeader>
-				<CardContent>
-					<form onSubmit={onSubmit}>
-						<FieldGroup>
-							{/* -- Alert -- */}
-							{errorMessage && (
-								<Alert variant="destructive">
-									<AlertTitle>Error</AlertTitle>
-									<AlertDescription>{errorMessage}</AlertDescription>
-								</Alert>
-							)}
-							<Field>
-								<FieldLabel htmlFor={emailId}>Email</FieldLabel>
-								<Input
-									id={emailId}
-									type="email"
-									placeholder="m@example.com"
-									autoComplete="email"
-									required
-									value={email}
-									onChange={(e) => onEmailChange(e.target.value)}
-								/>
-							</Field>
-							<Field>
-								<div className="flex items-center">
-									<FieldLabel htmlFor={passwordId}>Password</FieldLabel>
-									<Link
-										href="/forgot-password"
-										className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-									>
-										Forgot your password?
-									</Link>
-								</div>
-								<Input
-									id={passwordId}
-									type="password"
-									autoComplete="current-password"
-									required
-									value={password}
-									onChange={(e) => onPasswordChange(e.target.value)}
-								/>
-							</Field>
-							<Field>
-								<Button
-									className="cursor-pointer"
-									type="submit"
-									disabled={isLoading}
-								>
-									{isLoading && (
-										<Loader2Icon
-											className="mr-2 size-4 animate-spin"
-											aria-hidden="true"
-										/>
-									)}
-									{isLoading ? 'Logging in...' : 'Login'}
-								</Button>
-								{canUseDevAdminLogin && (
-									<>
-										<Button
-											className="cursor-pointer"
-											variant="outline"
-											type="submit"
-											form={devAdminFormId}
-											onClick={devAdminLoginHandlers.onClick}
-											onTouchEnd={devAdminLoginHandlers.onTouchEnd}
-											disabled={isLoading}
-										>
-											Dev Admin
-										</Button>
-										<FieldDescription className="text-center text-sm">
-											Dev-only shortcut for the seeded admin account.
-										</FieldDescription>
-									</>
-								)}
-								<SsoButton
-									disabled={isLoading}
-									icon={<GoogleIcon className="size-4" />}
-									label="Continue with Google"
-									provider="google"
-								/>
-								<SsoButton
-									disabled={isLoading}
-									icon={<AppleIcon className="size-4" />}
-									label="Continue with Apple"
-									provider="apple"
-								/>
-								<FieldDescription className="text-center">
-									Don&apos;t have an account? <Link href="/signup">Sign up</Link>
-								</FieldDescription>
-							</Field>
-						</FieldGroup>
-					</form>
-					{canUseDevAdminLogin && (
-						<form
-							action={buildDevLoginFormAction(postLoginTarget)}
-							id={devAdminFormId}
-							method="post"
-						>
-							<input type="hidden" name="redirect_to" value={postLoginTarget} />
-						</form>
-					)}
-				</CardContent>
-			</Card>
-		</div>
-	);
+  return (
+    <div className={cn('flex flex-col gap-6', className)} {...props}>
+      <Card>
+        <CardHeader>
+          <CardTitle>Login to your account</CardTitle>
+          <CardDescription>Enter your email below to login to your account</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={onSubmit}>
+            <FieldGroup>
+              {/* -- Alert -- */}
+              {errorMessage && (
+                <Alert variant="destructive">
+                  <AlertTitle>Error</AlertTitle>
+                  <AlertDescription>{errorMessage}</AlertDescription>
+                </Alert>
+              )}
+              <Field>
+                <FieldLabel htmlFor={emailId}>Email</FieldLabel>
+                <Input
+                  id={emailId}
+                  type="email"
+                  placeholder="m@example.com"
+                  autoComplete="email"
+                  required
+                  value={email}
+                  onChange={(e) => onEmailChange(e.target.value)}
+                />
+              </Field>
+              <Field>
+                <div className="flex items-center">
+                  <FieldLabel htmlFor={passwordId}>Password</FieldLabel>
+                  <Link
+                    href="/forgot-password"
+                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
+                  >
+                    Forgot your password?
+                  </Link>
+                </div>
+                <Input
+                  id={passwordId}
+                  type="password"
+                  autoComplete="current-password"
+                  required
+                  value={password}
+                  onChange={(e) => onPasswordChange(e.target.value)}
+                />
+              </Field>
+              <Field>
+                <Button className="cursor-pointer" type="submit" disabled={isLoading}>
+                  {isLoading && <Loader2Icon className="mr-2 size-4 animate-spin" aria-hidden="true" />}
+                  {isLoading ? 'Logging in...' : 'Login'}
+                </Button>
+                {canUseDevAdminLogin && (
+                  <>
+                    <Button
+                      className="cursor-pointer"
+                      variant="outline"
+                      type="submit"
+                      form={devAdminFormId}
+                      onClick={devAdminLoginHandlers.onClick}
+                      onTouchEnd={devAdminLoginHandlers.onTouchEnd}
+                      disabled={isLoading}
+                    >
+                      Dev Admin
+                    </Button>
+                    <FieldDescription className="text-center text-sm">
+                      Dev-only shortcut for the seeded admin account.
+                    </FieldDescription>
+                  </>
+                )}
+                <SsoButton
+                  disabled={isLoading}
+                  icon={<GoogleIcon className="size-4" />}
+                  label="Continue with Google"
+                  provider="google"
+                />
+                <SsoButton
+                  disabled={isLoading}
+                  icon={<AppleIcon className="size-4" />}
+                  label="Continue with Apple"
+                  provider="apple"
+                />
+                <FieldDescription className="text-center">
+                  Don&apos;t have an account? <Link href="/signup">Sign up</Link>
+                </FieldDescription>
+              </Field>
+            </FieldGroup>
+          </form>
+          {canUseDevAdminLogin && (
+            <form action={buildDevLoginFormAction(postLoginTarget)} id={devAdminFormId} method="post">
+              <input type="hidden" name="redirect_to" value={postLoginTarget} />
+            </form>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
 }

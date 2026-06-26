@@ -16,28 +16,28 @@ const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://pawrrtal.octaviant
  * @returns the sitemap entries
  */
 export default function sitemap(): MetadataRoute.Sitemap {
-	const handbookEntries: MetadataRoute.Sitemap = handbookSource.getPages().map((page) => ({
-		url: `${BASE_URL}${page.url}`,
-		lastModified: new Date(),
-		changeFrequency: 'weekly',
-		priority: 0.7,
-	}));
+  const handbookEntries: MetadataRoute.Sitemap = handbookSource.getPages().map((page) => ({
+    url: `${BASE_URL}${page.url}`,
+    lastModified: new Date(),
+    changeFrequency: 'weekly',
+    priority: 0.7,
+  }));
 
-	const productEntries: MetadataRoute.Sitemap = productSource.getPages().map((page) => ({
-		url: `${BASE_URL}${page.url}`,
-		lastModified: new Date(),
-		changeFrequency: 'weekly',
-		priority: 0.8,
-	}));
+  const productEntries: MetadataRoute.Sitemap = productSource.getPages().map((page) => ({
+    url: `${BASE_URL}${page.url}`,
+    lastModified: new Date(),
+    changeFrequency: 'weekly',
+    priority: 0.8,
+  }));
 
-	return [
-		{
-			url: `${BASE_URL}/docs`,
-			lastModified: new Date(),
-			changeFrequency: 'monthly',
-			priority: 0.9,
-		},
-		...handbookEntries,
-		...productEntries,
-	];
+  return [
+    {
+      url: `${BASE_URL}/docs`,
+      lastModified: new Date(),
+      changeFrequency: 'monthly',
+      priority: 0.9,
+    },
+    ...handbookEntries,
+    ...productEntries,
+  ];
 }

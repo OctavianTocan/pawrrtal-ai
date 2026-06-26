@@ -1,38 +1,38 @@
 {
-	"name": "@pawrrtal/backend-ts",
-	"private": true,
-	"type": "module",
-	"workspaces": [
-		"packages/*",
-		"apps/*"
-	],
-	"scripts": {
-		"install:deps": "bun install",
-		"typecheck": "bun run --filter '@pawrrtal/*' typecheck",
-		"test": "bun --bun vitest run",
-		"check": "bunx biome check ."
-	},
-	"dependencies": {
-		"@effect/platform-bun": "4.0.0-beta.74",
-		"@effect/platform-node": "4.0.0-beta.74",
-		"@effect/sql-sqlite-bun": "4.0.0-beta.74",
-		"effect": "4.0.0-beta.74"
-	},
-	"overrides": {
-		"effect": "4.0.0-beta.74",
-		"@effect/platform-bun": "4.0.0-beta.74",
-		"@effect/platform-node": "4.0.0-beta.74",
-		"@effect/sql-sqlite-bun": "4.0.0-beta.74",
-		"@effect/vitest": "4.0.0-beta.74",
-		"vitest": "4.1.4",
-		"@vitest/runner": "4.1.4",
-		"@vitest/expect": "4.1.4"
-	},
-	"devDependencies": {
-		"@effect/language-service": "^0.85.1",
-		"@effect/vitest": "4.0.0-beta.74",
-		"@types/bun": "latest",
-		"typescript": "^5.9.3",
-		"vitest": "4.1.4"
-	}
+  "name": "@pawrrtal/backend-ts",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "install:deps": "bun install",
+    "typecheck": "bun run --filter '@pawrrtal/*' typecheck",
+    "test": "bun --bun vitest run",
+    "check": "bunx biome check ."
+  },
+  "dependencies": {
+    "@effect/platform-bun": "4.0.0-beta.74",
+    "@effect/platform-node": "4.0.0-beta.74",
+    "@effect/sql-sqlite-bun": "4.0.0-beta.74",
+    "effect": "4.0.0-beta.74"
+  },
+  "overrides": {
+    "effect": "4.0.0-beta.74",
+    "@effect/platform-bun": "4.0.0-beta.74",
+    "@effect/platform-node": "4.0.0-beta.74",
+    "@effect/sql-sqlite-bun": "4.0.0-beta.74",
+    "@effect/vitest": "4.0.0-beta.74",
+    "vitest": "4.1.4",
+    "@vitest/runner": "4.1.4",
+    "@vitest/expect": "4.1.4"
+  },
+  "devDependencies": {
+    "@effect/language-service": "^0.85.1",
+    "@effect/vitest": "4.0.0-beta.74",
+    "@types/bun": "latest",
+    "typescript": "^5.9.3",
+    "vitest": "4.1.4"
+  }
 }

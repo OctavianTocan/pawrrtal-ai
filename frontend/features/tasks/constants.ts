@@ -15,10 +15,10 @@
  * project as its own row).
  */
 export const TASK_VIEWS = {
-	today: 'today',
-	upcoming: 'upcoming',
-	inbox: 'inbox',
-	completed: 'completed',
+  today: 'today',
+  upcoming: 'upcoming',
+  inbox: 'inbox',
+  completed: 'completed',
 } as const;
 
 /** Default sub-view when `?view=` is absent or unrecognised. */
@@ -26,8 +26,8 @@ export const DEFAULT_TASK_VIEW = TASK_VIEWS.today;
 
 /** Keys used on the `/tasks` route to encode the current view + filter. */
 export const TASK_QUERY_KEYS = {
-	view: 'view',
-	filter: 'filter',
+  view: 'view',
+  filter: 'filter',
 } as const;
 
 /**
@@ -52,10 +52,10 @@ export const TASK_PROJECT_TONES = ['neutral', 'info', 'success', 'accent', 'dest
  * task title's cap-height.
  */
 export const PRIORITY_RING: Record<(typeof TASK_PRIORITIES)[number], string> = {
-	urgent: 'ring-2 ring-inset ring-destructive/60',
-	high: 'ring-2 ring-inset ring-info/60',
-	normal: 'ring-[1.5px] ring-inset ring-foreground/25',
-	low: 'ring-[1.5px] ring-inset ring-foreground/12',
+  urgent: 'ring-2 ring-inset ring-destructive/60',
+  high: 'ring-2 ring-inset ring-info/60',
+  normal: 'ring-[1.5px] ring-inset ring-foreground/25',
+  low: 'ring-[1.5px] ring-inset ring-foreground/12',
 };
 
 /**
@@ -63,11 +63,11 @@ export const PRIORITY_RING: Record<(typeof TASK_PRIORITIES)[number], string> = {
  * Keyed by tone so the chip component never inlines a switch.
  */
 export const PROJECT_TONE_CLASSES: Record<(typeof TASK_PROJECT_TONES)[number], string> = {
-	neutral: 'bg-foreground/[0.05] text-muted-foreground',
-	info: 'bg-info/10 text-info-text',
-	success: 'bg-success/10 text-success-text',
-	accent: 'bg-accent/10 text-accent',
-	destructive: 'bg-destructive/10 text-destructive-text',
+  neutral: 'bg-foreground/[0.05] text-muted-foreground',
+  info: 'bg-info/10 text-info-text',
+  success: 'bg-success/10 text-success-text',
+  accent: 'bg-accent/10 text-accent',
+  destructive: 'bg-destructive/10 text-destructive-text',
 };
 
 /**
@@ -78,10 +78,10 @@ export const PROJECT_TONE_CLASSES: Record<(typeof TASK_PROJECT_TONES)[number], s
  * literals when reading or writing storage from feature code.
  */
 export const TASK_STORAGE_KEYS = {
-	/** Set of section IDs the user has collapsed in the current view. */
-	collapsedSections: 'tasks:collapsed-sections',
-	/** Set of task IDs the user has marked complete locally (mock only). */
-	completedTaskIds: 'tasks:completed-task-ids',
+  /** Set of section IDs the user has collapsed in the current view. */
+  collapsedSections: 'tasks:collapsed-sections',
+  /** Set of task IDs the user has marked complete locally (mock only). */
+  completedTaskIds: 'tasks:completed-task-ids',
 } as const;
 
 /**

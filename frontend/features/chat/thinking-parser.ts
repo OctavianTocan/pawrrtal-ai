@@ -11,10 +11,10 @@
 
 /** A reasoning section parsed out of a `thinking` block. */
 export interface ThinkingSection {
-	/** Header text — empty string for content that appeared before any header. */
-	title: string;
-	/** Trimmed body content of the section. */
-	content: string;
+  /** Header text — empty string for content that appeared before any header. */
+  title: string;
+  /** Trimmed body content of the section. */
+  content: string;
 }
 
 /**
@@ -26,47 +26,47 @@ export interface ThinkingSection {
  * the renderer can choose to render it as plain prose.
  */
 export function parseThinkingSections(text: string): ThinkingSection[] {
-	if (!text) return [];
+  if (!text) return [];
 
-	const headerPattern = /^(?:\*\*([^*\n]+)\*\*[ \t]*$|#{2,3}\s+(.+?)[ \t]*)$/gm;
-	const headers: Array<{ title: string; index: number; endIndex: number }> = [];
-	let match: RegExpExecArray | null = headerPattern.exec(text);
-	while (match !== null) {
-		const captured = match[1] ?? match[2] ?? '';
-		const title = captured.trim();
-		headers.push({
-			title,
-			index: match.index,
-			endIndex: match.index + match[0].length,
-		});
-		match = headerPattern.exec(text);
-	}
+  const headerPattern = /^(?:\*\*([^*\n]+)\*\*[ \t]*$|#{2,3}\s+(.+?)[ \t]*)$/gm;
+  const headers: Array<{ title: string; index: number; endIndex: number }> = [];
+  let match: RegExpExecArray | null = headerPattern.exec(text);
+  while (match !== null) {
+    const captured = match[1] ?? match[2] ?? '';
+    const title = captured.trim();
+    headers.push({
+      title,
+      index: match.index,
+      endIndex: match.index + match[0].length,
+    });
+    match = headerPattern.exec(text);
+  }
 
-	if (headers.length === 0) {
-		const trimmed = text.trim();
-		return trimmed ? [{ title: '', content: trimmed }] : [];
-	}
+  if (headers.length === 0) {
+    const trimmed = text.trim();
+    return trimmed ? [{ title: '', content: trimmed }] : [];
+  }
 
-	const sections: ThinkingSection[] = [];
-	const firstHeaderIndex = headers[0]?.index ?? 0;
-	if (firstHeaderIndex > 0) {
-		const preamble = text.slice(0, firstHeaderIndex).trim();
-		if (preamble) sections.push({ title: '', content: preamble });
-	}
+  const sections: ThinkingSection[] = [];
+  const firstHeaderIndex = headers[0]?.index ?? 0;
+  if (firstHeaderIndex > 0) {
+    const preamble = text.slice(0, firstHeaderIndex).trim();
+    if (preamble) sections.push({ title: '', content: preamble });
+  }
 
-	for (let i = 0; i < headers.length; i++) {
-		const header = headers[i];
-		if (!header) continue;
-		const next = headers[i + 1];
-		const contentStart = header.endIndex;
-		const contentEnd = next ? next.index : text.length;
-		sections.push({
-			title: header.title,
-			content: text.slice(contentStart, contentEnd).trim(),
-		});
-	}
+  for (let i = 0; i < headers.length; i++) {
+    const header = headers[i];
+    if (!header) continue;
+    const next = headers[i + 1];
+    const contentStart = header.endIndex;
+    const contentEnd = next ? next.index : text.length;
+    sections.push({
+      title: header.title,
+      content: text.slice(contentStart, contentEnd).trim(),
+    });
+  }
 
-	return sections;
+  return sections;
 }
 
 /**
@@ -74,6 +74,6 @@ export function parseThinkingSections(text: string): ThinkingSection[] {
  * trigger. Uses established wording so the UX feels familiar.
  */
 export function formatThinkingDuration(seconds: number): string {
-	if (seconds < 1) return 'Thought for <1s';
-	return `Thought for ${seconds}s`;
+  if (seconds < 1) return 'Thought for <1s';
+  return `Thought for ${seconds}s`;
 }

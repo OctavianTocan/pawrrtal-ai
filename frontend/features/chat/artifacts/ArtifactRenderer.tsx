@@ -26,30 +26,27 @@ import { ArtifactInteractionScope } from './interaction-context';
 // artifactComponents uses BaseComponentProps<any> for loose typing; cast to
 // Components<...> here — json-render validates props against catalog schemas.
 const { registry } = defineRegistry(artifactCatalog, {
-	components: artifactComponents as unknown as Components<typeof artifactCatalog>,
+  components: artifactComponents as unknown as Components<typeof artifactCatalog>,
 });
 
 interface ArtifactRendererProps {
-	artifact: ChatArtifactPayload;
-	/**
-	 * Fired after a successful interaction dispatch — the dialog uses
-	 * this to close itself when the user has answered. Renderers should
-	 * NOT depend on this for correctness; treat as polish.
-	 */
-	onInteractionSubmitted?: () => void;
+  artifact: ChatArtifactPayload;
+  /**
+   * Fired after a successful interaction dispatch — the dialog uses
+   * this to close itself when the user has answered. Renderers should
+   * NOT depend on this for correctness; treat as polish.
+   */
+  onInteractionSubmitted?: () => void;
 }
 
-export function ArtifactRenderer({
-	artifact,
-	onInteractionSubmitted,
-}: ArtifactRendererProps): ReactNode {
-	return (
-		<ArtifactInteractionScope artifactId={artifact.id} onSubmitted={onInteractionSubmitted}>
-			<JSONUIProvider registry={registry}>
-				{/* Cast because our ChatArtifactPayload.spec has optional props fields;
+export function ArtifactRenderer({ artifact, onInteractionSubmitted }: ArtifactRendererProps): ReactNode {
+  return (
+    <ArtifactInteractionScope artifactId={artifact.id} onSubmitted={onInteractionSubmitted}>
+      <JSONUIProvider registry={registry}>
+        {/* Cast because our ChatArtifactPayload.spec has optional props fields;
 				    json-render validates the spec at runtime before rendering. */}
-				<Renderer spec={artifact.spec as unknown as Spec} registry={registry} />
-			</JSONUIProvider>
-		</ArtifactInteractionScope>
-	);
+        <Renderer spec={artifact.spec as unknown as Spec} registry={registry} />
+      </JSONUIProvider>
+    </ArtifactInteractionScope>
+  );
 }

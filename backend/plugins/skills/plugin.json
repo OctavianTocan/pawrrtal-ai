@@ -1,53 +1,53 @@
 {
-	"schema_version": 1,
-	"id": "skills",
-	"name": "Skills",
-	"description": "Expose workspace skill discovery and instruction invocation tools.",
-	"version": "1.0.0",
-	"enabled_by_default": true,
-	"permissions": ["filesystem_read"],
-	"capabilities": [
-		{
-			"type": "python_tool",
-			"id": "list_skills",
-			"tool_name": "list_skills",
-			"title": "List Skills",
-			"description": "List the skills configured in the active workspace.",
-			"tags": ["skills", "workspace"],
-			"intents": ["skills.list", "workspace.guidance"],
-			"slots": ["skills"],
-			"exposure": "direct_and_catalog",
-			"permissions": ["filesystem_read"],
-			"risk": "local_read",
-			"entrypoint": "app.plugins.skills.tools:make_list_skills_tool"
-		},
-		{
-			"type": "python_tool",
-			"id": "read_skill",
-			"tool_name": "read_skill",
-			"title": "Read Skill",
-			"description": "Read the SKILL.md instructions for one workspace skill.",
-			"tags": ["skills", "workspace"],
-			"intents": ["skills.read", "workspace.guidance"],
-			"slots": ["skills"],
-			"exposure": "direct_and_catalog",
-			"permissions": ["filesystem_read"],
-			"risk": "local_read",
-			"entrypoint": "app.plugins.skills.tools:make_read_skill_tool"
-		},
-		{
-			"type": "python_tool",
-			"id": "invoke_skill",
-			"tool_name": "invoke_skill",
-			"title": "Invoke Skill",
-			"description": "Inject one workspace skill's instructions into the agent turn.",
-			"tags": ["skills", "workspace"],
-			"intents": ["skills.invoke", "workspace.guidance"],
-			"slots": ["skills", "agent_guidance"],
-			"exposure": "direct_and_catalog",
-			"permissions": ["filesystem_read"],
-			"risk": "local_read",
-			"entrypoint": "app.plugins.skills.tools:make_invoke_skill_tool"
-		}
-	]
+  "schema_version": 1,
+  "id": "skills",
+  "name": "Skills",
+  "description": "Expose workspace skill discovery and instruction invocation tools.",
+  "version": "1.0.0",
+  "enabled_by_default": true,
+  "permissions": ["filesystem_read"],
+  "capabilities": [
+    {
+      "type": "python_tool",
+      "id": "list_skills",
+      "tool_name": "list_skills",
+      "title": "List Skills",
+      "description": "List the skills configured in the active workspace.",
+      "tags": ["skills", "workspace"],
+      "intents": ["skills.list", "workspace.guidance"],
+      "slots": ["skills"],
+      "exposure": "direct_and_catalog",
+      "permissions": ["filesystem_read"],
+      "risk": "local_read",
+      "entrypoint": "app.plugins.skills.tools:make_list_skills_tool"
+    },
+    {
+      "type": "python_tool",
+      "id": "read_skill",
+      "tool_name": "read_skill",
+      "title": "Read Skill",
+      "description": "Read the SKILL.md instructions for one workspace skill.",
+      "tags": ["skills", "workspace"],
+      "intents": ["skills.read", "workspace.guidance"],
+      "slots": ["skills"],
+      "exposure": "direct_and_catalog",
+      "permissions": ["filesystem_read"],
+      "risk": "local_read",
+      "entrypoint": "app.plugins.skills.tools:make_read_skill_tool"
+    },
+    {
+      "type": "python_tool",
+      "id": "invoke_skill",
+      "tool_name": "invoke_skill",
+      "title": "Invoke Skill",
+      "description": "Inject one workspace skill's instructions into the agent turn.",
+      "tags": ["skills", "workspace"],
+      "intents": ["skills.invoke", "workspace.guidance"],
+      "slots": ["skills", "agent_guidance"],
+      "exposure": "direct_and_catalog",
+      "permissions": ["filesystem_read"],
+      "risk": "local_read",
+      "entrypoint": "app.plugins.skills.tools:make_invoke_skill_tool"
+    }
+  ]
 }

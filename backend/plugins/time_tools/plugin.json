@@ -1,25 +1,25 @@
 {
-	"schema_version": 1,
-	"id": "time_tools",
-	"name": "Time Tools",
-	"description": "Expose current wall-clock time lookups as optional agent tools.",
-	"version": "1.0.0",
-	"enabled_by_default": true,
-	"permissions": [],
-	"capabilities": [
-		{
-			"type": "python_tool",
-			"id": "now",
-			"tool_name": "now",
-			"title": "Now",
-			"description": "Return current UTC and local wall-clock time for scheduling and date reasoning.",
-			"tags": ["time", "date", "schedule"],
-			"intents": ["time.now", "date.reason"],
-			"slots": ["time"],
-			"exposure": "direct_and_catalog",
-			"permissions": [],
-			"risk": "local_read",
-			"entrypoint": "app.plugins.time_tools.tools:make_now_tool"
-		}
-	]
+  "schema_version": 1,
+  "id": "time_tools",
+  "name": "Time Tools",
+  "description": "Expose current wall-clock time lookups as optional agent tools.",
+  "version": "1.0.0",
+  "enabled_by_default": true,
+  "permissions": [],
+  "capabilities": [
+    {
+      "type": "python_tool",
+      "id": "now",
+      "tool_name": "now",
+      "title": "Now",
+      "description": "Return current UTC and local wall-clock time for scheduling and date reasoning.",
+      "tags": ["time", "date", "schedule"],
+      "intents": ["time.now", "date.reason"],
+      "slots": ["time"],
+      "exposure": "direct_and_catalog",
+      "permissions": [],
+      "risk": "local_read",
+      "entrypoint": "app.plugins.time_tools.tools:make_now_tool"
+    }
+  ]
 }

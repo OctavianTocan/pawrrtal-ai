@@ -23,82 +23,79 @@ import { z } from 'zod';
 import { expect, test } from './fixtures';
 
 const SidebarStateSchema = z.object({
-	visibleConversationCount: z
-		.number()
-		.describe(
-			'How many conversation rows are currently visible in the left sidebar list (exclude group headers like "Today")'
-		),
-	emptySearchPlaceholder: z
-		.boolean()
-		.describe(
-			'True if the sidebar is currently showing an "empty search" / "no results" affordance (because the search query matches nothing)'
-		),
+  visibleConversationCount: z
+    .number()
+    .describe(
+      'How many conversation rows are currently visible in the left sidebar list (exclude group headers like "Today")'
+    ),
+  emptySearchPlaceholder: z
+    .boolean()
+    .describe(
+      'True if the sidebar is currently showing an "empty search" / "no results" affordance (because the search query matches nothing)'
+    ),
 });
 
 test.describe('sidebar — search', () => {
-	test('typing in the search input filters the conversation list', async ({
-		stagehand,
-		navigateToApp,
-	}) => {
-		await navigateToApp('/');
-		const page = stagehand.context.pages()[0];
-		if (page === undefined) throw new Error('No active Stagehand page');
+  test('typing in the search input filters the conversation list', async ({ stagehand, navigateToApp }) => {
+    await navigateToApp('/');
+    const page = stagehand.context.pages()[0];
+    if (page === undefined) throw new Error('No active Stagehand page');
 
-		// Snapshot the unfiltered count so we can compare later.
-		const { visibleConversationCount: baseline } = await stagehand.extract(
-			'Inspect the left sidebar — how many conversation rows are visible right now?',
-			SidebarStateSchema
-		);
+    // Snapshot the unfiltered count so we can compare later.
+    const { visibleConversationCount: baseline } = await stagehand.extract(
+      'Inspect the left sidebar — how many conversation rows are visible right now?',
+      SidebarStateSchema
+    );
 
-		// Type a string designed to match no real conversation.
-		const noMatchQuery = `zzz-no-match-${Date.now().toString(36)}`;
-		const typeInstruction = `Type %query% into the conversations search input at the top of the left sidebar`;
-		const [typeAction] = await stagehand.observe(typeInstruction);
-		if (typeAction === undefined) {
-			await stagehand.act(typeInstruction, { variables: { query: noMatchQuery } });
-		} else {
-			await stagehand.act(typeAction, { variables: { query: noMatchQuery } });
-		}
+    // Type a string designed to match no real conversation.
+    const noMatchQuery = `zzz-no-match-${Date.now().toString(36)}`;
+    const typeInstruction = `Type %query% into the conversations search input at the top of the left sidebar`;
+    const [typeAction] = await stagehand.observe(typeInstruction);
+    if (typeAction === undefined) {
+      await stagehand.act(typeInstruction, { variables: { query: noMatchQuery } });
+    } else {
+      await stagehand.act(typeAction, { variables: { query: noMatchQuery } });
+    }
 
-		// Search filtering is debounced; small wait avoids racing the
-		// extract against the in-flight filter computation.
-		await page.waitForTimeout(400);
+    // Search filtering is debounced; small wait avoids racing the
+    // extract against the in-flight filter computation.
+    await page.waitForTimeout(400);
 
-		const filteredState = await stagehand.extract(
-			'Inspect the left sidebar — how many conversation rows are visible right now?',
-			SidebarStateSchema
-		);
+    const filteredState = await stagehand.extract(
+      'Inspect the left sidebar — how many conversation rows are visible right now?',
+      SidebarStateSchema
+    );
 
-		// Either the filtered count went down, OR the sidebar is showing
-		// an empty-search placeholder. Both are valid "search worked"
-		// signals — empty placeholder is the right behavior when the
-		// baseline list was already empty.
-		expect(
-			filteredState.visibleConversationCount <= baseline,
-			`expected the filtered count (${filteredState.visibleConversationCount}) to drop from baseline (${baseline}) after a no-match query`
-		).toBe(true);
+    // Either the filtered count went down, OR the sidebar is showing
+    // an empty-search placeholder. Both are valid "search worked"
+    // signals — empty placeholder is the right behavior when the
+    // baseline list was already empty.
+    expect(
+      filteredState.visibleConversationCount <= baseline,
+      `expected the filtered count (${filteredState.visibleConversationCount}) to drop from baseline (${baseline}) after a no-match query`
+    ).toBe(true);
 
-		// Clear the search via the search-cancel affordance (X button
-		// inside the input or Escape key — Stagehand picks whichever it
-		// can resolve via the accessibility tree).
-		const clearInstruction =
-			'Clear the conversations search input in the left sidebar (click the X / clear button inside the input, or press Escape while the input is focused)';
-		const [clearAction] = await stagehand.observe(clearInstruction);
-		if (clearAction === undefined) {
-			await stagehand.act(clearInstruction);
-		} else {
-			await stagehand.act(clearAction);
-		}
-		await page.waitForTimeout(400);
+    // Clear the search via the search-cancel affordance (X button
+    // inside the input or Escape key — Stagehand picks whichever it
+    // can resolve via the accessibility tree).
+    const clearInstruction =
+      'Clear the conversations search input in the left sidebar (click the X / clear button inside the input, or press Escape while the input is focused)';
+    const [clearAction] = await stagehand.observe(clearInstruction);
+    if (clearAction === undefined) {
+      await stagehand.act(clearInstruction);
+    } else {
+      await stagehand.act(clearAction);
+    }
+    await page.waitForTimeout(400);
 
-		const { visibleConversationCount: afterClear } = await stagehand.extract(
-			'Inspect the left sidebar — how many conversation rows are visible right now?',
-			SidebarStateSchema
-		);
+    const { visibleConversationCount: afterClear } = await stagehand.extract(
+      'Inspect the left sidebar — how many conversation rows are visible right now?',
+      SidebarStateSchema
+    );
 
-		expect(
-			afterClear,
-			`expected the sidebar to return to baseline (${baseline}) after clearing the search. Got: ${afterClear}`
-		).toBeGreaterThanOrEqual(baseline);
-	});
+    expect(
+      afterClear,
+      `expected the sidebar to return to baseline (${baseline}) after clearing the search. Got: ${afterClear}`
+    ).toBeGreaterThanOrEqual(baseline);
+  });
 });

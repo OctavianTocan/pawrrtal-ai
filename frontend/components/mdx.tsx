@@ -13,14 +13,14 @@ import type { MDXComponents } from 'mdx/types';
  * @returns the full MDX component registry
  */
 export function getMDXComponents(components?: MDXComponents): MDXComponents {
-	return {
-		...defaultMdxComponents,
-		...components,
-	};
+  return {
+    ...defaultMdxComponents,
+    ...components,
+  };
 }
 
 const _useMDXComponents = getMDXComponents;
 
 declare global {
-	type MDXProvidedComponents = ReturnType<typeof getMDXComponents>;
+  type MDXProvidedComponents = ReturnType<typeof getMDXComponents>;
 }

@@ -38,5 +38,5 @@ export type AppDialogProps = ResponsiveModalProps;
  * @returns The active overlay for the current breakpoint.
  */
 export function AppDialog(props: AppDialogProps): React.JSX.Element {
-	return <ResponsiveModal {...props} />;
+  return <ResponsiveModal {...props} />;
 }

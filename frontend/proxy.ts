@@ -26,8 +26,7 @@ const isProtectedRoute = (path: string) => protectedRoutes.some((route) => path.
 
 /** True when `path` is a public auth page or sits under a public subtree. */
 const isPublicRoute = (path: string) =>
-	publicRoutes.includes(path) ||
-	publicPrefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
+  publicRoutes.includes(path) || publicPrefixes.some((prefix) => path === prefix || path.startsWith(`${prefix}/`));
 
 /**
  * Next.js middleware entrypoint: enforces cookie auth on protected paths.
@@ -36,21 +35,21 @@ const isPublicRoute = (path: string) =>
  * @returns `NextResponse.next()` to continue, or a redirect to `/login` when unauthenticated.
  */
 export function proxy(request: NextRequest) {
-	const path = request.nextUrl.pathname;
-	const sessionToken = request.cookies.get('session_token');
+  const path = request.nextUrl.pathname;
+  const sessionToken = request.cookies.get('session_token');
 
-	if (isPublicRoute(path)) {
-		return NextResponse.next();
-	}
+  if (isPublicRoute(path)) {
+    return NextResponse.next();
+  }
 
-	if (isProtectedRoute(path) && !sessionToken) {
-		const loginUrl = new URL('/login', request.url);
-		const target = path + request.nextUrl.search;
-		loginUrl.searchParams.set('redirect', target);
-		return NextResponse.redirect(loginUrl);
-	}
+  if (isProtectedRoute(path) && !sessionToken) {
+    const loginUrl = new URL('/login', request.url);
+    const target = path + request.nextUrl.search;
+    loginUrl.searchParams.set('redirect', target);
+    return NextResponse.redirect(loginUrl);
+  }
 
-	return NextResponse.next();
+  return NextResponse.next();
 }
 
 /**
@@ -63,5 +62,5 @@ export function proxy(request: NextRequest) {
  * parse as JS.
  */
 export const config = {
-	matcher: ['/((?!api|auth|users|_next/static|_next/image|favicon.ico|.+\\.[a-zA-Z0-9]+$).*)'],
+  matcher: ['/((?!api|auth|users|_next/static|_next/image|favicon.ico|.+\\.[a-zA-Z0-9]+$).*)'],
 };

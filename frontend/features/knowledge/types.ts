@@ -26,19 +26,19 @@ export type KnowledgeViewId = (typeof KNOWLEDGE_VIEWS)[keyof typeof KNOWLEDGE_VI
  * `name` is the display label and the URL path segment.
  */
 export type FileTreeNode =
-	| {
-			kind: 'folder';
-			name: string;
-			updatedLabel: string;
-			children: FileTreeNode[];
-	  }
-	| {
-			kind: 'file';
-			name: string;
-			updatedLabel: string;
-			/** Raw markdown source rendered in the document viewer. */
-			markdown: string;
-	  };
+  | {
+      kind: 'folder';
+      name: string;
+      updatedLabel: string;
+      children: FileTreeNode[];
+    }
+  | {
+      kind: 'file';
+      name: string;
+      updatedLabel: string;
+      /** Raw markdown source rendered in the document viewer. */
+      markdown: string;
+    };
 
 /**
  * Tinted background variant for memory cards. Mirrors the limited tint
@@ -63,11 +63,11 @@ export type MemoryCardTone = 'info' | 'success' | 'accent' | 'destructive' | 'fo
  * Mirrors the backend `WorkspaceRead` Pydantic schema.
  */
 export interface WorkspaceRead {
-	id: string;
-	name: string;
-	slug: string;
-	is_default: boolean;
-	created_at: string;
+  id: string;
+  name: string;
+  slug: string;
+  is_default: boolean;
+  created_at: string;
 }
 
 /**
@@ -75,24 +75,24 @@ export interface WorkspaceRead {
  * Mirrors `WorkspaceFileNode` on the backend.
  */
 export interface WorkspaceApiNode {
-	name: string;
-	/** Workspace-relative POSIX path, e.g. `memory/note.md`. */
-	path: string;
-	is_dir: boolean;
-	/** Byte size; `null` for directories. */
-	size: number | null;
+  name: string;
+  /** Workspace-relative POSIX path, e.g. `memory/note.md`. */
+  path: string;
+  is_dir: boolean;
+  /** Byte size; `null` for directories. */
+  size: number | null;
 }
 
 /** Response envelope from `GET /api/v1/workspaces/:id/tree`. */
 export interface WorkspaceTreeApiResponse {
-	workspace_id: string;
-	nodes: WorkspaceApiNode[];
+  workspace_id: string;
+  nodes: WorkspaceApiNode[];
 }
 
 /** Response from `GET /api/v1/workspaces/:id/files/:path`. */
 export interface WorkspaceFileApiResponse {
-	path: string;
-	content: string;
+  path: string;
+  content: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -100,14 +100,14 @@ export interface WorkspaceFileApiResponse {
 // ---------------------------------------------------------------------------
 
 export interface MemoryCardData {
-	/** Stable identifier — used as the React key and any future routing slug. */
-	id: string;
-	/** Card title rendered in the heading row. */
-	title: string;
-	/** One-line description rendered under the title. */
-	description: string;
-	/** Tint mapping for the icon chip background. */
-	tone: MemoryCardTone;
-	/** Human-readable tally label, e.g. `"24 entries"`. Mock for now. */
-	count: string;
+  /** Stable identifier — used as the React key and any future routing slug. */
+  id: string;
+  /** Card title rendered in the heading row. */
+  title: string;
+  /** One-line description rendered under the title. */
+  description: string;
+  /** Tint mapping for the icon chip background. */
+  tone: MemoryCardTone;
+  /** Human-readable tally label, e.g. `"24 entries"`. Mock for now. */
+  count: string;
 }

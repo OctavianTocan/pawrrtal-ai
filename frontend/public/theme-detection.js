@@ -27,18 +27,18 @@
  * would silently break.
  */
 (() => {
-	try {
-		const d = document.documentElement;
-		const m = window.matchMedia('(prefers-color-scheme:dark)');
-		if (m.matches) d.classList.add('dark');
-		m.addEventListener('change', (e) => {
-			if (e.matches) {
-				d.classList.add('dark');
-			} else {
-				d.classList.remove('dark');
-			}
-		});
-	} catch (_e) {
-		/* matchMedia unavailable — leave the default light theme. */
-	}
+  try {
+    const d = document.documentElement;
+    const m = window.matchMedia('(prefers-color-scheme:dark)');
+    if (m.matches) d.classList.add('dark');
+    m.addEventListener('change', (e) => {
+      if (e.matches) {
+        d.classList.add('dark');
+      } else {
+        d.classList.remove('dark');
+      }
+    });
+  } catch (_e) {
+    /* matchMedia unavailable — leave the default light theme. */
+  }
 })();

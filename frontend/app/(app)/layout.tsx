@@ -8,9 +8,9 @@ import { AppShell } from '@/features/app-shell/AppShell';
  * Wraps `(app)/*` routes with the persistent {@link AppShell} chrome.
  */
 export default function AppShellWrapper({
-	children,
+  children,
 }: Readonly<{
-	children: React.ReactNode;
+  children: React.ReactNode;
 }>) {
-	return <AppShell>{children}</AppShell>;
+  return <AppShell>{children}</AppShell>;
 }

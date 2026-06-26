@@ -8,34 +8,34 @@ import type { Conversation, ConversationStatus } from '@/lib/types';
 
 /** Variables required to rename a conversation. */
 interface RenameConversationVariables {
-	conversationId: string;
-	title: string;
+  conversationId: string;
+  title: string;
 }
 
 /** Variables required to delete a conversation. */
 interface DeleteConversationVariables {
-	conversationId: string;
+  conversationId: string;
 }
 
 /** Metadata fields that can be patched in a single conversation update. */
 export interface UpdateConversationMetadataVariables {
-	conversationId: string;
-	is_archived?: boolean;
-	is_flagged?: boolean;
-	is_unread?: boolean;
-	status?: ConversationStatus;
-	/**
-	 * Full replacement of the conversation's label set. Callers (the toggle
-	 * handler in `use-conversation-metadata-actions`) build this from the
-	 * current row's labels plus/minus the toggled label ID; the server does
-	 * not merge — it overwrites.
-	 */
-	labels?: string[];
+  conversationId: string;
+  is_archived?: boolean;
+  is_flagged?: boolean;
+  is_unread?: boolean;
+  status?: ConversationStatus;
+  /**
+   * Full replacement of the conversation's label set. Callers (the toggle
+   * handler in `use-conversation-metadata-actions`) build this from the
+   * current row's labels plus/minus the toggled label ID; the server does
+   * not merge — it overwrites.
+   */
+  labels?: string[];
 }
 
 /** Variables required to regenerate a conversation title. */
 interface RegenerateTitleVariables {
-	conversationId: string;
+  conversationId: string;
 }
 
 /**
@@ -45,16 +45,16 @@ interface RegenerateTitleVariables {
  * Returns the same array reference if conversations is undefined.
  */
 function replaceConversation(
-	conversations: Conversation[] | undefined,
-	updatedConversation: Conversation
+  conversations: Conversation[] | undefined,
+  updatedConversation: Conversation
 ): Conversation[] | undefined {
-	if (!conversations) {
-		return conversations;
-	}
+  if (!conversations) {
+    return conversations;
+  }
 
-	return conversations.map((conversation) =>
-		conversation.id === updatedConversation.id ? updatedConversation : conversation
-	);
+  return conversations.map((conversation) =>
+    conversation.id === updatedConversation.id ? updatedConversation : conversation
+  );
 }
 
 /**
@@ -64,14 +64,14 @@ function replaceConversation(
  * Returns the same array reference if conversations is undefined.
  */
 function removeConversation(
-	conversations: Conversation[] | undefined,
-	deletedConversationId: string
+  conversations: Conversation[] | undefined,
+  deletedConversationId: string
 ): Conversation[] | undefined {
-	if (!conversations) {
-		return conversations;
-	}
+  if (!conversations) {
+    return conversations;
+  }
 
-	return conversations.filter((conversation) => conversation.id !== deletedConversationId);
+  return conversations.filter((conversation) => conversation.id !== deletedConversationId);
 }
 
 /**
@@ -83,39 +83,34 @@ function removeConversation(
  *
  * @returns A mutation object with `mutate` and `mutateAsync` methods.
  */
-export function useRenameConversation(): UseMutationResult<
-	Conversation,
-	Error,
-	RenameConversationVariables
-> {
-	const fetcher = useAuthedFetch();
-	const queryClient = useQueryClient();
+export function useRenameConversation(): UseMutationResult<Conversation, Error, RenameConversationVariables> {
+  const fetcher = useAuthedFetch();
+  const queryClient = useQueryClient();
 
-	return useMutation({
-		mutationKey: ['conversations', 'rename'],
-		mutationFn: async ({ conversationId, title }: RenameConversationVariables) => {
-			const response = await fetcher(API_ENDPOINTS.conversations.update(conversationId), {
-				method: 'PATCH',
-				headers: {
-					'content-type': 'application/json',
-				},
-				body: JSON.stringify({ title }),
-			});
+  return useMutation({
+    mutationKey: ['conversations', 'rename'],
+    mutationFn: async ({ conversationId, title }: RenameConversationVariables) => {
+      const response = await fetcher(API_ENDPOINTS.conversations.update(conversationId), {
+        method: 'PATCH',
+        headers: {
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ title }),
+      });
 
-			return (await response.json()) as Conversation;
-		},
-		onSuccess: (updatedConversation) => {
-			queryClient.setQueryData<Conversation[] | undefined>(
-				['conversations'],
-				(conversations) => replaceConversation(conversations, updatedConversation)
-			);
-			queryClient.setQueryData<Conversation | undefined>(
-				['conversations', updatedConversation.id],
-				updatedConversation
-			);
-			queryClient.invalidateQueries({ queryKey: ['conversations'] });
-		},
-	});
+      return (await response.json()) as Conversation;
+    },
+    onSuccess: (updatedConversation) => {
+      queryClient.setQueryData<Conversation[] | undefined>(['conversations'], (conversations) =>
+        replaceConversation(conversations, updatedConversation)
+      );
+      queryClient.setQueryData<Conversation | undefined>(
+        ['conversations', updatedConversation.id],
+        updatedConversation
+      );
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
 }
 
 /**
@@ -127,39 +122,35 @@ export function useRenameConversation(): UseMutationResult<
  * @returns A mutation object with `mutate` and `mutateAsync` methods.
  */
 export function useUpdateConversationMetadata(): UseMutationResult<
-	Conversation,
-	Error,
-	UpdateConversationMetadataVariables
+  Conversation,
+  Error,
+  UpdateConversationMetadataVariables
 > {
-	const fetcher = useAuthedFetch();
-	const queryClient = useQueryClient();
+  const fetcher = useAuthedFetch();
+  const queryClient = useQueryClient();
 
-	return useMutation({
-		mutationKey: ['conversations', 'update-metadata'],
-		mutationFn: async ({
-			conversationId,
-			...fields
-		}: UpdateConversationMetadataVariables): Promise<Conversation> => {
-			const response = await fetcher(API_ENDPOINTS.conversations.update(conversationId), {
-				method: 'PATCH',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify(fields),
-			});
+  return useMutation({
+    mutationKey: ['conversations', 'update-metadata'],
+    mutationFn: async ({ conversationId, ...fields }: UpdateConversationMetadataVariables): Promise<Conversation> => {
+      const response = await fetcher(API_ENDPOINTS.conversations.update(conversationId), {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(fields),
+      });
 
-			return (await response.json()) as Conversation;
-		},
-		onSuccess: (updatedConversation) => {
-			queryClient.setQueryData<Conversation[] | undefined>(
-				['conversations'],
-				(conversations) => replaceConversation(conversations, updatedConversation)
-			);
-			queryClient.setQueryData<Conversation | undefined>(
-				['conversations', updatedConversation.id],
-				updatedConversation
-			);
-			queryClient.invalidateQueries({ queryKey: ['conversations'] });
-		},
-	});
+      return (await response.json()) as Conversation;
+    },
+    onSuccess: (updatedConversation) => {
+      queryClient.setQueryData<Conversation[] | undefined>(['conversations'], (conversations) =>
+        replaceConversation(conversations, updatedConversation)
+      );
+      queryClient.setQueryData<Conversation | undefined>(
+        ['conversations', updatedConversation.id],
+        updatedConversation
+      );
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
 }
 
 /**
@@ -171,24 +162,21 @@ export function useUpdateConversationMetadata(): UseMutationResult<
  * @returns A mutation object with `mutate` and `mutateAsync` methods.
  */
 export function useRegenerateTitle(): UseMutationResult<string, Error, RegenerateTitleVariables> {
-	const fetcher = useAuthedFetch();
-	const queryClient = useQueryClient();
+  const fetcher = useAuthedFetch();
+  const queryClient = useQueryClient();
 
-	return useMutation({
-		mutationKey: ['conversations', 'regenerate-title'],
-		mutationFn: async ({ conversationId }: RegenerateTitleVariables): Promise<string> => {
-			const response = await fetcher(
-				API_ENDPOINTS.conversations.generateTitle(conversationId, ''),
-				{ method: 'POST' }
-			);
+  return useMutation({
+    mutationKey: ['conversations', 'regenerate-title'],
+    mutationFn: async ({ conversationId }: RegenerateTitleVariables): Promise<string> => {
+      const response = await fetcher(API_ENDPOINTS.conversations.generateTitle(conversationId, ''), { method: 'POST' });
 
-			return (await response.text()) as string;
-		},
-		onSuccess: (_title, { conversationId }) => {
-			queryClient.invalidateQueries({ queryKey: ['conversations'] });
-			queryClient.invalidateQueries({ queryKey: ['conversations', conversationId] });
-		},
-	});
+      return (await response.text()) as string;
+    },
+    onSuccess: (_title, { conversationId }) => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      queryClient.invalidateQueries({ queryKey: ['conversations', conversationId] });
+    },
+  });
 }
 
 /**
@@ -201,30 +189,25 @@ export function useRegenerateTitle(): UseMutationResult<string, Error, Regenerat
  *
  * @returns A mutation object with `mutate` and `mutateAsync` methods.
  */
-export function useDeleteConversation(): UseMutationResult<
-	string,
-	Error,
-	DeleteConversationVariables
-> {
-	const fetcher = useAuthedFetch();
-	const queryClient = useQueryClient();
+export function useDeleteConversation(): UseMutationResult<string, Error, DeleteConversationVariables> {
+  const fetcher = useAuthedFetch();
+  const queryClient = useQueryClient();
 
-	return useMutation({
-		mutationKey: ['conversations', 'delete'],
-		mutationFn: async ({ conversationId }: DeleteConversationVariables) => {
-			await fetcher(API_ENDPOINTS.conversations.delete(conversationId), {
-				method: 'DELETE',
-			});
+  return useMutation({
+    mutationKey: ['conversations', 'delete'],
+    mutationFn: async ({ conversationId }: DeleteConversationVariables) => {
+      await fetcher(API_ENDPOINTS.conversations.delete(conversationId), {
+        method: 'DELETE',
+      });
 
-			return conversationId;
-		},
-		onSuccess: (deletedConversationId) => {
-			queryClient.setQueryData<Conversation[] | undefined>(
-				['conversations'],
-				(conversations) => removeConversation(conversations, deletedConversationId)
-			);
-			queryClient.removeQueries({ queryKey: ['conversations', deletedConversationId] });
-			queryClient.invalidateQueries({ queryKey: ['conversations'] });
-		},
-	});
+      return conversationId;
+    },
+    onSuccess: (deletedConversationId) => {
+      queryClient.setQueryData<Conversation[] | undefined>(['conversations'], (conversations) =>
+        removeConversation(conversations, deletedConversationId)
+      );
+      queryClient.removeQueries({ queryKey: ['conversations', deletedConversationId] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+  });
 }

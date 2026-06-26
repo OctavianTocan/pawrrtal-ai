@@ -20,31 +20,31 @@ const FRONTEND_URL = process.env.E2E_BASE_URL ?? 'http://localhost:3000';
 const BACKEND_URL = process.env.E2E_API_URL ?? 'http://localhost:8000';
 
 export default defineConfig({
-	testDir: './e2e',
-	timeout: 30_000,
-	expect: { timeout: 5_000 },
-	fullyParallel: false,
-	forbidOnly: Boolean(process.env.CI),
-	retries: process.env.CI ? 2 : 0,
-	workers: 1,
-	reporter: [['list']],
-	use: {
-		baseURL: FRONTEND_URL,
-		trace: 'on-first-retry',
-		screenshot: 'only-on-failure',
-		video: 'retain-on-failure',
-		actionTimeout: 10_000,
-		extraHTTPHeaders: {
-			'x-e2e-run': '1',
-		},
-	},
-	projects: [
-		{
-			name: 'chromium',
-			use: { browserName: 'chromium' },
-		},
-	],
-	metadata: {
-		backend: BACKEND_URL,
-	},
+  testDir: './e2e',
+  timeout: 30_000,
+  expect: { timeout: 5_000 },
+  fullyParallel: false,
+  forbidOnly: Boolean(process.env.CI),
+  retries: process.env.CI ? 2 : 0,
+  workers: 1,
+  reporter: [['list']],
+  use: {
+    baseURL: FRONTEND_URL,
+    trace: 'on-first-retry',
+    screenshot: 'only-on-failure',
+    video: 'retain-on-failure',
+    actionTimeout: 10_000,
+    extraHTTPHeaders: {
+      'x-e2e-run': '1',
+    },
+  },
+  projects: [
+    {
+      name: 'chromium',
+      use: { browserName: 'chromium' },
+    },
+  ],
+  metadata: {
+    backend: BACKEND_URL,
+  },
 });

@@ -16,18 +16,18 @@ const DROPDOWN_CLOSE_GUARD_MS = 300;
 
 /** Return value of {@link useTooltipDropdown}. */
 export interface UseTooltipDropdownReturn {
-	/** Whether the dropdown is currently open. */
-	menuOpen: boolean;
-	/**
-	 * Whether the tooltip should be open.
-	 * Already accounts for `menuOpen` — returns `false` while the dropdown is open
-	 * so the tooltip and dropdown never appear simultaneously.
-	 */
-	tooltipOpen: boolean;
-	/** Pass to `DropdownMenu.onOpenChange`. */
-	handleMenuOpenChange: (open: boolean) => void;
-	/** Pass to `Tooltip.onOpenChange`. */
-	handleTooltipOpenChange: (open: boolean) => void;
+  /** Whether the dropdown is currently open. */
+  menuOpen: boolean;
+  /**
+   * Whether the tooltip should be open.
+   * Already accounts for `menuOpen` — returns `false` while the dropdown is open
+   * so the tooltip and dropdown never appear simultaneously.
+   */
+  tooltipOpen: boolean;
+  /** Pass to `DropdownMenu.onOpenChange`. */
+  handleMenuOpenChange: (open: boolean) => void;
+  /** Pass to `Tooltip.onOpenChange`. */
+  handleTooltipOpenChange: (open: boolean) => void;
 }
 
 /**
@@ -45,38 +45,38 @@ export interface UseTooltipDropdownReturn {
  * @returns State and handlers to spread onto `<Tooltip>` and `<DropdownMenu>`.
  */
 export function useTooltipDropdown(): UseTooltipDropdownReturn {
-	const [menuOpen, setMenuOpen] = useState(false);
-	const [tooltipOpen, setTooltipOpen] = useState(false);
-	// Guard ref — true while the dropdown is in the process of closing.
-	const isMenuClosingRef = useRef(false);
-	// Timer ref so a pending guard-clear can be cancelled if the dropdown
-	// reopens before the window expires (prevents stale ref state leaks).
-	const closingTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [tooltipOpen, setTooltipOpen] = useState(false);
+  // Guard ref — true while the dropdown is in the process of closing.
+  const isMenuClosingRef = useRef(false);
+  // Timer ref so a pending guard-clear can be cancelled if the dropdown
+  // reopens before the window expires (prevents stale ref state leaks).
+  const closingTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
-	function handleMenuOpenChange(open: boolean): void {
-		setMenuOpen(open);
-		if (!open) {
-			isMenuClosingRef.current = true;
-			setTooltipOpen(false);
-			clearTimeout(closingTimerRef.current);
-			closingTimerRef.current = setTimeout(() => {
-				isMenuClosingRef.current = false;
-			}, DROPDOWN_CLOSE_GUARD_MS);
-		}
-	}
+  function handleMenuOpenChange(open: boolean): void {
+    setMenuOpen(open);
+    if (!open) {
+      isMenuClosingRef.current = true;
+      setTooltipOpen(false);
+      clearTimeout(closingTimerRef.current);
+      closingTimerRef.current = setTimeout(() => {
+        isMenuClosingRef.current = false;
+      }, DROPDOWN_CLOSE_GUARD_MS);
+    }
+  }
 
-	function handleTooltipOpenChange(open: boolean): void {
-		// Block tooltip while the dropdown is open or still in its closing
-		// window (focus-return fires here and would set data-state="instant-open").
-		if (menuOpen || isMenuClosingRef.current) return;
-		setTooltipOpen(open);
-	}
+  function handleTooltipOpenChange(open: boolean): void {
+    // Block tooltip while the dropdown is open or still in its closing
+    // window (focus-return fires here and would set data-state="instant-open").
+    if (menuOpen || isMenuClosingRef.current) return;
+    setTooltipOpen(open);
+  }
 
-	return {
-		menuOpen,
-		// Tooltip must never show while the dropdown is open.
-		tooltipOpen: menuOpen ? false : tooltipOpen,
-		handleMenuOpenChange,
-		handleTooltipOpenChange,
-	};
+  return {
+    menuOpen,
+    // Tooltip must never show while the dropdown is open.
+    tooltipOpen: menuOpen ? false : tooltipOpen,
+    handleMenuOpenChange,
+    handleTooltipOpenChange,
+  };
 }

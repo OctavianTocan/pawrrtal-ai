@@ -16,31 +16,31 @@ export type IntegrationBadge = 'beta' | 'connected' | 'expired' | null;
 
 /** Integration row metadata shown in the "Your Integrations" list. */
 export interface IntegrationDef {
-	/** Stable id used as React key + storage key. */
-	id: string;
-	/** Display name (e.g. "Apple Calendar", "Gmail"). */
-	name: string;
-	/** Short subtitle ("See your events in Apple Calendar"). */
-	description: string;
-	/** Optional badge rendered to the right of the name. */
-	badge?: IntegrationBadge;
-	/** Lucide icon used as the integration's avatar tile. */
-	Icon: LucideIcon;
-	/** Tailwind background class for the avatar tile. */
-	tileBgClass: string;
-	/** Tailwind text class for the avatar tile icon. */
-	tileTextClass: string;
-	/** Per-account rows (Gmail / Google Calendar can have multiple accounts). */
-	accounts?: IntegrationAccount[];
+  /** Stable id used as React key + storage key. */
+  id: string;
+  /** Display name (e.g. "Apple Calendar", "Gmail"). */
+  name: string;
+  /** Short subtitle ("See your events in Apple Calendar"). */
+  description: string;
+  /** Optional badge rendered to the right of the name. */
+  badge?: IntegrationBadge;
+  /** Lucide icon used as the integration's avatar tile. */
+  Icon: LucideIcon;
+  /** Tailwind background class for the avatar tile. */
+  tileBgClass: string;
+  /** Tailwind text class for the avatar tile icon. */
+  tileTextClass: string;
+  /** Per-account rows (Gmail / Google Calendar can have multiple accounts). */
+  accounts?: IntegrationAccount[];
 }
 
 /** A single account attached to an integration (Gmail address, etc). */
 export interface IntegrationAccount {
-	id: string;
-	email: string;
-	subtitle?: string;
-	status: 'connected' | 'expired';
-	label?: string;
+  id: string;
+  email: string;
+  subtitle?: string;
+  status: 'connected' | 'expired';
+  label?: string;
 }
 
 /**
@@ -54,8 +54,8 @@ export const YOUR_INTEGRATIONS: IntegrationDef[] = [];
 
 /** Catalog rendered inside the "Add integration" modal grid. */
 export interface CatalogIntegration extends IntegrationDef {
-	/** "connect" → CTA button shown; otherwise pre-installed (gear). */
-	state: 'installed' | 'connectable';
+  /** "connect" → CTA button shown; otherwise pre-installed (gear). */
+  state: 'installed' | 'connectable';
 }
 
 /**

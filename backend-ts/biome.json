@@ -1,26 +1,34 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
-	"root": false,
-	"extends": ["../biome.json"],
-	"files": {
-		"includes": ["**/*.ts", "**/*.json", "!**/node_modules"]
-	},
-	"vcs": {
-		"enabled": false
-	},
-	"overrides": [
-		{
-			"includes": ["**/*"],
-			"linter": {
-				"rules": {
-					"style": {
-						"useFilenamingConvention": "off"
-					},
-					"correctness": {
-						"useImportExtensions": "off"
-					}
-				}
-			}
-		}
-	]
+  "$schema": "https://biomejs.dev/schemas/2.4.16/schema.json",
+  "root": false,
+  "extends": ["../biome.json"],
+  "files": {
+    "includes": ["**/*.ts", "**/*.json", "!**/node_modules"]
+  },
+  "vcs": {
+    "enabled": false
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "double",
+      "semicolons": "asNeeded",
+      "trailingCommas": "none",
+      "arrowParentheses": "always"
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useFilenamingConvention": "off"
+          },
+          "correctness": {
+            "useImportExtensions": "off"
+          }
+        }
+      }
+    }
+  ]
 }

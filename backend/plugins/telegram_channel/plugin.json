@@ -1,98 +1,98 @@
 {
-	"schema_version": 1,
-	"id": "telegram_channel",
-	"name": "Telegram Channel",
-	"description": "Telegram bot ingress, commands, keyboards, formatting, and delivery for Pawrrtal.",
-	"version": "1.0.0",
-	"enabled_by_default": true,
-	"permissions": ["network", "external_read", "external_write"],
-	"env": [
-		{
-			"name": "TELEGRAM_BOT_TOKEN",
-			"required": false,
-			"scope": "gateway",
-			"overridable": false,
-			"secret": true,
-			"label": "Telegram Bot Token",
-			"description": "Bot token used to receive updates and send Telegram messages."
-		},
-		{
-			"name": "TELEGRAM_BOT_USERNAME",
-			"required": false,
-			"scope": "gateway",
-			"overridable": false,
-			"secret": false,
-			"label": "Telegram Bot Username",
-			"description": "Bot username shown to users during channel linking."
-		},
-		{
-			"name": "TELEGRAM_MODE",
-			"required": false,
-			"scope": "gateway",
-			"overridable": false,
-			"secret": false,
-			"label": "Telegram Mode",
-			"description": "Telegram runtime mode, usually polling locally or webhook in production."
-		},
-		{
-			"name": "TELEGRAM_WEBHOOK_URL",
-			"required": false,
-			"scope": "gateway",
-			"overridable": false,
-			"secret": false,
-			"label": "Telegram Webhook URL",
-			"description": "Public webhook URL used when TELEGRAM_MODE is webhook."
-		},
-		{
-			"name": "TELEGRAM_WEBHOOK_SECRET",
-			"required": false,
-			"scope": "gateway",
-			"overridable": false,
-			"secret": true,
-			"label": "Telegram Webhook Secret",
-			"description": "Secret header value required for Telegram webhook requests."
-		}
-	],
-	"capabilities": [
-		{
-			"type": "channel",
-			"id": "telegram",
-			"title": "Telegram",
-			"description": "Receives Telegram updates and sends formatted Pawrrtal responses.",
-			"tags": ["chat", "telegram", "messaging"],
-			"intents": ["message", "notify", "bot"],
-			"slots": ["channel:telegram", "channel:messaging"],
-			"priority": 100,
-			"exposure": "catalog",
-			"permissions": ["network", "external_read", "external_write"],
-			"risk": "external_write",
-			"surface": "telegram",
-			"entrypoint": "app.channels.plugin_adapters:make_telegram_channel",
-			"commands": {
-				"slash": [
-					"start",
-					"new",
-					"model",
-					"thinking",
-					"config",
-					"verbose",
-					"stop",
-					"status",
-					"tools",
-					"whoami",
-					"lcm",
-					"compact"
-				],
-				"inline_keyboards": ["model", "thinking", "status", "regenerate"],
-				"formatting": ["telegram_html", "chunked_delivery"]
-			},
-			"lifespan": {
-				"entrypoint": "app.channels.telegram:telegram_lifespan",
-				"context_key": "telegram_lifespan_context",
-				"service_key": "telegram_service",
-				"order": 70,
-				"post_start": "app.channels.telegram.notifications:register_telegram_notifications"
-			}
-		}
-	]
+  "schema_version": 1,
+  "id": "telegram_channel",
+  "name": "Telegram Channel",
+  "description": "Telegram bot ingress, commands, keyboards, formatting, and delivery for Pawrrtal.",
+  "version": "1.0.0",
+  "enabled_by_default": true,
+  "permissions": ["network", "external_read", "external_write"],
+  "env": [
+    {
+      "name": "TELEGRAM_BOT_TOKEN",
+      "required": false,
+      "scope": "gateway",
+      "overridable": false,
+      "secret": true,
+      "label": "Telegram Bot Token",
+      "description": "Bot token used to receive updates and send Telegram messages."
+    },
+    {
+      "name": "TELEGRAM_BOT_USERNAME",
+      "required": false,
+      "scope": "gateway",
+      "overridable": false,
+      "secret": false,
+      "label": "Telegram Bot Username",
+      "description": "Bot username shown to users during channel linking."
+    },
+    {
+      "name": "TELEGRAM_MODE",
+      "required": false,
+      "scope": "gateway",
+      "overridable": false,
+      "secret": false,
+      "label": "Telegram Mode",
+      "description": "Telegram runtime mode, usually polling locally or webhook in production."
+    },
+    {
+      "name": "TELEGRAM_WEBHOOK_URL",
+      "required": false,
+      "scope": "gateway",
+      "overridable": false,
+      "secret": false,
+      "label": "Telegram Webhook URL",
+      "description": "Public webhook URL used when TELEGRAM_MODE is webhook."
+    },
+    {
+      "name": "TELEGRAM_WEBHOOK_SECRET",
+      "required": false,
+      "scope": "gateway",
+      "overridable": false,
+      "secret": true,
+      "label": "Telegram Webhook Secret",
+      "description": "Secret header value required for Telegram webhook requests."
+    }
+  ],
+  "capabilities": [
+    {
+      "type": "channel",
+      "id": "telegram",
+      "title": "Telegram",
+      "description": "Receives Telegram updates and sends formatted Pawrrtal responses.",
+      "tags": ["chat", "telegram", "messaging"],
+      "intents": ["message", "notify", "bot"],
+      "slots": ["channel:telegram", "channel:messaging"],
+      "priority": 100,
+      "exposure": "catalog",
+      "permissions": ["network", "external_read", "external_write"],
+      "risk": "external_write",
+      "surface": "telegram",
+      "entrypoint": "app.channels.plugin_adapters:make_telegram_channel",
+      "commands": {
+        "slash": [
+          "start",
+          "new",
+          "model",
+          "thinking",
+          "config",
+          "verbose",
+          "stop",
+          "status",
+          "tools",
+          "whoami",
+          "lcm",
+          "compact"
+        ],
+        "inline_keyboards": ["model", "thinking", "status", "regenerate"],
+        "formatting": ["telegram_html", "chunked_delivery"]
+      },
+      "lifespan": {
+        "entrypoint": "app.channels.telegram:telegram_lifespan",
+        "context_key": "telegram_lifespan_context",
+        "service_key": "telegram_service",
+        "order": 70,
+        "post_start": "app.channels.telegram.notifications:register_telegram_notifications"
+      }
+    }
+  ]
 }

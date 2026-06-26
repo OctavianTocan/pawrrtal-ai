@@ -16,18 +16,18 @@ import { handbookSource, productSource } from '@/lib/source';
  * Merges handbook and product pages into one searchable index.
  */
 export const { GET } = createSearchAPI('advanced', {
-	indexes: [
-		...handbookSource.getPages().map((page) => ({
-			title: page.data.title as string,
-			structuredData: page.data.structuredData,
-			id: page.url,
-			url: page.url,
-		})),
-		...productSource.getPages().map((page) => ({
-			title: page.data.title as string,
-			structuredData: page.data.structuredData,
-			id: page.url,
-			url: page.url,
-		})),
-	],
+  indexes: [
+    ...handbookSource.getPages().map((page) => ({
+      title: page.data.title as string,
+      structuredData: page.data.structuredData,
+      id: page.url,
+      url: page.url,
+    })),
+    ...productSource.getPages().map((page) => ({
+      title: page.data.title as string,
+      structuredData: page.data.structuredData,
+      id: page.url,
+      url: page.url,
+    })),
+  ],
 });

@@ -1,2 +1,2 @@
-export { DatabaseConfig } from './Config';
-export { DatabaseLive } from './Sqlite';
+export { DatabaseConfig } from "./Config"
+export { DatabaseLive } from "./Sqlite"

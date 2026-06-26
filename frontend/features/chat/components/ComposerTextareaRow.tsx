@@ -17,29 +17,29 @@ import { useGhostCompletion } from '../hooks/use-ghost-completion';
 
 /** Renders the rotating placeholder above the textarea. */
 function AnimatedComposerPlaceholder({
-	isVisible,
-	text,
+  isVisible,
+  text,
 }: {
-	isVisible: boolean;
-	text: string;
+  isVisible: boolean;
+  text: string;
 }): React.JSX.Element | null {
-	if (!isVisible) {
-		return null;
-	}
+  if (!isVisible) {
+    return null;
+  }
 
-	return (
-		<div
-			// `top-2` matches the textarea's `pt-2` so the placeholder sits on
-			// the same baseline as the user's first line of text; `top-3` left
-			// the placeholder a pixel off when the textarea was tightened.
-			className="pointer-events-none absolute top-2 left-3 z-10 pr-6 text-[14px] leading-6 text-muted-foreground/70"
-			aria-hidden="true"
-		>
-			<span className="composer-placeholder-enter block" key={text}>
-				{text}
-			</span>
-		</div>
-	);
+  return (
+    <div
+      // `top-2` matches the textarea's `pt-2` so the placeholder sits on
+      // the same baseline as the user's first line of text; `top-3` left
+      // the placeholder a pixel off when the textarea was tightened.
+      className="pointer-events-none absolute top-2 left-3 z-10 pr-6 text-[14px] leading-6 text-muted-foreground/70"
+      aria-hidden="true"
+    >
+      <span className="composer-placeholder-enter block" key={text}>
+        {text}
+      </span>
+    </div>
+  );
 }
 
 /**
@@ -52,24 +52,24 @@ function AnimatedComposerPlaceholder({
  * drifts visually from the caret position.
  */
 function GhostSuggestionOverlay({
-	value,
-	suggestion,
+  value,
+  suggestion,
 }: {
-	value: string;
-	suggestion: string;
+  value: string;
+  suggestion: string;
 }): React.JSX.Element | null {
-	if (!suggestion) {
-		return null;
-	}
-	return (
-		<div
-			aria-hidden="true"
-			className="pointer-events-none col-start-1 row-start-1 z-0 max-h-48 min-h-11 overflow-hidden px-3 pt-2 pb-1 text-[14px] leading-6 whitespace-pre-wrap break-words"
-		>
-			<span className="invisible">{value}</span>
-			<span className="text-muted-foreground/50">{suggestion}</span>
-		</div>
-	);
+  if (!suggestion) {
+    return null;
+  }
+  return (
+    <div
+      aria-hidden="true"
+      className="pointer-events-none col-start-1 row-start-1 z-0 max-h-48 min-h-11 overflow-hidden px-3 pt-2 pb-1 text-[14px] leading-6 whitespace-pre-wrap break-words"
+    >
+      <span className="invisible">{value}</span>
+      <span className="text-muted-foreground/50">{suggestion}</span>
+    </div>
+  );
 }
 
 /**
@@ -77,12 +77,12 @@ function GhostSuggestionOverlay({
  * exported so the row prop type can reference the same shape.
  */
 export interface ComposerGhostState {
-	/** Current ghost suggestion (empty string when none). */
-	suggestion: string;
-	/** Apply the active suggestion to the composer value. */
-	handleAccept: () => void;
-	/** Clear the active suggestion without applying it. */
-	handleDismiss: () => void;
+  /** Current ghost suggestion (empty string when none). */
+  suggestion: string;
+  /** Apply the active suggestion to the composer value. */
+  handleAccept: () => void;
+  /** Clear the active suggestion without applying it. */
+  handleDismiss: () => void;
 }
 
 /**
@@ -92,39 +92,39 @@ export interface ComposerGhostState {
  * repeat the same plumbing.
  */
 export function useComposerGhostCompletion({
-	content,
-	enabled,
-	onReplaceMessageContent,
+  content,
+  enabled,
+  onReplaceMessageContent,
 }: {
-	content: string;
-	enabled: boolean;
-	onReplaceMessageContent: (next: string) => void;
+  content: string;
+  enabled: boolean;
+  onReplaceMessageContent: (next: string) => void;
 }): ComposerGhostState {
-	const { suggestion, acceptSuggestion, dismissSuggestion } = useGhostCompletion({
-		text: content,
-		enabled,
-	});
-	const handleAccept = useCallback((): void => {
-		const accepted = acceptSuggestion();
-		if (accepted) {
-			onReplaceMessageContent(content + accepted);
-		}
-	}, [acceptSuggestion, content, onReplaceMessageContent]);
-	return { suggestion, handleAccept, handleDismiss: dismissSuggestion };
+  const { suggestion, acceptSuggestion, dismissSuggestion } = useGhostCompletion({
+    text: content,
+    enabled,
+  });
+  const handleAccept = useCallback((): void => {
+    const accepted = acceptSuggestion();
+    if (accepted) {
+      onReplaceMessageContent(content + accepted);
+    }
+  }, [acceptSuggestion, content, onReplaceMessageContent]);
+  return { suggestion, handleAccept, handleDismiss: dismissSuggestion };
 }
 
 /** Props for {@link ComposerTextareaRow}. */
 export interface ComposerTextareaRowProps {
-	/** Placeholder text shown when `hasContent` is false. */
-	placeholder: string;
-	/** Whether the current draft has any non-whitespace content. */
-	hasContent: boolean;
-	/** Current draft text — controlled by the parent. */
-	value: string;
-	/** Native textarea change handler forwarded to the underlying control. */
-	onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
-	/** Ghost-completion state from {@link useComposerGhostCompletion}. */
-	ghost: ComposerGhostState;
+  /** Placeholder text shown when `hasContent` is false. */
+  placeholder: string;
+  /** Whether the current draft has any non-whitespace content. */
+  hasContent: boolean;
+  /** Current draft text — controlled by the parent. */
+  value: string;
+  /** Native textarea change handler forwarded to the underlying control. */
+  onChange: (event: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  /** Ghost-completion state from {@link useComposerGhostCompletion}. */
+  ghost: ComposerGhostState;
 }
 
 /**
@@ -132,30 +132,30 @@ export interface ComposerTextareaRowProps {
  * textarea as one stack. Consumed by `ChatComposer`.
  */
 export function ComposerTextareaRow({
-	placeholder,
-	hasContent,
-	value,
-	onChange,
-	ghost,
+  placeholder,
+  hasContent,
+  value,
+  onChange,
+  ghost,
 }: ComposerTextareaRowProps): React.JSX.Element {
-	return (
-		<div className="relative grid grid-cols-1 grid-rows-1 w-full self-stretch">
-			<AnimatedComposerPlaceholder isVisible={!hasContent} text={placeholder} />
-			<GhostSuggestionOverlay suggestion={ghost.suggestion} value={value} />
-			{/* `min-h-11` (44px) + `pt-2` lets a one-line draft sit
+  return (
+    <div className="relative grid grid-cols-1 grid-rows-1 w-full self-stretch">
+      <AnimatedComposerPlaceholder isVisible={!hasContent} text={placeholder} />
+      <GhostSuggestionOverlay suggestion={ghost.suggestion} value={value} />
+      {/* `min-h-11` (44px) + `pt-2` lets a one-line draft sit
 			comfortably without the textarea reading as a tall card on
 			its own. The placeholder absolutely-positioned at `top-3`
 			is shifted to `top-2` to track this in the parent. */}
-			<PromptInputTextarea
-				aria-label={placeholder}
-				className="col-start-1 row-start-1 relative z-10 max-h-48 min-h-11 w-full overflow-y-auto px-3 pt-2 pb-1 text-[14px] leading-6 outline-none placeholder:text-transparent focus-visible:outline-none"
-				ghostSuggestion={ghost.suggestion}
-				onAcceptSuggestion={ghost.handleAccept}
-				onChange={onChange}
-				onDismissSuggestion={ghost.handleDismiss}
-				placeholder=""
-				value={value}
-			/>
-		</div>
-	);
+      <PromptInputTextarea
+        aria-label={placeholder}
+        className="col-start-1 row-start-1 relative z-10 max-h-48 min-h-11 w-full overflow-y-auto px-3 pt-2 pb-1 text-[14px] leading-6 outline-none placeholder:text-transparent focus-visible:outline-none"
+        ghostSuggestion={ghost.suggestion}
+        onAcceptSuggestion={ghost.handleAccept}
+        onChange={onChange}
+        onDismissSuggestion={ghost.handleDismiss}
+        placeholder=""
+        value={value}
+      />
+    </div>
+  );
 }

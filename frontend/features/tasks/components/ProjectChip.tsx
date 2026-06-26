@@ -17,14 +17,14 @@ import { PROJECT_TONE_CLASSES } from '../constants';
 import type { TaskProjectTone } from '../types';
 
 export interface ProjectChipProps {
-	/** Display label rendered to the right of the optional emoji. */
-	label: string;
-	/** Tint mapping for the chip background and text color. */
-	tone: TaskProjectTone;
-	/** Optional emoji prefix — used by Survival Mode and any future flagged set. */
-	emoji?: string;
-	/** When `true`, the chip omits the leading hash glyph (e.g. for the survival-mode badge). */
-	hideHash?: boolean;
+  /** Display label rendered to the right of the optional emoji. */
+  label: string;
+  /** Tint mapping for the chip background and text color. */
+  tone: TaskProjectTone;
+  /** Optional emoji prefix — used by Survival Mode and any future flagged set. */
+  emoji?: string;
+  /** When `true`, the chip omits the leading hash glyph (e.g. for the survival-mode badge). */
+  hideHash?: boolean;
 }
 
 /**
@@ -32,18 +32,16 @@ export interface ProjectChipProps {
  * push it to the right edge.
  */
 export function ProjectChip({ label, tone, emoji, hideHash }: ProjectChipProps): ReactNode {
-	return (
-		<span
-			className={cn(
-				'inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium tracking-tight whitespace-nowrap',
-				PROJECT_TONE_CLASSES[tone]
-			)}
-		>
-			{emoji ? <span aria-hidden="true">{emoji}</span> : null}
-			{!hideHash && !emoji ? (
-				<HashIcon aria-hidden="true" className="size-3 opacity-70" strokeWidth={2.25} />
-			) : null}
-			{label}
-		</span>
-	);
+  return (
+    <span
+      className={cn(
+        'inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium tracking-tight whitespace-nowrap',
+        PROJECT_TONE_CLASSES[tone]
+      )}
+    >
+      {emoji ? <span aria-hidden="true">{emoji}</span> : null}
+      {!hideHash && !emoji ? <HashIcon aria-hidden="true" className="size-3 opacity-70" strokeWidth={2.25} /> : null}
+      {label}
+    </span>
+  );
 }

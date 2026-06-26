@@ -1,25 +1,25 @@
 {
-	"schema_version": 1,
-	"id": "document_conversion",
-	"name": "Document Conversion",
-	"description": "Convert workspace documents into Markdown through local file tools.",
-	"version": "1.0.0",
-	"enabled_by_default": true,
-	"permissions": ["filesystem_read"],
-	"capabilities": [
-		{
-			"type": "python_tool",
-			"id": "convert_to_markdown",
-			"tool_name": "convert_to_markdown",
-			"title": "Convert To Markdown",
-			"description": "Convert a workspace file such as PDF, DOCX, PPTX, HTML, CSV, or JSON into Markdown.",
-			"tags": ["documents", "markdown", "conversion"],
-			"intents": ["document.convert", "markdown.extract"],
-			"slots": ["document_conversion", "markdown"],
-			"exposure": "direct_and_catalog",
-			"permissions": ["filesystem_read"],
-			"risk": "local_read",
-			"entrypoint": "app.plugins.document_conversion.tools:make_markitdown_tool"
-		}
-	]
+  "schema_version": 1,
+  "id": "document_conversion",
+  "name": "Document Conversion",
+  "description": "Convert workspace documents into Markdown through local file tools.",
+  "version": "1.0.0",
+  "enabled_by_default": true,
+  "permissions": ["filesystem_read"],
+  "capabilities": [
+    {
+      "type": "python_tool",
+      "id": "convert_to_markdown",
+      "tool_name": "convert_to_markdown",
+      "title": "Convert To Markdown",
+      "description": "Convert a workspace file such as PDF, DOCX, PPTX, HTML, CSV, or JSON into Markdown.",
+      "tags": ["documents", "markdown", "conversion"],
+      "intents": ["document.convert", "markdown.extract"],
+      "slots": ["document_conversion", "markdown"],
+      "exposure": "direct_and_catalog",
+      "permissions": ["filesystem_read"],
+      "risk": "local_read",
+      "entrypoint": "app.plugins.document_conversion.tools:make_markitdown_tool"
+    }
+  ]
 }

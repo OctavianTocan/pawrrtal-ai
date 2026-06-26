@@ -20,20 +20,13 @@ import { getQueryClient } from './get-query-client';
  * @returns The query client provider wrapped around the children.
  */
 export function Providers({ children }: { children: React.ReactNode }) {
-	const queryClient = getQueryClient();
+  const queryClient = getQueryClient();
 
-	return (
-		<QueryClientProvider client={queryClient}>
-			{/* <QueryDevtools /> */}
-			{children}
-			<Toaster
-				closeButton
-				duration={3500}
-				position="top-center"
-				richColors={false}
-				theme="system"
-				visibleToasts={3}
-			/>
-		</QueryClientProvider>
-	);
+  return (
+    <QueryClientProvider client={queryClient}>
+      {/* <QueryDevtools /> */}
+      {children}
+      <Toaster closeButton duration={3500} position="top-center" richColors={false} theme="system" visibleToasts={3} />
+    </QueryClientProvider>
+  );
 }

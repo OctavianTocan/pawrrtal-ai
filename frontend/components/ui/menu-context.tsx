@@ -2,11 +2,11 @@
 
 import { createContext, use, type ReactNode } from 'react';
 import {
-	DropdownMenuItem,
-	DropdownMenuSeparator,
-	DropdownSubmenu,
-	DropdownSubmenuTrigger,
-	DropdownSubmenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownSubmenu,
+  DropdownSubmenuTrigger,
+  DropdownSubmenuContent,
 } from '@octavian-tocan/react-dropdown';
 
 /**
@@ -24,11 +24,11 @@ import {
  * one of them keeps working unchanged.
  */
 type MenuComponents = {
-	MenuItem: typeof DropdownMenuItem;
-	MenuSeparator: typeof DropdownMenuSeparator;
-	MenuSub: typeof DropdownSubmenu;
-	MenuSubTrigger: typeof DropdownSubmenuTrigger;
-	MenuSubContent: typeof DropdownSubmenuContent;
+  MenuItem: typeof DropdownMenuItem;
+  MenuSeparator: typeof DropdownMenuSeparator;
+  MenuSub: typeof DropdownSubmenu;
+  MenuSubTrigger: typeof DropdownSubmenuTrigger;
+  MenuSubContent: typeof DropdownSubmenuContent;
 };
 
 const MenuComponentsContext = createContext<MenuComponents | null>(null);
@@ -39,11 +39,11 @@ const MenuComponentsContext = createContext<MenuComponents | null>(null);
  * APIs — there's no flavor distinction to bridge.
  */
 const VENDORED_MENU_COMPONENTS: MenuComponents = {
-	MenuItem: DropdownMenuItem,
-	MenuSeparator: DropdownMenuSeparator,
-	MenuSub: DropdownSubmenu,
-	MenuSubTrigger: DropdownSubmenuTrigger,
-	MenuSubContent: DropdownSubmenuContent,
+  MenuItem: DropdownMenuItem,
+  MenuSeparator: DropdownMenuSeparator,
+  MenuSub: DropdownSubmenu,
+  MenuSubTrigger: DropdownSubmenuTrigger,
+  MenuSubContent: DropdownSubmenuContent,
 };
 
 /**
@@ -56,27 +56,19 @@ const VENDORED_MENU_COMPONENTS: MenuComponents = {
  * @throws If called outside a `MenuProvider`.
  */
 export function useMenuComponents(): MenuComponents {
-	const ctx = use(MenuComponentsContext);
-	if (!ctx) {
-		throw new Error('useMenuComponents must be used within a MenuProvider');
-	}
-	return ctx;
+  const ctx = use(MenuComponentsContext);
+  if (!ctx) {
+    throw new Error('useMenuComponents must be used within a MenuProvider');
+  }
+  return ctx;
 }
 
 /** Provides dropdown-flavoured menu components to child menu content. */
 export function DropdownMenuProvider({ children }: { children: ReactNode }): React.JSX.Element {
-	return (
-		<MenuComponentsContext.Provider value={VENDORED_MENU_COMPONENTS}>
-			{children}
-		</MenuComponentsContext.Provider>
-	);
+  return <MenuComponentsContext.Provider value={VENDORED_MENU_COMPONENTS}>{children}</MenuComponentsContext.Provider>;
 }
 
 /** Provides context-menu-flavoured menu components to child menu content. */
 export function ContextMenuProvider({ children }: { children: ReactNode }): React.JSX.Element {
-	return (
-		<MenuComponentsContext.Provider value={VENDORED_MENU_COMPONENTS}>
-			{children}
-		</MenuComponentsContext.Provider>
-	);
+  return <MenuComponentsContext.Provider value={VENDORED_MENU_COMPONENTS}>{children}</MenuComponentsContext.Provider>;
 }

@@ -9,11 +9,11 @@
 import { mkdir } from 'node:fs/promises';
 import { $ } from 'bun';
 import {
-	DEV_BACKEND_PORT,
-	DEV_BACKEND_TS_PORT,
-	DEV_BACKEND_URL,
-	DEV_FRONTEND_PORT,
-	DEV_FRONTEND_URL,
+  DEV_BACKEND_PORT,
+  DEV_BACKEND_TS_PORT,
+  DEV_BACKEND_URL,
+  DEV_FRONTEND_PORT,
+  DEV_FRONTEND_URL,
 } from './scripts/dev-ports';
 
 const SQLITE_DB_FILENAME_PREFIX = 'pawrrtal';
@@ -34,17 +34,17 @@ process.env.DATABASE_URL = process.env[DEV_DATABASE_URL_ENV] ?? '';
  * empty output), letting the backend's built-in default apply.
  */
 async function sqliteDbFilenameForBranch(): Promise<string | null> {
-	const result = await $`git rev-parse --abbrev-ref HEAD`.quiet().nothrow();
-	if (result.exitCode !== 0) return null;
-	const branch = result.stdout.toString().trim();
-	if (!branch || branch === 'HEAD') return null;
-	const sanitized = branch
-		.replace(/[^A-Za-z0-9._-]+/g, '-')
-		.replace(/-+/g, '-')
-		.replace(/^[-.]+|[-.]+$/g, '')
-		.slice(0, MAX_BRANCH_FILENAME_LENGTH);
-	if (!sanitized) return null;
-	return `${SQLITE_DB_FILENAME_PREFIX}-${sanitized}.db`;
+  const result = await $`git rev-parse --abbrev-ref HEAD`.quiet().nothrow();
+  if (result.exitCode !== 0) return null;
+  const branch = result.stdout.toString().trim();
+  if (!branch || branch === 'HEAD') return null;
+  const sanitized = branch
+    .replace(/[^A-Za-z0-9._-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^[-.]+|[-.]+$/g, '')
+    .slice(0, MAX_BRANCH_FILENAME_LENGTH);
+  if (!sanitized) return null;
+  return `${SQLITE_DB_FILENAME_PREFIX}-${sanitized}.db`;
 }
 
 // Effect TS strangler always starts on :8001 alongside frontend and Python backend.
@@ -62,15 +62,15 @@ await $`rm -rf frontend/.next/dev/lock`.quiet().nothrow();
 // defaults to SQLite even when the shell exports a global DATABASE_URL; set
 // PAWRRTAL_DEV_DATABASE_URL to opt into a non-SQLite dev database.
 if (!process.env.SQLITE_DB_FILENAME) {
-	const branchDbFilename = await sqliteDbFilenameForBranch();
-	if (branchDbFilename) {
-		process.env.SQLITE_DB_FILENAME = branchDbFilename;
-		console.log(`Using branch-scoped SQLite database: ${branchDbFilename}`);
-	}
+  const branchDbFilename = await sqliteDbFilenameForBranch();
+  if (branchDbFilename) {
+    process.env.SQLITE_DB_FILENAME = branchDbFilename;
+    console.log(`Using branch-scoped SQLite database: ${branchDbFilename}`);
+  }
 }
 
 console.log(
-	`Starting dev servers — frontend on ${DEV_FRONTEND_URL}, backend on ${DEV_BACKEND_URL}, Effect TS on http://127.0.0.1:${DEV_BACKEND_TS_PORT}`
+  `Starting dev servers — frontend on ${DEV_FRONTEND_URL}, backend on ${DEV_BACKEND_URL}, Effect TS on http://127.0.0.1:${DEV_BACKEND_TS_PORT}`
 );
 
 // Frontend: plain Next.js dev server. Workspace package, run via bun --filter.
@@ -79,9 +79,9 @@ const frontendPromise = $`bun --filter pawrrtal dev`.quiet(false);
 // Backend: explicit ASGI target via uvicorn. `main.app` is wrapped in CORS
 // middleware, so FastAPI CLI discovery cannot treat it as a raw FastAPI instance.
 const backendPromise =
-	$`uv run --project backend uvicorn main:app --app-dir backend --host 127.0.0.1 --port ${DEV_BACKEND_PORT} --reload --reload-dir backend`.quiet(
-		false
-	);
+  $`uv run --project backend uvicorn main:app --app-dir backend --host 127.0.0.1 --port ${DEV_BACKEND_PORT} --reload --reload-dir backend`.quiet(
+    false
+  );
 
 // Effect TS strangler: `bun --filter @pawrrtal/api dev` runs `src/index.ts`
 // which imports `./Main.ts` — the bootstrap that launches the server on :8001.

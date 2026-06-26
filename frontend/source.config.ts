@@ -10,12 +10,12 @@ import { defineConfig, defineDocs } from 'fumadocs-mdx/config';
 
 /** Curated, public-safe internal handbook content. */
 export const handbookDocs = defineDocs({
-	dir: 'content/docs/handbook',
+  dir: 'content/docs/handbook',
 });
 
 /** User-facing product documentation. */
 export const productDocs = defineDocs({
-	dir: 'content/docs/product',
+  dir: 'content/docs/product',
 });
 
 export default defineConfig();

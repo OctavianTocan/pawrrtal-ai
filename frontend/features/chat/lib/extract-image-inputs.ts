@@ -38,31 +38,31 @@ const ALLOWED_IMAGE_MIME_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image
 type AllowedImageMimeType = (typeof ALLOWED_IMAGE_MIME_TYPES)[number];
 
 function isAllowedImageMimeType(value: string): value is AllowedImageMimeType {
-	return (ALLOWED_IMAGE_MIME_TYPES as readonly string[]).includes(value);
+  return (ALLOWED_IMAGE_MIME_TYPES as readonly string[]).includes(value);
 }
 
 function arrayBufferToBase64(buffer: ArrayBuffer): string {
-	let binary = '';
-	const bytes = new Uint8Array(buffer);
-	for (let i = 0; i < bytes.byteLength; i += 1) binary += String.fromCharCode(bytes[i] as number);
-	return btoa(binary);
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.byteLength; i += 1) binary += String.fromCharCode(bytes[i] as number);
+  return btoa(binary);
 }
 
 async function partToImageInput(part: FileUIPart): Promise<ChatImageInput | null> {
-	const mime = part.mediaType;
-	if (!mime || !isAllowedImageMimeType(mime)) return null;
-	try {
-		const response = await fetch(part.url);
-		if (!response.ok) return null;
-		const buffer = await response.arrayBuffer();
-		const base64Payload = arrayBufferToBase64(buffer);
-		if (!base64Payload) return null;
-		return { data: base64Payload, media_type: mime };
-	} catch {
-		// Silently drop failed reads so a single bad attachment can't abort
-		// the rest of the slideshow.
-		return null;
-	}
+  const mime = part.mediaType;
+  if (!mime || !isAllowedImageMimeType(mime)) return null;
+  try {
+    const response = await fetch(part.url);
+    if (!response.ok) return null;
+    const buffer = await response.arrayBuffer();
+    const base64Payload = arrayBufferToBase64(buffer);
+    if (!base64Payload) return null;
+    return { data: base64Payload, media_type: mime };
+  } catch {
+    // Silently drop failed reads so a single bad attachment can't abort
+    // the rest of the slideshow.
+    return null;
+  }
 }
 
 /**
@@ -74,10 +74,10 @@ async function partToImageInput(part: FileUIPart): Promise<ChatImageInput | null
  *   so the caller can omit the `images` field from the wire payload.
  */
 export async function extractImageInputs(parts: readonly FileUIPart[]): Promise<ChatImageInput[]> {
-	// Cap the input list before reading to bound the I/O work; an over-cap
-	// drag-drop shouldn't pay the cost of decoding files that would be
-	// discarded anyway.
-	const cappedParts = parts.slice(0, MAX_COMPOSER_IMAGES);
-	const candidates = await Promise.all(cappedParts.map(partToImageInput));
-	return candidates.filter((input): input is ChatImageInput => input !== null);
+  // Cap the input list before reading to bound the I/O work; an over-cap
+  // drag-drop shouldn't pay the cost of decoding files that would be
+  // discarded anyway.
+  const cappedParts = parts.slice(0, MAX_COMPOSER_IMAGES);
+  const candidates = await Promise.all(cappedParts.map(partToImageInput));
+  return candidates.filter((input): input is ChatImageInput => input !== null);
 }

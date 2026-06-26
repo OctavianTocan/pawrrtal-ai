@@ -15,12 +15,12 @@ import { cn } from '@/lib/utils';
 export type AppDialogCalloutTone = 'info' | 'warning';
 
 export interface AppDialogCalloutProps {
-	/** Visual emphasis — info uses a slightly stronger tray than warning. */
-	tone: AppDialogCalloutTone;
-	/** Leading glyph (decorative — parent sets **`aria-hidden`** as appropriate). */
-	icon: React.ReactNode;
-	children: React.ReactNode;
-	className?: string;
+  /** Visual emphasis — info uses a slightly stronger tray than warning. */
+  tone: AppDialogCalloutTone;
+  /** Leading glyph (decorative — parent sets **`aria-hidden`** as appropriate). */
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  className?: string;
 }
 
 /**
@@ -28,22 +28,17 @@ export interface AppDialogCalloutProps {
  *
  * @returns Accessible complementary region inside the dialog body.
  */
-export function AppDialogCallout({
-	tone,
-	icon,
-	children,
-	className,
-}: AppDialogCalloutProps): React.JSX.Element {
-	return (
-		<aside
-			className={cn(
-				'flex items-start gap-3 rounded-soft p-3 text-sm leading-snug text-muted-foreground',
-				tone === 'info' ? 'bg-foreground/[0.05]' : 'bg-foreground/[0.04]',
-				className
-			)}
-		>
-			<span className="mt-0.5 shrink-0">{icon}</span>
-			<div className="min-w-0">{children}</div>
-		</aside>
-	);
+export function AppDialogCallout({ tone, icon, children, className }: AppDialogCalloutProps): React.JSX.Element {
+  return (
+    <aside
+      className={cn(
+        'flex items-start gap-3 rounded-soft p-3 text-sm leading-snug text-muted-foreground',
+        tone === 'info' ? 'bg-foreground/[0.05]' : 'bg-foreground/[0.04]',
+        className
+      )}
+    >
+      <span className="mt-0.5 shrink-0">{icon}</span>
+      <div className="min-w-0">{children}</div>
+    </aside>
+  );
 }

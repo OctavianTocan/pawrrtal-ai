@@ -8,5 +8,5 @@ import { useAuthedQuery } from './use-authed-query';
  * @returns React Query result with `Conversation[]` data.
  */
 export default function useGetConversations() {
-	return useAuthedQuery<Conversation[]>(['conversations'], API_ENDPOINTS.conversations.list);
+  return useAuthedQuery<Conversation[]>(['conversations'], API_ENDPOINTS.conversations.list);
 }

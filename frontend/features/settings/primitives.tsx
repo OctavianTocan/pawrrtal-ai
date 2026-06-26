@@ -44,31 +44,31 @@ import { cn } from '@/lib/utils';
  * @returns `#0b0b0b` for light backgrounds, `#fafafa` for dark.
  */
 function pickContrastForeground(background: string): string {
-	if (typeof document === 'undefined') return '#fafafa';
-	const ctx = document.createElement('canvas').getContext('2d');
-	if (!ctx) return '#fafafa';
-	try {
-		ctx.fillStyle = '#000';
-		ctx.fillStyle = background;
-		const computed = ctx.fillStyle;
-		// Canvas normalises every parseable CSS color to `#rrggbb` (or
-		// `rgba(...)`). Hex is the common case for our pills.
-		const hex = typeof computed === 'string' ? computed : '';
-		const match = /^#([0-9a-f]{6})$/i.exec(hex);
-		const channels = match?.[1];
-		if (!channels) return '#fafafa';
-		const value = Number.parseInt(channels, 16);
-		const r = (value >> 16) & 0xff;
-		const g = (value >> 8) & 0xff;
-		const b = value & 0xff;
-		// BT.709 relative luminance against the 0-255 channel range.
-		// We don't bother sRGB-linearising for this binary decision —
-		// the threshold is well-clear of any preset slot.
-		const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-		return luminance > 0.6 ? '#0b0b0b' : '#fafafa';
-	} catch {
-		return '#fafafa';
-	}
+  if (typeof document === 'undefined') return '#fafafa';
+  const ctx = document.createElement('canvas').getContext('2d');
+  if (!ctx) return '#fafafa';
+  try {
+    ctx.fillStyle = '#000';
+    ctx.fillStyle = background;
+    const computed = ctx.fillStyle;
+    // Canvas normalises every parseable CSS color to `#rrggbb` (or
+    // `rgba(...)`). Hex is the common case for our pills.
+    const hex = typeof computed === 'string' ? computed : '';
+    const match = /^#([0-9a-f]{6})$/i.exec(hex);
+    const channels = match?.[1];
+    if (!channels) return '#fafafa';
+    const value = Number.parseInt(channels, 16);
+    const r = (value >> 16) & 0xff;
+    const g = (value >> 8) & 0xff;
+    const b = value & 0xff;
+    // BT.709 relative luminance against the 0-255 channel range.
+    // We don't bother sRGB-linearising for this binary decision —
+    // the threshold is well-clear of any preset slot.
+    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    return luminance > 0.6 ? '#0b0b0b' : '#fafafa';
+  } catch {
+    return '#fafafa';
+  }
 }
 
 /**
@@ -79,31 +79,28 @@ function pickContrastForeground(background: string): string {
  * shadcn-style component file. Sized at h-6 w-11 / thumb size-5 — Fitts-
  * compliant for trackpad use without crowding the row.
  */
-export function Switch({
-	className,
-	...props
-}: React.ComponentProps<typeof SwitchPrimitive.Root>): React.JSX.Element {
-	return (
-		<SwitchPrimitive.Root
-			className={cn(
-				'peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full',
-				'border border-border bg-foreground/10 transition-colors duration-150',
-				'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
-				'data-[state=checked]:border-accent data-[state=checked]:bg-accent',
-				'disabled:cursor-not-allowed disabled:opacity-50',
-				className
-			)}
-			{...props}
-		>
-			<SwitchPrimitive.Thumb
-				className={cn(
-					'pointer-events-none block size-5 rounded-full bg-background shadow-sm ring-0',
-					'transition-transform duration-150 ease-out',
-					'data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0.5'
-				)}
-			/>
-		</SwitchPrimitive.Root>
-	);
+export function Switch({ className, ...props }: React.ComponentProps<typeof SwitchPrimitive.Root>): React.JSX.Element {
+  return (
+    <SwitchPrimitive.Root
+      className={cn(
+        'peer inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full',
+        'border border-border bg-foreground/10 transition-colors duration-150',
+        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40',
+        'data-[state=checked]:border-accent data-[state=checked]:bg-accent',
+        'disabled:cursor-not-allowed disabled:opacity-50',
+        className
+      )}
+      {...props}
+    >
+      <SwitchPrimitive.Thumb
+        className={cn(
+          'pointer-events-none block size-5 rounded-full bg-background shadow-sm ring-0',
+          'transition-transform duration-150 ease-out',
+          'data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0.5'
+        )}
+      />
+    </SwitchPrimitive.Root>
+  );
 }
 
 /**
@@ -112,39 +109,33 @@ export function Switch({
  * Matches the contrast slider in the Appearance section — value + range
  * accepted as numbers so consumers can hold local state without coercing.
  */
-export function Slider({
-	className,
-	...props
-}: React.ComponentProps<typeof SliderPrimitive.Root>): React.JSX.Element {
-	return (
-		<SliderPrimitive.Root
-			className={cn(
-				'relative flex w-full cursor-pointer touch-none select-none items-center',
-				className
-			)}
-			{...props}
-		>
-			<SliderPrimitive.Track className="relative h-1 w-full grow overflow-hidden rounded-full bg-foreground/10">
-				<SliderPrimitive.Range className="absolute h-full bg-accent" />
-			</SliderPrimitive.Track>
-			<SliderPrimitive.Thumb
-				aria-label="Slider value"
-				className="block size-4 rounded-full border-2 border-accent bg-background shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
-			/>
-		</SliderPrimitive.Root>
-	);
+export function Slider({ className, ...props }: React.ComponentProps<typeof SliderPrimitive.Root>): React.JSX.Element {
+  return (
+    <SliderPrimitive.Root
+      className={cn('relative flex w-full cursor-pointer touch-none select-none items-center', className)}
+      {...props}
+    >
+      <SliderPrimitive.Track className="relative h-1 w-full grow overflow-hidden rounded-full bg-foreground/10">
+        <SliderPrimitive.Range className="absolute h-full bg-accent" />
+      </SliderPrimitive.Track>
+      <SliderPrimitive.Thumb
+        aria-label="Slider value"
+        className="block size-4 rounded-full border-2 border-accent bg-background shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+      />
+    </SliderPrimitive.Root>
+  );
 }
 
 /** Props for the labelled row used throughout the settings sections. */
 export type SettingsRowProps = {
-	/** Bold label rendered on the left. */
-	label: ReactNode;
-	/** Optional secondary helper text under the label. */
-	description?: ReactNode;
-	/** The control / value rendered on the right. */
-	children: ReactNode;
-	/** Override classes on the outer row. */
-	className?: string;
+  /** Bold label rendered on the left. */
+  label: ReactNode;
+  /** Optional secondary helper text under the label. */
+  description?: ReactNode;
+  /** The control / value rendered on the right. */
+  children: ReactNode;
+  /** Override classes on the outer row. */
+  className?: string;
 };
 
 /**
@@ -159,46 +150,35 @@ export type SettingsRowProps = {
  * Override with `className` (e.g. `items-start`) when stacking taller
  * controls like textareas.
  */
-export function SettingsRow({
-	label,
-	description,
-	children,
-	className,
-}: SettingsRowProps): React.JSX.Element {
-	return (
-		<div
-			className={cn(
-				'flex items-center justify-between gap-6 border-b border-border/40 py-4 first:pt-2 last:border-0 last:pb-2',
-				className
-			)}
-		>
-			<div className="flex min-w-0 max-w-[60%] flex-col gap-1">
-				<span className="text-pretty text-sm font-medium text-foreground tabular-nums">
-					{label}
-				</span>
-				{description ? (
-					<span className="text-pretty text-sm leading-snug text-muted-foreground tabular-nums">
-						{description}
-					</span>
-				) : null}
-			</div>
-			<div className="flex shrink-0 items-center justify-end gap-2 text-right">
-				{children}
-			</div>
-		</div>
-	);
+export function SettingsRow({ label, description, children, className }: SettingsRowProps): React.JSX.Element {
+  return (
+    <div
+      className={cn(
+        'flex items-center justify-between gap-6 border-b border-border/40 py-4 first:pt-2 last:border-0 last:pb-2',
+        className
+      )}
+    >
+      <div className="flex min-w-0 max-w-[60%] flex-col gap-1">
+        <span className="text-pretty text-sm font-medium text-foreground tabular-nums">{label}</span>
+        {description ? (
+          <span className="text-pretty text-sm leading-snug text-muted-foreground tabular-nums">{description}</span>
+        ) : null}
+      </div>
+      <div className="flex shrink-0 items-center justify-end gap-2 text-right">{children}</div>
+    </div>
+  );
 }
 
 /** Props for the section card wrapper. */
 export type SettingsCardProps = {
-	/** Section heading rendered above the card body. */
-	title?: ReactNode;
-	/** Optional helper line under the title. */
-	description?: ReactNode;
-	/** Card body — typically a stack of `SettingsRow`s. */
-	children: ReactNode;
-	/** Override classes on the card root. */
-	className?: string;
+  /** Section heading rendered above the card body. */
+  title?: ReactNode;
+  /** Optional helper line under the title. */
+  description?: ReactNode;
+  /** Card body — typically a stack of `SettingsRow`s. */
+  children: ReactNode;
+  /** Override classes on the card root. */
+  className?: string;
 };
 
 /**
@@ -210,43 +190,30 @@ export type SettingsCardProps = {
  * gray-bordered panel. See DESIGN.md → Elevation & Depth → Edges for
  * why we stopped using bare 1 px borders here.
  */
-export function SettingsCard({
-	title,
-	description,
-	children,
-	className,
-}: SettingsCardProps): React.JSX.Element {
-	return (
-		<section className={cn('rounded-[14px] bg-card px-6 pt-3 pb-3 shadow-edge', className)}>
-			{title || description ? (
-				<header className="mb-1 flex flex-col gap-1 pt-2">
-					{title ? (
-						<h3 className="text-base font-semibold tracking-tight text-foreground">
-							{title}
-						</h3>
-					) : null}
-					{description ? (
-						<p className="text-pretty text-sm leading-snug text-muted-foreground">
-							{description}
-						</p>
-					) : null}
-				</header>
-			) : null}
-			<div className="flex flex-col">{children}</div>
-		</section>
-	);
+export function SettingsCard({ title, description, children, className }: SettingsCardProps): React.JSX.Element {
+  return (
+    <section className={cn('rounded-[14px] bg-card px-6 pt-3 pb-3 shadow-edge', className)}>
+      {title || description ? (
+        <header className="mb-1 flex flex-col gap-1 pt-2">
+          {title ? <h3 className="text-base font-semibold tracking-tight text-foreground">{title}</h3> : null}
+          {description ? <p className="text-pretty text-sm leading-snug text-muted-foreground">{description}</p> : null}
+        </header>
+      ) : null}
+      <div className="flex flex-col">{children}</div>
+    </section>
+  );
 }
 
 /** Props for the page-level shell wrapping every Settings section. */
 export type SettingsPageProps = {
-	/** Page title rendered as `<h1>` at the top. */
-	title: ReactNode;
-	/** Optional sub-line beneath the title (text-pretty, muted). */
-	description?: ReactNode;
-	/** Page body — typically a stack of `SettingsCard`s. */
-	children: ReactNode;
-	/** Override classes on the page root. */
-	className?: string;
+  /** Page title rendered as `<h1>` at the top. */
+  title: ReactNode;
+  /** Optional sub-line beneath the title (text-pretty, muted). */
+  description?: ReactNode;
+  /** Page body — typically a stack of `SettingsCard`s. */
+  children: ReactNode;
+  /** Override classes on the page root. */
+  className?: string;
 };
 
 /**
@@ -262,43 +229,34 @@ export type SettingsPageProps = {
  * (was `text-2xl`); kerning stays `tracking-tight` so long words like
  * "Personalization" don't drift.
  */
-export function SettingsPage({
-	title,
-	description,
-	children,
-	className,
-}: SettingsPageProps): React.JSX.Element {
-	return (
-		<div className={cn('flex flex-col gap-8', className)}>
-			<header className="flex flex-col gap-2">
-				<h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground">
-					{title}
-				</h1>
-				{description ? (
-					<p className="max-w-[60ch] text-pretty text-sm leading-relaxed text-muted-foreground">
-						{description}
-					</p>
-				) : null}
-			</header>
-			<div className="flex flex-col gap-6">{children}</div>
-		</div>
-	);
+export function SettingsPage({ title, description, children, className }: SettingsPageProps): React.JSX.Element {
+  return (
+    <div className={cn('flex flex-col gap-8', className)}>
+      <header className="flex flex-col gap-2">
+        <h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground">{title}</h1>
+        {description ? (
+          <p className="max-w-[60ch] text-pretty text-sm leading-relaxed text-muted-foreground">{description}</p>
+        ) : null}
+      </header>
+      <div className="flex flex-col gap-6">{children}</div>
+    </div>
+  );
 }
 
 /** Props for the consistent settings-section header. */
 export type SettingsSectionHeaderProps = {
-	/** Section heading rendered on the left. */
-	title: ReactNode;
-	/** Sub-line under the title (small, muted, `text-pretty`). */
-	description?: ReactNode;
-	/** Right-aligned actions / pickers (e.g. preset selector, mode toggle). */
-	actions?: ReactNode;
-	/**
-	 * Drop the bottom hairline. Use for cards where the header is the only
-	 * content — without this, the divider reads as a stray separator at the
-	 * bottom of the card.
-	 */
-	noDivider?: boolean;
+  /** Section heading rendered on the left. */
+  title: ReactNode;
+  /** Sub-line under the title (small, muted, `text-pretty`). */
+  description?: ReactNode;
+  /** Right-aligned actions / pickers (e.g. preset selector, mode toggle). */
+  actions?: ReactNode;
+  /**
+   * Drop the bottom hairline. Use for cards where the header is the only
+   * content — without this, the divider reads as a stray separator at the
+   * bottom of the card.
+   */
+  noDivider?: boolean;
 };
 
 /**
@@ -314,53 +272,46 @@ export type SettingsSectionHeaderProps = {
  * the header row with its bottom hairline.
  */
 export function SettingsSectionHeader({
-	title,
-	description,
-	actions,
-	noDivider,
+  title,
+  description,
+  actions,
+  noDivider,
 }: SettingsSectionHeaderProps): React.JSX.Element {
-	return (
-		<header
-			className={cn(
-				'flex items-start justify-between gap-3 pt-1 pb-3',
-				!noDivider && 'border-b border-border/40'
-			)}
-		>
-			<div className="flex min-w-0 flex-col gap-1">
-				{/* Semantic `<h3>` so this matches `SettingsCard`'s standalone
+  return (
+    <header
+      className={cn('flex items-start justify-between gap-3 pt-1 pb-3', !noDivider && 'border-b border-border/40')}
+    >
+      <div className="flex min-w-0 flex-col gap-1">
+        {/* Semantic `<h3>` so this matches `SettingsCard`'s standalone
 				   title path (also `<h3>`). Using a `<span>` previously meant
 				   the two header surfaces shared classes but rendered as
 				   different elements, which subtly nudged user-agent line-
 				   heights and broke the assumption that both render
 				   identically. */}
-				<h3 className="text-base font-semibold tracking-tight text-foreground">{title}</h3>
-				{description ? (
-					<p className="text-pretty text-sm leading-snug text-muted-foreground">
-						{description}
-					</p>
-				) : null}
-			</div>
-			{actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
-		</header>
-	);
+        <h3 className="text-base font-semibold tracking-tight text-foreground">{title}</h3>
+        {description ? <p className="text-pretty text-sm leading-snug text-muted-foreground">{description}</p> : null}
+      </div>
+      {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
+    </header>
+  );
 }
 
 /** Props for the {@link ColorPill} primitive. */
 export interface ColorPillProps {
-	/** Accessible label for the picker (e.g. "Accent color picker"). */
-	ariaLabel: string;
-	/** The fully-resolved color the pill should render. Any CSS color works. */
-	resolvedColor: string;
-	/** The hex literal used to seed `<input type="color">`. */
-	pickerSeed: string;
-	/** Display value (typically the typed override; falls back to defaultValue). */
-	displayValue: string;
-	/** Placeholder when {@link displayValue} is empty (e.g. the slot's default hex). */
-	placeholder: string;
-	/** Fired when the user types into the value field. */
-	onValueChange: (value: string) => void;
-	/** Fired when the native color picker emits a new value (RAF-batched upstream). */
-	onPickerChange: (value: string) => void;
+  /** Accessible label for the picker (e.g. "Accent color picker"). */
+  ariaLabel: string;
+  /** The fully-resolved color the pill should render. Any CSS color works. */
+  resolvedColor: string;
+  /** The hex literal used to seed `<input type="color">`. */
+  pickerSeed: string;
+  /** Display value (typically the typed override; falls back to defaultValue). */
+  displayValue: string;
+  /** Placeholder when {@link displayValue} is empty (e.g. the slot's default hex). */
+  placeholder: string;
+  /** Fired when the user types into the value field. */
+  onValueChange: (value: string) => void;
+  /** Fired when the native color picker emits a new value (RAF-batched upstream). */
+  onPickerChange: (value: string) => void;
 }
 
 /**
@@ -380,68 +331,68 @@ export interface ColorPillProps {
  * produces ≤60 PUTs/s instead of hundreds.
  */
 export function ColorPill({
-	ariaLabel,
-	resolvedColor,
-	pickerSeed,
-	displayValue,
-	placeholder,
-	onValueChange,
-	onPickerChange,
+  ariaLabel,
+  resolvedColor,
+  pickerSeed,
+  displayValue,
+  placeholder,
+  onValueChange,
+  onPickerChange,
 }: ColorPillProps): React.JSX.Element {
-	const handleValueChange = useCallback(
-		(event: ChangeEvent<HTMLInputElement>) => onValueChange(event.target.value),
-		[onValueChange]
-	);
-	const handlePickerChange = useCallback(
-		(event: ChangeEvent<HTMLInputElement>) => onPickerChange(event.target.value),
-		[onPickerChange]
-	);
+  const handleValueChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => onValueChange(event.target.value),
+    [onValueChange]
+  );
+  const handlePickerChange = useCallback(
+    (event: ChangeEvent<HTMLInputElement>) => onPickerChange(event.target.value),
+    [onPickerChange]
+  );
 
-	const inputRef = useRef<HTMLInputElement | null>(null);
-	useEffect(() => {
-		// Re-seed the uncontrolled picker on external resets (preset apply,
-		// server refetch). Using `defaultValue + key` would re-mount the
-		// node mid-drag and steal focus; setting `value` here only fires
-		// when the seed changes outside the picker's own onChange loop.
-		if (inputRef.current && inputRef.current.value !== pickerSeed) {
-			inputRef.current.value = pickerSeed;
-		}
-	}, [pickerSeed]);
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    // Re-seed the uncontrolled picker on external resets (preset apply,
+    // server refetch). Using `defaultValue + key` would re-mount the
+    // node mid-drag and steal focus; setting `value` here only fires
+    // when the seed changes outside the picker's own onChange loop.
+    if (inputRef.current && inputRef.current.value !== pickerSeed) {
+      inputRef.current.value = pickerSeed;
+    }
+  }, [pickerSeed]);
 
-	// Compute a flat contrast color so mid-tone pills (warm greens,
-	// oranges, browns) get a readable label. `mix-blend-mode: difference`
-	// fails on those — it folds (255 - bg) per channel and a green like
-	// `#3fa760` ends up rendering the label as a muddy mid-tone instead
-	// of crisp on/off-white. See `pickContrastForeground` above.
-	const foregroundColor = useMemo(() => pickContrastForeground(resolvedColor), [resolvedColor]);
+  // Compute a flat contrast color so mid-tone pills (warm greens,
+  // oranges, browns) get a readable label. `mix-blend-mode: difference`
+  // fails on those — it folds (255 - bg) per channel and a green like
+  // `#3fa760` ends up rendering the label as a muddy mid-tone instead
+  // of crisp on/off-white. See `pickContrastForeground` above.
+  const foregroundColor = useMemo(() => pickContrastForeground(resolvedColor), [resolvedColor]);
 
-	return (
-		<label
-			aria-label={ariaLabel}
-			className="group relative flex h-7 min-w-36 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-border/50 px-3 transition-shadow duration-150 hover:shadow-sm focus-within:ring-2 focus-within:ring-ring/40"
-			style={{ backgroundColor: resolvedColor }}
-		>
-			<input
-				aria-label={`${ariaLabel} value`}
-				className="w-full bg-transparent text-center font-mono text-xs tabular-nums outline-none placeholder:text-current/60"
-				onChange={handleValueChange}
-				placeholder={placeholder}
-				style={{ color: foregroundColor }}
-				type="text"
-				value={displayValue}
-			/>
-			{/* Native color picker — clicking the pill opens the OS dialog.
+  return (
+    <label
+      aria-label={ariaLabel}
+      className="group relative flex h-7 min-w-36 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-border/50 px-3 transition-shadow duration-150 hover:shadow-sm focus-within:ring-2 focus-within:ring-ring/40"
+      style={{ backgroundColor: resolvedColor }}
+    >
+      <input
+        aria-label={`${ariaLabel} value`}
+        className="w-full bg-transparent text-center font-mono text-xs tabular-nums outline-none placeholder:text-current/60"
+        onChange={handleValueChange}
+        placeholder={placeholder}
+        style={{ color: foregroundColor }}
+        type="text"
+        value={displayValue}
+      />
+      {/* Native color picker — clicking the pill opens the OS dialog.
 			    Uncontrolled via `defaultValue` + ref-driven re-seed, see
 			    the `pickerSeed` effect above for why this is NOT
 			    controlled. */}
-			<input
-				aria-label={`${ariaLabel} color picker`}
-				className="absolute inset-0 size-full cursor-pointer opacity-0"
-				defaultValue={pickerSeed}
-				onChange={handlePickerChange}
-				ref={inputRef}
-				type="color"
-			/>
-		</label>
-	);
+      <input
+        aria-label={`${ariaLabel} color picker`}
+        className="absolute inset-0 size-full cursor-pointer opacity-0"
+        defaultValue={pickerSeed}
+        onChange={handlePickerChange}
+        ref={inputRef}
+        type="color"
+      />
+    </label>
+  );
 }

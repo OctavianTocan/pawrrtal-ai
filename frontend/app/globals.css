@@ -11,79 +11,79 @@
 @import "../lib/react-chat-composer/src/styles/animations.css";
 
 @font-face {
-	font-family: "Google Sans";
-	font-style: normal;
-	font-weight: 400;
-	font-display: swap;
-	src: url("https://fonts.gstatic.com/s/googlesans/v67/4Ua_rENHsxJlGDuGo1OIlJfC6l_24rlCK1Yo_Iqcsih3SAyH6cAwhX9RFD48TE63OOYKtrwEIKli.ttf")
-		format("truetype");
+  font-family: "Google Sans";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/googlesans/v67/4Ua_rENHsxJlGDuGo1OIlJfC6l_24rlCK1Yo_Iqcsih3SAyH6cAwhX9RFD48TE63OOYKtrwEIKli.ttf")
+    format("truetype");
 }
 
 @font-face {
-	font-family: "Google Sans";
-	font-style: normal;
-	font-weight: 500;
-	font-display: swap;
-	src: url("https://fonts.gstatic.com/s/googlesans/v67/4Ua_rENHsxJlGDuGo1OIlJfC6l_24rlCK1Yo_Iqcsih3SAyH6cAwhX9RFD48TE63OOYKtrw2IKli.ttf")
-		format("truetype");
+  font-family: "Google Sans";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/googlesans/v67/4Ua_rENHsxJlGDuGo1OIlJfC6l_24rlCK1Yo_Iqcsih3SAyH6cAwhX9RFD48TE63OOYKtrw2IKli.ttf")
+    format("truetype");
 }
 
 @font-face {
-	font-family: "Google Sans";
-	font-style: normal;
-	font-weight: 600;
-	font-display: swap;
-	src: url("https://fonts.gstatic.com/s/googlesans/v67/4Ua_rENHsxJlGDuGo1OIlJfC6l_24rlCK1Yo_Iqcsih3SAyH6cAwhX9RFD48TE63OOYKtrzaJ6li.ttf")
-		format("truetype");
+  font-family: "Google Sans";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/googlesans/v67/4Ua_rENHsxJlGDuGo1OIlJfC6l_24rlCK1Yo_Iqcsih3SAyH6cAwhX9RFD48TE63OOYKtrzaJ6li.ttf")
+    format("truetype");
 }
 
 @font-face {
-	font-family: "Google Sans";
-	font-style: normal;
-	font-weight: 700;
-	font-display: swap;
-	src: url("https://fonts.gstatic.com/s/googlesans/v67/4Ua_rENHsxJlGDuGo1OIlJfC6l_24rlCK1Yo_Iqcsih3SAyH6cAwhX9RFD48TE63OOYKtrzjJ6li.ttf")
-		format("truetype");
+  font-family: "Google Sans";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/googlesans/v67/4Ua_rENHsxJlGDuGo1OIlJfC6l_24rlCK1Yo_Iqcsih3SAyH6cAwhX9RFD48TE63OOYKtrzjJ6li.ttf")
+    format("truetype");
 }
 
 @font-face {
-	font-family: "Google Sans Flex";
-	font-style: normal;
-	font-weight: 400;
-	font-stretch: normal;
-	font-display: swap;
-	src: url("https://fonts.gstatic.com/s/googlesansflex/v20/t5sJIQcYNIWbFgDgAAzZ34auoVyXkJCOvp3SFWJbN5hF8Ju1x6sKCyp0l9sI40swNJwInycYAJzz0m7kJ4qFQOJBOjLvDSndo0SKMpKSTzwliVdHAy4bxTDHg_ugnAakp8ubycs.ttf")
-		format("truetype");
+  font-family: "Google Sans Flex";
+  font-style: normal;
+  font-weight: 400;
+  font-stretch: normal;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/googlesansflex/v20/t5sJIQcYNIWbFgDgAAzZ34auoVyXkJCOvp3SFWJbN5hF8Ju1x6sKCyp0l9sI40swNJwInycYAJzz0m7kJ4qFQOJBOjLvDSndo0SKMpKSTzwliVdHAy4bxTDHg_ugnAakp8ubycs.ttf")
+    format("truetype");
 }
 
 @font-face {
-	font-family: "Google Sans Flex";
-	font-style: normal;
-	font-weight: 500;
-	font-stretch: normal;
-	font-display: swap;
-	src: url("https://fonts.gstatic.com/s/googlesansflex/v20/t5sJIQcYNIWbFgDgAAzZ34auoVyXkJCOvp3SFWJbN5hF8Ju1x6sKCyp0l9sI40swNJwInycYAJzz0m7kJ4qFQOJBOjLvDSndo0SKMpKSTzwliVdHAy4bxTDHg_ugnAakp_mbycs.ttf")
-		format("truetype");
+  font-family: "Google Sans Flex";
+  font-style: normal;
+  font-weight: 500;
+  font-stretch: normal;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/googlesansflex/v20/t5sJIQcYNIWbFgDgAAzZ34auoVyXkJCOvp3SFWJbN5hF8Ju1x6sKCyp0l9sI40swNJwInycYAJzz0m7kJ4qFQOJBOjLvDSndo0SKMpKSTzwliVdHAy4bxTDHg_ugnAakp_mbycs.ttf")
+    format("truetype");
 }
 
 @font-face {
-	font-family: "Google Sans Flex";
-	font-style: normal;
-	font-weight: 600;
-	font-stretch: normal;
-	font-display: swap;
-	src: url("https://fonts.gstatic.com/s/googlesansflex/v20/t5sJIQcYNIWbFgDgAAzZ34auoVyXkJCOvp3SFWJbN5hF8Ju1x6sKCyp0l9sI40swNJwInycYAJzz0m7kJ4qFQOJBOjLvDSndo0SKMpKSTzwliVdHAy4bxTDHg_ugnAakpxWcycs.ttf")
-		format("truetype");
+  font-family: "Google Sans Flex";
+  font-style: normal;
+  font-weight: 600;
+  font-stretch: normal;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/googlesansflex/v20/t5sJIQcYNIWbFgDgAAzZ34auoVyXkJCOvp3SFWJbN5hF8Ju1x6sKCyp0l9sI40swNJwInycYAJzz0m7kJ4qFQOJBOjLvDSndo0SKMpKSTzwliVdHAy4bxTDHg_ugnAakpxWcycs.ttf")
+    format("truetype");
 }
 
 @font-face {
-	font-family: "Google Sans Flex";
-	font-style: normal;
-	font-weight: 700;
-	font-stretch: normal;
-	font-display: swap;
-	src: url("https://fonts.gstatic.com/s/googlesansflex/v20/t5sJIQcYNIWbFgDgAAzZ34auoVyXkJCOvp3SFWJbN5hF8Ju1x6sKCyp0l9sI40swNJwInycYAJzz0m7kJ4qFQOJBOjLvDSndo0SKMpKSTzwliVdHAy4bxTDHg_ugnAakpyycycs.ttf")
-		format("truetype");
+  font-family: "Google Sans Flex";
+  font-style: normal;
+  font-weight: 700;
+  font-stretch: normal;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/googlesansflex/v20/t5sJIQcYNIWbFgDgAAzZ34auoVyXkJCOvp3SFWJbN5hF8Ju1x6sKCyp0l9sI40swNJwInycYAJzz0m7kJ4qFQOJBOjLvDSndo0SKMpKSTzwliVdHAy4bxTDHg_ugnAakpyycycs.ttf")
+    format("truetype");
 }
 
 /* Linked `@octavian-tocan/react-dropdown` resolves here — ensure Tailwind scans it so
@@ -103,19 +103,19 @@
    of a flat-white island. The `var()` forwards track preset + theme switches.
 ============================================================================= */
 :root {
-	--color-chat-bg-elevated: var(--background-elevated) !important;
-	--color-chat-bg-elevated-shade: var(--background-elevated-shade) !important;
-	--color-chat-foreground: var(--foreground) !important;
-	--color-chat-muted: var(--muted-foreground) !important;
-	--color-chat-border: var(--border) !important;
-	--color-chat-accent: var(--accent) !important;
-	--color-chat-accent-foreground: var(--primary-foreground) !important;
-	--color-chat-info: var(--info) !important;
-	--color-chat-warning: var(--info) !important;
-	--color-chat-destructive: var(--destructive) !important;
-	--color-chat-success: var(--success) !important;
-	--radius-chat-lg: var(--radius-surface-lg) !important;
-	--shadow-chat-minimal: var(--shadow-minimal) !important;
+  --color-chat-bg-elevated: var(--background-elevated) !important;
+  --color-chat-bg-elevated-shade: var(--background-elevated-shade) !important;
+  --color-chat-foreground: var(--foreground) !important;
+  --color-chat-muted: var(--muted-foreground) !important;
+  --color-chat-border: var(--border) !important;
+  --color-chat-accent: var(--accent) !important;
+  --color-chat-accent-foreground: var(--primary-foreground) !important;
+  --color-chat-info: var(--info) !important;
+  --color-chat-warning: var(--info) !important;
+  --color-chat-destructive: var(--destructive) !important;
+  --color-chat-success: var(--success) !important;
+  --radius-chat-lg: var(--radius-surface-lg) !important;
+  --shadow-chat-minimal: var(--shadow-minimal) !important;
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -128,45 +128,45 @@
 ============================================================================= */
 
 @property --background {
-	syntax: "<color>";
-	inherits: true;
-	/* Warm off-white surface — `#f7f7f4` territory. */
-	initial-value: oklch(0.973 0.014 90);
+  syntax: "<color>";
+  inherits: true;
+  /* Warm off-white surface — `#f7f7f4` territory. */
+  initial-value: oklch(0.973 0.014 90);
 }
 
 @property --foreground {
-	syntax: "<color>";
-	inherits: true;
-	/* Deep ink ~#1f1f1f — primary text. */
-	initial-value: oklch(0.2392923762 0 0);
+  syntax: "<color>";
+  inherits: true;
+  /* Deep ink ~#1f1f1f — primary text. */
+  initial-value: oklch(0.2392923762 0 0);
 }
 
 @property --accent {
-	syntax: "<color>";
-	inherits: true;
-	/* Soft purple ~#9E94D5 — primary brand accent. */
-	initial-value: oklch(0.704 0.102 285);
+  syntax: "<color>";
+  inherits: true;
+  /* Soft purple ~#9E94D5 — primary brand accent. */
+  initial-value: oklch(0.704 0.102 285);
 }
 
 @property --info {
-	syntax: "<color>";
-	inherits: true;
-	/* Soft blue ~#87C3FF — info, warnings, Ask mode. */
-	initial-value: oklch(0.783 0.119 255);
+  syntax: "<color>";
+  inherits: true;
+  /* Soft blue ~#87C3FF — info, warnings, Ask mode. */
+  initial-value: oklch(0.783 0.119 255);
 }
 
 @property --success {
-	syntax: "<color>";
-	inherits: true;
-	/* Forest green ~#1F8A65 — success, connected states. */
-	initial-value: oklch(0.5 0.12 165);
+  syntax: "<color>";
+  inherits: true;
+  /* Forest green ~#1F8A65 — success, connected states. */
+  initial-value: oklch(0.5 0.12 165);
 }
 
 @property --destructive {
-	syntax: "<color>";
-	inherits: true;
-	/* Rose red ~#cf2d56 — errors, destructive actions. */
-	initial-value: oklch(0.55 0.2 355);
+  syntax: "<color>";
+  inherits: true;
+  /* Rose red ~#cf2d56 — errors, destructive actions. */
+  initial-value: oklch(0.55 0.2 355);
 }
 
 /* =============================================================================
@@ -189,10 +189,10 @@
 
 /* Light Mode */
 :root {
-	/* === 6 BASE COLORS — Pawrrtal defaults === */
-	/* Warm off-white surface (~#f7f7f4). High luminance, neutral warm. */
-	--background: oklch(0.973 0.014 90);
-	/* Light-mode chat panel — pinned at OKLCH lightness 0.99 (near-white)
+  /* === 6 BASE COLORS — Pawrrtal defaults === */
+  /* Warm off-white surface (~#f7f7f4). High luminance, neutral warm. */
+  --background: oklch(0.973 0.014 90);
+  /* Light-mode chat panel — pinned at OKLCH lightness 0.99 (near-white)
 	   while preserving the canvas hue and dropping chroma to 25% so warm
 	   backgrounds (Pawrrtal warm-white, Cursor warm-grey) resolve to a near-white
 	   surface that still carries a hint of the preset's tint, and pure-color
@@ -200,288 +200,276 @@
 	   into the chat panel as a tinted wash. Result: chat panel feels white
 	   on every preset, with just enough hue carry to read as the same
 	   family as the sidebar. */
-	--background-elevated: oklch(from var(--background) 0.99 calc(c * 0.25) h);
-	/* Slightly-darker companion to `--background-elevated` for surfaces that
+  --background-elevated: oklch(from var(--background) 0.99 calc(c * 0.25) h);
+  /* Slightly-darker companion to `--background-elevated` for surfaces that
 	   should sit one notch lower in the elevation stack — currently the
 	   "Connect your apps" strip attached under the composer. Lift the
 	   lightness of `--background-elevated` *down* by 0.03 so the shade
 	   tracks any hue/chroma the chat panel inherited from the preset. */
-	--background-elevated-shade: oklch(from var(--background-elevated) calc(l - 0.03) c h);
-	--background-image:
-		radial-gradient(circle at top, oklch(from var(--accent) l c h / 0.18), transparent 45%),
-		radial-gradient(
-			circle at bottom left,
-			oklch(from var(--info) l c h / 0.12),
-			transparent 40%
-		),
-		linear-gradient(180deg, var(--background), var(--foreground-3));
-	/* Deep ink ~#1f1f1f — primary text. */
-	--foreground: oklch(0.2392923762 0 0);
-	--foreground-dimmed: oklch(0.9158314607 0 0);
-	--foreground-rgb: 31, 31, 31;
-	--user-message-bubble: oklch(0.9158314607 0 0);
-	--user-message-bubble-dimmed: oklch(0.9158314607 0 0);
-	--user-message-foreground: oklch(0.2392923762 0 0);
-	--assistant-message-text: oklch(0.2392923762 0 0);
-	--assistant-message-bubble: oklch(from var(--foreground) l c h / 0.12);
-	--assistant-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.12);
-	/* Soft purple ~#9e94d5 — brand accent + active states. */
-	--accent: oklch(0.704 0.102 285);
-	--accent-rgb: 158, 148, 213;
-	/* Soft blue ~#87c3ff — info, Ask mode, warnings. */
-	--info: oklch(0.783 0.119 255);
-	--info-rgb: 135, 195, 255;
-	/* Forest green ~#1f8a65 — success, connected states. */
-	--success: oklch(0.5 0.12 165);
-	--success-rgb: 31, 138, 101;
-	/* Rose red ~#cf2d56 — errors, destructive actions. */
-	--destructive: oklch(0.55 0.2 355);
-	--destructive-rgb: 207, 45, 86;
+  --background-elevated-shade: oklch(from var(--background-elevated) calc(l - 0.03) c h);
+  --background-image:
+    radial-gradient(circle at top, oklch(from var(--accent) l c h / 0.18), transparent 45%),
+    radial-gradient(circle at bottom left, oklch(from var(--info) l c h / 0.12), transparent 40%),
+    linear-gradient(180deg, var(--background), var(--foreground-3));
+  /* Deep ink ~#1f1f1f — primary text. */
+  --foreground: oklch(0.2392923762 0 0);
+  --foreground-dimmed: oklch(0.9158314607 0 0);
+  --foreground-rgb: 31, 31, 31;
+  --user-message-bubble: oklch(0.9158314607 0 0);
+  --user-message-bubble-dimmed: oklch(0.9158314607 0 0);
+  --user-message-foreground: oklch(0.2392923762 0 0);
+  --assistant-message-text: oklch(0.2392923762 0 0);
+  --assistant-message-bubble: oklch(from var(--foreground) l c h / 0.12);
+  --assistant-message-bubble-dimmed: oklch(from var(--foreground) l c h / 0.12);
+  /* Soft purple ~#9e94d5 — brand accent + active states. */
+  --accent: oklch(0.704 0.102 285);
+  --accent-rgb: 158, 148, 213;
+  /* Soft blue ~#87c3ff — info, Ask mode, warnings. */
+  --info: oklch(0.783 0.119 255);
+  --info-rgb: 135, 195, 255;
+  /* Forest green ~#1f8a65 — success, connected states. */
+  --success: oklch(0.5 0.12 165);
+  --success-rgb: 31, 138, 101;
+  /* Rose red ~#cf2d56 — errors, destructive actions. */
+  --destructive: oklch(0.55 0.2 355);
+  --destructive-rgb: 207, 45, 86;
 
-	/* === SHADOW OPACITY (light mode = subtle, dark mode = stronger) === */
-	--shadow-border-opacity: 0.08;
-	--shadow-blur-opacity: 0.06;
+  /* === SHADOW OPACITY (light mode = subtle, dark mode = stronger) === */
+  --shadow-border-opacity: 0.08;
+  --shadow-blur-opacity: 0.06;
 
-	/* === SHADOW VALUES === */
-	--shadow-minimal:
-		rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-		rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-		rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px,
-		rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 1px 1px -0.5px,
-		rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 3px 3px -1.5px;
+  /* === SHADOW VALUES === */
+  --shadow-minimal:
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px,
+    rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 1px 1px -0.5px,
+    rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 3px 3px -1.5px;
 
-	--shadow-minimal-flat:
-		rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-		rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-		rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px;
+  --shadow-minimal-flat:
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px, rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px;
 
-	--shadow-modal-small:
-		rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-		rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-		rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px,
-		rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.67)) 0px 1px 1px -0.5px,
-		rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.67)) 0px 3px 3px 0px,
-		rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.33)) 0px 6px 6px 0px,
-		rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.33)) 0px 12px 12px 0px,
-		rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.33)) 0px 24px 24px 0px;
+  --shadow-modal-small:
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px,
+    rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.67)) 0px 1px 1px -0.5px,
+    rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.67)) 0px 3px 3px 0px,
+    rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.33)) 0px 6px 6px 0px,
+    rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.33)) 0px 12px 12px 0px,
+    rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.33)) 0px 24px 24px 0px;
 
-	/*
+  /*
 	 * Floating panel shadow used by surfaces that sit on top of another
 	 * panel (e.g. the chat panel above the sidebar). Stronger than
 	 * --shadow-modal-small so the surface visibly separates on all four
 	 * sides — top/right/bottom drop AND a left-edge cast that lands on
 	 * whatever sits behind it.
 	 */
-	--shadow-panel-floating:
-		rgba(var(--foreground-rgb), 0.1) 0px 0px 0px 1px,
-		rgba(0, 0, 0, 0.04) 0px 1px 2px 0px,
-		rgba(0, 0, 0, 0.06) 0px 4px 8px -2px,
-		rgba(0, 0, 0, 0.08) 0px 12px 24px -6px,
-		rgba(0, 0, 0, 0.06) 0px 24px 48px -12px;
+  --shadow-panel-floating:
+    rgba(var(--foreground-rgb), 0.1) 0px 0px 0px 1px,
+    rgba(0, 0, 0, 0.04) 0px 1px 2px 0px,
+    rgba(0, 0, 0, 0.06) 0px 4px 8px -2px,
+    rgba(0, 0, 0, 0.08) 0px 12px 24px -6px,
+    rgba(0, 0, 0, 0.06) 0px 24px 48px -12px;
 
-	/* === MIX VARIANTS (solid interpolation toward background) === */
-	--foreground-1\.5: color-mix(in srgb, var(--foreground) 1.5%, var(--background));
-	--foreground-2: color-mix(in srgb, var(--foreground) 2%, var(--background));
-	--foreground-3: color-mix(in srgb, var(--foreground) 3%, var(--background));
-	--foreground-5: color-mix(in srgb, var(--foreground) 5%, var(--background));
-	--foreground-10: color-mix(in srgb, var(--foreground) 10%, var(--background));
-	--foreground-20: color-mix(in srgb, var(--foreground) 20%, var(--background));
-	--foreground-30: color-mix(in srgb, var(--foreground) 30%, var(--background));
-	--foreground-40: color-mix(in srgb, var(--foreground) 40%, var(--background));
-	--foreground-50: color-mix(in srgb, var(--foreground) 50%, var(--background));
-	--foreground-60: color-mix(in srgb, var(--foreground) 60%, var(--background));
-	--foreground-65: color-mix(in srgb, var(--foreground) 65%, var(--background));
-	--foreground-70: color-mix(in srgb, var(--foreground) 70%, var(--background));
-	--foreground-80: color-mix(in srgb, var(--foreground) 80%, var(--background));
-	--foreground-90: color-mix(in srgb, var(--foreground) 90%, var(--background));
-	--foreground-95: color-mix(in srgb, var(--foreground) 95%, var(--background));
+  /* === MIX VARIANTS (solid interpolation toward background) === */
+  --foreground-1\.5: color-mix(in srgb, var(--foreground) 1.5%, var(--background));
+  --foreground-2: color-mix(in srgb, var(--foreground) 2%, var(--background));
+  --foreground-3: color-mix(in srgb, var(--foreground) 3%, var(--background));
+  --foreground-5: color-mix(in srgb, var(--foreground) 5%, var(--background));
+  --foreground-10: color-mix(in srgb, var(--foreground) 10%, var(--background));
+  --foreground-20: color-mix(in srgb, var(--foreground) 20%, var(--background));
+  --foreground-30: color-mix(in srgb, var(--foreground) 30%, var(--background));
+  --foreground-40: color-mix(in srgb, var(--foreground) 40%, var(--background));
+  --foreground-50: color-mix(in srgb, var(--foreground) 50%, var(--background));
+  --foreground-60: color-mix(in srgb, var(--foreground) 60%, var(--background));
+  --foreground-65: color-mix(in srgb, var(--foreground) 65%, var(--background));
+  --foreground-70: color-mix(in srgb, var(--foreground) 70%, var(--background));
+  --foreground-80: color-mix(in srgb, var(--foreground) 80%, var(--background));
+  --foreground-90: color-mix(in srgb, var(--foreground) 90%, var(--background));
+  --foreground-95: color-mix(in srgb, var(--foreground) 95%, var(--background));
 
-	/* Success/destructive/info interpolated toward foreground (for tinted text) */
-	--success-text: color-mix(in oklab, var(--success) 50%, var(--foreground));
-	--destructive-text: color-mix(in oklab, var(--destructive) 50%, var(--foreground));
-	--info-text: color-mix(in oklab, var(--info) 50%, var(--foreground));
+  /* Success/destructive/info interpolated toward foreground (for tinted text) */
+  --success-text: color-mix(in oklab, var(--success) 50%, var(--foreground));
+  --destructive-text: color-mix(in oklab, var(--destructive) 50%, var(--foreground));
+  --info-text: color-mix(in oklab, var(--info) 50%, var(--foreground));
 
-	/* === SHADCN COMPATIBILITY (derived from 6 base colors) === */
-	--primary: var(--accent);
-	/* Deep ink on soft purple clears WCAG AA while avoiding true black. */
-	--primary-foreground: oklch(0.2392923762 0 0);
-	--secondary: oklch(from var(--foreground) l c h / 0.05);
-	--secondary-foreground: var(--foreground);
-	--muted: oklch(from var(--foreground) l c h / 0.05);
-	--muted-foreground: var(--foreground-70);
-	--card: var(--background);
-	--card-foreground: var(--foreground);
-	--popover: var(--background);
-	--popover-foreground: var(--foreground);
-	--border: oklch(from var(--foreground) l c h / 0.05);
-	--input: oklch(from var(--foreground) l c h / 0.1);
-	--ring: oklch(from var(--foreground) l c h / 0.25);
-	--ring-width: 1px;
-	--ring-offset: 0px;
+  /* === SHADCN COMPATIBILITY (derived from 6 base colors) === */
+  --primary: var(--accent);
+  /* Deep ink on soft purple clears WCAG AA while avoiding true black. */
+  --primary-foreground: oklch(0.2392923762 0 0);
+  --secondary: oklch(from var(--foreground) l c h / 0.05);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(from var(--foreground) l c h / 0.05);
+  --muted-foreground: var(--foreground-70);
+  --card: var(--background);
+  --card-foreground: var(--foreground);
+  --popover: var(--background);
+  --popover-foreground: var(--foreground);
+  --border: oklch(from var(--foreground) l c h / 0.05);
+  --input: oklch(from var(--foreground) l c h / 0.1);
+  --ring: oklch(from var(--foreground) l c h / 0.25);
+  --ring-width: 1px;
+  --ring-offset: 0px;
 
-	/* Sidebar tokens — sidebar surface matches `--background` exactly so the
+  /* Sidebar tokens — sidebar surface matches `--background` exactly so the
 	   sidebar reads as the same canvas as the page. The chat panel uses
 	   `--background-elevated` (a derivation of `--background` mixed with 1.5%
 	   `--foreground`) so it follows the user's mental model: when foreground
 	   is dark the panel reads as a slightly darker tint of background, when
 	   foreground is light it reads as slightly lighter. Both sidebar and
 	   chat panel automatically follow whatever `--background` resolves to. */
-	--sidebar: var(--background);
-	--sidebar-foreground: oklch(0.2392923762 0 0);
-	--sidebar-primary: var(--accent);
-	--sidebar-primary-foreground: var(--background);
-	--sidebar-accent: var(--foreground-5);
-	--sidebar-accent-foreground: oklch(0.2392923762 0 0);
-	--sidebar-border: var(--border);
-	--sidebar-ring: var(--ring);
-	--sidebar-hover: oklch(from var(--foreground) l c h / 0.02);
+  --sidebar: var(--background);
+  --sidebar-foreground: oklch(0.2392923762 0 0);
+  --sidebar-primary: var(--accent);
+  --sidebar-primary-foreground: var(--background);
+  --sidebar-accent: var(--foreground-5);
+  --sidebar-accent-foreground: oklch(0.2392923762 0 0);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+  --sidebar-hover: oklch(from var(--foreground) l c h / 0.02);
 
-	/* Markdown list markers */
-	--md-bullets: var(--foreground-50);
-	--md-counters: var(--foreground-50);
+  /* Markdown list markers */
+  --md-bullets: var(--foreground-50);
+  --md-counters: var(--foreground-50);
 
-	/* Onboarding step styling */
-	--step-icon-size: 4rem;
-	--step-icon-inner-size: 2rem;
-	--step-icon-radius: 1rem;
-	--step-title-size: 1.5rem;
-	--step-description-max-width: 24rem;
-	--step-actions-gap: 0.75rem;
-	--step-content-gap: 1.5rem;
-	--step-actions-margin: 2rem;
+  /* Onboarding step styling */
+  --step-icon-size: 4rem;
+  --step-icon-inner-size: 2rem;
+  --step-icon-radius: 1rem;
+  --step-title-size: 1.5rem;
+  --step-description-max-width: 24rem;
+  --step-actions-gap: 0.75rem;
+  --step-content-gap: 1.5rem;
+  --step-actions-margin: 2rem;
 
-	/* Fonts — Google Sans Flex → Google Sans → Helvetica; @font-face rules live
+  /* Fonts — Google Sans Flex → Google Sans → Helvetica; @font-face rules live
 	   above because these families are not exposed by `next/font/google`. */
-	--font-sans-stack: "Google Sans Flex", "Google Sans", "Helvetica Neue", sans-serif;
-	/* Editorial display family — Mistral-inspired near-serif voice for hero
+  --font-sans-stack: "Google Sans Flex", "Google Sans", "Helvetica Neue", sans-serif;
+  /* Editorial display family — Mistral-inspired near-serif voice for hero
 	 * displays and large headings. Newsreader (variable Google Font) is the
 	 * canonical face; falls back to a system serif chain so the editorial
 	 * character reads even before the web font loads. Loaded by next/font
 	 * in `app/layout.tsx`, exposed as `--font-display-loaded`. */
-	--font-display-stack:
-		var(--font-display-loaded, "Newsreader"), "Iowan Old Style", "Charter", Georgia,
-		"Times New Roman", serif;
-	--font-serif-stack:
-		"JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-	--font-mono-stack:
-		"JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-	--font-sans: var(--font-sans-stack);
-	--font-display: var(--font-display-stack);
-	--font-serif: var(--font-serif-stack);
-	--font-mono: var(--font-mono-stack);
-	--font-default: var(--font-sans);
+  --font-display-stack:
+    var(--font-display-loaded, "Newsreader"), "Iowan Old Style", "Charter", Georgia, "Times New Roman", serif;
+  --font-serif-stack: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --font-mono-stack: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  --font-sans: var(--font-sans-stack);
+  --font-display: var(--font-display-stack);
+  --font-serif: var(--font-serif-stack);
+  --font-mono: var(--font-mono-stack);
+  --font-default: var(--font-sans);
 
-	/* Layout */
-	--font-size-base: 16px;
-	--radius: 0rem;
-	--spacing: 0.25rem;
-	--tracking-normal: 0em;
+  /* Layout */
+  --font-size-base: 16px;
+  --radius: 0rem;
+  --spacing: 0.25rem;
+  --tracking-normal: 0em;
 
-	/* Chat bubble radii — separate token because the global `--radius` is 0
+  /* Chat bubble radii — separate token because the global `--radius` is 0
 	 * (flat aesthetic) but message bubbles need a rounded silhouette. The
 	 * "tail" corner is kept sharper (2px) to create the Telegram-style
 	 * pointed bubble effect; the triangle pseudo-element reinforces the tail.
 	 * Asymmetric: user bubble tail points right (toward avatar on the right). */
-	--radius-bubble: 1.25rem; /* 20px */
-	--radius-bubble-tail: 0.125rem; /* 2px — sharp tail corner */
+  --radius-bubble: 1.25rem; /* 20px */
+  --radius-bubble-tail: 0.125rem; /* 2px — sharp tail corner */
 
-	/* Thinking-gradient endpoints — sourced from project semantic colors so
+  /* Thinking-gradient endpoints — sourced from project semantic colors so
 	 * theme switches propagate to the streaming-state shimmer text. */
-	--thinking-gradient-from: var(--accent);
-	--thinking-gradient-to: var(--info);
+  --thinking-gradient-from: var(--accent);
+  --thinking-gradient-to: var(--info);
 
-	/* === Z-INDEX SCALE === */
-	--z-base: 0;
-	--z-local: 10;
-	--z-sticky: 20;
-	--z-titlebar: 40;
-	--z-panel: 50;
-	--z-dropdown: 100;
-	--z-tooltip: 150;
-	--z-modal: 200;
-	--z-overlay: 300;
-	--z-fullscreen: 350;
-	--z-floating-backdrop: 390;
-	--z-floating-menu: 400;
-	--z-island-overlay: 390;
-	--z-island: 400;
-	--z-island-popover: 410;
-	--z-splash: 600;
+  /* === Z-INDEX SCALE === */
+  --z-base: 0;
+  --z-local: 10;
+  --z-sticky: 20;
+  --z-titlebar: 40;
+  --z-panel: 50;
+  --z-dropdown: 100;
+  --z-tooltip: 150;
+  --z-modal: 200;
+  --z-overlay: 300;
+  --z-fullscreen: 350;
+  --z-floating-backdrop: 390;
+  --z-floating-menu: 400;
+  --z-island-overlay: 390;
+  --z-island: 400;
+  --z-island-popover: 410;
+  --z-splash: 600;
 }
 
 /* Dark Mode — near-black canvas (#141414) + soft purple accent (#9E94D5) */
 .dark {
-	/* === 6 BASE COLORS === */
-	/* Page/workspace ~#141414 */
-	--background: oklch(0.145 0.005 285);
-	/* Dark-mode chat panel — lift lightness off `--background` while keeping
+  /* === 6 BASE COLORS === */
+  /* Page/workspace ~#141414 */
+  --background: oklch(0.145 0.005 285);
+  /* Dark-mode chat panel — lift lightness off `--background` while keeping
 	   chroma and hue, so the panel re-tints whenever the preset's dark
 	   palette changes (instead of the old hardcoded blue). The +0.04
 	   lightness gives a clearly visible "elevated" surface that still
 	   reads as the same hue family as the canvas. */
-	--background-elevated: oklch(from var(--background) calc(l + 0.04) c h);
-	/* In dark mode the shade is slightly darker than the elevated panel —
+  --background-elevated: oklch(from var(--background) calc(l + 0.04) c h);
+  /* In dark mode the shade is slightly darker than the elevated panel —
 	   sits between canvas and panel, so the connect-apps strip reads as a
 	   recessed band beneath the chat surface instead of competing with it. */
-	--background-elevated-shade: oklch(from var(--background-elevated) calc(l - 0.02) c h);
-	--background-image:
-		radial-gradient(circle at top, oklch(from var(--accent) l c h / 0.22), transparent 45%),
-		radial-gradient(
-			circle at bottom right,
-			oklch(from var(--info) l c h / 0.12),
-			transparent 40%
-		),
-		linear-gradient(180deg, var(--background), var(--foreground-5));
-	/* Primary text ~#e3e3e3 */
-	--foreground: oklch(0.9158314607 0 0);
-	--foreground-dimmed: oklch(0.9158314607 0 0);
-	--foreground-rgb: 227, 227, 227;
-	--user-message-bubble: oklch(0.2837694632 0.0046572957 247.9916671312);
-	--user-message-bubble-dimmed: oklch(0.2837694632 0.0046572957 247.9916671312);
-	--user-message-foreground: oklch(0.9158314607 0 0);
-	--assistant-message-text: oklch(0.9158314607 0 0);
-	--assistant-message-bubble: oklch(0.95 0 0);
-	--assistant-message-bubble-dimmed: oklch(0.95 0 0);
-	/* Soft purple ~#9e94d5 — consistent brand accent in dark mode */
-	--accent: oklch(0.704 0.102 285);
-	--accent-rgb: 158, 148, 213;
-	/* Soft blue ~#87c3ff — info, Ask mode, warnings. */
-	--info: oklch(0.783 0.119 255);
-	--info-rgb: 135, 195, 255;
-	/* Mid forest green ~#34785c — success, connected states. */
-	--success: oklch(0.5 0.09 165);
-	--success-rgb: 52, 120, 92;
-	/* Rose red ~#cf2d56 — errors, destructive actions. */
-	--destructive: oklch(0.55 0.2 355);
-	--destructive-rgb: 207, 45, 86;
+  --background-elevated-shade: oklch(from var(--background-elevated) calc(l - 0.02) c h);
+  --background-image:
+    radial-gradient(circle at top, oklch(from var(--accent) l c h / 0.22), transparent 45%),
+    radial-gradient(circle at bottom right, oklch(from var(--info) l c h / 0.12), transparent 40%),
+    linear-gradient(180deg, var(--background), var(--foreground-5));
+  /* Primary text ~#e3e3e3 */
+  --foreground: oklch(0.9158314607 0 0);
+  --foreground-dimmed: oklch(0.9158314607 0 0);
+  --foreground-rgb: 227, 227, 227;
+  --user-message-bubble: oklch(0.2837694632 0.0046572957 247.9916671312);
+  --user-message-bubble-dimmed: oklch(0.2837694632 0.0046572957 247.9916671312);
+  --user-message-foreground: oklch(0.9158314607 0 0);
+  --assistant-message-text: oklch(0.9158314607 0 0);
+  --assistant-message-bubble: oklch(0.95 0 0);
+  --assistant-message-bubble-dimmed: oklch(0.95 0 0);
+  /* Soft purple ~#9e94d5 — consistent brand accent in dark mode */
+  --accent: oklch(0.704 0.102 285);
+  --accent-rgb: 158, 148, 213;
+  /* Soft blue ~#87c3ff — info, Ask mode, warnings. */
+  --info: oklch(0.783 0.119 255);
+  --info-rgb: 135, 195, 255;
+  /* Mid forest green ~#34785c — success, connected states. */
+  --success: oklch(0.5 0.09 165);
+  --success-rgb: 52, 120, 92;
+  /* Rose red ~#cf2d56 — errors, destructive actions. */
+  --destructive: oklch(0.55 0.2 355);
+  --destructive-rgb: 207, 45, 86;
 
-	/* === SHADOW OPACITY (stronger in dark mode for visibility) === */
-	--shadow-border-opacity: 0.15;
-	--shadow-blur-opacity: 0.12;
+  /* === SHADOW OPACITY (stronger in dark mode for visibility) === */
+  --shadow-border-opacity: 0.15;
+  --shadow-blur-opacity: 0.12;
 
-	/* === MIX VARIANTS === */
-	--foreground-1\.5: color-mix(in srgb, var(--foreground) 1.5%, var(--background));
-	--foreground-2: color-mix(in srgb, var(--foreground) 2%, var(--background));
-	--foreground-3: color-mix(in srgb, var(--foreground) 3%, var(--background));
-	--foreground-5: color-mix(in srgb, var(--foreground) 5%, var(--background));
-	--foreground-10: color-mix(in srgb, var(--foreground) 10%, var(--background));
-	--foreground-20: color-mix(in srgb, var(--foreground) 20%, var(--background));
-	--foreground-30: color-mix(in srgb, var(--foreground) 30%, var(--background));
-	--foreground-40: color-mix(in srgb, var(--foreground) 40%, var(--background));
-	--foreground-50: color-mix(in srgb, var(--foreground) 50%, var(--background));
-	--foreground-60: color-mix(in srgb, var(--foreground) 60%, var(--background));
-	--foreground-65: color-mix(in srgb, var(--foreground) 65%, var(--background));
-	--foreground-70: color-mix(in srgb, var(--foreground) 70%, var(--background));
-	--foreground-80: color-mix(in srgb, var(--foreground) 80%, var(--background));
-	--foreground-90: color-mix(in srgb, var(--foreground) 90%, var(--background));
-	--foreground-95: color-mix(in srgb, var(--foreground) 95%, var(--background));
+  /* === MIX VARIANTS === */
+  --foreground-1\.5: color-mix(in srgb, var(--foreground) 1.5%, var(--background));
+  --foreground-2: color-mix(in srgb, var(--foreground) 2%, var(--background));
+  --foreground-3: color-mix(in srgb, var(--foreground) 3%, var(--background));
+  --foreground-5: color-mix(in srgb, var(--foreground) 5%, var(--background));
+  --foreground-10: color-mix(in srgb, var(--foreground) 10%, var(--background));
+  --foreground-20: color-mix(in srgb, var(--foreground) 20%, var(--background));
+  --foreground-30: color-mix(in srgb, var(--foreground) 30%, var(--background));
+  --foreground-40: color-mix(in srgb, var(--foreground) 40%, var(--background));
+  --foreground-50: color-mix(in srgb, var(--foreground) 50%, var(--background));
+  --foreground-60: color-mix(in srgb, var(--foreground) 60%, var(--background));
+  --foreground-65: color-mix(in srgb, var(--foreground) 65%, var(--background));
+  --foreground-70: color-mix(in srgb, var(--foreground) 70%, var(--background));
+  --foreground-80: color-mix(in srgb, var(--foreground) 80%, var(--background));
+  --foreground-90: color-mix(in srgb, var(--foreground) 90%, var(--background));
+  --foreground-95: color-mix(in srgb, var(--foreground) 95%, var(--background));
 
-	/* Success/destructive/info interpolated toward foreground (for tinted text) */
-	--success-text: color-mix(in oklab, var(--success) 50%, var(--foreground));
-	--destructive-text: color-mix(in oklab, var(--destructive) 50%, var(--foreground));
-	--info-text: color-mix(in oklab, var(--info) 50%, var(--foreground));
+  /* Success/destructive/info interpolated toward foreground (for tinted text) */
+  --success-text: color-mix(in oklab, var(--success) 50%, var(--foreground));
+  --destructive-text: color-mix(in oklab, var(--destructive) 50%, var(--foreground));
+  --info-text: color-mix(in oklab, var(--info) 50%, var(--foreground));
 
-	/* === SHADCN COMPATIBILITY (derived from 6 base colors) ===
+  /* === SHADCN COMPATIBILITY (derived from 6 base colors) ===
 	 *
 	 * Every token below derives from `--background` / `--foreground` /
 	 * `--accent` so a preset swap (Mistral → Cursor) re-tints the
@@ -502,77 +490,77 @@
 	 * preserving the visual rhythm while inheriting the preset's
 	 * underlying hue and chroma.
 	 */
-	--primary: var(--accent);
-	/* Light text on accent primary surfaces — derived from accent so
+  --primary: var(--accent);
+  /* Light text on accent primary surfaces — derived from accent so
 	 * a colored CTA always renders readable text regardless of preset. */
-	--primary-foreground: oklch(from var(--accent) calc(1 - l + 0.05) calc(c * 0.05) h);
-	/* Subtly elevated muted/secondary surfaces — pull from the user's
+  --primary-foreground: oklch(from var(--accent) calc(1 - l + 0.05) calc(c * 0.05) h);
+  /* Subtly elevated muted/secondary surfaces — pull from the user's
 	 * background and lift it +0.04 lightness so cards stand off the
 	 * page. Chroma + hue inherit from `--background` so warm-cream
 	 * presets get warm cards, cool-grey presets get cool cards. */
-	--secondary: oklch(from var(--background) calc(l + 0.04) c h);
-	--secondary-foreground: var(--foreground);
-	--muted: oklch(from var(--background) calc(l + 0.04) c h);
-	/* Mid-tone copy — interpolates 60% toward foreground for a
+  --secondary: oklch(from var(--background) calc(l + 0.04) c h);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(from var(--background) calc(l + 0.04) c h);
+  /* Mid-tone copy — interpolates 60% toward foreground for a
 	 * proper secondary-text feel. */
-	--muted-foreground: var(--foreground-60);
-	/* Card / popover surfaces — same +0.04 lightness lift, kept
+  --muted-foreground: var(--foreground-60);
+  /* Card / popover surfaces — same +0.04 lightness lift, kept
 	 * separate from `--secondary` so they can be tuned independently
 	 * if a future spec asks for it. */
-	--card: oklch(from var(--background) calc(l + 0.04) c h);
-	--card-foreground: var(--foreground);
-	--popover: oklch(from var(--background) calc(l + 0.05) c h);
-	--popover-foreground: var(--foreground);
-	/* Borders + inputs — foreground at low opacity, so they tint
+  --card: oklch(from var(--background) calc(l + 0.04) c h);
+  --card-foreground: var(--foreground);
+  --popover: oklch(from var(--background) calc(l + 0.05) c h);
+  --popover-foreground: var(--foreground);
+  /* Borders + inputs — foreground at low opacity, so they tint
 	 * with whatever ink color the preset uses. */
-	--border: oklch(from var(--foreground) l c h / 0.14);
-	--input: oklch(from var(--foreground) l c h / 0.1);
-	--ring: oklch(from var(--accent) l c h / 0.45);
+  --border: oklch(from var(--foreground) l c h / 0.14);
+  --input: oklch(from var(--foreground) l c h / 0.1);
+  --ring: oklch(from var(--accent) l c h / 0.45);
 
-	/* Sidebar tokens — sidebar matches `--background` exactly so the sidebar
+  /* Sidebar tokens — sidebar matches `--background` exactly so the sidebar
 	 * canvas and the page background read as one continuous surface. The
 	 * chat panel uses `--background-elevated` (derived from background +
 	 * 1.5% foreground mix) for its mild tint — so when foreground is light,
 	 * the panel reads as a slightly lighter tint of background; when
 	 * foreground is dark, slightly darker. */
-	--sidebar: var(--background);
-	--sidebar-foreground: oklch(0.9158314607 0 0);
-	--sidebar-primary: var(--accent);
-	--sidebar-primary-foreground: var(--primary-foreground);
-	--sidebar-accent: var(--foreground-5);
-	--sidebar-accent-foreground: oklch(0.9158314607 0 0);
-	--sidebar-border: var(--border);
-	--sidebar-ring: var(--ring);
-	--sidebar-hover: oklch(from var(--foreground) l c h / 0.02);
+  --sidebar: var(--background);
+  --sidebar-foreground: oklch(0.9158314607 0 0);
+  --sidebar-primary: var(--accent);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: var(--foreground-5);
+  --sidebar-accent-foreground: oklch(0.9158314607 0 0);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--ring);
+  --sidebar-hover: oklch(from var(--foreground) l c h / 0.02);
 
-	/* Markdown list markers */
-	--md-bullets: var(--foreground-50);
-	--md-counters: var(--foreground-50);
+  /* Markdown list markers */
+  --md-bullets: var(--foreground-50);
+  --md-counters: var(--foreground-50);
 }
 
 /* Theme Override - Semi-transparent background to allow vibrancy through */
 html[data-theme-override]::before {
-	content: "";
-	position: fixed;
-	inset: 0;
-	background: color-mix(in srgb, var(--background) 50%, transparent);
-	z-index: -1;
-	pointer-events: none;
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: color-mix(in srgb, var(--background) 50%, transparent);
+  z-index: -1;
+  pointer-events: none;
 }
 
 /* Theme Mismatch - Solid background when theme doesn't support current mode */
 html[data-theme-mismatch]::before {
-	content: "";
-	position: fixed;
-	inset: 0;
-	background: var(--foreground-10);
-	z-index: -1;
-	pointer-events: none;
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: var(--foreground-10);
+  z-index: -1;
+  pointer-events: none;
 }
 
 .sidepanel-text-scope {
-	--foreground: var(--sidebar-foreground);
-	--muted-foreground: var(--foreground-70);
+  --foreground: var(--sidebar-foreground);
+  --muted-foreground: var(--foreground-70);
 }
 
 /* =============================================================================
@@ -582,182 +570,180 @@ html[data-theme-mismatch]::before {
 ============================================================================= */
 
 html[data-scenic]::before {
-	content: "";
-	position: fixed;
-	inset: 0;
-	background-image: var(--background-image);
-	background-size: cover;
-	background-position: center;
-	background-repeat: no-repeat;
-	z-index: -2;
-	pointer-events: none;
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: var(--background-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: -2;
+  pointer-events: none;
 }
 
 html.dark[data-scenic]::after {
-	content: "";
-	position: fixed;
-	inset: 0;
-	background: linear-gradient(to right, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4));
-	z-index: -1;
-	pointer-events: none;
+  content: "";
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4));
+  z-index: -1;
+  pointer-events: none;
 }
 
 html[data-scenic][data-theme-override]::before {
-	background: transparent;
-	background-image: var(--background-image);
-	background-size: cover;
-	background-position: center;
-	background-repeat: no-repeat;
+  background: transparent;
+  background-image: var(--background-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 html[data-scenic] {
-	--background: oklch(0.145 0.005 285 / 0.55);
+  --background: oklch(0.145 0.005 285 / 0.55);
 }
 
 /* Inter Font - Opt-in via data-font="inter" attribute */
 html[data-font="inter"] {
-	--font-sans-stack: "Inter", "Google Sans Flex", "Google Sans", "Helvetica Neue", sans-serif;
-	--font-sans: var(--font-sans-stack);
-	--font-default: var(--font-sans);
-	font-optical-sizing: auto;
-	font-feature-settings: "cv01", "cv02", "cv03", "cv04", "case";
+  --font-sans-stack: "Inter", "Google Sans Flex", "Google Sans", "Helvetica Neue", sans-serif;
+  --font-sans: var(--font-sans-stack);
+  --font-default: var(--font-sans);
+  font-optical-sizing: auto;
+  font-feature-settings: "cv01", "cv02", "cv03", "cv04", "case";
 }
 
 /* Theme integration for Tailwind v4 */
 @theme inline {
-	/* === 6 BASE COLORS === */
-	--color-background: var(--background);
-	--color-background-elevated: var(--background-elevated);
-	--color-background-elevated-shade: var(--background-elevated-shade);
-	--color-foreground: var(--foreground);
-	--color-accent: var(--accent);
-	--color-info: var(--info);
-	--color-success: var(--success);
-	--color-destructive: var(--destructive);
+  /* === 6 BASE COLORS === */
+  --color-background: var(--background);
+  --color-background-elevated: var(--background-elevated);
+  --color-background-elevated-shade: var(--background-elevated-shade);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-info: var(--info);
+  --color-success: var(--success);
+  --color-destructive: var(--destructive);
 
-	/* === MIX VARIANTS (solid interpolation) === */
-	--color-foreground-1\.5: var(--foreground-1\.5);
-	--color-foreground-2: var(--foreground-2);
-	--color-foreground-3: var(--foreground-3);
-	--color-foreground-5: var(--foreground-5);
-	--color-foreground-10: var(--foreground-10);
-	--color-foreground-20: var(--foreground-20);
-	--color-foreground-30: var(--foreground-30);
-	--color-foreground-40: var(--foreground-40);
-	--color-foreground-50: var(--foreground-50);
-	--color-foreground-60: var(--foreground-60);
-	--color-foreground-70: var(--foreground-70);
-	--color-foreground-80: var(--foreground-80);
-	--color-foreground-90: var(--foreground-90);
-	--color-foreground-95: var(--foreground-95);
+  /* === MIX VARIANTS (solid interpolation) === */
+  --color-foreground-1\.5: var(--foreground-1\.5);
+  --color-foreground-2: var(--foreground-2);
+  --color-foreground-3: var(--foreground-3);
+  --color-foreground-5: var(--foreground-5);
+  --color-foreground-10: var(--foreground-10);
+  --color-foreground-20: var(--foreground-20);
+  --color-foreground-30: var(--foreground-30);
+  --color-foreground-40: var(--foreground-40);
+  --color-foreground-50: var(--foreground-50);
+  --color-foreground-60: var(--foreground-60);
+  --color-foreground-70: var(--foreground-70);
+  --color-foreground-80: var(--foreground-80);
+  --color-foreground-90: var(--foreground-90);
+  --color-foreground-95: var(--foreground-95);
 
-	/* === SEMANTIC SURFACE COLORS === */
-	--color-sidebar: var(--sidebar);
-	--color-sidebar-foreground: var(--sidebar-foreground);
-	--color-sidebar-primary: var(--sidebar-primary);
-	--color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-	--color-sidebar-accent: var(--sidebar-accent);
-	--color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-	--color-sidebar-border: var(--sidebar-border);
-	--color-sidebar-ring: var(--sidebar-ring);
-	--color-sidebar-hover: var(--sidebar-hover);
-	--color-user-message-bubble: var(--user-message-bubble);
-	--color-user-message-foreground: var(--user-message-foreground);
-	--color-assistant-message-text: var(--assistant-message-text);
+  /* === SEMANTIC SURFACE COLORS === */
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-user-message-bubble: var(--user-message-bubble);
+  --color-user-message-foreground: var(--user-message-foreground);
+  --color-assistant-message-text: var(--assistant-message-text);
 
-	/* === LEGACY COMPATIBILITY (shadcn/ui) === */
-	--color-primary: var(--primary);
-	--color-primary-foreground: var(--primary-foreground);
-	--color-card: var(--card);
-	--color-card-foreground: var(--card-foreground);
-	--color-popover: var(--popover);
-	--color-popover-foreground: var(--popover-foreground);
-	--color-secondary: var(--secondary);
-	--color-secondary-foreground: var(--secondary-foreground);
-	--color-muted: var(--muted);
-	--color-muted-foreground: var(--muted-foreground);
-	--color-destructive-foreground: var(--background);
-	--color-accent-foreground: var(--foreground);
-	--color-border: var(--border);
-	--color-input: var(--input);
-	--color-ring: var(--ring);
-	--color-md-bullets: var(--md-bullets);
-	--color-md-counters: var(--md-counters);
+  /* === LEGACY COMPATIBILITY (shadcn/ui) === */
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive-foreground: var(--background);
+  --color-accent-foreground: var(--foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-md-bullets: var(--md-bullets);
+  --color-md-counters: var(--md-counters);
 
-	--font-sans: var(--font-sans-stack);
-	--font-display: var(--font-display-stack);
-	--font-mono: var(--font-mono-stack);
-	--font-serif: var(--font-serif-stack);
+  --font-sans: var(--font-sans-stack);
+  --font-display: var(--font-display-stack);
+  --font-mono: var(--font-mono-stack);
+  --font-serif: var(--font-serif-stack);
 
-	/* === RADIUS === */
-	--radius-sm: max(0px, calc(var(--radius) - 4px));
-	--radius-md: max(0px, calc(var(--radius) - 2px));
-	--radius-lg: var(--radius);
-	--radius-xl: calc(var(--radius) + 4px);
-	/* DESIGN.md `rounded.lg` — panels, chat shell, composer chrome */
-	--radius-surface-lg: 14px;
-	/* DESIGN.md `rounded.md` — sidebar header row (New Session, search): softer than control */
-	--radius-soft: 8px;
-	/* Tight controls — text inputs, chips, onboarding primary CTAs */
-	--radius-control: 6px;
-	--radius-bubble: var(--radius-bubble);
-	--radius-bubble-tail: var(--radius-bubble-tail);
+  /* === RADIUS === */
+  --radius-sm: max(0px, calc(var(--radius) - 4px));
+  --radius-md: max(0px, calc(var(--radius) - 2px));
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  /* DESIGN.md `rounded.lg` — panels, chat shell, composer chrome */
+  --radius-surface-lg: 14px;
+  /* DESIGN.md `rounded.md` — sidebar header row (New Session, search): softer than control */
+  --radius-soft: 8px;
+  /* Tight controls — text inputs, chips, onboarding primary CTAs */
+  --radius-control: 6px;
+  --radius-bubble: var(--radius-bubble);
+  --radius-bubble-tail: var(--radius-bubble-tail);
 
-	/* === Z-INDEX SCALE === */
-	--z-index-base: var(--z-base);
-	--z-index-local: var(--z-local);
-	--z-index-sticky: var(--z-sticky);
-	--z-index-titlebar: var(--z-titlebar);
-	--z-index-panel: var(--z-panel);
-	--z-index-dropdown: var(--z-dropdown);
-	--z-index-tooltip: var(--z-tooltip);
-	--z-index-modal: var(--z-modal);
-	--z-index-overlay: var(--z-overlay);
-	--z-index-fullscreen: var(--z-fullscreen);
-	--z-index-floating-backdrop: var(--z-floating-backdrop);
-	--z-index-floating-menu: var(--z-floating-menu);
-	--z-index-island-overlay: var(--z-island-overlay);
-	--z-index-island: var(--z-island);
-	--z-index-island-popover: var(--z-island-popover);
-	--z-index-splash: var(--z-splash);
+  /* === Z-INDEX SCALE === */
+  --z-index-base: var(--z-base);
+  --z-index-local: var(--z-local);
+  --z-index-sticky: var(--z-sticky);
+  --z-index-titlebar: var(--z-titlebar);
+  --z-index-panel: var(--z-panel);
+  --z-index-dropdown: var(--z-dropdown);
+  --z-index-tooltip: var(--z-tooltip);
+  --z-index-modal: var(--z-modal);
+  --z-index-overlay: var(--z-overlay);
+  --z-index-fullscreen: var(--z-fullscreen);
+  --z-index-floating-backdrop: var(--z-floating-backdrop);
+  --z-index-floating-menu: var(--z-floating-menu);
+  --z-index-island-overlay: var(--z-island-overlay);
+  --z-index-island: var(--z-island);
+  --z-index-island-popover: var(--z-island-popover);
+  --z-index-splash: var(--z-splash);
 
-	--shadow-2xs: var(--shadow-minimal-flat);
-	--shadow-xs: var(--shadow-minimal-flat);
-	--shadow-sm: var(--shadow-minimal);
-	--shadow: var(--shadow-minimal);
-	--shadow-md: var(--shadow-modal-small);
-	--shadow-lg: var(--shadow-modal-small);
-	--shadow-xl: var(--shadow-modal-small);
-	--shadow-2xl: var(--shadow-modal-small);
+  --shadow-2xs: var(--shadow-minimal-flat);
+  --shadow-xs: var(--shadow-minimal-flat);
+  --shadow-sm: var(--shadow-minimal);
+  --shadow: var(--shadow-minimal);
+  --shadow-md: var(--shadow-modal-small);
+  --shadow-lg: var(--shadow-modal-small);
+  --shadow-xl: var(--shadow-modal-small);
+  --shadow-2xl: var(--shadow-modal-small);
 
-	/* === ANIMATION TOKENS (v4 generates `animate-*` utilities from these) ===
+  /* === ANIMATION TOKENS (v4 generates `animate-*` utilities from these) ===
 	 * Keyframes are defined below the @theme block; v4 picks them up by name
 	 * when `--animate-*` references them. */
-	--animate-shimmer: shimmer 1.5s ease-in-out infinite;
-	--animate-shimmer-loading: shimmer-loading 1.2s linear infinite;
-	--animate-shimmer-text: shimmer-text 1.2s ease-in-out infinite;
-	--animate-shake: shake 0.4s ease-in-out;
-	--animate-toast-in: toast-in 0.2s ease-out;
-	--animate-thinking-gradient: thinking-gradient-flow 5s linear infinite;
-	--animate-onboarding-panel: onboarding-panel-enter 260ms cubic-bezier(0.25, 1, 0.5, 1) both;
-	/* `--animate-composer-placeholder` and the `composer-placeholder-enter`
+  --animate-shimmer: shimmer 1.5s ease-in-out infinite;
+  --animate-shimmer-loading: shimmer-loading 1.2s linear infinite;
+  --animate-shimmer-text: shimmer-text 1.2s ease-in-out infinite;
+  --animate-shake: shake 0.4s ease-in-out;
+  --animate-toast-in: toast-in 0.2s ease-out;
+  --animate-thinking-gradient: thinking-gradient-flow 5s linear infinite;
+  --animate-onboarding-panel: onboarding-panel-enter 260ms cubic-bezier(0.25, 1, 0.5, 1) both;
+  /* `--animate-composer-placeholder` and the `composer-placeholder-enter`
 	   keyframe + class now ship with `@octavian-tocan/react-chat-composer`
 	   (imported via `theme.css` + `animations.css` at the top of this file).
 	   Same for the `waveform-scroll` keyframe used by the voice meter. */
-	/* Dropdown open/close — expo ease-out curve; `both` fills before & after so
+  /* Dropdown open/close — expo ease-out curve; `both` fills before & after so
 	   there's no flash. Radix detects animationend on data-state="closed" and
 	   waits before removing the element, so the exit plays in full. */
-	--animate-dropdown-open: dropdown-open 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
-	--animate-dropdown-close: dropdown-close 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
-	/* Collapsible open/close — asymmetric easing: ease-out for enter, ease-in for exit.
+  --animate-dropdown-open: dropdown-open 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-dropdown-close: dropdown-close 150ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* Collapsible open/close — asymmetric easing: ease-out for enter, ease-in for exit.
 	   `both` fill-mode so the `from` state applies before the animation fires
 	   (no flash on mount) and the `to` state persists after it ends. */
-	--animate-collapsible-open: collapsible-open 200ms cubic-bezier(0.25, 1, 0.5, 1) both;
-	--animate-collapsible-close: collapsible-close 150ms cubic-bezier(0.7, 0, 0.84, 0) both;
-	--animate-reasoning-panel-open: reasoning-panel-open 300ms cubic-bezier(0.165, 0.84, 0.44, 1)
-		both;
-	--animate-reasoning-panel-close: reasoning-panel-close 300ms cubic-bezier(0.165, 0.84, 0.44, 1)
-		both;
+  --animate-collapsible-open: collapsible-open 200ms cubic-bezier(0.25, 1, 0.5, 1) both;
+  --animate-collapsible-close: collapsible-close 150ms cubic-bezier(0.7, 0, 0.84, 0) both;
+  --animate-reasoning-panel-open: reasoning-panel-open 300ms cubic-bezier(0.165, 0.84, 0.44, 1) both;
+  --animate-reasoning-panel-close: reasoning-panel-close 300ms cubic-bezier(0.165, 0.84, 0.44, 1) both;
 }
 
 /* Keyframes consolidated near the end of this file under the
@@ -765,31 +751,31 @@ html[data-font="inter"] {
 
 /* Global styles */
 @layer base {
-	* {
-		box-sizing: border-box;
-		border-color: var(--border);
-	}
+  * {
+    box-sizing: border-box;
+    border-color: var(--border);
+  }
 
-	html {
-		font-size: var(--font-size-base);
-	}
+  html {
+    font-size: var(--font-size-base);
+  }
 
-	html,
-	body,
-	#root,
-	#__next {
-		height: 100%;
-	}
+  html,
+  body,
+  #root,
+  #__next {
+    height: 100%;
+  }
 
-	body {
-		font-family: var(--font-default);
-		background: var(--background);
-		color: var(--foreground);
-		-webkit-font-smoothing: antialiased;
-		-moz-osx-font-smoothing: grayscale;
-	}
+  body {
+    font-family: var(--font-default);
+    background: var(--background);
+    color: var(--foreground);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
 
-	/*
+  /*
 	 * Suppress browser focus outlines on pointer interactions while keeping
 	 * them for keyboard users. :focus-visible only matches when focus came
 	 * from the keyboard (Tab / Shift+Tab / arrow keys), so the inverted
@@ -800,110 +786,99 @@ html[data-font="inter"] {
 	 * See .claude/rules/general/no-focus-ring-on-mouse-click.md for the
 	 * rationale and the lint-time check.
 	 */
-	*:focus:not(:focus-visible) {
-		outline: none;
-		box-shadow: none;
-	}
+  *:focus:not(:focus-visible) {
+    outline: none;
+    box-shadow: none;
+  }
 
-	/* Scrollbar styling */
-	::-webkit-scrollbar {
-		width: 8px;
-		height: 8px;
-	}
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
 
-	::-webkit-scrollbar-track {
-		background: transparent;
-	}
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
 
-	::-webkit-scrollbar-thumb {
-		background: var(--border);
-		border-radius: 4px;
-	}
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 4px;
+  }
 
-	::-webkit-scrollbar-thumb:hover {
-		background: var(--muted-foreground);
-	}
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
 
-	/* Focus ring styles */
-	*:focus-visible {
-		outline: var(--ring-width) solid var(--ring);
-		outline-offset: 2px;
-		--tw-ring-offset-width: var(--ring-offset);
-		--tw-ring-width: var(--ring-width);
-		--tw-ring-color: var(--ring);
-	}
+  /* Focus ring styles */
+  *:focus-visible {
+    outline: var(--ring-width) solid var(--ring);
+    outline-offset: 2px;
+    --tw-ring-offset-width: var(--ring-offset);
+    --tw-ring-width: var(--ring-width);
+    --tw-ring-color: var(--ring);
+  }
 }
 
 @layer utilities {
-	/* Thin horizontal scrollbar for panel stack */
-	.panel-scroll::-webkit-scrollbar {
-		height: 4px;
-	}
+  /* Thin horizontal scrollbar for panel stack */
+  .panel-scroll::-webkit-scrollbar {
+    height: 4px;
+  }
 
-	/* Hide scrollbar but keep scrolling */
-	.scrollbar-hide {
-		-ms-overflow-style: none;
-		scrollbar-width: none;
-	}
-	.scrollbar-hide::-webkit-scrollbar {
-		display: none;
-	}
+  /* Hide scrollbar but keep scrolling */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 
-	/* Hide scrollbar until parent .group is hovered */
-	.scrollbar-hover::-webkit-scrollbar {
-		width: 4px;
-	}
-	.scrollbar-hover::-webkit-scrollbar-track {
-		background: transparent;
-	}
-	.scrollbar-hover::-webkit-scrollbar-thumb {
-		background: transparent;
-		border-radius: 4px;
-	}
-	.group:hover .scrollbar-hover::-webkit-scrollbar-thumb {
-		background: var(--border);
-	}
-	.group:hover .scrollbar-hover::-webkit-scrollbar-thumb:hover {
-		background: var(--muted-foreground);
-	}
+  /* Hide scrollbar until parent .group is hovered */
+  .scrollbar-hover::-webkit-scrollbar {
+    width: 4px;
+  }
+  .scrollbar-hover::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-hover::-webkit-scrollbar-thumb {
+    background: transparent;
+    border-radius: 4px;
+  }
+  .group:hover .scrollbar-hover::-webkit-scrollbar-thumb {
+    background: var(--border);
+  }
+  .group:hover .scrollbar-hover::-webkit-scrollbar-thumb:hover {
+    background: var(--muted-foreground);
+  }
 
-	/* Mask fade utilities */
-	.mask-fade-y {
-		mask-image: linear-gradient(
-			to bottom,
-			transparent 0%,
-			black 32px,
-			black calc(100% - 32px),
-			transparent 100%
-		);
-		-webkit-mask-image: linear-gradient(
-			to bottom,
-			transparent 0%,
-			black 32px,
-			black calc(100% - 32px),
-			transparent 100%
-		);
-	}
+  /* Mask fade utilities */
+  .mask-fade-y {
+    mask-image: linear-gradient(to bottom, transparent 0%, black 32px, black calc(100% - 32px), transparent 100%);
+    -webkit-mask-image: linear-gradient(
+      to bottom,
+      transparent 0%,
+      black 32px,
+      black calc(100% - 32px),
+      transparent 100%
+    );
+  }
 
-	.mask-fade-bottom {
-		mask-image: linear-gradient(to bottom, black 0%, black calc(100% - 32px), transparent 100%);
-		-webkit-mask-image: linear-gradient(
-			to bottom,
-			black 0%,
-			black calc(100% - 32px),
-			transparent 100%
-		);
-	}
+  .mask-fade-bottom {
+    mask-image: linear-gradient(to bottom, black 0%, black calc(100% - 32px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, black 0%, black calc(100% - 32px), transparent 100%);
+  }
 
-	/* Custom shadow utilities */
-	.shadow-thin {
-		box-shadow:
-			rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-			rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-			rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px;
-	}
+  /* Custom shadow utilities */
+  .shadow-thin {
+    box-shadow:
+      rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+      rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+      rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px;
+  }
 
-	/*
+  /*
 	 * Sharp-edge utility — replaces the dull `border-1px-gray` look with a
 	 * stacked 1px white inset highlight + 1px black 4% outer shadow. Adds
 	 * dimension so cards, inputs, and toggles read as physical objects
@@ -913,121 +888,117 @@ html[data-font="inter"] {
 	 * opacity in light mode and the foreground at 6% in dark mode, so the
 	 * "highlight from above" reads correctly under either palette.
 	 */
-	.shadow-edge {
-		box-shadow:
-			inset 0 1px 0 0 rgb(255 255 255 / 0.6),
-			0 1px 0 0 rgb(0 0 0 / 0.04);
-	}
+  .shadow-edge {
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.6),
+      0 1px 0 0 rgb(0 0 0 / 0.04);
+  }
 
-	.dark .shadow-edge {
-		box-shadow:
-			inset 0 1px 0 0 rgb(255 255 255 / 0.06),
-			0 1px 0 0 rgb(0 0 0 / 0.4);
-	}
+  .dark .shadow-edge {
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.06),
+      0 1px 0 0 rgb(0 0 0 / 0.4);
+  }
 
-	.shadow-bottom-border {
-		box-shadow: inset 0 -1.5px 0 var(--color-border);
-	}
+  .shadow-bottom-border {
+    box-shadow: inset 0 -1.5px 0 var(--color-border);
+  }
 
-	.shadow-bottom-border-thin {
-		box-shadow: inset 0 -1px 0 var(--color-border);
-	}
+  .shadow-bottom-border-thin {
+    box-shadow: inset 0 -1px 0 var(--color-border);
+  }
 
-	.shadow-minimal {
-		box-shadow: var(--shadow-minimal);
-	}
+  .shadow-minimal {
+    box-shadow: var(--shadow-minimal);
+  }
 
-	.shadow-middle {
-		box-shadow:
-			rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-			rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-			rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px,
-			rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 1px 1px -0.5px,
-			rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 3px 3px -1.5px,
-			rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 6px 6px -3px;
-	}
+  .shadow-middle {
+    box-shadow:
+      rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+      rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+      rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px,
+      rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 1px 1px -0.5px,
+      rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 3px 3px -1.5px,
+      rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 6px 6px -3px;
+  }
 
-	/* Tinted shadow - use with style={{ '--shadow-color': 'r, g, b' }} */
-	.shadow-tinted {
-		--shadow-color: 0, 0, 0;
-		box-shadow:
-			rgba(var(--shadow-color), 0) 0px 0px 0px 0px,
-			rgba(var(--shadow-color), 0) 0px 0px 0px 0px,
-			rgba(var(--shadow-color), calc(var(--shadow-border-opacity) * 1.5)) 0px 0px 0px 1px,
-			rgba(var(--shadow-color), var(--shadow-border-opacity)) 0px 1px 1px -0.5px,
-			rgba(var(--shadow-color), var(--shadow-blur-opacity)) 0px 3px 3px -1.5px,
-			rgba(var(--shadow-color), calc(var(--shadow-blur-opacity) * 0.67)) 0px 6px 6px -3px;
-	}
+  /* Tinted shadow - use with style={{ '--shadow-color': 'r, g, b' }} */
+  .shadow-tinted {
+    --shadow-color: 0, 0, 0;
+    box-shadow:
+      rgba(var(--shadow-color), 0) 0px 0px 0px 0px,
+      rgba(var(--shadow-color), 0) 0px 0px 0px 0px,
+      rgba(var(--shadow-color), calc(var(--shadow-border-opacity) * 1.5)) 0px 0px 0px 1px,
+      rgba(var(--shadow-color), var(--shadow-border-opacity)) 0px 1px 1px -0.5px,
+      rgba(var(--shadow-color), var(--shadow-blur-opacity)) 0px 3px 3px -1.5px,
+      rgba(var(--shadow-color), calc(var(--shadow-blur-opacity) * 0.67)) 0px 6px 6px -3px;
+  }
 
-	.dark .shadow-tinted {
-		box-shadow:
-			rgba(var(--shadow-color), 0) 0px 0px 0px 0px,
-			rgba(var(--shadow-color), 0) 0px 0px 0px 0px,
-			oklch(from rgb(var(--shadow-color)) 0.425 c h / 0.6) 0px 0px 0px 1px,
-			rgba(var(--shadow-color), 0) 0px 1px 1px -0.5px,
-			rgba(var(--shadow-color), 0) 0px 3px 3px -1.5px,
-			rgba(var(--shadow-color), 0) 0px 6px 6px -3px;
-	}
+  .dark .shadow-tinted {
+    box-shadow:
+      rgba(var(--shadow-color), 0) 0px 0px 0px 0px,
+      rgba(var(--shadow-color), 0) 0px 0px 0px 0px,
+      oklch(from rgb(var(--shadow-color)) 0.425 c h / 0.6) 0px 0px 0px 1px,
+      rgba(var(--shadow-color), 0) 0px 1px 1px -0.5px,
+      rgba(var(--shadow-color), 0) 0px 3px 3px -1.5px,
+      rgba(var(--shadow-color), 0) 0px 6px 6px -3px;
+  }
 
-	.shadow-strong {
-		box-shadow:
-			rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-			rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-			rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px,
-			rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 1px 1px -0.5px,
-			rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 3px 3px -1.5px,
-			rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 6px 6px -3px,
-			rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.67)) 0px 12px 12px -6px,
-			rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.67)) 0px 24px 24px -12px;
-	}
+  .shadow-strong {
+    box-shadow:
+      rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+      rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+      rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px,
+      rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 1px 1px -0.5px,
+      rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 3px 3px -1.5px,
+      rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 6px 6px -3px,
+      rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.67)) 0px 12px 12px -6px,
+      rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.67)) 0px 24px 24px -12px;
+  }
 
-	.shadow-panel-focused {
-		position: relative;
-		box-shadow:
-			rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-			rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-			rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-			rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.67)) 0px 1px 1px -0.5px,
-			rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.67)) 0px 3px 3px 1px,
-			rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.5)) 0px 6px 6px 2px,
-			rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.5)) 0px 12px 12px 3px,
-			rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.33)) 0px 24px 24px 4px;
-	}
+  .shadow-panel-focused {
+    position: relative;
+    box-shadow:
+      rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+      rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+      rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+      rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.67)) 0px 1px 1px -0.5px,
+      rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.67)) 0px 3px 3px 1px,
+      rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.5)) 0px 6px 6px 2px,
+      rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.5)) 0px 12px 12px 3px,
+      rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.33)) 0px 24px 24px 4px;
+  }
 
-	.shadow-panel-focused::before {
-		content: "";
-		position: absolute;
-		inset: 0;
-		border-radius: inherit;
-		padding: 1px;
-		background: linear-gradient(
-			to bottom,
-			rgba(var(--foreground-rgb), 0.1),
-			rgba(var(--foreground-rgb), 0.3)
-		);
-		-webkit-mask:
-			linear-gradient(#fff 0 0) content-box,
-			linear-gradient(#fff 0 0);
-		-webkit-mask-composite: xor;
-		mask-composite: exclude;
-		pointer-events: none;
-		z-index: 1;
-	}
+  .shadow-panel-focused::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(to bottom, rgba(var(--foreground-rgb), 0.1), rgba(var(--foreground-rgb), 0.3));
+    -webkit-mask:
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+    z-index: 1;
+  }
 
-	.shadow-panel-focused > * {
-		position: relative;
-		z-index: 2;
-	}
+  .shadow-panel-focused > * {
+    position: relative;
+    z-index: 2;
+  }
 
-	.shadow-modal-small {
-		box-shadow: var(--shadow-modal-small);
-	}
+  .shadow-modal-small {
+    box-shadow: var(--shadow-modal-small);
+  }
 
-	.shadow-panel-floating {
-		box-shadow: var(--shadow-panel-floating);
-	}
+  .shadow-panel-floating {
+    box-shadow: var(--shadow-panel-floating);
+  }
 
-	/* Unified popover styling.
+  /* Unified popover styling.
 	 *
 	 * Background uses a translucent mix (95% / 5% transparent) so the global
 	 * `backdrop-filter: blur(8px)` reads through softly without making the
@@ -1038,33 +1009,33 @@ html[data-font="inter"] {
 	 * is still visible — see the `html[data-scenic] .popover-styled`
 	 * override below.
 	 */
-	.popover-styled {
-		background: color-mix(in srgb, var(--background) 95%, transparent);
-		color: var(--foreground);
-		border-radius: 8px;
-		border: none;
-		backdrop-filter: blur(8px);
-		-webkit-backdrop-filter: blur(8px);
-		box-shadow:
-			rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-			rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-			rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px,
-			rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.67)) 0px 1px 1px -0.5px,
-			rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.67)) 0px 3px 3px 0px,
-			rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.33)) 0px 6px 6px 0px,
-			rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.33)) 0px 12px 12px 0px,
-			rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.33)) 0px 24px 24px 0px;
-	}
+  .popover-styled {
+    background: color-mix(in srgb, var(--background) 95%, transparent);
+    color: var(--foreground);
+    border-radius: 8px;
+    border: none;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow:
+      rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+      rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+      rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px,
+      rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.67)) 0px 1px 1px -0.5px,
+      rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.67)) 0px 3px 3px 0px,
+      rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.33)) 0px 6px 6px 0px,
+      rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.33)) 0px 12px 12px 0px,
+      rgba(0, 0, 0, calc(var(--shadow-blur-opacity) * 0.33)) 0px 24px 24px 0px;
+  }
 
-	/* Full-bleed modal / sheet / alert scrims — DESIGN.md § Overlay & frosted surfaces.
+  /* Full-bleed modal / sheet / alert scrims — DESIGN.md § Overlay & frosted surfaces.
 	 * Backdrop blur (same 8px as `.popover-styled`) plus a subtle vertical gradient
 	 * tint (~10–14% black), not a flat `bg-black/80` opacity wash.
 	 */
-	.modal-scrim {
-		-webkit-backdrop-filter: blur(8px);
-		backdrop-filter: blur(8px);
-		background: linear-gradient(to bottom, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.14));
-	}
+  .modal-scrim {
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    background: linear-gradient(to bottom, rgba(0, 0, 0, 0.1), rgba(0, 0, 0, 0.14));
+  }
 }
 
 /* Prompt-input textarea scroll fade.
@@ -1076,19 +1047,13 @@ html[data-font="inter"] {
  * suggests "more content above/below" without rendering a hard scrollbar
  * stripe. The fade height is 16 px, tuned to feel ambient rather than busy. */
 [data-prompt-textarea][data-scroll-up="true"]:not([data-scroll-down="true"]) {
-	mask-image: linear-gradient(to bottom, transparent 0, black 16px, black 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, black 16px, black 100%);
 }
 [data-prompt-textarea][data-scroll-down="true"]:not([data-scroll-up="true"]) {
-	mask-image: linear-gradient(to bottom, black 0, black calc(100% - 16px), transparent 100%);
+  mask-image: linear-gradient(to bottom, black 0, black calc(100% - 16px), transparent 100%);
 }
 [data-prompt-textarea][data-scroll-up="true"][data-scroll-down="true"] {
-	mask-image: linear-gradient(
-		to bottom,
-		transparent 0,
-		black 16px,
-		black calc(100% - 16px),
-		transparent 100%
-	);
+  mask-image: linear-gradient(to bottom, transparent 0, black 16px, black calc(100% - 16px), transparent 100%);
 }
 
 /* Sidebar conversation-list scroll fade.
@@ -1102,30 +1067,24 @@ html[data-font="inter"] {
  * because conversation rows are taller than a single text line, so the
  * eye needs more runway to read the fade as ambient rather than a clip. */
 [data-nav-chats-scroll][data-scroll-up="true"]:not([data-scroll-down="true"]) {
-	mask-image: linear-gradient(to bottom, transparent 0, black 20px, black 100%);
+  mask-image: linear-gradient(to bottom, transparent 0, black 20px, black 100%);
 }
 [data-nav-chats-scroll][data-scroll-down="true"]:not([data-scroll-up="true"]) {
-	mask-image: linear-gradient(to bottom, black 0, black calc(100% - 20px), transparent 100%);
+  mask-image: linear-gradient(to bottom, black 0, black calc(100% - 20px), transparent 100%);
 }
 [data-nav-chats-scroll][data-scroll-up="true"][data-scroll-down="true"] {
-	mask-image: linear-gradient(
-		to bottom,
-		transparent 0,
-		black 20px,
-		black calc(100% - 20px),
-		transparent 100%
-	);
+  mask-image: linear-gradient(to bottom, transparent 0, black 20px, black calc(100% - 20px), transparent 100%);
 }
 
 /* Draggable title bar region */
 .titlebar-drag-region {
-	-webkit-app-region: drag;
-	app-region: drag;
+  -webkit-app-region: drag;
+  app-region: drag;
 }
 
 .titlebar-no-drag {
-	-webkit-app-region: no-drag;
-	app-region: no-drag;
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }
 
 /* =============================================================================
@@ -1134,62 +1093,62 @@ html[data-font="inter"] {
 
 html[data-scenic] .shadow-middle,
 html[data-scenic] .shadow-strong {
-	backdrop-filter: blur(8px);
-	-webkit-backdrop-filter: blur(8px);
-	position: relative;
-	z-index: var(--z-panel);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  position: relative;
+  z-index: var(--z-panel);
 }
 
 html[data-scenic] .input-container {
-	background: rgba(0, 0, 0, 0.15);
+  background: rgba(0, 0, 0, 0.15);
 }
 
 html[data-scenic] .shadow-middle::before,
 html[data-scenic] .shadow-strong::before {
-	content: "";
-	position: absolute;
-	inset: 0;
-	border-radius: inherit;
-	padding: 1px;
-	background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1));
-	-webkit-mask:
-		linear-gradient(#fff 0 0) content-box,
-		linear-gradient(#fff 0 0);
-	-webkit-mask-composite: xor;
-	mask-composite: exclude;
-	pointer-events: none;
-	z-index: 1;
-	mix-blend-mode: soft-light;
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0.3), rgba(255, 255, 255, 0.1));
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+  mix-blend-mode: soft-light;
 }
 
 html[data-scenic] .shadow-middle > *,
 html[data-scenic] .shadow-strong > * {
-	position: relative;
-	z-index: 2;
+  position: relative;
+  z-index: 2;
 }
 
 html[data-scenic] .popover-styled {
-	/* Scenic keeps the original ~88% alpha so the user's chosen background
+  /* Scenic keeps the original ~88% alpha so the user's chosen background
 	   image is still visible behind the menu. The opaque 95% used in
 	   default mode would defeat the "glass on photography" look that
 	   scenic exists to deliver. The stronger 24px blur compensates for
 	   the lower alpha so menu text stays readable over busy backgrounds. */
-	background: color-mix(in srgb, var(--background) 88%, transparent);
-	backdrop-filter: blur(24px);
-	-webkit-backdrop-filter: blur(24px);
+  background: color-mix(in srgb, var(--background) 88%, transparent);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
 
 html[data-scenic] .fullscreen-overlay-background {
-	backdrop-filter: blur(24px);
-	-webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
 }
 
 html[data-scenic]:not(.dark) .fullscreen-overlay-background {
-	background: color-mix(in srgb, var(--foreground-3) 70%, transparent);
+  background: color-mix(in srgb, var(--foreground-3) 70%, transparent);
 }
 
 html.dark[data-scenic] .fullscreen-overlay-background {
-	background: color-mix(in srgb, var(--foreground-3) 60%, transparent);
+  background: color-mix(in srgb, var(--foreground-3) 60%, transparent);
 }
 
 /* =============================================================================
@@ -1213,7 +1172,7 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 [data-radix-context-menu-content],
 [data-radix-alert-dialog-overlay],
 [data-radix-alert-dialog-content] {
-	animation: none !important;
+  animation: none !important;
 }
 
 /* Radix Collapsible height animation via grid-template-rows.
@@ -1224,19 +1183,19 @@ html.dark[data-scenic] .fullscreen-overlay-background {
    Durations: 150ms close (matches content slide-up), 200ms open (matches
    content slide-down). Easing: ease-in for exit, ease-out for enter. */
 [data-radix-collapsible-content-wrapper] {
-	display: grid;
-	grid-template-rows: 0fr;
-	transition: grid-template-rows 150ms cubic-bezier(0.7, 0, 0.84, 0);
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 150ms cubic-bezier(0.7, 0, 0.84, 0);
 }
 
 [data-radix-collapsible-content-wrapper][data-state="open"] {
-	grid-template-rows: 1fr;
-	transition: grid-template-rows 200ms cubic-bezier(0.25, 1, 0.5, 1);
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 200ms cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 [data-radix-scroll-area-viewport] > div {
-	min-width: 0 !important;
-	display: block !important;
+  min-width: 0 !important;
+  display: block !important;
 }
 
 /* =============================================================================
@@ -1244,33 +1203,33 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 ============================================================================= */
 
 @layer components {
-	.step-icon {
-		width: var(--step-icon-size);
-		height: var(--step-icon-size);
-		border-radius: var(--step-icon-radius);
-	}
+  .step-icon {
+    width: var(--step-icon-size);
+    height: var(--step-icon-size);
+    border-radius: var(--step-icon-radius);
+  }
 
-	.step-icon > div {
-		width: var(--step-icon-inner-size);
-		height: var(--step-icon-inner-size);
-	}
+  .step-icon > div {
+    width: var(--step-icon-inner-size);
+    height: var(--step-icon-inner-size);
+  }
 
-	.step-title {
-		font-size: var(--step-title-size);
-	}
+  .step-title {
+    font-size: var(--step-title-size);
+  }
 
-	.step-description {
-		max-width: var(--step-description-max-width);
-	}
+  .step-description {
+    max-width: var(--step-description-max-width);
+  }
 
-	.step-actions {
-		margin-top: var(--step-actions-margin);
-		gap: var(--step-actions-gap);
-	}
+  .step-actions {
+    margin-top: var(--step-actions-margin);
+    gap: var(--step-actions-gap);
+  }
 
-	.feature-bullet {
-		background-color: var(--foreground);
-	}
+  .feature-bullet {
+    background-color: var(--foreground);
+  }
 }
 
 /* =============================================================================
@@ -1279,12 +1238,12 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 
 .session-item:hover > .session-separator,
 .session-item[data-selected] > .session-separator {
-	opacity: 0;
+  opacity: 0;
 }
 
 .session-item:hover + .session-item > .session-separator,
 .session-item[data-selected] + .session-item > .session-separator {
-	opacity: 0;
+  opacity: 0;
 }
 
 /* =============================================================================
@@ -1293,12 +1252,12 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 
 .source-item:hover > .source-separator,
 .source-item[data-selected] > .source-separator {
-	opacity: 0;
+  opacity: 0;
 }
 
 .source-item:hover + .source-item > .source-separator,
 .source-item[data-selected] + .source-item > .source-separator {
-	opacity: 0;
+  opacity: 0;
 }
 
 /* =============================================================================
@@ -1307,12 +1266,12 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 
 .import-item:hover > .import-separator,
 .import-item[data-selected] > .import-separator {
-	opacity: 0;
+  opacity: 0;
 }
 
 .import-item:hover + .import-item > .import-separator,
 .import-item[data-selected] + .import-item > .import-separator {
-	opacity: 0;
+  opacity: 0;
 }
 
 /* =============================================================================
@@ -1320,45 +1279,45 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 ============================================================================= */
 
 .spinner {
-	display: inline-grid;
-	grid-template-columns: repeat(3, 1fr);
-	width: 1em;
-	height: 1em;
-	gap: 0.08em;
+  display: inline-grid;
+  grid-template-columns: repeat(3, 1fr);
+  width: 1em;
+  height: 1em;
+  gap: 0.08em;
 }
 
 .spinner-cube {
-	background-color: currentColor;
-	animation: spinner-grid 1.3s infinite ease-in-out;
-	transform: scale3d(0.5, 0.5, 1);
+  background-color: currentColor;
+  animation: spinner-grid 1.3s infinite ease-in-out;
+  transform: scale3d(0.5, 0.5, 1);
 }
 
 .spinner-cube:nth-child(1) {
-	animation-delay: 0.2s;
+  animation-delay: 0.2s;
 }
 .spinner-cube:nth-child(2) {
-	animation-delay: 0.3s;
+  animation-delay: 0.3s;
 }
 .spinner-cube:nth-child(3) {
-	animation-delay: 0.4s;
+  animation-delay: 0.4s;
 }
 .spinner-cube:nth-child(4) {
-	animation-delay: 0.1s;
+  animation-delay: 0.1s;
 }
 .spinner-cube:nth-child(5) {
-	animation-delay: 0.2s;
+  animation-delay: 0.2s;
 }
 .spinner-cube:nth-child(6) {
-	animation-delay: 0.3s;
+  animation-delay: 0.3s;
 }
 .spinner-cube:nth-child(7) {
-	animation-delay: 0s;
+  animation-delay: 0s;
 }
 .spinner-cube:nth-child(8) {
-	animation-delay: 0.1s;
+  animation-delay: 0.1s;
 }
 .spinner-cube:nth-child(9) {
-	animation-delay: 0.2s;
+  animation-delay: 0.2s;
 }
 
 /* spinner-grid + toast-in keyframes moved to the consolidated
@@ -1381,24 +1340,19 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 /* shimmer keyframes moved to the consolidated Animations section. */
 
 .animate-shimmer {
-	position: relative;
-	overflow: hidden;
+  position: relative;
+  overflow: hidden;
 }
 
 .animate-shimmer::after {
-	content: "";
-	position: absolute;
-	inset: 0;
-	background: linear-gradient(
-		90deg,
-		transparent 0%,
-		oklch(from var(--foreground) l c h / 0.06) 50%,
-		transparent 100%
-	);
-	background-size: 200% 100%;
-	animation: shimmer 1.5s ease-in-out infinite;
-	pointer-events: none;
-	border-radius: inherit;
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, oklch(from var(--foreground) l c h / 0.06) 50%, transparent 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  pointer-events: none;
+  border-radius: inherit;
 }
 
 /* =============================================================================
@@ -1411,50 +1365,50 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 /* thinking-gradient-flow keyframes moved to the consolidated Animations section. */
 
 .thinking-gradient-text {
-	background: linear-gradient(
-		90deg,
-		var(--thinking-gradient-from) 0%,
-		var(--thinking-gradient-to) 25%,
-		var(--thinking-gradient-from) 50%,
-		var(--thinking-gradient-to) 75%,
-		var(--thinking-gradient-from) 100%
-	);
-	background-size: 200% 100%;
-	-webkit-background-clip: text;
-	background-clip: text;
-	-webkit-text-fill-color: transparent;
-	color: transparent;
-	animation: thinking-gradient-flow 5s linear infinite;
+  background: linear-gradient(
+    90deg,
+    var(--thinking-gradient-from) 0%,
+    var(--thinking-gradient-to) 25%,
+    var(--thinking-gradient-from) 50%,
+    var(--thinking-gradient-to) 75%,
+    var(--thinking-gradient-from) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: thinking-gradient-flow 5s linear infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.thinking-gradient-text {
-		animation: none;
-		color: var(--thinking-gradient-from);
-		-webkit-text-fill-color: var(--thinking-gradient-from);
-	}
+  .thinking-gradient-text {
+    animation: none;
+    color: var(--thinking-gradient-from);
+    -webkit-text-fill-color: var(--thinking-gradient-from);
+  }
 
-	/* Collapsible: disable motion animations, keep instant state changes */
-	.animate-collapsible-open,
-	.animate-collapsible-close {
-		animation: none !important;
-		opacity: 1 !important;
-		transform: none !important;
-	}
+  /* Collapsible: disable motion animations, keep instant state changes */
+  .animate-collapsible-open,
+  .animate-collapsible-close {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
 
-	[data-radix-collapsible-content-wrapper] {
-		transition: none !important;
-	}
+  [data-radix-collapsible-content-wrapper] {
+    transition: none !important;
+  }
 }
 
 /* shimmer-loading keyframes moved to the consolidated Animations section. */
 
 .animate-shimmer-loading {
-	animation: shimmer-loading 1.2s linear infinite;
+  animation: shimmer-loading 1.2s linear infinite;
 }
 
 .animate-shimmer-text {
-	animation: shimmer-text 1.2s ease-in-out infinite;
+  animation: shimmer-text 1.2s ease-in-out infinite;
 }
 
 /* shimmer-text keyframes moved to the consolidated Animations section. */
@@ -1466,20 +1420,20 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 /* shake keyframes moved to the consolidated Animations section. */
 
 .animate-shake {
-	animation: shake 0.4s ease-in-out;
+  animation: shake 0.4s ease-in-out;
 }
 
 /* Collapsible open/close — explicit classes so `tw-animate-css` cannot inject
    a default scale transform onto `.animate-*`. transform: none resets any
    inherited scale from Radix or the animation framework. */
 .animate-collapsible-open {
-	animation: var(--animate-collapsible-open);
-	transform: none;
+  animation: var(--animate-collapsible-open);
+  transform: none;
 }
 
 .animate-collapsible-close {
-	animation: var(--animate-collapsible-close);
-	transform: none;
+  animation: var(--animate-collapsible-close);
+  transform: none;
 }
 
 /* editPopoverFadeIn keyframes moved to the consolidated Animations section. */
@@ -1489,89 +1443,89 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 ============================================================================= */
 
 [data-sonner-toast] {
-	box-shadow: var(--shadow-modal-small) !important;
-	background-color: oklch(from var(--popover) l c h / 0.8) !important;
-	-webkit-app-region: no-drag !important;
-	width: min(356px, calc(100vw - 32px)) !important;
+  box-shadow: var(--shadow-modal-small) !important;
+  background-color: oklch(from var(--popover) l c h / 0.8) !important;
+  -webkit-app-region: no-drag !important;
+  width: min(356px, calc(100vw - 32px)) !important;
 }
 
 [data-sonner-toast] [data-icon] {
-	display: none !important;
+  display: none !important;
 }
 
 [data-sonner-toast] [data-title],
 [data-sonner-toast] [data-description] {
-	white-space: nowrap !important;
-	overflow: hidden !important;
-	text-overflow: ellipsis !important;
-	min-width: 0 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  min-width: 0 !important;
 }
 
 [data-sonner-toast] [data-content] {
-	min-width: 0 !important;
-	overflow: hidden !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
 }
 
 [data-sonner-toast] [data-description] {
-	color: inherit !important;
-	opacity: 0.7 !important;
+  color: inherit !important;
+  opacity: 0.7 !important;
 }
 
 [data-sonner-toast] [data-button],
 [data-sonner-toast] [data-cancel] {
-	background-color: var(--background) !important;
-	box-shadow: var(--shadow-minimal) !important;
-	color: oklch(from var(--foreground) l c h / 0.7) !important;
-	transition: color 0.15s ease !important;
+  background-color: var(--background) !important;
+  box-shadow: var(--shadow-minimal) !important;
+  color: oklch(from var(--foreground) l c h / 0.7) !important;
+  transition: color 0.15s ease !important;
 }
 
 [data-sonner-toast] [data-button]:hover,
 [data-sonner-toast] [data-cancel]:hover {
-	color: var(--foreground) !important;
+  color: var(--foreground) !important;
 }
 
 [data-sonner-toast] [data-close-button] {
-	left: unset !important;
-	right: -14px !important;
-	opacity: 0 !important;
-	transition:
-		opacity 0.15s ease,
-		color 0.15s ease !important;
-	background-color: var(--background) !important;
-	color: oklch(from var(--foreground) l c h / 0.7) !important;
-	border: none !important;
-	box-shadow:
-		rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px,
-		var(--shadow-minimal) !important;
+  left: unset !important;
+  right: -14px !important;
+  opacity: 0 !important;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease !important;
+  background-color: var(--background) !important;
+  color: oklch(from var(--foreground) l c h / 0.7) !important;
+  border: none !important;
+  box-shadow:
+    rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px,
+    var(--shadow-minimal) !important;
 }
 
 [data-sonner-toast].group:hover [data-close-button],
 [data-sonner-toast]:hover [data-close-button],
 [data-sonner-toast]:focus-within [data-close-button],
 [data-sonner-toast] [data-close-button]:focus-visible {
-	opacity: 1 !important;
+  opacity: 1 !important;
 }
 
 @media (hover: none), (pointer: coarse) {
-	[data-sonner-toast] [data-close-button] {
-		opacity: 1 !important;
-	}
+  [data-sonner-toast] [data-close-button] {
+    opacity: 1 !important;
+  }
 }
 
 [data-sonner-toast] [data-close-button]:hover {
-	color: var(--foreground) !important;
+  color: var(--foreground) !important;
 }
 
 [data-sonner-toast]:focus-visible {
-	box-shadow:
-		var(--shadow-modal-small),
-		0 0 0 2px rgba(var(--foreground-rgb), 0.18) !important;
+  box-shadow:
+    var(--shadow-modal-small),
+    0 0 0 2px rgba(var(--foreground-rgb), 0.18) !important;
 }
 
 [data-sonner-toast] [data-close-button]:focus-visible {
-	box-shadow:
-		var(--shadow-minimal),
-		0 0 0 2px rgba(var(--foreground-rgb), 0.18) !important;
+  box-shadow:
+    var(--shadow-minimal),
+    0 0 0 2px rgba(var(--foreground-rgb), 0.18) !important;
 }
 
 /* Tinted toast backgrounds.
@@ -1581,21 +1535,21 @@ html.dark[data-scenic] .fullscreen-overlay-background {
  * the gradient + title color from that variable. Dark mode just bumps
  * the tint alpha. This replaces 6 nearly-identical background blocks. */
 [data-sonner-toast][data-type="error"] {
-	--toast-tint: var(--destructive-rgb);
+  --toast-tint: var(--destructive-rgb);
 }
 [data-sonner-toast][data-type="warning"] {
-	--toast-tint: var(--info-rgb);
+  --toast-tint: var(--info-rgb);
 }
 [data-sonner-toast][data-type="success"] {
-	--toast-tint: var(--success-rgb);
+  --toast-tint: var(--success-rgb);
 }
 
 [data-sonner-toast][data-type="error"],
 [data-sonner-toast][data-type="warning"],
 [data-sonner-toast][data-type="success"] {
-	background:
-		linear-gradient(rgba(var(--toast-tint), 0.07), rgba(var(--toast-tint), 0.07)),
-		oklch(from var(--popover) l c h / 0.8) !important;
+  background:
+    linear-gradient(rgba(var(--toast-tint), 0.07), rgba(var(--toast-tint), 0.07)),
+    oklch(from var(--popover) l c h / 0.8) !important;
 }
 
 [data-sonner-toast][data-type="error"] [data-title],
@@ -1604,16 +1558,16 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 [data-sonner-toast][data-type="warning"] [data-description],
 [data-sonner-toast][data-type="success"] [data-title],
 [data-sonner-toast][data-type="success"] [data-description] {
-	color: color-mix(in srgb, rgb(var(--foreground-rgb)) 70%, rgb(var(--toast-tint))) !important;
+  color: color-mix(in srgb, rgb(var(--foreground-rgb)) 70%, rgb(var(--toast-tint))) !important;
 }
 
 /* Dark mode: stronger tints (alpha 0.15 vs 0.07). */
 .dark [data-sonner-toast][data-type="error"],
 .dark [data-sonner-toast][data-type="warning"],
 .dark [data-sonner-toast][data-type="success"] {
-	background:
-		linear-gradient(rgba(var(--toast-tint), 0.15), rgba(var(--toast-tint), 0.15)),
-		oklch(from var(--popover) l c h / 0.8) !important;
+  background:
+    linear-gradient(rgba(var(--toast-tint), 0.15), rgba(var(--toast-tint), 0.15)),
+    oklch(from var(--popover) l c h / 0.8) !important;
 }
 
 /* =============================================================================
@@ -1625,7 +1579,7 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 ============================================================================= */
 
 .onboarding-panel {
-	animation: onboarding-panel-enter 260ms cubic-bezier(0.25, 1, 0.5, 1) both;
+  animation: onboarding-panel-enter 260ms cubic-bezier(0.25, 1, 0.5, 1) both;
 }
 
 /* `.composer-placeholder-enter` class + keyframe now ship with
@@ -1634,34 +1588,34 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 /* onboarding-panel-enter keyframes moved to the consolidated Animations section. */
 
 @media (prefers-reduced-motion: reduce) {
-	.onboarding-panel {
-		animation: none;
-	}
+  .onboarding-panel {
+    animation: none;
+  }
 }
 
 .react-pdf__Document {
-	display: flex;
-	flex-direction: column;
-	align-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .react-pdf__Page {
-	max-width: 100%;
-	box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
-	margin-bottom: 1rem;
+  max-width: 100%;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 1rem;
 }
 
 .react-pdf__Page__canvas {
-	max-width: 100%;
-	height: auto !important;
+  max-width: 100%;
+  height: auto !important;
 }
 
 .react-pdf__Page__textContent {
-	border: none !important;
+  border: none !important;
 }
 
 .react-pdf__Page__annotations {
-	border: none !important;
+  border: none !important;
 }
 
 /* =============================================================================
@@ -1671,31 +1625,31 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 ============================================================================= */
 
 .popover-styled.onboarding-panel {
-	background: oklch(from var(--background) l c h / 0.95);
-	color: var(--foreground);
-	border: 1px solid var(--border);
-	box-shadow: var(--shadow-modal-small);
+  background: oklch(from var(--background) l c h / 0.95);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-modal-small);
 }
 
 .chat-composer-input-group,
 .chat-composer-input-group:focus-within,
 .chat-composer-input-group:has([data-slot="input-group-control"]:focus-visible) {
-	/* `border-color` is left to the inline class (`border-border/50`) so the
+  /* `border-color` is left to the inline class (`border-border/50`) so the
 	   composer reads as a discrete card on the white chat panel — this rule
 	   used to force `transparent`, which made the box indistinguishable from
 	   the panel surface. The hairline shadow stays. */
-	box-shadow: var(--shadow-minimal);
+  box-shadow: var(--shadow-minimal);
 }
 
 /* Model menus opened from the chat composer — share the same `--background-
    elevated` surface as the chat panel so the dropdown reads as part of the
    chat shell instead of the gray-cast `--foreground-5` it had before. */
 .chat-composer-dropdown-menu.popover-styled {
-	background: var(--background-elevated);
-	color: var(--foreground);
-	border-radius: var(--radius-surface-lg);
-	border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
-	box-shadow: var(--shadow-minimal);
+  background: var(--background-elevated);
+  color: var(--foreground);
+  border-radius: var(--radius-surface-lg);
+  border: 1px solid color-mix(in srgb, var(--border) 65%, transparent);
+  box-shadow: var(--shadow-minimal);
 }
 
 /* =============================================================================
@@ -1713,181 +1667,181 @@ html.dark[data-scenic] .fullscreen-overlay-background {
 /* --- Overlay open / close ------------------------------------------------- */
 
 @keyframes dropdown-open {
-	from {
-		opacity: 0;
-		transform: scale(0.95);
-	}
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
 }
 
 @keyframes dropdown-close {
-	to {
-		opacity: 0;
-		transform: scale(0.95);
-	}
+  to {
+    opacity: 0;
+    transform: scale(0.95);
+  }
 }
 
 /* --- Loading + status indicators ----------------------------------------- */
 
 @keyframes spinner-grid {
-	0%,
-	70%,
-	100% {
-		transform: scale3d(0.5, 0.5, 1);
-	}
-	35% {
-		transform: scale3d(0, 0, 1);
-	}
+  0%,
+  70%,
+  100% {
+    transform: scale3d(0.5, 0.5, 1);
+  }
+  35% {
+    transform: scale3d(0, 0, 1);
+  }
 }
 
 @keyframes toast-in {
-	from {
-		opacity: 0;
-		transform: scale(0.75);
-	}
-	to {
-		opacity: 1;
-		transform: scale(1);
-	}
+  from {
+    opacity: 0;
+    transform: scale(0.75);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }
 
 /* `waveform-scroll` keyframe ships with `@octavian-tocan/react-chat-composer`
    (imported at the top of this file). */
 
 @keyframes shimmer {
-	0% {
-		background-position: -200% 0;
-	}
-	100% {
-		background-position: 200% 0;
-	}
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 @keyframes thinking-gradient-flow {
-	0% {
-		background-position: 100% 50%;
-	}
-	100% {
-		background-position: 0% 50%;
-	}
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
 }
 
 @keyframes thinking-dot-rise {
-	0%,
-	100% {
-		opacity: 0.45;
-		transform: translateY(0) scale(0.9);
-	}
-	45% {
-		opacity: 1;
-		transform: translateY(-3px) scale(1);
-	}
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: translateY(0) scale(0.9);
+  }
+  45% {
+    opacity: 1;
+    transform: translateY(-3px) scale(1);
+  }
 }
 
 @keyframes shimmer-loading {
-	0% {
-		transform: translateX(-100%);
-	}
-	100% {
-		transform: translateX(100%);
-	}
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
 }
 
 @keyframes shimmer-text {
-	0%,
-	100% {
-		opacity: 1;
-	}
-	50% {
-		opacity: 0.5;
-	}
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 @keyframes shake {
-	0%,
-	100% {
-		transform: translateX(0);
-	}
-	10%,
-	30%,
-	50%,
-	70%,
-	90% {
-		transform: translateX(-2px);
-	}
-	20%,
-	40%,
-	60%,
-	80% {
-		transform: translateX(2px);
-	}
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  10%,
+  30%,
+  50%,
+  70%,
+  90% {
+    transform: translateX(-2px);
+  }
+  20%,
+  40%,
+  60%,
+  80% {
+    transform: translateX(2px);
+  }
 }
 
 /* --- Entry effects ------------------------------------------------------- */
 
 @keyframes editPopoverFadeIn {
-	from {
-		opacity: 0;
-	}
-	to {
-		opacity: 1;
-	}
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes onboarding-panel-enter {
-	from {
-		opacity: 0;
-		transform: translateY(8px);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0);
-	}
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* --- Collapsible open / close ---------------------------------------------- */
 
 @keyframes collapsible-open {
-	from {
-		opacity: 0;
-		transform: translateY(-4px);
-	}
-	to {
-		opacity: 1;
-		transform: translateY(0);
-	}
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes collapsible-close {
-	from {
-		opacity: 1;
-		transform: translateY(0);
-	}
-	to {
-		opacity: 0;
-		transform: translateY(-4px);
-	}
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 @keyframes reasoning-panel-open {
-	from {
-		height: 0;
-		opacity: 0;
-	}
-	to {
-		height: var(--radix-collapsible-content-height);
-		opacity: 1;
-	}
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
 }
 
 @keyframes reasoning-panel-close {
-	from {
-		height: var(--radix-collapsible-content-height);
-		opacity: 1;
-	}
-	to {
-		height: 0;
-		opacity: 0;
-	}
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
 }
 
 /* `composer-placeholder-enter` keyframe ships with
@@ -1899,11 +1853,11 @@ html.dark[data-scenic] .fullscreen-overlay-background {
  * layouts so this scope only affects /docs/** and never bleeds into
  * in-app prose surfaces (chat messages, knowledge viewer, etc.). */
 .pawrrtal-docs :is(h1, h2, h3, h4) {
-	font-family: var(--font-display-stack);
-	letter-spacing: -0.01em;
+  font-family: var(--font-display-stack);
+  letter-spacing: -0.01em;
 }
 
 .chat-message-response,
 .chat-message-response * {
-	color: inherit !important;
+  color: inherit !important;
 }

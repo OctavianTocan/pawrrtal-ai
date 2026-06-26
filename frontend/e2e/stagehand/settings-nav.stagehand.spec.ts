@@ -21,33 +21,30 @@ import { z } from 'zod';
 import { expect, test } from './fixtures';
 
 test.describe('settings page', () => {
-	test('navigates to Appearance and shows the matching heading', async ({
-		stagehand,
-		navigateToApp,
-	}) => {
-		await navigateToApp('/settings');
+  test('navigates to Appearance and shows the matching heading', async ({ stagehand, navigateToApp }) => {
+    await navigateToApp('/settings');
 
-		// Plan-then-act with `observe` is the cache-friendly pattern,
-		// but some models (e.g. Gemini 3.1 Pro Preview) occasionally
-		// return zero observed elements on the first pass. Fall back
-		// to a direct `act` in that case — Stagehand's act path uses
-		// the same a11y tree internally and reliably finds the element.
-		const instruction = "Click the 'Appearance' item in the left navigation rail";
-		const [clickAppearance] = await stagehand.observe(instruction);
-		if (clickAppearance === undefined) {
-			await stagehand.act(instruction);
-		} else {
-			await stagehand.act(clickAppearance);
-		}
+    // Plan-then-act with `observe` is the cache-friendly pattern,
+    // but some models (e.g. Gemini 3.1 Pro Preview) occasionally
+    // return zero observed elements on the first pass. Fall back
+    // to a direct `act` in that case — Stagehand's act path uses
+    // the same a11y tree internally and reliably finds the element.
+    const instruction = "Click the 'Appearance' item in the left navigation rail";
+    const [clickAppearance] = await stagehand.observe(instruction);
+    if (clickAppearance === undefined) {
+      await stagehand.act(instruction);
+    } else {
+      await stagehand.act(clickAppearance);
+    }
 
-		const { heading } = await stagehand.extract(
-			'Read the H1 heading currently shown in the settings detail pane',
-			z.object({ heading: z.string() })
-		);
+    const { heading } = await stagehand.extract(
+      'Read the H1 heading currently shown in the settings detail pane',
+      z.object({ heading: z.string() })
+    );
 
-		// The "Appearance" nav item opens the section whose H1 is "Theme"
-		// (the design labels the nav item by category, the heading by
-		// the actual control on screen).
-		expect(heading.toLowerCase()).toContain('theme');
-	});
+    // The "Appearance" nav item opens the section whose H1 is "Theme"
+    // (the design labels the nav item by category, the heading by
+    // the actual control on screen).
+    expect(heading.toLowerCase()).toContain('theme');
+  });
 });

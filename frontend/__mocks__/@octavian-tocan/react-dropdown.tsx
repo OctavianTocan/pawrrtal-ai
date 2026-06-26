@@ -8,24 +8,24 @@
 import type * as React from 'react';
 
 export function DropdownPanelMenu({
-	children,
+  children,
 }: {
-	children: React.ReactNode;
-	[key: string]: unknown;
+  children: React.ReactNode;
+  [key: string]: unknown;
 }): React.JSX.Element {
-	return <div data-testid="dropdown-panel-menu">{children}</div>;
+  return <div data-testid="dropdown-panel-menu">{children}</div>;
 }
 
 export function DropdownMenuItem({
-	children,
+  children,
 }: {
-	children: React.ReactNode;
-	[key: string]: unknown;
+  children: React.ReactNode;
+  [key: string]: unknown;
 }): React.JSX.Element {
-	// biome-ignore lint/a11y/useFocusableInteractive: test mock — no real interaction
-	return <div role="menuitem">{children}</div>;
+  // biome-ignore lint/a11y/useFocusableInteractive: test mock — no real interaction
+  return <div role="menuitem">{children}</div>;
 }
 
 export function DropdownMenuSeparator(): React.JSX.Element {
-	return <hr />;
+  return <hr />;
 }

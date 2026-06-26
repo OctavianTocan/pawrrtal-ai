@@ -11,12 +11,12 @@ import { cn } from '@/lib/utils';
  * Props for {@link UserMessage}.
  */
 export interface UserMessageProps {
-	/** Plain-text user prompt — rendered through Streamdown for inline markdown. */
-	content: string;
-	/** Whether this row's copy button should currently render its "Copied!" state. */
-	isCopied?: boolean;
-	/** Copy the user message body to the clipboard. */
-	onCopy?: () => void;
+  /** Plain-text user prompt — rendered through Streamdown for inline markdown. */
+  content: string;
+  /** Whether this row's copy button should currently render its "Copied!" state. */
+  isCopied?: boolean;
+  /** Copy the user message body to the clipboard. */
+  onCopy?: () => void;
 }
 
 /**
@@ -31,43 +31,39 @@ export interface UserMessageProps {
  * @returns The user message bubble plus its hover-revealed action row.
  */
 export function UserMessage({ content, isCopied, onCopy }: UserMessageProps): ReactNode {
-	return (
-		<div className="group flex flex-col items-end">
-			<Message from="user">
-				<MessageContent>
-					<MessageResponse>{content}</MessageResponse>
-				</MessageContent>
-			</Message>
-			{onCopy ? (
-				<div
-					className={cn(
-						// Always-mounted row so the next message's position never
-						// shifts when the user hovers — only opacity transitions.
-						'mt-1 flex h-8 items-center justify-end',
-						'opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100'
-					)}
-				>
-					<Tooltip>
-						<TooltipTrigger asChild>
-							<Button
-								aria-label={isCopied ? 'Copied' : 'Copy message'}
-								className="size-8 p-0 text-muted-foreground hover:bg-muted hover:text-foreground"
-								onClick={onCopy}
-								size="sm"
-								type="button"
-								variant="ghost"
-							>
-								{isCopied ? (
-									<CheckIcon className="size-4" />
-								) : (
-									<CopyIcon className="size-4" />
-								)}
-							</Button>
-						</TooltipTrigger>
-						<TooltipContent>{isCopied ? 'Copied' : 'Copy'}</TooltipContent>
-					</Tooltip>
-				</div>
-			) : null}
-		</div>
-	);
+  return (
+    <div className="group flex flex-col items-end">
+      <Message from="user">
+        <MessageContent>
+          <MessageResponse>{content}</MessageResponse>
+        </MessageContent>
+      </Message>
+      {onCopy ? (
+        <div
+          className={cn(
+            // Always-mounted row so the next message's position never
+            // shifts when the user hovers — only opacity transitions.
+            'mt-1 flex h-8 items-center justify-end',
+            'opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100'
+          )}
+        >
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                aria-label={isCopied ? 'Copied' : 'Copy message'}
+                className="size-8 p-0 text-muted-foreground hover:bg-muted hover:text-foreground"
+                onClick={onCopy}
+                size="sm"
+                type="button"
+                variant="ghost"
+              >
+                {isCopied ? <CheckIcon className="size-4" /> : <CopyIcon className="size-4" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{isCopied ? 'Copied' : 'Copy'}</TooltipContent>
+          </Tooltip>
+        </div>
+      ) : null}
+    </div>
+  );
 }

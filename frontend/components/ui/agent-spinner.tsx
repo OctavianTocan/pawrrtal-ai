@@ -24,12 +24,12 @@ const FRAME_INTERVAL_MS = 80;
  * Props for {@link AgentSpinner}.
  */
 export interface AgentSpinnerProps {
-	/** Glyph font-size in pixels. Defaults to 16. */
-	size?: number;
-	/** Extra class names for the wrapper span. */
-	className?: string;
-	/** Optional inline style overrides for the wrapper span. */
-	style?: CSSProperties;
+  /** Glyph font-size in pixels. Defaults to 16. */
+  size?: number;
+  /** Extra class names for the wrapper span. */
+  className?: string;
+  /** Optional inline style overrides for the wrapper span. */
+  style?: CSSProperties;
 }
 
 /**
@@ -38,37 +38,30 @@ export interface AgentSpinnerProps {
  * @param props - Spinner sizing and styling.
  * @returns A span element containing the current animation frame.
  */
-export function AgentSpinner({
-	size = 16,
-	className,
-	style,
-}: AgentSpinnerProps): React.JSX.Element {
-	const [frame, setFrame] = useState(0);
+export function AgentSpinner({ size = 16, className, style }: AgentSpinnerProps): React.JSX.Element {
+  const [frame, setFrame] = useState(0);
 
-	useEffect(() => {
-		const id = window.setInterval(
-			() => setFrame((current) => (current + 1) % BRAILLE_FRAMES.length),
-			FRAME_INTERVAL_MS
-		);
-		return () => window.clearInterval(id);
-	}, []);
+  useEffect(() => {
+    const id = window.setInterval(
+      () => setFrame((current) => (current + 1) % BRAILLE_FRAMES.length),
+      FRAME_INTERVAL_MS
+    );
+    return () => window.clearInterval(id);
+  }, []);
 
-	return (
-		<span
-			aria-hidden="true"
-			className={cn(
-				'inline-flex items-center justify-center font-mono leading-none',
-				className
-			)}
-			style={{
-				fontSize: size,
-				// Fixed width ≈ 1.2em keeps adjacent text from shifting between frames.
-				width: `${size * 1.2}px`,
-				height: `${size * 1.2}px`,
-				...style,
-			}}
-		>
-			{BRAILLE_FRAMES[frame]}
-		</span>
-	);
+  return (
+    <span
+      aria-hidden="true"
+      className={cn('inline-flex items-center justify-center font-mono leading-none', className)}
+      style={{
+        fontSize: size,
+        // Fixed width ≈ 1.2em keeps adjacent text from shifting between frames.
+        width: `${size * 1.2}px`,
+        height: `${size * 1.2}px`,
+        ...style,
+      }}
+    >
+      {BRAILLE_FRAMES[frame]}
+    </span>
+  );
 }

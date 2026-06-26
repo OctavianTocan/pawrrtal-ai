@@ -13,9 +13,9 @@ export type BannerState = { status: 'collapsed' } | { status: 'expanded'; expand
 
 /** A single access request entry. */
 export type AccessRequest = {
-	id: string;
-	name: string;
-	avatarUrl?: string;
+  id: string;
+  name: string;
+  avatarUrl?: string;
 };
 
 /** Decision state for a single access request. */
@@ -23,16 +23,16 @@ export type Decision = 'undecided' | 'approved' | 'rejected';
 
 /** Props for the {@link AccessRequestBanner} component (public API). */
 export type AccessRequestBannerProps = {
-	/** All pending access requests to display. An empty array renders nothing. */
-	requests: AccessRequest[];
-	/** Called when the user approves a request. Receives the request's `id`. */
-	onApprove?: (id: string) => void;
-	/** Called when the user rejects a request. Receives the request's `id`. */
-	onReject?: (id: string) => void;
-	/** Called when the user clears a previously chosen decision. */
-	onReset?: (id: string) => void;
-	/** Called when the user dismisses the entire banner. */
-	onDismiss?: () => void;
+  /** All pending access requests to display. An empty array renders nothing. */
+  requests: AccessRequest[];
+  /** Called when the user approves a request. Receives the request's `id`. */
+  onApprove?: (id: string) => void;
+  /** Called when the user rejects a request. Receives the request's `id`. */
+  onReject?: (id: string) => void;
+  /** Called when the user clears a previously chosen decision. */
+  onReset?: (id: string) => void;
+  /** Called when the user dismisses the entire banner. */
+  onDismiss?: () => void;
 };
 
 /**
@@ -48,36 +48,36 @@ export type AccessRequestBannerProps = {
  *   clear these are internal, already-bound handlers rather than raw external callbacks.
  */
 export type AccessRequestBannerViewProps = {
-	/** Full list of requests; passed through so the View can iterate rows. */
-	requests: AccessRequest[];
-	/**
-	 * Current expand/collapse state of the banner.
-	 * The `expanded` variant carries `expandKey` — the key that forces
-	 * AnimatePresence to re-mount the list for fresh stagger animations.
-	 */
-	bannerState: BannerState;
-	/** Per-request decision map; drives the DecisionPill selected state. */
-	decisions: Record<string, Decision>;
-	/**
-	 * Pre-sliced avatar list for the collapsed header (≤ MAX_COLLAPSED_AVATARS).
-	 * Derived in the Component so the View doesn't repeat the slice logic.
-	 */
-	collapsedAvatars: AccessRequest[];
-	/**
-	 * Number of requests beyond the collapsed avatar limit.
-	 * Rendered as the "+N" overflow count bubble. 0 means no bubble shown.
-	 */
-	remainingCount: number;
-	/** Fired when the user clicks/keys the header bar to open or close the list. */
-	onToggleExpand: () => void;
-	/** Forwarded from the public `onDismiss` prop; optional so callers can omit it. */
-	onDismiss?: () => void;
-	/** Approves the given request id and notifies the parent. */
-	onApproveRequest: (id: string) => void;
-	/** Rejects the given request id and notifies the parent. */
-	onRejectRequest: (id: string) => void;
-	/** Reverts the given request's decision back to undecided. */
-	onResetRequest: (id: string) => void;
+  /** Full list of requests; passed through so the View can iterate rows. */
+  requests: AccessRequest[];
+  /**
+   * Current expand/collapse state of the banner.
+   * The `expanded` variant carries `expandKey` — the key that forces
+   * AnimatePresence to re-mount the list for fresh stagger animations.
+   */
+  bannerState: BannerState;
+  /** Per-request decision map; drives the DecisionPill selected state. */
+  decisions: Record<string, Decision>;
+  /**
+   * Pre-sliced avatar list for the collapsed header (≤ MAX_COLLAPSED_AVATARS).
+   * Derived in the Component so the View doesn't repeat the slice logic.
+   */
+  collapsedAvatars: AccessRequest[];
+  /**
+   * Number of requests beyond the collapsed avatar limit.
+   * Rendered as the "+N" overflow count bubble. 0 means no bubble shown.
+   */
+  remainingCount: number;
+  /** Fired when the user clicks/keys the header bar to open or close the list. */
+  onToggleExpand: () => void;
+  /** Forwarded from the public `onDismiss` prop; optional so callers can omit it. */
+  onDismiss?: () => void;
+  /** Approves the given request id and notifies the parent. */
+  onApproveRequest: (id: string) => void;
+  /** Rejects the given request id and notifies the parent. */
+  onRejectRequest: (id: string) => void;
+  /** Reverts the given request's decision back to undecided. */
+  onResetRequest: (id: string) => void;
 };
 
 /**
@@ -87,21 +87,21 @@ export type AccessRequestBannerViewProps = {
  * sibling dismiss button. Kept internal — not exported from the barrel.
  */
 export type BannerHeaderProps = {
-	/** Current expand/collapse state; drives avatar group visibility and chevron rotation. */
-	bannerState: BannerState;
-	/** Full request list — forwarded to `SummaryText` for the collapsed label. */
-	requests: AccessRequest[];
-	/**
-	 * Pre-sliced avatar list for the collapsed state (≤ MAX_COLLAPSED_AVATARS).
-	 * Derived by the Component layer so this component stays free of slice logic.
-	 */
-	collapsedAvatars: AccessRequest[];
-	/** Number of requests beyond the visible avatar limit; renders "+N" bubble when > 0. */
-	remainingCount: number;
-	/** Fired when the user clicks the toggle button or activates it via keyboard. */
-	onToggleExpand: () => void;
-	/** Forwarded from the public `onDismiss` prop. */
-	onDismiss?: () => void;
+  /** Current expand/collapse state; drives avatar group visibility and chevron rotation. */
+  bannerState: BannerState;
+  /** Full request list — forwarded to `SummaryText` for the collapsed label. */
+  requests: AccessRequest[];
+  /**
+   * Pre-sliced avatar list for the collapsed state (≤ MAX_COLLAPSED_AVATARS).
+   * Derived by the Component layer so this component stays free of slice logic.
+   */
+  collapsedAvatars: AccessRequest[];
+  /** Number of requests beyond the visible avatar limit; renders "+N" bubble when > 0. */
+  remainingCount: number;
+  /** Fired when the user clicks the toggle button or activates it via keyboard. */
+  onToggleExpand: () => void;
+  /** Forwarded from the public `onDismiss` prop. */
+  onDismiss?: () => void;
 };
 
 /**
@@ -111,16 +111,16 @@ export type BannerHeaderProps = {
  * exported from the barrel.
  */
 export type RequestRowProps = {
-	/** The request this row represents. */
-	request: AccessRequest;
-	/** Current decision for this request; drives the DecisionPill state. */
-	decision: Decision;
-	/** Called when the approve side of the pill is activated. */
-	onApprove: () => void;
-	/** Called when the reject side of the pill is activated. */
-	onReject: () => void;
-	/** Called when the active side is re-clicked to revert to undecided. */
-	onReset: () => void;
+  /** The request this row represents. */
+  request: AccessRequest;
+  /** Current decision for this request; drives the DecisionPill state. */
+  decision: Decision;
+  /** Called when the approve side of the pill is activated. */
+  onApprove: () => void;
+  /** Called when the reject side of the pill is activated. */
+  onReject: () => void;
+  /** Called when the active side is re-clicked to revert to undecided. */
+  onReset: () => void;
 };
 
 /**
@@ -130,23 +130,23 @@ export type RequestRowProps = {
  * Kept internal — not exported from the barrel.
  */
 export type ExpandedRequestListProps = {
-	/**
-	 * Current expand/collapse state. The `expanded` variant's `expandKey` is
-	 * used directly as the `motion.div` key — TypeScript narrowing inside the
-	 * `status === "expanded"` branch makes the key access type-safe without
-	 * an extra prop or non-null assertion.
-	 */
-	bannerState: BannerState;
-	/** Full list of requests to render as rows. */
-	requests: AccessRequest[];
-	/** Per-request decision map passed down to each `RequestRow`. */
-	decisions: Record<string, Decision>;
-	/** Approves the request with the given id. */
-	onApproveRequest: (id: string) => void;
-	/** Rejects the request with the given id. */
-	onRejectRequest: (id: string) => void;
-	/** Reverts the request with the given id back to undecided. */
-	onResetRequest: (id: string) => void;
+  /**
+   * Current expand/collapse state. The `expanded` variant's `expandKey` is
+   * used directly as the `motion.div` key — TypeScript narrowing inside the
+   * `status === "expanded"` branch makes the key access type-safe without
+   * an extra prop or non-null assertion.
+   */
+  bannerState: BannerState;
+  /** Full list of requests to render as rows. */
+  requests: AccessRequest[];
+  /** Per-request decision map passed down to each `RequestRow`. */
+  decisions: Record<string, Decision>;
+  /** Approves the request with the given id. */
+  onApproveRequest: (id: string) => void;
+  /** Rejects the request with the given id. */
+  onRejectRequest: (id: string) => void;
+  /** Reverts the request with the given id back to undecided. */
+  onResetRequest: (id: string) => void;
 };
 
 /**
@@ -156,9 +156,9 @@ export type ExpandedRequestListProps = {
  * lively without being distractingly springy on repeated open/close cycles.
  */
 export const BOUNCY_SPRING = {
-	type: 'spring' as const,
-	stiffness: 300,
-	damping: 20,
+  type: 'spring' as const,
+  stiffness: 300,
+  damping: 20,
 };
 
 /**
@@ -173,9 +173,9 @@ export const BOUNCY_SPRING = {
  * via `BOUNCY_SPRING` — the card itself stays calm.
  */
 export const EXPAND_SPRING = {
-	type: 'spring' as const,
-	stiffness: 400,
-	damping: 40,
+  type: 'spring' as const,
+  stiffness: 400,
+  damping: 40,
 };
 
 /**
@@ -185,9 +185,9 @@ export const EXPAND_SPRING = {
  * header-level transitions feel like a single cohesive gesture.
  */
 export const TEXT_SWAP_SPRING = {
-	type: 'spring' as const,
-	stiffness: 400,
-	damping: 30,
+  type: 'spring' as const,
+  stiffness: 400,
+  damping: 30,
 };
 
 /**
@@ -196,16 +196,16 @@ export const TEXT_SWAP_SPRING = {
  * "Octavian Tocan" -> "OT", "Jane" -> "J"
  */
 export function getInitials(name: string): string {
-	name = name.trim();
-	if (!name) {
-		return '';
-	}
+  name = name.trim();
+  if (!name) {
+    return '';
+  }
 
-	return name
-		.split(/\s+/)
-		.filter(Boolean)
-		.map((n) => n[0] ?? '')
-		.join('')
-		.slice(0, 2)
-		.toUpperCase();
+  return name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((n) => n[0] ?? '')
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
 }

@@ -23,63 +23,63 @@ import type { ChatArtifactPayload } from '@/lib/types';
 import { ArtifactRenderer } from './ArtifactRenderer';
 
 interface ArtifactDialogProps {
-	artifact: ChatArtifactPayload;
-	onClose: () => void;
+  artifact: ChatArtifactPayload;
+  onClose: () => void;
 }
 
 export function ArtifactDialog({ artifact, onClose }: ArtifactDialogProps): ReactNode {
-	const closeRef = useRef<HTMLButtonElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
 
-	useEffect(() => {
-		const handleKey = (e: KeyboardEvent) => {
-			if (e.key === 'Escape') onClose();
-		};
-		window.addEventListener('keydown', handleKey);
-		closeRef.current?.focus();
-		// Lock body scroll while the dialog is open.
-		const previousOverflow = document.body.style.overflow;
-		document.body.style.overflow = 'hidden';
-		return () => {
-			window.removeEventListener('keydown', handleKey);
-			document.body.style.overflow = previousOverflow;
-		};
-	}, [onClose]);
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handleKey);
+    closeRef.current?.focus();
+    // Lock body scroll while the dialog is open.
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      window.removeEventListener('keydown', handleKey);
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [onClose]);
 
-	return createPortal(
-		<dialog
-			open
-			aria-modal="true"
-			aria-label={artifact.title}
-			className="artifact-dialog-overlay"
-			onClick={(e) => {
-				// Click on the overlay (but not bubbled from the inner dialog)
-				// closes — same affordance most chat-app modals use.
-				if (e.target === e.currentTarget) onClose();
-			}}
-			onKeyDown={(event) => {
-				if (event.key === 'Escape') onClose();
-			}}
-		>
-			<div className="artifact-dialog">
-				<header className="artifact-dialog-header">
-					<h2 className="artifact-dialog-title">{artifact.title}</h2>
-					<button
-						type="button"
-						ref={closeRef}
-						onClick={onClose}
-						aria-label="Close artifact"
-						className="artifact-dialog-close"
-					>
-						<XIcon className="size-4" />
-					</button>
-				</header>
-				<div className="artifact-dialog-body">
-					{/* Close on successful interaction submit so the user sees
+  return createPortal(
+    <dialog
+      open
+      aria-modal="true"
+      aria-label={artifact.title}
+      className="artifact-dialog-overlay"
+      onClick={(e) => {
+        // Click on the overlay (but not bubbled from the inner dialog)
+        // closes — same affordance most chat-app modals use.
+        if (e.target === e.currentTarget) onClose();
+      }}
+      onKeyDown={(event) => {
+        if (event.key === 'Escape') onClose();
+      }}
+    >
+      <div className="artifact-dialog">
+        <header className="artifact-dialog-header">
+          <h2 className="artifact-dialog-title">{artifact.title}</h2>
+          <button
+            type="button"
+            ref={closeRef}
+            onClick={onClose}
+            aria-label="Close artifact"
+            className="artifact-dialog-close"
+          >
+            <XIcon className="size-4" />
+          </button>
+        </header>
+        <div className="artifact-dialog-body">
+          {/* Close on successful interaction submit so the user sees
 					    the chat respond instead of staring at the modal. */}
-					<ArtifactRenderer artifact={artifact} onInteractionSubmitted={onClose} />
-				</div>
-			</div>
-		</dialog>,
-		document.body
-	);
+          <ArtifactRenderer artifact={artifact} onInteractionSubmitted={onClose} />
+        </div>
+      </div>
+    </dialog>,
+    document.body
+  );
 }

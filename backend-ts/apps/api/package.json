@@ -1,22 +1,22 @@
 {
-	"name": "@pawrrtal/api",
-	"version": "0.0.0",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
-		"dev": "bun run src/index.ts"
-	},
-	"dependencies": {
-		"@effect/platform-bun": "4.0.0-beta.74",
-		"@effect/platform-node": "4.0.0-beta.74",
-		"@effect/sql-sqlite-bun": "4.0.0-beta.74",
-		"@pawrrtal/api-core": "workspace:*",
-		"effect": "4.0.0-beta.74"
-	},
-	"devDependencies": {
-		"@effect/vitest": "4.0.0-beta.74",
-		"@types/bun": "latest",
-		"typescript": "^5.9.3"
-	}
+  "name": "@pawrrtal/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit -p tsconfig.json && tsc --noEmit -p tsconfig.test.json",
+    "dev": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "4.0.0-beta.74",
+    "@effect/platform-node": "4.0.0-beta.74",
+    "@effect/sql-sqlite-bun": "4.0.0-beta.74",
+    "@pawrrtal/api-core": "workspace:*",
+    "effect": "4.0.0-beta.74"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.0.0-beta.74",
+    "@types/bun": "latest",
+    "typescript": "^5.9.3"
+  }
 }

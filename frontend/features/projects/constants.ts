@@ -9,8 +9,8 @@
 
 /** localStorage keys owned by the projects feature. */
 export const PROJECTS_STORAGE_KEYS = {
-	/** Set of project IDs the user has manually collapsed in the sidebar. */
-	collapsedProjects: 'projects:collapsed',
+  /** Set of project IDs the user has manually collapsed in the sidebar. */
+  collapsedProjects: 'projects:collapsed',
 } as const;
 
 /** Union of every recognized projects `localStorage` key. */

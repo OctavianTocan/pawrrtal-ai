@@ -15,7 +15,7 @@
 
 /** Return a fixed greeting; a placeholder body for the fixture. */
 export function sampleFunction() {
-	return 'hello';
+  return 'hello';
 }
 
 //<skill-gen>

@@ -4,557 +4,557 @@
 
 /* ─── Preview card (inline in chat) ─────────────────────────────────── */
 .artifact-preview-card {
-	display: grid;
-	grid-template-columns: auto 1fr auto;
-	align-items: center;
-	gap: 12px;
-	width: 100%;
-	max-width: 480px;
-	padding: 10px 14px;
-	border-radius: 14px;
-	border: 1px solid var(--border);
-	background: var(--background-elevated, var(--background));
-	cursor: pointer;
-	text-align: left;
-	transition:
-		background 0.15s ease,
-		transform 0.15s ease;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 480px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--background-elevated, var(--background));
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.15s ease,
+    transform 0.15s ease;
 }
 .artifact-preview-card:hover {
-	background: var(--foreground-5);
-	transform: translateY(-1px);
+  background: var(--foreground-5);
+  transform: translateY(-1px);
 }
 .artifact-preview-card-icon {
-	width: 32px;
-	height: 32px;
-	border-radius: 10px;
-	display: grid;
-	place-items: center;
-	background: var(--foreground-5);
-	color: var(--foreground);
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: var(--foreground-5);
+  color: var(--foreground);
 }
 .artifact-preview-card-title {
-	font-size: 14px;
-	font-weight: 600;
-	color: var(--foreground);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--foreground);
 }
 .artifact-preview-card-sub {
-	font-size: 12px;
-	color: var(--muted-foreground);
+  font-size: 12px;
+  color: var(--muted-foreground);
 }
 .artifact-preview-card-chev {
-	color: var(--muted-foreground);
+  color: var(--muted-foreground);
 }
 
 /* ─── Dialog overlay + frame ─────────────────────────────────────────── */
 .artifact-dialog-overlay {
-	position: fixed;
-	inset: 0;
-	z-index: 60;
-	display: grid;
-	place-items: center;
-	background: rgba(0, 0, 0, 0.55);
-	backdrop-filter: blur(2px);
-	padding: 24px;
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(2px);
+  padding: 24px;
 }
 .artifact-dialog {
-	display: flex;
-	flex-direction: column;
-	width: min(960px, 100%);
-	max-height: min(85vh, 900px);
-	background: var(--background);
-	border: 1px solid var(--border);
-	border-radius: 18px;
-	box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.5);
-	overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  width: min(960px, 100%);
+  max-height: min(85vh, 900px);
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 30px 80px -20px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
 }
 .artifact-dialog-header {
-	display: flex;
-	align-items: center;
-	gap: 12px;
-	padding: 12px 16px;
-	border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
 }
 .artifact-dialog-title {
-	flex: 1;
-	margin: 0;
-	font-size: 14px;
-	font-weight: 600;
-	color: var(--foreground);
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--foreground);
 }
 .artifact-dialog-close {
-	width: 32px;
-	height: 32px;
-	border-radius: 8px;
-	display: grid;
-	place-items: center;
-	background: transparent;
-	color: var(--muted-foreground);
-	cursor: pointer;
-	transition:
-		background 0.15s ease,
-		color 0.15s ease;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--muted-foreground);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
 }
 .artifact-dialog-close:hover {
-	background: var(--foreground-5);
-	color: var(--foreground);
+  background: var(--foreground-5);
+  color: var(--foreground);
 }
 .artifact-dialog-body {
-	flex: 1;
-	min-height: 0;
-	overflow-y: auto;
-	padding: 24px 28px 32px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 24px 28px 32px;
 }
 
 /* ─── json-render component palette ──────────────────────────────────── */
 .artifact-page {
-	--a1: #ff7eb8;
-	--a2: #b388ff;
-	--ink-on-accent: #1a0c20;
+  --a1: #ff7eb8;
+  --a2: #b388ff;
+  --ink-on-accent: #1a0c20;
 }
 .artifact-page.theme-cobalt {
-	--a1: #7ec8ff;
-	--a2: #5d63ff;
-	--ink-on-accent: #0a1024;
+  --a1: #7ec8ff;
+  --a2: #5d63ff;
+  --ink-on-accent: #0a1024;
 }
 .artifact-page.theme-forest {
-	--a1: #7be29a;
-	--a2: #3aa56b;
-	--ink-on-accent: #08200d;
+  --a1: #7be29a;
+  --a2: #3aa56b;
+  --ink-on-accent: #08200d;
 }
 .artifact-page.theme-vite {
-	--a1: #ff7a59;
-	--a2: #ffb547;
-	--ink-on-accent: #1a1300;
+  --a1: #ff7a59;
+  --a2: #ffb547;
+  --ink-on-accent: #1a1300;
 }
 
 .artifact-page > * + * {
-	margin-top: 24px;
+  margin-top: 24px;
 }
 .artifact-section h2 {
-	font-size: 20px;
-	margin: 0 0 4px;
+  font-size: 20px;
+  margin: 0 0 4px;
 }
 .artifact-lede {
-	color: var(--muted-foreground);
-	margin: 0 0 14px;
-	font-size: 14px;
+  color: var(--muted-foreground);
+  margin: 0 0 14px;
+  font-size: 14px;
 }
 .artifact-section-body > * + * {
-	margin-top: 14px;
+  margin-top: 14px;
 }
 .artifact-heading-h1 {
-	font-size: 28px;
-	margin: 0 0 8px;
+  font-size: 28px;
+  margin: 0 0 8px;
 }
 .artifact-heading-h2 {
-	font-size: 20px;
-	margin: 0 0 6px;
+  font-size: 20px;
+  margin: 0 0 6px;
 }
 .artifact-heading-h3 {
-	font-size: 16px;
-	margin: 0 0 4px;
+  font-size: 16px;
+  margin: 0 0 4px;
 }
 .artifact-paragraph {
-	margin: 0;
-	font-size: 14px;
-	color: var(--foreground);
+  margin: 0;
+  font-size: 14px;
+  color: var(--foreground);
 }
 
 /* Stat pills */
 .artifact-pill {
-	display: inline-flex;
-	align-items: center;
-	gap: 6px;
-	background: rgba(0, 0, 0, 0.78);
-	color: var(--a2);
-	border-radius: 999px;
-	padding: 6px 12px;
-	font-size: 13px;
-	font-weight: 600;
-	margin-right: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.78);
+  color: var(--a2);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  margin-right: 6px;
 }
 .artifact-pill-num {
-	color: #fff;
-	font-weight: 800;
+  color: #fff;
+  font-weight: 800;
 }
 
 /* Card row */
 .artifact-cards {
-	display: grid;
-	grid-template-columns: repeat(3, 1fr);
-	gap: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
 }
 .artifact-card {
-	background: var(--background-elevated, var(--background));
-	border: 1px solid var(--border);
-	border-radius: 14px;
-	padding: 14px;
+  background: var(--background-elevated, var(--background));
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
 }
 .artifact-card-icon {
-	font-size: 24px;
-	line-height: 1;
-	margin-bottom: 6px;
+  font-size: 24px;
+  line-height: 1;
+  margin-bottom: 6px;
 }
 .artifact-card h3 {
-	margin: 0 0 4px;
-	font-size: 14px;
+  margin: 0 0 4px;
+  font-size: 14px;
 }
 .artifact-card p {
-	margin: 0;
-	font-size: 13px;
-	color: var(--muted-foreground);
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted-foreground);
 }
 @media (max-width: 720px) {
-	.artifact-cards {
-		grid-template-columns: 1fr;
-	}
+  .artifact-cards {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Before/after rename */
 .artifact-rename {
-	display: grid;
-	grid-template-columns: 1fr auto 1fr;
-	align-items: center;
-	gap: 16px;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 16px;
 }
 .artifact-name-card {
-	border-radius: 16px;
-	padding: 22px 18px;
-	text-align: center;
-	border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 22px 18px;
+  text-align: center;
+  border: 1px solid var(--border);
 }
 .artifact-name-card.before {
-	opacity: 0.85;
+  opacity: 0.85;
 }
 .artifact-name-card.after {
-	border-color: var(--a2);
+  border-color: var(--a2);
 }
 .artifact-name-card-label {
-	font-size: 11px;
-	letter-spacing: 0.18em;
-	text-transform: uppercase;
-	color: var(--muted-foreground);
-	font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+  font-weight: 700;
 }
 .artifact-name-card-name {
-	font-size: 32px;
-	font-weight: 800;
-	letter-spacing: -0.02em;
-	margin-top: 6px;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-top: 6px;
 }
 .artifact-name-card.after .artifact-name-card-name {
-	background: linear-gradient(135deg, var(--a1), var(--a2));
-	-webkit-background-clip: text;
-	background-clip: text;
-	color: transparent;
+  background: linear-gradient(135deg, var(--a1), var(--a2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 .artifact-rename-arrow {
-	font-size: 28px;
-	color: var(--a2);
-	font-weight: 700;
+  font-size: 28px;
+  color: var(--a2);
+  font-weight: 700;
 }
 
 /* Column lists */
 .artifact-col {
-	background: var(--background-elevated, var(--background));
-	border: 1px solid var(--border);
-	border-radius: 16px;
-	padding: 16px;
+  background: var(--background-elevated, var(--background));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
 }
 .artifact-col-title {
-	margin: 0 0 8px;
-	font-size: 14px;
-	display: flex;
-	gap: 8px;
-	align-items: center;
+  margin: 0 0 8px;
+  font-size: 14px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 .artifact-col ul {
-	margin: 0;
-	padding-left: 18px;
+  margin: 0;
+  padding-left: 18px;
 }
 .artifact-col li {
-	margin: 2px 0;
-	font-size: 13px;
+  margin: 2px 0;
+  font-size: 13px;
 }
 .artifact-tag {
-	font-size: 10px;
-	padding: 2px 7px;
-	border-radius: 5px;
-	font-weight: 700;
-	letter-spacing: 0.08em;
-	text-transform: uppercase;
+  font-size: 10px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 .artifact-tag-after {
-	background: var(--a2);
-	color: var(--ink-on-accent);
+  background: var(--a2);
+  color: var(--ink-on-accent);
 }
 .artifact-tag-before {
-	background: #ff6b88;
-	color: #2a0a14;
+  background: #ff6b88;
+  color: #2a0a14;
 }
 
 /* Buckets */
 .artifact-buckets {
-	display: grid;
-	gap: 10px;
+  display: grid;
+  gap: 10px;
 }
 .artifact-bucket {
-	background: var(--background-elevated, var(--background));
-	border: 1px solid var(--border);
-	border-radius: 12px;
-	padding: 12px 16px;
+  background: var(--background-elevated, var(--background));
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
 }
 .artifact-bucket-head {
-	display: flex;
-	align-items: center;
-	gap: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 .artifact-bucket-num {
-	width: 28px;
-	height: 28px;
-	border-radius: 8px;
-	background: var(--a2);
-	color: var(--ink-on-accent);
-	display: grid;
-	place-items: center;
-	font-weight: 800;
-	flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--a2);
+  color: var(--ink-on-accent);
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  flex-shrink: 0;
 }
 .artifact-bucket-title {
-	margin: 0;
-	font-size: 15px;
+  margin: 0;
+  font-size: 15px;
 }
 .artifact-bucket-where {
-	margin-left: auto;
-	color: var(--muted-foreground);
-	font-size: 12px;
+  margin-left: auto;
+  color: var(--muted-foreground);
+  font-size: 12px;
 }
 .artifact-bucket-body {
-	padding: 8px 0 0 40px;
-	color: var(--muted-foreground);
-	font-size: 13px;
+  padding: 8px 0 0 40px;
+  color: var(--muted-foreground);
+  font-size: 13px;
 }
 
 /* Routes table */
 .artifact-routes {
-	width: 100%;
-	border-collapse: collapse;
-	font-size: 13px;
-	border: 1px solid var(--border);
-	border-radius: 12px;
-	overflow: hidden;
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
 }
 .artifact-routes th,
 .artifact-routes td {
-	padding: 9px 12px;
-	text-align: left;
+  padding: 9px 12px;
+  text-align: left;
 }
 .artifact-routes th {
-	background: var(--foreground-5);
-	color: var(--muted-foreground);
-	font-weight: 600;
-	text-transform: uppercase;
-	font-size: 10px;
-	letter-spacing: 0.12em;
+  background: var(--foreground-5);
+  color: var(--muted-foreground);
+  font-weight: 600;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.12em;
 }
 .artifact-routes tr + tr td {
-	border-top: 1px dashed var(--border);
+  border-top: 1px dashed var(--border);
 }
 
 /* Risks */
 .artifact-risks {
-	display: grid;
-	grid-template-columns: 1fr 1fr;
-	gap: 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
 }
 .artifact-risk {
-	border-radius: 12px;
-	padding: 12px 14px;
-	border-left: 3px solid #ff6b88;
-	background: var(--background-elevated, var(--background));
+  border-radius: 12px;
+  padding: 12px 14px;
+  border-left: 3px solid #ff6b88;
+  background: var(--background-elevated, var(--background));
 }
 .artifact-risk-ok {
-	border-left-color: #6ee7a4;
+  border-left-color: #6ee7a4;
 }
 .artifact-risk-warn {
-	border-left-color: #ffd166;
+  border-left-color: #ffd166;
 }
 .artifact-risk h4 {
-	margin: 0 0 4px;
-	font-size: 13px;
+  margin: 0 0 4px;
+  font-size: 13px;
 }
 .artifact-risk p {
-	margin: 0;
-	color: var(--muted-foreground);
-	font-size: 12.5px;
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 12.5px;
 }
 
 /* Steps */
 .artifact-steps {
-	counter-reset: step;
-	padding-left: 0;
-	list-style: none;
-	margin: 0;
+  counter-reset: step;
+  padding-left: 0;
+  list-style: none;
+  margin: 0;
 }
 .artifact-steps li {
-	counter-increment: step;
-	padding: 12px 16px 12px 50px;
-	position: relative;
-	background: var(--background-elevated, var(--background));
-	border: 1px solid var(--border);
-	border-radius: 10px;
-	margin-bottom: 8px;
-	font-size: 13px;
+  counter-increment: step;
+  padding: 12px 16px 12px 50px;
+  position: relative;
+  background: var(--background-elevated, var(--background));
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  font-size: 13px;
 }
 .artifact-steps li::before {
-	content: counter(step);
-	position: absolute;
-	left: 12px;
-	top: 12px;
-	width: 24px;
-	height: 24px;
-	border-radius: 7px;
-	background: linear-gradient(135deg, var(--a1), var(--a2));
-	color: var(--ink-on-accent);
-	font-weight: 800;
-	display: grid;
-	place-items: center;
-	font-size: 12px;
+  content: counter(step);
+  position: absolute;
+  left: 12px;
+  top: 12px;
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, var(--a1), var(--a2));
+  color: var(--ink-on-accent);
+  font-weight: 800;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
 }
 
 /* ─── Interactive widgets (web/electron only) ───────────────────────── */
 /* Single button. */
 .artifact-action-button {
-	appearance: none;
-	border: 1px solid var(--border);
-	border-radius: 10px;
-	padding: 8px 14px;
-	font-size: 13px;
-	font-weight: 600;
-	cursor: pointer;
-	transition:
-		background 0.15s ease,
-		transform 0.1s ease,
-		opacity 0.15s ease;
+  appearance: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease,
+    opacity 0.15s ease;
 }
 .artifact-action-button:hover:not(:disabled) {
-	transform: translateY(-1px);
+  transform: translateY(-1px);
 }
 .artifact-action-button:disabled,
 .artifact-action-button[aria-disabled="true"] {
-	opacity: 0.55;
-	cursor: not-allowed;
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 .artifact-action-button-primary {
-	background: linear-gradient(135deg, var(--a1), var(--a2));
-	color: var(--ink-on-accent);
-	border-color: transparent;
+  background: linear-gradient(135deg, var(--a1), var(--a2));
+  color: var(--ink-on-accent);
+  border-color: transparent;
 }
 .artifact-action-button-secondary {
-	background: var(--background-elevated, var(--background));
-	color: var(--foreground);
+  background: var(--background-elevated, var(--background));
+  color: var(--foreground);
 }
 
 /* Choice group — radio or checkbox set. */
 .artifact-choice-group {
-	display: flex;
-	flex-direction: column;
-	gap: 10px;
-	padding: 12px 14px;
-	border-radius: 12px;
-	border: 1px solid var(--border);
-	background: var(--background-elevated, var(--background));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--background-elevated, var(--background));
 }
 .artifact-choice-prompt {
-	font-size: 13px;
-	font-weight: 600;
-	color: var(--foreground);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
 }
 .artifact-choice-options {
-	display: flex;
-	flex-direction: column;
-	gap: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 .artifact-choice-option {
-	display: flex;
-	align-items: center;
-	gap: 8px;
-	font-size: 13px;
-	color: var(--foreground);
-	cursor: pointer;
-	padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--foreground);
+  cursor: pointer;
+  padding: 4px 0;
 }
 .artifact-choice-option input {
-	accent-color: var(--a1);
-	cursor: pointer;
+  accent-color: var(--a1);
+  cursor: pointer;
 }
 
 /* Text input field. */
 .artifact-text-field {
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-	padding: 12px 14px;
-	border-radius: 12px;
-	border: 1px solid var(--border);
-	background: var(--background-elevated, var(--background));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--background-elevated, var(--background));
 }
 .artifact-text-field-label {
-	font-size: 13px;
-	font-weight: 600;
-	color: var(--foreground);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
 }
 .artifact-text-field-control {
-	font-family: inherit;
-	font-size: 13px;
-	padding: 8px 10px;
-	border-radius: 8px;
-	border: 1px solid var(--border);
-	background: var(--background);
-	color: var(--foreground);
-	resize: vertical;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
+  resize: vertical;
 }
 .artifact-text-field-control:focus-visible {
-	outline: 2px solid var(--a1);
-	outline-offset: -1px;
+  outline: 2px solid var(--a1);
+  outline-offset: -1px;
 }
 
 /* Numeric slider or input. */
 .artifact-number-field {
-	display: flex;
-	flex-direction: column;
-	gap: 8px;
-	padding: 12px 14px;
-	border-radius: 12px;
-	border: 1px solid var(--border);
-	background: var(--background-elevated, var(--background));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--background-elevated, var(--background));
 }
 .artifact-number-field-label {
-	display: flex;
-	align-items: center;
-	justify-content: space-between;
-	font-size: 13px;
-	font-weight: 600;
-	color: var(--foreground);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--foreground);
 }
 .artifact-number-field-value {
-	font-variant-numeric: tabular-nums;
-	font-weight: 700;
-	color: var(--a1);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--a1);
 }
 .artifact-number-field-control {
-	font-family: inherit;
-	font-size: 13px;
-	padding: 6px 8px;
-	border-radius: 8px;
-	border: 1px solid var(--border);
-	background: var(--background);
-	color: var(--foreground);
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--background);
+  color: var(--foreground);
 }
 .artifact-number-field-slider {
-	padding: 0;
-	border: none;
-	background: transparent;
-	accent-color: var(--a1);
+  padding: 0;
+  border: none;
+  background: transparent;
+  accent-color: var(--a1);
 }

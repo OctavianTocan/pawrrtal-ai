@@ -34,8 +34,7 @@ import { mkdirSync } from 'node:fs';
 import process from 'node:process';
 
 const DEV_URL = process.env.DEV_URL ?? 'http://localhost:3001';
-const AGENT_BROWSER_SOCKET_DIR =
-	process.env.AGENT_BROWSER_SOCKET_DIR ?? `/tmp/pawrrtal-agent-browser-${process.pid}`;
+const AGENT_BROWSER_SOCKET_DIR = process.env.AGENT_BROWSER_SOCKET_DIR ?? `/tmp/pawrrtal-agent-browser-${process.pid}`;
 mkdirSync(AGENT_BROWSER_SOCKET_DIR, { recursive: true });
 
 /** Routes a cold-boot user hits first. Each is checked independently
@@ -59,117 +58,115 @@ const POST_LOAD_WAIT_MS = 4_000;
  * could shadow real React errors.
  */
 const ALLOWLIST = [
-	// Next.js dev-server HMR WebSocket fails to reconnect cleanly
-	// when the smoke tears the page down right after asserting.
-	// Real users keep the connection open; the underlying compile
-	// itself is fine.
-	/WebSocket connection to '.+\/_next\/webpack-hmr/,
-	// Bare-string `Event` console.error Chromium emits when a
-	// WebSocket fails before any frame.  Pairs with the entry above.
-	/^Event$/,
+  // Next.js dev-server HMR WebSocket fails to reconnect cleanly
+  // when the smoke tears the page down right after asserting.
+  // Real users keep the connection open; the underlying compile
+  // itself is fine.
+  /WebSocket connection to '.+\/_next\/webpack-hmr/,
+  // Bare-string `Event` console.error Chromium emits when a
+  // WebSocket fails before any frame.  Pairs with the entry above.
+  /^Event$/,
 ];
 
 function isAllowlisted(text) {
-	return ALLOWLIST.some((pattern) => pattern.test(text));
+  return ALLOWLIST.some((pattern) => pattern.test(text));
 }
 
 function ab(...args) {
-	const out = spawnSync('agent-browser', args, {
-		encoding: 'utf8',
-		env: { ...process.env, AGENT_BROWSER_SOCKET_DIR },
-	});
-	if (out.status !== 0 && out.status !== null) {
-		process.stderr.write(out.stderr ?? '');
-		process.stderr.write(out.stdout ?? '');
-		throw new Error(`agent-browser ${args.join(' ')} exited ${out.status}`);
-	}
-	return out.stdout ?? '';
+  const out = spawnSync('agent-browser', args, {
+    encoding: 'utf8',
+    env: { ...process.env, AGENT_BROWSER_SOCKET_DIR },
+  });
+  if (out.status !== 0 && out.status !== null) {
+    process.stderr.write(out.stderr ?? '');
+    process.stderr.write(out.stdout ?? '');
+    throw new Error(`agent-browser ${args.join(' ')} exited ${out.status}`);
+  }
+  return out.stdout ?? '';
 }
 
 function abJson(...args) {
-	const raw = ab(...args, '--json');
-	if (!raw.trim()) return [];
-	try {
-		const parsed = JSON.parse(raw);
-		return Array.isArray(parsed) ? parsed : [];
-	} catch (err) {
-		throw new Error(
-			`agent-browser ${args.join(' ')} returned non-JSON: ${err.message}\n---\n${raw}`
-		);
-	}
+  const raw = ab(...args, '--json');
+  if (!raw.trim()) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    throw new Error(`agent-browser ${args.join(' ')} returned non-JSON: ${err.message}\n---\n${raw}`);
+  }
 }
 
 function sleep(ms) {
-	return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function checkRoute(route) {
-	const url = `${DEV_URL}${route}`;
-	console.log(`[dev-console-smoke] navigating to ${url}`);
+  const url = `${DEV_URL}${route}`;
+  console.log(`[dev-console-smoke] navigating to ${url}`);
 
-	// Clear console + errors first so this route's check only sees
-	// its own output, not anything from the prior route.
-	ab('console', '--clear');
-	ab('errors', '--clear');
+  // Clear console + errors first so this route's check only sees
+  // its own output, not anything from the prior route.
+  ab('console', '--clear');
+  ab('errors', '--clear');
 
-	ab('open', url);
-	await sleep(POST_LOAD_WAIT_MS);
+  ab('open', url);
+  await sleep(POST_LOAD_WAIT_MS);
 
-	const consoleMessages = abJson('console');
-	const pageErrors = abJson('errors');
+  const consoleMessages = abJson('console');
+  const pageErrors = abJson('errors');
 
-	const captured = [];
-	for (const msg of consoleMessages) {
-		// `agent-browser console --json` returns entries with a
-		// `type` field; we only fail on `error` (warn/log/info are
-		// noise we deliberately ignore).
-		if (msg.type !== 'error') continue;
-		const text = msg.text ?? '';
-		if (isAllowlisted(text)) continue;
-		captured.push({ kind: 'console.error', text });
-	}
-	for (const err of pageErrors) {
-		const text = err.text ?? err.message ?? JSON.stringify(err);
-		if (isAllowlisted(text)) continue;
-		captured.push({ kind: 'pageerror', text });
-	}
+  const captured = [];
+  for (const msg of consoleMessages) {
+    // `agent-browser console --json` returns entries with a
+    // `type` field; we only fail on `error` (warn/log/info are
+    // noise we deliberately ignore).
+    if (msg.type !== 'error') continue;
+    const text = msg.text ?? '';
+    if (isAllowlisted(text)) continue;
+    captured.push({ kind: 'console.error', text });
+  }
+  for (const err of pageErrors) {
+    const text = err.text ?? err.message ?? JSON.stringify(err);
+    if (isAllowlisted(text)) continue;
+    captured.push({ kind: 'pageerror', text });
+  }
 
-	return captured;
+  return captured;
 }
 
 async function main() {
-	const failures = [];
-	for (const route of COLD_BOOT_ROUTES) {
-		const errs = await checkRoute(route);
-		if (errs.length > 0) {
-			failures.push({ route, errors: errs });
-		} else {
-			console.log(`[dev-console-smoke] ${route}: clean`);
-		}
-	}
+  const failures = [];
+  for (const route of COLD_BOOT_ROUTES) {
+    const errs = await checkRoute(route);
+    if (errs.length > 0) {
+      failures.push({ route, errors: errs });
+    } else {
+      console.log(`[dev-console-smoke] ${route}: clean`);
+    }
+  }
 
-	// Always close the agent-browser session so the smoke leaves no
-	// orphan Chrome processes on the runner.
-	ab('close', '--all');
+  // Always close the agent-browser session so the smoke leaves no
+  // orphan Chrome processes on the runner.
+  ab('close', '--all');
 
-	if (failures.length === 0) {
-		console.log('[dev-console-smoke] OK — every cold-boot route silent');
-		return;
-	}
+  if (failures.length === 0) {
+    console.log('[dev-console-smoke] OK — every cold-boot route silent');
+    return;
+  }
 
-	console.error('\n[dev-console-smoke] FAILED — console errors on dev boot:\n');
-	for (const f of failures) {
-		console.error(`  ${f.route}:`);
-		for (const e of f.errors) {
-			console.error(`    [${e.kind}] ${e.text.slice(0, 400)}`);
-		}
-	}
-	console.error(
-		'\nIf a third-party library is emitting unavoidable dev-only noise, ' +
-			'add a narrow regex to ALLOWLIST in this file with a TODO + reason ' +
-			'— do NOT widen the matcher.'
-	);
-	process.exitCode = 1;
+  console.error('\n[dev-console-smoke] FAILED — console errors on dev boot:\n');
+  for (const f of failures) {
+    console.error(`  ${f.route}:`);
+    for (const e of f.errors) {
+      console.error(`    [${e.kind}] ${e.text.slice(0, 400)}`);
+    }
+  }
+  console.error(
+    '\nIf a third-party library is emitting unavoidable dev-only noise, ' +
+      'add a narrow regex to ALLOWLIST in this file with a TODO + reason ' +
+      '— do NOT widen the matcher.'
+  );
+  process.exitCode = 1;
 }
 
 await main();

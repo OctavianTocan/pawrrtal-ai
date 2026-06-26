@@ -21,10 +21,10 @@ import { API_ENDPOINTS } from '@/lib/api';
 import type { WorkspaceFileApiResponse } from '../types';
 
 interface WriteFileArgs {
-	/** Workspace-relative POSIX path, e.g. `memory/note.md`. */
-	filePath: string;
-	/** Full UTF-8 text content to write. */
-	content: string;
+  /** Workspace-relative POSIX path, e.g. `memory/note.md`. */
+  filePath: string;
+  /** Full UTF-8 text content to write. */
+  content: string;
 }
 
 /**
@@ -35,38 +35,32 @@ interface WriteFileArgs {
  *   (safe to call before the workspace loads).
  */
 export function useWriteWorkspaceFile(workspaceId: string | null) {
-	const authedFetch = useAuthedFetch();
-	const queryClient = useQueryClient();
+  const authedFetch = useAuthedFetch();
+  const queryClient = useQueryClient();
 
-	return useMutation<WorkspaceFileApiResponse, Error, WriteFileArgs>({
-		mutationFn: async ({ filePath, content }) => {
-			if (!workspaceId) {
-				throw new Error('No workspace selected — cannot save file.');
-			}
-			const res = await authedFetch(
-				API_ENDPOINTS.workspaces.writeFile(workspaceId, filePath),
-				{
-					method: 'PUT',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({ content }),
-				}
-			);
-			if (!res.ok) {
-				const body = await res.json().catch(() => ({}));
-				throw new Error(
-					(body as { detail?: string }).detail ??
-						`HTTP ${res.status}: Failed to save file`
-				);
-			}
-			return res.json() as Promise<WorkspaceFileApiResponse>;
-		},
+  return useMutation<WorkspaceFileApiResponse, Error, WriteFileArgs>({
+    mutationFn: async ({ filePath, content }) => {
+      if (!workspaceId) {
+        throw new Error('No workspace selected — cannot save file.');
+      }
+      const res = await authedFetch(API_ENDPOINTS.workspaces.writeFile(workspaceId, filePath), {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error((body as { detail?: string }).detail ?? `HTTP ${res.status}: Failed to save file`);
+      }
+      return res.json() as Promise<WorkspaceFileApiResponse>;
+    },
 
-		onSuccess: (_data, { filePath }) => {
-			// Invalidate the matching read query so any subsequent open of this
-			// file re-fetches the latest content from the server.
-			queryClient.invalidateQueries({
-				queryKey: ['workspace-file', workspaceId ?? '', filePath],
-			});
-		},
-	});
+    onSuccess: (_data, { filePath }) => {
+      // Invalidate the matching read query so any subsequent open of this
+      // file re-fetches the latest content from the server.
+      queryClient.invalidateQueries({
+        queryKey: ['workspace-file', workspaceId ?? '', filePath],
+      });
+    },
+  });
 }

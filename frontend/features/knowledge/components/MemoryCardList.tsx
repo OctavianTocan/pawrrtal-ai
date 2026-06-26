@@ -11,26 +11,26 @@
  */
 
 import {
-	BookOpenIcon,
-	BrainIcon,
-	HistoryIcon,
-	type LucideIcon,
-	ShieldIcon,
-	SparklesIcon,
-	UserIcon,
-	UsersIcon,
-	WrenchIcon,
+  BookOpenIcon,
+  BrainIcon,
+  HistoryIcon,
+  type LucideIcon,
+  ShieldIcon,
+  SparklesIcon,
+  UserIcon,
+  UsersIcon,
+  WrenchIcon,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import type { MemoryCardData, MemoryCardTone } from '../types';
 
 const TONE_CLASSNAMES: Record<MemoryCardTone, string> = {
-	info: 'bg-info/15 text-info-text',
-	success: 'bg-success/15 text-success-text',
-	accent: 'bg-accent/15 text-accent',
-	destructive: 'bg-destructive/15 text-destructive-text',
-	foreground: 'bg-foreground-10 text-muted-foreground',
+  info: 'bg-info/15 text-info-text',
+  success: 'bg-success/15 text-success-text',
+  accent: 'bg-accent/15 text-accent',
+  destructive: 'bg-destructive/15 text-destructive-text',
+  foreground: 'bg-foreground-10 text-muted-foreground',
 };
 
 /**
@@ -41,17 +41,17 @@ const TONE_CLASSNAMES: Record<MemoryCardTone, string> = {
  * a server-fetched payload later.
  */
 const ICON_BY_ID: Record<string, LucideIcon> = {
-	preferences: SparklesIcon,
-	rules: ShieldIcon,
-	profile: UserIcon,
-	tools: WrenchIcon,
-	identity: BrainIcon,
-	relationships: UsersIcon,
-	activity: HistoryIcon,
+  preferences: SparklesIcon,
+  rules: ShieldIcon,
+  profile: UserIcon,
+  tools: WrenchIcon,
+  identity: BrainIcon,
+  relationships: UsersIcon,
+  activity: HistoryIcon,
 };
 
 interface MemoryCardListProps {
-	cards: readonly MemoryCardData[];
+  cards: readonly MemoryCardData[];
 }
 
 /**
@@ -60,36 +60,32 @@ interface MemoryCardListProps {
  * `<button>` so the eventual interaction is one prop swap away.
  */
 export function MemoryCardList({ cards }: MemoryCardListProps): ReactNode {
-	return (
-		<ul className="flex flex-col gap-2 py-2">
-			{cards.map((card) => {
-				const Icon = ICON_BY_ID[card.id] ?? BookOpenIcon;
-				return (
-					<li key={card.id}>
-						<button
-							type="button"
-							className="flex w-full cursor-pointer items-start gap-3 rounded-[10px] border border-border/60 bg-background p-3 text-left transition-colors duration-150 ease-out hover:bg-foreground-5"
-						>
-							<span
-								className={cn(
-									'flex size-9 shrink-0 items-center justify-center rounded-full',
-									TONE_CLASSNAMES[card.tone]
-								)}
-							>
-								<Icon aria-hidden="true" className="size-4" />
-							</span>
-							<span className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5">
-								<span className="truncate text-[13px] font-semibold text-foreground">
-									{card.title}
-								</span>
-								<span className="line-clamp-2 text-[12px] leading-snug text-muted-foreground">
-									{card.description}
-								</span>
-							</span>
-						</button>
-					</li>
-				);
-			})}
-		</ul>
-	);
+  return (
+    <ul className="flex flex-col gap-2 py-2">
+      {cards.map((card) => {
+        const Icon = ICON_BY_ID[card.id] ?? BookOpenIcon;
+        return (
+          <li key={card.id}>
+            <button
+              type="button"
+              className="flex w-full cursor-pointer items-start gap-3 rounded-[10px] border border-border/60 bg-background p-3 text-left transition-colors duration-150 ease-out hover:bg-foreground-5"
+            >
+              <span
+                className={cn(
+                  'flex size-9 shrink-0 items-center justify-center rounded-full',
+                  TONE_CLASSNAMES[card.tone]
+                )}
+              >
+                <Icon aria-hidden="true" className="size-4" />
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5">
+                <span className="truncate text-[13px] font-semibold text-foreground">{card.title}</span>
+                <span className="line-clamp-2 text-[12px] leading-snug text-muted-foreground">{card.description}</span>
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }

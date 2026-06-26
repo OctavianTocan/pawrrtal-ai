@@ -17,13 +17,13 @@ import { OnboardingBackdrop } from '@/features/onboarding/OnboardingBackdrop';
  * @returns A safe path to navigate to after login.
  */
 function safeRedirectTarget(raw: string | string[] | undefined): string {
-	if (typeof raw !== 'string') return '/';
-	if (!raw.startsWith('/') || raw.startsWith('//')) return '/';
-	return raw;
+  if (typeof raw !== 'string') return '/';
+  if (!raw.startsWith('/') || raw.startsWith('//')) return '/';
+  return raw;
 }
 
 interface LoginPageProps {
-	searchParams: Promise<{ redirect?: string | string[] }>;
+  searchParams: Promise<{ redirect?: string | string[] }>;
 }
 
 /**
@@ -43,19 +43,16 @@ interface LoginPageProps {
  * @returns The rendered login page.
  */
 export default async function Page({ searchParams }: LoginPageProps): Promise<React.JSX.Element> {
-	const showDevAdminLogin = canUseDevAdminLogin();
-	const { redirect } = await searchParams;
-	const postLoginTarget = safeRedirectTarget(redirect);
+  const showDevAdminLogin = canUseDevAdminLogin();
+  const { redirect } = await searchParams;
+  const postLoginTarget = safeRedirectTarget(redirect);
 
-	return (
-		<div className="relative flex min-h-svh w-full items-center justify-center overflow-hidden bg-background p-6 md:p-10">
-			<OnboardingBackdrop />
-			<div className="relative z-10 w-full max-w-md">
-				<LoginForm
-					canUseDevAdminLogin={showDevAdminLogin}
-					postLoginTarget={postLoginTarget}
-				/>
-			</div>
-		</div>
-	);
+  return (
+    <div className="relative flex min-h-svh w-full items-center justify-center overflow-hidden bg-background p-6 md:p-10">
+      <OnboardingBackdrop />
+      <div className="relative z-10 w-full max-w-md">
+        <LoginForm canUseDevAdminLogin={showDevAdminLogin} postLoginTarget={postLoginTarget} />
+      </div>
+    </div>
+  );
 }

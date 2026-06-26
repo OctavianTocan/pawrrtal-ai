@@ -9,27 +9,27 @@
 
 /** Map from host wire-slug to user-facing display string. Mirrors backend `app.core.providers.labels.HOST_LABELS`. */
 const HOST_LABELS = {
-	'claude-code-pty': 'Claude Code PTY',
-	'agy-api': 'Antigravity API',
-	'google-ai': 'Gemini API',
-	litellm: 'LiteLLM',
-	'opencode-go': 'OpenCode Go',
-	'openai-codex': 'Codex SDK',
-	xai: 'xAI',
+  'claude-code-pty': 'Claude Code PTY',
+  'agy-api': 'Antigravity API',
+  'google-ai': 'Gemini API',
+  litellm: 'LiteLLM',
+  'opencode-go': 'OpenCode Go',
+  'openai-codex': 'Codex SDK',
+  xai: 'xAI',
 } as const satisfies Record<string, string>;
 
 /** Map from vendor wire-slug to user-facing display string. Mirrors backend `app.core.providers.labels.VENDOR_LABELS`. */
 const VENDOR_LABELS = {
-	alibaba: 'Alibaba',
-	anthropic: 'Anthropic',
-	deepseek: 'DeepSeek',
-	google: 'Google',
-	minimax: 'MiniMax',
-	moonshot: 'Moonshot',
-	openai: 'OpenAI',
-	xai: 'xAI',
-	xiaomi: 'Xiaomi',
-	zai: 'Z.AI',
+  alibaba: 'Alibaba',
+  anthropic: 'Anthropic',
+  deepseek: 'DeepSeek',
+  google: 'Google',
+  minimax: 'MiniMax',
+  moonshot: 'Moonshot',
+  openai: 'OpenAI',
+  xai: 'xAI',
+  xiaomi: 'Xiaomi',
+  zai: 'Z.AI',
 } as const satisfies Record<string, string>;
 
 /**
@@ -39,7 +39,7 @@ const VENDOR_LABELS = {
  * @returns The display label, or the slug itself when unknown.
  */
 export function hostLabel(slug: string): string {
-	return (HOST_LABELS as Record<string, string>)[slug] ?? slug;
+  return (HOST_LABELS as Record<string, string>)[slug] ?? slug;
 }
 
 /**
@@ -49,5 +49,5 @@ export function hostLabel(slug: string): string {
  * @returns The display label, or the slug itself when unknown.
  */
 export function vendorLabel(slug: string): string {
-	return (VENDOR_LABELS as Record<string, string>)[slug] ?? slug;
+  return (VENDOR_LABELS as Record<string, string>)[slug] ?? slug;
 }

@@ -13,9 +13,9 @@ import { KnowledgeContainer } from '@/features/knowledge/KnowledgeContainer';
  * global sidebar and header are present without any extra plumbing here.
  */
 export default function KnowledgePage(): ReactNode {
-	return (
-		<Suspense fallback={null}>
-			<KnowledgeContainer />
-		</Suspense>
-	);
+  return (
+    <Suspense fallback={null}>
+      <KnowledgeContainer />
+    </Suspense>
+  );
 }

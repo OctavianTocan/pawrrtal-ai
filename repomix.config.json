@@ -1,108 +1,95 @@
 {
-	"$schema": "https://raw.githubusercontent.com/yamadashy/repomix/main/schemas/repomix.config.schema.json",
-	"version": "1.0.0",
-	"projectName": "pawrrtal",
-	"description": "Pawrrtal - A modern AI chat application with user authentication and conversation management",
-	"author": "Octavian Tocan",
-	"license": "MIT",
-	"output": {
-		"format": "xml",
-		"filePath": "repomix-output.xml",
-		"includeFileSummary": true,
-		"includeDirectoryStructure": true,
-		"includeInstruction": true,
-		"instructionFilePath": ".repomix-instruction.md"
-	},
-	"include": [
-		"**/*.ts",
-		"**/*.tsx",
-		"**/*.js",
-		"**/*.jsx",
-		"**/*.json",
-		"**/*.md",
-		"**/*.py",
-		"**/*.toml",
-		"**/*.lock",
-		"**/*.yaml",
-		"**/*.yml",
-		"**/*.css",
-		"**/*.html",
-		"**/*.config.*",
-		"**/Dockerfile*",
-		"**/.dockerignore",
-		"**/.env*"
-	],
-	"exclude": [
-		"**/node_modules/**",
-		"**/.next/**",
-		"**/.venv/**",
-		"**/.git/**",
-		"**/.mypy_cache/**",
-		"**/__pycache__/**",
-		"**/*.log",
-		"**/tmp/**",
-		"**/dist/**",
-		"**/build/**",
-		"**/coverage/**",
-		"**/*.min.*",
-		"**/bundle.*",
-		"**/yarn.lock",
-		"**/pnpm-lock.yaml",
-		"**/bun.lockb",
-		"**/*.png",
-		"**/*.jpg",
-		"**/*.jpeg",
-		"**/*.gif",
-		"**/*.svg",
-		"**/*.ico",
-		"**/*.woff",
-		"**/*.woff2",
-		"**/*.ttf",
-		"**/*.eot",
-		"**/*.mp4",
-		"**/*.webm",
-		"**/*.mov",
-		"**/*.pdf"
-	],
-	"git": {
-		"includeLogs": false,
-		"includeLogsCount": 10,
-		"includeDiffs": false
-	},
-	"compression": {
-		"enabled": false,
-		"strategy": "tree-sitter"
-	},
-	"security": {
-		"secretLint": true,
-		"secretLintRules": ["@secretlint/secretlint-rule-preset-recommend"]
-	},
-	"advanced": {
-		"maxFileSize": "10MB",
-		"maxTotalSize": "100MB",
-		"followSymlinks": false,
-		"sortFiles": "path",
-		"fileEncoding": "utf-8",
-		"lineEnding": "lf"
-	},
-	"customMetadata": {
-		"repositoryUrl": "https://github.com/OctavianTocan/pawrrtal",
-		"projectType": "full-stack",
-		"technologies": [
-			"Next.js",
-			"React",
-			"TypeScript",
-			"FastAPI",
-			"Python",
-			"SQLAlchemy",
-			"TailwindCSS"
-		],
-		"features": [
-			"AI Chat",
-			"User Authentication",
-			"Conversation Management",
-			"Multi-user Support"
-		],
-		"developmentStatus": "active"
-	}
+  "$schema": "https://raw.githubusercontent.com/yamadashy/repomix/main/schemas/repomix.config.schema.json",
+  "version": "1.0.0",
+  "projectName": "pawrrtal",
+  "description": "Pawrrtal - A modern AI chat application with user authentication and conversation management",
+  "author": "Octavian Tocan",
+  "license": "MIT",
+  "output": {
+    "format": "xml",
+    "filePath": "repomix-output.xml",
+    "includeFileSummary": true,
+    "includeDirectoryStructure": true,
+    "includeInstruction": true,
+    "instructionFilePath": ".repomix-instruction.md"
+  },
+  "include": [
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.js",
+    "**/*.jsx",
+    "**/*.json",
+    "**/*.md",
+    "**/*.py",
+    "**/*.toml",
+    "**/*.lock",
+    "**/*.yaml",
+    "**/*.yml",
+    "**/*.css",
+    "**/*.html",
+    "**/*.config.*",
+    "**/Dockerfile*",
+    "**/.dockerignore",
+    "**/.env*"
+  ],
+  "exclude": [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/.venv/**",
+    "**/.git/**",
+    "**/.mypy_cache/**",
+    "**/__pycache__/**",
+    "**/*.log",
+    "**/tmp/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/*.min.*",
+    "**/bundle.*",
+    "**/yarn.lock",
+    "**/pnpm-lock.yaml",
+    "**/bun.lockb",
+    "**/*.png",
+    "**/*.jpg",
+    "**/*.jpeg",
+    "**/*.gif",
+    "**/*.svg",
+    "**/*.ico",
+    "**/*.woff",
+    "**/*.woff2",
+    "**/*.ttf",
+    "**/*.eot",
+    "**/*.mp4",
+    "**/*.webm",
+    "**/*.mov",
+    "**/*.pdf"
+  ],
+  "git": {
+    "includeLogs": false,
+    "includeLogsCount": 10,
+    "includeDiffs": false
+  },
+  "compression": {
+    "enabled": false,
+    "strategy": "tree-sitter"
+  },
+  "security": {
+    "secretLint": true,
+    "secretLintRules": ["@secretlint/secretlint-rule-preset-recommend"]
+  },
+  "advanced": {
+    "maxFileSize": "10MB",
+    "maxTotalSize": "100MB",
+    "followSymlinks": false,
+    "sortFiles": "path",
+    "fileEncoding": "utf-8",
+    "lineEnding": "lf"
+  },
+  "customMetadata": {
+    "repositoryUrl": "https://github.com/OctavianTocan/pawrrtal",
+    "projectType": "full-stack",
+    "technologies": ["Next.js", "React", "TypeScript", "FastAPI", "Python", "SQLAlchemy", "TailwindCSS"],
+    "features": ["AI Chat", "User Authentication", "Conversation Management", "Multi-user Support"],
+    "developmentStatus": "active"
+  }
 }

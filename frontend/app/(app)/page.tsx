@@ -13,7 +13,7 @@ import ChatContainer from '@/features/chat/ChatContainer';
  * mounted here so it doesn't auto-open every time the user returns to home.
  */
 export default async function ConversationPage() {
-	const uuid: string = crypto.randomUUID();
+  const uuid: string = crypto.randomUUID();
 
-	return <ChatContainer key={uuid} conversationId={uuid} />;
+  return <ChatContainer key={uuid} conversationId={uuid} />;
 }

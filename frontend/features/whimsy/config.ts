@@ -29,12 +29,12 @@ const WHIMSY_STORAGE_KEY = 'whimsy:config';
  * or stale value can't slip through one and fail the other.
  */
 export const WHIMSY_BOUNDS = {
-	grid: { min: 3, max: 10 },
-	size: { min: 120, max: 360 },
-	/** Slider integer scale — internal 0-200 maps to opacity 0-0.20 (0%-20%). */
-	opacityScale: { min: 0, max: 200 },
-	/** Preset tile width in CSS pixels. Height auto-resolves from the SVG aspect. */
-	presetSize: { min: 200, max: 1200 },
+  grid: { min: 3, max: 10 },
+  size: { min: 120, max: 360 },
+  /** Slider integer scale — internal 0-200 maps to opacity 0-0.20 (0%-20%). */
+  opacityScale: { min: 0, max: 200 },
+  /** Preset tile width in CSS pixels. Height auto-resolves from the SVG aspect. */
+  presetSize: { min: 200, max: 1200 },
 } as const;
 
 /** Multiplier applied to the slider integer value to get the stored decimal opacity. */
@@ -60,64 +60,64 @@ export type WhimsyColor = 'theme' | string;
 
 /** Validate a stored ``WhimsyColor`` value. */
 function isWhimsyColor(value: unknown): value is WhimsyColor {
-	if (value === 'theme') return true;
-	return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value);
+  if (value === 'theme') return true;
+  return typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value);
 }
 
 /** User-tunable parameters for the whimsy texture overlay. */
 export interface WhimsyConfig {
-	/** When false, the texture overlay is not rendered at all. */
-	enabled: boolean;
-	/** Source of the texture — procedurally generated tile or a static preset. */
-	mode: WhimsyMode;
-	/**
-	 * Custom background colour painted under the texture. ``'theme'``
-	 * keeps the chat panel's underlying ``bg-background`` showing
-	 * through; a hex string overrides it with a solid fill before the
-	 * masked tile renders.
-	 */
-	backgroundColor: WhimsyColor;
-	/**
-	 * Custom tile tint. ``'theme'`` uses the foreground theme token
-	 * (current behaviour); a hex string overrides the masked-tile
-	 * colour.
-	 */
-	tintColor: WhimsyColor;
-	/** Curated motif set name; one of {@link WHIMSY_THEMES}'s keys. Used in ``generated`` mode. */
-	theme: WhimsyThemeName;
-	/** Identifier of the active preset under ``/whimsy-patterns/``. Used in ``preset`` mode. */
-	preset: WhimsyPresetId;
-	/**
-	 * Tile width in CSS pixels for ``preset`` mode. Height resolves
-	 * from the SVG's intrinsic aspect via ``mask-size: <width>px auto``.
-	 * Smaller = tighter repeats with smaller doodles; larger = bigger
-	 * drawings, fewer repeats. Procedural ``size`` doesn't translate
-	 * (different SVG aspect), so we keep this as its own field.
-	 */
-	presetSize: number;
-	/** Deterministic placement seed. Any 32-bit integer; reroll for fresh layout. */
-	seed: number;
-	/** Motifs per row/column in the placement grid. Higher = denser pattern. */
-	grid: number;
-	/** Repeating tile dimension in CSS pixels. */
-	size: number;
-	/** Texture intensity. Stored as a 0..1 fraction; rendered via CSS `opacity`. */
-	opacity: number;
+  /** When false, the texture overlay is not rendered at all. */
+  enabled: boolean;
+  /** Source of the texture — procedurally generated tile or a static preset. */
+  mode: WhimsyMode;
+  /**
+   * Custom background colour painted under the texture. ``'theme'``
+   * keeps the chat panel's underlying ``bg-background`` showing
+   * through; a hex string overrides it with a solid fill before the
+   * masked tile renders.
+   */
+  backgroundColor: WhimsyColor;
+  /**
+   * Custom tile tint. ``'theme'`` uses the foreground theme token
+   * (current behaviour); a hex string overrides the masked-tile
+   * colour.
+   */
+  tintColor: WhimsyColor;
+  /** Curated motif set name; one of {@link WHIMSY_THEMES}'s keys. Used in ``generated`` mode. */
+  theme: WhimsyThemeName;
+  /** Identifier of the active preset under ``/whimsy-patterns/``. Used in ``preset`` mode. */
+  preset: WhimsyPresetId;
+  /**
+   * Tile width in CSS pixels for ``preset`` mode. Height resolves
+   * from the SVG's intrinsic aspect via ``mask-size: <width>px auto``.
+   * Smaller = tighter repeats with smaller doodles; larger = bigger
+   * drawings, fewer repeats. Procedural ``size`` doesn't translate
+   * (different SVG aspect), so we keep this as its own field.
+   */
+  presetSize: number;
+  /** Deterministic placement seed. Any 32-bit integer; reroll for fresh layout. */
+  seed: number;
+  /** Motifs per row/column in the placement grid. Higher = denser pattern. */
+  grid: number;
+  /** Repeating tile dimension in CSS pixels. */
+  size: number;
+  /** Texture intensity. Stored as a 0..1 fraction; rendered via CSS `opacity`. */
+  opacity: number;
 }
 
 /** Default config — matches the values originally hardcoded in `ChatView`. */
 export const DEFAULT_WHIMSY_CONFIG: WhimsyConfig = {
-	enabled: true,
-	mode: 'generated',
-	backgroundColor: 'theme',
-	tintColor: 'theme',
-	theme: 'kawaii',
-	preset: 'pattern-1',
-	presetSize: 600,
-	seed: 42,
-	grid: 6,
-	size: 240,
-	opacity: 0.035,
+  enabled: true,
+  mode: 'generated',
+  backgroundColor: 'theme',
+  tintColor: 'theme',
+  theme: 'kawaii',
+  preset: 'pattern-1',
+  presetSize: 600,
+  seed: 42,
+  grid: 6,
+  size: 240,
+  opacity: 0.035,
 };
 
 /** Theme-name allowlist derived from the registered themes. */
@@ -125,7 +125,7 @@ const THEME_NAMES = Object.keys(WHIMSY_THEMES) as readonly WhimsyThemeName[];
 
 /** Type guard for a string being one of the registered theme names. */
 export function isWhimsyThemeName(value: unknown): value is WhimsyThemeName {
-	return typeof value === 'string' && THEME_NAMES.includes(value as WhimsyThemeName);
+  return typeof value === 'string' && THEME_NAMES.includes(value as WhimsyThemeName);
 }
 
 /** Public list of registered theme names — consumed by the settings UI. */
@@ -142,30 +142,30 @@ export const WHIMSY_THEME_NAMES = THEME_NAMES;
  * value.
  */
 function validateWhimsyConfig(value: unknown): value is WhimsyConfig {
-	if (!value || typeof value !== 'object') return false;
-	const v = value as Partial<Record<keyof WhimsyConfig, unknown>>;
-	return (
-		typeof v.enabled === 'boolean' &&
-		(v.mode === 'generated' || v.mode === 'preset') &&
-		isWhimsyColor(v.backgroundColor) &&
-		isWhimsyColor(v.tintColor) &&
-		isWhimsyThemeName(v.theme) &&
-		isWhimsyPresetId(v.preset) &&
-		typeof v.presetSize === 'number' &&
-		v.presetSize >= WHIMSY_BOUNDS.presetSize.min &&
-		v.presetSize <= WHIMSY_BOUNDS.presetSize.max &&
-		typeof v.seed === 'number' &&
-		Number.isFinite(v.seed) &&
-		typeof v.grid === 'number' &&
-		v.grid >= WHIMSY_BOUNDS.grid.min &&
-		v.grid <= WHIMSY_BOUNDS.grid.max &&
-		typeof v.size === 'number' &&
-		v.size >= WHIMSY_BOUNDS.size.min &&
-		v.size <= WHIMSY_BOUNDS.size.max &&
-		typeof v.opacity === 'number' &&
-		v.opacity >= 0 &&
-		v.opacity <= 1
-	);
+  if (!value || typeof value !== 'object') return false;
+  const v = value as Partial<Record<keyof WhimsyConfig, unknown>>;
+  return (
+    typeof v.enabled === 'boolean' &&
+    (v.mode === 'generated' || v.mode === 'preset') &&
+    isWhimsyColor(v.backgroundColor) &&
+    isWhimsyColor(v.tintColor) &&
+    isWhimsyThemeName(v.theme) &&
+    isWhimsyPresetId(v.preset) &&
+    typeof v.presetSize === 'number' &&
+    v.presetSize >= WHIMSY_BOUNDS.presetSize.min &&
+    v.presetSize <= WHIMSY_BOUNDS.presetSize.max &&
+    typeof v.seed === 'number' &&
+    Number.isFinite(v.seed) &&
+    typeof v.grid === 'number' &&
+    v.grid >= WHIMSY_BOUNDS.grid.min &&
+    v.grid <= WHIMSY_BOUNDS.grid.max &&
+    typeof v.size === 'number' &&
+    v.size >= WHIMSY_BOUNDS.size.min &&
+    v.size <= WHIMSY_BOUNDS.size.max &&
+    typeof v.opacity === 'number' &&
+    v.opacity >= 0 &&
+    v.opacity <= 1
+  );
 }
 
 /**
@@ -176,9 +176,9 @@ function validateWhimsyConfig(value: unknown): value is WhimsyConfig {
  * @returns A `[config, setConfig]` tuple matching React's `useState` signature.
  */
 export function useWhimsyConfig(): [WhimsyConfig, Dispatch<SetStateAction<WhimsyConfig>>] {
-	return usePersistedState<WhimsyConfig>({
-		storageKey: WHIMSY_STORAGE_KEY,
-		defaultValue: DEFAULT_WHIMSY_CONFIG,
-		validate: validateWhimsyConfig,
-	});
+  return usePersistedState<WhimsyConfig>({
+    storageKey: WHIMSY_STORAGE_KEY,
+    defaultValue: DEFAULT_WHIMSY_CONFIG,
+    validate: validateWhimsyConfig,
+  });
 }

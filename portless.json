@@ -1,10 +1,10 @@
 {
-	"turbo": false,
-	"apps": {
-		"frontend": {
-			"name": "pawrrtal",
-			"script": "dev:app",
-			"appPort": 3000
-		}
-	}
+  "turbo": false,
+  "apps": {
+    "frontend": {
+      "name": "pawrrtal",
+      "script": "dev:app",
+      "appPort": 3000
+    }
+  }
 }

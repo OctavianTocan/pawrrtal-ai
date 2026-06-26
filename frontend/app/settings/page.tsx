@@ -9,9 +9,9 @@ import type { Metadata } from 'next';
 import { SettingsLayout } from '@/features/settings/SettingsLayout';
 
 export const metadata: Metadata = {
-	title: 'Settings — Pawrrtal',
+  title: 'Settings — Pawrrtal',
 };
 
 export default function SettingsPage(): React.JSX.Element {
-	return <SettingsLayout />;
+  return <SettingsLayout />;
 }

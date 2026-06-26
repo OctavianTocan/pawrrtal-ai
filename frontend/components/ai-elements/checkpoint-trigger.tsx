@@ -9,30 +9,30 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 export type CheckpointTriggerProps = ComponentProps<typeof Button> & {
-	tooltip?: string;
+  tooltip?: string;
 };
 
 export const CheckpointTrigger = ({
-	children,
-	className,
-	variant = 'ghost',
-	size = 'sm',
-	tooltip,
-	...props
+  children,
+  className,
+  variant = 'ghost',
+  size = 'sm',
+  tooltip,
+  ...props
 }: CheckpointTriggerProps) =>
-	tooltip ? (
-		<Tooltip>
-			<TooltipTrigger asChild>
-				<Button size={size} type="button" variant={variant} {...props}>
-					{children}
-				</Button>
-			</TooltipTrigger>
-			<TooltipContent align="start" side="bottom">
-				{tooltip}
-			</TooltipContent>
-		</Tooltip>
-	) : (
-		<Button size={size} type="button" variant={variant} {...props}>
-			{children}
-		</Button>
-	);
+  tooltip ? (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button size={size} type="button" variant={variant} {...props}>
+          {children}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent align="start" side="bottom">
+        {tooltip}
+      </TooltipContent>
+    </Tooltip>
+  ) : (
+    <Button size={size} type="button" variant={variant} {...props}>
+      {children}
+    </Button>
+  );

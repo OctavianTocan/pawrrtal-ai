@@ -23,53 +23,47 @@ import { BOUNCY_SPRING, getInitials, type RequestRowProps } from './types';
  * beyond `MAX_COLLAPSED_AVATARS`).
  */
 export function RequestRow({ request, decision, onApprove, onReject, onReset }: RequestRowProps) {
-	return (
-		<m.div
-			initial={{ opacity: 0 }}
-			animate={{ opacity: 1 }}
-			transition={{ duration: 0.15 }}
-			className="flex items-center justify-between gap-3 px-4 py-2"
-		>
-			<div className="flex items-center gap-3">
-				{/*
-				 * layoutId matches the collapsed avatar in BannerHeader so Motion
-				 * creates a shared-layout transition: the avatar appears to physically
-				 * fly from the header group into this row position on expand.
-				 */}
-				<m.div layoutId={`avatar-${request.id}`} transition={BOUNCY_SPRING}>
-					<Avatar size="sm">
-						{request.avatarUrl && (
-							<AvatarImage src={request.avatarUrl} alt={request.name} />
-						)}
-						<AvatarFallback>{getInitials(request.name)}</AvatarFallback>
-					</Avatar>
-				</m.div>
+  return (
+    <m.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.15 }}
+      className="flex items-center justify-between gap-3 px-4 py-2"
+    >
+      <div className="flex items-center gap-3">
+        {/*
+         * layoutId matches the collapsed avatar in BannerHeader so Motion
+         * creates a shared-layout transition: the avatar appears to physically
+         * fly from the header group into this row position on expand.
+         */}
+        <m.div layoutId={`avatar-${request.id}`} transition={BOUNCY_SPRING}>
+          <Avatar size="sm">
+            {request.avatarUrl && <AvatarImage src={request.avatarUrl} alt={request.name} />}
+            <AvatarFallback>{getInitials(request.name)}</AvatarFallback>
+          </Avatar>
+        </m.div>
 
-				{/* Scale bounce echoes the avatar spring for a cohesive row entry */}
-				<m.span
-					className="text-sm font-medium"
-					initial={{ scale: 0.92, opacity: 0 }}
-					animate={{ scale: 1, opacity: 1 }}
-					transition={BOUNCY_SPRING}
-				>
-					{request.name}
-				</m.span>
-			</div>
+        {/* Scale bounce echoes the avatar spring for a cohesive row entry */}
+        <m.span
+          className="text-sm font-medium"
+          initial={{ scale: 0.92, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={BOUNCY_SPRING}
+        >
+          {request.name}
+        </m.span>
+      </div>
 
-			{/* Same spring as the name so the entire right side arrives together */}
-			<m.div
-				initial={{ scale: 0.85, opacity: 0 }}
-				animate={{ scale: 1, opacity: 1 }}
-				transition={BOUNCY_SPRING}
-			>
-				<DecisionPill
-					pillId={request.id}
-					decision={decision}
-					onApprove={onApprove}
-					onReject={onReject}
-					onReset={onReset}
-				/>
-			</m.div>
-		</m.div>
-	);
+      {/* Same spring as the name so the entire right side arrives together */}
+      <m.div initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={BOUNCY_SPRING}>
+        <DecisionPill
+          pillId={request.id}
+          decision={decision}
+          onApprove={onApprove}
+          onReject={onReject}
+          onReset={onReset}
+        />
+      </m.div>
+    </m.div>
+  );
 }

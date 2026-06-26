@@ -1,11 +1,6 @@
 'use client';
 
-import {
-	type UseMutationResult,
-	useMutation,
-	useQuery,
-	useQueryClient,
-} from '@tanstack/react-query';
+import { type UseMutationResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthedFetch } from '@/hooks/use-authed-fetch';
 import { useAuthedQuery } from '@/hooks/use-authed-query';
 import { API_ENDPOINTS } from '@/lib/api';
@@ -20,33 +15,33 @@ import { API_ENDPOINTS } from '@/lib/api';
  * its allowlist with HTTP 400.
  */
 export const WORKSPACE_ENV_KEY_IDS = [
-	'GEMINI_API_KEY',
-	'EXA_API_KEY',
-	'XAI_API_KEY',
-	'OPENAI_API_KEY',
-	'OPENAI_CODEX_OAUTH_TOKEN',
-	'NOTION_API_KEY',
-	'OPENCODE_API_KEY',
-	'GITHUB_TOKEN',
-	'GITHUB_ISSUES_REPO',
-	'ACTIVE_RECALL_ENABLED',
-	'ACTIVE_RECALL_MODEL',
-	'ACTIVE_RECALL_SEARCH_WORKSPACE',
-	'ACTIVE_RECALL_TIMEOUT_S',
-	'ACTIVE_RECALL_SYSTEM_PROMPT',
+  'GEMINI_API_KEY',
+  'EXA_API_KEY',
+  'XAI_API_KEY',
+  'OPENAI_API_KEY',
+  'OPENAI_CODEX_OAUTH_TOKEN',
+  'NOTION_API_KEY',
+  'OPENCODE_API_KEY',
+  'GITHUB_TOKEN',
+  'GITHUB_ISSUES_REPO',
+  'ACTIVE_RECALL_ENABLED',
+  'ACTIVE_RECALL_MODEL',
+  'ACTIVE_RECALL_SEARCH_WORKSPACE',
+  'ACTIVE_RECALL_TIMEOUT_S',
+  'ACTIVE_RECALL_SYSTEM_PROMPT',
 ] as const satisfies readonly WorkspaceEnvKey[];
 
 /** Workspace env key names are backend-owned and may come from plugins. */
 export type WorkspaceEnvKey = string;
 
 export interface WorkspaceEnvKeyRead {
-	key: WorkspaceEnvKey;
-	label: string;
-	description: string;
-	secret: boolean;
-	required: boolean;
-	source: 'kernel' | 'plugin';
-	help_url: string | null;
+  key: WorkspaceEnvKey;
+  label: string;
+  description: string;
+  secret: boolean;
+  required: boolean;
+  source: 'kernel' | 'plugin';
+  help_url: string | null;
 }
 
 /**
@@ -56,16 +51,16 @@ export interface WorkspaceEnvKeyRead {
  * empty-string value and `keys` carries display metadata for dynamic plugins.
  */
 export interface WorkspaceEnvResponse {
-	/** Map of every overridable key to its current value (empty string when unset). */
-	vars: Record<string, string>;
-	/** Display metadata for every key in `vars`. */
-	keys: WorkspaceEnvKeyRead[];
+  /** Map of every overridable key to its current value (empty string when unset). */
+  vars: Record<string, string>;
+  /** Display metadata for every key in `vars`. */
+  keys: WorkspaceEnvKeyRead[];
 }
 
 /** Minimal workspace shape pulled from `GET /api/v1/workspaces`. */
 interface WorkspaceSummary {
-	id: string;
-	is_default: boolean;
+  id: string;
+  is_default: boolean;
 }
 
 /** React Query cache key shared by the GET hook and the mutation invalidate. */
@@ -79,7 +74,7 @@ const WORKSPACES_LIST_STALE_MS = 5 * 60 * 1000;
  * surfaces the message under `detail`; everything else falls through.
  */
 interface BackendErrorBody {
-	detail?: string;
+  detail?: string;
 }
 
 /**
@@ -91,19 +86,19 @@ interface BackendErrorBody {
  * (or `message`) and falls back to the original string.
  */
 export function extractApiErrorMessage(error: unknown, fallback: string): string {
-	if (!(error instanceof Error)) return fallback;
-	const match = error.message.match(/Body:\s*(\{.*\})\s*$/s);
-	const body = match?.[1];
-	if (!body) return error.message;
-	try {
-		const parsed = JSON.parse(body) as BackendErrorBody;
-		if (typeof parsed.detail === 'string' && parsed.detail.length > 0) {
-			return parsed.detail;
-		}
-	} catch {
-		/* fall through */
-	}
-	return error.message;
+  if (!(error instanceof Error)) return fallback;
+  const match = error.message.match(/Body:\s*(\{.*\})\s*$/s);
+  const body = match?.[1];
+  if (!body) return error.message;
+  try {
+    const parsed = JSON.parse(body) as BackendErrorBody;
+    if (typeof parsed.detail === 'string' && parsed.detail.length > 0) {
+      return parsed.detail;
+    }
+  } catch {
+    /* fall through */
+  }
+  return error.message;
 }
 
 /**
@@ -115,18 +110,17 @@ export function extractApiErrorMessage(error: unknown, fallback: string): string
  * workspaces only triggers one refetch.
  */
 export function useDefaultWorkspaceId(): string | null {
-	const authedFetch = useAuthedFetch();
-	const workspacesQuery = useQuery<WorkspaceSummary[]>({
-		queryKey: ['workspaces'],
-		queryFn: async (): Promise<WorkspaceSummary[]> => {
-			const res = await authedFetch(API_ENDPOINTS.workspaces.list);
-			return res.json() as Promise<WorkspaceSummary[]>;
-		},
-		staleTime: WORKSPACES_LIST_STALE_MS,
-	});
-	const defaultWorkspace =
-		workspacesQuery.data?.find((w) => w.is_default) ?? workspacesQuery.data?.[0];
-	return defaultWorkspace?.id ?? null;
+  const authedFetch = useAuthedFetch();
+  const workspacesQuery = useQuery<WorkspaceSummary[]>({
+    queryKey: ['workspaces'],
+    queryFn: async (): Promise<WorkspaceSummary[]> => {
+      const res = await authedFetch(API_ENDPOINTS.workspaces.list);
+      return res.json() as Promise<WorkspaceSummary[]>;
+    },
+    staleTime: WORKSPACES_LIST_STALE_MS,
+  });
+  const defaultWorkspace = workspacesQuery.data?.find((w) => w.is_default) ?? workspacesQuery.data?.[0];
+  return defaultWorkspace?.id ?? null;
 }
 
 /**
@@ -142,12 +136,12 @@ export function useDefaultWorkspaceId(): string | null {
  * skeleton without firing a 404.
  */
 export function useWorkspaceEnv(): ReturnType<typeof useAuthedQuery<WorkspaceEnvResponse>> {
-	const workspaceId = useDefaultWorkspaceId();
-	return useAuthedQuery<WorkspaceEnvResponse>(
-		[...WORKSPACE_ENV_QUERY_KEY, workspaceId ?? ''],
-		workspaceId ? API_ENDPOINTS.workspaces.env(workspaceId) : '',
-		{ enabled: workspaceId !== null }
-	);
+  const workspaceId = useDefaultWorkspaceId();
+  return useAuthedQuery<WorkspaceEnvResponse>(
+    [...WORKSPACE_ENV_QUERY_KEY, workspaceId ?? ''],
+    workspaceId ? API_ENDPOINTS.workspaces.env(workspaceId) : '',
+    { enabled: workspaceId !== null }
+  );
 }
 
 /**
@@ -162,34 +156,29 @@ export function useWorkspaceEnv(): ReturnType<typeof useAuthedQuery<WorkspaceEnv
  * the Settings UI is a follow-up (`pawrrtal-TBD`).
  */
 export function useUpsertWorkspaceEnv(): UseMutationResult<
-	WorkspaceEnvResponse,
-	Error,
-	Partial<Record<string, string>>
+  WorkspaceEnvResponse,
+  Error,
+  Partial<Record<string, string>>
 > {
-	const fetcher = useAuthedFetch();
-	const queryClient = useQueryClient();
-	const workspaceId = useDefaultWorkspaceId();
+  const fetcher = useAuthedFetch();
+  const queryClient = useQueryClient();
+  const workspaceId = useDefaultWorkspaceId();
 
-	return useMutation({
-		mutationKey: ['workspace-env', 'upsert', workspaceId ?? ''],
-		mutationFn: async (
-			vars: Partial<Record<string, string>>
-		): Promise<WorkspaceEnvResponse> => {
-			if (!workspaceId) {
-				throw new Error('Cannot save workspace env: default workspace has not loaded yet.');
-			}
-			const response = await fetcher(API_ENDPOINTS.workspaces.env(workspaceId), {
-				method: 'PUT',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ vars }),
-			});
-			return (await response.json()) as WorkspaceEnvResponse;
-		},
-		onSuccess: (next) => {
-			queryClient.setQueryData<WorkspaceEnvResponse>(
-				[...WORKSPACE_ENV_QUERY_KEY, workspaceId ?? ''],
-				next
-			);
-		},
-	});
+  return useMutation({
+    mutationKey: ['workspace-env', 'upsert', workspaceId ?? ''],
+    mutationFn: async (vars: Partial<Record<string, string>>): Promise<WorkspaceEnvResponse> => {
+      if (!workspaceId) {
+        throw new Error('Cannot save workspace env: default workspace has not loaded yet.');
+      }
+      const response = await fetcher(API_ENDPOINTS.workspaces.env(workspaceId), {
+        method: 'PUT',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ vars }),
+      });
+      return (await response.json()) as WorkspaceEnvResponse;
+    },
+    onSuccess: (next) => {
+      queryClient.setQueryData<WorkspaceEnvResponse>([...WORKSPACE_ENV_QUERY_KEY, workspaceId ?? ''], next);
+    },
+  });
 }

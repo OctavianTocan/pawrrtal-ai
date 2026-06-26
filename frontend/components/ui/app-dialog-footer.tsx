@@ -14,10 +14,10 @@ import type * as React from 'react';
 import { cn } from '@/lib/utils';
 
 export interface AppDialogFooterProps {
-	children: React.ReactNode;
-	/** Horizontal alignment after the **`sm`** breakpoint. */
-	align?: 'end' | 'between';
-	className?: string;
+  children: React.ReactNode;
+  /** Horizontal alignment after the **`sm`** breakpoint. */
+  align?: 'end' | 'between';
+  className?: string;
 }
 
 /**
@@ -25,21 +25,17 @@ export interface AppDialogFooterProps {
  *
  * @returns Footer markup for `AppDialog` **`footer`** prop.
  */
-export function AppDialogFooter({
-	children,
-	align = 'end',
-	className,
-}: AppDialogFooterProps): React.JSX.Element {
-	return (
-		<div
-			className={cn(
-				'flex flex-col-reverse gap-2 sm:flex-row',
-				align === 'end' && 'sm:justify-end',
-				align === 'between' && 'sm:justify-between',
-				className
-			)}
-		>
-			{children}
-		</div>
-	);
+export function AppDialogFooter({ children, align = 'end', className }: AppDialogFooterProps): React.JSX.Element {
+  return (
+    <div
+      className={cn(
+        'flex flex-col-reverse gap-2 sm:flex-row',
+        align === 'end' && 'sm:justify-end',
+        align === 'between' && 'sm:justify-between',
+        className
+      )}
+    >
+      {children}
+    </div>
+  );
 }

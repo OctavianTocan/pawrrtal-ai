@@ -22,9 +22,9 @@ import { TasksContainer } from '@/features/tasks/TasksContainer';
  * during static generation.
  */
 export default function TasksPage(): React.JSX.Element {
-	return (
-		<Suspense fallback={null}>
-			<TasksContainer />
-		</Suspense>
-	);
+  return (
+    <Suspense fallback={null}>
+      <TasksContainer />
+    </Suspense>
+  );
 }

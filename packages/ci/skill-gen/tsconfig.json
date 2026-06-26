@@ -1,18 +1,18 @@
 {
-	"compilerOptions": {
-		"allowImportingTsExtensions": true,
-		"exactOptionalPropertyTypes": true,
-		"isolatedModules": true,
-		"lib": ["ES2024"],
-		"module": "ESNext",
-		"moduleResolution": "bundler",
-		"noEmit": true,
-		"noUncheckedIndexedAccess": true,
-		"skipLibCheck": true,
-		"strict": true,
-		"target": "ES2024",
-		"types": ["bun"]
-	},
-	"include": ["src/**/*.ts"],
-	"exclude": ["node_modules", "e2e-test", "e2e-test-expected"]
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "exactOptionalPropertyTypes": true,
+    "isolatedModules": true,
+    "lib": ["ES2024"],
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "noEmit": true,
+    "noUncheckedIndexedAccess": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2024",
+    "types": ["bun"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "e2e-test", "e2e-test-expected"]
 }

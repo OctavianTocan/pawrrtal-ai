@@ -1,66 +1,59 @@
 {
-	"compilerOptions": {
-		"skipDefaultLibCheck": true,
-		"target": "es2022",
-		"verbatimModuleSyntax": true,
-		"allowJs": true,
-		"resolveJsonModule": true,
-		"moduleDetection": "force",
-		// Strictness.
-		"strict": true,
-		"noUncheckedIndexedAccess": true,
-		// Not transpiling with Typescript:
-		"moduleResolution": "bundler",
-		"module": "esnext",
-		"noEmit": true,
-		"lib": ["dom", "dom.iterable", "esnext"],
-		"forceConsistentCasingInFileNames": true,
-		"skipLibCheck": true,
-		"isolatedModules": true,
-		"jsx": "react-jsx",
-		"incremental": true,
-		"plugins": [
-			{
-				"name": "next"
-			}
-		],
-		"paths": {
-			"@/*": ["./*"],
-			"collections/*": ["./.source/*"],
-			"@octavian-tocan/react-dropdown": ["./lib/react-dropdown/src/index.ts"],
-			"@octavian-tocan/react-dropdown/*": ["./lib/react-dropdown/src/*"],
-			"@octavian-tocan/react-overlay": ["./lib/react-overlay/src/index.ts"],
-			"@octavian-tocan/react-overlay/*": ["./lib/react-overlay/src/*"],
-			"@octavian-tocan/react-chat-composer": ["./lib/react-chat-composer/src/index.ts"],
-			"@octavian-tocan/react-chat-composer/*": ["./lib/react-chat-composer/src/*"]
-		},
-		"esModuleInterop": true
-	},
-	"include": [
-		"next-env.d.ts",
-		"**/*.ts",
-		"**/*.tsx",
-		".next/types/**/*.ts",
-		"**/*.mts",
-		".next/dev/types/**/*.ts"
-	],
-	"exclude": [
-		"node_modules",
-		"lib/react-dropdown/src/__stories__",
-		"lib/react-dropdown/src/__storybook__",
-		"lib/react-dropdown/src/__tests__",
-		"lib/react-dropdown/src/test-utils",
-		"lib/react-dropdown/lostpixel.config.ts",
-		"lib/react-dropdown/tsup.config.ts",
-		"lib/react-dropdown/vitest.config.ts",
-		"lib/react-dropdown/vitest.setup.ts",
-		"lib/react-overlay/src/__tests__",
-		"lib/react-overlay/.storybook",
-		"lib/react-overlay/lostpixel.config.ts",
-		"lib/react-overlay/playwright.config.ts",
-		"lib/react-overlay/tsup.config.ts",
-		"lib/react-overlay/vitest.config.ts",
-		"lib/react-overlay/vitest.setup.ts",
-		"lib/react-chat-composer"
-	]
+  "compilerOptions": {
+    "skipDefaultLibCheck": true,
+    "target": "es2022",
+    "verbatimModuleSyntax": true,
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "moduleDetection": "force",
+    // Strictness.
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    // Not transpiling with Typescript:
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "noEmit": true,
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "incremental": true,
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./*"],
+      "collections/*": ["./.source/*"],
+      "@octavian-tocan/react-dropdown": ["./lib/react-dropdown/src/index.ts"],
+      "@octavian-tocan/react-dropdown/*": ["./lib/react-dropdown/src/*"],
+      "@octavian-tocan/react-overlay": ["./lib/react-overlay/src/index.ts"],
+      "@octavian-tocan/react-overlay/*": ["./lib/react-overlay/src/*"],
+      "@octavian-tocan/react-chat-composer": ["./lib/react-chat-composer/src/index.ts"],
+      "@octavian-tocan/react-chat-composer/*": ["./lib/react-chat-composer/src/*"]
+    },
+    "esModuleInterop": true
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "**/*.mts", ".next/dev/types/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "lib/react-dropdown/src/__stories__",
+    "lib/react-dropdown/src/__storybook__",
+    "lib/react-dropdown/src/__tests__",
+    "lib/react-dropdown/src/test-utils",
+    "lib/react-dropdown/lostpixel.config.ts",
+    "lib/react-dropdown/tsup.config.ts",
+    "lib/react-dropdown/vitest.config.ts",
+    "lib/react-dropdown/vitest.setup.ts",
+    "lib/react-overlay/src/__tests__",
+    "lib/react-overlay/.storybook",
+    "lib/react-overlay/lostpixel.config.ts",
+    "lib/react-overlay/playwright.config.ts",
+    "lib/react-overlay/tsup.config.ts",
+    "lib/react-overlay/vitest.config.ts",
+    "lib/react-overlay/vitest.setup.ts",
+    "lib/react-chat-composer"
+  ]
 }

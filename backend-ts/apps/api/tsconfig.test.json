@@ -1,9 +1,9 @@
 {
-	"extends": "./tsconfig.json",
-	"compilerOptions": {
-		"types": ["bun", "vitest/globals"],
-		"noUnusedLocals": false,
-		"noUnusedParameters": false
-	},
-	"include": ["test/unit/**/*.ts"]
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["bun", "vitest/globals"],
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
+  },
+  "include": ["test/unit/**/*.ts"]
 }

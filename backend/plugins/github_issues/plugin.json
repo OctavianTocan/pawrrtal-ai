@@ -1,56 +1,56 @@
 {
-	"schema_version": 1,
-	"id": "github_issues",
-	"name": "GitHub Issues",
-	"description": "Create GitHub issues from agent-discovered bugs and improvements.",
-	"version": "1.0.0",
-	"enabled_by_default": false,
-	"permissions": ["network", "external_write", "publishing", "secrets"],
-	"capabilities": [
-		{
-			"type": "python_tool",
-			"id": "report_issue",
-			"tool_name": "report_issue",
-			"title": "Report Issue",
-			"description": "Create a GitHub issue with labels for bugs, improvements, features, or chores.",
-			"tags": ["github", "issues", "feedback"],
-			"intents": ["github.issue.create", "feedback.report"],
-			"slots": ["issue_reporting", "github"],
-			"exposure": "direct_and_catalog",
-			"permissions": ["network", "external_write", "publishing", "secrets"],
-			"risk": "publishing",
-			"entrypoint": "app.plugins.github_issues.tools:make_report_issue_tool"
-		},
-		{
-			"type": "settings",
-			"id": "github_issues_settings",
-			"title": "GitHub Issues Settings",
-			"description": "Workspace-scoped GitHub issue-reporting settings.",
-			"permissions": ["secrets"],
-			"env": [
-				{
-					"name": "GITHUB_TOKEN",
-					"required": true,
-					"scope": "workspace",
-					"overridable": true,
-					"gateway_fallback": true,
-					"secret": true,
-					"label": "GitHub Token",
-					"description": "Token used to create GitHub issues.",
-					"help_url": "https://github.com/settings/tokens"
-				},
-				{
-					"name": "GITHUB_ISSUES_REPO",
-					"required": false,
-					"scope": "workspace",
-					"overridable": true,
-					"gateway_fallback": true,
-					"secret": false,
-					"label": "GitHub Issues Repo",
-					"description": "Target repository for agent-reported issues, shaped as owner/repo.",
-					"help_url": "https://docs.github.com/en/issues"
-				}
-			]
-		}
-	]
+  "schema_version": 1,
+  "id": "github_issues",
+  "name": "GitHub Issues",
+  "description": "Create GitHub issues from agent-discovered bugs and improvements.",
+  "version": "1.0.0",
+  "enabled_by_default": false,
+  "permissions": ["network", "external_write", "publishing", "secrets"],
+  "capabilities": [
+    {
+      "type": "python_tool",
+      "id": "report_issue",
+      "tool_name": "report_issue",
+      "title": "Report Issue",
+      "description": "Create a GitHub issue with labels for bugs, improvements, features, or chores.",
+      "tags": ["github", "issues", "feedback"],
+      "intents": ["github.issue.create", "feedback.report"],
+      "slots": ["issue_reporting", "github"],
+      "exposure": "direct_and_catalog",
+      "permissions": ["network", "external_write", "publishing", "secrets"],
+      "risk": "publishing",
+      "entrypoint": "app.plugins.github_issues.tools:make_report_issue_tool"
+    },
+    {
+      "type": "settings",
+      "id": "github_issues_settings",
+      "title": "GitHub Issues Settings",
+      "description": "Workspace-scoped GitHub issue-reporting settings.",
+      "permissions": ["secrets"],
+      "env": [
+        {
+          "name": "GITHUB_TOKEN",
+          "required": true,
+          "scope": "workspace",
+          "overridable": true,
+          "gateway_fallback": true,
+          "secret": true,
+          "label": "GitHub Token",
+          "description": "Token used to create GitHub issues.",
+          "help_url": "https://github.com/settings/tokens"
+        },
+        {
+          "name": "GITHUB_ISSUES_REPO",
+          "required": false,
+          "scope": "workspace",
+          "overridable": true,
+          "gateway_fallback": true,
+          "secret": false,
+          "label": "GitHub Issues Repo",
+          "description": "Target repository for agent-reported issues, shaped as owner/repo.",
+          "help_url": "https://docs.github.com/en/issues"
+        }
+      ]
+    }
+  ]
 }

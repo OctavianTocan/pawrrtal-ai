@@ -26,7 +26,7 @@ const VENDOR_LOGO_SIZE = 12;
  * @returns Absolute URL to the vendor's SVG logo.
  */
 function modelsDevLogoUrl(vendor: string): string {
-	return `https://models.dev/logos/${vendor}.svg`;
+  return `https://models.dev/logos/${vendor}.svg`;
 }
 
 /**
@@ -47,20 +47,20 @@ function modelsDevLogoUrl(vendor: string): string {
  * @returns A React component that renders the vendor's logo.
  */
 function createModelsDevLogo(vendor: string): ComponentType<SVGProps<SVGSVGElement>> {
-	function ModelsDevLogo({ className }: SVGProps<SVGSVGElement>): React.ReactNode {
-		return (
-			<Image
-				alt={`${vendor} logo`}
-				className={cn('size-3 rounded-full dark:invert', className)}
-				height={VENDOR_LOGO_SIZE}
-				src={modelsDevLogoUrl(vendor)}
-				unoptimized
-				width={VENDOR_LOGO_SIZE}
-			/>
-		);
-	}
-	ModelsDevLogo.displayName = `VendorLogo(${vendor})`;
-	return ModelsDevLogo;
+  function ModelsDevLogo({ className }: SVGProps<SVGSVGElement>): React.ReactNode {
+    return (
+      <Image
+        alt={`${vendor} logo`}
+        className={cn('size-3 rounded-full dark:invert', className)}
+        height={VENDOR_LOGO_SIZE}
+        src={modelsDevLogoUrl(vendor)}
+        unoptimized
+        width={VENDOR_LOGO_SIZE}
+      />
+    );
+  }
+  ModelsDevLogo.displayName = `VendorLogo(${vendor})`;
+  return ModelsDevLogo;
 }
 
 /**
@@ -70,8 +70,7 @@ function createModelsDevLogo(vendor: string): ComponentType<SVGProps<SVGSVGEleme
  * recognisable; replace this once a generic placeholder lands under
  * `components/brand-icons/`.
  */
-const FALLBACK_VENDOR_LOGO: ComponentType<SVGProps<SVGSVGElement>> =
-	createModelsDevLogo('anthropic');
+const FALLBACK_VENDOR_LOGO: ComponentType<SVGProps<SVGSVGElement>> = createModelsDevLogo('anthropic');
 
 /**
  * Vendor → logo component map. Pure UI concern; not a source of truth
@@ -83,9 +82,9 @@ const FALLBACK_VENDOR_LOGO: ComponentType<SVGProps<SVGSVGElement>> =
  * {@link FALLBACK_VENDOR_LOGO} via {@link vendorLogo}.
  */
 const VENDOR_LOGOS: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
-	anthropic: FALLBACK_VENDOR_LOGO,
-	google: createModelsDevLogo('google'),
-	openai: createModelsDevLogo('openai'),
+  anthropic: FALLBACK_VENDOR_LOGO,
+  google: createModelsDevLogo('google'),
+  openai: createModelsDevLogo('openai'),
 };
 
 /**
@@ -100,5 +99,5 @@ const VENDOR_LOGOS: Record<string, ComponentType<SVGProps<SVGSVGElement>>> = {
  * @returns Logo component for the vendor.
  */
 export function vendorLogo(vendor: string): ComponentType<SVGProps<SVGSVGElement>> {
-	return VENDOR_LOGOS[vendor] ?? FALLBACK_VENDOR_LOGO;
+  return VENDOR_LOGOS[vendor] ?? FALLBACK_VENDOR_LOGO;
 }

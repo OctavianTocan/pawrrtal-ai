@@ -20,15 +20,15 @@ const packageJsonPath = resolve(repoRoot, 'frontend', 'package.json');
 
 const file = Bun.file(packageJsonPath);
 if (!(await file.exists())) {
-	console.error(`check-dev-port-contract: ${packageJsonPath} does not exist`);
-	process.exit(1);
+  console.error(`check-dev-port-contract: ${packageJsonPath} does not exist`);
+  process.exit(1);
 }
 
 try {
-	assertFrontendPortMatchesPackageJson(await file.text());
-	console.log('check-dev-port-contract: OK');
+  assertFrontendPortMatchesPackageJson(await file.text());
+  console.log('check-dev-port-contract: OK');
 } catch (error) {
-	const message = error instanceof Error ? error.message : String(error);
-	console.error(`check-dev-port-contract: ${message}`);
-	process.exit(1);
+  const message = error instanceof Error ? error.message : String(error);
+  console.error(`check-dev-port-contract: ${message}`);
+  process.exit(1);
 }

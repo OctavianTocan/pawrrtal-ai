@@ -1,38 +1,38 @@
 {
-	"schema_version": 1,
-	"id": "core_channels",
-	"name": "Core Channels",
-	"description": "Bundled web and Electron channel adapters.",
-	"version": "1.0.0",
-	"enabled_by_default": true,
-	"capabilities": [
-		{
-			"type": "channel",
-			"id": "web",
-			"title": "Web Channel",
-			"description": "Server-Sent Events channel used by the browser web application.",
-			"slots": ["chat_surface"],
-			"surface": "web",
-			"entrypoint": "app.channels.plugin_adapters:make_sse_channel"
-		},
-		{
-			"type": "channel",
-			"id": "electron",
-			"title": "Electron Channel",
-			"description": "Server-Sent Events channel used by the Electron desktop shell.",
-			"slots": ["chat_surface"],
-			"surface": "electron",
-			"entrypoint": "app.channels.plugin_adapters:make_sse_channel"
-		},
-		{
-			"type": "router",
-			"id": "channel_routes",
-			"title": "Channel Routes",
-			"description": "HTTP routes for channel binding, diagnostics, webhook ingress, and local simulation.",
-			"slots": ["api_router", "channel:messaging"],
-			"entrypoint": "app.channels.router:get_channels_router",
-			"prefix": "/api/v1/channels",
-			"tags": ["channels"]
-		}
-	]
+  "schema_version": 1,
+  "id": "core_channels",
+  "name": "Core Channels",
+  "description": "Bundled web and Electron channel adapters.",
+  "version": "1.0.0",
+  "enabled_by_default": true,
+  "capabilities": [
+    {
+      "type": "channel",
+      "id": "web",
+      "title": "Web Channel",
+      "description": "Server-Sent Events channel used by the browser web application.",
+      "slots": ["chat_surface"],
+      "surface": "web",
+      "entrypoint": "app.channels.plugin_adapters:make_sse_channel"
+    },
+    {
+      "type": "channel",
+      "id": "electron",
+      "title": "Electron Channel",
+      "description": "Server-Sent Events channel used by the Electron desktop shell.",
+      "slots": ["chat_surface"],
+      "surface": "electron",
+      "entrypoint": "app.channels.plugin_adapters:make_sse_channel"
+    },
+    {
+      "type": "router",
+      "id": "channel_routes",
+      "title": "Channel Routes",
+      "description": "HTTP routes for channel binding, diagnostics, webhook ingress, and local simulation.",
+      "slots": ["api_router", "channel:messaging"],
+      "entrypoint": "app.channels.router:get_channels_router",
+      "prefix": "/api/v1/channels",
+      "tags": ["channels"]
+    }
+  ]
 }

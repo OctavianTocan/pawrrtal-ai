@@ -87,13 +87,13 @@ export const DEV_BACKEND_URL = `http://127.0.0.1:${DEV_BACKEND_PORT}`;
  *   is missing or differs.
  */
 export function assertFrontendPortMatchesPackageJson(packageJsonText: string): true {
-	const expected = `next dev --hostname ${DEV_FRONTEND_BIND_HOST} --port ${DEV_FRONTEND_PORT}`;
-	if (!packageJsonText.includes(expected)) {
-		throw new Error(
-			`frontend/package.json does not reference the canonical dev host/port. ` +
-				`Expected the substring '${expected}' in scripts.dev; update package.json ` +
-				`or scripts/dev-ports.ts so the two match.`
-		);
-	}
-	return true;
+  const expected = `next dev --hostname ${DEV_FRONTEND_BIND_HOST} --port ${DEV_FRONTEND_PORT}`;
+  if (!packageJsonText.includes(expected)) {
+    throw new Error(
+      `frontend/package.json does not reference the canonical dev host/port. ` +
+        `Expected the substring '${expected}' in scripts.dev; update package.json ` +
+        `or scripts/dev-ports.ts so the two match.`
+    );
+  }
+  return true;
 }

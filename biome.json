@@ -1,272 +1,266 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
-	"vcs": {
-		"enabled": true,
-		"clientKind": "git",
-		"useIgnoreFile": true,
-		"defaultBranch": "main"
-	},
-	"files": {
-		"ignoreUnknown": false,
-		"includes": [
-			"**",
-			"!**/.agents",
-			"!**/.claude",
-			"!**/.cursor",
-			"!**/.pi",
-			"!**/.opencode",
-			"!**/.crush",
-			"!**/.codex",
-			"!**/.beans",
-			"!**/.pawrrtal",
-			"!**/.zed",
-			"!**/.vscode",
-			"!**/.sentrux",
-			"!**/.antigravitycli",
-			"!**/coverage",
-			"!**/.stagehand-cache",
-			"!**/playwright-report",
-			"!**/test-results",
-			"!frontend/e2e/output",
-			"!frontend/lib",
-			"!backend/vendor",
-			"!third_party"
-		]
-	},
-	"formatter": {
-		"enabled": true,
-		"indentStyle": "tab",
-		"indentWidth": 4,
-		"lineWidth": 100
-	},
-	"javascript": {
-		"formatter": {
-			"quoteStyle": "single",
-			"semicolons": "always",
-			"trailingCommas": "es5"
-		}
-	},
-	"css": {
-		"parser": {
-			"tailwindDirectives": true
-		}
-	},
-	"linter": {
-		"enabled": true,
-		"domains": {
-			"react": "all"
-		},
-		"rules": {
-			"recommended": true,
-			"complexity": {
-				"noExcessiveLinesPerFunction": {
-					"level": "warn",
-					"options": {
-						"maxLines": 120
-					}
-				},
-				"noExcessiveCognitiveComplexity": {
-					"level": "warn",
-					"options": {
-						"maxAllowedComplexity": 20
-					}
-				},
-				"noUselessFragments": "warn",
-				"noUselessTypeConstraint": "error",
-				"noUselessRename": "error"
-			},
-			"performance": {
-				"noImgElement": "off",
-				"useSolidForComponent": "off"
-			},
-			"suspicious": {
-				"noExplicitAny": "error",
-				"noArrayIndexKey": "off",
-				"noConfusingVoidType": "off",
-				"noReactForwardRef": "off",
-				"noConsole": {
-					"level": "warn",
-					"options": {
-						"allow": ["warn", "error", "group", "groupEnd", "time", "timeEnd", "table"]
-					}
-				},
-				"noDoubleEquals": "error",
-				"noShadowRestrictedNames": "error",
-				"noEmptyBlockStatements": "warn"
-			},
-			"correctness": {
-				"noUnusedVariables": "error",
-				"useSingleJsDocAsterisk": "warn",
-				"noUndeclaredDependencies": "warn",
-				"useExhaustiveDependencies": "warn",
-				"noUnusedImports": "error"
-			},
-			"style": {
-				"useComponentExportOnlyModules": "off",
-				"useImportType": "error",
-				"useExportType": "error",
-				"useConst": "error",
-				"useDefaultSwitchClause": "warn"
-			},
-			"a11y": {
-				"noStaticElementInteractions": "off",
-				"noSvgWithoutTitle": "off",
-				"useKeyWithClickEvents": "off"
-			},
-			"security": {
-				"noDangerouslySetInnerHtml": "warn",
-				"noSecrets": "off"
-			}
-		}
-	},
-	"overrides": [
-		{
-			"includes": ["**/*.md"],
-			"formatter": {
-				"enabled": false
-			},
-			"linter": {
-				"enabled": false
-			},
-			"assist": {
-				"enabled": false
-			}
-		},
-		{
-			"includes": ["frontend/features/**"],
-			"linter": {
-				"rules": {
-					"style": {
-						"noRestrictedImports": {
-							"level": "error",
-							"options": {
-								"paths": {
-									"@/components/ui/dialog": "Feature code must use AppDialog from @/components/ui/app-dialog (responsive Modal+BottomSheet) instead of raw shadcn Dialog. See .claude/rules/react/use-octavian-overlay-for-modals.md.",
-									"@/components/ui/alert-dialog": "Feature code must use AppDialog from @/components/ui/app-dialog instead of raw shadcn AlertDialog. See .claude/rules/react/use-octavian-overlay-for-modals.md.",
-									"@/components/ui/sheet": "Feature code must use AppDialog or BottomSheet from @octavian-tocan/react-overlay instead of raw shadcn Sheet. See .claude/rules/react/use-octavian-overlay-for-modals.md."
-								}
-							}
-						}
-					}
-				}
-			}
-		},
-		{
-			"includes": ["frontend/features/onboarding/**"],
-			"linter": {
-				"rules": {
-					"style": {
-						"noRestrictedImports": "off"
-					}
-				}
-			}
-		},
-		{
-			"includes": ["commit.ts", "dev.ts"],
-			"linter": {
-				"rules": {
-					"suspicious": {
-						"noConsole": "off"
-					}
-				}
-			}
-		},
-		{
-			"includes": ["frontend/e2e/**", "frontend/scripts/**", "scripts/**"],
-			"linter": {
-				"rules": {
-					"suspicious": {
-						"noConsole": "off"
-					}
-				}
-			}
-		},
-		{
-			"includes": [".agents/**"],
-			"linter": {
-				"enabled": false
-			}
-		},
-		{
-			"includes": ["frontend/app/globals.css"],
-			"linter": {
-				"rules": {
-					"complexity": {
-						"noImportantStyles": "off"
-					}
-				}
-			}
-		},
-		{
-			"includes": ["docs/**/*.html"],
-			"linter": {
-				"rules": {
-					"style": {
-						"noDescendingSpecificity": "off"
-					}
-				}
-			}
-		},
-		{
-			"includes": ["frontend/components/ui/**"],
-			"linter": {
-				"enabled": false
-			},
-			"assist": {
-				"enabled": false
-			}
-		},
-		{
-			"includes": ["frontend/packages/react-resizable-panels/**"],
-			"linter": {
-				"enabled": false
-			},
-			"assist": {
-				"enabled": false
-			}
-		},
-		{
-			"includes": ["frontend/app/layout.tsx"],
-			"linter": {
-				"rules": {
-					"security": {
-						"noDangerouslySetInnerHtml": "off"
-					}
-				}
-			}
-		},
-		{
-			"includes": [
-				"**/*.test.ts",
-				"**/*.test.tsx",
-				"**/*.spec.ts",
-				"**/*.spec.tsx",
-				"**/__tests__/**"
-			],
-			"linter": {
-				"rules": {
-					"complexity": {
-						"noExcessiveLinesPerFunction": "off"
-					},
-					"suspicious": {
-						"noExplicitAny": "off",
-						"noConsole": "off",
-						"noEmptyBlockStatements": "off"
-					},
-					"correctness": {
-						"noUndeclaredDependencies": "off",
-						"useExhaustiveDependencies": "off"
-					}
-				}
-			}
-		}
-	],
-	"assist": {
-		"enabled": true,
-		"actions": {
-			"source": {
-				"organizeImports": "on"
-			}
-		}
-	}
+  "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true,
+    "defaultBranch": "main"
+  },
+  "files": {
+    "ignoreUnknown": false,
+    "includes": [
+      "**",
+      "!**/.agents",
+      "!**/.claude",
+      "!**/.cursor",
+      "!**/.pi",
+      "!**/.opencode",
+      "!**/.crush",
+      "!**/.codex",
+      "!**/.beans",
+      "!**/.pawrrtal",
+      "!**/.zed",
+      "!**/.vscode",
+      "!**/.sentrux",
+      "!**/.antigravitycli",
+      "!**/coverage",
+      "!**/.stagehand-cache",
+      "!**/playwright-report",
+      "!**/test-results",
+      "!frontend/e2e/output",
+      "!frontend/lib",
+      "!backend/vendor",
+      "!third_party"
+    ]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 120
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "semicolons": "always",
+      "trailingCommas": "es5"
+    }
+  },
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "domains": {
+      "react": "all"
+    },
+    "rules": {
+      "recommended": true,
+      "complexity": {
+        "noExcessiveLinesPerFunction": {
+          "level": "warn",
+          "options": {
+            "maxLines": 120
+          }
+        },
+        "noExcessiveCognitiveComplexity": {
+          "level": "warn",
+          "options": {
+            "maxAllowedComplexity": 20
+          }
+        },
+        "noUselessFragments": "warn",
+        "noUselessTypeConstraint": "error",
+        "noUselessRename": "error"
+      },
+      "performance": {
+        "noImgElement": "off",
+        "useSolidForComponent": "off"
+      },
+      "suspicious": {
+        "noExplicitAny": "error",
+        "noArrayIndexKey": "off",
+        "noConfusingVoidType": "off",
+        "noReactForwardRef": "off",
+        "noConsole": {
+          "level": "warn",
+          "options": {
+            "allow": ["warn", "error", "group", "groupEnd", "time", "timeEnd", "table"]
+          }
+        },
+        "noDoubleEquals": "error",
+        "noShadowRestrictedNames": "error",
+        "noEmptyBlockStatements": "warn"
+      },
+      "correctness": {
+        "noUnusedVariables": "error",
+        "useSingleJsDocAsterisk": "warn",
+        "noUndeclaredDependencies": "warn",
+        "useExhaustiveDependencies": "warn",
+        "noUnusedImports": "error"
+      },
+      "style": {
+        "useComponentExportOnlyModules": "off",
+        "useImportType": "error",
+        "useExportType": "error",
+        "useConst": "error",
+        "useDefaultSwitchClause": "warn"
+      },
+      "a11y": {
+        "noStaticElementInteractions": "off",
+        "noSvgWithoutTitle": "off",
+        "useKeyWithClickEvents": "off"
+      },
+      "security": {
+        "noDangerouslySetInnerHtml": "warn",
+        "noSecrets": "off"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["**/*.md"],
+      "formatter": {
+        "enabled": false
+      },
+      "linter": {
+        "enabled": false
+      },
+      "assist": {
+        "enabled": false
+      }
+    },
+    {
+      "includes": ["frontend/features/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@/components/ui/dialog": "Feature code must use AppDialog from @/components/ui/app-dialog (responsive Modal+BottomSheet) instead of raw shadcn Dialog. See .claude/rules/react/use-octavian-overlay-for-modals.md.",
+                  "@/components/ui/alert-dialog": "Feature code must use AppDialog from @/components/ui/app-dialog instead of raw shadcn AlertDialog. See .claude/rules/react/use-octavian-overlay-for-modals.md.",
+                  "@/components/ui/sheet": "Feature code must use AppDialog or BottomSheet from @octavian-tocan/react-overlay instead of raw shadcn Sheet. See .claude/rules/react/use-octavian-overlay-for-modals.md."
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["frontend/features/onboarding/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["commit.ts", "dev.ts"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["frontend/e2e/**", "frontend/scripts/**", "scripts/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": [".agents/**"],
+      "linter": {
+        "enabled": false
+      }
+    },
+    {
+      "includes": ["frontend/app/globals.css"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noImportantStyles": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["docs/**/*.html"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noDescendingSpecificity": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["frontend/components/ui/**"],
+      "linter": {
+        "enabled": false
+      },
+      "assist": {
+        "enabled": false
+      }
+    },
+    {
+      "includes": ["frontend/packages/react-resizable-panels/**"],
+      "linter": {
+        "enabled": false
+      },
+      "assist": {
+        "enabled": false
+      }
+    },
+    {
+      "includes": ["frontend/app/layout.tsx"],
+      "linter": {
+        "rules": {
+          "security": {
+            "noDangerouslySetInnerHtml": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx", "**/__tests__/**"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noExcessiveLinesPerFunction": "off"
+          },
+          "suspicious": {
+            "noExplicitAny": "off",
+            "noConsole": "off",
+            "noEmptyBlockStatements": "off"
+          },
+          "correctness": {
+            "noUndeclaredDependencies": "off",
+            "useExhaustiveDependencies": "off"
+          }
+        }
+      }
+    }
+  ],
+  "assist": {
+    "enabled": true,
+    "actions": {
+      "source": {
+        "organizeImports": "on"
+      }
+    }
+  }
 }

@@ -25,9 +25,7 @@ const MAX_COLLAPSED_AVATARS = 2;
  *
  * This keeps the entire state machine self-contained in one `useReducer`.
  */
-type InternalBannerState =
-	| { status: 'collapsed'; nextExpandKey: number }
-	| { status: 'expanded'; expandKey: number };
+type InternalBannerState = { status: 'collapsed'; nextExpandKey: number } | { status: 'expanded'; expandKey: number };
 
 /**
  * Pure state transition for the banner toggle.
@@ -39,18 +37,18 @@ type InternalBannerState =
  * No action payload is needed; toggle is the only transition.
  */
 function reduceBannerState(state: InternalBannerState): InternalBannerState {
-	if (state.status === 'collapsed') {
-		return { status: 'expanded', expandKey: state.nextExpandKey };
-	}
-	return { status: 'collapsed', nextExpandKey: state.expandKey + 1 };
+  if (state.status === 'collapsed') {
+    return { status: 'expanded', expandKey: state.nextExpandKey };
+  }
+  return { status: 'collapsed', nextExpandKey: state.expandKey + 1 };
 }
 
 /** Strip internal fields before handing state to the View layer. */
 function toBannerState(state: InternalBannerState): BannerState {
-	if (state.status === 'expanded') {
-		return state;
-	}
-	return { status: 'collapsed' };
+  if (state.status === 'expanded') {
+    return state;
+  }
+  return { status: 'collapsed' };
 }
 
 // ---------------------------------------------------------------------------
@@ -86,68 +84,62 @@ function toBannerState(state: InternalBannerState): BannerState {
  * />
  * ```
  */
-export function AccessRequestBanner({
-	requests,
-	onApprove,
-	onReject,
-	onReset,
-	onDismiss,
-}: AccessRequestBannerProps) {
-	/**
-	 * Banner expand/collapse state machine.
-	 * Uses `InternalBannerState` (not the public `BannerState`) so the reducer
-	 * can pre-compute `nextExpandKey` on collapse without any external counter.
-	 * `nextExpandKey: 1` means the first expand gets key `1`.
-	 */
-	const [internalBannerState, dispatchBannerToggle] = useReducer(reduceBannerState, {
-		status: 'collapsed',
-		nextExpandKey: 1,
-	});
+export function AccessRequestBanner({ requests, onApprove, onReject, onReset, onDismiss }: AccessRequestBannerProps) {
+  /**
+   * Banner expand/collapse state machine.
+   * Uses `InternalBannerState` (not the public `BannerState`) so the reducer
+   * can pre-compute `nextExpandKey` on collapse without any external counter.
+   * `nextExpandKey: 1` means the first expand gets key `1`.
+   */
+  const [internalBannerState, dispatchBannerToggle] = useReducer(reduceBannerState, {
+    status: 'collapsed',
+    nextExpandKey: 1,
+  });
 
-	/**
-	 * Local decision map keeps the banner's UI in sync immediately,
-	 * even before an optimistic server mutation resolves.
-	 * The parent's `onApprove` / `onReject` callbacks handle persistence.
-	 */
-	const [decisions, setDecisions] = useState<Record<string, Decision>>({});
+  /**
+   * Local decision map keeps the banner's UI in sync immediately,
+   * even before an optimistic server mutation resolves.
+   * The parent's `onApprove` / `onReject` callbacks handle persistence.
+   */
+  const [decisions, setDecisions] = useState<Record<string, Decision>>({});
 
-	/** Optimistically marks a request as approved locally, then notifies the parent. */
-	const handleApprove = (id: string) => {
-		setDecisions((prev) => ({ ...prev, [id]: 'approved' }));
-		onApprove?.(id);
-	};
+  /** Optimistically marks a request as approved locally, then notifies the parent. */
+  const handleApprove = (id: string) => {
+    setDecisions((prev) => ({ ...prev, [id]: 'approved' }));
+    onApprove?.(id);
+  };
 
-	/** Optimistically marks a request as rejected locally, then notifies the parent. */
-	const handleReject = (id: string) => {
-		setDecisions((prev) => ({ ...prev, [id]: 'rejected' }));
-		onReject?.(id);
-	};
+  /** Optimistically marks a request as rejected locally, then notifies the parent. */
+  const handleReject = (id: string) => {
+    setDecisions((prev) => ({ ...prev, [id]: 'rejected' }));
+    onReject?.(id);
+  };
 
-	/** Reverts a decision back to undecided and mirrors that state to the parent. */
-	const handleReset = (id: string) => {
-		setDecisions((prev) => ({ ...prev, [id]: 'undecided' }));
-		onReset?.(id);
-	};
+  /** Reverts a decision back to undecided and mirrors that state to the parent. */
+  const handleReset = (id: string) => {
+    setDecisions((prev) => ({ ...prev, [id]: 'undecided' }));
+    onReset?.(id);
+  };
 
-	// Nothing to show — bail before rendering anything.
-	if (requests.length === 0) return null;
+  // Nothing to show — bail before rendering anything.
+  if (requests.length === 0) return null;
 
-	// Precomputed for the View so it doesn't repeat slice/max logic.
-	const collapsedAvatars = requests.slice(0, MAX_COLLAPSED_AVATARS);
-	const remainingCount = Math.max(0, requests.length - MAX_COLLAPSED_AVATARS);
+  // Precomputed for the View so it doesn't repeat slice/max logic.
+  const collapsedAvatars = requests.slice(0, MAX_COLLAPSED_AVATARS);
+  const remainingCount = Math.max(0, requests.length - MAX_COLLAPSED_AVATARS);
 
-	return (
-		<AccessRequestBannerView
-			requests={requests}
-			bannerState={toBannerState(internalBannerState)}
-			decisions={decisions}
-			collapsedAvatars={collapsedAvatars}
-			remainingCount={remainingCount}
-			onToggleExpand={dispatchBannerToggle}
-			onDismiss={onDismiss}
-			onApproveRequest={handleApprove}
-			onRejectRequest={handleReject}
-			onResetRequest={handleReset}
-		/>
-	);
+  return (
+    <AccessRequestBannerView
+      requests={requests}
+      bannerState={toBannerState(internalBannerState)}
+      decisions={decisions}
+      collapsedAvatars={collapsedAvatars}
+      remainingCount={remainingCount}
+      onToggleExpand={dispatchBannerToggle}
+      onDismiss={onDismiss}
+      onApproveRequest={handleApprove}
+      onRejectRequest={handleReject}
+      onResetRequest={handleReset}
+    />
+  );
 }

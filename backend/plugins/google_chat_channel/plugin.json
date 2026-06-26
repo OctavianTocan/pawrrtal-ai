@@ -1,75 +1,75 @@
 {
-	"schema_version": 1,
-	"id": "google_chat_channel",
-	"name": "Google Chat Channel",
-	"description": "Google Chat Pub/Sub ingress and message delivery for Pawrrtal.",
-	"version": "1.0.0",
-	"enabled_by_default": true,
-	"permissions": ["network", "external_read", "external_write"],
-	"env": [
-		{
-			"name": "GOOGLE_CHAT_SERVICE_ACCOUNT_FILE",
-			"required": false,
-			"scope": "gateway",
-			"overridable": false,
-			"secret": false,
-			"label": "Google Chat Service Account File",
-			"description": "Path to the Google Cloud service account JSON used for Chat and Pub/Sub."
-		},
-		{
-			"name": "GOOGLE_CHAT_PROJECT_ID",
-			"required": false,
-			"scope": "gateway",
-			"overridable": false,
-			"secret": false,
-			"label": "Google Chat Project ID",
-			"description": "Google Cloud project that owns the Pub/Sub resources."
-		},
-		{
-			"name": "GOOGLE_CHAT_SUBSCRIPTION_ID",
-			"required": false,
-			"scope": "gateway",
-			"overridable": false,
-			"secret": false,
-			"label": "Google Chat Subscription ID",
-			"description": "Pub/Sub pull subscription that receives inbound Google Chat events."
-		},
-		{
-			"name": "GOOGLE_CHAT_DEV_ADMIN_ID",
-			"required": false,
-			"scope": "gateway",
-			"overridable": false,
-			"secret": false,
-			"label": "Google Chat Dev Admin ID",
-			"description": "Optional sender resource name that auto-links to the seeded dev admin."
-		}
-	],
-	"capabilities": [
-		{
-			"type": "channel",
-			"id": "google_chat",
-			"title": "Google Chat",
-			"description": "Receives Google Chat events and sends formatted Pawrrtal responses.",
-			"tags": ["chat", "google-chat", "messaging"],
-			"intents": ["message", "notify", "workspace-chat"],
-			"slots": ["channel:google_chat", "channel:messaging"],
-			"priority": 90,
-			"exposure": "catalog",
-			"permissions": ["network", "external_read", "external_write"],
-			"risk": "external_write",
-			"surface": "google_chat",
-			"entrypoint": "app.channels.plugin_adapters:make_google_chat_channel",
-			"commands": {
-				"slash": ["status", "compact"],
-				"cards": ["placeholder", "final_answer"],
-				"formatting": ["google_chat_markdown"]
-			},
-			"lifespan": {
-				"entrypoint": "app.channels.google_chat:google_chat_lifespan",
-				"context_key": "google_chat_lifespan_context",
-				"service_key": "google_chat_service",
-				"order": 72
-			}
-		}
-	]
+  "schema_version": 1,
+  "id": "google_chat_channel",
+  "name": "Google Chat Channel",
+  "description": "Google Chat Pub/Sub ingress and message delivery for Pawrrtal.",
+  "version": "1.0.0",
+  "enabled_by_default": true,
+  "permissions": ["network", "external_read", "external_write"],
+  "env": [
+    {
+      "name": "GOOGLE_CHAT_SERVICE_ACCOUNT_FILE",
+      "required": false,
+      "scope": "gateway",
+      "overridable": false,
+      "secret": false,
+      "label": "Google Chat Service Account File",
+      "description": "Path to the Google Cloud service account JSON used for Chat and Pub/Sub."
+    },
+    {
+      "name": "GOOGLE_CHAT_PROJECT_ID",
+      "required": false,
+      "scope": "gateway",
+      "overridable": false,
+      "secret": false,
+      "label": "Google Chat Project ID",
+      "description": "Google Cloud project that owns the Pub/Sub resources."
+    },
+    {
+      "name": "GOOGLE_CHAT_SUBSCRIPTION_ID",
+      "required": false,
+      "scope": "gateway",
+      "overridable": false,
+      "secret": false,
+      "label": "Google Chat Subscription ID",
+      "description": "Pub/Sub pull subscription that receives inbound Google Chat events."
+    },
+    {
+      "name": "GOOGLE_CHAT_DEV_ADMIN_ID",
+      "required": false,
+      "scope": "gateway",
+      "overridable": false,
+      "secret": false,
+      "label": "Google Chat Dev Admin ID",
+      "description": "Optional sender resource name that auto-links to the seeded dev admin."
+    }
+  ],
+  "capabilities": [
+    {
+      "type": "channel",
+      "id": "google_chat",
+      "title": "Google Chat",
+      "description": "Receives Google Chat events and sends formatted Pawrrtal responses.",
+      "tags": ["chat", "google-chat", "messaging"],
+      "intents": ["message", "notify", "workspace-chat"],
+      "slots": ["channel:google_chat", "channel:messaging"],
+      "priority": 90,
+      "exposure": "catalog",
+      "permissions": ["network", "external_read", "external_write"],
+      "risk": "external_write",
+      "surface": "google_chat",
+      "entrypoint": "app.channels.plugin_adapters:make_google_chat_channel",
+      "commands": {
+        "slash": ["status", "compact"],
+        "cards": ["placeholder", "final_answer"],
+        "formatting": ["google_chat_markdown"]
+      },
+      "lifespan": {
+        "entrypoint": "app.channels.google_chat:google_chat_lifespan",
+        "context_key": "google_chat_lifespan_context",
+        "service_key": "google_chat_service",
+        "order": 72
+      }
+    }
+  ]
 }

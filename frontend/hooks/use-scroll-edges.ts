@@ -15,10 +15,10 @@ import { useEffect, useState } from 'react';
  * visible area.
  */
 export interface ScrollEdges {
-	/** True when scrollTop > 0 — content exists above the visible area. */
-	canScrollUp: boolean;
-	/** True when scrollTop + clientHeight < scrollHeight — content exists below. */
-	canScrollDown: boolean;
+  /** True when scrollTop > 0 — content exists above the visible area. */
+  canScrollUp: boolean;
+  /** True when scrollTop + clientHeight < scrollHeight — content exists below. */
+  canScrollDown: boolean;
 }
 
 /**
@@ -48,40 +48,38 @@ export interface ScrollEdges {
  * @returns Current scroll-edge state
  */
 export function useScrollEdges<T extends HTMLElement>(ref: RefObject<T | null>): ScrollEdges {
-	const [edges, setEdges] = useState<ScrollEdges>({
-		canScrollUp: false,
-		canScrollDown: false,
-	});
+  const [edges, setEdges] = useState<ScrollEdges>({
+    canScrollUp: false,
+    canScrollDown: false,
+  });
 
-	useEffect(() => {
-		const el = ref.current;
-		if (!el) return;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
 
-		const update = (): void => {
-			// `scrollHeight - clientHeight - scrollTop` is the remaining scroll
-			// distance below; a 1 px fudge avoids flicker at the rounding edge
-			// where browsers report fractional values.
-			const canScrollUp = el.scrollTop > 1;
-			const canScrollDown = el.scrollHeight - el.clientHeight - el.scrollTop > 1;
-			setEdges((prev) =>
-				prev.canScrollUp === canScrollUp && prev.canScrollDown === canScrollDown
-					? prev
-					: { canScrollUp, canScrollDown }
-			);
-		};
+    const update = (): void => {
+      // `scrollHeight - clientHeight - scrollTop` is the remaining scroll
+      // distance below; a 1 px fudge avoids flicker at the rounding edge
+      // where browsers report fractional values.
+      const canScrollUp = el.scrollTop > 1;
+      const canScrollDown = el.scrollHeight - el.clientHeight - el.scrollTop > 1;
+      setEdges((prev) =>
+        prev.canScrollUp === canScrollUp && prev.canScrollDown === canScrollDown ? prev : { canScrollUp, canScrollDown }
+      );
+    };
 
-		update();
-		el.addEventListener('scroll', update, { passive: true });
-		// Watch for size changes so we re-check when the user types (textarea
-		// auto-grows) or the container resizes around it.
-		const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
-		observer?.observe(el);
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    // Watch for size changes so we re-check when the user types (textarea
+    // auto-grows) or the container resizes around it.
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+    observer?.observe(el);
 
-		return () => {
-			el.removeEventListener('scroll', update);
-			observer?.disconnect();
-		};
-	}, [ref]);
+    return () => {
+      el.removeEventListener('scroll', update);
+      observer?.disconnect();
+    };
+  }, [ref]);
 
-	return edges;
+  return edges;
 }

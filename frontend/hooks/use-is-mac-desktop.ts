@@ -14,9 +14,9 @@ import { getDesktopPlatformSync } from '@/lib/desktop';
  * `process.platform === 'darwin'`.
  */
 export function useIsMacDesktop(): boolean {
-	const [isMacDesktop, setIsMacDesktop] = useState(false);
-	useEffect(() => {
-		setIsMacDesktop(getDesktopPlatformSync() === 'darwin');
-	}, []);
-	return isMacDesktop;
+  const [isMacDesktop, setIsMacDesktop] = useState(false);
+  useEffect(() => {
+    setIsMacDesktop(getDesktopPlatformSync() === 'darwin');
+  }, []);
+  return isMacDesktop;
 }

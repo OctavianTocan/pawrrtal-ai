@@ -30,49 +30,43 @@ const WCAG_TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'];
  * upsert that triggers ``ensure_default_workspace`` server-side.
  */
 async function seedAuthenticatedHomeShell(context: BrowserContext): Promise<void> {
-	const backend = process.env.E2E_API_URL ?? 'http://localhost:8000';
-	const loginResponse = await context.request.post(`${backend}/auth/dev-login`);
-	expect(loginResponse.ok()).toBe(true);
-	const provisionResponse = await context.request.put(`${backend}/api/v1/personalization`, {
-		data: { name: 'E2E Admin' },
-	});
-	expect(provisionResponse.ok()).toBe(true);
+  const backend = process.env.E2E_API_URL ?? 'http://localhost:8000';
+  const loginResponse = await context.request.post(`${backend}/auth/dev-login`);
+  expect(loginResponse.ok()).toBe(true);
+  const provisionResponse = await context.request.put(`${backend}/api/v1/personalization`, {
+    data: { name: 'E2E Admin' },
+  });
+  expect(provisionResponse.ok()).toBe(true);
 }
 
 test.describe('a11y smoke', () => {
-	test('login page has no auto-detectable a11y violations', async ({ page }) => {
-		await page.goto('/login');
-		const results = await new AxeBuilder({ page: page as never }).withTags(WCAG_TAGS).analyze();
-		expect(results.violations).toEqual([]);
-	});
+  test('login page has no auto-detectable a11y violations', async ({ page }) => {
+    await page.goto('/login');
+    const results = await new AxeBuilder({ page: page as never }).withTags(WCAG_TAGS).analyze();
+    expect(results.violations).toEqual([]);
+  });
 
-	test('authenticated home shell has no auto-detectable a11y violations', async ({
-		page,
-		context,
-	}) => {
-		await seedAuthenticatedHomeShell(context);
-		await page.goto('/');
-		await expect(page.getByRole('textbox', { name: /Ask Pawrrtal/i })).toBeVisible();
-		const results = await new AxeBuilder({ page: page as never }).withTags(WCAG_TAGS).analyze();
-		expect(results.violations).toEqual([]);
-	});
+  test('authenticated home shell has no auto-detectable a11y violations', async ({ page, context }) => {
+    await seedAuthenticatedHomeShell(context);
+    await page.goto('/');
+    await expect(page.getByRole('textbox', { name: /Ask Pawrrtal/i })).toBeVisible();
+    const results = await new AxeBuilder({ page: page as never }).withTags(WCAG_TAGS).analyze();
+    expect(results.violations).toEqual([]);
+  });
 
-	test('settings page has no auto-detectable a11y violations', async ({ page, context }) => {
-		await seedAuthenticatedHomeShell(context);
-		await page.goto('/settings');
-		const results = await new AxeBuilder({ page: page as never }).withTags(WCAG_TAGS).analyze();
-		expect(results.violations).toEqual([]);
-	});
+  test('settings page has no auto-detectable a11y violations', async ({ page, context }) => {
+    await seedAuthenticatedHomeShell(context);
+    await page.goto('/settings');
+    const results = await new AxeBuilder({ page: page as never }).withTags(WCAG_TAGS).analyze();
+    expect(results.violations).toEqual([]);
+  });
 
-	test('chat composer with a draft has no auto-detectable a11y violations', async ({
-		page,
-		context,
-	}) => {
-		await seedAuthenticatedHomeShell(context);
-		await page.goto('/');
-		const composer = page.getByRole('textbox', { name: /Ask Pawrrtal/i });
-		await composer.fill('Hello — this is an a11y smoke draft.');
-		const results = await new AxeBuilder({ page: page as never }).withTags(WCAG_TAGS).analyze();
-		expect(results.violations).toEqual([]);
-	});
+  test('chat composer with a draft has no auto-detectable a11y violations', async ({ page, context }) => {
+    await seedAuthenticatedHomeShell(context);
+    await page.goto('/');
+    const composer = page.getByRole('textbox', { name: /Ask Pawrrtal/i });
+    await composer.fill('Hello — this is an a11y smoke draft.');
+    const results = await new AxeBuilder({ page: page as never }).withTags(WCAG_TAGS).analyze();
+    expect(results.violations).toEqual([]);
+  });
 });

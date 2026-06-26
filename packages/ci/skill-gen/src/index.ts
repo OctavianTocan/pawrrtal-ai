@@ -121,147 +121,141 @@ import { scan } from './scan';
  * Detect git repo root, falling back to cwd.
  */
 function detectRepoRoot(): string {
-	try {
-		return execSync('git rev-parse --show-toplevel', {
-			encoding: 'utf-8',
-		}).trim();
-	} catch {
-		return process.cwd();
-	}
+  try {
+    return execSync('git rev-parse --show-toplevel', {
+      encoding: 'utf-8',
+    }).trim();
+  } catch {
+    return process.cwd();
+  }
 }
 
 /** Produce merged skills for a base directory, skipping the output directory. */
 async function runPipeline(
-	baseDir: string,
-	outputDir: string,
-	verbose: boolean
+  baseDir: string,
+  outputDir: string,
+  verbose: boolean
 ): Promise<ReturnType<typeof mergeFragments>> {
-	const rawFragments = await scan(baseDir, outputDir, verbose);
+  const rawFragments = await scan(baseDir, outputDir, verbose);
 
-	if (verbose) {
-		process.stdout.write(`pipeline: found ${rawFragments.length} raw fragment(s)\n`);
-	}
+  if (verbose) {
+    process.stdout.write(`pipeline: found ${rawFragments.length} raw fragment(s)\n`);
+  }
 
-	const parsed = rawFragments
-		.map(parseFragment)
-		.filter((f): f is NonNullable<typeof f> => f !== null);
-	const merged = mergeFragments(parsed);
+  const parsed = rawFragments.map(parseFragment).filter((f): f is NonNullable<typeof f> => f !== null);
+  const merged = mergeFragments(parsed);
 
-	if (verbose) {
-		process.stdout.write(`pipeline: merged into ${merged.size} skill(s)\n`);
-	}
+  if (verbose) {
+    process.stdout.write(`pipeline: merged into ${merged.size} skill(s)\n`);
+  }
 
-	return merged;
+  return merged;
 }
 
 /** Resolve the default output directory for a base directory. */
 function defaultOutputDir(baseDir: string): string {
-	return resolve(baseDir, '.agents', 'skills');
+  return resolve(baseDir, '.agents', 'skills');
 }
 
 const baseFlag = Flag.string('base').pipe(
-	Flag.optional,
-	Flag.withDescription('Base folder to scan (default: git repo root)')
+  Flag.optional,
+  Flag.withDescription('Base folder to scan (default: git repo root)')
 );
 
 const outputFlag = Flag.string('output').pipe(
-	Flag.optional,
-	Flag.withDescription('Output folder for generated skills')
+  Flag.optional,
+  Flag.withDescription('Output folder for generated skills')
 );
 
 const verboseFlag = Flag.boolean('verbose').pipe(
-	Flag.withDefault(false),
-	Flag.withDescription('Print discovered fragments and merge diagnostics')
+  Flag.withDefault(false),
+  Flag.withDescription('Print discovered fragments and merge diagnostics')
 );
 
 /** Generate skills for the requested base/output pair. */
 const generate = Command.make('generate', {
-	base: baseFlag,
-	output: outputFlag,
-	verbose: verboseFlag,
+  base: baseFlag,
+  output: outputFlag,
+  verbose: verboseFlag,
 }).pipe(
-	Command.withHandler(({ base, output, verbose }) =>
-		Effect.gen(function* () {
-			const baseDir = Option.getOrElse(base, detectRepoRoot);
-			const outputDir = Option.getOrElse(output, () => defaultOutputDir(baseDir));
-			const merged = yield* Effect.promise(() => runPipeline(baseDir, outputDir, verbose));
+  Command.withHandler(({ base, output, verbose }) =>
+    Effect.gen(function* () {
+      const baseDir = Option.getOrElse(base, detectRepoRoot);
+      const outputDir = Option.getOrElse(output, () => defaultOutputDir(baseDir));
+      const merged = yield* Effect.promise(() => runPipeline(baseDir, outputDir, verbose));
 
-			yield* Effect.promise(() => writeSkills(merged, outputDir, verbose));
-			yield* Console.log(`generate: wrote ${merged.size} skill(s) to ${outputDir}`);
-		})
-	)
+      yield* Effect.promise(() => writeSkills(merged, outputDir, verbose));
+      yield* Console.log(`generate: wrote ${merged.size} skill(s) to ${outputDir}`);
+    })
+  )
 );
 
 /** Check generated skills against the files on disk. */
 const check = Command.make('check', {
-	base: baseFlag,
-	output: outputFlag,
-	verbose: verboseFlag,
+  base: baseFlag,
+  output: outputFlag,
+  verbose: verboseFlag,
 }).pipe(
-	Command.withHandler(({ base, output, verbose }) =>
-		Effect.gen(function* () {
-			const baseDir = Option.getOrElse(base, detectRepoRoot);
-			const outputDir = Option.getOrElse(output, () => defaultOutputDir(baseDir));
-			const merged = yield* Effect.promise(() => runPipeline(baseDir, outputDir, verbose));
-			const diffs = yield* Effect.promise(() => checkSkills(merged, outputDir));
+  Command.withHandler(({ base, output, verbose }) =>
+    Effect.gen(function* () {
+      const baseDir = Option.getOrElse(base, detectRepoRoot);
+      const outputDir = Option.getOrElse(output, () => defaultOutputDir(baseDir));
+      const merged = yield* Effect.promise(() => runPipeline(baseDir, outputDir, verbose));
+      const diffs = yield* Effect.promise(() => checkSkills(merged, outputDir));
 
-			if (diffs.length === 0) {
-				yield* Console.log('check: all skills are up-to-date');
-				return;
-			}
+      if (diffs.length === 0) {
+        yield* Console.log('check: all skills are up-to-date');
+        return;
+      }
 
-			yield* Console.error(`check: ${diffs.length} difference(s) found`);
-			yield* Console.error(formatDiffs(diffs));
-			process.exitCode = 1;
-		})
-	)
+      yield* Console.error(`check: ${diffs.length} difference(s) found`);
+      yield* Console.error(formatDiffs(diffs));
+      process.exitCode = 1;
+    })
+  )
 );
 
 /** Run the fixture-based end-to-end generator check. */
 const e2eTest = Command.make('e2e-test', {
-	verbose: verboseFlag,
+  verbose: verboseFlag,
 }).pipe(
-	Command.withHandler(({ verbose }) =>
-		Effect.gen(function* () {
-			const projectDir = resolve(dirname(new URL(import.meta.url).pathname), '..');
-			const testDir = resolve(projectDir, 'e2e-test');
-			const expectedDir = resolve(projectDir, 'e2e-test-expected');
-			const tmpOutput = mkdtempSync(resolve(tmpdir(), 'skill-gen-e2e-'));
+  Command.withHandler(({ verbose }) =>
+    Effect.gen(function* () {
+      const projectDir = resolve(dirname(new URL(import.meta.url).pathname), '..');
+      const testDir = resolve(projectDir, 'e2e-test');
+      const expectedDir = resolve(projectDir, 'e2e-test-expected');
+      const tmpOutput = mkdtempSync(resolve(tmpdir(), 'skill-gen-e2e-'));
 
-			try {
-				const merged = yield* Effect.promise(() =>
-					runPipeline(testDir, tmpOutput, verbose)
-				);
-				yield* Effect.promise(() => writeSkills(merged, tmpOutput, verbose));
+      try {
+        const merged = yield* Effect.promise(() => runPipeline(testDir, tmpOutput, verbose));
+        yield* Effect.promise(() => writeSkills(merged, tmpOutput, verbose));
 
-				const expectedFiles = yield* Effect.promise(() => collectSkillFiles(expectedDir));
-				const results = yield* Effect.promise(() =>
-					Promise.all(
-						expectedFiles.map((file) => compareFile(file, expectedDir, tmpOutput))
-					)
-				);
+        const expectedFiles = yield* Effect.promise(() => collectSkillFiles(expectedDir));
+        const results = yield* Effect.promise(() =>
+          Promise.all(expectedFiles.map((file) => compareFile(file, expectedDir, tmpOutput)))
+        );
 
-				let hasError = results.some((ok) => !ok);
-				const actualFiles = yield* Effect.promise(() => collectSkillFiles(tmpOutput));
-				for (const file of actualFiles) {
-					if (!expectedFiles.includes(file)) {
-						yield* Console.error(`FAIL: unexpected file ${file} in output`);
-						hasError = true;
-					}
-				}
+        let hasError = results.some((ok) => !ok);
+        const actualFiles = yield* Effect.promise(() => collectSkillFiles(tmpOutput));
+        for (const file of actualFiles) {
+          if (!expectedFiles.includes(file)) {
+            yield* Console.error(`FAIL: unexpected file ${file} in output`);
+            hasError = true;
+          }
+        }
 
-				if (hasError) {
-					yield* Console.error('e2e-test: FAILED');
-					process.exitCode = 1;
-					return;
-				}
+        if (hasError) {
+          yield* Console.error('e2e-test: FAILED');
+          process.exitCode = 1;
+          return;
+        }
 
-				yield* Console.log('e2e-test: PASSED');
-			} finally {
-				rmSync(tmpOutput, { recursive: true, force: true });
-			}
-		})
-	)
+        yield* Console.log('e2e-test: PASSED');
+      } finally {
+        rmSync(tmpOutput, { recursive: true, force: true });
+      }
+    })
+  )
 );
 
 const root = Command.make('skill-gen').pipe(Command.withSubcommands([generate, check, e2eTest]));

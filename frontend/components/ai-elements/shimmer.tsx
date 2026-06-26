@@ -21,11 +21,11 @@ import { cn } from '@/lib/utils';
 type MotionWrappedComponent = React.ComponentType<any>;
 
 export type TextShimmerProps = {
-	children: string;
-	as?: ElementType;
-	className?: string;
-	duration?: number;
-	spread?: number;
+  children: string;
+  as?: ElementType;
+  className?: string;
+  duration?: number;
+  spread?: number;
 };
 
 // Hoist the motion-wrapped element factory cache to module scope.
@@ -48,61 +48,54 @@ const motionTagCache = new Map<string, MotionWrappedComponent>();
 const motionComponentCache = new WeakMap<React.ComponentType<unknown>, MotionWrappedComponent>();
 
 function resolveMotionComponent(Component: ElementType): MotionWrappedComponent {
-	if (typeof Component === 'string') {
-		const cached = motionTagCache.get(Component);
-		if (cached) return cached;
-		// biome-ignore lint/suspicious/noExplicitAny: see top-of-file
-		const created = m.create(Component as any) as MotionWrappedComponent;
-		motionTagCache.set(Component, created);
-		return created;
-	}
-	const componentKey = Component as React.ComponentType<unknown>;
-	const cached = motionComponentCache.get(componentKey);
-	if (cached) return cached;
-	// biome-ignore lint/suspicious/noExplicitAny: see top-of-file
-	const created = m.create(Component as any) as MotionWrappedComponent;
-	motionComponentCache.set(componentKey, created);
-	return created;
+  if (typeof Component === 'string') {
+    const cached = motionTagCache.get(Component);
+    if (cached) return cached;
+    // biome-ignore lint/suspicious/noExplicitAny: see top-of-file
+    const created = m.create(Component as any) as MotionWrappedComponent;
+    motionTagCache.set(Component, created);
+    return created;
+  }
+  const componentKey = Component as React.ComponentType<unknown>;
+  const cached = motionComponentCache.get(componentKey);
+  if (cached) return cached;
+  // biome-ignore lint/suspicious/noExplicitAny: see top-of-file
+  const created = m.create(Component as any) as MotionWrappedComponent;
+  motionComponentCache.set(componentKey, created);
+  return created;
 }
 
-const ShimmerComponent = ({
-	children,
-	as: Component = 'p',
-	className,
-	duration = 2,
-	spread = 2,
-}: TextShimmerProps) => {
-	const MotionComponent = useMemo(() => resolveMotionComponent(Component), [Component]);
+const ShimmerComponent = ({ children, as: Component = 'p', className, duration = 2, spread = 2 }: TextShimmerProps) => {
+  const MotionComponent = useMemo(() => resolveMotionComponent(Component), [Component]);
 
-	const dynamicSpread = useMemo(() => (children?.length ?? 0) * spread, [children, spread]);
+  const dynamicSpread = useMemo(() => (children?.length ?? 0) * spread, [children, spread]);
 
-	return (
-		<LazyMotion features={domAnimation}>
-			<MotionComponent
-				animate={{ backgroundPosition: '0% center' }}
-				className={cn(
-					'relative inline-block bg-[length:250%_100%,auto] bg-clip-text text-transparent',
-					'[--bg:linear-gradient(90deg,#0000_calc(50%-var(--spread)),var(--color-background),#0000_calc(50%+var(--spread)))] [background-repeat:no-repeat,padding-box]',
-					className
-				)}
-				initial={{ backgroundPosition: '100% center' }}
-				style={
-					{
-						'--spread': `${dynamicSpread}px`,
-						backgroundImage:
-							'var(--bg), linear-gradient(var(--color-muted-foreground), var(--color-muted-foreground))',
-					} as CSSProperties
-				}
-				transition={{
-					repeat: Number.POSITIVE_INFINITY,
-					duration,
-					ease: 'linear',
-				}}
-			>
-				{children}
-			</MotionComponent>
-		</LazyMotion>
-	);
+  return (
+    <LazyMotion features={domAnimation}>
+      <MotionComponent
+        animate={{ backgroundPosition: '0% center' }}
+        className={cn(
+          'relative inline-block bg-[length:250%_100%,auto] bg-clip-text text-transparent',
+          '[--bg:linear-gradient(90deg,#0000_calc(50%-var(--spread)),var(--color-background),#0000_calc(50%+var(--spread)))] [background-repeat:no-repeat,padding-box]',
+          className
+        )}
+        initial={{ backgroundPosition: '100% center' }}
+        style={
+          {
+            '--spread': `${dynamicSpread}px`,
+            backgroundImage: 'var(--bg), linear-gradient(var(--color-muted-foreground), var(--color-muted-foreground))',
+          } as CSSProperties
+        }
+        transition={{
+          repeat: Number.POSITIVE_INFINITY,
+          duration,
+          ease: 'linear',
+        }}
+      >
+        {children}
+      </MotionComponent>
+    </LazyMotion>
+  );
 };
 
 export const Shimmer = memo(ShimmerComponent);

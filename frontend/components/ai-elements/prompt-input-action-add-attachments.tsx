@@ -13,25 +13,25 @@ import { usePromptInputAttachments } from './prompt-input-context';
 
 /** Props for the action that opens the prompt input file chooser. */
 export type PromptInputActionAddAttachmentsProps = ComponentProps<typeof DropdownMenuItem> & {
-	label?: string;
+  label?: string;
 };
 
 /** Menu item that opens the prompt input file chooser. */
 export const PromptInputActionAddAttachments = ({
-	label = 'Add photos or files',
-	...props
+  label = 'Add photos or files',
+  ...props
 }: PromptInputActionAddAttachmentsProps) => {
-	const attachments = usePromptInputAttachments();
+  const attachments = usePromptInputAttachments();
 
-	return (
-		<DropdownMenuItem
-			{...props}
-			onSelect={(e) => {
-				e.preventDefault();
-				attachments.openFileDialog();
-			}}
-		>
-			<ImageIcon className="mr-2 size-4" /> {label}
-		</DropdownMenuItem>
-	);
+  return (
+    <DropdownMenuItem
+      {...props}
+      onSelect={(e) => {
+        e.preventDefault();
+        attachments.openFileDialog();
+      }}
+    >
+      <ImageIcon className="mr-2 size-4" /> {label}
+    </DropdownMenuItem>
+  );
 };

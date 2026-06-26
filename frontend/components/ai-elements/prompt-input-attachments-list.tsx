@@ -13,26 +13,22 @@ import { usePromptInputAttachments } from './prompt-input-context';
 
 /** Props for rendering the current attachment list. */
 export type PromptInputAttachmentsProps = Omit<HTMLAttributes<HTMLDivElement>, 'children'> & {
-	children: (attachment: FileUIPart & { id: string }) => ReactNode;
+  children: (attachment: FileUIPart & { id: string }) => ReactNode;
 };
 
 /** Attachment list renderer for the current prompt input. */
-export function PromptInputAttachments({
-	children,
-	className,
-	...props
-}: PromptInputAttachmentsProps) {
-	const attachments = usePromptInputAttachments();
+export function PromptInputAttachments({ children, className, ...props }: PromptInputAttachmentsProps) {
+  const attachments = usePromptInputAttachments();
 
-	if (!attachments.files.length) {
-		return null;
-	}
+  if (!attachments.files.length) {
+    return null;
+  }
 
-	return (
-		<div className={cn('flex w-full flex-wrap items-center gap-2 p-3', className)} {...props}>
-			{attachments.files.map((file) => (
-				<Fragment key={file.id}>{children(file)}</Fragment>
-			))}
-		</div>
-	);
+  return (
+    <div className={cn('flex w-full flex-wrap items-center gap-2 p-3', className)} {...props}>
+      {attachments.files.map((file) => (
+        <Fragment key={file.id}>{children(file)}</Fragment>
+      ))}
+    </div>
+  );
 }

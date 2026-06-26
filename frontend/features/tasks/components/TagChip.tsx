@@ -12,8 +12,8 @@ import type { ReactNode } from 'react';
 import { AppPill } from '@/components/ui/app-pill';
 
 export interface TagChipProps {
-	/** Tag label without the leading `#`. The chip prepends it visually. */
-	label: string;
+  /** Tag label without the leading `#`. The chip prepends it visually. */
+  label: string;
 }
 
 /**
@@ -22,12 +22,12 @@ export interface TagChipProps {
  * or inline mentions later.
  */
 export function TagChip({ label }: TagChipProps): ReactNode {
-	return (
-		<AppPill shape="tag" tone="neutral">
-			<span aria-hidden="true" className="opacity-60">
-				#
-			</span>
-			{label}
-		</AppPill>
-	);
+  return (
+    <AppPill shape="tag" tone="neutral">
+      <span aria-hidden="true" className="opacity-60">
+        #
+      </span>
+      {label}
+    </AppPill>
+  );
 }

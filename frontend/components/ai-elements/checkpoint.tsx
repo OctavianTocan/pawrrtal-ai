@@ -16,11 +16,8 @@ export { CheckpointTrigger, type CheckpointTriggerProps } from './checkpoint-tri
 export type CheckpointProps = HTMLAttributes<HTMLDivElement>;
 
 export const Checkpoint = ({ className, children, ...props }: CheckpointProps) => (
-	<div
-		className={cn('flex items-center gap-0.5 text-muted-foreground overflow-hidden', className)}
-		{...props}
-	>
-		{children}
-		<Separator />
-	</div>
+  <div className={cn('flex items-center gap-0.5 text-muted-foreground overflow-hidden', className)} {...props}>
+    {children}
+    <Separator />
+  </div>
 );

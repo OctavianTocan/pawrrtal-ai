@@ -7,5 +7,5 @@
 import type * as React from 'react';
 
 export function Streamdown({ children }: { children: string }): React.JSX.Element {
-	return <div data-testid="streamdown">{children}</div>;
+  return <div data-testid="streamdown">{children}</div>;
 }

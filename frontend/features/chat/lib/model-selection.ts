@@ -1,10 +1,10 @@
 import type { ChatModelOption } from '../hooks/use-chat-models';
 
 interface ResolveSelectedModelIdArgs {
-	userChoice: string | null;
-	initialModelId: string | null | undefined;
-	models: readonly ChatModelOption[];
-	defaultEntry: ChatModelOption | null;
+  userChoice: string | null;
+  initialModelId: string | null | undefined;
+  models: readonly ChatModelOption[];
+  defaultEntry: ChatModelOption | null;
 }
 
 /**
@@ -16,19 +16,16 @@ interface ResolveSelectedModelIdArgs {
  * 3. The catalog's first entry for a fresh conversation.
  */
 export function resolveSelectedModelId({
-	userChoice,
-	initialModelId,
-	models,
-	defaultEntry,
+  userChoice,
+  initialModelId,
+  models,
+  defaultEntry,
 }: ResolveSelectedModelIdArgs): string {
-	if (userChoice !== null && models.some((model): boolean => model.id === userChoice)) {
-		return userChoice;
-	}
-	if (
-		typeof initialModelId === 'string' &&
-		models.some((model): boolean => model.id === initialModelId)
-	) {
-		return initialModelId;
-	}
-	return defaultEntry?.id ?? '';
+  if (userChoice !== null && models.some((model): boolean => model.id === userChoice)) {
+    return userChoice;
+  }
+  if (typeof initialModelId === 'string' && models.some((model): boolean => model.id === initialModelId)) {
+    return initialModelId;
+  }
+  return defaultEntry?.id ?? '';
 }

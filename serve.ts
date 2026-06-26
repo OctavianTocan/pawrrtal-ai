@@ -42,114 +42,105 @@ await copyStandaloneAssets();
 logInfo(`Starting Pawrrtal production services: ${FRONTEND_URL} + ${BACKEND_URL}`);
 
 type ManagedProcess = {
-	name: string;
-	child: ChildProcess;
+  name: string;
+  child: ChildProcess;
 };
 
 function envValue(name: string): string | undefined {
-	return process.env[name];
+  return process.env[name];
 }
 
 function setEnv(name: string, value: string): void {
-	process.env[name] = value;
+  process.env[name] = value;
 }
 
 function setEnvDefault(name: string, value: string): void {
-	process.env[name] ??= value;
+  process.env[name] ??= value;
 }
 
 function logInfo(message: string): void {
-	process.stderr.write(`${message}\n`);
+  process.stderr.write(`${message}\n`);
 }
 
 async function copyStandaloneAssets(): Promise<void> {
-	const staticTarget = `${STANDALONE_APP_DIR}/.next/static`;
-	const publicTarget = `${STANDALONE_APP_DIR}/public`;
-	await rm(staticTarget, { recursive: true, force: true });
-	await rm(publicTarget, { recursive: true, force: true });
-	await cp(`${FRONTEND_DIR}/.next/static`, staticTarget, { recursive: true });
-	await cp(`${FRONTEND_DIR}/public`, publicTarget, { recursive: true });
+  const staticTarget = `${STANDALONE_APP_DIR}/.next/static`;
+  const publicTarget = `${STANDALONE_APP_DIR}/public`;
+  await rm(staticTarget, { recursive: true, force: true });
+  await rm(publicTarget, { recursive: true, force: true });
+  await cp(`${FRONTEND_DIR}/.next/static`, staticTarget, { recursive: true });
+  await cp(`${FRONTEND_DIR}/public`, publicTarget, { recursive: true });
 }
 
-function startManagedProcess(
-	name: string,
-	command: string,
-	args: readonly string[]
-): ManagedProcess {
-	const child = spawn(command, [...args], {
-		cwd: process.cwd(),
-		detached: true,
-		env: process.env,
-		stdio: 'inherit',
-	});
-	return { name, child };
+function startManagedProcess(name: string, command: string, args: readonly string[]): ManagedProcess {
+  const child = spawn(command, [...args], {
+    cwd: process.cwd(),
+    detached: true,
+    env: process.env,
+    stdio: 'inherit',
+  });
+  return { name, child };
 }
 
 function waitForExit(processInfo: ManagedProcess): Promise<number> {
-	return new Promise((resolve) => {
-		processInfo.child.once('exit', (code, signal) => {
-			if (signal) {
-				logInfo(`${processInfo.name} exited from signal ${signal}`);
-				resolve(1);
-				return;
-			}
-			resolve(code ?? 1);
-		});
-	});
+  return new Promise((resolve) => {
+    processInfo.child.once('exit', (code, signal) => {
+      if (signal) {
+        logInfo(`${processInfo.name} exited from signal ${signal}`);
+        resolve(1);
+        return;
+      }
+      resolve(code ?? 1);
+    });
+  });
 }
 
 async function stopProcess(processInfo: ManagedProcess): Promise<void> {
-	const pid = processInfo.child.pid;
-	if (!pid || processInfo.child.exitCode !== null) return;
-	try {
-		process.kill(-pid, 'SIGTERM');
-	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
-	}
-	await Promise.race([
-		waitForExit(processInfo),
-		new Promise((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS)),
-	]);
-	if (processInfo.child.exitCode !== null) return;
-	try {
-		process.kill(-pid, 'SIGKILL');
-	} catch (error) {
-		if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
-	}
+  const pid = processInfo.child.pid;
+  if (!pid || processInfo.child.exitCode !== null) return;
+  try {
+    process.kill(-pid, 'SIGTERM');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+  }
+  await Promise.race([waitForExit(processInfo), new Promise((resolve) => setTimeout(resolve, SHUTDOWN_TIMEOUT_MS))]);
+  if (processInfo.child.exitCode !== null) return;
+  try {
+    process.kill(-pid, 'SIGKILL');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error;
+  }
 }
 
 const managedProcesses: ManagedProcess[] = [
-	startManagedProcess('frontend', 'node', [STANDALONE_SERVER]),
-	startManagedProcess('backend', 'uv', [
-		'run',
-		'--project',
-		'backend',
-		'python',
-		'-m',
-		'uvicorn',
-		'main:app',
-		'--app-dir',
-		'backend',
-		'--host',
-		BACKEND_BIND_HOST,
-		'--port',
-		String(BACKEND_PORT),
-	]),
+  startManagedProcess('frontend', 'node', [STANDALONE_SERVER]),
+  startManagedProcess('backend', 'uv', [
+    'run',
+    '--project',
+    'backend',
+    'python',
+    '-m',
+    'uvicorn',
+    'main:app',
+    '--app-dir',
+    'backend',
+    '--host',
+    BACKEND_BIND_HOST,
+    '--port',
+    String(BACKEND_PORT),
+  ]),
 ];
 
 let shuttingDown = false;
 
 async function shutdown(exitCode: number): Promise<never> {
-	if (shuttingDown) process.exit(exitCode);
-	shuttingDown = true;
-	await Promise.all(managedProcesses.map((processInfo) => stopProcess(processInfo)));
-	process.exit(exitCode);
+  if (shuttingDown) process.exit(exitCode);
+  shuttingDown = true;
+  await Promise.all(managedProcesses.map((processInfo) => stopProcess(processInfo)));
+  process.exit(exitCode);
 }
 
 process.once('SIGINT', () => void shutdown(130));
 process.once('SIGTERM', () => void shutdown(143));
 
-const exitCode = await Promise.race(
-	managedProcesses.map((processInfo) => waitForExit(processInfo))
-);
+const exitCode = await Promise.race(managedProcesses.map((processInfo) => waitForExit(processInfo)));
 await shutdown(exitCode);

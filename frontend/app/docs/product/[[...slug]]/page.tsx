@@ -17,27 +17,27 @@ import { productSource } from '@/lib/source';
  * @returns the rendered MDX page
  */
 export default async function ProductPage(props: {
-	params: Promise<{ slug?: string[] }>;
+  params: Promise<{ slug?: string[] }>;
 }): Promise<React.ReactElement> {
-	const params = await props.params;
-	const page = productSource.getPage(params.slug);
-	if (!page) notFound();
+  const params = await props.params;
+  const page = productSource.getPage(params.slug);
+  if (!page) notFound();
 
-	const MdxContent = page.data.body;
+  const MdxContent = page.data.body;
 
-	return (
-		<DocsPage toc={page.data.toc} full={page.data.full}>
-			<DocsTitle>{page.data.title}</DocsTitle>
-			<DocsDescription>{page.data.description}</DocsDescription>
-			<DocsBody>
-				<MdxContent
-					components={getMDXComponents({
-						a: createRelativeLink(productSource, page),
-					})}
-				/>
-			</DocsBody>
-		</DocsPage>
-	);
+  return (
+    <DocsPage toc={page.data.toc} full={page.data.full}>
+      <DocsTitle>{page.data.title}</DocsTitle>
+      <DocsDescription>{page.data.description}</DocsDescription>
+      <DocsBody>
+        <MdxContent
+          components={getMDXComponents({
+            a: createRelativeLink(productSource, page),
+          })}
+        />
+      </DocsBody>
+    </DocsPage>
+  );
 }
 
 /**
@@ -46,7 +46,7 @@ export default async function ProductPage(props: {
  * @returns one params object per page
  */
 export async function generateStaticParams(): Promise<{ slug?: string[] }[]> {
-	return productSource.generateParams();
+  return productSource.generateParams();
 }
 
 /**
@@ -55,14 +55,12 @@ export async function generateStaticParams(): Promise<{ slug?: string[] }[]> {
  * @param props.params - dynamic route params
  * @returns the metadata for the active slug
  */
-export async function generateMetadata(props: {
-	params: Promise<{ slug?: string[] }>;
-}): Promise<Metadata> {
-	const params = await props.params;
-	const page = productSource.getPage(params.slug);
-	if (!page) notFound();
-	return {
-		title: page.data.title,
-		description: page.data.description,
-	};
+export async function generateMetadata(props: { params: Promise<{ slug?: string[] }> }): Promise<Metadata> {
+  const params = await props.params;
+  const page = productSource.getPage(params.slug);
+  if (!page) notFound();
+  return {
+    title: page.data.title,
+    description: page.data.description,
+  };
 }

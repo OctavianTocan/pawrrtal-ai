@@ -1,22 +1,22 @@
 {
-	"name": "@ci/skill-gen",
-	"version": "0.0.1",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"typecheck": "tsc --noEmit",
-		"generate": "bun run src/index.ts generate",
-		"check": "bun run src/index.ts check",
-		"e2e-test": "bun run src/index.ts e2e-test",
-		"test": "vitest run --passWithNoTests"
-	},
-	"dependencies": {
-		"@effect/platform-node": "4.0.0-beta.74",
-		"effect": "4.0.0-beta.74"
-	},
-	"devDependencies": {
-		"@types/bun": "latest",
-		"typescript": "^5.9.3",
-		"vitest": "^3.0.0"
-	}
+  "name": "@ci/skill-gen",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "generate": "bun run src/index.ts generate",
+    "check": "bun run src/index.ts check",
+    "e2e-test": "bun run src/index.ts e2e-test",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@effect/platform-node": "4.0.0-beta.74",
+    "effect": "4.0.0-beta.74"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.9.3",
+    "vitest": "^3.0.0"
+  }
 }

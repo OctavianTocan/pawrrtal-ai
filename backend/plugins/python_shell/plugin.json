@@ -1,26 +1,26 @@
 {
-	"schema_version": 1,
-	"id": "python_shell",
-	"name": "Python Shell",
-	"description": "Expose the trusted in-process Python execution tool.",
-	"version": "1.0.0",
-	"enabled_by_default": false,
-	"permissions": ["filesystem_read", "filesystem_write", "destructive"],
-	"capabilities": [
-		{
-			"type": "python_tool",
-			"id": "python",
-			"tool_name": "python",
-			"title": "Python",
-			"description": "Execute trusted Python code in the Pawrrtal worker process.",
-			"tags": ["shell", "python", "workspace"],
-			"intents": ["shell.python", "workspace.automation"],
-			"slots": ["shell", "code_execution"],
-			"exposure": "direct_and_catalog",
-			"permissions": ["filesystem_read", "filesystem_write", "destructive"],
-			"risk": "destructive",
-			"requires_confirmation": true,
-			"entrypoint": "app.plugins.python_shell.tools:make_python_tool"
-		}
-	]
+  "schema_version": 1,
+  "id": "python_shell",
+  "name": "Python Shell",
+  "description": "Expose the trusted in-process Python execution tool.",
+  "version": "1.0.0",
+  "enabled_by_default": false,
+  "permissions": ["filesystem_read", "filesystem_write", "destructive"],
+  "capabilities": [
+    {
+      "type": "python_tool",
+      "id": "python",
+      "tool_name": "python",
+      "title": "Python",
+      "description": "Execute trusted Python code in the Pawrrtal worker process.",
+      "tags": ["shell", "python", "workspace"],
+      "intents": ["shell.python", "workspace.automation"],
+      "slots": ["shell", "code_execution"],
+      "exposure": "direct_and_catalog",
+      "permissions": ["filesystem_read", "filesystem_write", "destructive"],
+      "risk": "destructive",
+      "requires_confirmation": true,
+      "entrypoint": "app.plugins.python_shell.tools:make_python_tool"
+    }
+  ]
 }

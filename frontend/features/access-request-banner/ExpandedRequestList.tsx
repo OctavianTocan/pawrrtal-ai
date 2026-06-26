@@ -29,41 +29,41 @@ import { EXPAND_SPRING, type ExpandedRequestListProps } from './types';
  * at full width from frame one.
  */
 export function ExpandedRequestList({
-	bannerState,
-	requests,
-	decisions,
-	onApproveRequest,
-	onRejectRequest,
-	onResetRequest,
+  bannerState,
+  requests,
+  decisions,
+  onApproveRequest,
+  onRejectRequest,
+  onResetRequest,
 }: ExpandedRequestListProps) {
-	return (
-		<AnimatePresence>
-			{bannerState.status === 'expanded' && (
-				// expandKey is only accessible here because TypeScript has narrowed
-				// bannerState to the `expanded` variant — the union does the guarding.
-				<m.div
-					key={bannerState.expandKey}
-					initial={{ height: 0, opacity: 0 }}
-					animate={{ height: 'auto', opacity: 1 }}
-					exit={{ height: 0, opacity: 0 }}
-					transition={EXPAND_SPRING}
-					className="overflow-hidden"
-				>
-					<div className="border-t border-border" />
-					<div className="py-1">
-						{requests.map((request) => (
-							<RequestRow
-								key={request.id}
-								request={request}
-								decision={decisions[request.id] ?? 'undecided'}
-								onApprove={() => onApproveRequest(request.id)}
-								onReject={() => onRejectRequest(request.id)}
-								onReset={() => onResetRequest(request.id)}
-							/>
-						))}
-					</div>
-				</m.div>
-			)}
-		</AnimatePresence>
-	);
+  return (
+    <AnimatePresence>
+      {bannerState.status === 'expanded' && (
+        // expandKey is only accessible here because TypeScript has narrowed
+        // bannerState to the `expanded` variant — the union does the guarding.
+        <m.div
+          key={bannerState.expandKey}
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={EXPAND_SPRING}
+          className="overflow-hidden"
+        >
+          <div className="border-t border-border" />
+          <div className="py-1">
+            {requests.map((request) => (
+              <RequestRow
+                key={request.id}
+                request={request}
+                decision={decisions[request.id] ?? 'undecided'}
+                onApprove={() => onApproveRequest(request.id)}
+                onReject={() => onRejectRequest(request.id)}
+                onReset={() => onResetRequest(request.id)}
+              />
+            ))}
+          </div>
+        </m.div>
+      )}
+    </AnimatePresence>
+  );
 }

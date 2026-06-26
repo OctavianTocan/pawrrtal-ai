@@ -1,21 +1,21 @@
 {
-	"version": "0.10.2",
-	"integration_state_schema": 1,
-	"installed_integrations": ["codex", "claude"],
-	"integration_settings": {
-		"codex": {
-			"script": "sh",
-			"raw_options": "--skills",
-			"parsed_options": {
-				"skills": true
-			},
-			"invoke_separator": "-"
-		},
-		"claude": {
-			"script": "sh",
-			"invoke_separator": "-"
-		}
-	},
-	"integration": "codex",
-	"default_integration": "codex"
+  "version": "0.10.2",
+  "integration_state_schema": 1,
+  "installed_integrations": ["codex", "claude"],
+  "integration_settings": {
+    "codex": {
+      "script": "sh",
+      "raw_options": "--skills",
+      "parsed_options": {
+        "skills": true
+      },
+      "invoke_separator": "-"
+    },
+    "claude": {
+      "script": "sh",
+      "invoke_separator": "-"
+    }
+  },
+  "integration": "codex",
+  "default_integration": "codex"
 }

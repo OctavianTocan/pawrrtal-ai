@@ -5,7 +5,7 @@ export { AccessRequestBanner } from './AccessRequestBanner';
 export { AccessRequestBannerView } from './AccessRequestBannerView';
 
 export type {
-	AccessRequest,
-	AccessRequestBannerProps,
-	AccessRequestBannerViewProps,
+  AccessRequest,
+  AccessRequestBannerProps,
+  AccessRequestBannerViewProps,
 } from './types';

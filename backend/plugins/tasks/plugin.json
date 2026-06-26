@@ -1,53 +1,53 @@
 {
-	"schema_version": 1,
-	"id": "tasks",
-	"name": "Tasks",
-	"description": "Manage workspace TASKS.md entries through agent tools.",
-	"version": "1.0.0",
-	"enabled_by_default": true,
-	"permissions": ["filesystem_read", "filesystem_write"],
-	"capabilities": [
-		{
-			"type": "python_tool",
-			"id": "add_task",
-			"tool_name": "add_task",
-			"title": "Add Task",
-			"description": "Append a new task to the workspace TASKS.md file.",
-			"tags": ["tasks", "workspace"],
-			"intents": ["tasks.add", "workspace.plan"],
-			"slots": ["tasks"],
-			"exposure": "direct_and_catalog",
-			"permissions": ["filesystem_write"],
-			"risk": "local_read",
-			"entrypoint": "app.plugins.tasks.tools:make_add_task_tool"
-		},
-		{
-			"type": "python_tool",
-			"id": "list_tasks",
-			"tool_name": "list_tasks",
-			"title": "List Tasks",
-			"description": "Read open or completed tasks from the workspace TASKS.md file.",
-			"tags": ["tasks", "workspace"],
-			"intents": ["tasks.list", "workspace.plan"],
-			"slots": ["tasks"],
-			"exposure": "direct_and_catalog",
-			"permissions": ["filesystem_read"],
-			"risk": "local_read",
-			"entrypoint": "app.plugins.tasks.tools:make_list_tasks_tool"
-		},
-		{
-			"type": "python_tool",
-			"id": "complete_task",
-			"tool_name": "complete_task",
-			"title": "Complete Task",
-			"description": "Mark a matching task complete in the workspace TASKS.md file.",
-			"tags": ["tasks", "workspace"],
-			"intents": ["tasks.complete", "workspace.plan"],
-			"slots": ["tasks"],
-			"exposure": "direct_and_catalog",
-			"permissions": ["filesystem_read", "filesystem_write"],
-			"risk": "local_read",
-			"entrypoint": "app.plugins.tasks.tools:make_complete_task_tool"
-		}
-	]
+  "schema_version": 1,
+  "id": "tasks",
+  "name": "Tasks",
+  "description": "Manage workspace TASKS.md entries through agent tools.",
+  "version": "1.0.0",
+  "enabled_by_default": true,
+  "permissions": ["filesystem_read", "filesystem_write"],
+  "capabilities": [
+    {
+      "type": "python_tool",
+      "id": "add_task",
+      "tool_name": "add_task",
+      "title": "Add Task",
+      "description": "Append a new task to the workspace TASKS.md file.",
+      "tags": ["tasks", "workspace"],
+      "intents": ["tasks.add", "workspace.plan"],
+      "slots": ["tasks"],
+      "exposure": "direct_and_catalog",
+      "permissions": ["filesystem_write"],
+      "risk": "local_read",
+      "entrypoint": "app.plugins.tasks.tools:make_add_task_tool"
+    },
+    {
+      "type": "python_tool",
+      "id": "list_tasks",
+      "tool_name": "list_tasks",
+      "title": "List Tasks",
+      "description": "Read open or completed tasks from the workspace TASKS.md file.",
+      "tags": ["tasks", "workspace"],
+      "intents": ["tasks.list", "workspace.plan"],
+      "slots": ["tasks"],
+      "exposure": "direct_and_catalog",
+      "permissions": ["filesystem_read"],
+      "risk": "local_read",
+      "entrypoint": "app.plugins.tasks.tools:make_list_tasks_tool"
+    },
+    {
+      "type": "python_tool",
+      "id": "complete_task",
+      "tool_name": "complete_task",
+      "title": "Complete Task",
+      "description": "Mark a matching task complete in the workspace TASKS.md file.",
+      "tags": ["tasks", "workspace"],
+      "intents": ["tasks.complete", "workspace.plan"],
+      "slots": ["tasks"],
+      "exposure": "direct_and_catalog",
+      "permissions": ["filesystem_read", "filesystem_write"],
+      "risk": "local_read",
+      "entrypoint": "app.plugins.tasks.tools:make_complete_task_tool"
+    }
+  ]
 }

@@ -10,12 +10,12 @@ import { createContext, type RefObject } from 'react';
 
 /** Attachment controller exposed to prompt input child components. */
 export type AttachmentsContext = {
-	files: (FileUIPart & { id: string })[];
-	add: (files: File[] | FileList) => void;
-	remove: (id: string) => void;
-	clear: () => void;
-	openFileDialog: () => void;
-	fileInputRef: RefObject<HTMLInputElement | null>;
+  files: (FileUIPart & { id: string })[];
+  add: (files: File[] | FileList) => void;
+  remove: (id: string) => void;
+  clear: () => void;
+  openFileDialog: () => void;
+  fileInputRef: RefObject<HTMLInputElement | null>;
 };
 
 /** Local (per-PromptInput) attachments context. */

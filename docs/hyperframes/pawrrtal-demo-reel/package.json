@@ -1,11 +1,11 @@
 {
-	"name": "pawrrtal-demo-reel",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"dev": "npx --yes hyperframes@0.6.80 preview",
-		"check": "npx --yes hyperframes@0.6.80 lint && npx --yes hyperframes@0.6.80 validate && npx --yes hyperframes@0.6.80 inspect",
-		"render": "npx --yes hyperframes@0.6.80 render",
-		"publish": "npx --yes hyperframes@0.6.80 publish"
-	}
+  "name": "pawrrtal-demo-reel",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes hyperframes@0.6.80 preview",
+    "check": "npx --yes hyperframes@0.6.80 lint && npx --yes hyperframes@0.6.80 validate && npx --yes hyperframes@0.6.80 inspect",
+    "render": "npx --yes hyperframes@0.6.80 render",
+    "publish": "npx --yes hyperframes@0.6.80 publish"
+  }
 }

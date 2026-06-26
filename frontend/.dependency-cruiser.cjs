@@ -29,12 +29,12 @@
  * (the frontend workspace root), so `frontend/` is stripped.
  */
 const LAYER = {
-	feApp: '^app/',
-	feFeatures: '^features/',
-	feShell: '^components/(app-|nav-|new-|signup-form)',
-	feAiElements: '^components/ai-elements/',
-	feUiPrim: '^components/(ui/|icons/)',
-	feLib: '^(lib|hooks)/',
+  feApp: '^app/',
+  feFeatures: '^features/',
+  feShell: '^components/(app-|nav-|new-|signup-form)',
+  feAiElements: '^components/ai-elements/',
+  feUiPrim: '^components/(ui/|icons/)',
+  feLib: '^(lib|hooks)/',
 };
 
 /**
@@ -43,107 +43,99 @@ const LAYER = {
  * dependency-cruiser output.
  */
 function noImport(name, comment, fromPath, toPaths) {
-	return {
-		name,
-		severity: 'error',
-		comment,
-		from: { path: fromPath },
-		to: { path: toPaths.length === 1 ? toPaths[0] : `(?:${toPaths.join('|')})` },
-	};
+  return {
+    name,
+    severity: 'error',
+    comment,
+    from: { path: fromPath },
+    to: { path: toPaths.length === 1 ? toPaths[0] : `(?:${toPaths.join('|')})` },
+  };
 }
 
 module.exports = {
-	forbidden: [
-		// --- Cross-stack boundary --------------------------------------------
-		{
-			name: 'no-frontend-to-backend',
-			severity: 'error',
-			comment: 'Frontend must talk to backend only via HTTP. Never import Python.',
-			// Use a relative-up path because depcruise is invoked from `frontend/`.
-			from: { path: '.*' },
-			to: { path: '^\\.\\./backend/' },
-		},
+  forbidden: [
+    // --- Cross-stack boundary --------------------------------------------
+    {
+      name: 'no-frontend-to-backend',
+      severity: 'error',
+      comment: 'Frontend must talk to backend only via HTTP. Never import Python.',
+      // Use a relative-up path because depcruise is invoked from `frontend/`.
+      from: { path: '.*' },
+      to: { path: '^\\.\\./backend/' },
+    },
 
-		// --- Layer ordering (upward imports are violations) ------------------
-		noImport(
-			'no-lib-to-anywhere',
-			'fe-lib (order 4) is the foundation; nothing above it may be imported.',
-			LAYER.feLib,
-			[LAYER.feApp, LAYER.feFeatures, LAYER.feShell, LAYER.feAiElements, LAYER.feUiPrim]
-		),
-		noImport(
-			'no-ui-primitives-to-above',
-			'fe-ui-primitives (order 3) cannot reach into ai-elements, features, shell, or app.',
-			LAYER.feUiPrim,
-			[LAYER.feApp, LAYER.feFeatures, LAYER.feShell, LAYER.feAiElements]
-		),
-		noImport(
-			'no-ai-elements-to-above',
-			'fe-ai-elements (order 2) cannot reach into features, shell, or app.',
-			LAYER.feAiElements,
-			[LAYER.feApp, LAYER.feFeatures, LAYER.feShell]
-		),
-		noImport(
-			'no-features-to-app',
-			'fe-features (order 1) cannot import the app router layer.',
-			LAYER.feFeatures,
-			[LAYER.feApp]
-		),
-		noImport(
-			'no-shell-to-app',
-			'fe-shell (order 1) cannot import the app router layer.',
-			LAYER.feShell,
-			[LAYER.feApp]
-		),
+    // --- Layer ordering (upward imports are violations) ------------------
+    noImport(
+      'no-lib-to-anywhere',
+      'fe-lib (order 4) is the foundation; nothing above it may be imported.',
+      LAYER.feLib,
+      [LAYER.feApp, LAYER.feFeatures, LAYER.feShell, LAYER.feAiElements, LAYER.feUiPrim]
+    ),
+    noImport(
+      'no-ui-primitives-to-above',
+      'fe-ui-primitives (order 3) cannot reach into ai-elements, features, shell, or app.',
+      LAYER.feUiPrim,
+      [LAYER.feApp, LAYER.feFeatures, LAYER.feShell, LAYER.feAiElements]
+    ),
+    noImport(
+      'no-ai-elements-to-above',
+      'fe-ai-elements (order 2) cannot reach into features, shell, or app.',
+      LAYER.feAiElements,
+      [LAYER.feApp, LAYER.feFeatures, LAYER.feShell]
+    ),
+    noImport('no-features-to-app', 'fe-features (order 1) cannot import the app router layer.', LAYER.feFeatures, [
+      LAYER.feApp,
+    ]),
+    noImport('no-shell-to-app', 'fe-shell (order 1) cannot import the app router layer.', LAYER.feShell, [LAYER.feApp]),
 
-		// --- Universal hygiene -----------------------------------------------
-		{
-			name: 'no-circular',
-			severity: 'error',
-			comment:
-				'Runtime cycles fail this rule. Type-only `import type` and JSDoc ' +
-				'`import(...)` annotations are excluded (see `tsPreCompilationDeps`).',
-			from: {},
-			to: { circular: true },
-		},
-	],
+    // --- Universal hygiene -----------------------------------------------
+    {
+      name: 'no-circular',
+      severity: 'error',
+      comment:
+        'Runtime cycles fail this rule. Type-only `import type` and JSDoc ' +
+        '`import(...)` annotations are excluded (see `tsPreCompilationDeps`).',
+      from: {},
+      to: { circular: true },
+    },
+  ],
 
-	options: {
-		// Use the project's tsconfig so the `@/*` path alias resolves.
-		tsConfig: { fileName: 'tsconfig.json' },
+  options: {
+    // Use the project's tsconfig so the `@/*` path alias resolves.
+    tsConfig: { fileName: 'tsconfig.json' },
 
-		// Skip type-only deps (matches sentrux's runtime-only cycle counting).
-		tsPreCompilationDeps: false,
+    // Skip type-only deps (matches sentrux's runtime-only cycle counting).
+    tsPreCompilationDeps: false,
 
-		// Don't follow into vendored packages — they have their own boundaries.
-		doNotFollow: {
-			path: 'node_modules',
-		},
+    // Don't follow into vendored packages — they have their own boundaries.
+    doNotFollow: {
+      path: 'node_modules',
+    },
 
-		exclude: {
-			// Test files and Next.js generated types live outside the layered model.
-			path: [
-				'\\.test\\.(ts|tsx|js|jsx)$',
-				'\\.spec\\.(ts|tsx|js|jsx)$',
-				'^e2e/',
-				'^test/',
-				'^\\.next/',
-				'^\\.source/',
-				'^lib/react-(dropdown|overlay|chat-composer)/',
-			],
-		},
+    exclude: {
+      // Test files and Next.js generated types live outside the layered model.
+      path: [
+        '\\.test\\.(ts|tsx|js|jsx)$',
+        '\\.spec\\.(ts|tsx|js|jsx)$',
+        '^e2e/',
+        '^test/',
+        '^\\.next/',
+        '^\\.source/',
+        '^lib/react-(dropdown|overlay|chat-composer)/',
+      ],
+    },
 
-		moduleSystems: ['es6', 'cjs', 'tsd'],
+    moduleSystems: ['es6', 'cjs', 'tsd'],
 
-		enhancedResolveOptions: {
-			exportsFields: ['exports'],
-			conditionNames: ['import', 'require', 'node', 'default', 'types'],
-			extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'],
-		},
+    enhancedResolveOptions: {
+      exportsFields: ['exports'],
+      conditionNames: ['import', 'require', 'node', 'default', 'types'],
+      extensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'],
+    },
 
-		reporterOptions: {
-			// dot+archi reports help local exploration; text is the CI gate.
-			text: { highlightFocused: true },
-		},
-	},
+    reporterOptions: {
+      // dot+archi reports help local exploration; text is the CI gate.
+      text: { highlightFocused: true },
+    },
+  },
 };

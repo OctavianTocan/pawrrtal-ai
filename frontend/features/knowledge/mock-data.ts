@@ -101,56 +101,56 @@ last used.
  * `Misc` (long-running scratchpad) and `onboarding` (introductory docs).
  */
 const _KNOWLEDGE_FILE_TREE: FileTreeNode = {
-	kind: 'folder',
-	name: 'My Files',
-	updatedLabel: 'Today',
-	children: [
-		{
-			kind: 'folder',
-			name: 'Misc',
-			updatedLabel: 'Today',
-			children: [
-				{
-					kind: 'folder',
-					name: 'Daily Briefs',
-					updatedLabel: 'Today',
-					children: [
-						{
-							kind: 'file',
-							name: '2026-05-06_Daily_Briefing.md',
-							updatedLabel: 'Yesterday',
-							markdown: DAILY_BRIEF_2026_05_06,
-						},
-						{
-							kind: 'file',
-							name: '2026-05-07_Daily_Briefing.md',
-							updatedLabel: 'Today',
-							markdown: DAILY_BRIEF_2026_05_07,
-						},
-					],
-				},
-			],
-		},
-		{
-			kind: 'folder',
-			name: 'onboarding',
-			updatedLabel: 'Today',
-			children: [
-				{
-					kind: 'file',
-					name: 'welcome.md',
-					updatedLabel: 'Today',
-					markdown: ONBOARDING_WELCOME,
-				},
-				{
-					kind: 'file',
-					name: 'setup.md',
-					updatedLabel: 'Today',
-					markdown: ONBOARDING_SETUP,
-				},
-			],
-		},
-	],
+  kind: 'folder',
+  name: 'My Files',
+  updatedLabel: 'Today',
+  children: [
+    {
+      kind: 'folder',
+      name: 'Misc',
+      updatedLabel: 'Today',
+      children: [
+        {
+          kind: 'folder',
+          name: 'Daily Briefs',
+          updatedLabel: 'Today',
+          children: [
+            {
+              kind: 'file',
+              name: '2026-05-06_Daily_Briefing.md',
+              updatedLabel: 'Yesterday',
+              markdown: DAILY_BRIEF_2026_05_06,
+            },
+            {
+              kind: 'file',
+              name: '2026-05-07_Daily_Briefing.md',
+              updatedLabel: 'Today',
+              markdown: DAILY_BRIEF_2026_05_07,
+            },
+          ],
+        },
+      ],
+    },
+    {
+      kind: 'folder',
+      name: 'onboarding',
+      updatedLabel: 'Today',
+      children: [
+        {
+          kind: 'file',
+          name: 'welcome.md',
+          updatedLabel: 'Today',
+          markdown: ONBOARDING_WELCOME,
+        },
+        {
+          kind: 'file',
+          name: 'setup.md',
+          updatedLabel: 'Today',
+          markdown: ONBOARDING_SETUP,
+        },
+      ],
+    },
+  ],
 };
 
 /**
@@ -161,53 +161,53 @@ const _KNOWLEDGE_FILE_TREE: FileTreeNode = {
  * introducing literal palette entries — see `DESIGN.md` § Colors.
  */
 export const KNOWLEDGE_MEMORY_CARDS: readonly MemoryCardData[] = [
-	{
-		id: 'preferences',
-		title: 'User Preferences',
-		description: 'Tone, length, formatting defaults Pawrrtal picked up over time.',
-		tone: 'accent',
-		count: '24 entries',
-	},
-	{
-		id: 'rules',
-		title: 'Rules',
-		description: 'Hard constraints — never email contacts unless explicitly asked.',
-		tone: 'destructive',
-		count: '8 entries',
-	},
-	{
-		id: 'profile',
-		title: 'User Profile',
-		description: 'Name, role, working hours, time zone, and other long-lived facts.',
-		tone: 'success',
-		count: '12 entries',
-	},
-	{
-		id: 'tools',
-		title: 'Your Tools',
-		description: 'Connected integrations and the scopes the assistant may use.',
-		tone: 'info',
-		count: '6 entries',
-	},
-	{
-		id: 'identity',
-		title: 'Assistant Identity',
-		description: "the assistant's voice, tone, and persona traits as you've shaped them.",
-		tone: 'accent',
-		count: '5 entries',
-	},
-	{
-		id: 'relationships',
-		title: 'User Relationships',
-		description: 'People in your orbit — names, context, ongoing threads.',
-		tone: 'info',
-		count: '18 entries',
-	},
-	{
-		id: 'activity',
-		title: 'Recent Activity',
-		description: 'A rolling buffer of the last few days of conversations.',
-		tone: 'foreground',
-		count: 'Live',
-	},
+  {
+    id: 'preferences',
+    title: 'User Preferences',
+    description: 'Tone, length, formatting defaults Pawrrtal picked up over time.',
+    tone: 'accent',
+    count: '24 entries',
+  },
+  {
+    id: 'rules',
+    title: 'Rules',
+    description: 'Hard constraints — never email contacts unless explicitly asked.',
+    tone: 'destructive',
+    count: '8 entries',
+  },
+  {
+    id: 'profile',
+    title: 'User Profile',
+    description: 'Name, role, working hours, time zone, and other long-lived facts.',
+    tone: 'success',
+    count: '12 entries',
+  },
+  {
+    id: 'tools',
+    title: 'Your Tools',
+    description: 'Connected integrations and the scopes the assistant may use.',
+    tone: 'info',
+    count: '6 entries',
+  },
+  {
+    id: 'identity',
+    title: 'Assistant Identity',
+    description: "the assistant's voice, tone, and persona traits as you've shaped them.",
+    tone: 'accent',
+    count: '5 entries',
+  },
+  {
+    id: 'relationships',
+    title: 'User Relationships',
+    description: 'People in your orbit — names, context, ongoing threads.',
+    tone: 'info',
+    count: '18 entries',
+  },
+  {
+    id: 'activity',
+    title: 'Recent Activity',
+    description: 'A rolling buffer of the last few days of conversations.',
+    tone: 'foreground',
+    count: 'Live',
+  },
 ];

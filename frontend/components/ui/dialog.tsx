@@ -7,158 +7,146 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
 function Dialog({ ...props }: React.ComponentProps<typeof DialogPrimitive.Root>) {
-	return <DialogPrimitive.Root data-slot="dialog" {...props} />;
+  return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }
 
 function DialogTrigger({ ...props }: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
-	return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
+  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
 }
 
 function DialogPortal({ ...props }: React.ComponentProps<typeof DialogPrimitive.Portal>) {
-	return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
+  return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
 }
 
 function DialogClose({ ...props }: React.ComponentProps<typeof DialogPrimitive.Close>) {
-	return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
+  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
-function DialogOverlay({
-	className,
-	...props
-}: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
-	return (
-		<DialogPrimitive.Overlay
-			data-slot="dialog-overlay"
-			className={cn(
-				'modal-scrim fixed inset-0 isolate z-50 duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
-				className
-			)}
-			{...props}
-		/>
-	);
+function DialogOverlay({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Overlay>) {
+  return (
+    <DialogPrimitive.Overlay
+      data-slot="dialog-overlay"
+      className={cn(
+        'modal-scrim fixed inset-0 isolate z-50 duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0',
+        className
+      )}
+      {...props}
+    />
+  );
 }
 
 function DialogContent({
-	className,
-	children,
-	showCloseButton = true,
-	...props
+  className,
+  children,
+  showCloseButton = true,
+  ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
-	showCloseButton?: boolean;
+  showCloseButton?: boolean;
 }) {
-	// Radix warns if Content has neither a `<DialogDescription>` child nor
-	// an explicit `aria-describedby={undefined}` opt-out. Most call sites
-	// in this repo are full-screen onboarding / scenic shells that do not
-	// need a description, so the wrapper defaults `aria-describedby` to
-	// `undefined` here (silences the warning); call sites that DO want a
-	// description still wire it through `<DialogDescription>`, which sets
-	// `aria-describedby` itself and wins via the spread on the next line.
-	return (
-		<DialogPortal>
-			<DialogOverlay />
-			<DialogPrimitive.Content
-				aria-describedby={undefined}
-				data-slot="dialog-content"
-				className={cn(
-					'fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-4xl bg-background p-6 text-sm ring-1 ring-foreground/5 duration-100 outline-none sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
-					className
-				)}
-				{...props}
-			>
-				{children}
-				{showCloseButton && (
-					<DialogPrimitive.Close data-slot="dialog-close" asChild>
-						<Button
-							variant="ghost"
-							className="absolute top-4 right-4 text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"
-							size="icon-sm"
-							type="button"
-						>
-							<IconX aria-hidden="true" />
-							<span className="sr-only">Close</span>
-						</Button>
-					</DialogPrimitive.Close>
-				)}
-			</DialogPrimitive.Content>
-		</DialogPortal>
-	);
+  // Radix warns if Content has neither a `<DialogDescription>` child nor
+  // an explicit `aria-describedby={undefined}` opt-out. Most call sites
+  // in this repo are full-screen onboarding / scenic shells that do not
+  // need a description, so the wrapper defaults `aria-describedby` to
+  // `undefined` here (silences the warning); call sites that DO want a
+  // description still wire it through `<DialogDescription>`, which sets
+  // `aria-describedby` itself and wins via the spread on the next line.
+  return (
+    <DialogPortal>
+      <DialogOverlay />
+      <DialogPrimitive.Content
+        aria-describedby={undefined}
+        data-slot="dialog-content"
+        className={cn(
+          'fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] -translate-x-1/2 -translate-y-1/2 gap-6 rounded-4xl bg-background p-6 text-sm ring-1 ring-foreground/5 duration-100 outline-none sm:max-w-md data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+          className
+        )}
+        {...props}
+      >
+        {children}
+        {showCloseButton && (
+          <DialogPrimitive.Close data-slot="dialog-close" asChild>
+            <Button
+              variant="ghost"
+              className="absolute top-4 right-4 text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"
+              size="icon-sm"
+              type="button"
+            >
+              <IconX aria-hidden="true" />
+              <span className="sr-only">Close</span>
+            </Button>
+          </DialogPrimitive.Close>
+        )}
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  );
 }
 
 function DialogHeader({ className, ...props }: React.ComponentProps<'div'>) {
-	return (
-		<div
-			data-slot="dialog-header"
-			className={cn('flex flex-col gap-2', className)}
-			{...props}
-		/>
-	);
+  return <div data-slot="dialog-header" className={cn('flex flex-col gap-2', className)} {...props} />;
 }
 
 function DialogFooter({
-	className,
-	showCloseButton = false,
-	children,
-	...props
+  className,
+  showCloseButton = false,
+  children,
+  ...props
 }: React.ComponentProps<'div'> & {
-	showCloseButton?: boolean;
+  showCloseButton?: boolean;
 }) {
-	return (
-		<div
-			data-slot="dialog-footer"
-			className={cn('flex flex-col-reverse gap-2 sm:flex-row sm:justify-end', className)}
-			{...props}
-		>
-			{children}
-			{showCloseButton && (
-				<DialogPrimitive.Close asChild>
-					<Button variant="outline">Close</Button>
-				</DialogPrimitive.Close>
-			)}
-		</div>
-	);
+  return (
+    <div
+      data-slot="dialog-footer"
+      className={cn('flex flex-col-reverse gap-2 sm:flex-row sm:justify-end', className)}
+      {...props}
+    >
+      {children}
+      {showCloseButton && (
+        <DialogPrimitive.Close asChild>
+          <Button variant="outline">Close</Button>
+        </DialogPrimitive.Close>
+      )}
+    </div>
+  );
 }
 
 function DialogTitle({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Title>) {
-	return (
-		<DialogPrimitive.Title
-			data-slot="dialog-title"
-			// `text-balance` per the userinterface-wiki rule on heading wrap —
-			// dialog titles are short headings that benefit from balanced
-			// line breaks. Caller can override via `className`.
-			className={cn('text-balance text-base leading-none font-medium', className)}
-			{...props}
-		/>
-	);
+  return (
+    <DialogPrimitive.Title
+      data-slot="dialog-title"
+      // `text-balance` per the userinterface-wiki rule on heading wrap —
+      // dialog titles are short headings that benefit from balanced
+      // line breaks. Caller can override via `className`.
+      className={cn('text-balance text-base leading-none font-medium', className)}
+      {...props}
+    />
+  );
 }
 
-function DialogDescription({
-	className,
-	...props
-}: React.ComponentProps<typeof DialogPrimitive.Description>) {
-	return (
-		<DialogPrimitive.Description
-			data-slot="dialog-description"
-			// `text-pretty` per the userinterface-wiki rule on body wrap —
-			// dialog descriptions are short prose that benefits from
-			// orphan-suppression at the wrap.
-			className={cn(
-				'text-pretty text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground',
-				className
-			)}
-			{...props}
-		/>
-	);
+function DialogDescription({ className, ...props }: React.ComponentProps<typeof DialogPrimitive.Description>) {
+  return (
+    <DialogPrimitive.Description
+      data-slot="dialog-description"
+      // `text-pretty` per the userinterface-wiki rule on body wrap —
+      // dialog descriptions are short prose that benefits from
+      // orphan-suppression at the wrap.
+      className={cn(
+        'text-pretty text-sm text-muted-foreground *:[a]:underline *:[a]:underline-offset-3 *:[a]:hover:text-foreground',
+        className
+      )}
+      {...props}
+    />
+  );
 }
 
 export {
-	Dialog,
-	DialogClose,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogOverlay,
-	DialogPortal,
-	DialogTitle,
-	DialogTrigger,
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogOverlay,
+  DialogPortal,
+  DialogTitle,
+  DialogTrigger,
 };

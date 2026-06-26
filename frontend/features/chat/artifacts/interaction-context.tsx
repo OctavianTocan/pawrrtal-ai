@@ -22,9 +22,9 @@
 
 import { createContext, type ReactNode, use, useCallback, useMemo } from 'react';
 import type {
-	ChatArtifactInteractionMode,
-	ChatArtifactInteractionPayload,
-	ChatArtifactInteractionValue,
+  ChatArtifactInteractionMode,
+  ChatArtifactInteractionPayload,
+  ChatArtifactInteractionValue,
 } from '@/lib/types';
 
 /** Default submission mode — the renderer never sets `mode` itself. */
@@ -36,40 +36,34 @@ const DEFAULT_INTERACTION_MODE: ChatArtifactInteractionMode = 'new_turn';
  * by the inner provider) and returns a Promise so callers can await
  * completion if they want — most renderers ignore the return value.
  */
-export type ArtifactInteractionHandler = (
-	payload: ChatArtifactInteractionPayload
-) => Promise<void> | void;
+export type ArtifactInteractionHandler = (payload: ChatArtifactInteractionPayload) => Promise<void> | void;
 
 /** Outer context value supplied by the chat surface. */
 interface OuterContextValue {
-	handler: ArtifactInteractionHandler;
+  handler: ArtifactInteractionHandler;
 }
 
 /** Inner context value supplied by {@link ArtifactRenderer}. */
 interface InnerContextValue {
-	/** Artifact id captured from the surrounding {@link ArtifactRenderer}. */
-	artifactId: string;
-	/**
-	 * Whether an outer {@link ArtifactInteractionProvider} is installed.
-	 * Widgets render disabled when this is `false` so a missing dispatcher
-	 * is visually communicated instead of silently swallowing clicks.
-	 */
-	hasHandler: boolean;
-	/**
-	 * Submit an interaction. Auto-injects `artifactId` + the default mode
-	 * so widget code stays focused on the action-id/label/value triple.
-	 */
-	submit: (input: {
-		actionId: string;
-		label: string;
-		value: ChatArtifactInteractionValue;
-	}) => Promise<void> | void;
-	/**
-	 * Optional callback fired after a successful submit — used by
-	 * {@link ArtifactDialog} to close itself when the user has answered.
-	 * Renderers should NOT depend on this for behaviour; treat as polish.
-	 */
-	onSubmitted?: () => void;
+  /** Artifact id captured from the surrounding {@link ArtifactRenderer}. */
+  artifactId: string;
+  /**
+   * Whether an outer {@link ArtifactInteractionProvider} is installed.
+   * Widgets render disabled when this is `false` so a missing dispatcher
+   * is visually communicated instead of silently swallowing clicks.
+   */
+  hasHandler: boolean;
+  /**
+   * Submit an interaction. Auto-injects `artifactId` + the default mode
+   * so widget code stays focused on the action-id/label/value triple.
+   */
+  submit: (input: { actionId: string; label: string; value: ChatArtifactInteractionValue }) => Promise<void> | void;
+  /**
+   * Optional callback fired after a successful submit — used by
+   * {@link ArtifactDialog} to close itself when the user has answered.
+   * Renderers should NOT depend on this for behaviour; treat as polish.
+   */
+  onSubmitted?: () => void;
 }
 
 const OuterContext = createContext<OuterContextValue | null>(null);
@@ -79,34 +73,31 @@ const InnerContext = createContext<InnerContextValue | null>(null);
  * Props for the outer interaction provider.
  */
 interface ArtifactInteractionProviderProps {
-	/** Receives the fully-shaped payload and dispatches it. */
-	handler: ArtifactInteractionHandler;
-	/** Wrapped subtree — typically the entire chat surface. */
-	children: ReactNode;
+  /** Receives the fully-shaped payload and dispatches it. */
+  handler: ArtifactInteractionHandler;
+  /** Wrapped subtree — typically the entire chat surface. */
+  children: ReactNode;
 }
 
 /**
  * Installs the outer handler. Place around every component tree that may
  * render an artifact (today: the chat surface).
  */
-export function ArtifactInteractionProvider({
-	handler,
-	children,
-}: ArtifactInteractionProviderProps): ReactNode {
-	const value = useMemo<OuterContextValue>(() => ({ handler }), [handler]);
-	return <OuterContext.Provider value={value}>{children}</OuterContext.Provider>;
+export function ArtifactInteractionProvider({ handler, children }: ArtifactInteractionProviderProps): ReactNode {
+  const value = useMemo<OuterContextValue>(() => ({ handler }), [handler]);
+  return <OuterContext.Provider value={value}>{children}</OuterContext.Provider>;
 }
 
 /**
  * Props for the inner per-artifact provider used by {@link ArtifactRenderer}.
  */
 interface ArtifactInteractionScopeProps {
-	/** Artifact id auto-injected into every submission from this subtree. */
-	artifactId: string;
-	/** Fired after a successful submit; opt-in. */
-	onSubmitted?: () => void;
-	/** Wrapped subtree — the rendered artifact spec. */
-	children: ReactNode;
+  /** Artifact id auto-injected into every submission from this subtree. */
+  artifactId: string;
+  /** Fired after a successful submit; opt-in. */
+  onSubmitted?: () => void;
+  /** Wrapped subtree — the rendered artifact spec. */
+  children: ReactNode;
 }
 
 /**
@@ -118,38 +109,34 @@ interface ArtifactInteractionScopeProps {
  * without disturbing the spec's layout.
  */
 export function ArtifactInteractionScope({
-	artifactId,
-	onSubmitted,
-	children,
+  artifactId,
+  onSubmitted,
+  children,
 }: ArtifactInteractionScopeProps): ReactNode {
-	const outer = use(OuterContext);
+  const outer = use(OuterContext);
 
-	const submit = useCallback(
-		async (input: {
-			actionId: string;
-			label: string;
-			value: ChatArtifactInteractionValue;
-		}): Promise<void> => {
-			if (!outer) return;
-			await outer.handler({
-				artifactId,
-				actionId: input.actionId,
-				label: input.label,
-				value: input.value,
-				mode: DEFAULT_INTERACTION_MODE,
-			});
-			onSubmitted?.();
-		},
-		[artifactId, onSubmitted, outer]
-	);
+  const submit = useCallback(
+    async (input: { actionId: string; label: string; value: ChatArtifactInteractionValue }): Promise<void> => {
+      if (!outer) return;
+      await outer.handler({
+        artifactId,
+        actionId: input.actionId,
+        label: input.label,
+        value: input.value,
+        mode: DEFAULT_INTERACTION_MODE,
+      });
+      onSubmitted?.();
+    },
+    [artifactId, onSubmitted, outer]
+  );
 
-	const hasHandler = outer !== null;
-	const value = useMemo<InnerContextValue>(
-		() => ({ artifactId, hasHandler, submit, onSubmitted }),
-		[artifactId, hasHandler, submit, onSubmitted]
-	);
+  const hasHandler = outer !== null;
+  const value = useMemo<InnerContextValue>(
+    () => ({ artifactId, hasHandler, submit, onSubmitted }),
+    [artifactId, hasHandler, submit, onSubmitted]
+  );
 
-	return <InnerContext.Provider value={value}>{children}</InnerContext.Provider>;
+  return <InnerContext.Provider value={value}>{children}</InnerContext.Provider>;
 }
 
 /**
@@ -158,5 +145,5 @@ export function ArtifactInteractionScope({
  * case rather than crashing (read-only previews, tests, etc.).
  */
 export function useArtifactInteraction(): InnerContextValue | null {
-	return use(InnerContext);
+  return use(InnerContext);
 }

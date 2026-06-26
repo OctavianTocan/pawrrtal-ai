@@ -11,141 +11,115 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import {
-	WORKSPACE_ENV_KEY_IDS,
-	type WorkspaceEnvKey,
-} from '@/features/settings/workspace-env/use-workspace-env';
+import { WORKSPACE_ENV_KEY_IDS, type WorkspaceEnvKey } from '@/features/settings/workspace-env/use-workspace-env';
 import { type WorkspaceEnvKeyMeta, WorkspacesSectionView } from './WorkspacesSectionView';
 
 const KEY_METAS: readonly WorkspaceEnvKeyMeta[] = [
-	{
-		key: 'GEMINI_API_KEY',
-		label: 'Gemini API Key',
-		description: 'Google Gemini.',
-		placeholder: 'AIza...',
-		url: 'https://aistudio.google.com/apikey',
-	},
-	{
-		key: 'EXA_API_KEY',
-		label: 'Exa API Key',
-		description: 'Exa search.',
-		placeholder: 'exa-...',
-		url: 'https://exa.ai',
-	},
+  {
+    key: 'GEMINI_API_KEY',
+    label: 'Gemini API Key',
+    description: 'Google Gemini.',
+    placeholder: 'AIza...',
+    url: 'https://aistudio.google.com/apikey',
+  },
+  {
+    key: 'EXA_API_KEY',
+    label: 'Exa API Key',
+    description: 'Exa search.',
+    placeholder: 'exa-...',
+    url: 'https://exa.ai',
+  },
 ];
 
 function emptyValues(): Record<WorkspaceEnvKey, string> {
-	const values = {} as Record<WorkspaceEnvKey, string>;
-	for (const key of WORKSPACE_ENV_KEY_IDS) {
-		values[key] = '';
-	}
-	return values;
+  const values = {} as Record<WorkspaceEnvKey, string>;
+  for (const key of WORKSPACE_ENV_KEY_IDS) {
+    values[key] = '';
+  }
+  return values;
 }
 
 describe('WorkspacesSectionView', () => {
-	const baseProps = {
-		keyMetas: KEY_METAS,
-		values: emptyValues(),
-		state: {
-			showTokens: {},
-			isLoading: false,
-			isDirty: false,
-			isSaving: false,
-		},
-		errorMessage: null,
-		onValueChange: vi.fn(),
-		onToggleVisibility: vi.fn(),
-		onSave: vi.fn(),
-		onDiscard: vi.fn(),
-	};
+  const baseProps = {
+    keyMetas: KEY_METAS,
+    values: emptyValues(),
+    state: {
+      showTokens: {},
+      isLoading: false,
+      isDirty: false,
+      isSaving: false,
+    },
+    errorMessage: null,
+    onValueChange: vi.fn(),
+    onToggleVisibility: vi.fn(),
+    onSave: vi.fn(),
+    onDiscard: vi.fn(),
+  };
 
-	it('renders one input per overridable key with a Get key link', () => {
-		render(<WorkspacesSectionView {...baseProps} />);
-		expect(screen.getByLabelText('Gemini API Key')).toBeTruthy();
-		expect(screen.getByLabelText('Exa API Key')).toBeTruthy();
-		const links = screen.getAllByRole('link', { name: 'Get key' });
-		expect(links).toHaveLength(2);
-	});
+  it('renders one input per overridable key with a Get key link', () => {
+    render(<WorkspacesSectionView {...baseProps} />);
+    expect(screen.getByLabelText('Gemini API Key')).toBeTruthy();
+    expect(screen.getByLabelText('Exa API Key')).toBeTruthy();
+    const links = screen.getAllByRole('link', { name: 'Get key' });
+    expect(links).toHaveLength(2);
+  });
 
-	it('disables Save and Discard when the form is clean', () => {
-		render(<WorkspacesSectionView {...baseProps} />);
-		expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(
-			true
-		);
-		expect(
-			(screen.getByRole('button', { name: 'Discard' }) as HTMLButtonElement).disabled
-		).toBe(true);
-	});
+  it('disables Save and Discard when the form is clean', () => {
+    render(<WorkspacesSectionView {...baseProps} />);
+    expect((screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Discard' }) as HTMLButtonElement).disabled).toBe(true);
+  });
 
-	it('enables Save when isDirty is true and fires onSave on click', async () => {
-		const onSave = vi.fn();
-		const user = userEvent.setup();
-		render(
-			<WorkspacesSectionView
-				{...baseProps}
-				onSave={onSave}
-				state={{ ...baseProps.state, isDirty: true }}
-			/>
-		);
-		const saveButton = screen.getByRole('button', { name: 'Save' });
-		await user.click(saveButton);
-		expect(onSave).toHaveBeenCalledTimes(1);
-	});
+  it('enables Save when isDirty is true and fires onSave on click', async () => {
+    const onSave = vi.fn();
+    const user = userEvent.setup();
+    render(<WorkspacesSectionView {...baseProps} onSave={onSave} state={{ ...baseProps.state, isDirty: true }} />);
+    const saveButton = screen.getByRole('button', { name: 'Save' });
+    await user.click(saveButton);
+    expect(onSave).toHaveBeenCalledTimes(1);
+  });
 
-	it('shows "Saving..." label while the mutation is pending', () => {
-		render(
-			<WorkspacesSectionView
-				{...baseProps}
-				state={{ ...baseProps.state, isDirty: true, isSaving: true }}
-			/>
-		);
-		expect(screen.getByRole('button', { name: 'Saving...' })).toBeTruthy();
-	});
+  it('shows "Saving..." label while the mutation is pending', () => {
+    render(<WorkspacesSectionView {...baseProps} state={{ ...baseProps.state, isDirty: true, isSaving: true }} />);
+    expect(screen.getByRole('button', { name: 'Saving...' })).toBeTruthy();
+  });
 
-	it('renders the error region as alert when errorMessage is provided', () => {
-		render(
-			<WorkspacesSectionView
-				{...baseProps}
-				errorMessage="Value for GEMINI_API_KEY exceeds 512 characters."
-			/>
-		);
-		const alert = screen.getByRole('alert');
-		expect(alert.textContent).toContain('exceeds 512 characters');
-	});
+  it('renders the error region as alert when errorMessage is provided', () => {
+    render(<WorkspacesSectionView {...baseProps} errorMessage="Value for GEMINI_API_KEY exceeds 512 characters." />);
+    const alert = screen.getByRole('alert');
+    expect(alert.textContent).toContain('exceeds 512 characters');
+  });
 
-	it('fires onValueChange with the typed key + new value on input', async () => {
-		const onValueChange = vi.fn();
-		const user = userEvent.setup();
-		render(<WorkspacesSectionView {...baseProps} onValueChange={onValueChange} />);
-		const gemini = screen.getByLabelText('Gemini API Key');
-		await user.click(gemini);
-		await user.paste('new-gemini-value');
-		expect(onValueChange).toHaveBeenCalledWith('GEMINI_API_KEY', 'new-gemini-value');
-	});
+  it('fires onValueChange with the typed key + new value on input', async () => {
+    const onValueChange = vi.fn();
+    const user = userEvent.setup();
+    render(<WorkspacesSectionView {...baseProps} onValueChange={onValueChange} />);
+    const gemini = screen.getByLabelText('Gemini API Key');
+    await user.click(gemini);
+    await user.paste('new-gemini-value');
+    expect(onValueChange).toHaveBeenCalledWith('GEMINI_API_KEY', 'new-gemini-value');
+  });
 
-	it('shows the eye toggle as a focusable button with an aria label', async () => {
-		const onToggleVisibility = vi.fn();
-		const user = userEvent.setup();
-		render(<WorkspacesSectionView {...baseProps} onToggleVisibility={onToggleVisibility} />);
-		const toggle = screen.getByRole('button', { name: /show gemini api key value/i });
-		await user.click(toggle);
-		expect(onToggleVisibility).toHaveBeenCalledWith('GEMINI_API_KEY');
-	});
+  it('shows the eye toggle as a focusable button with an aria label', async () => {
+    const onToggleVisibility = vi.fn();
+    const user = userEvent.setup();
+    render(<WorkspacesSectionView {...baseProps} onToggleVisibility={onToggleVisibility} />);
+    const toggle = screen.getByRole('button', { name: /show gemini api key value/i });
+    await user.click(toggle);
+    expect(onToggleVisibility).toHaveBeenCalledWith('GEMINI_API_KEY');
+  });
 
-	it('renders the input as type="text" when the key is in showTokens', () => {
-		render(
-			<WorkspacesSectionView
-				{...baseProps}
-				state={{ ...baseProps.state, showTokens: { GEMINI_API_KEY: true } }}
-			/>
-		);
-		const gemini = screen.getByLabelText('Gemini API Key') as HTMLInputElement;
-		expect(gemini.type).toBe('text');
-	});
+  it('renders the input as type="text" when the key is in showTokens', () => {
+    render(
+      <WorkspacesSectionView {...baseProps} state={{ ...baseProps.state, showTokens: { GEMINI_API_KEY: true } }} />
+    );
+    const gemini = screen.getByLabelText('Gemini API Key') as HTMLInputElement;
+    expect(gemini.type).toBe('text');
+  });
 
-	it('renders the input as type="password" by default', () => {
-		render(<WorkspacesSectionView {...baseProps} />);
-		const gemini = screen.getByLabelText('Gemini API Key') as HTMLInputElement;
-		expect(gemini.type).toBe('password');
-	});
+  it('renders the input as type="password" by default', () => {
+    render(<WorkspacesSectionView {...baseProps} />);
+    const gemini = screen.getByLabelText('Gemini API Key') as HTMLInputElement;
+    expect(gemini.type).toBe('password');
+  });
 });

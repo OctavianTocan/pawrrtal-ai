@@ -19,21 +19,21 @@ import type { ChatMessage } from '@/lib/types';
 
 /** Snapshot of the conversation currently open in the chat panel. */
 type ActiveConversationState = {
-	conversationId: string | null;
-	chatHistory: ChatMessage[];
-	isLoading: boolean;
+  conversationId: string | null;
+  chatHistory: ChatMessage[];
+  isLoading: boolean;
 };
 
 /** Context value exposed to consumers: current state + mutation helpers. */
 type ChatActivityContextValue = ActiveConversationState & {
-	/** Publish the latest active conversation snapshot for sidebar consumers. */
-	publishActiveConversation: (state: ActiveConversationState) => void;
-	/**
-	 * Clear the active conversation, but only if the given ID matches.
-	 * Guards against race conditions where a slow close callback fires
-	 * after a new conversation was already opened.
-	 */
-	clearActiveConversation: (conversationId: string) => void;
+  /** Publish the latest active conversation snapshot for sidebar consumers. */
+  publishActiveConversation: (state: ActiveConversationState) => void;
+  /**
+   * Clear the active conversation, but only if the given ID matches.
+   * Guards against race conditions where a slow close callback fires
+   * after a new conversation was already opened.
+   */
+  clearActiveConversation: (conversationId: string) => void;
 };
 
 const ChatActivityContext = createContext<ChatActivityContextValue | null>(null);
@@ -42,33 +42,29 @@ const ChatActivityContext = createContext<ChatActivityContextValue | null>(null)
  * Provides chat activity state to the sidebar and any other component
  * that needs to know which conversation is currently open.
  */
-export function ChatActivityProvider({
-	children,
-}: {
-	children: React.ReactNode;
-}): React.JSX.Element {
-	const [state, setState] = useState<ActiveConversationState>({
-		conversationId: null,
-		chatHistory: [],
-		isLoading: false,
-	});
+export function ChatActivityProvider({ children }: { children: React.ReactNode }): React.JSX.Element {
+  const [state, setState] = useState<ActiveConversationState>({
+    conversationId: null,
+    chatHistory: [],
+    isLoading: false,
+  });
 
-	const value = useMemo<ChatActivityContextValue>(
-		() => ({
-			...state,
-			publishActiveConversation: setState,
-			clearActiveConversation: (conversationId) => {
-				setState((current) =>
-					current.conversationId === conversationId
-						? { conversationId: null, chatHistory: [], isLoading: false }
-						: current
-				);
-			},
-		}),
-		[state]
-	);
+  const value = useMemo<ChatActivityContextValue>(
+    () => ({
+      ...state,
+      publishActiveConversation: setState,
+      clearActiveConversation: (conversationId) => {
+        setState((current) =>
+          current.conversationId === conversationId
+            ? { conversationId: null, chatHistory: [], isLoading: false }
+            : current
+        );
+      },
+    }),
+    [state]
+  );
 
-	return <ChatActivityContext.Provider value={value}>{children}</ChatActivityContext.Provider>;
+  return <ChatActivityContext.Provider value={value}>{children}</ChatActivityContext.Provider>;
 }
 
 /**
@@ -76,9 +72,9 @@ export function ChatActivityProvider({
  * @throws If called outside the provider tree.
  */
 export function useChatActivity(): ChatActivityContextValue {
-	const context = use(ChatActivityContext);
-	if (!context) {
-		throw new Error('useChatActivity must be used within ChatActivityProvider.');
-	}
-	return context;
+  const context = use(ChatActivityContext);
+  if (!context) {
+    throw new Error('useChatActivity must be used within ChatActivityProvider.');
+  }
+  return context;
 }

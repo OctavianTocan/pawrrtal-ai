@@ -18,51 +18,51 @@ import { cn } from '@/lib/utils';
 export const TOOLTIP_DEFAULT_DELAY_MS = 500;
 
 function TooltipProvider({
-	delayDuration = TOOLTIP_DEFAULT_DELAY_MS,
-	...props
+  delayDuration = TOOLTIP_DEFAULT_DELAY_MS,
+  ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Provider>) {
-	return (
-		<TooltipPrimitive.Provider
-			data-slot="tooltip-provider"
-			delayDuration={delayDuration}
-			disableHoverableContent
-			{...props}
-		/>
-	);
+  return (
+    <TooltipPrimitive.Provider
+      data-slot="tooltip-provider"
+      delayDuration={delayDuration}
+      disableHoverableContent
+      {...props}
+    />
+  );
 }
 
 function Tooltip({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-	return (
-		<TooltipProvider>
-			<TooltipPrimitive.Root data-slot="tooltip" {...props} />
-		</TooltipProvider>
-	);
+  return (
+    <TooltipProvider>
+      <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+    </TooltipProvider>
+  );
 }
 
 function TooltipTrigger({ ...props }: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
-	return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
+  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
 }
 
 function TooltipContent({
-	className,
-	sideOffset = 4,
-	...props
+  className,
+  sideOffset = 4,
+  ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Content>) {
-	return (
-		<TooltipPrimitive.Portal>
-			<TooltipPrimitive.Content
-				data-slot="tooltip-content"
-				sideOffset={sideOffset}
-				className={cn(
-					'z-50 overflow-hidden rounded-[8px] px-2.5 py-1.5 text-xs',
-					'dark bg-background/80 backdrop-blur-xl backdrop-saturate-150 border border-border/50 text-foreground shadow-modal-small',
-					'animate-in fade-in-0 duration-100 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-75',
-					className
-				)}
-				{...props}
-			/>
-		</TooltipPrimitive.Portal>
-	);
+  return (
+    <TooltipPrimitive.Portal>
+      <TooltipPrimitive.Content
+        data-slot="tooltip-content"
+        sideOffset={sideOffset}
+        className={cn(
+          'z-50 overflow-hidden rounded-[8px] px-2.5 py-1.5 text-xs',
+          'dark bg-background/80 backdrop-blur-xl backdrop-saturate-150 border border-border/50 text-foreground shadow-modal-small',
+          'animate-in fade-in-0 duration-100 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:duration-75',
+          className
+        )}
+        {...props}
+      />
+    </TooltipPrimitive.Portal>
+  );
 }
 
 export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger };

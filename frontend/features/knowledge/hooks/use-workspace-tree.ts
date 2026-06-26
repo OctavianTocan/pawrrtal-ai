@@ -20,20 +20,20 @@ import { flatNodesToTree } from '../path-utils';
 import type { FileTreeNode, WorkspaceRead, WorkspaceTreeApiResponse } from '../types';
 
 export interface WorkspaceTreeResult {
-	/** UUID of the active workspace, or `null` while loading. */
-	workspaceId: string | null;
-	/**
-	 * Recursive file tree rooted at "My Files".  `null` until both fetches
-	 * complete; components should handle this with a loading skeleton or by
-	 * rendering an empty root.
-	 */
-	fileTree: FileTreeNode | null;
-	/** True while either network request is in-flight. */
-	isLoading: boolean;
-	/** True if either request failed. */
-	isError: boolean;
-	/** The first error encountered (workspace list or tree), if any. */
-	error: Error | null;
+  /** UUID of the active workspace, or `null` while loading. */
+  workspaceId: string | null;
+  /**
+   * Recursive file tree rooted at "My Files".  `null` until both fetches
+   * complete; components should handle this with a loading skeleton or by
+   * rendering an empty root.
+   */
+  fileTree: FileTreeNode | null;
+  /** True while either network request is in-flight. */
+  isLoading: boolean;
+  /** True if either request failed. */
+  isError: boolean;
+  /** The first error encountered (workspace list or tree), if any. */
+  error: Error | null;
 }
 
 /**
@@ -43,60 +43,57 @@ export interface WorkspaceTreeResult {
  * route does not re-fetch unless the cache has gone stale.
  */
 export function useWorkspaceTree(): WorkspaceTreeResult {
-	const authedFetch = useAuthedFetch();
+  const authedFetch = useAuthedFetch();
 
-	// ── Step 1: workspace list ────────────────────────────────────────────────
+  // ── Step 1: workspace list ────────────────────────────────────────────────
 
-	const workspacesQuery = useQuery<WorkspaceRead[]>({
-		queryKey: ['workspaces'],
-		queryFn: async () => {
-			const res = await authedFetch(API_ENDPOINTS.workspaces.list);
-			return res.json() as Promise<WorkspaceRead[]>;
-		},
-		// Keep the list fresh for 5 minutes — it's unlikely to change mid-session.
-		staleTime: 5 * 60 * 1000,
-	});
+  const workspacesQuery = useQuery<WorkspaceRead[]>({
+    queryKey: ['workspaces'],
+    queryFn: async () => {
+      const res = await authedFetch(API_ENDPOINTS.workspaces.list);
+      return res.json() as Promise<WorkspaceRead[]>;
+    },
+    // Keep the list fresh for 5 minutes — it's unlikely to change mid-session.
+    staleTime: 5 * 60 * 1000,
+  });
 
-	// Prefer is_default; fall back to the first workspace in the list.
-	const defaultWorkspace: WorkspaceRead | null =
-		workspacesQuery.data?.find((w) => w.is_default) ?? workspacesQuery.data?.[0] ?? null;
+  // Prefer is_default; fall back to the first workspace in the list.
+  const defaultWorkspace: WorkspaceRead | null =
+    workspacesQuery.data?.find((w) => w.is_default) ?? workspacesQuery.data?.[0] ?? null;
 
-	// ── Step 2: file tree (dependent on step 1) ───────────────────────────────
+  // ── Step 2: file tree (dependent on step 1) ───────────────────────────────
 
-	const treeQuery = useQuery<WorkspaceTreeApiResponse>({
-		queryKey: ['workspace-tree', defaultWorkspace?.id ?? ''],
-		queryFn: async () => {
-			// `enabled` above ensures defaultWorkspace is non-null when this runs.
-			const wsId = defaultWorkspace?.id ?? '';
-			const res = await authedFetch(API_ENDPOINTS.workspaces.tree(wsId));
-			return res.json() as Promise<WorkspaceTreeApiResponse>;
-		},
-		// Only run once we have a workspace ID.
-		enabled: !!defaultWorkspace?.id,
-		staleTime: 30 * 1000,
-	});
+  const treeQuery = useQuery<WorkspaceTreeApiResponse>({
+    queryKey: ['workspace-tree', defaultWorkspace?.id ?? ''],
+    queryFn: async () => {
+      // `enabled` above ensures defaultWorkspace is non-null when this runs.
+      const wsId = defaultWorkspace?.id ?? '';
+      const res = await authedFetch(API_ENDPOINTS.workspaces.tree(wsId));
+      return res.json() as Promise<WorkspaceTreeApiResponse>;
+    },
+    // Only run once we have a workspace ID.
+    enabled: !!defaultWorkspace?.id,
+    staleTime: 30 * 1000,
+  });
 
-	// ── Derived state ─────────────────────────────────────────────────────────
+  // ── Derived state ─────────────────────────────────────────────────────────
 
-	const fileTree: FileTreeNode | null = treeQuery.data
-		? flatNodesToTree(treeQuery.data.nodes)
-		: null;
+  const fileTree: FileTreeNode | null = treeQuery.data ? flatNodesToTree(treeQuery.data.nodes) : null;
 
-	const isLoading =
-		workspacesQuery.isLoading ||
-		// Tree is "loading" only while we actually have a workspace ID to fetch.
-		(!!defaultWorkspace && treeQuery.isLoading);
+  const isLoading =
+    workspacesQuery.isLoading ||
+    // Tree is "loading" only while we actually have a workspace ID to fetch.
+    (!!defaultWorkspace && treeQuery.isLoading);
 
-	const isError = workspacesQuery.isError || treeQuery.isError;
+  const isError = workspacesQuery.isError || treeQuery.isError;
 
-	const error: Error | null =
-		(workspacesQuery.error as Error | null) ?? (treeQuery.error as Error | null) ?? null;
+  const error: Error | null = (workspacesQuery.error as Error | null) ?? (treeQuery.error as Error | null) ?? null;
 
-	return {
-		workspaceId: defaultWorkspace?.id ?? null,
-		fileTree,
-		isLoading,
-		isError,
-		error,
-	};
+  return {
+    workspaceId: defaultWorkspace?.id ?? null,
+    fileTree,
+    isLoading,
+    isError,
+    error,
+  };
 }
