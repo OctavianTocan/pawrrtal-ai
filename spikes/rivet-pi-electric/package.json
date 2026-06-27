@@ -1,0 +1,22 @@
+{
+  "name": "spike-rivet-pi-electric",
+  "private": true,
+  "type": "module",
+  "workspaces": [],
+  "description": "Throwaway spike: one conversation = one Rivet actor running the unforked Pi agent loop, streaming tokens out over the actor WebSocket. Validates the 003 substrate ADR (Rivet + Postgres + Electric + Hatchet) before rewriting the plan. NOT the final package layout.",
+  "scripts": {
+    "m1": "bun run src/m1.ts",
+    "m2:seed": "bun run src/m2.ts seed",
+    "m2:verify": "bun run src/m2.ts verify",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@earendil-works/pi-agent-core": "0.80.2",
+    "@earendil-works/pi-ai": "0.80.2",
+    "rivetkit": "^2.2.2-rc.1"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.3"
+  }
+}
