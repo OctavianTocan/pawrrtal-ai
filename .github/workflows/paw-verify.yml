@@ -56,7 +56,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v7.0.0
         with:
           submodules: recursive
 
@@ -69,7 +69,7 @@ jobs:
         uses: astral-sh/setup-uv@v7
 
       - name: Cache codex binary build
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: backend/vendor/codex/codex-rs/target/release/codex
           key: codex-bin-${{ runner.os }}-${{ hashFiles('.gitmodules', 'backend/vendor/codex/codex-rs/Cargo.lock') }}
