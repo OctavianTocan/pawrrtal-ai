@@ -8,15 +8,22 @@
     "m1": "bun run src/m1.ts",
     "m2:seed": "bun run src/m2.ts seed",
     "m2:verify": "bun run src/m2.ts verify",
+    "m3a": "bun run src/m3.ts m3a",
+    "m3b": "bun run src/m3.ts m3b",
+    "m3c:seed": "bun run src/m3.ts seed",
+    "m3c:verify": "bun run src/m3.ts verify",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.80.2",
     "@earendil-works/pi-ai": "0.80.2",
+    "@electric-sql/client": "1.5.13",
+    "pg": "^8.13.0",
     "rivetkit": "^2.2.2-rc.1"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "@types/pg": "^8.11.10",
     "typescript": "^5.9.3"
   }
 }

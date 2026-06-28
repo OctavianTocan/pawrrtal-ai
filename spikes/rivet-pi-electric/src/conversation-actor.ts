@@ -3,18 +3,25 @@
  *
  * The actor owns the live session state (transcript + turn counter) and is the
  * single writer for it. `sendMessage` runs an unforked Pi turn and broadcasts
- * each text delta over the actor's WebSocket so connected clients stream live.
- * This is the M1/M2 substrate probe for the 003 overhaul ADR.
+ * each text delta over the actor's WebSocket so connected clients stream live
+ * (M1/M2). When an identity is bound via `setIdentity`, each finished turn also
+ * projects a conversation-summary row to Postgres through the API seam — the
+ * actor never touches PG directly (M3 single-writer path).
  */
 
 import type { AgentEvent, AgentMessage } from '@earendil-works/pi-agent-core';
 import { actor } from 'rivetkit';
+import { upsertConversationSummary } from './api.ts';
 import { runPiTurn, userMessage } from './pi-turn.ts';
 
 const SYSTEM_PROMPT = 'You are Pawrrtal, running inside a Rivet actor.';
+const TITLE_MAX_LENGTH = 60;
 
 interface ConversationState {
   systemPrompt: string;
+  /** Postgres conversation id; null until `setIdentity` binds one (no projection). */
+  id: string | null;
+  owner: string;
   messages: AgentMessage[];
   turnCount: number;
 }
@@ -28,14 +35,44 @@ function assistantText(messages: AgentMessage[]): string {
   return assistant.content.map((block) => (block.type === 'text' ? block.text : '')).join('');
 }
 
+/** Derive a conversation title from the first user message. */
+function conversationTitle(messages: AgentMessage[]): string {
+  const firstUser = messages.find((m) => m.role === 'user');
+  let text = '';
+  if (firstUser?.role === 'user') {
+    const { content } = firstUser;
+    text =
+      typeof content === 'string'
+        ? content
+        : content.map((block) => (block.type === 'text' ? block.text : '')).join('');
+  }
+  const title = text.trim().length > 0 ? text.trim() : 'New conversation';
+  return title.length > TITLE_MAX_LENGTH ? `${title.slice(0, TITLE_MAX_LENGTH - 1)}…` : title;
+}
+
 export const conversation = actor({
   createState: (): ConversationState => ({
     systemPrompt: SYSTEM_PROMPT,
+    id: null,
+    owner: 'spike-user',
     messages: [],
     turnCount: 0,
   }),
 
   actions: {
+    /**
+     * Bind this actor to a Postgres conversation id (and owner) so finished
+     * turns project a summary row through the API. Without it, the actor stays
+     * PG-free (M1/M2 behavior).
+     */
+    setIdentity: (c, identity: { id: string; owner?: string }) => {
+      c.state.id = identity.id;
+      if (identity.owner) {
+        c.state.owner = identity.owner;
+      }
+      return { id: c.state.id, owner: c.state.owner };
+    },
+
     /** Run one Pi turn for `text`, streaming deltas out as broadcasts. */
     sendMessage: async (c, text: string) => {
       const priorHistory = c.state.messages;
@@ -66,11 +103,23 @@ export const conversation = actor({
 
       c.state.messages = [...priorHistory, ...newMessages];
       c.state.turnCount += 1;
+      const reply = assistantText(newMessages);
+
+      // Single-writer projection: the actor reaches Postgres only via the API.
+      if (c.state.id) {
+        await upsertConversationSummary({
+          id: c.state.id,
+          owner: c.state.owner,
+          title: conversationTitle(c.state.messages),
+          lastMessage: reply,
+          turnCount: c.state.turnCount,
+        });
+      }
 
       return {
         ok: true as const,
         turnCount: c.state.turnCount,
-        assistantText: assistantText(newMessages),
+        assistantText: reply,
         transcriptLength: c.state.messages.length,
       };
     },
