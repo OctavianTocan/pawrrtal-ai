@@ -1,8 +1,9 @@
-# Spike: Rivet + Pi + Postgres + Electric (M1–M3 gate)
+# Spike: Rivet + Pi + Postgres + Electric (M1–M4 gate)
 
 Throwaway spike validating the substrate ADR
 (`2026-06-27-rivet-postgres-electric-hatchet-substrate`) before rewriting the
-003 plan. It now covers the full read/write vertical slice:
+003 plan. It now covers the full read/write vertical slice plus the read-path
+security boundary:
 
 - **M1** — one conversation = one Rivet actor running the unforked Pi loop,
   streaming tokens out over the actor WebSocket.
@@ -10,9 +11,12 @@ Throwaway spike validating the substrate ADR
 - **M3** — the actor projects a conversation summary to **Postgres through the
   API (single writer)**, and **Electric** syncs that row to a second client
   live; the row + actor state survive a cold restart together.
+- **M4** — an **identity-scoped gatekeeper** in front of Electric enforces a
+  per-owner `where` clause + table/column allowlist server-side; a client cannot
+  widen its view, even by sending its own `where`.
 
-Hatchet and the identity-scoped Electric gatekeeper are intentionally **not** in
-this gate (next: M4).
+Effect-v4 client wrapping and Hatchet are intentionally **not** in this gate
+(next gates).
 
 ## What runs
 
@@ -30,9 +34,16 @@ this gate (next: M4).
   RPC; here it is an in-process function.
 - `src/shape-client.ts` — the read-path client: `@electric-sql/client`
   `ShapeStream` over the `conversations` shape, materialized into a live map.
+  Defaults to Electric directly (M3); accepts `url`/`headers` to route through
+  the gatekeeper (M4).
+- `src/proxy.ts` — the **identity-scoped gatekeeper** (`node:http`), trimmed from
+  `backend/vendor/effect-api-layout/apps/electric-proxy`. Authenticates an
+  identity, validates the table, forwards ONLY recognized Electric protocol
+  params (`ELECTRIC_PROTOCOL_QUERY_PARAMS`), and **server-forces** the table, a
+  column allowlist, and `where owner = $1` bound to the caller.
 - `src/harness.ts` — in-process Rivet boot via `rivetkit/test` `setupTest`, with
   a runner-readiness retry (see findings).
-- `src/m1.ts` / `src/m2.ts` / `src/m3.ts` — the milestone runners.
+- `src/m1.ts` / `src/m2.ts` / `src/m3.ts` / `src/m4.ts` — the milestone runners.
 - `infra/docker-compose.yml` — PG 17 (logical replication) + Electric 1.5.1,
   isolated project/ports so it can't collide with the host's other Postgres.
 
@@ -78,6 +89,9 @@ RIVET_ENVOY_VERSION=1 HOME="$PWD/.rivethome" bun run m3c:seed
 pgrep -f 'engine-cli-linux-x64-musl/rivet-engine start' | grep -vw "$$" | xargs -r kill
 sleep 5   # PG + Electric keep running; only the Rivet engine restarts
 RIVET_ENVOY_VERSION=1 HOME="$PWD/.rivethome" bun run m3c:verify
+
+# M4 — identity-scoped gatekeeper (no actor/engine; just PG + Electric + the proxy)
+bun run m4
 ```
 
 ## Results
@@ -112,6 +126,20 @@ Cold restart with **PG + Electric left running, only the Rivet engine killed**
 - A follow-up turn continued to `turnCount=2`/`messageCount=4` and Electric
   synced the post-restart update (`turn_count=2`) live.
 
+### M4 — PASS
+Two owners (`alice`, `bob`) each own a row. With the gatekeeper in front of
+Electric:
+- **scope** — a client authenticating as alice synced **only** alice's row
+  (`ownRow=true bobRow=false onlyOwnOwner=true rows=1`); bob's row never arrived.
+- **sneak** — a client authenticating as alice but requesting `where owner='bob'`
+  **still** saw nothing of bob's (`bobRow=false`): the proxy drops the client
+  `where` and forces `owner = $1` server-side.
+- **reject** — a request with no identity → **401**; a request for a
+  non-allowlisted table (`secrets`) → **403**.
+
+This is the boundary files-first could never enforce centrally: read access is
+scoped per identity by the server, independent of what the client asks for.
+
 ## Operational findings (these matter for the ADR)
 
 1. **rivetkit dev/test is not "pure in-process."** Even `setupTest` spawns the
@@ -136,17 +164,29 @@ Cold restart with **PG + Electric left running, only the Rivet engine killed**
    pattern is in your own argv), so a naive `pkill`/`xargs kill` kills the shell
    (or, with a multi-line PID string, zsh's no-word-split throws `illegal pid`).
    Exclude the current shell: `pgrep -f ... | grep -vw "$$" | xargs -r kill`.
+9. **The gatekeeper's security rests on forwarding an allowlist, not a denylist.**
+   The proxy copies ONLY `ELECTRIC_PROTOCOL_QUERY_PARAMS` (offset/handle/live/
+   cursor/cache-buster) from the client, then sets `table`/`columns`/`where`/
+   `params` itself. Because `where`/`columns`/`table` are not protocol params,
+   any client-supplied versions are silently dropped — there's no way for a
+   client to inject a broader scope. Forward the Electric protocol param list as
+   it ships in `@electric-sql/client`; don't hand-maintain it.
+10. **Forward the client's disconnect to the upstream.** Electric long-polls on
+   `live=true`; without wiring the request `close` event into an `AbortController`
+   on the upstream `fetch`, a client closing its `ShapeStream` leaves a dangling
+   long-poll against Electric per reconnect.
 
 ## Implication for the next step
 
-The full read/write substrate is structurally sound: single-writer actor →
-API → Postgres → Electric → second client, all surviving a cold restart. What's
-still unproven / deliberately deferred before the 003 rewrite:
+The full read/write substrate is structurally sound and the read path is safe to
+expose to untrusted clients: single-writer actor → API → Postgres → Electric →
+**identity-scoped gatekeeper** → second client, all surviving a cold restart.
+What's still unproven / deliberately deferred before the 003 rewrite:
 
 - **Engine lifecycle + runner-pool versioning** must move off the `setupTest`
   harness onto the reference's `serverless.configureRunnerPool` shape.
-- **Identity-scoped Electric gatekeeper** (the `electric-proxy` `where`-clause +
-  column allowlist, per `backend/vendor/effect-api-layout/apps/electric-proxy`) —
-  M4.
+- **Real identity** behind the gatekeeper: the spike trusts an `x-spike-user`
+  header; production must validate the session cookie (Tailscale/profile) and
+  derive the owner from it, not from a client-controlled header.
 - **Effect v4 wrapping** of the Rivet + Electric + PG clients (`@clients/*`),
   and **Hatchet** for system-level durable work — later gates.

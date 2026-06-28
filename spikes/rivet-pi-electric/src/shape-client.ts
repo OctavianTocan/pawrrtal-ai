@@ -27,18 +27,29 @@ export interface ConversationShape {
   close(): void;
 }
 
+export interface ShapeOptions {
+  /** Scope the shape (e.g. `owner = 'alice'`). Ignored when going via the gatekeeper. */
+  where?: string;
+  /** Shape endpoint; defaults to Electric directly. Point at the proxy for M4. */
+  url?: string;
+  /** Extra request headers (e.g. the identity the proxy authenticates on). */
+  headers?: Record<string, string>;
+}
+
 /**
- * Open a live subscription to the `conversations` shape. Pass `where` to scope
- * it (e.g. `owner = 'alice'`); omit for the whole table.
+ * Open a live subscription to the `conversations` shape. By default it hits
+ * Electric directly (M3); pass `url`/`headers` to route through the gatekeeper
+ * proxy (M4), which enforces the owner scope server-side regardless of `where`.
  */
-export function openConversationShape(where?: string): ConversationShape {
+export function openConversationShape(opts: ShapeOptions = {}): ConversationShape {
   const controller = new AbortController();
   const rows = new Map<string, ConversationRow>();
   const listeners = new Set<() => void>();
 
   const stream = new ShapeStream<ConversationRow>({
-    url: `${ELECTRIC_URL}/v1/shape`,
-    params: { table: 'conversations', ...(where ? { where } : {}) },
+    url: opts.url ?? `${ELECTRIC_URL}/v1/shape`,
+    params: { table: 'conversations', ...(opts.where ? { where: opts.where } : {}) },
+    ...(opts.headers ? { headers: opts.headers } : {}),
     signal: controller.signal,
     // Tolerate the startup race where the shape is requested before Electric has
     // finished publishing the table; returning {} retries with the same params.

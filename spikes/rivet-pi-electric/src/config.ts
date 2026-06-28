@@ -9,3 +9,7 @@ export const PG_URL = process.env.SPIKE_PG_URL ?? 'postgresql://postgres:postgre
 
 /** Electric sync service the read-path clients subscribe to. */
 export const ELECTRIC_URL = process.env.SPIKE_ELECTRIC_URL ?? 'http://127.0.0.1:5599';
+
+/** Identity-scoped gatekeeper proxy that sits in front of Electric (M4). */
+export const PROXY_PORT = Number(process.env.SPIKE_PROXY_PORT ?? 5699);
+export const PROXY_URL = process.env.SPIKE_PROXY_URL ?? `http://127.0.0.1:${PROXY_PORT}`;

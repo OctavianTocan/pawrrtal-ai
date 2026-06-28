@@ -12,6 +12,7 @@
     "m3b": "bun run src/m3.ts m3b",
     "m3c:seed": "bun run src/m3.ts seed",
     "m3c:verify": "bun run src/m3.ts verify",
+    "m4": "bun run src/m4.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
