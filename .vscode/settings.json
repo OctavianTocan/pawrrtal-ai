@@ -13,5 +13,23 @@
 	},
 	"cursorpyright.analysis.extraPaths": ["${workspaceFolder}/backend"],
 	"python-envs.pythonProjects": [],
-	"typescript.tsdk": "node_modules/typescript/lib"
+	"typescript.tsdk": "node_modules/typescript/lib",
+	"typescript.tsserver.maxTsServerMemory": 4096,
+	"files.watcherExclude": {
+		"**/node_modules/**": true,
+		"**/.next/**": true,
+		"**/.cache/**": true,
+		"**/.venv/**": true,
+		"**/backend/vendor/**": true,
+		"**/.claude/worktrees/**": true,
+		"**/.opencode/node_modules/**": true
+	},
+	"search.exclude": {
+		"**/node_modules/**": true,
+		"**/.next/**": true,
+		"**/.cache/**": true,
+		"**/.venv/**": true,
+		"**/backend/vendor/**": true,
+		"**/.claude/worktrees/**": true
+	}
 }
