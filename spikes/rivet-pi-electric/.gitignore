@@ -1,4 +1,5 @@
 node_modules/
-.rivethome/
+.rivethome*/
+infra/hatchet-creds/
 bun.lock
 *.log
