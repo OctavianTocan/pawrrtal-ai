@@ -24,6 +24,10 @@ interface ConversationState {
   owner: string;
   messages: AgentMessage[];
   turnCount: number;
+  /** Times the actor's own scheduler fired a per-session wake (M9 durability). */
+  wakeCount: number;
+  /** Label of the most recent fired wake; proves the right schedule ran. */
+  lastWakeLabel: string | null;
 }
 
 /** Extract the concatenated assistant text from a finished turn's new messages. */
@@ -57,6 +61,8 @@ export const conversation = actor({
     owner: 'spike-user',
     messages: [],
     turnCount: 0,
+    wakeCount: 0,
+    lastWakeLabel: null,
   }),
 
   actions: {
@@ -129,6 +135,29 @@ export const conversation = actor({
       turnCount: c.state.turnCount,
       messageCount: c.state.messages.length,
       messages: c.state.messages,
+    }),
+
+    /**
+     * Register a per-session wake `delayMs` from now via the actor's OWN
+     * scheduler. The wake invokes `fireWake` even if the actor hibernates or the
+     * engine restarts in the meantime — this is the session-scoped durable timer
+     * the ADR puts on the actor (not Hatchet). Returns when the wake will fire.
+     */
+    scheduleWake: async (c, args: { delayMs: number; label: string }) => {
+      await c.schedule.after(args.delayMs, 'fireWake', args.label);
+      return { scheduledFor: Date.now() + args.delayMs, label: args.label };
+    },
+
+    /** Scheduler-invoked callback (never called by clients). Mutates state. */
+    fireWake: (c, label: string) => {
+      c.state.wakeCount += 1;
+      c.state.lastWakeLabel = label;
+    },
+
+    /** Read the wake counters (used to prove the schedule fired post-restart). */
+    getWakes: (c) => ({
+      wakeCount: c.state.wakeCount,
+      lastWakeLabel: c.state.lastWakeLabel,
     }),
   },
 });

@@ -1,10 +1,10 @@
-# Spike: Rivet + Pi + Postgres + Electric + Hatchet (M1–M8)
+# Spike: Rivet + Pi + Postgres + Electric + Hatchet (M1–M9)
 
 Throwaway spike validating the substrate ADR
 (`2026-06-27-rivet-postgres-electric-hatchet-substrate`) before rewriting the
 003 plan. It now covers the full read/write vertical slice, the read-path
 security boundary, the production engine lifecycle, the Effect-v4 client
-wrapping, and durable background work:
+wrapping, durable background work, and the actor's own session-scoped scheduler:
 
 - **M1** — one conversation = one Rivet actor running the unforked Pi loop,
   streaming tokens out over the actor WebSocket.
@@ -26,6 +26,10 @@ wrapping, and durable background work:
   + layers** and exercised through one composed runtime.
 - **M8** — durable system work runs on **Hatchet** (Postgres-backed queue),
   survives a worker restart, and projects through the same single-writer seam.
+- **M9** — the actor's **own scheduler** (`c.schedule.after(...)` → a named
+  action) is durable: a per-session wake registered before a real cold restart
+  still fires (mutating state) after the actor rehydrates, with no client
+  invoking it. This is the session-scoped-timer half of the ADR's RC risk.
 
 ## What runs
 
@@ -34,9 +38,12 @@ wrapping, and durable background work:
   (`createFauxCore` from `@earendil-works/pi-ai/providers/faux`). Pi is consumed
   as a published npm dependency (`0.80.2`); nothing patches it.
 - `src/conversation-actor.ts` — a `rivetkit` actor. State = `{ systemPrompt, id,
-  owner, messages, turnCount }`. `sendMessage` runs one Pi turn, `c.broadcast`s
-  each `text_delta`, and (when an identity is bound via `setIdentity`) projects
-  a summary row through the API. `getTranscript` reads persisted state.
+  owner, messages, turnCount, wakeCount, lastWakeLabel }`. `sendMessage` runs one
+  Pi turn, `c.broadcast`s each `text_delta`, and (when an identity is bound via
+  `setIdentity`) projects a summary row through the API. `getTranscript` reads
+  persisted state. `scheduleWake` registers a durable per-session wake via
+  `c.schedule.after`, `fireWake` is the scheduler-only callback that mutates
+  state, `getWakes` reads the wake counters (M9).
 - `src/db.ts` — the **only** module that talks to Postgres (`pg` pool, lazy).
 - `src/api.ts` — the **single-writer** API seam (`upsertConversationSummary`).
   The actor imports this, never `db.ts`. In production this is `apps/api` over
@@ -67,7 +74,7 @@ wrapping, and durable background work:
   (`project-conversation-summary`), which projects through the SAME
   `upsertConversationSummary` seam. `src/hatchet/worker.ts` — the standalone
   worker process (run as a child so M8 can kill it).
-- `src/m1.ts` … `src/m8.ts` — the milestone runners.
+- `src/m1.ts` … `src/m9.ts` — the milestone runners.
 - `infra/docker-compose.yml` — PG 17 (logical replication) + Electric 1.5.1,
   isolated project/ports (`:5499` / `:5599`).
 - `infra/hatchet-compose.yml` — `hatchet-lite` on its OWN Postgres (`:5502`),
@@ -125,11 +132,13 @@ bun run m4
 # M5 — identity from a trusted session authority (header no longer trusted)
 bun run m5
 
-# M6 / M7 — standalone engine server on :6420. Ensure :6420 is FREE first
+# M6 / M7 / M9 — standalone engine server on :6420. Ensure :6420 is FREE first
 # (a stale engine breaks the boot with no_runner_config_configured — see findings):
 pgrep -x rivet-engine | xargs -r kill ; sleep 3
 RIVET_ENVOY_VERSION=1 bun run m6   # cold-restart durability, off the harness
 RIVET_ENVOY_VERSION=1 bun run m7   # PG/Electric/Rivet wrapped as Effect v4 layers
+pgrep -x rivet-engine | xargs -r kill ; sleep 3
+RIVET_ENVOY_VERSION=1 bun run m9   # actor scheduler/alarm durability across a cold restart
 
 # M8 — Hatchet durable background work surviving a worker restart
 docker compose -f infra/hatchet-compose.yml up -d   # mints infra/hatchet-creds/api-token
@@ -219,6 +228,20 @@ Hatchet (`hatchet-lite` on its own Postgres) ran the durable
 Durable system work survives the worker dying and lands through the single
 writer — no work is lost, and Hatchet never gets its own write path to the DB.
 
+### M9 — PASS
+The actor scheduled a per-session wake via its own scheduler
+(`c.schedule.after(20s, 'fireWake', label)`), under the same standalone engine
+shape as M6. `wakeCount=0` before the cold restart (the wake had not fired); the
+runner then killed the server **and** the engine, waited for `:6420` to free,
+and rebooted. After rehydration the scheduler fired the wake **unaided** (no
+client called `fireWake`): `wakeCount=1`, `lastWakeLabel` matched. Deterministic
+across repeated runs. Because the engine reboot (boot + runner registration)
+itself takes ~20-30s, the wake's fire time elapses during downtime and the wake
+**catches up on rehydration** — the stronger durability property (a missed
+session timer is not dropped). This is the alarm half of the ADR's RC risk that
+M2/M6 (state) left open, and it's what lets session-scoped timers live on the
+actor instead of Hatchet.
+
 ## Operational findings (these matter for the ADR)
 
 1. **rivetkit dev/test is not "pure in-process."** Even `setupTest` spawns the
@@ -283,6 +306,16 @@ writer — no work is lost, and Hatchet never gets its own write path to the DB.
     worker is alive sits in Hatchet's Postgres and is delivered to the next
     worker that registers the task — the restarted worker picked up the *same run
     id*. The worker is stateless; the durability lives in Hatchet's PG.
+17. **Actor schedules are durable AND catch up on rehydration.** A wake set with
+    `c.schedule.after(ms, 'action', ...args)` persists alongside actor state;
+    after a cold restart the actor fires it on its own, with no client connected.
+    Because the engine reboot alone takes ~20-30s, the wake's fire time routinely
+    elapses *during downtime* — and it still fires when the actor rehydrates
+    (a missed session timer is caught up, not dropped). This is the durability
+    that lets session-scoped timers live on the actor (per the ADR scope rule),
+    leaving Hatchet for system-level work. Same async-persist caveat as #12: the
+    `schedule` call returning is not the same as it being on disk — settle (or
+    shut down gracefully) before a hard kill.
 
 ## Implication for the next step
 
@@ -300,8 +333,15 @@ nothing left deliberately deferred:
   composed runtime (M7).
 - **durable system work** — Hatchet (Postgres-backed) surviving a worker restart
   and projecting through the single writer (M8).
+- **session-scoped durable timers** — the actor's own scheduler firing a wake
+  after a cold restart (catching up a missed fire on rehydration), which is what
+  keeps per-session time on the actor and off Hatchet (M9).
+
+Both halves of the ADR's headline RC risk — **state** durability (M2/M3c/M6)
+**and** **alarm** durability (M9) — are now proven for `rivetkit` 2.3.2.
 
 The substrate is ready to graduate from a throwaway spike into the 003 plan
-rewrite. The findings above (especially #11 engine-port hygiene, #12 commit
-settle, #15 Hatchet broadcast address) are the operational sharp edges the real
-`apps/api` + engine-lifecycle code must handle deliberately rather than rediscover.
+rewrite. The findings above (especially #11 engine-port hygiene, #12/#17
+async-persist settle, #15 Hatchet broadcast address) are the operational sharp
+edges the real `apps/api` + engine-lifecycle code must handle deliberately
+rather than rediscover.

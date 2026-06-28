@@ -17,6 +17,7 @@
     "m6": "bun run src/m6.ts",
     "m7": "bun run src/m7.ts",
     "m8": "bun run src/m8.ts",
+    "m9": "bun run src/m9.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
