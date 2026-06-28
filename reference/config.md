@@ -72,7 +72,7 @@ const allowedEmails = yield* AllowedEmailsConfig;
 | Path | Extract |
 |------|---------|
 | `effect-api-layout/apps/api/src/Modules/Authentication/Config.ts` | `Config.all`, yield in layer |
-| `effect-api-layout/apps/api/test/unit/Modules/Authentication/Config.test.ts` | `ConfigProvider.fromMap` |
+| `effect-api-layout/apps/api/test/unit/Modules/Authentication/Config.test.ts` | Config test shape (translate v3 `fromMap` → v4 `fromEnv`) |
 | `effect-api-layout/packages/*/sandbox/src/Config.ts` | `withDefault` + `mapOrFail` |
 | `effect-smol/packages/effect/src/Config.ts` | v4 `string`, `withDefault`, `map` |
 

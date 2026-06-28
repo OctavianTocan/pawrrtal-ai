@@ -18,6 +18,4 @@ export const AuthMiddlewareStubLive = Layer.succeed(AuthenticationMiddlewareServ
 })
 
 /** Injects a fixed `CurrentUser` for HttpApi groups that require allowed user middleware. */
-export const AllowedUserMiddlewareStubLive = Layer.succeed(AllowedUserMiddlewareService, (httpEffect) =>
-  Effect.provideService(httpEffect, CurrentUser, stubUser)
-)
+export const AllowedUserMiddlewareStubLive = Layer.succeed(AllowedUserMiddlewareService, (httpEffect) => httpEffect)

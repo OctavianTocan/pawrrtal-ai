@@ -175,6 +175,12 @@ package-lock.json
 # Local vendor reference clones (not submodules). See backend/vendor/README.md.
 backend/vendor/effect-api-layout/
 backend/vendor/effect/
+backend/vendor/pi/
+backend/vendor/hermes-agent
+backend/vendor/electric
+
+# Git worktrees (isolated workspaces created via the using-git-worktrees skill)
+.worktrees/
 
 # Docker
 */.env.docker

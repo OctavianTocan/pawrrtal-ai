@@ -3,70 +3,15 @@
 import { NodeHttpServer } from "@effect/platform-node"
 import { assert } from "@effect/vitest"
 import { Api } from "@pawrrtal/api-core"
-import {
-  Project,
-  ProjectCreateInput,
-  type ProjectId,
-  ProjectUpdateInput,
-  type UserId
-} from "@pawrrtal/api-core/Modules/Projects/Domain"
+import { ProjectCreateInput, ProjectUpdateInput } from "@pawrrtal/api-core/Modules/Projects/Domain"
 import { ProjectNotFoundError } from "@pawrrtal/api-core/Modules/Projects/Errors"
-import { DateTime, Effect, Exit, Layer } from "effect"
-import { HttpApiBuilder, HttpApiTest } from "effect/unstable/httpapi"
+import { Effect, Exit, Layer } from "effect"
+import { HttpApiTest } from "effect/unstable/httpapi"
 import { describe, it } from "vitest"
 import { AllowedUserMiddlewareStubLive, AuthMiddlewareStubLive } from "../../_helpers/AuthStub"
-
-const STUB_USER_ID = "00000000-0000-4000-8000-000000000001" as UserId
-const FAKE_PROJECT_ID = "a1b2c3d4-e5f6-4a7b-8c9d-0e1f2a3b4c5d" as ProjectId
-const FAKE_DATE = DateTime.makeUnsafe("2026-06-08T12:00:00.000Z")
-
-type ProjectsTestClient = {
-  readonly projects: {
-    readonly list: () => Effect.Effect<ReadonlyArray<Project>>
-    readonly create: (request: { readonly payload: ProjectCreateInput }) => Effect.Effect<Project>
-    readonly update: (request: {
-      readonly params: { readonly project_id: string }
-      readonly payload: ProjectUpdateInput
-    }) => Effect.Effect<Project>
-    readonly delete: (request: { readonly params: { readonly project_id: string } }) => Effect.Effect<void>
-  }
-}
-
-const fakeProject = (overrides: Partial<{ name: string; id: string }> = {}): Project =>
-  new Project({
-    id: overrides.id ?? FAKE_PROJECT_ID,
-    user_id: STUB_USER_ID,
-    name: overrides.name ?? "fake",
-    created_at: FAKE_DATE,
-    updated_at: FAKE_DATE
-  })
+import { FAKE_PROJECT_ID, fakeProject, makeHandlerLayer, type ProjectsTestClient } from "../../_helpers/ProjectsStub"
 
 describe("Projects.Http (handler stubs)", () => {
-  const makeHandlerLayer = (overrides: {
-    list?: () => Effect.Effect<ReadonlyArray<Project>, never>
-    create?: (name: string) => Effect.Effect<Project, never>
-    update?: (id: string, name: string) => Effect.Effect<Project, ProjectNotFoundError>
-    delete?: (id: string) => Effect.Effect<void, ProjectNotFoundError>
-  }) => {
-    const defaults = {
-      list: () => Effect.succeed<ReadonlyArray<Project>>([]),
-      create: (name: string) => Effect.succeed(fakeProject({ name })),
-      update: (id: string, name: string) => Effect.succeed(fakeProject({ id, name })),
-      delete: () => Effect.void
-    }
-    const h = { ...defaults, ...overrides }
-
-    return HttpApiBuilder.group(Api, "projects", (handlers) =>
-      Effect.gen(function* () {
-        return handlers
-          .handle("list", () => h.list())
-          .handle("create", ({ payload }) => h.create(payload.name))
-          .handle("update", ({ params, payload }) => h.update(params.project_id, payload.name ?? "kept"))
-          .handle("delete", ({ params }) => h.delete(params.project_id))
-      })
-    )
-  }
-
   const platformLayer = NodeHttpServer.layerHttpServices
 
   const getClient = async (handlerLayer: ReturnType<typeof makeHandlerLayer>): Promise<ProjectsTestClient> =>

@@ -43,11 +43,13 @@ const AllowedUserLayer = Layer.effect(
     return (httpEffect) =>
       Effect.gen(function* () {
         const user = yield* CurrentUser
-        if (!allowedEmails.has(user.email)) {
-          return yield* new AuthorizationError({
-            message: "User is not allowed to access this resource",
-            cause: new Error("User is not allowed to access this resource")
-          })
+        if (allowedEmails.size > 0 && !allowedEmails.has(user.email.toLowerCase())) {
+          return yield* Effect.fail(
+            new AuthorizationError({
+              message: "This Pawrrtal deployment is private.",
+              cause: new Error("This Pawrrtal deployment is private.")
+            })
+          )
         }
         return yield* httpEffect
       })
