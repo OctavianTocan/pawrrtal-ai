@@ -96,6 +96,12 @@
       "skillPath": "plugins/python-development/skills/python-testing-patterns/SKILL.md",
       "computedHash": "69915bb276b6aec61fe5b283a933f96584f66d14b616ce2060d95757629c6866"
     },
+    "skill-cleaner": {
+      "source": "steipete/agent-scripts",
+      "sourceType": "github",
+      "skillPath": "skills/skill-cleaner/SKILL.md",
+      "computedHash": "2b0c85757b069957f24ab70d1e54addfcd547d788f9bcd2b3c6b38969933f01f"
+    },
     "tdd": {
       "source": "mattpocock/skills",
       "sourceType": "github",
