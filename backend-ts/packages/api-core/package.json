@@ -12,10 +12,10 @@
   },
   "dependencies": {},
   "peerDependencies": {
-    "effect": "4.0.0-beta.74"
+    "effect": "4.0.0-beta.91"
   },
   "devDependencies": {
-    "effect": "4.0.0-beta.74",
+    "effect": "4.0.0-beta.91",
     "typescript": "^5.9.3"
   }
 }
