@@ -1,0 +1,106 @@
+---
+title: Rivet Actors + Postgres + Electric + Hatchet as the Persistence & Runtime Substrate
+description: ADR — replace the files-first/no-database persistence model from the 003 overhaul with a per-conversation Rivet actor (running Pi unforked) for live session state, Postgres as the API-owned queryable record, Electric for read-path sync, and Hatchet for system-level durable work.
+date: 2026-06-27
+status: Proposed
+related:
+  - 2026-06-07-generic-core-and-plugin-extraction
+  - 2026-05-18-heartbeat-job-scheduler-bridge
+  - 2026-05-19-workspace-tool-sandboxing
+---
+
+# Rivet Actors + Postgres + Electric + Hatchet as the Persistence & Runtime Substrate
+
+<Callout type="warn" title="Status: Proposed — supersedes the files-first model in spec 003">
+This ADR records the outcome of a design session (`/grill-me`) on the `003-pawrrtal-overhaul` umbrella. It **supersedes the "PURE FILES — no database" decision** in `specs/003-pawrrtal-overhaul/plan.md`, `spec.md`, and `data-model.md`. Those documents are annotated to point here; the substrate is validated by a spike (see Follow-up) before the 003 plan is rewritten wholesale.
+</Callout>
+
+**Reference implementation:** `backend/vendor/effect-api-layout` (Effect v4 monorepo using exactly this shape) and `backend/vendor/pi` (the unforked agent loop). Versions cited below are the ones pinned in that reference.
+
+## Context
+
+The 003 overhaul originally specified **files-first persistence with no database**: conversations, profiles, projects, memory and config all live as plain files under a `$PAWRRTAL_DATA` git repo, with `ripgrep`/scan as "search" and a `FileStore` service over effect-smol `FileSystem.ts`. That choice optimized for *self-hosted simplicity* and *no operational database*.
+
+During the grill, three forces moved the requirements away from that model:
+
+1. **Audience growth.** Pawrrtal is hosted for other people — initially trusted users, ideally a growing audience. Files-first scales poorly past a handful of trusted single-node users.
+2. **Multi-device + live sync is day-one, not later.** Users expect their conversation list, projects and settings to appear and update across devices without a manual refresh. A git-backed file tree gives no live read path.
+3. **Search matters at v1.** Cross-conversation search was pulled forward; `ripgrep` over per-conversation JSONL is a single-node, unindexed scan.
+
+We also adopted a hard constraint from the start of the session: **Pi (`backend/vendor/pi`) is used unforked.** We wrap it in Effect and extend it only through its injection seams (`ExecutionEnv`, providers, tools, hooks) — we never modify it.
+
+The `effect-api-layout` reference already solves exactly this problem shape with four substrates, and (notably) its `agents` stack already wraps a Pi-scope agent loop inside a Rivet actor. That reframed the decision from "build vs. buy a shell around Pi" to "adopt the reference's proven substrate split, with our own unforked `@earendil-works/pi-*`."
+
+## Decision
+
+Adopt a four-substrate split, mirroring `effect-api-layout`, with Pi unforked as the loop.
+
+### Runtime spine (top to bottom)
+
+```
+Product (Pawrrtal web / desktop / mobile / paw)
+   │  one typed contract (api-core → HTTP + Effect RPC)
+   ▼
+API  (Effect v4 — SOLE writer of Postgres)
+   │  RPC                                   ▲ read-path sync (Electric)
+   ▼                                        │
+Rivet actor  (one per conversation)     Postgres  ──►  Electric  ──►  all devices
+   │  runs                                  ▲ (system-level durable work)
+   ▼                                        │
+Pi  (unforked agent loop, wrapped in Effect)   Hatchet (apps/worker)
+```
+
+1. **Pi is the loop**, `@earendil-works/pi-agent-core` + `pi-ai`, wrapped in Effect, extended only via injection seams — never modified.
+2. **The Rivet actor is the live session.** One actor per conversation; it runs Pi, holds working/turn state, streams tokens and events over its built-in WebSocket, hibernates when idle, and schedules its own per-session wakes (`ctx.schedule.at(...)` → `fireSchedule`). Its per-actor on-disk SQLite database holds the live transcript + agent/turn/queue/per-session cron state.
+3. **Postgres is the cross-cutting record** (v1): conversation list/metadata, profiles, projects, automations, integrations, settings, and search. **The API is its sole writer.**
+4. **Electric syncs Postgres read-models** to every device through a gatekeeper proxy (the `electric-proxy` app), with shapes scoped by the caller's identity. **The live transcript does not flow through Electric** — it streams from the actor.
+5. **Hatchet runs system-level durable work** in a separate `apps/worker` host (worker pools: `integration` / `automation` / `background` / `scheduler`). Task definitions live next to their domain in `apps/api/src/Modules/**/Tasks/`; the worker is a thin runner. Cron → fan-out, with deliberate concurrency keys.
+
+### Invariants
+
+- **Single writer per store.** The actor owns its per-actor session state; the API owns Postgres; the actor reaches Postgres only by calling the API over RPC; Hatchet works on Postgres and reaches a conversation only by **messaging its actor** — never by mutating session state directly. No split-brain.
+- **Scope rule for durable work.** Session-scoped time/work (per-conversation reminders, in-session retries) → the **Rivet actor scheduler**. System-level / cross-cutting / external / heavy work (global crons, automations, inbound integrations, fan-outs) → **Hatchet**. Hatchet never owns session state.
+- **Sandbox is independent of actor isolation.** The actor isolates *session state*; the command sandbox isolates *agent-generated code*. Both exist. Default = Tier-1 `local-confined` (bubblewrap) behind a swappable `SandboxRuntime`/`ExecutionEnv` seam; VM (gVisor/Kata/micro-VM) and managed (E2B) tiers are opt-in.
+- **Identity resolves behind one seam.** v1 = tailnet + profiles (public/anonymous auth is a separate later project). That same seam feeds the Electric gatekeeper's per-request where-clause scoping.
+- **Style follows the reference.** Namespace-layered packages (`@platform/*`, `@clients/*`, product domains), thin handlers (Service → Policy → RLS), `@clients/rivet` + `@clients/hatchet` Effect wrappers, contracts in `api-core`, `electric-proxy` gatekeeper. **Effect v4** — match the `backend/vendor/effect-smol` submodule, not the v3-flavored reference syntax.
+
+### Pinned versions (from the reference)
+
+| Substrate | Package | Version in reference |
+|---|---|---|
+| Actors | `rivetkit` / `@rivetkit/react` | `^2.2.2-rc.1` |
+| Sync | `@electric-sql/client` | `1.5.13` |
+| Automations | `@hatchet-dev/typescript-sdk` | `^1.22.0` |
+| Loop | `@earendil-works/pi-agent-core`, `pi-ai` | unforked vendored (`backend/vendor/pi`) |
+| Framework | `effect` v4 | per `backend/vendor/effect-smol` (today `4.0.0-beta.74`) |
+
+### Consciously deferred
+
+- **Search depth** — whether Postgres holds only conversation metadata (shallow), a projected message-text **content digest** for full-text search, or a **full message mirror**. Banked the store-map + single-writer rule; the depth decision waits until the spike shows what is actually painful to write and query.
+- The exact inbound-event → actor messaging hop (traceable from the reference on demand).
+
+## Rejected alternatives
+
+| Alternative | Why rejected |
+|---|---|
+| **Files-first / no database** (the original 003 model) | Single-node, no live read path for multi-device, unindexed scan-search. Fails the audience-growth, cross-device-sync, and v1-search requirements that emerged. |
+| **Hand-built custom shell around Pi** (own transport, streams, durability, scheduling) | Re-implements exactly what Rivet provides (stateful actors, WebSockets, persistence, hibernation, scheduling). Rivet supplies the shell; we keep Pi unforked inside it. |
+| **Electric's full `agents-*` shell** (its bundled Pi-scope adapter + entity/stream schema) | Couples us to its pinned older Pi scope and its entity model. We want our own unforked `@earendil-works/pi-*` and our own contracts; we adopt Electric only as the read-path sync engine. |
+| **Centralize ALL durable work in Hatchet** | Breaks the single-writer invariant — per-session timers would have Hatchet reaching into session state. Session-scoped work belongs on the actor's own scheduler; Hatchet stays system-level. |
+
+## Consequences
+
+- **Operational weight rises.** "Self-hosted by default" now means running a Rivet engine, Postgres, an Electric sync service (Elixir), and a Hatchet engine — heavier than the files-first promise. Mitigations: Rivet runs in-process in dev; Hatchet and Electric reuse the same Postgres server (separate logical DBs/schemas); each ships as a single binary/container.
+- **The 003 persistence sections are now wrong** and are annotated as superseded (see the banner). `data-model.md`'s "pure files — there is no database" note, `plan.md`'s `Storage:` / `Constraints:` / Phase-0 item 6 / Step-7 persistence cutover, and `spec.md`'s files-first language must be rewritten to this substrate. The `SessionStore`/`EventStreamStore` **ports** survive; only their realization changes (per-actor SQLite + Postgres projection instead of `$PAWRRTAL_DATA` JSONL).
+- **`rivetkit` is at RC** (`2.2.2-rc.1`) — the single biggest technical risk. Alarm/state durability and Pi-inside-an-actor are unproven for us and are the first things the spike validates.
+- **Two Pi scopes must never coexist.** We use `@earendil-works/pi-*`; the Electric-agents stack uses a `@mariozechner/pi-*` scope. Pulling in Electric-agents code would risk a dual-scope hazard — so we take Electric as the sync engine only.
+
+## Follow-up — the validating spike (next, not in this ADR)
+
+Before rewriting the 003 plan, build a one-conversation vertical slice that de-risks the unproven assumptions:
+
+- Pi runs cleanly **inside** a Rivet actor (a long loop streaming tokens out via actor events).
+- The actor **persists and resumes** transcript + turn state across a restart (validates Rivet state/alarm durability at RC).
+- The actor projects a conversation **summary row to Postgres via the API** (single-writer path), and **Electric syncs** that row to a second client.
+
+Acceptance: a token streamed from Pi appears live in client A (actor WS) **and** the conversation's metadata row appears in client B (Electric) — and both survive an actor restart. The detailed spike plan is delivered separately for approval before any code lands.
