@@ -102,8 +102,8 @@ export function ProjectRow({
     // events so the row beneath still receives them.
     <div className="group/project-row relative" data-project-id={id}>
       <SidebarNavRow
-        aria-current={isSelected ? 'page' : undefined}
         align="center"
+        aria-current={isSelected ? 'page' : undefined}
         className={cn(
           'min-h-9 w-full pr-9 transition-colors',
           isDropTarget &&
@@ -128,7 +128,7 @@ export function ProjectRow({
       </SidebarNavRow>
       <button
         aria-label={`Rename ${name}`}
-        className="absolute right-1.5 top-1/2 -translate-y-1/2 cursor-pointer rounded-[5px] p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/[0.06] hover:text-foreground group-hover/project-row:opacity-100 focus-visible:opacity-100"
+        className="absolute top-1/2 right-1.5 -translate-y-1/2 cursor-pointer rounded-[5px] p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/[0.06] hover:text-foreground focus-visible:opacity-100 group-hover/project-row:opacity-100"
         onClick={(event) => {
           event.stopPropagation();
           onRename();

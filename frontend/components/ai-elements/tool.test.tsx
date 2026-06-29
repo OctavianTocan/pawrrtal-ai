@@ -6,7 +6,7 @@ describe('Tool', () => {
   it('renders header title + state + content', () => {
     const { getByText, container } = render(
       <Tool defaultOpen>
-        <ToolHeader state="output-available" type="tool-search" title="search-web" />
+        <ToolHeader state="output-available" title="search-web" type="tool-search" />
         <ToolContent>
           <ToolInput input={{ query: 'foo' }} />
           <ToolOutput errorText={undefined} output={'result'} />
@@ -36,7 +36,7 @@ describe('Tool', () => {
     it('shows "Ran" once a tool completes successfully', () => {
       const { getByText } = render(
         <Tool defaultOpen>
-          <ToolHeader state="output-available" type="tool-search" title="search-web" />
+          <ToolHeader state="output-available" title="search-web" type="tool-search" />
         </Tool>
       );
       expect(getByText('Ran')).toBeTruthy();
@@ -45,7 +45,7 @@ describe('Tool', () => {
     it('shows "Failed" when a tool errors', () => {
       const { getByText } = render(
         <Tool defaultOpen>
-          <ToolHeader state="output-error" type="tool-search" title="search-web" />
+          <ToolHeader state="output-error" title="search-web" type="tool-search" />
         </Tool>
       );
       expect(getByText('Failed')).toBeTruthy();
@@ -54,7 +54,7 @@ describe('Tool', () => {
     it('still shows "Running" while a tool is in flight', () => {
       const { getByText } = render(
         <Tool defaultOpen>
-          <ToolHeader state="input-available" type="tool-search" title="search-web" />
+          <ToolHeader state="input-available" title="search-web" type="tool-search" />
         </Tool>
       );
       expect(getByText('Running')).toBeTruthy();
@@ -63,7 +63,7 @@ describe('Tool', () => {
     it('shows "Denied" when the user blocks a tool call', () => {
       const { getByText } = render(
         <Tool defaultOpen>
-          <ToolHeader state="output-denied" type="tool-search" title="search-web" />
+          <ToolHeader state="output-denied" title="search-web" type="tool-search" />
         </Tool>
       );
       expect(getByText('Denied')).toBeTruthy();

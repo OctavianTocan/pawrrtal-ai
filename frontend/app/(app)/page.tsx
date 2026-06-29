@@ -15,5 +15,5 @@ import ChatContainer from '@/features/chat/ChatContainer';
 export default async function ConversationPage() {
   const uuid: string = crypto.randomUUID();
 
-  return <ChatContainer key={uuid} conversationId={uuid} />;
+  return <ChatContainer conversationId={uuid} key={uuid} />;
 }

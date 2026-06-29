@@ -76,30 +76,30 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
             )}
             <Field>
               <FieldLabel htmlFor={nameId}>Full Name</FieldLabel>
-              <Input id={nameId} type="text" placeholder="John Doe" required name="name" />
+              <Input id={nameId} name="name" placeholder="John Doe" required type="text" />
             </Field>
             <Field>
               <FieldLabel htmlFor={emailId}>Email</FieldLabel>
-              <Input id={emailId} type="email" placeholder="m@example.com" required name="email" />
+              <Input id={emailId} name="email" placeholder="m@example.com" required type="email" />
               <FieldDescription>
                 We&apos;ll use this to contact you. We will not share your email with anyone else.
               </FieldDescription>
             </Field>
             <Field>
               <FieldLabel htmlFor={passwordId}>Password</FieldLabel>
-              <Input id={passwordId} type="password" required name="password" />
+              <Input id={passwordId} name="password" required type="password" />
               {/* TODO: We're not validating the password strength here. */}
               <FieldDescription>Must be at least 8 characters long.</FieldDescription>
             </Field>
             <Field>
               <FieldLabel htmlFor={confirmPasswordId}>Confirm Password</FieldLabel>
-              <Input id={confirmPasswordId} type="password" required name="confirm-password" />
+              <Input id={confirmPasswordId} name="confirm-password" required type="password" />
               <FieldDescription>Please confirm your password.</FieldDescription>
             </Field>
             <FieldGroup>
               <Field>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting && <Loader2Icon className="mr-2 size-4 animate-spin" aria-hidden="true" />}
+                <Button disabled={isSubmitting} type="submit">
+                  {isSubmitting && <Loader2Icon aria-hidden="true" className="mr-2 size-4 animate-spin" />}
                   {isSubmitting ? 'Creating Account...' : 'Create Account'}
                 </Button>
                 {/* <Button variant="outline" type="button">

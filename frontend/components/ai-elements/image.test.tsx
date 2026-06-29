@@ -5,7 +5,7 @@ import { Image } from './image';
 describe('Image', () => {
   it('renders an <img> with a data URL pointing at the base64 payload', () => {
     const { container } = render(
-      <Image base64="aGVsbG8=" uint8Array={new Uint8Array([1])} mediaType="image/png" alt="hello" />
+      <Image alt="hello" base64="aGVsbG8=" mediaType="image/png" uint8Array={new Uint8Array([1])} />
     );
     const img = container.querySelector('img');
     expect(img?.getAttribute('src')).toBe('data:image/png;base64,aGVsbG8=');
@@ -14,7 +14,7 @@ describe('Image', () => {
 
   it('forwards a custom className alongside the defaults', () => {
     const { container } = render(
-      <Image base64="aGVsbG8=" uint8Array={new Uint8Array([1])} mediaType="image/png" className="custom-img" alt="" />
+      <Image alt="" base64="aGVsbG8=" className="custom-img" mediaType="image/png" uint8Array={new Uint8Array([1])} />
     );
     expect(container.querySelector('img')?.className).toContain('custom-img');
   });

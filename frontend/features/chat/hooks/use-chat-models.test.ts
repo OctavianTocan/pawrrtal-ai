@@ -1,7 +1,8 @@
 import { renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createQueryClientWrapper, createTestQueryClient } from '@/test/utils/render';
-import { type ChatModelOption, useChatModels } from './use-chat-models';
+import type { ChatModelOption } from './use-chat-models';
+import { useChatModels } from './use-chat-models';
 
 const replaceMock = vi.fn();
 

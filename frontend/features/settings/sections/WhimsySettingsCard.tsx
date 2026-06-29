@@ -21,7 +21,9 @@ import { Shuffle } from 'lucide-react';
 import type { Dispatch, SetStateAction } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { SelectButton, type SelectButtonOption } from '@/components/ui/select-button';
+import type { SelectButtonOption } from '@/components/ui/select-button';
+import { SelectButton } from '@/components/ui/select-button';
+import type { WhimsyColor, WhimsyConfig, WhimsyMode } from '@/features/whimsy/config';
 import {
   DEFAULT_WHIMSY_CONFIG,
   isWhimsyThemeName,
@@ -29,13 +31,11 @@ import {
   useWhimsyConfig,
   WHIMSY_BOUNDS,
   WHIMSY_THEME_NAMES,
-  type WhimsyColor,
-  type WhimsyConfig,
-  type WhimsyMode,
 } from '@/features/whimsy/config';
 import { cn } from '@/lib/utils';
 import { WHIMSY_PRESETS, whimsyPresetUrl } from '@/lib/whimsy-presets';
-import { WHIMSY_THEMES, type WhimsyThemeName } from '@/lib/whimsy-tile';
+import type { WhimsyThemeName } from '@/lib/whimsy-tile';
+import { WHIMSY_THEMES } from '@/lib/whimsy-tile';
 import { SettingsCard, SettingsRow, SettingsSectionHeader, Slider, Switch } from '../primitives';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -113,7 +113,7 @@ function WhimsyColorPicker({ value, onChange }: WhimsyColorPickerProps): React.J
           value={hexValue}
         />
       </label>
-      <span className="font-mono text-xs tabular-nums text-muted-foreground">
+      <span className="font-mono text-muted-foreground text-xs tabular-nums">
         {isThemeDefault ? 'theme' : hexValue}
       </span>
       {!isThemeDefault ? (
@@ -153,7 +153,7 @@ function WhimsyPresetModeRows({ config, setConfig }: WhimsyRowProps): React.JSX.
             step={20}
             value={[config.presetSize]}
           />
-          <span className="w-14 text-right text-xs tabular-nums text-muted-foreground">{config.presetSize}px</span>
+          <span className="w-14 text-right text-muted-foreground text-xs tabular-nums">{config.presetSize}px</span>
         </div>
       </SettingsRow>
       <SettingsRow
@@ -275,7 +275,7 @@ function WhimsyGeneratedModeRows({ config, setConfig }: WhimsyRowProps): React.J
             step={1}
             value={[config.grid]}
           />
-          <span className="w-12 text-right text-xs tabular-nums text-muted-foreground">
+          <span className="w-12 text-right text-muted-foreground text-xs tabular-nums">
             {config.grid}×{config.grid}
           </span>
         </div>
@@ -296,7 +296,7 @@ function WhimsyGeneratedModeRows({ config, setConfig }: WhimsyRowProps): React.J
             step={20}
             value={[config.size]}
           />
-          <span className="w-12 text-right text-xs tabular-nums text-muted-foreground">{config.size}px</span>
+          <span className="w-12 text-right text-muted-foreground text-xs tabular-nums">{config.size}px</span>
         </div>
       </SettingsRow>
     </>
@@ -357,7 +357,7 @@ export function WhimsySettingsCard(): React.JSX.Element {
          * Theme/Preset stay SelectButton-driven because they each
          * have many options.
          */}
-        <div className="inline-flex rounded-[7px] bg-foreground/[0.04] p-0.5 text-xs font-medium">
+        <div className="inline-flex rounded-[7px] bg-foreground/[0.04] p-0.5 font-medium text-xs">
           {(['generated', 'preset'] as const).map((mode) => {
             const isActive = config.mode === mode;
             return (
@@ -391,8 +391,8 @@ export function WhimsySettingsCard(): React.JSX.Element {
         label="Background colour"
       >
         <WhimsyColorPicker
-          value={config.backgroundColor}
           onChange={(next) => setConfig((c) => ({ ...c, backgroundColor: next }))}
+          value={config.backgroundColor}
         />
       </SettingsRow>
 
@@ -401,8 +401,8 @@ export function WhimsySettingsCard(): React.JSX.Element {
         label="Tile tint"
       >
         <WhimsyColorPicker
-          value={config.tintColor}
           onChange={(next) => setConfig((c) => ({ ...c, tintColor: next }))}
+          value={config.tintColor}
         />
       </SettingsRow>
 
@@ -423,7 +423,7 @@ export function WhimsySettingsCard(): React.JSX.Element {
             step={5}
             value={[opacitySliderValue]}
           />
-          <span className="w-12 text-right text-xs tabular-nums text-muted-foreground">
+          <span className="w-12 text-right text-muted-foreground text-xs tabular-nums">
             {(config.opacity * 100).toFixed(1)}%
           </span>
         </div>

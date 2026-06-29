@@ -21,13 +21,13 @@ import { usePersistedState } from '@/hooks/use-persisted-state';
 import { usePointerDownCommit } from '@/hooks/use-pointer-down-commit';
 import { useTooltipDropdown } from '@/hooks/use-tooltip-dropdown';
 import { cn } from '@/lib/utils';
+import type { SafetyMode } from '../constants';
 import {
   CHAT_STORAGE_KEYS,
   DEFAULT_SAFETY_MODE,
   SAFETY_MODE_ADVANCED,
   SAFETY_MODE_ORDER,
   SAFETY_MODES,
-  type SafetyMode,
 } from '../constants';
 import { WaveformTimeline } from './ChatComposerWaveform';
 import { formatRecordingTime } from './chat-composer-speech';
@@ -83,7 +83,7 @@ export function PlanButton({
       <TooltipTrigger asChild>
         <Button
           className={cn(
-            'h-7 gap-1 rounded-[7px] px-1.5 text-[12px] font-normal',
+            'h-7 gap-1 rounded-[7px] px-1.5 font-normal text-[12px]',
             isActive ? 'bg-info/20 text-info hover:bg-info/25' : 'text-muted-foreground hover:text-foreground'
           )}
           onClick={onToggle}
@@ -184,10 +184,9 @@ export function AutoReviewSelector(): React.JSX.Element {
         <TooltipTrigger asChild>
           <span className="inline-flex">
             <DropdownMenu
-              asChild
               align="start"
+              asChild
               closeOnSelect
-              usePortal
               // Match ModelSelectorPopover's surface — `popover-styled` provides
               // the project's elevated background, layered shadow, and themed
               // border; `chat-composer-dropdown-menu` overrides the surface to
@@ -209,7 +208,7 @@ export function AutoReviewSelector(): React.JSX.Element {
               trigger={
                 <Button
                   className={cn(
-                    'h-7 gap-1 rounded-[7px] bg-transparent px-1.5 text-[12px] font-normal hover:bg-foreground/[0.04]',
+                    'h-7 gap-1 rounded-[7px] bg-transparent px-1.5 font-normal text-[12px] hover:bg-foreground/[0.04]',
                     menuOpen && 'bg-foreground/[0.04]',
                     activeMeta.colorClass
                   )}
@@ -221,6 +220,7 @@ export function AutoReviewSelector(): React.JSX.Element {
                   <ChevronDownIcon aria-hidden="true" className="size-3" />
                 </Button>
               }
+              usePortal
             />
           </span>
         </TooltipTrigger>

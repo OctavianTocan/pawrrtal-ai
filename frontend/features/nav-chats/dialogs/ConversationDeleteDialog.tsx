@@ -57,19 +57,19 @@ export function ConversationDeleteDialog({
 
   return (
     <AppDialog
-      open={isOpen}
+      ariaLabel="Delete Conversation"
+      closeOnEscape={!isPending}
+      closeOnOverlayClick={!isPending}
+      footer={footer}
+      header={header}
       onDismiss={() => {
         if (!isPending) {
           onOpenChange(false);
         }
       }}
-      closeOnOverlayClick={!isPending}
-      closeOnEscape={!isPending}
-      ariaLabel="Delete Conversation"
-      footer={footer}
-      header={header}
-      showDismissButton={!isPending}
+      open={isOpen}
       sheetTitle="Delete Conversation"
+      showDismissButton={!isPending}
       size="sm"
       testId="conversation-delete-dialog"
     >

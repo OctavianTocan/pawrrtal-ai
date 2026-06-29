@@ -9,7 +9,8 @@
 import { DropdownMenuItem, DropdownPanelMenu } from '@octavian-tocan/react-dropdown';
 import type { ChatStatus } from 'ai';
 import { CornerDownLeftIcon, Loader2Icon, PlusIcon, SquareIcon, XIcon } from 'lucide-react';
-import { Children, type ComponentProps, type HTMLAttributes, isValidElement, type ReactNode } from 'react';
+import type { ComponentProps, HTMLAttributes, ReactNode } from 'react';
+import { Children, isValidElement } from 'react';
 import {
   Command,
   CommandEmpty,
@@ -119,12 +120,12 @@ const _PromptInputActionMenu = ({ children, className, onOpenChange }: PromptInp
 
   return (
     <DropdownPanelMenu
-      asChild
-      usePortal
       align="start"
+      asChild
       className={className}
       onOpenChange={onOpenChange}
       trigger={triggerNode ?? <PlusIcon className="size-4" />}
+      usePortal
     >
       {contentNode}
     </DropdownPanelMenu>

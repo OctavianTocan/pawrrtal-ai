@@ -6,7 +6,8 @@
  */
 
 import type { FileUIPart } from 'ai';
-import { createContext, type RefObject } from 'react';
+import type { RefObject } from 'react';
+import { createContext } from 'react';
 
 /** Attachment controller exposed to prompt input child components. */
 export type AttachmentsContext = {

@@ -39,7 +39,7 @@ export function TaskDetailPane({ task, project, dueLabel, isOverdue, onClose }: 
     <aside
       aria-hidden={!open}
       className={cn(
-        'absolute inset-y-0 right-0 flex w-[360px] flex-col border-l border-border bg-background transition-transform duration-[220ms] ease-out motion-reduce:transition-none',
+        'absolute inset-y-0 right-0 flex w-[360px] flex-col border-border border-l bg-background transition-transform duration-[220ms] ease-out motion-reduce:transition-none',
         open ? 'translate-x-0 shadow-[var(--shadow-panel-floating)]' : 'pointer-events-none translate-x-full'
       )}
       style={{
@@ -48,7 +48,7 @@ export function TaskDetailPane({ task, project, dueLabel, isOverdue, onClose }: 
       }}
     >
       {task ? (
-        <TaskDetailBody task={task} project={project} dueLabel={dueLabel} isOverdue={isOverdue} onClose={onClose} />
+        <TaskDetailBody dueLabel={dueLabel} isOverdue={isOverdue} onClose={onClose} project={project} task={task} />
       ) : null}
     </aside>
   );
@@ -71,22 +71,22 @@ function TaskDetailBody({ task, project, dueLabel, isOverdue, onClose }: TaskDet
 
   return (
     <>
-      <header className="flex items-center justify-between gap-2 border-b border-foreground/[0.08] px-5 py-4">
+      <header className="flex items-center justify-between gap-2 border-foreground/[0.08] border-b px-5 py-4">
         <div className="flex min-w-0 items-center gap-2">
           {project ? (
             <ProjectChip
-              label={survivalMode ? 'Survival Mode' : project.name}
-              tone={survivalMode ? 'destructive' : project.tone}
               emoji={survivalMode ? '🔥' : project.emoji}
               hideHash={survivalMode}
+              label={survivalMode ? 'Survival Mode' : project.name}
+              tone={survivalMode ? 'destructive' : project.tone}
             />
           ) : null}
         </div>
         <button
-          type="button"
-          onClick={onClose}
           aria-label="Close task detail"
           className="flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 ease-out hover:bg-foreground/[0.05] hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
+          onClick={onClose}
+          type="button"
         >
           <XIcon aria-hidden="true" className="size-4" />
         </button>
@@ -94,11 +94,11 @@ function TaskDetailBody({ task, project, dueLabel, isOverdue, onClose }: TaskDet
 
       <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto p-5">
         <div>
-          <h2 className="font-display text-[22px] leading-tight font-medium tracking-tight text-balance text-foreground">
+          <h2 className="text-balance font-display font-medium text-[22px] text-foreground leading-tight tracking-tight">
             {task.title}
           </h2>
           {task.description ? (
-            <p className="mt-3 text-[13px] leading-relaxed text-pretty text-muted-foreground">{task.description}</p>
+            <p className="mt-3 text-pretty text-[13px] text-muted-foreground leading-relaxed">{task.description}</p>
           ) : (
             <p className="mt-3 text-[13px] text-muted-foreground/70 italic">
               No description yet. Click the row to add one.
@@ -106,7 +106,7 @@ function TaskDetailBody({ task, project, dueLabel, isOverdue, onClose }: TaskDet
           )}
         </div>
 
-        <dl className="flex flex-col gap-3 border-t border-foreground/[0.06] pt-4">
+        <dl className="flex flex-col gap-3 border-foreground/[0.06] border-t pt-4">
           <DetailRow icon={CalendarIcon} label="Due">
             <DueValue dueLabel={dueLabel} isOverdue={isOverdue} />
           </DetailRow>
@@ -119,12 +119,12 @@ function TaskDetailBody({ task, project, dueLabel, isOverdue, onClose }: TaskDet
         </dl>
       </div>
 
-      <footer className="flex items-center justify-between border-t border-foreground/[0.08] px-5 py-4 text-[12px] text-muted-foreground">
+      <footer className="flex items-center justify-between border-foreground/[0.08] border-t px-5 py-4 text-[12px] text-muted-foreground">
         <span>Edit (mock)</span>
         <button
-          type="button"
+          className="cursor-pointer rounded-md px-3 py-1.5 font-medium text-[12px] text-foreground transition-colors duration-150 ease-out hover:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
           onClick={onClose}
-          className="cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-medium text-foreground transition-colors duration-150 ease-out hover:bg-foreground/[0.06] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
+          type="button"
         >
           Close task details
         </button>
@@ -157,8 +157,8 @@ function TagList({ tags }: { tags: readonly string[] }): ReactNode {
     <span className="flex flex-wrap gap-1.5">
       {tags.map((tag) => (
         <span
+          className="inline-flex h-5 items-center rounded-md bg-foreground/[0.05] px-1.5 font-medium text-[11px] text-muted-foreground"
           key={tag}
-          className="inline-flex h-5 items-center rounded-md bg-foreground/[0.05] px-1.5 text-[11px] font-medium text-muted-foreground"
         >
           <span aria-hidden="true" className="opacity-60">
             #

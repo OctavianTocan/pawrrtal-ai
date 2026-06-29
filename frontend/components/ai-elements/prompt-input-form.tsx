@@ -8,27 +8,19 @@
 
 import type { FileUIPart } from 'ai';
 import { nanoid } from 'nanoid';
-import {
-  type ChangeEventHandler,
-  type DragEventHandler,
-  type FormEvent,
-  type FormEventHandler,
-  type HTMLAttributes,
-  type RefObject,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
+import type {
+  ChangeEventHandler,
+  DragEventHandler,
+  FormEvent,
+  FormEventHandler,
+  HTMLAttributes,
+  RefObject,
 } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { InputGroup } from '@/components/ui/input-group';
 import { cn } from '@/lib/utils';
-import {
-  type AttachmentsContext,
-  LocalAttachmentsContext,
-  type PromptInputControllerProps,
-  useOptionalPromptInputController,
-} from './prompt-input-context';
+import type { AttachmentsContext, PromptInputControllerProps } from './prompt-input-context';
+import { LocalAttachmentsContext, useOptionalPromptInputController } from './prompt-input-context';
 
 /** Message payload emitted when the prompt input form submits. */
 export type PromptInputMessage = {

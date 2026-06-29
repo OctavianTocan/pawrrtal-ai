@@ -146,8 +146,8 @@ export function NavUser({ user }: { user: NavUserIdentity }): React.JSX.Element 
         <AvatarFallback className="text-xs">{getInitials(user.name)}</AvatarFallback>
       </Avatar>
       <div className="flex min-w-0 flex-1 flex-col leading-tight">
-        <span className="truncate text-sm font-medium text-foreground">{user.name}</span>
-        <span className="truncate text-sm text-muted-foreground">{user.plan}</span>
+        <span className="truncate font-medium text-foreground text-sm">{user.name}</span>
+        <span className="truncate text-muted-foreground text-sm">{user.plan}</span>
       </div>
       <ChevronsUpDownIcon
         aria-hidden="true"
@@ -166,11 +166,8 @@ export function NavUser({ user }: { user: NavUserIdentity }): React.JSX.Element 
     // hard line. Wrapper gets its own padding instead of forcing the
     // trigger button to swallow it — this lets the trigger's hover paint
     // a clean fully-rounded pill that actually fills the visible row.
-    <div className="shrink-0 border-t border-foreground/8 p-2">
+    <div className="shrink-0 border-foreground/8 border-t p-2">
       <DropdownPanelMenu
-        asChild
-        usePortal
-        placement="top"
         // Anchor the panel's LEFT edge to the trigger's LEFT edge so it
         // grows up-and-to-the-right. The default `align="end"` (right-edge
         // anchored) overflows off-screen left because the trigger sits at
@@ -178,6 +175,7 @@ export function NavUser({ user }: { user: NavUserIdentity }): React.JSX.Element 
         // menu's right edge would land mid-trigger, pushing its left
         // edge into negative X. See image #36 for the prior bug.
         align="start"
+        asChild
         // `popover-styled` provides the project's themed background,
         // border, layered shadow, and global backdrop-filter blur.
         // Without it the consumer's className REPLACES the package's
@@ -185,9 +183,11 @@ export function NavUser({ user }: { user: NavUserIdentity }): React.JSX.Element 
         // letting the sidebar bleed through.
         contentClassName="popover-styled p-1 w-64"
         onOpenChange={setIsOpen}
+        placement="top"
         trigger={trigger}
+        usePortal
       >
-        <DropdownMenuLabel className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
+        <DropdownMenuLabel className="px-2 py-1.5 font-medium text-muted-foreground text-xs">
           {user.email}
         </DropdownMenuLabel>
         <DropdownMenuItem className="justify-between" onSelect={() => push('/settings')}>
@@ -195,7 +195,7 @@ export function NavUser({ user }: { user: NavUserIdentity }): React.JSX.Element 
             <SettingsIcon aria-hidden="true" className="size-4" />
             Settings
           </span>
-          <span className="text-xs tracking-widest text-muted-foreground">⇧⌘,</span>
+          <span className="text-muted-foreground text-xs tracking-widest">⇧⌘,</span>
         </DropdownMenuItem>
         {/*
          * Side-flyout submenu — replaces the inline-accordion variant the
@@ -208,7 +208,7 @@ export function NavUser({ user }: { user: NavUserIdentity }): React.JSX.Element 
             <GlobeIcon aria-hidden="true" className="size-4" />
             <span className="flex-1 text-left">Language</span>
           </DropdownSubmenuTrigger>
-          <DropdownSubmenuContent className="popover-styled p-1 min-w-44">
+          <DropdownSubmenuContent className="popover-styled min-w-44 p-1">
             {LANGUAGE_OPTIONS.map((opt) => (
               <DropdownMenuItem key={opt.id} onSelect={noop}>
                 {opt.label}
@@ -245,9 +245,9 @@ export function NavUser({ user }: { user: NavUserIdentity }): React.JSX.Element 
             <InfoIcon aria-hidden="true" className="size-4" />
             <span className="flex-1 text-left">Learn more</span>
           </DropdownSubmenuTrigger>
-          <DropdownSubmenuContent className="popover-styled p-1 min-w-44">
+          <DropdownSubmenuContent className="popover-styled min-w-44 p-1">
             {LEARN_MORE_LINKS.map((link) => (
-              <DropdownMenuItem key={link.id} disabled onSelect={noop}>
+              <DropdownMenuItem disabled key={link.id} onSelect={noop}>
                 {link.label}
               </DropdownMenuItem>
             ))}

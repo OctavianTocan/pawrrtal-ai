@@ -20,6 +20,7 @@
     "themes:build": "bun run scripts/build-themes.ts"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.1",
     "@google/design.md": "^0.3.0",
     "@tanstack/react-query-devtools": "^5.101.0",
     "@types/bun": "^1.3.14",
@@ -37,7 +38,8 @@
     "frontend/lib/react-chat-composer",
     "backend-ts/packages/api-core",
     "backend-ts/apps/api",
-    "packages/ci/skill-gen"
+    "packages/ci/skill-gen",
+    "packages/paw-cli"
   ],
   "overrides": {
     "react": "19.2.7",

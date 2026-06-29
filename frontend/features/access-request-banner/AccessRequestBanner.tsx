@@ -130,16 +130,16 @@ export function AccessRequestBanner({ requests, onApprove, onReject, onReset, on
 
   return (
     <AccessRequestBannerView
-      requests={requests}
       bannerState={toBannerState(internalBannerState)}
-      decisions={decisions}
       collapsedAvatars={collapsedAvatars}
-      remainingCount={remainingCount}
-      onToggleExpand={dispatchBannerToggle}
-      onDismiss={onDismiss}
+      decisions={decisions}
       onApproveRequest={handleApprove}
+      onDismiss={onDismiss}
       onRejectRequest={handleReject}
       onResetRequest={handleReset}
+      onToggleExpand={dispatchBannerToggle}
+      remainingCount={remainingCount}
+      requests={requests}
     />
   );
 }

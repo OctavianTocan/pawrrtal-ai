@@ -21,7 +21,8 @@
  * the backend, not through UI clicks.
  */
 
-import { type BrowserContext, test as base } from '@playwright/test';
+import type { BrowserContext } from '@playwright/test';
+import { test as base } from '@playwright/test';
 import { E2E_SKIP_ONBOARDING_STORAGE_KEY } from '../features/onboarding/v2/OnboardingFlow';
 
 const BACKEND_URL = process.env.E2E_API_URL ?? 'http://localhost:8000';

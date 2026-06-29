@@ -1,7 +1,8 @@
 'use client';
 
 import { AlertTriangleIcon, RefreshCwIcon } from 'lucide-react';
-import { type ReactNode, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useMemo, useState } from 'react';
 import { Message, MessageContent, MessageResponse } from '@/components/ai-elements/message';
 import { Shimmer } from '@/components/ai-elements/shimmer';
 import { AgentSpinner } from '@/components/ui/agent-spinner';
@@ -10,7 +11,8 @@ import { Collapsible, CollapsibleContent } from '@/components/ui/collapsible';
 import type { ChatArtifactPayload, ChatTimelineEntry } from '@/lib/types';
 import { cn } from '@/lib/utils';
 import { ArtifactCard } from '../artifacts/ArtifactCard';
-import { extractToolChips, type ToolResultChips } from '../tool-result-parsers';
+import type { ToolResultChips } from '../tool-result-parsers';
+import { extractToolChips } from '../tool-result-parsers';
 import type { ChatToolCall } from '../types';
 import { ChainOfThought } from './ChainOfThought';
 import { ReplyActionsRow } from './ReplyActionsRow';

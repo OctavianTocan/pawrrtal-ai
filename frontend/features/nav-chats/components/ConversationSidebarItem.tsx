@@ -117,7 +117,27 @@ export function ConversationSidebarItem({
 
   return (
     <ConversationSidebarItemView
-      title={title}
+      absoluteHref={absoluteHref}
+      age={age}
+      appliedLabelIds={appliedLabelIds}
+      badges={badges}
+      buttonProps={buttonProps}
+      conversationId={id}
+      href={href}
+      icon={icon}
+      onArchive={() => onArchive(id)}
+      onClick={onClick}
+      onClickMenuItem={() => onNavigate(href)}
+      onDelete={() => onDelete(id)}
+      onExportMarkdown={() => onExportMarkdown(id)}
+      onFlag={() => onFlag(id)}
+      onMarkUnread={() => onMarkUnread(id)}
+      onMouseDown={onMouseDown}
+      onNavigate={onNavigate}
+      onRegenerateTitle={() => onRegenerateTitle(id)}
+      onRename={() => onRename(id)}
+      onSetStatus={(s) => onSetStatus(id, s)}
+      onToggleLabel={(labelId) => onToggleLabel(id, labelId)}
       state={{
         isArchived,
         isFlagged,
@@ -126,29 +146,9 @@ export function ConversationSidebarItem({
         isUnread,
         showSeparator,
       }}
-      age={age}
-      href={href}
-      absoluteHref={absoluteHref}
       status={status}
-      appliedLabelIds={appliedLabelIds}
-      icon={icon}
-      badges={badges}
+      title={title}
       titleTrailing={titleTrailing}
-      onClick={onClick}
-      onMouseDown={onMouseDown}
-      onClickMenuItem={() => onNavigate(href)}
-      onNavigate={onNavigate}
-      onRename={() => onRename(id)}
-      onDelete={() => onDelete(id)}
-      onArchive={() => onArchive(id)}
-      onFlag={() => onFlag(id)}
-      onSetStatus={(s) => onSetStatus(id, s)}
-      onMarkUnread={() => onMarkUnread(id)}
-      onRegenerateTitle={() => onRegenerateTitle(id)}
-      onToggleLabel={(labelId) => onToggleLabel(id, labelId)}
-      onExportMarkdown={() => onExportMarkdown(id)}
-      conversationId={id}
-      buttonProps={buttonProps}
     />
   );
 }

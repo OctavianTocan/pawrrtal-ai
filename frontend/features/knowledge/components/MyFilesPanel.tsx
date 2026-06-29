@@ -15,11 +15,13 @@
  */
 
 import { CheckSquare2Icon, FolderIcon } from 'lucide-react';
-import { type ReactNode, useCallback, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useCallback, useState } from 'react';
 import type { KnowledgeBreadcrumb } from '../path-utils';
 import type { FileTreeNode } from '../types';
 import { EmptyState } from './EmptyState';
-import { FileRow, type FileRowAction } from './FileRow';
+import type { FileRowAction } from './FileRow';
+import { FileRow } from './FileRow';
 import { KnowledgeBreadcrumbs } from './KnowledgeBreadcrumbs';
 
 interface MyFilesPanelProps {
@@ -67,9 +69,9 @@ export function MyFilesPanel({ currentNode, crumbs, onNavigateBreadcrumb, onOpen
           <KnowledgeBreadcrumbs crumbs={crumbs} onNavigate={onNavigateBreadcrumb} />
         </div>
         <EmptyState
+          description="The location in this URL doesn’t exist anymore. Use the breadcrumb to head back."
           icon={FolderIcon}
           title="Folder not found"
-          description="The location in this URL doesn’t exist anymore. Use the breadcrumb to head back."
         />
       </div>
     );
@@ -86,9 +88,9 @@ export function MyFilesPanel({ currentNode, crumbs, onNavigateBreadcrumb, onOpen
             <span className="text-[12px] text-muted-foreground">Selected: {selectedNames.length}</span>
           ) : null}
           <button
-            type="button"
+            className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2 font-medium text-[12px] text-muted-foreground transition-colors duration-150 ease-out hover:bg-foreground-5 hover:text-foreground"
             onClick={handleToggleSelect}
-            className="inline-flex h-7 cursor-pointer items-center gap-1.5 rounded-md px-2 text-[12px] font-medium text-muted-foreground transition-colors duration-150 ease-out hover:bg-foreground-5 hover:text-foreground"
+            type="button"
           >
             <CheckSquare2Icon aria-hidden="true" className="size-3.5" />
             {selectionMode ? 'Cancel' : 'Select'}
@@ -99,23 +101,23 @@ export function MyFilesPanel({ currentNode, crumbs, onNavigateBreadcrumb, onOpen
       <div className="min-h-0 flex-1 overflow-y-auto px-3 pb-4">
         {children.length === 0 ? (
           <EmptyState
+            description="Drop in a file or right-click to create a new one."
             icon={FolderIcon}
             title="This folder is empty"
-            description="Drop in a file or right-click to create a new one."
           />
         ) : (
           <ul className="flex flex-col gap-0.5">
             {children.map((child) => (
               <li key={child.name}>
                 <FileRow
-                  name={child.name}
-                  updatedLabel={child.updatedLabel}
-                  kind={child.kind}
-                  selectionMode={selectionMode}
                   isSelected={selectedNames.includes(child.name)}
+                  kind={child.kind}
+                  name={child.name}
+                  onAction={(action) => handleAction(action, child.name)}
                   onActivate={() => onOpenChild(child.name, child.kind)}
                   onToggleSelect={() => toggleSelection(child.name)}
-                  onAction={(action) => handleAction(action, child.name)}
+                  selectionMode={selectionMode}
+                  updatedLabel={child.updatedLabel}
                 />
               </li>
             ))}

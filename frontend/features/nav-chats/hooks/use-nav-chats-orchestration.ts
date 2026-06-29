@@ -20,13 +20,8 @@ import { extractConversationIdFromPath } from '@/lib/route-utils';
 import type { Conversation } from '@/lib/types';
 import type { NavChatsViewProps } from '../components/NavChatsView';
 import { useOptionalSidebarFocusContext } from '../context/sidebar-focus';
-import {
-  createInitialSelectionState,
-  type MultiSelectState,
-  rangeSelect,
-  singleSelect,
-  toggleSelect,
-} from '../lib/conversation-selection';
+import type { MultiSelectState } from '../lib/conversation-selection';
+import { createInitialSelectionState, rangeSelect, singleSelect, toggleSelect } from '../lib/conversation-selection';
 import { useConversationSearch } from './use-conversation-search';
 
 type OptionalSidebarFocus = ReturnType<typeof useOptionalSidebarFocusContext>;

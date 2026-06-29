@@ -6,8 +6,10 @@
 
 'use client';
 
-import { createContext, type PropsWithChildren, type RefObject, use } from 'react';
-import { type AttachmentsContext, LocalAttachmentsContext } from './prompt-input-attachments-context';
+import type { PropsWithChildren, RefObject } from 'react';
+import { createContext, use } from 'react';
+import type { AttachmentsContext } from './prompt-input-attachments-context';
+import { LocalAttachmentsContext } from './prompt-input-attachments-context';
 
 /** Controlled textarea value used by provider-backed prompt inputs. */
 export type TextInputContext = {

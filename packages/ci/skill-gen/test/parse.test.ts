@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
-import { type ParsedSkillFragment, parseFragment } from '../src/parse';
+import type { ParsedSkillFragment } from '../src/parse';
+import { parseFragment } from '../src/parse';
 import type { RawFragment } from '../src/scan';
 
 /**

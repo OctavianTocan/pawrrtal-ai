@@ -17,7 +17,8 @@
  */
 
 import { XIcon } from 'lucide-react';
-import { type ReactNode, useEffect, useRef } from 'react';
+import type { ReactNode } from 'react';
+import { useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import type { ChatArtifactPayload } from '@/lib/types';
 import { ArtifactRenderer } from './ArtifactRenderer';
@@ -47,9 +48,8 @@ export function ArtifactDialog({ artifact, onClose }: ArtifactDialogProps): Reac
 
   return createPortal(
     <dialog
-      open
-      aria-modal="true"
       aria-label={artifact.title}
+      aria-modal="true"
       className="artifact-dialog-overlay"
       onClick={(e) => {
         // Click on the overlay (but not bubbled from the inner dialog)
@@ -59,16 +59,17 @@ export function ArtifactDialog({ artifact, onClose }: ArtifactDialogProps): Reac
       onKeyDown={(event) => {
         if (event.key === 'Escape') onClose();
       }}
+      open
     >
       <div className="artifact-dialog">
         <header className="artifact-dialog-header">
           <h2 className="artifact-dialog-title">{artifact.title}</h2>
           <button
-            type="button"
-            ref={closeRef}
-            onClick={onClose}
             aria-label="Close artifact"
             className="artifact-dialog-close"
+            onClick={onClose}
+            ref={closeRef}
+            type="button"
           >
             <XIcon className="size-4" />
           </button>

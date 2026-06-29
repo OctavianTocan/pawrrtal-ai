@@ -6,7 +6,7 @@
 
 ## Project overview
 
-Self-hosted AI agent platform. Long-term program: [specs/003-pawrrtal-overhaul/plan.md](../../../specs/003-pawrrtal-overhaul/plan.md).
+Self-hosted AI agent platform. Local planning specs live in gitignored `specs/` (not on GitHub).
 
 | Area | Path | Role |
 |------|------|------|
@@ -17,6 +17,22 @@ Self-hosted AI agent platform. Long-term program: [specs/003-pawrrtal-overhaul/p
 | Agent brain | `.agent/` | Portable memory, skills, protocols |
 | Tasks | `.beans/` | Local tracker (`beans` CLI) |
 | Design system | `DESIGN.md` | Tokens in `frontend/app/globals.css` |
+| Handbook | `frontend/content/docs/` | Versioned product + agent docs (not repo-root `/docs/`) |
+
+## Agent brain layout
+
+| What | Canonical path | Notes |
+|------|----------------|-------|
+| Skills | `.agent/skills/` | `bun run skill-gen:generate` writes here; run `agentic-stack sync-manifest` after tree changes |
+| Rules | `.agent/rules/` | `.claude/rules`, `.agents/rules` symlink here |
+| Preferences | `.agent/memory/personal/PREFERENCES.md` | Taste and workflow — not in AGENTS.md |
+| Facts | `.agent/memory/semantic/DOMAIN_KNOWLEDGE.md` | Stable repo facts — not in AGENTS.md |
+| Entry contract | `.agent/AGENTS.md` | Bootstrap + non-negotiables only |
+| Root stub | `AGENTS.md` | Pointer to `.agent/AGENTS.md`; `CLAUDE.md` symlinks here |
+
+**VPS host CLI:** `~/.local/bin/agentic-stack` (source at `/mnt/work/code/personal/agentic-stack`).
+
+**Gitignored local paths (keep untracked):** `/docs/`, `/specs/`, `/reference/`, `.mcp.json`, `**/.mcp.json`, `config/mcporter.json`, `.beans/`, `GLOSSARY.md`, `WARP.md`, `.vscode/`, harness skill/rule mirrors.
 
 ## Architecture layers (sentrux)
 
@@ -79,7 +95,7 @@ cd backend-ts && bun run check && bun run typecheck && bun run test
 - **Post-login:** `LoginForm` uses `window.location.replace('/')`, not `router.push` — avoids 401 before `Set-Cookie` commits
 - **Private deploy:** `ALLOWED_EMAILS` — empty admits any authed user; non-empty → 403 `This Pawrrtal deployment is private.`
 
-**003 direction:** profiles via `X-Pawrrtal-Profile` + `Tailscale-User-Login`; see `specs/003-pawrrtal-overhaul/research.md` §11. Do not extend cookie auth in new `003` slices.
+**003 direction:** profiles via `X-Pawrrtal-Profile` + `Tailscale-User-Login`; see local gitignored `specs/003-pawrrtal-overhaul/research.md` §11. Do not extend cookie auth in new `003` slices.
 
 ## Production routing (current)
 

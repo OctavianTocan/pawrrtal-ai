@@ -1,12 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import {
-  PromptInput,
-  PromptInputAttachment,
-  PromptInputAttachments,
-  type PromptInputProps,
-  PromptInputTextarea,
-} from './prompt-input';
+import type { PromptInputProps } from './prompt-input';
+import { PromptInput, PromptInputAttachment, PromptInputAttachments, PromptInputTextarea } from './prompt-input';
 
 type PromptInputOnError = NonNullable<PromptInputProps['onError']>;
 type PromptInputOnSubmit = PromptInputProps['onSubmit'];
@@ -25,7 +20,7 @@ const renderPromptInput = ({
   onSubmit?: PromptInputOnSubmit;
 } = {}) => {
   render(
-    <PromptInput accept={accept} maxFiles={maxFiles} maxFileSize={maxFileSize} onError={onError} onSubmit={onSubmit}>
+    <PromptInput accept={accept} maxFileSize={maxFileSize} maxFiles={maxFiles} onError={onError} onSubmit={onSubmit}>
       <PromptInputTextarea aria-label="Message" />
       <PromptInputAttachments>{(attachment) => <PromptInputAttachment data={attachment} />}</PromptInputAttachments>
       <button type="submit">Send</button>

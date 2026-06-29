@@ -92,8 +92,11 @@ jobs:
           } >> "$GITHUB_OUTPUT"
           exit "$status"
 
-      - name: Run backend-ts typecheck
-        run: cd backend-ts && bun run typecheck
+      - name: Install backend-ts dependencies
+        run: cd backend-ts && bun install --frozen-lockfile
+
+      - name: Run backend-ts check (Biome + TypeScript)
+        run: cd backend-ts && bun run check && bun run typecheck
 
       - name: Comment PR on failure
         if: failure() && github.event_name == 'pull_request'
@@ -110,6 +113,7 @@ jobs:
               '',
               '- **Biome** — lint or format violations',
               '- **TypeScript** — `tsc --noEmit` type errors (frontend + backend-ts)',
+              '- **backend-ts Biome** — lint or format violations in Effect TS workspace',
               '- **File-lines** — `node scripts/check-file-lines.mjs` 500-line budget overflow',
               '- **Nesting** — `node scripts/check-nesting.mjs` depth-3 budget overflow',
               '',

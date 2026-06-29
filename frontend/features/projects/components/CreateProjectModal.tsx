@@ -83,8 +83,8 @@ export function CreateProjectModal({
       header={header}
       onDismiss={handleClose}
       open={open}
-      showDismissButton
       sheetTitle="Create project"
+      showDismissButton
       size="md"
     >
       <form className="flex flex-col gap-5 text-foreground" id={formId} onSubmit={handleSubmit}>

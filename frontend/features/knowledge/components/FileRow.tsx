@@ -87,8 +87,8 @@ function RowMenuContent({ onAction }: RowMenuContentProps): ReactNode {
       </DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem
-        onSelect={() => onAction('delete')}
         className="text-destructive-text data-[highlighted=true]:bg-destructive/10"
+        onSelect={() => onAction('delete')}
       >
         <Trash2Icon className="size-3.5" />
         Delete
@@ -144,15 +144,15 @@ export function FileRow({
       <DropdownContextMenuTrigger asChild>
         {/* biome-ignore lint/a11y/useSemanticElements: row hosts a nested three-dot <button> menu trigger; using <button> here would be invalid HTML (button-in-button). The role/tabIndex/keydown trio replicates the native button contract. */}
         <div
-          role="button"
-          tabIndex={0}
-          onClick={handleActivate}
-          onKeyDown={handleKeyDown}
           className={cn(
             'group flex h-10 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left transition-colors duration-150 ease-out',
             'focus:outline-none focus-visible:ring-1 focus-visible:ring-ring',
             isSelected ? 'bg-foreground-5' : 'hover:bg-foreground-5'
           )}
+          onClick={handleActivate}
+          onKeyDown={handleKeyDown}
+          role="button"
+          tabIndex={0}
         >
           {selectionMode ? (
             <span
@@ -169,19 +169,18 @@ export function FileRow({
             aria-hidden="true"
             className={cn('size-4 shrink-0', kind === 'folder' ? 'text-foreground' : 'text-muted-foreground')}
           />
-          <span className="flex-1 truncate text-[13px] font-medium text-foreground">{name}</span>
+          <span className="flex-1 truncate font-medium text-[13px] text-foreground">{name}</span>
           <span className="text-[12px] text-muted-foreground">{updatedLabel}</span>
           <DropdownPanelMenu
-            asChild
-            usePortal
             align="end"
+            asChild
             contentClassName="popover-styled p-1 min-w-44"
             trigger={
               <button
-                type="button"
                 aria-label={`More actions for ${name}`}
+                className="flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity duration-150 ease-out hover:bg-foreground-5 hover:text-foreground group-focus-within:opacity-100 group-hover:opacity-100"
                 onClick={stopMouse}
-                className="flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground opacity-0 transition-opacity duration-150 ease-out group-hover:opacity-100 group-focus-within:opacity-100 hover:bg-foreground-5 hover:text-foreground"
+                type="button"
               >
                 <MoreHorizontalIcon aria-hidden="true" className="size-4" />
               </button>

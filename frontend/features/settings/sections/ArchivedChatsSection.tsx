@@ -49,7 +49,7 @@ export function ArchivedChatsSection(): React.JSX.Element {
       description="Conversations you've archived. Unarchive any to bring it back into your active chat list."
       title="Archived chats"
     >
-      {isLoading ? <p className="text-sm text-muted-foreground">Loading archived chats&hellip;</p> : null}
+      {isLoading ? <p className="text-muted-foreground text-sm">Loading archived chats&hellip;</p> : null}
 
       {!isLoading && archived.length === 0 ? <ArchivedEmptyState /> : null}
 
@@ -99,12 +99,12 @@ function ArchivedChatRow({
       className={
         isLast
           ? 'flex items-center justify-between gap-6 px-5 py-4'
-          : 'flex items-center justify-between gap-6 border-b border-border/40 px-5 py-4'
+          : 'flex items-center justify-between gap-6 border-border/40 border-b px-5 py-4'
       }
     >
       <div className="flex min-w-0 flex-col gap-1">
-        <span className="truncate text-sm font-medium text-foreground">{conversation.title || 'Untitled chat'}</span>
-        <span className="truncate text-sm text-muted-foreground">{formatted} · pawrrtal</span>
+        <span className="truncate font-medium text-foreground text-sm">{conversation.title || 'Untitled chat'}</span>
+        <span className="truncate text-muted-foreground text-sm">{formatted} · pawrrtal</span>
       </div>
       <Button
         className="cursor-pointer"

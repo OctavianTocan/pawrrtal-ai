@@ -17,7 +17,8 @@
 'use client';
 
 import React from 'react';
-import { NavUser, type NavUserIdentity } from '@/components/nav-user';
+import type { NavUserIdentity } from '@/components/nav-user';
+import { NavUser } from '@/components/nav-user';
 import { NewSessionButton } from '@/components/new-session-button';
 import { Button } from '@/components/ui/button';
 import {
@@ -76,7 +77,7 @@ function AppShellReadinessError({
   return (
     <div className="flex min-h-0 flex-1 items-center justify-center bg-background p-6">
       <div className="flex w-full max-w-sm flex-col gap-3 text-center">
-        <h1 className="font-semibold text-lg text-foreground">Backend unavailable</h1>
+        <h1 className="font-semibold text-foreground text-lg">Backend unavailable</h1>
         <p className="text-muted-foreground text-sm">
           Pawrrtal could not confirm workspace readiness. Check the service and try again.
         </p>
@@ -114,7 +115,7 @@ function SidebarFocusShell({
     // child (input or button) via focusFirst, so the shell itself is never a
     // focus target. ChatFocusShell uses tabIndex={-1} because its focusFirst
     // targets a specific textarea/textbox — the shell div is the fallback.
-    <div ref={zoneRef} className={className} data-focus-zone="sidebar">
+    <div className={className} data-focus-zone="sidebar" ref={zoneRef}>
       {children}
     </div>
   );
@@ -141,7 +142,7 @@ function ChatFocusShell({ children }: { children: React.ReactNode }): React.JSX.
     // outline-none is safe: this div only receives focus programmatically via
     // focusZone('chat'), which immediately forwards to the textarea/textbox child.
     // Users never see keyboard focus land here.
-    <div ref={zoneRef} className="h-full min-w-0 outline-none" data-focus-zone="chat" tabIndex={-1}>
+    <div className="h-full min-w-0 outline-none" data-focus-zone="chat" ref={zoneRef} tabIndex={-1}>
       {children}
     </div>
   );
@@ -192,7 +193,7 @@ function ResizableSidebarContent({ children }: { children: React.ReactNode }): R
       <>
         <Sidebar>
           <SidebarFocusShell className="group flex h-full flex-col">
-            <SidebarHeader className="px-2 pt-0 pb-1 shrink-0">
+            <SidebarHeader className="shrink-0 px-2 pt-0 pb-1">
               <NewSessionButton />
             </SidebarHeader>
             <SidebarContent>
@@ -233,7 +234,7 @@ function ResizableSidebarContent({ children }: { children: React.ReactNode }): R
          */}
         <SidebarFocusShell
           className={cn(
-            'group sidepanel-text-scope bg-sidebar text-sidebar-foreground absolute inset-y-0 left-0 flex flex-col overflow-hidden pt-10',
+            'group sidepanel-text-scope absolute inset-y-0 left-0 flex flex-col overflow-hidden bg-sidebar pt-10 text-sidebar-foreground',
             transformTransition,
             isExpanded ? 'translate-x-0' : '-translate-x-full'
           )}
@@ -244,11 +245,11 @@ function ResizableSidebarContent({ children }: { children: React.ReactNode }): R
            * past it.
            */}
           <div
+            className="flex h-full flex-col data-[state=collapsed]:pointer-events-none data-[state=expanded]:pointer-events-auto"
             data-state={state}
             style={{ width: `${desktopWidth}px` }}
-            className="flex h-full flex-col data-[state=collapsed]:pointer-events-none data-[state=expanded]:pointer-events-auto"
           >
-            <SidebarHeader className="px-2 pt-0 pb-1 shrink-0">
+            <SidebarHeader className="shrink-0 px-2 pt-0 pb-1">
               <NewSessionButton />
             </SidebarHeader>
             <SidebarContent>

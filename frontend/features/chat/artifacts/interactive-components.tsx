@@ -20,7 +20,8 @@
  */
 
 import type { BaseComponentProps } from '@json-render/react';
-import { type ReactNode, useId, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useId, useState } from 'react';
 import type { ChatArtifactInteractionValue } from '@/lib/types';
 import { useArtifactInteraction } from './interaction-context';
 

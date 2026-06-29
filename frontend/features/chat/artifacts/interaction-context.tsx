@@ -20,7 +20,8 @@
  *    need to call `submit({ actionId, label, value })`.
  */
 
-import { createContext, type ReactNode, use, useCallback, useMemo } from 'react';
+import type { ReactNode } from 'react';
+import { createContext, use, useCallback, useMemo } from 'react';
 import type {
   ChatArtifactInteractionMode,
   ChatArtifactInteractionPayload,

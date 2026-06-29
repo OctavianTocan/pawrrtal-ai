@@ -63,57 +63,57 @@ export function TaskRow({
 
   return (
     <div
-      data-active={isActive ? '' : undefined}
       className={cn(
-        'group/row relative flex items-start gap-3 border-b border-foreground/[0.06] py-3 pr-3 pl-2 transition-colors duration-150 ease-out',
+        'group/row relative flex items-start gap-3 border-foreground/[0.06] border-b py-3 pr-3 pl-2 transition-colors duration-150 ease-out',
         'hover:bg-foreground/[0.025] data-[active]:bg-foreground/[0.04]',
         task.completed && 'opacity-55'
       )}
+      data-active={isActive ? '' : undefined}
     >
       {/* The checkbox sits in its own column so its 40×40 hit area doesn't
 			    get absorbed into the text click target. */}
       <div className="-ml-1 flex h-6 items-start pt-0.5">
         <TaskCheckbox
+          ariaLabel={`Mark "${task.title}" ${task.completed ? 'incomplete' : 'complete'}`}
           checked={task.completed}
           onToggle={onToggleComplete}
           ringClass={PRIORITY_RING[task.priority]}
-          ariaLabel={`Mark "${task.title}" ${task.completed ? 'incomplete' : 'complete'}`}
         />
       </div>
 
       {/* The title column expands to fill remaining width. The whole column
 			    is the click target for opening the detail pane. */}
       <button
-        type="button"
-        onClick={onSelect}
         className="group/title min-w-0 flex-1 cursor-pointer text-left focus-visible:outline-none"
+        onClick={onSelect}
+        type="button"
       >
         <p
           className={cn(
-            'text-[14px] leading-snug text-pretty text-foreground transition-colors duration-150 ease-out',
+            'text-pretty text-[14px] text-foreground leading-snug transition-colors duration-150 ease-out',
             task.completed && 'text-muted-foreground line-through decoration-foreground/30'
           )}
         >
           {task.title}
         </p>
         {task.description ? (
-          <p className="mt-0.5 line-clamp-1 text-[12px] leading-snug text-muted-foreground">{task.description}</p>
+          <p className="mt-0.5 line-clamp-1 text-[12px] text-muted-foreground leading-snug">{task.description}</p>
         ) : null}
         <TaskMetadata dueLabel={dueLabel} dueTone={isOverdue ? 'destructive' : 'neutral'} tags={task.tags} />
       </button>
 
       {/* Right edge cluster — project chip + reveal-on-hover overflow. */}
       <div className="flex shrink-0 items-center gap-2 pt-0.5">
-        <ProjectChip label={chipLabel} tone={chipTone} emoji={chipEmoji} hideHash={survivalMode} />
+        <ProjectChip emoji={chipEmoji} hideHash={survivalMode} label={chipLabel} tone={chipTone} />
         <button
-          type="button"
-          onClick={onOpenMenu}
           aria-label="Task actions"
           className={cn(
             'flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-[opacity,background-color] duration-150 ease-out',
             'opacity-0 hover:bg-foreground/[0.06] hover:text-foreground group-hover/row:opacity-100',
-            'focus-visible:opacity-100 focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none'
+            'focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50'
           )}
+          onClick={onOpenMenu}
+          type="button"
         >
           <MoreHorizontalIcon aria-hidden="true" className="size-4" />
         </button>

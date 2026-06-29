@@ -30,7 +30,8 @@
  */
 
 import { AlertCircleIcon, LoaderIcon } from 'lucide-react';
-import { type ReactNode, useCallback } from 'react';
+import type { ReactNode } from 'react';
+import { useCallback } from 'react';
 import { KNOWLEDGE_VIEWS } from './constants';
 import { useWriteWorkspaceFile } from './hooks/use-write-workspace-file';
 import { KnowledgeView } from './KnowledgeView';
@@ -46,7 +47,7 @@ import { useKnowledgeUrlState } from './use-knowledge-url-state';
 function TreeLoadingState(): ReactNode {
   return (
     <div className="flex h-full items-center justify-center text-muted-foreground">
-      <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+      <LoaderIcon aria-hidden="true" className="size-4 animate-spin" />
       <span className="ml-2 text-[13px]">Loading workspace&hellip;</span>
     </div>
   );
@@ -56,8 +57,8 @@ function TreeLoadingState(): ReactNode {
 function TreeErrorState({ message }: { message: string }): ReactNode {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center text-muted-foreground">
-      <AlertCircleIcon className="size-5 text-destructive" aria-hidden="true" />
-      <p className="text-[13px] font-medium text-foreground">Couldn't load your workspace</p>
+      <AlertCircleIcon aria-hidden="true" className="size-5 text-destructive" />
+      <p className="font-medium text-[13px] text-foreground">Couldn't load your workspace</p>
       <p className="max-w-[340px] text-[12px]">{message}</p>
     </div>
   );
@@ -103,11 +104,11 @@ export function KnowledgeContainer(): ReactNode {
     return (
       <KnowledgeView
         activeView={activeView}
-        currentNode={null}
-        crumbs={crumbs}
-        openFile={null}
-        memoryCards={KNOWLEDGE_MEMORY_CARDS}
         contentOverride={<TreeLoadingState />}
+        crumbs={crumbs}
+        currentNode={null}
+        memoryCards={KNOWLEDGE_MEMORY_CARDS}
+        openFile={null}
         {...handlers}
       />
     );
@@ -117,11 +118,11 @@ export function KnowledgeContainer(): ReactNode {
     return (
       <KnowledgeView
         activeView={activeView}
-        currentNode={null}
-        crumbs={crumbs}
-        openFile={null}
-        memoryCards={KNOWLEDGE_MEMORY_CARDS}
         contentOverride={<TreeErrorState message={tree.error?.message ?? 'Unknown error — check the backend.'} />}
+        crumbs={crumbs}
+        currentNode={null}
+        memoryCards={KNOWLEDGE_MEMORY_CARDS}
+        openFile={null}
         {...handlers}
       />
     );
@@ -130,11 +131,11 @@ export function KnowledgeContainer(): ReactNode {
   return (
     <KnowledgeView
       activeView={activeView}
-      currentNode={currentNode}
       crumbs={crumbs}
-      openFile={openFile}
-      onSaveFile={onSaveFile}
+      currentNode={currentNode}
       memoryCards={KNOWLEDGE_MEMORY_CARDS}
+      onSaveFile={onSaveFile}
+      openFile={openFile}
       {...handlers}
     />
   );

@@ -59,7 +59,7 @@ export function SingleVendorHostMenuRow({
         <VendorLogo vendor={onlyVendor.vendor} />
         <span className="min-w-0 flex-1 truncate text-left">{hostLabel(group.host)}</span>
       </DropdownSubmenuTrigger>
-      <DropdownSubmenuContent className="chat-composer-dropdown-menu popover-styled p-1 min-w-64">
+      <DropdownSubmenuContent className="chat-composer-dropdown-menu popover-styled min-w-64 p-1">
         {onlyVendor.entries.map((model) =>
           renderModelRow({
             model,
@@ -95,7 +95,7 @@ export function MultiVendorHostMenuRow({
       >
         <span className="min-w-0 flex-1 truncate text-left">{hostLabel(group.host)}</span>
       </DropdownSubmenuTrigger>
-      <DropdownSubmenuContent className="chat-composer-dropdown-menu popover-styled p-1 min-w-56">
+      <DropdownSubmenuContent className="chat-composer-dropdown-menu popover-styled min-w-56 p-1">
         {group.vendors.map((vendorGroup) => {
           const isActiveVendor = selectedModel?.host === group.host && selectedModel?.vendor === vendorGroup.vendor;
           return (
@@ -109,7 +109,7 @@ export function MultiVendorHostMenuRow({
                 <VendorLogo vendor={vendorGroup.vendor} />
                 <span className="min-w-0 flex-1 truncate text-left">{vendorLabel(vendorGroup.vendor)}</span>
               </DropdownSubmenuTrigger>
-              <DropdownSubmenuContent className="chat-composer-dropdown-menu popover-styled p-1 min-w-64">
+              <DropdownSubmenuContent className="chat-composer-dropdown-menu popover-styled min-w-64 p-1">
                 {vendorGroup.entries.map((model) =>
                   renderModelRow({
                     model,

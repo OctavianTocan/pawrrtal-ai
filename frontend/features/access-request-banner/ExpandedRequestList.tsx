@@ -3,7 +3,8 @@
 import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
 import { RequestRow } from './RequestRow';
-import { EXPAND_SPRING, type ExpandedRequestListProps } from './types';
+import type { ExpandedRequestListProps } from './types';
+import { EXPAND_SPRING } from './types';
 
 /**
  * Sliding animated panel that reveals the per-user request rows.
@@ -42,23 +43,23 @@ export function ExpandedRequestList({
         // expandKey is only accessible here because TypeScript has narrowed
         // bannerState to the `expanded` variant — the union does the guarding.
         <m.div
-          key={bannerState.expandKey}
-          initial={{ height: 0, opacity: 0 }}
           animate={{ height: 'auto', opacity: 1 }}
-          exit={{ height: 0, opacity: 0 }}
-          transition={EXPAND_SPRING}
           className="overflow-hidden"
+          exit={{ height: 0, opacity: 0 }}
+          initial={{ height: 0, opacity: 0 }}
+          key={bannerState.expandKey}
+          transition={EXPAND_SPRING}
         >
-          <div className="border-t border-border" />
+          <div className="border-border border-t" />
           <div className="py-1">
             {requests.map((request) => (
               <RequestRow
-                key={request.id}
-                request={request}
                 decision={decisions[request.id] ?? 'undecided'}
+                key={request.id}
                 onApprove={() => onApproveRequest(request.id)}
                 onReject={() => onRejectRequest(request.id)}
                 onReset={() => onResetRequest(request.id)}
+                request={request}
               />
             ))}
           </div>

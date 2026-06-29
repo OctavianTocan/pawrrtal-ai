@@ -9,7 +9,8 @@ import { Effect, Exit, Layer } from "effect"
 import { HttpApiTest } from "effect/unstable/httpapi"
 import { describe, it } from "vitest"
 import { AllowedUserMiddlewareStubLive, AuthMiddlewareStubLive } from "../../_helpers/AuthStub"
-import { FAKE_PROJECT_ID, fakeProject, makeHandlerLayer, type ProjectsTestClient } from "../../_helpers/ProjectsStub"
+import type { ProjectsTestClient } from "../../_helpers/ProjectsStub"
+import { FAKE_PROJECT_ID, fakeProject, makeHandlerLayer } from "../../_helpers/ProjectsStub"
 
 describe("Projects.Http (handler stubs)", () => {
   const platformLayer = NodeHttpServer.layerHttpServices

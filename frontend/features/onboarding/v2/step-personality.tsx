@@ -3,7 +3,8 @@
 import { Check } from 'lucide-react';
 import type * as React from 'react';
 import { Button } from '@/components/ui/button';
-import { PERSONALITY_OPTIONS, type PersonalityId, type PersonalizationProfile } from '@/lib/personalization/storage';
+import type { PersonalityId, PersonalizationProfile } from '@/lib/personalization/storage';
+import { PERSONALITY_OPTIONS } from '@/lib/personalization/storage';
 import { cn } from '@/lib/utils';
 import { OnboardingShell } from './onboarding-shell';
 
@@ -28,7 +29,7 @@ export function StepPersonality({ profile, onPatch, onContinue }: StepPersonalit
     <OnboardingShell
       footer={
         <Button
-          className="h-11 w-full max-w-sm cursor-pointer rounded-control bg-foreground px-8 text-sm font-semibold text-background shadow-none hover:bg-foreground/90 hover:shadow-minimal"
+          className="h-11 w-full max-w-sm cursor-pointer rounded-control bg-foreground px-8 font-semibold text-background text-sm shadow-none hover:bg-foreground/90 hover:shadow-minimal"
           onClick={onContinue}
           size="lg"
           type="button"
@@ -56,7 +57,7 @@ export function StepPersonality({ profile, onPatch, onContinue }: StepPersonalit
               type="button"
             >
               <div className="flex items-start justify-between gap-3">
-                <span className="text-sm font-semibold text-foreground">{option.label}</span>
+                <span className="font-semibold text-foreground text-sm">{option.label}</span>
                 <span
                   aria-hidden="true"
                   className={cn(
@@ -67,11 +68,11 @@ export function StepPersonality({ profile, onPatch, onContinue }: StepPersonalit
                   {isSelected ? <Check className="size-3" strokeWidth={3} /> : null}
                 </span>
               </div>
-              <p className="text-sm text-muted-foreground">{option.summary}</p>
+              <p className="text-muted-foreground text-sm">{option.summary}</p>
               <div className="flex flex-wrap gap-1.5 pt-1">
                 {option.traits.map((trait) => (
                   <span
-                    className="rounded-full bg-foreground/[0.06] px-2 py-0.5 text-xs text-muted-foreground"
+                    className="rounded-full bg-foreground/[0.06] px-2 py-0.5 text-muted-foreground text-xs"
                     key={trait}
                   >
                     {trait}

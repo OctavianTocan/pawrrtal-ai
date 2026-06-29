@@ -15,7 +15,8 @@
 'use client';
 
 import { ChevronRightIcon } from 'lucide-react';
-import { type ReactNode, useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { formatThinkingDuration } from '../thinking-parser';
 
@@ -97,7 +98,7 @@ export function ThinkingHeader({
       aria-expanded={isOpen}
       aria-label={isOpen ? 'Collapse thinking' : 'Expand thinking'}
       className={cn(
-        'cursor-pointer inline-flex items-center gap-1 transition-opacity',
+        'inline-flex cursor-pointer items-center gap-1 transition-opacity',
         'hover:opacity-80 focus-visible:opacity-80'
       )}
       onClick={onToggle}

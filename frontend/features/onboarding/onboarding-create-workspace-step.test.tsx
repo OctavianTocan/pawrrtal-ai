@@ -5,7 +5,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { OnboardingCreateWorkspaceStep } from './onboarding-create-workspace-step';
 
 const wrap = (node: React.ReactElement): React.ReactElement => (
-  <Dialog open onOpenChange={() => undefined}>
+  <Dialog onOpenChange={() => undefined} open>
     {node}
   </Dialog>
 );

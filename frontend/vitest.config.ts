@@ -1,6 +1,7 @@
 import path from 'node:path';
 import react from '@vitejs/plugin-react';
-import { defineConfig, type Plugin } from 'vitest/config';
+import type { Plugin } from 'vitest/config';
+import { defineConfig } from 'vitest/config';
 
 // Force NODE_ENV=test before vitest's React plugin picks the build to
 // alias.  Without this, Bun's vitest runtime defaults to production for

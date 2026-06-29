@@ -1,6 +1,7 @@
 import { Api } from "@pawrrtal/api-core"
 import type { ProjectId, UserId } from "@pawrrtal/api-core/Lib/TypeIds"
-import { Project, type ProjectCreateInput, type ProjectUpdateInput } from "@pawrrtal/api-core/Modules/Projects/Domain"
+import type { ProjectCreateInput, ProjectUpdateInput } from "@pawrrtal/api-core/Modules/Projects/Domain"
+import { Project } from "@pawrrtal/api-core/Modules/Projects/Domain"
 import type { ProjectNotFoundError } from "@pawrrtal/api-core/Modules/Projects/Errors"
 import { DateTime, Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"

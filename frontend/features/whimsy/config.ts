@@ -17,8 +17,10 @@
 
 import type { Dispatch, SetStateAction } from 'react';
 import { usePersistedState } from '@/hooks/use-persisted-state';
-import { isWhimsyPresetId, type WhimsyPresetId } from '@/lib/whimsy-presets';
-import { WHIMSY_THEMES, type WhimsyThemeName } from '@/lib/whimsy-tile';
+import type { WhimsyPresetId } from '@/lib/whimsy-presets';
+import { isWhimsyPresetId } from '@/lib/whimsy-presets';
+import type { WhimsyThemeName } from '@/lib/whimsy-tile';
+import { WHIMSY_THEMES } from '@/lib/whimsy-tile';
 
 /** localStorage key under which the whimsy customization is persisted. */
 const WHIMSY_STORAGE_KEY = 'whimsy:config';

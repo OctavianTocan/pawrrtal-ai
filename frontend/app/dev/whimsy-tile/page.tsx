@@ -2,7 +2,8 @@ import type { Metadata } from 'next';
 import Image from 'next/image';
 import type React from 'react';
 import { WHIMSY_PRESETS, whimsyPresetUrl } from '@/lib/whimsy-presets';
-import { generateWhimsyTile, svgToDataUri, WHIMSY_THEMES, type WhimsyThemeName } from '@/lib/whimsy-tile';
+import type { WhimsyThemeName } from '@/lib/whimsy-tile';
+import { generateWhimsyTile, svgToDataUri, WHIMSY_THEMES } from '@/lib/whimsy-tile';
 
 export const metadata: Metadata = {
   title: 'Whimsy Tile Dev',
@@ -105,7 +106,7 @@ export default function WhimsyTilePage(): React.JSX.Element {
     <main className="min-h-screen bg-background p-8 text-foreground">
       <div className="mx-auto max-w-5xl space-y-12">
         <header className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight">Whimsy tile test</h1>
+          <h1 className="font-semibold text-3xl tracking-tight">Whimsy tile test</h1>
           <p className="text-muted-foreground">
             Toroidally-tiled motifs rendered as a CSS mask. The mask carries shape only; color comes from theme tokens,
             so light and dark mode adapt automatically. Three knobs control the output: <code>theme</code> (motif set),{' '}
@@ -115,8 +116,8 @@ export default function WhimsyTilePage(): React.JSX.Element {
 
         <section className="space-y-4">
           <header className="space-y-1">
-            <h2 className="text-xl font-semibold">Theme presets</h2>
-            <p className="text-sm text-muted-foreground">
+            <h2 className="font-semibold text-xl">Theme presets</h2>
+            <p className="text-muted-foreground text-sm">
               Each preset restricts the generator to a curated subset of motifs. Pass{' '}
               <code>motifs: WHIMSY_THEMES.cosmic</code> (etc.) to use one.
             </p>
@@ -135,11 +136,11 @@ export default function WhimsyTilePage(): React.JSX.Element {
               const caption = `${theme} · ${motifs.join(', ')}`;
               return (
                 <Sample
-                  key={theme}
-                  uri={uri}
                   caption={caption}
                   className="bg-background text-foreground/10"
                   heightClass="h-56"
+                  key={theme}
+                  uri={uri}
                 />
               );
             })}
@@ -148,8 +149,8 @@ export default function WhimsyTilePage(): React.JSX.Element {
 
         <section className="space-y-4">
           <header className="space-y-1">
-            <h2 className="text-xl font-semibold">Density &amp; seed variants</h2>
-            <p className="text-sm text-muted-foreground">
+            <h2 className="font-semibold text-xl">Density &amp; seed variants</h2>
+            <p className="text-muted-foreground text-sm">
               All three use the default <code>kawaii</code> theme. Only <code>seed</code> and <code>grid</code> change.
               Same surface (light + dark) for each.
             </p>
@@ -159,23 +160,23 @@ export default function WhimsyTilePage(): React.JSX.Element {
             const svg = generateWhimsyTile({ size: TILE_SIZE, seed, grid });
             const uri = svgToDataUri(svg);
             return (
-              <div key={label} className="space-y-3">
-                <h3 className="font-mono text-xs uppercase tracking-wider text-muted-foreground">{label}</h3>
+              <div className="space-y-3" key={label}>
+                <h3 className="font-mono text-muted-foreground text-xs uppercase tracking-wider">{label}</h3>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   <Sample
-                    uri={uri}
                     caption="bg-background · text-foreground/10"
                     className="bg-background text-foreground/10"
+                    uri={uri}
                   />
                   <Sample
-                    uri={uri}
                     caption="bg-foreground · text-background/15"
                     className="bg-foreground text-background/15"
+                    uri={uri}
                   />
                 </div>
 
-                <details className="text-xs text-muted-foreground">
+                <details className="text-muted-foreground text-xs">
                   <summary className="cursor-pointer">Single tile (raw)</summary>
                   <Image
                     alt={`Single ${label} tile`}
@@ -193,8 +194,8 @@ export default function WhimsyTilePage(): React.JSX.Element {
 
         <section className="space-y-4">
           <header className="space-y-1">
-            <h2 className="text-xl font-semibold">Preset patterns</h2>
-            <p className="text-sm text-muted-foreground">
+            <h2 className="font-semibold text-xl">Preset patterns</h2>
+            <p className="text-muted-foreground text-sm">
               Hand-laid SVG wallpapers under <code>/whimsy-patterns/</code>. They ignore <code>seed</code>/
               <code>grid</code>/<code>theme</code>. Tile size here is fixed at 600 px to match the runtime hook.
             </p>
@@ -203,19 +204,19 @@ export default function WhimsyTilePage(): React.JSX.Element {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {WHIMSY_PRESETS.map((preset) => (
               <Sample
-                key={preset.id}
-                uri={whimsyPresetUrl(preset.id)}
                 caption={preset.label}
                 className="bg-background text-foreground/15"
                 heightClass="h-72"
+                key={preset.id}
                 maskSize={`${PRESET_TILE_SIZE}px auto`}
+                uri={whimsyPresetUrl(preset.id)}
               />
             ))}
           </div>
         </section>
 
         <section className="space-y-3 rounded-lg border border-border bg-muted/30 p-5 text-sm">
-          <h2 className="text-base font-semibold">How to use</h2>
+          <h2 className="font-semibold text-base">How to use</h2>
           <pre className="overflow-x-auto text-xs leading-relaxed">
             {`import { generateWhimsyTile, svgToDataUri, WHIMSY_THEMES } from '@/lib/whimsy-tile';
 
@@ -248,7 +249,7 @@ const heartfield = generateWhimsyTile({
           </pre>
         </section>
 
-        <footer className="border-t border-border pt-6 text-xs text-muted-foreground">
+        <footer className="border-border border-t pt-6 text-muted-foreground text-xs">
           To remove this test: delete <code className="rounded bg-muted px-1">frontend/app/dev/whimsy-tile/</code> and{' '}
           <code className="rounded bg-muted px-1">frontend/lib/whimsy-tile.ts</code>.
         </footer>

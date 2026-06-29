@@ -1,4 +1,5 @@
-import { WORKSPACE_ENV_KEY_IDS, type WorkspaceEnvKey, type WorkspaceEnvResponse } from './use-workspace-env';
+import type { WorkspaceEnvKey, WorkspaceEnvResponse } from './use-workspace-env';
+import { WORKSPACE_ENV_KEY_IDS } from './use-workspace-env';
 import type { WorkspaceEnvKeyMeta } from './WorkspacesSectionView';
 
 /**

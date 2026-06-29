@@ -18,11 +18,11 @@
 
 import type * as React from 'react';
 import { useRef, useState } from 'react';
+import type { WorkspaceEnvKey } from '@/features/settings/workspace-env/use-workspace-env';
 import {
   extractApiErrorMessage,
   useUpsertWorkspaceEnv,
   useWorkspaceEnv,
-  type WorkspaceEnvKey,
 } from '@/features/settings/workspace-env/use-workspace-env';
 import { WorkspacesSectionView } from '@/features/settings/workspace-env/WorkspacesSectionView';
 import {

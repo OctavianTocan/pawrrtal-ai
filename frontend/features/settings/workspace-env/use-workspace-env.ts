@@ -1,6 +1,7 @@
 'use client';
 
-import { type UseMutationResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { UseMutationResult } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuthedFetch } from '@/hooks/use-authed-fetch';
 import { useAuthedQuery } from '@/hooks/use-authed-query';
 import { API_ENDPOINTS } from '@/lib/api';

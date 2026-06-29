@@ -10,7 +10,7 @@
     "install:deps": "bun install",
     "typecheck": "bun run --filter '@pawrrtal/*' typecheck",
     "test": "bun --bun vitest run",
-    "check": "bunx biome check ."
+    "check": "bun biome check ."
   },
   "dependencies": {
     "@effect/platform-bun": "4.0.0-beta.74",
@@ -29,6 +29,7 @@
     "@vitest/expect": "4.1.4"
   },
   "devDependencies": {
+    "@biomejs/biome": "2.5.1",
     "@effect/language-service": "^0.85.1",
     "@effect/vitest": "4.0.0-beta.74",
     "@types/bun": "latest",

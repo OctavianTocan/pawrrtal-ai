@@ -5,14 +5,8 @@ import { AnimatePresence } from 'motion/react';
 import * as m from 'motion/react-m';
 import { Avatar, AvatarFallback, AvatarGroup, AvatarGroupCount, AvatarImage } from '@/components/ui/avatar';
 import { SummaryText } from './SummaryText';
-import {
-  type AccessRequest,
-  type BannerHeaderProps,
-  type BannerState,
-  BOUNCY_SPRING,
-  getInitials,
-  TEXT_SWAP_SPRING,
-} from './types';
+import type { AccessRequest, BannerHeaderProps, BannerState } from './types';
+import { BOUNCY_SPRING, getInitials, TEXT_SWAP_SPRING } from './types';
 
 // ---------------------------------------------------------------------------
 // Private sub-components — not exported; only used within this file.
@@ -44,12 +38,12 @@ function CollapsedAvatarGroup({
         <m.div
           key={r.id}
           layoutId={`avatar-${r.id}`}
-          transition={BOUNCY_SPRING}
           // Leftmost avatar (i=0) gets the highest z-index
           style={{ zIndex: collapsedAvatars.length - i + 1 }}
+          transition={BOUNCY_SPRING}
         >
           <Avatar>
-            {r.avatarUrl && <AvatarImage src={r.avatarUrl} alt={r.name} />}
+            {r.avatarUrl && <AvatarImage alt={r.name} src={r.avatarUrl} />}
             <AvatarFallback>{getInitials(r.name)}</AvatarFallback>
           </Avatar>
         </m.div>
@@ -72,23 +66,23 @@ function CollapsedAvatarGroup({
 function HeaderTextBlock({ bannerState, requests }: { bannerState: BannerState; requests: AccessRequest[] }) {
   return (
     <div className="min-w-0 flex-1 overflow-hidden">
-      <AnimatePresence mode="popLayout" initial={false}>
+      <AnimatePresence initial={false} mode="popLayout">
         {bannerState.status === 'expanded' ? (
           <m.div
-            key="title"
-            initial={{ opacity: 0, y: -16, filter: 'blur(4px)' }}
             animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
             exit={{ opacity: 0, y: -16, filter: 'blur(4px)' }}
+            initial={{ opacity: 0, y: -16, filter: 'blur(4px)' }}
+            key="title"
             transition={TEXT_SWAP_SPRING}
           >
-            <span className="block text-sm font-semibold text-foreground">Access Requests</span>
+            <span className="block font-semibold text-foreground text-sm">Access Requests</span>
           </m.div>
         ) : (
           <m.div
-            key="summary"
-            initial={{ opacity: 0, y: 16, filter: 'blur(4px)' }}
             animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
             exit={{ opacity: 0, y: 16, filter: 'blur(4px)' }}
+            initial={{ opacity: 0, y: 16, filter: 'blur(4px)' }}
+            key="summary"
             transition={TEXT_SWAP_SPRING}
           >
             <SummaryText requests={requests} />
@@ -117,11 +111,11 @@ export function BannerHeader({
   return (
     <div className="flex items-center gap-3 px-4 py-3">
       <button
-        type="button"
-        onClick={onToggleExpand}
         aria-expanded={bannerState.status === 'expanded'}
         aria-label={bannerState.status === 'expanded' ? 'Collapse access requests' : 'Expand access requests'}
         className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 text-left"
+        onClick={onToggleExpand}
+        type="button"
       >
         {/* Unmounted when expanded so the layoutId hero animation can fire */}
         {bannerState.status === 'collapsed' && (
@@ -132,8 +126,8 @@ export function BannerHeader({
 
         <m.div
           animate={{ rotate: bannerState.status === 'expanded' ? 180 : 0 }}
-          transition={BOUNCY_SPRING}
           className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          transition={BOUNCY_SPRING}
         >
           <IconChevronDown className="size-4" />
         </m.div>
@@ -141,10 +135,10 @@ export function BannerHeader({
 
       {onDismiss && (
         <button
-          type="button"
-          onClick={onDismiss}
-          className="shrink-0 cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
           aria-label="Dismiss"
+          className="shrink-0 cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          onClick={onDismiss}
+          type="button"
         >
           <IconX className="size-4" />
         </button>

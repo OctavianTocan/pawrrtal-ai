@@ -10,7 +10,8 @@
  */
 
 import type { useRouter } from 'next/navigation';
-import { type Dispatch, type SetStateAction, useCallback } from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import { useCallback } from 'react';
 import { DEFAULT_TASK_VIEW, TASK_QUERY_KEYS } from './constants';
 import type { TaskViewId } from './types';
 

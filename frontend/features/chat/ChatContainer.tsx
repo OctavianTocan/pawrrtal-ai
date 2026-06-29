@@ -9,13 +9,10 @@ import { usePersistedState } from '@/hooks/use-persisted-state';
 import type { ChatArtifactInteractionPayload, ChatMessage } from '@/lib/types';
 import { ArtifactInteractionProvider } from './artifacts/interaction-context';
 import ChatView from './ChatView';
-import {
-  CHAT_REASONING_LEVELS,
-  CHAT_STORAGE_KEYS,
-  type ChatReasoningLevel,
-  DEFAULT_REASONING_LEVEL,
-} from './constants';
-import { type ChatModelOption, useChatModels } from './hooks/use-chat-models';
+import type { ChatReasoningLevel } from './constants';
+import { CHAT_REASONING_LEVELS, CHAT_STORAGE_KEYS, DEFAULT_REASONING_LEVEL } from './constants';
+import type { ChatModelOption } from './hooks/use-chat-models';
+import { useChatModels } from './hooks/use-chat-models';
 import { useChatTurnController } from './hooks/use-chat-turn-controller';
 import { resolveSelectedModelId } from './lib/model-selection';
 
@@ -308,21 +305,21 @@ export default function ChatContainer({
   return (
     <ArtifactInteractionProvider handler={handleArtifactInteraction}>
       <ChatView
+        catalogStatus={model.isCatalogLoading ? 'loading' : model.isCatalogError ? 'error' : 'ready'}
         chatHistory={chat.chatHistory}
+        composerBlockedMessage={gate.composerBlockedMessage}
         composerText={composerText}
         copiedMessageId={chat.copiedId}
-        catalogStatus={model.isCatalogLoading ? 'loading' : model.isCatalogError ? 'error' : 'ready'}
+        isComposerBlocked={gate.isComposerBlocked}
         isLoading={chat.isLoading}
         models={model.models}
         onChangeComposerText={setComposerText}
         onCopy={chat.copyMessage}
+        onOpenOnboarding={gate.openSetup}
         onRegenerate={chat.regenerateMessage}
         onSelectModel={model.selectModel}
         onSelectReasoning={reasoning.selectReasoning}
         onSelectSuggestion={handleSelectSuggestion}
-        isComposerBlocked={gate.isComposerBlocked}
-        composerBlockedMessage={gate.composerBlockedMessage}
-        onOpenOnboarding={gate.openSetup}
         onSendMessage={handleSendMessage}
         regeneratingIndex={chat.regeneratingIndex}
         selectedModelId={model.selectedModelId}

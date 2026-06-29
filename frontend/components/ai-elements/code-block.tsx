@@ -7,18 +7,10 @@
 'use client';
 
 import { CheckIcon, CopyIcon } from 'lucide-react';
-import {
-  type ComponentProps,
-  type CSSProperties,
-  createContext,
-  type HTMLAttributes,
-  use,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from 'react';
-import { type BundledLanguage, codeToTokens } from 'shiki';
+import type { ComponentProps, CSSProperties, HTMLAttributes } from 'react';
+import { createContext, use, useEffect, useMemo, useRef, useState } from 'react';
+import type { BundledLanguage } from 'shiki';
+import { codeToTokens } from 'shiki';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -135,11 +127,17 @@ export const CodeBlock = ({
 
   useEffect(() => {
     let cancelled = false;
-    highlightCode(code, language).then(([light, dark]) => {
-      if (!cancelled) {
-        setHighlighted({ dark, light });
-      }
-    });
+    void highlightCode(code, language)
+      .then(([light, dark]) => {
+        if (!cancelled) {
+          setHighlighted({ dark, light });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setHighlighted({ dark: null, light: null });
+        }
+      });
 
     return () => {
       cancelled = true;

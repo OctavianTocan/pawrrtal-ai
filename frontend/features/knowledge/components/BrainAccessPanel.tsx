@@ -10,7 +10,8 @@
  */
 
 import { ChevronDownIcon, PlusIcon, UserIcon, UsersIcon } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { EmptyState } from './EmptyState';
 
@@ -27,15 +28,15 @@ function BrainAccessTab({ tabId, label, activeTab, onSelect }: BrainAccessTabPro
   const isActive = tabId === activeTab;
   return (
     <button
-      type="button"
-      onClick={() => onSelect(tabId)}
       aria-current={isActive ? 'page' : undefined}
       className={cn(
-        'cursor-pointer rounded-md px-3 py-1.5 text-[13px] font-medium transition-colors duration-150 ease-out',
+        'cursor-pointer rounded-md px-3 py-1.5 font-medium text-[13px] transition-colors duration-150 ease-out',
         isActive
           ? 'bg-foreground-5 text-foreground'
           : 'text-muted-foreground hover:bg-foreground-5 hover:text-foreground'
       )}
+      onClick={() => onSelect(tabId)}
+      type="button"
     >
       {label}
     </button>
@@ -57,13 +58,13 @@ export function BrainAccessPanel(): ReactNode {
         <div className="flex items-start gap-4">
           <span className="relative flex size-10 shrink-0 items-center justify-center rounded-full bg-foreground-5 text-muted-foreground">
             <UserIcon aria-hidden="true" className="size-5" />
-            <span className="absolute -right-1 -bottom-1 flex size-4 items-center justify-center rounded-full bg-accent text-[10px] font-bold text-background">
+            <span className="absolute -right-1 -bottom-1 flex size-4 items-center justify-center rounded-full bg-accent font-bold text-[10px] text-background">
               <PlusIcon aria-hidden="true" className="size-2.5" />
             </span>
           </span>
           <div className="flex flex-1 flex-col gap-1">
-            <h3 className="font-display text-[16px] font-medium text-foreground">Share brain access</h3>
-            <p className="text-[13px] leading-relaxed text-muted-foreground">
+            <h3 className="font-display font-medium text-[16px] text-foreground">Share brain access</h3>
+            <p className="text-[13px] text-muted-foreground leading-relaxed">
               Invite teammates to your workspace. They can read your saved files, memory, and skills. You control the
               level of access.
             </p>
@@ -73,20 +74,20 @@ export function BrainAccessPanel(): ReactNode {
         <div className="mt-4 flex flex-wrap items-center gap-2">
           <input
             aria-label="Invite email address"
-            type="email"
+            className="h-9 min-w-[200px] flex-1 cursor-text rounded-md border border-border bg-background px-3 text-[13px] text-foreground outline-none transition-colors duration-150 placeholder:text-muted-foreground focus-visible:border-ring"
             placeholder="email@example.com"
-            className="h-9 flex-1 min-w-[200px] cursor-text rounded-md border border-border bg-background px-3 text-[13px] text-foreground outline-none transition-colors duration-150 placeholder:text-muted-foreground focus-visible:border-ring"
+            type="email"
           />
           <button
+            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background px-3 font-medium text-[13px] text-foreground transition-colors duration-150 ease-out hover:bg-foreground-5"
             type="button"
-            className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-md border border-border bg-background px-3 text-[13px] font-medium text-foreground transition-colors duration-150 ease-out hover:bg-foreground-5"
           >
             Read only
             <ChevronDownIcon aria-hidden="true" className="size-3.5" />
           </button>
           <button
+            className="inline-flex h-9 cursor-pointer items-center rounded-md bg-foreground px-4 font-medium text-[13px] text-background transition-colors duration-150 ease-out hover:bg-foreground/90"
             type="button"
-            className="inline-flex h-9 cursor-pointer items-center rounded-md bg-foreground px-4 text-[13px] font-medium text-background transition-colors duration-150 ease-out hover:bg-foreground/90"
           >
             Invite
           </button>
@@ -96,20 +97,20 @@ export function BrainAccessPanel(): ReactNode {
       {/* Tabs */}
       <section className="flex flex-col gap-3">
         <div className="flex items-center gap-1">
-          <BrainAccessTab tabId="shared-by-me" label="Shared by me" activeTab={activeTab} onSelect={setActiveTab} />
-          <BrainAccessTab tabId="shared-with-me" label="Shared with me" activeTab={activeTab} onSelect={setActiveTab} />
+          <BrainAccessTab activeTab={activeTab} label="Shared by me" onSelect={setActiveTab} tabId="shared-by-me" />
+          <BrainAccessTab activeTab={activeTab} label="Shared with me" onSelect={setActiveTab} tabId="shared-with-me" />
         </div>
 
         <div className="min-h-[280px]">
           <EmptyState
-            icon={UsersIcon}
-            title={
-              activeTab === 'shared-by-me' ? 'You haven’t shared your workspace yet.' : 'Nothing shared with you yet.'
-            }
             description={
               activeTab === 'shared-by-me'
                 ? 'Invite a teammate above to give them access to your workspace brain.'
                 : 'When someone shares their workspace with you, it’ll show up here.'
+            }
+            icon={UsersIcon}
+            title={
+              activeTab === 'shared-by-me' ? 'You haven’t shared your workspace yet.' : 'Nothing shared with you yet.'
             }
           />
         </div>

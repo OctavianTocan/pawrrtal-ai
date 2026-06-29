@@ -104,6 +104,13 @@ export function ProjectsList({ activeProjectId, onProjectSelect }: ProjectsListP
         className="mt-3"
         isCollapsed={isCollapsed}
         label="Projects"
+        onToggle={() => {
+          if (!isLoading && list.length === 0) {
+            openCreateModal();
+            return;
+          }
+          setIsCollapsed((prev) => !prev);
+        }}
         toggleButtonProps={{
           'aria-expanded': !isCollapsed,
           'aria-label': isCollapsed ? 'Expand projects' : 'Collapse projects',
@@ -112,8 +119,8 @@ export function ProjectsList({ activeProjectId, onProjectSelect }: ProjectsListP
           <button
             aria-label="Create new project"
             className={cn(
-              'absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer rounded-[5px] p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/[0.06] hover:text-foreground',
-              'group-hover/header:opacity-100 focus-visible:opacity-100'
+              'absolute top-1/2 right-3 -translate-y-1/2 cursor-pointer rounded-[5px] p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-foreground/[0.06] hover:text-foreground',
+              'focus-visible:opacity-100 group-hover/header:opacity-100'
             )}
             onClick={(event) => {
               event.stopPropagation();
@@ -125,19 +132,12 @@ export function ProjectsList({ activeProjectId, onProjectSelect }: ProjectsListP
           </button>
         }
         variant={!isLoading && list.length === 0 ? 'static' : 'collapsible'}
-        onToggle={() => {
-          if (!isLoading && list.length === 0) {
-            openCreateModal();
-            return;
-          }
-          setIsCollapsed((prev) => !prev);
-        }}
       />
 
       {isCollapsed ? null : (
         <div className="flex flex-col gap-0.5 px-2 pb-1">
           {isLoading && list.length === 0 ? (
-            <span className="px-2 py-1 text-sm text-muted-foreground/70">Loading projects&hellip;</span>
+            <span className="px-2 py-1 text-muted-foreground/70 text-sm">Loading projects&hellip;</span>
           ) : null}
           {list.map((project) => (
             <ProjectRow
@@ -195,8 +195,8 @@ function RenameProjectModal({
   if (!project) return null;
   return (
     <RenameProjectModalInner
-      key={project.id}
       isPending={isPending}
+      key={project.id}
       onDismiss={onDismiss}
       onSubmit={onSubmit}
       project={project}
@@ -249,8 +249,8 @@ function RenameProjectModalInner({
       header={header}
       onDismiss={onDismiss}
       open
-      showDismissButton
       sheetTitle="Rename project"
+      showDismissButton
       size="md"
     >
       <form action={handleSubmit} className="flex flex-col gap-4 text-foreground" id={formId}>

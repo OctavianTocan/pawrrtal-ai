@@ -70,25 +70,25 @@ export function ConversationLabelBadge({ label }: { label: ConversationLabel | s
 
   return (
     <div
-      role="presentation"
-      className="shrink-0 h-[18px] max-w-[120px] px-1.5 text-[10px] font-medium rounded flex items-center whitespace-nowrap gap-0.5"
-      onPointerDown={(event) => {
+      className="flex h-[18px] max-w-[120px] shrink-0 items-center gap-0.5 whitespace-nowrap rounded px-1.5 font-medium text-[10px]"
+      onClick={(event) => {
         event.stopPropagation();
       }}
       onMouseDown={(event) => {
         event.stopPropagation();
         event.preventDefault();
       }}
-      onClick={(event) => {
+      onPointerDown={(event) => {
         event.stopPropagation();
       }}
+      role="presentation"
       style={style}
     >
       <span className="truncate">{normalized.name}</span>
       {normalized.value ? (
         <>
           <span style={{ opacity: 0.4 }}>·</span>
-          <span className="font-normal truncate min-w-0" style={{ opacity: 0.75 }}>
+          <span className="min-w-0 truncate font-normal" style={{ opacity: 0.75 }}>
             {normalized.value}
           </span>
         </>

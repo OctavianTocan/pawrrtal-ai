@@ -1,8 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1536 1536" width="1536" height="1536" role="img" aria-label="Three by three preview of the seamless whimsical AI Pawrrtal chat texture">
+<svg aria-label="Three by three preview of the seamless whimsical AI Pawrrtal chat texture" height="1536" role="img" viewBox="0 0 1536 1536" width="1536" xmlns="http://www.w3.org/2000/svg" >
   <defs>
-    <pattern id="texture" width="512" height="512" patternUnits="userSpaceOnUse">
-      <image href="chat-whimsy-guaranteed.svg" width="512" height="512" preserveAspectRatio="none" />
+    <pattern height="512" id="texture" patternUnits="userSpaceOnUse" width="512" >
+      <image height="512" href="chat-whimsy-guaranteed.svg" preserveAspectRatio="none" width="512" />
     </pattern>
   </defs>
-  <rect width="1536" height="1536" fill="url(#texture)" />
+  <rect fill="url(#texture)" height="1536" width="1536" />
 </svg>

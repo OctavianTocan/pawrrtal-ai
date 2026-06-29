@@ -1,5 +1,5 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -58,7 +58,7 @@
       "react": "all"
     },
     "rules": {
-      "recommended": true,
+      "preset": "recommended",
       "complexity": {
         "noExcessiveLinesPerFunction": {
           "level": "warn",
@@ -104,10 +104,26 @@
       },
       "style": {
         "useComponentExportOnlyModules": "off",
-        "useImportType": "error",
+        "useImportType": {
+          "level": "error",
+          "options": {
+            "style": "separatedType"
+          }
+        },
         "useExportType": "error",
         "useConst": "error",
         "useDefaultSwitchClause": "warn"
+      },
+      "nursery": {
+        "useSortedClasses": {
+          "level": "warn",
+          "fix": "safe",
+          "options": {
+            "attributes": ["classList"],
+            "functions": ["clsx", "cva", "cn", "tv", "tw"]
+          }
+        },
+        "noFloatingPromises": "error"
       },
       "a11y": {
         "noStaticElementInteractions": "off",
@@ -209,6 +225,26 @@
       }
     },
     {
+      "includes": [
+        "frontend/.source/**",
+        "frontend/.fumadocs/**",
+        "**/generated/**",
+        "packages/ci/skill-gen/**/generated/**"
+      ],
+      "assist": {
+        "actions": {
+          "source": {
+            "useSortedKeys": "off"
+          }
+        }
+      },
+      "javascript": {
+        "formatter": {
+          "expand": "never"
+        }
+      }
+    },
+    {
       "includes": ["frontend/components/ui/**"],
       "linter": {
         "enabled": false
@@ -243,6 +279,9 @@
           "complexity": {
             "noExcessiveLinesPerFunction": "off"
           },
+          "style": {
+            "noNonNullAssertion": "off"
+          },
           "suspicious": {
             "noExplicitAny": "off",
             "noConsole": "off",
@@ -260,7 +299,8 @@
     "enabled": true,
     "actions": {
       "source": {
-        "organizeImports": "on"
+        "organizeImports": "on",
+        "useSortedAttributes": "on"
       }
     }
   }

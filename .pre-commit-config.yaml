@@ -105,13 +105,13 @@ repos:
   # The wrapper already passes `--no-errors-on-unmatched --files-ignore-unknown`
   # internally — don't duplicate them here or biome rejects the args.
   - repo: https://github.com/biomejs/pre-commit
-    rev: v2.4.15
+    rev: v2.5.1
     hooks:
       - id: biome-check
-        name: biome check (JS/TS)
-        # Pin to the same version as frontend/package.json so schema versions match.
-        additional_dependencies: ["@biomejs/biome@2.4.15"]
-        files: \.(js|jsx|ts|tsx|json|jsonc)$
+        name: biome check (JS/TS/CSS)
+        # Pin to the same version as root package.json so schema versions match.
+        additional_dependencies: ["@biomejs/biome@2.5.1"]
+        files: \.(css|js|jsx|ts|tsx|json|jsonc)$
         exclude: ^backend/.*\.json$  # backend has no JS, but be defensive
 
   # ---- commit-msg: enforce conventional commits ----------------------------

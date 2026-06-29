@@ -25,11 +25,11 @@ export function IntegrationRow({ integration }: { integration: IntegrationDef })
         <integration.Icon className="size-4" />
       </span>
       <div className="flex min-w-0 flex-col">
-        <span className="flex items-center gap-2 text-sm font-medium text-foreground">
+        <span className="flex items-center gap-2 font-medium text-foreground text-sm">
           {integration.name}
           {integration.badge ? <IntegrationBadgePill badge={integration.badge} /> : null}
         </span>
-        <span className="truncate text-xs text-muted-foreground">{integration.description}</span>
+        <span className="truncate text-muted-foreground text-xs">{integration.description}</span>
       </div>
     </div>
   );
@@ -63,12 +63,12 @@ export function IntegrationRow({ integration }: { integration: IntegrationDef })
         </span>
       </button>
       {expanded ? (
-        <div className="flex flex-col gap-0 border-t border-foreground/8 px-3 py-1">
+        <div className="flex flex-col gap-0 border-foreground/8 border-t px-3 py-1">
           {integration.accounts?.map((account) => (
             <IntegrationAccountRow account={account} key={account.id} />
           ))}
           <button
-            className="mt-1 flex items-center gap-2 rounded-[6px] px-1 py-2 text-xs text-muted-foreground transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
+            className="mt-1 flex items-center gap-2 rounded-[6px] px-1 py-2 text-muted-foreground text-xs transition-colors hover:bg-foreground/[0.04] hover:text-foreground"
             type="button"
           >
             <Plus className="size-3.5" />
@@ -84,7 +84,7 @@ export function IntegrationRow({ integration }: { integration: IntegrationDef })
 function IntegrationAccountRow({ account }: { account: IntegrationAccount }): React.JSX.Element {
   const isConnected = account.status === 'connected';
   return (
-    <div className="flex items-center justify-between gap-3 border-b border-foreground/5 py-2 last:border-0">
+    <div className="flex items-center justify-between gap-3 border-foreground/5 border-b py-2 last:border-0">
       <div className="flex min-w-0 items-center gap-2 text-sm">
         {account.label ? <span className="text-muted-foreground">{account.label}</span> : null}
         <span className="truncate text-foreground">{account.email}</span>

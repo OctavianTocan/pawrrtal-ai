@@ -7,9 +7,9 @@ describe('ConversationsEmptyState', () => {
   it('renders the title, description, and supplied icon', () => {
     const { getByText } = render(
       <ConversationsEmptyState
+        description="Start a chat to see it land in the sidebar."
         icon={<span data-testid="icon">⚙️</span>}
         title="Nothing here yet"
-        description="Start a chat to see it land in the sidebar."
       />
     );
     expect(getByText('Nothing here yet')).toBeTruthy();
@@ -17,7 +17,7 @@ describe('ConversationsEmptyState', () => {
   });
 
   it('hides the CTA button when no buttonLabel is supplied', () => {
-    const { queryByRole } = render(<ConversationsEmptyState icon={<span />} title="Empty" description="..." />);
+    const { queryByRole } = render(<ConversationsEmptyState description="..." icon={<span />} title="Empty" />);
     expect(queryByRole('button')).toBeNull();
   });
 
@@ -26,11 +26,11 @@ describe('ConversationsEmptyState', () => {
     const user = userEvent.setup();
     const { getByRole } = render(
       <ConversationsEmptyState
-        icon={<span />}
-        title="Empty"
-        description="..."
         buttonLabel="Start a chat"
+        description="..."
+        icon={<span />}
         onAction={onAction}
+        title="Empty"
       />
     );
     await user.click(getByRole('button', { name: 'Start a chat' }));

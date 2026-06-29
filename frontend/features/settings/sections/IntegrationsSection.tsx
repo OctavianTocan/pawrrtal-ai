@@ -26,9 +26,9 @@ export function IntegrationsSection(): React.JSX.Element {
       description="Connect Pawrrtal to your tools so it can read context and run actions."
       title="Integrations"
     >
-      <div className="rounded-[10px] border border-amber-500/30 bg-amber-500/10 px-3.5 py-3 text-sm text-amber-200">
+      <div className="rounded-[10px] border border-amber-500/30 bg-amber-500/10 px-3.5 py-3 text-amber-200 text-sm">
         <div className="font-semibold">Coming soon</div>
-        <div className="text-xs text-amber-200/80 mt-0.5">
+        <div className="mt-0.5 text-amber-200/80 text-xs">
           This UI is in place, but no integrations are wired up yet. Connecting Gmail, Calendar, Drive, etc. will arrive
           in future releases.
         </div>
@@ -38,7 +38,7 @@ export function IntegrationsSection(): React.JSX.Element {
         <SettingsSectionHeader
           actions={
             <button
-              className="flex cursor-pointer items-center gap-1.5 rounded-[8px] border border-foreground/15 bg-foreground/[0.04] px-3 py-1.5 text-xs font-medium text-foreground transition-colors duration-150 ease-out hover:bg-foreground/[0.08]"
+              className="flex cursor-pointer items-center gap-1.5 rounded-[8px] border border-foreground/15 bg-foreground/[0.04] px-3 py-1.5 font-medium text-foreground text-xs transition-colors duration-150 ease-out hover:bg-foreground/[0.08]"
               onClick={() => setShowCatalog(true)}
               type="button"
             >
@@ -50,7 +50,7 @@ export function IntegrationsSection(): React.JSX.Element {
           title="Your integrations"
         />
         {YOUR_INTEGRATIONS.length === 0 ? (
-          <div className="pt-3 text-sm text-muted-foreground">No integrations connected yet.</div>
+          <div className="pt-3 text-muted-foreground text-sm">No integrations connected yet.</div>
         ) : (
           <div className="flex flex-col gap-2 pt-3">
             {YOUR_INTEGRATIONS.map((integration) => (

@@ -17,7 +17,8 @@ import {
   Tag,
   Trash2,
 } from 'lucide-react';
-import { type ReactNode, useMemo } from 'react';
+import type { ReactNode } from 'react';
+import { useMemo } from 'react';
 import { EntityRow } from '@/components/ui/entity-row';
 import { useMenuComponents } from '@/components/ui/menu-context';
 import { SidebarMenuItem } from '@/components/ui/sidebar';
@@ -342,7 +343,7 @@ export function ConversationSidebarItemView({
         <div className="flex items-center gap-1.5">
           {titleTrailing}
           {badges}
-          {age ? <span className="whitespace-nowrap text-sm text-foreground/40">{age}</span> : null}
+          {age ? <span className="whitespace-nowrap text-foreground/40 text-sm">{age}</span> : null}
         </div>
       ) : undefined,
     [hasTrailing, titleTrailing, badges, age]
@@ -366,48 +367,48 @@ export function ConversationSidebarItemView({
 
   const conversationMenu = (
     <ConversationMenuContent
-      href={href}
       absoluteHref={absoluteHref}
+      appliedLabelIds={appliedLabelIds}
+      href={href}
       isArchived={isArchived}
       isFlagged={isFlagged}
       isUnread={isUnread}
-      status={status}
-      appliedLabelIds={appliedLabelIds}
-      onNavigate={handleMenuNavigate}
-      onRename={onRename}
-      onDelete={onDelete}
       onArchive={onArchive}
-      onFlag={onFlag}
-      onSetStatus={onSetStatus}
-      onMarkUnread={onMarkUnread}
-      onRegenerateTitle={onRegenerateTitle}
-      onToggleLabel={onToggleLabel}
+      onDelete={onDelete}
       onExportMarkdown={onExportMarkdown}
+      onFlag={onFlag}
+      onMarkUnread={onMarkUnread}
+      onNavigate={handleMenuNavigate}
+      onRegenerateTitle={onRegenerateTitle}
+      onRename={onRename}
+      onSetStatus={onSetStatus}
+      onToggleLabel={onToggleLabel}
+      status={status}
     />
   );
 
   return (
     <SidebarMenuItem>
       <EntityRow
+        buttonProps={buttonProps}
         icon={icon ?? <ConversationStatusGlyph status={status} />}
+        menuContent={conversationMenu}
+        onClick={onClick}
+        onDragStart={(event) => {
+          if (!conversationId) return;
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData(CONVERSATION_DRAG_MIME, conversationId);
+        }}
+        onMouseDown={onMouseDown}
         state={{
           isDraggable: Boolean(conversationId),
           isInMultiSelect,
           isSelected,
           showSeparator,
         }}
-        onClick={onClick}
-        onMouseDown={onMouseDown}
-        onDragStart={(event) => {
-          if (!conversationId) return;
-          event.dataTransfer.effectAllowed = 'move';
-          event.dataTransfer.setData(CONVERSATION_DRAG_MIME, conversationId);
-        }}
         title={resolvedTitle}
         titleClassName={titleClassName}
         titleTrailing={resolvedTrailing}
-        menuContent={conversationMenu}
-        buttonProps={buttonProps}
       />
     </SidebarMenuItem>
   );

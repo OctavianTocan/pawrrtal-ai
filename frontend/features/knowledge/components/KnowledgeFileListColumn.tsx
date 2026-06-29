@@ -56,13 +56,13 @@ export function KnowledgeFileListColumn({
           return (
             <li key={file.name}>
               <button
-                type="button"
-                onClick={() => onOpenFile(file.name)}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
                   'flex w-full cursor-pointer items-center gap-2.5 rounded-md p-2 text-left transition-colors duration-150 ease-out',
                   isActive ? 'bg-foreground-5 text-foreground' : 'text-foreground hover:bg-foreground-5'
                 )}
+                onClick={() => onOpenFile(file.name)}
+                type="button"
               >
                 <span
                   className={cn(
@@ -73,7 +73,7 @@ export function KnowledgeFileListColumn({
                   <FileTextIcon aria-hidden="true" className="size-3.5" />
                 </span>
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-[13px] font-medium leading-tight">{file.name}</span>
+                  <span className="truncate font-medium text-[13px] leading-tight">{file.name}</span>
                   <span className="text-[11px] text-muted-foreground">{file.updatedLabel}</span>
                 </span>
               </button>

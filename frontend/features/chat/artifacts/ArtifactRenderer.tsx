@@ -45,7 +45,7 @@ export function ArtifactRenderer({ artifact, onInteractionSubmitted }: ArtifactR
       <JSONUIProvider registry={registry}>
         {/* Cast because our ChatArtifactPayload.spec has optional props fields;
 				    json-render validates the spec at runtime before rendering. */}
-        <Renderer spec={artifact.spec as unknown as Spec} registry={registry} />
+        <Renderer registry={registry} spec={artifact.spec as unknown as Spec} />
       </JSONUIProvider>
     </ArtifactInteractionScope>
   );

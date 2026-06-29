@@ -1,14 +1,7 @@
 'use client';
 
-import {
-  type Dispatch,
-  type SetStateAction,
-  useCallback,
-  useDebugValue,
-  useEffect,
-  useRef,
-  useSyncExternalStore,
-} from 'react';
+import type { Dispatch, SetStateAction } from 'react';
+import { useCallback, useDebugValue, useEffect, useRef, useSyncExternalStore } from 'react';
 
 /**
  * Options for {@link usePersistedState}.

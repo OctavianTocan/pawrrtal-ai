@@ -68,9 +68,9 @@ export default function RootLayout({
 }>) {
   return (
     <html
+      className={`${newsreader.variable} ${geist.variable} ${geistMono.variable}`}
       lang="en"
       suppressHydrationWarning
-      className={`${newsreader.variable} ${geist.variable} ${geistMono.variable}`}
     >
       {/*
 				suppressHydrationWarning is required because the blocking theme script
@@ -98,23 +98,14 @@ export default function RootLayout({
         {/* React Grab */}
         {enableAgentation && (
           <Script
-            src="//unpkg.com/react-grab/dist/index.global.js"
             crossOrigin="anonymous"
+            src="//unpkg.com/react-grab/dist/index.global.js"
             strategy="beforeInteractive"
           />
         )}
       </head>
       <body>
         <RootProvider
-          theme={{
-            // The blocking script at /theme-detection.js is the FOUC defence
-            // and the source of truth for the `dark` class on <html>.
-            // `attribute="class"` makes next-themes (inside RootProvider)
-            // read from that class on mount rather than write its own.
-            attribute: 'class',
-            defaultTheme: 'system',
-            enableSystem: true,
-          }}
           search={{
             // preload=false keeps the SearchDialog (and its Radix Dialog
             // tree) out of the server render and initial hydration. With
@@ -126,6 +117,15 @@ export default function RootLayout({
             // SearchDialogFooter div. Mounting only on first invocation
             // (Cmd/Ctrl+K) avoids the SSR/CSR divergence entirely.
             preload: false,
+          }}
+          theme={{
+            // The blocking script at /theme-detection.js is the FOUC defence
+            // and the source of truth for the `dark` class on <html>.
+            // `attribute="class"` makes next-themes (inside RootProvider)
+            // read from that class on mount rather than write its own.
+            attribute: 'class',
+            defaultTheme: 'system',
+            enableSystem: true,
           }}
         >
           <Providers>{children}</Providers>

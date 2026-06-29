@@ -51,19 +51,20 @@ push:
 
 # Lint check (read-only) — Biome (JS/TS) + ruff (Python)
 lint: lint-py
-    bunx --bun @biomejs/biome@2.4.16 check --no-errors-on-unmatched --files-ignore-unknown=true .
+    bun biome check --no-errors-on-unmatched --files-ignore-unknown=true .
 
 # Lint and auto-fix — Biome (JS/TS) + ruff (Python)
 lint-fix: lint-py-fix
-    bunx --bun @biomejs/biome@2.4.16 check --write --no-errors-on-unmatched --files-ignore-unknown=true .
+    bun biome check --write --no-errors-on-unmatched --files-ignore-unknown=true .
 
 # Format — Biome (JS/TS) + ruff (Python)
 format: format-py
-    bunx --bun @biomejs/biome@2.4.16 format --write .
+    bun biome format --write .
 
 # Check (read-only) — Biome + ruff lint + ruff format check + TS structural gates
 check: check-py
-    bunx --bun @biomejs/biome@2.4.15 check --no-errors-on-unmatched --files-ignore-unknown=true .
+    bun biome check --no-errors-on-unmatched --files-ignore-unknown=true .
+    cd backend-ts && bun biome check .
     node scripts/check-file-lines.mjs
     node scripts/check-nesting.mjs
 

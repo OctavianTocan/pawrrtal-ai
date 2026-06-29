@@ -31,24 +31,24 @@ export function ConversationSearchHeader({
   const isSearchActive = searchQuery.trim().length >= 2;
 
   return (
-    <div className="shrink-0 px-2 pt-1 pb-1.5 border-b border-border/50">
-      <div className="relative rounded-soft shadow-minimal bg-muted/50 has-[:focus-visible]:bg-background">
-        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+    <div className="shrink-0 border-border/50 border-b px-2 pt-1 pb-1.5">
+      <div className="relative rounded-soft bg-muted/50 shadow-minimal has-[:focus-visible]:bg-background">
+        <Search className="absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-muted-foreground" />
         <input
           aria-label="Search conversations"
-          type="text"
-          value={searchQuery}
+          className="h-8 w-full rounded-soft border-0 bg-transparent pr-8 pl-8 text-sm outline-none placeholder:text-muted-foreground/50 focus-visible:outline-none focus-visible:ring-0"
           onChange={(event) => onSearchChange(event.target.value)}
           placeholder="Search conversation titles..."
-          className="w-full h-8 pl-8 pr-8 text-sm bg-transparent border-0 rounded-soft outline-none focus-visible:ring-0 focus-visible:outline-none placeholder:text-muted-foreground/50"
+          type="text"
+          value={searchQuery}
         />
         {searchQuery ? (
           <button
-            type="button"
-            onClick={onSearchClose}
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 hover:bg-foreground/10 rounded cursor-pointer"
-            title="Clear search"
             aria-label="Clear search"
+            className="absolute top-1/2 right-2 -translate-y-1/2 cursor-pointer rounded p-0.5 hover:bg-foreground/10"
+            onClick={onSearchClose}
+            title="Clear search"
+            type="button"
           >
             <X className="size-3.5 text-muted-foreground" />
           </button>
@@ -56,7 +56,7 @@ export function ConversationSearchHeader({
       </div>
 
       {isSearchActive ? (
-        <div className="px-2 pt-2.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+        <div className="flex items-center gap-1.5 px-2 pt-2.5 text-muted-foreground text-xs">
           <span>{resultCount} results</span>
         </div>
       ) : null}

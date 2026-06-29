@@ -13,7 +13,7 @@ export function SectionHeader({ label }: SectionHeaderProps): React.JSX.Element 
       <span aria-hidden="true" className="flex size-3.5 shrink-0 items-center justify-center">
         <span className="size-[6px] rounded-full bg-muted-foreground/25" />
       </span>
-      <span className="text-sm font-medium text-muted-foreground">{label}</span>
+      <span className="font-medium text-muted-foreground text-sm">{label}</span>
     </li>
   );
 }

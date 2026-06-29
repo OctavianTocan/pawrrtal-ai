@@ -6,7 +6,8 @@ import { Cause, ConfigProvider, Effect, Exit, Layer } from "effect"
 import { HttpApiTest } from "effect/unstable/httpapi"
 import { assert, describe, it } from "vitest"
 import { AuthMiddlewareStubLive } from "../../_helpers/AuthStub"
-import { fakeProject, makeHandlerLayer, type ProjectsTestClient } from "../../_helpers/ProjectsStub"
+import type { ProjectsTestClient } from "../../_helpers/ProjectsStub"
+import { fakeProject, makeHandlerLayer } from "../../_helpers/ProjectsStub"
 
 describe("Authentication.AllowedUser", () => {
   const platformLayer = NodeHttpServer.layerHttpServices

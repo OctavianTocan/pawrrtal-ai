@@ -4,11 +4,8 @@ import type * as React from 'react';
 import { useCallback, useEffect, useReducer } from 'react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { OnboardingBackdrop } from '@/features/onboarding/OnboardingBackdrop';
-import {
-  loadPersonalizationProfile,
-  type PersonalizationProfile,
-  savePersonalizationProfile,
-} from '@/lib/personalization/storage';
+import type { PersonalizationProfile } from '@/lib/personalization/storage';
+import { loadPersonalizationProfile, savePersonalizationProfile } from '@/lib/personalization/storage';
 import { useGetPersonalization, useUpsertPersonalization } from '@/lib/personalization/use-personalization';
 import { StepContext } from './step-context';
 import { StepIdentity } from './step-identity';
@@ -269,8 +266,8 @@ export function OnboardingFlow({
   return (
     <Dialog onOpenChange={handleOpenChange} open={open}>
       <DialogContent
-        showCloseButton={false}
         className="top-0 left-0 h-[100dvh] max-h-none w-screen max-w-none translate-x-0 translate-y-0 overflow-y-auto overscroll-contain rounded-none border-0 bg-background p-0 text-foreground shadow-none ring-0 sm:max-w-none sm:p-0 [&>button]:top-6 [&>button]:right-6 [&>button]:z-30 [&>button]:rounded-control [&>button]:bg-foreground/[0.035] [&>button]:text-muted-foreground [&>button]:ring-1 [&>button]:ring-border [&>button]:hover:bg-foreground/[0.07] [&>button]:hover:text-foreground"
+        showCloseButton={false}
       >
         <DialogTitle className="sr-only">Onboarding</DialogTitle>
         <OnboardingBackdrop />

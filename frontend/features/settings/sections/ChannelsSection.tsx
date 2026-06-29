@@ -28,8 +28,8 @@ export function ChannelsSection(): React.JSX.Element {
   return (
     <div className="flex h-full flex-col gap-6 overflow-y-auto px-8 py-6">
       <header className="flex flex-col gap-1">
-        <h2 className="text-lg font-semibold text-foreground">Channels</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="font-semibold text-foreground text-lg">Channels</h2>
+        <p className="text-muted-foreground text-sm">
           Connect a messaging surface so you can reach Pawrrtal from anywhere. Each connection is bound to your account
           and only you can use it.
         </p>
@@ -55,8 +55,8 @@ export function ChannelsSection(): React.JSX.Element {
                   <MessageSquare className="size-4" />
                 </span>
                 <div className="flex flex-col">
-                  <span className="text-sm font-medium text-foreground">{channel.label}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground text-sm">{channel.label}</span>
+                  <span className="text-muted-foreground text-xs">
                     {isTelegram
                       ? isConnected
                         ? handle

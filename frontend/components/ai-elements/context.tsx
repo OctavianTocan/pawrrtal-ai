@@ -7,7 +7,8 @@
 'use client';
 
 import type { LanguageModelUsage } from 'ai';
-import { type ComponentProps, createContext, use, useMemo } from 'react';
+import type { ComponentProps } from 'react';
+import { createContext, use, useMemo } from 'react';
 import { getUsage } from 'tokenlens';
 import { Button } from '@/components/ui/button';
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
@@ -263,7 +264,7 @@ export type ContextReasoningUsageProps = ComponentProps<'div'>;
 
 export const ContextReasoningUsage = ({ className, children, ...props }: ContextReasoningUsageProps) => {
   const { usage, modelId } = useContextValue();
-  const reasoningTokens = usage?.reasoningTokens ?? 0;
+  const reasoningTokens = usage?.outputTokenDetails?.reasoningTokens ?? 0;
 
   if (children) {
     return children;
@@ -293,7 +294,7 @@ export type ContextCacheUsageProps = ComponentProps<'div'>;
 
 export const ContextCacheUsage = ({ className, children, ...props }: ContextCacheUsageProps) => {
   const { usage, modelId } = useContextValue();
-  const cacheTokens = usage?.cachedInputTokens ?? 0;
+  const cacheTokens = usage?.inputTokenDetails?.cacheReadTokens ?? 0;
 
   if (children) {
     return children;

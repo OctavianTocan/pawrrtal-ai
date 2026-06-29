@@ -7,7 +7,8 @@
 'use client';
 
 import { MicIcon } from 'lucide-react';
-import { type ComponentProps, type RefObject, useCallback, useEffect, useReducer, useRef } from 'react';
+import type { ComponentProps, RefObject } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import { PromptInputButton } from './prompt-input-layout';
 

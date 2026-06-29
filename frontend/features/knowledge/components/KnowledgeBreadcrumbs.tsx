@@ -9,7 +9,8 @@
  * as "you are here" without a separator glyph.
  */
 
-import { Fragment, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import { Fragment } from 'react';
 import { cn } from '@/lib/utils';
 import type { KnowledgeBreadcrumb } from '../path-utils';
 
@@ -32,19 +33,19 @@ export function KnowledgeBreadcrumbs({ crumbs, onNavigate }: KnowledgeBreadcrumb
         <Fragment key={`${crumb.path}-${index.toString()}`}>
           {crumb.isCurrent ? (
             <span
-              className="rounded-md bg-foreground-5 px-2 py-1 text-[13px] font-medium text-foreground"
               aria-current="page"
+              className="rounded-md bg-foreground-5 px-2 py-1 font-medium text-[13px] text-foreground"
             >
               {crumb.label}
             </span>
           ) : (
             <button
-              type="button"
-              onClick={() => onNavigate(crumb.path)}
               className={cn(
-                'cursor-pointer rounded-md px-2 py-1 text-[13px] font-medium text-muted-foreground transition-colors duration-150 ease-out',
+                'cursor-pointer rounded-md px-2 py-1 font-medium text-[13px] text-muted-foreground transition-colors duration-150 ease-out',
                 'hover:bg-foreground-5 hover:text-foreground'
               )}
+              onClick={() => onNavigate(crumb.path)}
+              type="button"
             >
               {crumb.label}
             </button>

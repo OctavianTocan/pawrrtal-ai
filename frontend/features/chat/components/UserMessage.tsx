@@ -44,7 +44,7 @@ export function UserMessage({ content, isCopied, onCopy }: UserMessageProps): Re
             // Always-mounted row so the next message's position never
             // shifts when the user hovers — only opacity transitions.
             'mt-1 flex h-8 items-center justify-end',
-            'opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100'
+            'opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100'
           )}
         >
           <Tooltip>

@@ -3,19 +3,20 @@
 import { ArrowUpIcon, MicIcon, SquareIcon } from 'lucide-react';
 import type * as React from 'react';
 import { useEffect, useState } from 'react';
+import type { PromptInputMessage } from '@/components/ai-elements/prompt-input';
 import {
   PromptInput,
   PromptInputAttachment,
   PromptInputAttachments,
   PromptInputFooter,
-  type PromptInputMessage,
   PromptInputSubmit,
 } from '@/components/ai-elements/prompt-input';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { cn } from '@/lib/utils';
-import { CHAT_STORAGE_KEYS, type ChatReasoningLevel, DEFAULT_PLAN_MODE_VISIBLE } from '../constants';
+import type { ChatReasoningLevel } from '../constants';
+import { CHAT_STORAGE_KEYS, DEFAULT_PLAN_MODE_VISIBLE } from '../constants';
 import type { ChatModelOption } from '../hooks/use-chat-models';
 import { useVoiceTranscribe, VOICE_TRANSCRIPTION_AVAILABLE } from '../hooks/use-voice-transcribe';
 import { AttachButton, AutoReviewSelector, ComposerTooltip, PlanButton, VoiceMeter } from './ChatComposerControls';
@@ -191,13 +192,13 @@ function ComposerSendCluster({
   return (
     <div className={cn('ml-auto flex shrink-0 items-center gap-1', isRecording && 'hidden')}>
       <ModelSelectorPopover
-        models={models}
-        selectedModelId={selectedModelId}
-        selectedReasoning={selectedReasoning}
-        onSelectModel={onSelectModel}
-        onSelectReasoning={onSelectReasoning}
         isError={catalogStatus === 'error'}
         isLoading={catalogStatus === 'loading'}
+        models={models}
+        onSelectModel={onSelectModel}
+        onSelectReasoning={onSelectReasoning}
+        selectedModelId={selectedModelId}
+        selectedReasoning={selectedReasoning}
       />
       {VOICE_TRANSCRIPTION_AVAILABLE ? (
         <ComposerTooltip content={isTranscribing ? 'Transcribing...' : 'Click to dictate or hold ^M'}>
@@ -382,6 +383,13 @@ export function ChatComposer({
           </div>
 
           <ComposerSendCluster
+            catalogStatus={catalogStatus}
+            models={models}
+            onSelectModel={onSelectModel}
+            onSelectReasoning={onSelectReasoning}
+            onStartRecording={startRecording}
+            selectedModelId={selectedModelId}
+            selectedReasoning={selectedReasoning}
             state={{
               hasContent,
               isLoading,
@@ -390,13 +398,6 @@ export function ChatComposer({
               isRecording,
               isTranscribing,
             }}
-            models={models}
-            catalogStatus={catalogStatus}
-            selectedModelId={selectedModelId}
-            selectedReasoning={selectedReasoning}
-            onSelectModel={onSelectModel}
-            onSelectReasoning={onSelectReasoning}
-            onStartRecording={startRecording}
           />
         </PromptInputFooter>
       </PromptInput>
@@ -405,7 +406,7 @@ export function ChatComposer({
           <p className="leading-snug">{blockedMessage}</p>
           {onOpenOnboarding ? (
             <Button
-              className="h-7 cursor-pointer rounded-full px-3 text-[12px] font-medium sm:h-6"
+              className="h-7 cursor-pointer rounded-full px-3 font-medium text-[12px] sm:h-6"
               onClick={onOpenOnboarding}
               size="sm"
               type="button"

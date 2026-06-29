@@ -126,49 +126,49 @@ export function LoginFormView({
               <Field>
                 <FieldLabel htmlFor={emailId}>Email</FieldLabel>
                 <Input
-                  id={emailId}
-                  type="email"
-                  placeholder="m@example.com"
                   autoComplete="email"
-                  required
-                  value={email}
+                  id={emailId}
                   onChange={(e) => onEmailChange(e.target.value)}
+                  placeholder="m@example.com"
+                  required
+                  type="email"
+                  value={email}
                 />
               </Field>
               <Field>
                 <div className="flex items-center">
                   <FieldLabel htmlFor={passwordId}>Password</FieldLabel>
                   <Link
-                    href="/forgot-password"
                     className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
+                    href="/forgot-password"
                   >
                     Forgot your password?
                   </Link>
                 </div>
                 <Input
-                  id={passwordId}
-                  type="password"
                   autoComplete="current-password"
-                  required
-                  value={password}
+                  id={passwordId}
                   onChange={(e) => onPasswordChange(e.target.value)}
+                  required
+                  type="password"
+                  value={password}
                 />
               </Field>
               <Field>
-                <Button className="cursor-pointer" type="submit" disabled={isLoading}>
-                  {isLoading && <Loader2Icon className="mr-2 size-4 animate-spin" aria-hidden="true" />}
+                <Button className="cursor-pointer" disabled={isLoading} type="submit">
+                  {isLoading && <Loader2Icon aria-hidden="true" className="mr-2 size-4 animate-spin" />}
                   {isLoading ? 'Logging in...' : 'Login'}
                 </Button>
                 {canUseDevAdminLogin && (
                   <>
                     <Button
                       className="cursor-pointer"
-                      variant="outline"
-                      type="submit"
+                      disabled={isLoading}
                       form={devAdminFormId}
                       onClick={devAdminLoginHandlers.onClick}
                       onTouchEnd={devAdminLoginHandlers.onTouchEnd}
-                      disabled={isLoading}
+                      type="submit"
+                      variant="outline"
                     >
                       Dev Admin
                     </Button>
@@ -197,7 +197,7 @@ export function LoginFormView({
           </form>
           {canUseDevAdminLogin && (
             <form action={buildDevLoginFormAction(postLoginTarget)} id={devAdminFormId} method="post">
-              <input type="hidden" name="redirect_to" value={postLoginTarget} />
+              <input name="redirect_to" type="hidden" value={postLoginTarget} />
             </form>
           )}
         </CardContent>

@@ -22,8 +22,10 @@
 - Run toolchain after substantive edits (`just check`, scoped tests you touched)
 - End-to-end claims: `paw verify` / `paw lab` — not ad-hoc `app.*` imports
 - Read implementations and official docs/skills before inventing APIs
+- Load `agents-md` before creating or editing root or nested `AGENTS.md` files
+- Keep root `AGENTS.md` a short pointer; put operational depth in `.agent/skills/`, not monolithic briefings
 - Update `DESIGN.md` when you change design tokens in code
-- Log technical decisions in `frontend/content/docs/handbook/decisions/` (ADR-style)
+- Log technical decisions in `frontend/content/docs/handbook/decisions/` (ADR-style) — beans tie-in optional, not required
 - Tasks: `beans create` / `beans update` — never hand-edit `.beans/` frontmatter
 
 ## Communication
@@ -46,7 +48,8 @@
 - Never force-push `main` or `development`; rebase onto `origin/development` before push
 - No backwards-compatibility shims — update callers directly
 - Do not extend cookie auth in new `003` slices (profiles + Tailscale is the direction)
-- Skills canonical in `.agent/skills/`; mirrors `.agents/`, `.claude/`, `.cursor/plugins/pawrrtal/skills/`
+- Skills canonical in `.agent/skills/`; harness mirrors (`.agents/`, `.claude/`, `.cursor/plugins/pawrrtal/skills/`) symlink there — edit only `.agent/skills/`
+- Path-scoped rules canonical in `.agent/rules/`; load `path-rules` before editing
 - User workspaces seed from `backend/templates/workspace/` — do not conflate repo dev brain with runtime workspace layout
 
 ## Multi-agent

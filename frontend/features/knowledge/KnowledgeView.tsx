@@ -135,26 +135,26 @@ function KnowledgeContent(props: KnowledgeViewProps): ReactNode {
       return (
         <div className="flex min-h-0 min-w-0 flex-1">
           <KnowledgeFileListColumn
-            crumbs={crumbs}
-            onNavigateBreadcrumb={onNavigateBreadcrumb}
-            files={currentNode.children}
             activeFileName={openFile?.name ?? null}
+            crumbs={crumbs}
+            files={currentNode.children}
+            onNavigateBreadcrumb={onNavigateBreadcrumb}
             onOpenFile={(name) => onOpenChild(name, 'file')}
           />
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">
             {openFile ? (
               <DocumentViewer
-                key={openFile.name}
                 filename={openFile.name}
+                key={openFile.name}
                 markdown={openFile.markdown}
                 onClose={onCloseFile}
                 onSave={props.onSaveFile}
               />
             ) : (
               <EmptyState
+                description="Select a file from the list to read it here."
                 icon={FileTextIcon}
                 title="Pick a file to read"
-                description="Select a file from the list to read it here."
               />
             )}
           </div>
@@ -165,8 +165,8 @@ function KnowledgeContent(props: KnowledgeViewProps): ReactNode {
     // Standard folder view — sub-folders + files mixed.
     return (
       <MyFilesPanel
-        currentNode={currentNode}
         crumbs={crumbs}
+        currentNode={currentNode}
         onNavigateBreadcrumb={onNavigateBreadcrumb}
         onOpenChild={onOpenChild}
       />
@@ -181,7 +181,7 @@ function KnowledgeContent(props: KnowledgeViewProps): ReactNode {
     return (
       <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col">
         <div className="flex h-12 shrink-0 items-center px-5">
-          <span className="rounded-md bg-foreground-5 px-2.5 py-1 text-[13px] font-medium text-foreground">Memory</span>
+          <span className="rounded-md bg-foreground-5 px-2.5 py-1 font-medium text-[13px] text-foreground">Memory</span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6">
           <div className="mx-auto w-full max-w-[560px]">
@@ -195,9 +195,9 @@ function KnowledgeContent(props: KnowledgeViewProps): ReactNode {
   if (activeView === KNOWLEDGE_VIEWS.skills) {
     return (
       <EmptyState
+        description="Reusable skills will live here once the the skills runtime ships."
         icon={SparklesIcon}
         title="Skills coming soon"
-        description="Reusable skills will live here once the the skills runtime ships."
       />
     );
   }
@@ -209,10 +209,10 @@ function KnowledgeContent(props: KnowledgeViewProps): ReactNode {
   if (activeView === KNOWLEDGE_VIEWS.sharedWithMe) {
     return (
       <EmptyState
+        action={{ label: 'Start sharing', onClick: onShareFromEmptyState }}
+        description="When someone gives you access to their workspace, their files will land here."
         icon={FileTextIcon}
         title="Nothing shared with you yet."
-        description="When someone gives you access to their workspace, their files will land here."
-        action={{ label: 'Start sharing', onClick: onShareFromEmptyState }}
       />
     );
   }
@@ -220,10 +220,10 @@ function KnowledgeContent(props: KnowledgeViewProps): ReactNode {
   if (activeView === KNOWLEDGE_VIEWS.sharedByMe) {
     return (
       <EmptyState
+        action={{ label: 'Start sharing', onClick: onShareFromEmptyState }}
+        description="Invite a teammate to share files, memory, and skills from your workspace."
         icon={UsersIcon}
         title="You haven’t shared anything yet."
-        description="Invite a teammate to share files, memory, and skills from your workspace."
-        action={{ label: 'Start sharing', onClick: onShareFromEmptyState }}
       />
     );
   }
@@ -231,9 +231,9 @@ function KnowledgeContent(props: KnowledgeViewProps): ReactNode {
   // Defensive default — unreachable while `activeView` is correctly typed.
   return (
     <EmptyState
+      description="Choose a Knowledge section from the sidebar to get started."
       icon={BookOpenIcon}
       title="Pick a section"
-      description="Choose a Knowledge section from the sidebar to get started."
     />
   );
 }
@@ -253,10 +253,10 @@ export function KnowledgeView(props: KnowledgeViewProps): ReactNode {
   return (
     <div className="flex h-full min-h-0 w-full min-w-0 gap-3">
       <aside className={`${PANEL_SURFACE_CLASSNAME} w-[224px] shrink-0`} style={PANEL_SURFACE_STYLE}>
-        <KnowledgeSubSidebar activeView={props.activeView} onSelectView={props.onSelectView} onNew={props.onNew} />
+        <KnowledgeSubSidebar activeView={props.activeView} onNew={props.onNew} onSelectView={props.onSelectView} />
       </aside>
 
-      <section className={`${PANEL_SURFACE_CLASSNAME} flex-1 min-w-0`} style={PANEL_SURFACE_STYLE}>
+      <section className={`${PANEL_SURFACE_CLASSNAME} min-w-0 flex-1`} style={PANEL_SURFACE_STYLE}>
         {props.contentOverride ?? <KnowledgeContent {...props} />}
       </section>
     </div>

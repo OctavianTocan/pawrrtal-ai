@@ -10,7 +10,8 @@
  * during 60fps drags.
  */
 
-import { type ChangeEvent, useCallback, useEffect, useReducer, useRef } from 'react';
+import type { ChangeEvent } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { ColorPill, SettingsRow } from '../primitives';
 import { TEXT_INPUT_DEBOUNCE_MS, toHex } from './appearance-helpers';

@@ -19,8 +19,8 @@ const GITHUB_URL = 'https://github.com/OctavianTocan/pawrrtal';
 export function DocsSidebarBanner(): React.ReactElement {
   return (
     <div className="rounded-md border border-fd-border bg-fd-card/40 px-3 py-2.5">
-      <div className="text-sm font-medium text-fd-foreground">Pawrrtal</div>
-      <div className="mt-0.5 text-[11px] leading-tight text-fd-muted-foreground">Model-agnostic chat. Public docs.</div>
+      <div className="font-medium text-fd-foreground text-sm">Pawrrtal</div>
+      <div className="mt-0.5 text-[11px] text-fd-muted-foreground leading-tight">Model-agnostic chat. Public docs.</div>
     </div>
   );
 }

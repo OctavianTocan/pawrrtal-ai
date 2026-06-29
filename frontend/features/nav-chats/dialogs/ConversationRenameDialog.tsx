@@ -61,13 +61,13 @@ export function ConversationRenameDialog({
 
   return (
     <AppDialog
-      open={isOpen}
-      onDismiss={() => onOpenChange(false)}
       ariaLabel="Rename Conversation"
       footer={footer}
       header={header}
-      showDismissButton
+      onDismiss={() => onOpenChange(false)}
+      open={isOpen}
       sheetTitle="Rename Conversation"
+      showDismissButton
       size="md"
       testId="conversation-rename-dialog"
     >

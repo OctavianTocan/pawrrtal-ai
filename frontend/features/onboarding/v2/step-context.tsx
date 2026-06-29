@@ -28,7 +28,7 @@ export function StepContext({ profile, onPatch, onContinue, onSkip }: StepContex
       footer={
         <>
           <Button
-            className="h-11 w-full max-w-sm cursor-pointer rounded-control bg-foreground px-8 text-sm font-semibold text-background shadow-none hover:bg-foreground/90 hover:shadow-minimal"
+            className="h-11 w-full max-w-sm cursor-pointer rounded-control bg-foreground px-8 font-semibold text-background text-sm shadow-none hover:bg-foreground/90 hover:shadow-minimal"
             onClick={onContinue}
             size="lg"
             type="button"
@@ -37,7 +37,7 @@ export function StepContext({ profile, onPatch, onContinue, onSkip }: StepContex
             <ArrowRight aria-hidden="true" className="ml-1 size-4" />
           </Button>
           <button
-            className="cursor-pointer text-sm text-muted-foreground hover:text-foreground"
+            className="cursor-pointer text-muted-foreground text-sm hover:text-foreground"
             onClick={onSkip}
             type="button"
           >
@@ -49,7 +49,7 @@ export function StepContext({ profile, onPatch, onContinue, onSkip }: StepContex
       title="Let's give your agent some context about you"
     >
       <a
-        className="flex items-center justify-center gap-2 rounded-[10px] border border-foreground/15 bg-foreground/[0.03] px-4 py-3 text-sm font-medium text-foreground transition-colors hover:bg-foreground/[0.06]"
+        className="flex items-center justify-center gap-2 rounded-[10px] border border-foreground/15 bg-foreground/[0.03] px-4 py-3 font-medium text-foreground text-sm transition-colors hover:bg-foreground/[0.06]"
         href="https://chat.openai.com"
         rel="noopener noreferrer"
         target="_blank"
@@ -63,7 +63,7 @@ export function StepContext({ profile, onPatch, onContinue, onSkip }: StepContex
         placeholder="Paste ChatGPT's response here..."
         value={profile.chatgptContext ?? ''}
       />
-      <p className="text-center text-sm text-muted-foreground">
+      <p className="text-center text-muted-foreground text-sm">
         Don't have ChatGPT? Skip this step. You can always add context later.
       </p>
     </OnboardingShell>

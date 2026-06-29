@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Conversation } from '@/lib/types';
-import { type ContentSearchResult, rankConversationsForSearch } from './use-conversation-search';
+import type { ContentSearchResult } from './use-conversation-search';
+import { rankConversationsForSearch } from './use-conversation-search';
 
 const mk = (id: string, title: string, updated_at: string): Conversation => ({
   id,

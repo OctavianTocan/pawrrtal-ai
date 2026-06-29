@@ -10,11 +10,11 @@
  * neutral foreground) so we never introduce literal palette colors.
  */
 
+import type { LucideIcon } from 'lucide-react';
 import {
   BookOpenIcon,
   BrainIcon,
   HistoryIcon,
-  type LucideIcon,
   ShieldIcon,
   SparklesIcon,
   UserIcon,
@@ -67,8 +67,8 @@ export function MemoryCardList({ cards }: MemoryCardListProps): ReactNode {
         return (
           <li key={card.id}>
             <button
-              type="button"
               className="flex w-full cursor-pointer items-start gap-3 rounded-[10px] border border-border/60 bg-background p-3 text-left transition-colors duration-150 ease-out hover:bg-foreground-5"
+              type="button"
             >
               <span
                 className={cn(
@@ -79,8 +79,8 @@ export function MemoryCardList({ cards }: MemoryCardListProps): ReactNode {
                 <Icon aria-hidden="true" className="size-4" />
               </span>
               <span className="flex min-w-0 flex-1 flex-col gap-0.5 pt-0.5">
-                <span className="truncate text-[13px] font-semibold text-foreground">{card.title}</span>
-                <span className="line-clamp-2 text-[12px] leading-snug text-muted-foreground">{card.description}</span>
+                <span className="truncate font-semibold text-[13px] text-foreground">{card.title}</span>
+                <span className="line-clamp-2 text-[12px] text-muted-foreground leading-snug">{card.description}</span>
               </span>
             </button>
           </li>

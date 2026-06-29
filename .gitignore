@@ -25,6 +25,17 @@ node_modules/
 # Repo-root docs/ (local notes, plans, hyperframes). Not versioned.
 /docs/
 
+# Spec-kit / feature specs (local planning artefacts). Not versioned.
+/specs/
+
+# Local reference notes (Effect teaching, contracts). Not versioned.
+/reference/
+
+# MCP client configs (local paths/keys). Not versioned.
+.mcp.json
+**/.mcp.json
+config/mcporter.json
+
 # Personal Effect-learning scaffolding (teach skill workspace). Not project artefacts.
 /MISSION.md
 /RESOURCES.md

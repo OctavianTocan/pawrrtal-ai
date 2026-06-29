@@ -21,7 +21,8 @@
  */
 
 import { Slider as SliderPrimitive, Switch as SwitchPrimitive } from 'radix-ui';
-import { type ChangeEvent, type ReactNode, useCallback, useEffect, useMemo, useRef } from 'react';
+import type { ChangeEvent, ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { cn } from '@/lib/utils';
 
 /**
@@ -154,14 +155,14 @@ export function SettingsRow({ label, description, children, className }: Setting
   return (
     <div
       className={cn(
-        'flex items-center justify-between gap-6 border-b border-border/40 py-4 first:pt-2 last:border-0 last:pb-2',
+        'flex items-center justify-between gap-6 border-border/40 border-b py-4 first:pt-2 last:border-0 last:pb-2',
         className
       )}
     >
       <div className="flex min-w-0 max-w-[60%] flex-col gap-1">
-        <span className="text-pretty text-sm font-medium text-foreground tabular-nums">{label}</span>
+        <span className="text-pretty font-medium text-foreground text-sm tabular-nums">{label}</span>
         {description ? (
-          <span className="text-pretty text-sm leading-snug text-muted-foreground tabular-nums">{description}</span>
+          <span className="text-pretty text-muted-foreground text-sm tabular-nums leading-snug">{description}</span>
         ) : null}
       </div>
       <div className="flex shrink-0 items-center justify-end gap-2 text-right">{children}</div>
@@ -195,8 +196,8 @@ export function SettingsCard({ title, description, children, className }: Settin
     <section className={cn('rounded-[14px] bg-card px-6 pt-3 pb-3 shadow-edge', className)}>
       {title || description ? (
         <header className="mb-1 flex flex-col gap-1 pt-2">
-          {title ? <h3 className="text-base font-semibold tracking-tight text-foreground">{title}</h3> : null}
-          {description ? <p className="text-pretty text-sm leading-snug text-muted-foreground">{description}</p> : null}
+          {title ? <h3 className="font-semibold text-base text-foreground tracking-tight">{title}</h3> : null}
+          {description ? <p className="text-pretty text-muted-foreground text-sm leading-snug">{description}</p> : null}
         </header>
       ) : null}
       <div className="flex flex-col">{children}</div>
@@ -233,9 +234,9 @@ export function SettingsPage({ title, description, children, className }: Settin
   return (
     <div className={cn('flex flex-col gap-8', className)}>
       <header className="flex flex-col gap-2">
-        <h1 className="text-balance text-3xl font-semibold tracking-tight text-foreground">{title}</h1>
+        <h1 className="text-balance font-semibold text-3xl text-foreground tracking-tight">{title}</h1>
         {description ? (
-          <p className="max-w-[60ch] text-pretty text-sm leading-relaxed text-muted-foreground">{description}</p>
+          <p className="max-w-[60ch] text-pretty text-muted-foreground text-sm leading-relaxed">{description}</p>
         ) : null}
       </header>
       <div className="flex flex-col gap-6">{children}</div>
@@ -279,7 +280,7 @@ export function SettingsSectionHeader({
 }: SettingsSectionHeaderProps): React.JSX.Element {
   return (
     <header
-      className={cn('flex items-start justify-between gap-3 pt-1 pb-3', !noDivider && 'border-b border-border/40')}
+      className={cn('flex items-start justify-between gap-3 pt-1 pb-3', !noDivider && 'border-border/40 border-b')}
     >
       <div className="flex min-w-0 flex-col gap-1">
         {/* Semantic `<h3>` so this matches `SettingsCard`'s standalone
@@ -288,8 +289,8 @@ export function SettingsSectionHeader({
 				   different elements, which subtly nudged user-agent line-
 				   heights and broke the assumption that both render
 				   identically. */}
-        <h3 className="text-base font-semibold tracking-tight text-foreground">{title}</h3>
-        {description ? <p className="text-pretty text-sm leading-snug text-muted-foreground">{description}</p> : null}
+        <h3 className="font-semibold text-base text-foreground tracking-tight">{title}</h3>
+        {description ? <p className="text-pretty text-muted-foreground text-sm leading-snug">{description}</p> : null}
       </div>
       {actions ? <div className="flex shrink-0 items-center gap-2">{actions}</div> : null}
     </header>
@@ -369,7 +370,7 @@ export function ColorPill({
   return (
     <label
       aria-label={ariaLabel}
-      className="group relative flex h-7 min-w-36 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-border/50 px-3 transition-shadow duration-150 hover:shadow-sm focus-within:ring-2 focus-within:ring-ring/40"
+      className="group relative flex h-7 min-w-36 cursor-pointer items-center justify-center overflow-hidden rounded-full border border-border/50 px-3 transition-shadow duration-150 focus-within:ring-2 focus-within:ring-ring/40 hover:shadow-sm"
       style={{ backgroundColor: resolvedColor }}
     >
       <input

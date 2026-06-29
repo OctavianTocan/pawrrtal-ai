@@ -7,12 +7,12 @@
  * UI imports come in via the icon `Record` exported here.
  */
 
+import type { LucideIcon } from 'lucide-react';
 import {
   BookOpenIcon,
   CalendarIcon,
   FileIcon,
   GlobeIcon,
-  type LucideIcon,
   MessageSquareIcon,
   NotebookText,
   SearchIcon,

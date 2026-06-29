@@ -6,13 +6,8 @@
 
 'use client';
 
-import {
-  type ChangeEvent,
-  type ClipboardEventHandler,
-  type ComponentProps,
-  type KeyboardEventHandler,
-  useRef,
-} from 'react';
+import type { ChangeEvent, ClipboardEventHandler, ComponentProps, KeyboardEventHandler } from 'react';
+import { useRef } from 'react';
 import { InputGroupTextarea } from '@/components/ui/input-group';
 import { useScrollEdges } from '@/hooks/use-scroll-edges';
 import { cn } from '@/lib/utils';
@@ -182,11 +177,10 @@ export const PromptInputTextarea = ({
 
   return (
     <InputGroupTextarea
-      ref={textareaRef}
       className={cn('field-sizing-content max-h-48 min-h-16', className)}
       data-prompt-textarea=""
-      data-scroll-up={canScrollUp ? 'true' : undefined}
       data-scroll-down={canScrollDown ? 'true' : undefined}
+      data-scroll-up={canScrollUp ? 'true' : undefined}
       name="message"
       onCompositionEnd={() => {
         isComposingRef.current = false;
@@ -197,6 +191,7 @@ export const PromptInputTextarea = ({
       onKeyDown={handleKeyDown}
       onPaste={handlePaste}
       placeholder={placeholder}
+      ref={textareaRef}
       {...props}
       {...controlledProps}
     />
