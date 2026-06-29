@@ -51,12 +51,34 @@ Done when: the slice typechecks, passes its `@effect/vitest` suite, and reaches 
   rg -n "API_KEY=|SECRET=|TOKEN=" --glob '!**/*.example' .   # expect: no real secrets
   infisical run --domain=$INFISICAL_DOMAIN --projectId=… --env=dev -- just dev   # app boots with injected env
   ```
-- **Sandbox**: agent-generated code runs under gVisor by default.
+- **Sandbox**: agent-generated code runs under the **`local-confined`** default (CWD-confined + network-off via OS primitives, no container); heavier tiers are opt-in.
   ```bash
+  # default tier: a write outside the confined CWD is refused, and shell/code has no network
+  # opt-in gVisor tier (only when a conversation selects docker-gvisor):
   docker run --runtime=runsc <agent-image> sh -c 'cat /proc/version'   # gVisor kernel, not host
   ```
 
-## Gate 4 — End-to-end via `paw` + the visual harness
+## Gate 4 — Persistence substrate (Rivet · Postgres · Electric · Hatchet)
+
+The substrate is validated end-to-end by the `spikes/rivet-pi-electric` M1–M9 spike (`rivetkit` 2.3.2). Each slice that touches persistence re-proves the relevant leg:
+
+- **Single-writer projection + live sync**: a turn streams tokens over the conversation actor's WebSocket **and** the conversation's metadata row, written **only by the API**, appears in a second client via Electric — and both survive an actor cold restart. (Spike M1–M3.)
+- **Read-path scoping**: a client cannot widen its Electric view — the gatekeeper server-forces `where owner = <id>` + a table/column allowlist, with identity from a **trusted session authority**, not a client header. (M4–M5.)
+- **Actor durability**: actor state **and** a per-session scheduled wake survive a real cold restart (the wake catches up on rehydration). (M2/M6/M9.)
+- **Durable system work**: a Hatchet task enqueued while the worker is down lands when a worker returns, through the same single-writer seam. (M8.)
+
+```bash
+# spike reproduction (throwaway slice; the real apps/api wires the same shape):
+cd spikes/rivet-pi-electric && bun install
+docker compose -f infra/docker-compose.yml up -d   # Postgres 17 + Electric on :5499 / :5599
+pgrep -x rivet-engine | xargs -r kill ; sleep 3     # engine-port hygiene before boot (FINDINGS #11)
+RIVET_ENVOY_VERSION=1 bun run m6                     # cold-restart durability, off the harness
+RIVET_ENVOY_VERSION=1 bun run m9                     # session-scoped scheduled wake survives a cold restart
+```
+
+Done when: the slice's persistence leg matches the spike's proven behavior — single writer per store, identity-scoped reads, durable actor state + schedules, durable Hatchet queue.
+
+## Gate 5 — End-to-end via `paw` + the visual harness
 
 - `cd backend && uv run paw verify chat-roundtrip --json` (or the Effect `paw` once rewritten) — exercises the real HTTP/SSE surface a UI would.
 - The **visual harness** (spec 002) captures the real Telegram/web rendering and compares it to the golden references — the rendering gate for any surface story.

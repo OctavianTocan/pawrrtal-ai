@@ -43,13 +43,14 @@ Consolidated cross-cutting decisions, grounded in existing code (six parallel re
 
 ## 6. Persistence + incremental migration
 
-> **RE-SCOPED (files-first, no DB for app data):** Pawrrtal's app-data persistence is **pure files, NO database** — no Postgres, no SQLite, no Alembic, and no `@effect/sql` for app data. The relational direction in this section is retired for app data; it survives only as historical context for the strangler. **See ## Persistence: files vs DB** for the chosen design (`FileStore` over `FileSystem.ts` + `KeyValueStore.layerFileSystem`, JSONL transcripts, ripgrep search, git-repo data root).
+> **RESOLVED (the four-store substrate, ADR 2026-06-27, spike-validated):** Pawrrtal's persistence is a **per-conversation Rivet actor** (live session state, Pi unforked) + **Postgres** (the API-owned queryable record) + **Electric** (identity-scoped read-path sync) + **Hatchet** (system-level durable work). **See ## 12. Persistence: the four-store substrate** for the full design, the rejected files-first alternative, and the spike evidence.
 
-- **App data = plain files, not a database** (`FileStore` over effect-smol `FileSystem.ts` + `KeyValueStore.layerFileSystem`). The earlier "Effect SQL (`@effect/sql`), not Drizzle" choice held only while a relational store was assumed; it is **dropped for app data**. No `@effect/sql`, no Postgres, no Alembic owning app schema. Drizzle (comcom style) was also evaluated and rejected (`docs/plans/2026-06-02-effect-ts-projects-pilot-approach.md`). Conversation history is append-only JSONL; profiles/projects/memory/config are JSON files; the data root (`$PAWRRTAL_DATA`) is a git repo for history/backups.
-- **No schema-migration authority needed** for app data — the JSON/JSONL readers are the schema; there is no Alembic/Effect-migration step. (The Python strangler still runs Alembic only during the one-shot exporter that walks the old tables into files.)
-- **Coexistence enabler (during migration)**: both backends still share the same `chat_messages` shape (provider-agnostic `content/thinking/tool_calls/timeline` JSON = "the source of truth for what the chat UI renders") and emit identical SSE frames; the one-shot exporter maps those rows 1:1 by `ordinal` into `messages.jsonl`.
-- **Extraction order**: Projects (done) → read-only CRUD slices (workspaces, conversation metadata) on the same auth stack → **paw CLI rewrite** (pure HTTP client; validates contracts from the consumer side, zero kernel coupling; uses `effect/unstable/cli`) → message-write slices → **streaming chat/turn LAST** (provider fan-out + SSE; flip only after parity + harness gates).
-- **Open**: error-body shape parity (status-code-only vs body adapter); per-conversation write-ownership lock during concurrent appends; paw rewrite scope (full port vs HTTP/SSE core first). *(The earlier relational open questions — Postgres timing/`PgClient`, SQLite-vs-Postgres dialect parity for `timeline`/`tool_calls` — are **moot** under the no-DB decision: there is no app-data SQL store. See ## Persistence: files vs DB.)* Cite: `backend-ts/apps/api/src/Modules/Projects/Repo.ts:4,59`, `backend/app/infrastructure/models/conversation.py`, `docs/plans/2026-06-02-effect-ts-projects-pilot-approach.md`.
+- **Decision**: App data splits across two stores with one writer each. **Live session state** (transcript + agent/turn/queue/per-session-cron state) lives in the **per-conversation Rivet actor**'s own on-disk store and streams over its WebSocket. **The cross-cutting queryable record** (conversation list/metadata, profiles, projects, automations, integrations, settings, search) lives in **Postgres** via **`@effect/sql`** (the original "Effect SQL, not Drizzle" choice from `docs/plans/2026-06-02-effect-ts-projects-pilot-approach.md` is back in force for the queryable record — Drizzle was evaluated and rejected there), with the **API as sole writer**. Electric syncs the Postgres read-models to devices; Hatchet runs system-level durable work on the same Postgres.
+- **Rationale**: files-first scaled poorly past a handful of single-node users, gave no live multi-device read path, and made cross-conversation search an unindexed scan — the three forces that moved the decision (ADR §Context). The `backend/vendor/effect-api-layout` reference already solves exactly this shape (Rivet actor wrapping a Pi-scope loop + Postgres + Electric + Hatchet), so the decision became "adopt the reference's proven substrate split with our own unforked `@earendil-works/pi-*`," not "build a shell around Pi." The spike (`spikes/rivet-pi-electric`, M1–M9) proved every leg end-to-end at `rivetkit` 2.3.2 — past the RC the ADR flagged as its top risk.
+- **Schema authority**: Postgres owns the queryable-record schema (Effect SQL migrations during the slice that introduces each table). The Python strangler runs Alembic only for the **one-shot SQLAlchemy→Postgres importer** that walks the legacy tables into the new record; the actor stores own their own per-actor schema.
+- **Coexistence enabler (during migration)**: both backends still share the same `chat_messages` shape (provider-agnostic `content/thinking/tool_calls/timeline` JSON = "the source of truth for what the chat UI renders") and emit identical SSE frames; the importer carries those rows (ordered by `ordinal`) into Postgres, and per-conversation transcript history is replayed into each actor on first touch.
+- **Extraction order**: Projects (done) → read-only CRUD slices (workspaces, conversation metadata) on the same auth stack → **paw CLI rewrite** (pure HTTP client; validates contracts from the consumer side, zero kernel coupling; uses `effect/unstable/cli`) → message-write slices → **streaming chat/turn LAST** (the substrate cutover — conversations move onto actors; provider fan-out streams over the actor WS; flip only after parity + harness gates).
+- **Open**: error-body shape parity (status-code-only vs body adapter); the inbound-event → actor messaging hop (traceable from `effect-api-layout` on demand); search depth (shallow metadata vs a projected message-text digest vs a full mirror — narrowed by the spike, see §12). Cite: `backend-ts/apps/api/src/Modules/Projects/Repo.ts:4,59`, `backend/app/infrastructure/models/conversation.py`, `docs/plans/2026-06-02-effect-ts-projects-pilot-approach.md`, `backend/vendor/effect-api-layout`.
 
 ---
 
@@ -91,9 +92,9 @@ Consolidated cross-cutting decisions, grounded in existing code (six parallel re
 7. **Safety for AgentProviders**: which `AgentSafetyConfig` guards a loop-owning CLI honors (codex bypasses `run_model_tool_loop`).
 8. **Per-profile password**: is an optional per-profile password **mandatory** once more than one human shares the tailnet (§11), or always optional?
 9. **Profiles seed source**: a `profiles/` directory vs a single `profiles.yaml`; and is profile CRUD an **authed RPC surface** (who may create/rename/delete a profile)?
-10. **Embeddings/vector storage under pure-files**: do semantic-search embeddings need a sidecar binary (e.g. a small vector file/index) or none at all (scan-only)? — the one place the no-DB decision (§12) might still pull in a non-file artifact.
+10. **Search depth + embeddings in Postgres** (§12): default is shallow conversation metadata; does v1 add a projected message-text **content digest** (or full mirror) for full-text search, and do semantic-search embeddings ride **pgvector** on the same Postgres or defer entirely? The substrate makes this a write-cost/query-shape call, not a "can we even index" question — narrowed from a risk to a per-slice product decision.
 11. **ACP adapter maturity per CLI**: validate that `claude-code-acp` and `codex-acp` actually expose enough of `session/request_permission` + `fs/*` + `terminal/*` to claim `tool_enforcement: enforced` (§15); Gemini CLI native ACP first.
-12. **Migration exporter language**: write the one-shot table→files exporter in **Python** (live SQLAlchemy ORM, reads the real DB directly) vs **Effect** (re-implement table reads) — §12.
+12. **Migration importer language**: write the one-shot legacy-tables→**Postgres** importer (+ per-conversation transcript replay into actors) in **Python** (live SQLAlchemy ORM, reads the real DB directly) vs **Effect** (re-implement table reads) — §12.
 13. **SDK publish trigger** (§16): resolved *internal-now, publish-gated* — but the maintainer still green-lights the four gates (contracts API-frozen 2+ cycles · stable non-`unstable`/non-beta Effect pin · 2+ in-repo consumers through the generated contract · an external party asks) and must **define what "an external party asks" concretely means** before any release.
 14. **SDK public scope/name at publish** (§16): keep the internal `pawrrtal`/`@pawrrtal/*` scope vs alias a vendor-neutral `agentkit` scope **at publish only** (do not squat a public name now) — decision deferred to publish-time.
 15. **`@clients/*` ship scope** (§16): how much of `packages/clients/*` ships publicly — proposed a **curated starter subset** at publish (all wrappers live in `packages/clients` regardless of what publishes); which wrappers make the starter cut is open.
@@ -231,84 +232,94 @@ Sources: `https://github.com/fathah/hermes-desktop` (`src/main/{profiles,config,
 
 ---
 
-## 12. Persistence: pure files, no database
+## 12. Persistence: the four-store substrate (Rivet · Postgres · Electric · Hatchet)
 
-> **⚠️ SUPERSEDED (2026-06-27).** This entire section is **superseded** by the ADR `frontend/content/docs/handbook/decisions/2026-06-27-rivet-postgres-electric-hatchet-substrate.mdx`. The chosen substrate is **per-conversation Rivet actors** (running Pi unforked) for live session state, **Postgres** as the API-owned queryable record, **Electric** for read-path sync, and **Hatchet** for system-level durable work — not files-first. The reference-survey reasoning below (Craft Agents / Hermes / flue) is retained as historical context for *why* the team first leaned no-DB and what changed (audience growth, multi-device live sync, and v1 search pulled the decision to a Postgres-backed substrate).
+> **Status: chosen (ADR 2026-06-27) and spike-validated.** This is the source-of-truth section for persistence + runtime. The design is recorded in the ADR `frontend/content/docs/handbook/decisions/2026-06-27-rivet-postgres-electric-hatchet-substrate.mdx` and proven end-to-end by the `spikes/rivet-pi-electric` M1–M9 spike. It **replaces** an earlier files-first/no-database model (kept only as the rejected alternative below).
 
-**Decision.** *(superseded — see banner)* Make plain files the **sole source of truth** for everything (profiles, projects, conversation transcripts, memory, agent/workspace state, config). **There is NO database — no Postgres, no SQLite, no Alembic, no `@effect/sql` for app data, and no derived SQLite search index.** Search is **ripgrep/scan over the JSONL** (`messages.jsonl`); the slower-search-at-scale tradeoff is **accepted** (program decision #4). This re-scopes the prior persistence research (§6, "Effect SQL not Drizzle, Alembic owns the schema"): §6's relational direction is **retired** for app data; the source of truth is files, and there is no index to keep.
-
-**Rationale (reference survey).** Every reference app that leans local converges on a similar split — agent definitions + human-readable artifacts = files; conversation history = append-only log; the only divergence is whether they additionally keep a DB *index* (hermes does; Craft Agents proves you do not need one). Pawrrtal chooses the no-DB end of that spectrum.
-
-| App | Source of truth | Format | History / search | DB? |
-|---|---|---|---|---|
-| **craft-ai-agents/craft-agents-oss** | Files | JSON config + **JSONL** sessions + AES-GCM creds under `~/.craft-agent/` | Full history as JSONL; search = scan | **No DB at all** |
-| **fathah/hermes-desktop** | Hybrid | YAML/`.env`/JSON files + **SQLite** `state.db` under `~/.hermes/` | **SQLite FTS5** for resume + search | **Yes — only** for FTS5/resume |
-| **vercel/eve** | Agent=files; runtime=durable checkpoints | `agent/{instructions.md,tools/,skills/,…}` | Vercel Workflows checkpointing | Not exposed |
-| **withastro/flue** | Agent=files; runtime=**append-only event log** behind pluggable adapter | Markdown agents/skills; `PersistenceAdapter` | **Durable Streams** replay; `sqlite()`/`@flue/postgres`/DO-SQLite | Optional/pluggable; default in-memory SQLite (ephemeral) |
-
-Craft Agents proves you can ship a full agent desktop with **zero DB** — that is the model Pawrrtal adopts. (Hermes is recorded accurately as using a SQLite FTS5 index for its search/resume UX, but Pawrrtal's decision is no-DB; slower scan-based search is the accepted cost.) Flue/eve prove conversation history is naturally an **append-only event log** (a JSONL file IS a Durable Stream).
-
-**Pawrrtal already has the files seam.** `backend/app/infrastructure/models/workspace.py:42` (`Workspace.path` → host dir with `.agent/` tree); `backend/app/workspace/filesystem.py` (`safe_child()` traversal guard at line 12, `build_tree()` at line 40 — reuse, do not reinvent). `ChatMessage` (`conversation.py:118`, ordered by `ordinal`, carrying `content`/`thinking`/`tool_calls`/`timeline`) is already an append-only ordered log → maps 1:1 to JSONL by `ordinal`.
-
-**On-disk layout** (`$PAWRRTAL_DATA`, e.g. `~/.pawrrtal/`):
+**Decision.** Adopt a four-substrate split, mirroring the `backend/vendor/effect-api-layout` reference, with **Pi unforked** as the loop:
 
 ```
-~/.pawrrtal/
-  config.json                      # global app config (non-secret)
-  profiles/
-    <profile-slug>/
-      profile.json                 # display name, avatar, created_at
-      auth.json                    # optional password hash (argon2) + params  ← profiles-auth substrate
-      preferences.json             # was UserPreferences
-      personalization.json         # was UserPersonalization
-      appearance.json              # was UserAppearance
-      memory.jsonl                 # append-only typed proactive memory (was `memories`)
-      projects/
-        <project-slug>/
-          project.json             # was `projects` row
-          conversations/
-            <conversation-id>/
-              meta.json            # `conversations` row (title, labels, model_id,
-                                   #   provider_session_*, channel keys, flags)
-              messages.jsonl       # append-only `chat_messages` (Durable Stream)
-              attachments/
-      conversations/               # unattached chats (project_id == NULL)
-        <conversation-id>/{meta.json, messages.jsonl, attachments/}
-      workspaces/
-        <workspace-slug>/          # == today's Workspace.path; .agent/ tree unchanged
-  .git/                            # data root is a git repo (versioned backups/history)
+Product (Pawrrtal web / desktop / mobile / paw)
+   │  one typed contract (api-core → HTTP + Effect RPC)
+   ▼
+API  (Effect v4 — SOLE writer of Postgres)
+   │  RPC                                   ▲ read-path sync (Electric)
+   ▼                                        │
+Rivet actor  (one per conversation)     Postgres  ──►  Electric  ──►  all devices
+   │  runs                                  ▲ (system-level durable work)
+   ▼                                        │
+Pi  (unforked agent loop, wrapped in Effect)   Hatchet (apps/worker)
 ```
+
+1. **Pi is the loop** (`@earendil-works/pi-agent-core` + `pi-ai`, wrapped in Effect, extended only via injection seams — never modified).
+2. **The Rivet actor is the live session.** One actor per conversation; it runs Pi, holds working/turn state, streams tokens + events over its built-in WebSocket, hibernates when idle, and schedules its own per-session wakes (`c.schedule.after(ms, '<action>', …)`). Its on-disk store holds the live transcript + agent/turn/queue/per-session-cron state.
+3. **Postgres is the cross-cutting record** (v1): conversation list/metadata, profiles, projects, automations, integrations, settings, search. **The API is its sole writer** (Effect SQL).
+4. **Electric syncs the Postgres read-models** to every device through a gatekeeper proxy (the `electric-proxy` app), shapes scoped by the caller's identity. **The live transcript does not flow through Electric** — it streams from the actor.
+5. **Hatchet runs system-level durable work** in a separate `apps/worker` (worker pools: `integration` / `automation` / `background` / `scheduler`); task defs live next to their domain in `apps/api/src/Modules/**/Tasks/`.
+
+**Invariants.** **Single writer per store** — the actor owns its session state; the API owns Postgres; the actor reaches Postgres only via the API over RPC; Hatchet works on Postgres and reaches a conversation only by **messaging its actor**. **Scope rule for durable work** — session-scoped time/work (per-conversation reminders, in-session retries) → the **actor scheduler**; system-level / cross-cutting / external / heavy work (global crons, automations, inbound integrations, fan-outs) → **Hatchet**.
+
+**Rationale.** Files-first optimized for self-hosted simplicity and no operational DB, but three forces moved the requirements off it: **audience growth** (hosted for others, growing past a handful of single-node users), **multi-device + live sync as day-one** (a git-backed file tree gives no live read path), and **v1 cross-conversation search** (ripgrep over per-conversation JSONL is a single-node unindexed scan). The `effect-api-layout` reference already solves this exact shape — and notably already wraps a Pi-scope agent loop inside a Rivet actor — which reframed the call from "build vs. buy a shell around Pi" to "adopt the reference's proven substrate split, with our own unforked `@earendil-works/pi-*`."
+
+**Spike evidence (`spikes/rivet-pi-electric`, M1–M9 — all PASS).** The vertical slice proved every leg:
+- **M1–M3**: Pi runs inside a Rivet actor streaming tokens over the actor WS; the actor projects a summary row to Postgres **through the API (single writer)** and **Electric syncs it live** to a second client; actor state + the PG row survive a real cold restart.
+- **M4–M5**: an **identity-scoped gatekeeper** in front of Electric server-forces a per-owner `where` + table/column allowlist, with identity from a **trusted session authority** — a client cannot name itself or widen scope, even by sending its own `where` or a forged header.
+- **M6/M7**: the actor runs under the **production standalone engine shape** (`startEngine` + pinned `engineVersion`/`envoy.version` + `registry.start()`), surviving a self-driven cold restart; the PG/Electric/Rivet clients wrap cleanly as **Effect v4 services + layers**.
+- **M8**: durable system work on **Hatchet** survives a worker restart (the run sits in Hatchet's Postgres queue and the restarted worker picks up the same run id) and projects through the same single-writer seam.
+- **M9**: the actor's **own scheduler** (`c.schedule.after`) is durable across a cold restart and **catches up a missed fire on rehydration** — the session-scoped-timer half of the ADR's RC risk.
+
+Both halves of the ADR's headline RC risk — **state** durability (M2/M3c/M6) **and** **alarm** durability (M9) — are proven for `rivetkit` **2.3.2** (past the RC the ADR worried about). Pinned versions (spike-resolved): `rivetkit` 2.3.2 · `@earendil-works/pi-agent-core` + `pi-ai` 0.80.2 · `@electric-sql/client` 1.5.13 · `@hatchet-dev/typescript-sdk` 1.24.3 · `effect` 4.0.0-beta.74 · Postgres 17 · `electricsql/electric` 1.5.1.
+
+**Pawrrtal already has the seams.** `ChatMessage` (`backend/app/infrastructure/models/conversation.py:118`, ordered by `ordinal`, carrying `content`/`thinking`/`tool_calls`/`timeline`) is already an append-only ordered log → it replays into a conversation's actor transcript, and the importer carries it into Postgres. `backend/app/infrastructure/models/workspace.py:42` (`Workspace.path` → host dir with `.agent/` tree) and `backend/app/workspace/filesystem.py` (`safe_child()` traversal guard at line 12, `build_tree()` at line 40) stay the **sandbox/workspace filesystem** seam — reuse, do not reinvent — independent of the conversation substrate.
+
+**Store map (by entity).**
+
+| Entity | Store | Writer | Notes |
+|---|---|---|---|
+| Live transcript + turn/queue/per-session-cron state | **Rivet actor** (per-conversation on-disk store) | the actor | streams over the actor WS; replays on rehydration |
+| Conversation list/metadata, profiles, projects, automations, integrations, settings | **Postgres** | the **API** (sole writer) | Electric-synced to devices; the queryable record |
+| Search | **Postgres** | the API | shallow conversation metadata by default (see below) |
+| System-level durable work (global crons, automations, inbound integrations, fan-outs) | **Hatchet** (Postgres-backed queue) | the worker | reaches a conversation only by messaging its actor |
+| `.agent/` workspace tree (agent-generated files) | host filesystem behind the sandbox seam | the sandbox runtime | unchanged; CWD-confined |
 
 **Hard requirements addressed.**
-- *Search*: **ripgrep / scan over `messages.jsonl`** (Craft-Agents style). No index file. This is viable single-user; the **slower-search-at-scale tradeoff is accepted** as the cost of a zero-DB design.
-- *Concurrent writes*: conversations are append-only JSONL → concurrent appends from web/Telegram/Google Chat are safe with `O_APPEND` + a per-conversation advisory lock (writers only append, no row contention). `meta.json` mutations are last-writer-wins via atomic temp+rename.
-- *Backups/history*: the data root (`$PAWRRTAL_DATA`) is a **git repo** — versioned, diffable transcripts, rsync/Tailscale-friendly.
-- *Migration off SQLAlchemy*: one-shot exporter walks the tables → `conversations`→`meta.json`, `chat_messages` (ordered by `ordinal`)→`messages.jsonl`, `projects`→`project.json`, `memories`→`memory.jsonl`, `user`/`user_profile`/appearance/preferences→`profiles/<slug>/…`; `workspaces.path` dirs move under `profiles/<slug>/workspaces/`. **Alembic stops owning app data entirely** — schema lives in the JSON/JSONL readers; there is no remaining "migration" step.
+- *Search*: a **Postgres-indexable** query, not an unindexed scan. Depth defaults to shallow conversation **metadata** (the row the spike projected + Electric-synced live, M3); a projected message-text **content digest** or a **full message mirror** is a per-slice write-cost decision — **narrowed by the spike from a substrate risk to a product call** (the single-writer projection path is proven trivial). Default shallow; add a digest column when search demands it.
+- *Concurrent writes*: the per-conversation **Rivet actor is the single writer** of session state, so concurrent inbound messages from web/Telegram/Google Chat are **serialized by the actor** (no file lock, no last-writer-wins race); the queryable record is written only by the API (its sole writer). No split-brain.
+- *Multi-device live sync*: **Electric** pushes Postgres read-model changes to every device through the identity-scoped gatekeeper — the live read path files-first lacked.
+- *Durable background work*: **Hatchet** survives a worker restart (the spike's M8: a run enqueued while the worker was down was delivered to the next worker, same run id).
+- *Migration off SQLAlchemy*: a **one-shot SQLAlchemy→Postgres importer** walks the legacy tables into the queryable record (`conversations`/`projects`/`memories`/`user`+profile rows); per-conversation transcript history (`chat_messages` ordered by `ordinal`) replays into each actor on first touch. Alembic survives only to run that importer; Postgres then owns the queryable-record schema via Effect SQL migrations.
 
-**Effect v4 mapping (grounded in vendored effect-smol).**
-- `backend/vendor/effect-smol/packages/effect/src/FileSystem.ts` — first-class Effect module (node live layer). Build a core-light **`FileStore`** service on it: `readFileString`, append for JSONL, `makeDirectory`, atomic temp+rename for `meta.json`. No new dependency.
-- `backend/vendor/effect-smol/packages/effect/src/unstable/persistence/KeyValueStore.ts` — already ships `layerMemory` (329) and **`layerFileSystem(directory)`** (361, one file per key, backed by `FileSystem` + `Path`). Use `layerFileSystem(dir)` as the backing for per-profile/per-project config blobs; cite it instead of hand-rolling. (Do **not** use `layerSql`.)
-- Composition in `Modules/Layers.ts`: a single `FileStore` service (core, light). Conversation read/write and search all go through `FileStore` (search = scan); there is no `SearchIndex`/`@effect/sql` service to wire.
+**Effect v4 mapping (grounded in `backend/vendor/effect-smol` + the `effect-api-layout` reference).**
+- **`@clients/rivet`** + **`@clients/hatchet`** — thin Effect wrappers (Client · Config · Errors) around `rivetkit` and `@hatchet-dev/typescript-sdk`, on `@platform/*` (M7 proved the wrapping shape: a scoped resource via `Layer.effect` + `Effect.acquireRelease`, since **Effect v4 has no `Layer.scoped`**, FINDINGS #13).
+- **Postgres via `@effect/sql`** (the queryable record), composed in `Modules/Layers.ts`; the API is the sole writer.
+- **`electric-proxy`** app — the identity-scoped gatekeeper; security rests on **forwarding an allowlist of Electric protocol params, not a denylist** (copy `ELECTRIC_PROTOCOL_QUERY_PARAMS`, then server-set `table`/`columns`/`where`), and on **forwarding the client disconnect to the upstream long-poll** (FINDINGS #9/#10).
+- The `SessionStore`/`EventStreamStore` **ports** are the kernel's substrate-agnostic boundary; their realization is the actor store + the API-written Postgres projection. The SDK's standalone reference impl stays a simple local store, so a `paw new` project runs with no actor/Postgres/Electric.
 
-**Rejected.** A relational SQLite/Postgres source of truth (couples app correctness to migrations; fights files-first/profiles/Tailscale; no local-leaning reference app does this), **and** the optional derived SQLite FTS5 index (dropped deliberately — the slower scan-based search is the accepted cost of a fully no-DB design).
+**Operational sharp edges (must be handled deliberately, FINDINGS):** engine-port hygiene before boot (#11), settle/commit before a hard kill since actor state persists asynchronously w.r.t. the turn (#12/#17), a **pinned durable runner version** else `actor_ready_timeout` (#5), and the Hatchet token **embedding its gRPC broadcast address** so a host-port remap must match (#15).
+
+**Rejected alternatives** (ADR): **files-first / no database** (single-node, no live read path, unindexed scan — fails audience-growth, cross-device-sync, v1-search); a **hand-built custom shell around Pi** (re-implements what Rivet already gives — stateful actors, WebSockets, persistence, hibernation, scheduling); **Electric's full `agents-*` shell** (couples us to its pinned older Pi scope + entity model — we take Electric as the sync engine only, with our own unforked `@earendil-works/pi-*` to avoid the dual-Pi-scope hazard); **centralizing all durable work in Hatchet** (breaks the single-writer invariant — session timers would have Hatchet reaching into session state; they belong on the actor scheduler).
 
 ---
 
-## 13. Removing Docker
+## 13. Docker after the substrate decision (the app image goes; the substrate stack returns)
 
-**Decision.** Remove all app-serving Docker. Keep the Docker **engine** on the host only as the substrate for explicitly non-core, opt-in tiers (self-hosted Infisical, the Docker+gVisor sandbox tier). A clean install runs chat with no Docker present.
+> **REVISED by §12 (2026-06-27).** An earlier draft removed *all* app-serving Docker because files-first/no-DB/Tailscale-direct dissolved the reason for a compose stack. The four-store substrate **reverses that**: a clean install now runs **Postgres + Electric + Hatchet** (and a **Rivet engine**), so a substrate compose stack returns. The *Python app image* still goes.
+
+**Decision.** Delete the **Python app image** (`backend/Dockerfile`) — the Effect API runs as a plain Bun process on the tailnet. Replace the old Python+app-Postgres compose with a **substrate compose stack** that hosts the ADR's infra: **Postgres** (shared by Electric + Hatchet as separate logical DBs/schemas), **Electric** (the read-path sync service), and **Hatchet** (the durable-work engine). The **Rivet engine** runs **in-process in dev** and as a single binary/container in prod. The Docker engine also still backs the **opt-in Infisical + docker-gvisor sandbox tiers**.
 
 **Repo audit (confirmed).**
 
 | Path | Services / role | Verdict |
 |---|---|---|
-| `docker-compose.yml` | `postgres` + `backend` + `postgres_data`/`workspace_data` volumes | **Delete** |
-| `docker-compose.dev.yml` | `postgres` + `backend` | **Delete** |
-| `docker-compose.demo.yml` | `postgres` + `backend` + demo volumes | **Delete** |
+| `docker-compose.yml` | `postgres` + `backend` + `postgres_data`/`workspace_data` volumes | **Replace** — drop the `backend` (Python) service; repurpose into the substrate stack (Postgres + Electric + Hatchet) |
+| `docker-compose.dev.yml` | `postgres` + `backend` | **Replace** — dev substrate stack (Rivet engine stays in-process in dev) |
+| `docker-compose.demo.yml` | `postgres` + `backend` + demo volumes | **Replace or delete** per demo needs |
 | `backend/Dockerfile` | Python FastAPI image | **Delete** (Python retired; Effect runs as a plain Bun process on the tailnet) |
 | `frontend/Dockerfile` | Next.js image | **Keep only if** a containerized web deploy is still wanted; otherwise delete (desktop ships via Electron's local Next standalone server, plan §8) |
 
-**Rationale.** Files-first + no-DB + Tailscale-direct dissolves the reason the compose stack exists: there is no Postgres service to orchestrate, the backend is reachable over the tailnet directly, and the data root is a git repo (not a `postgres_data` volume). No compose file currently references Infisical (grep returned nothing) — self-hosting Infisical via Docker Compose is a *future* substrate (research §5), so it does not constrain deleting the current app compose. After removal, the Docker engine is **not** a hard dependency of the core; it survives on the host purely for: (a) self-hosting Infisical (research §5), and (b) the `docker-gvisor` opt-in sandbox tier (see § Sandboxing posture). Both are non-core and opt-in.
+**Spike templates (working compose to lift from):** `spikes/rivet-pi-electric/infra/docker-compose.yml` (Postgres 17 with logical replication + Electric 1.5.1, isolated project/ports) and `infra/hatchet-compose.yml` (`hatchet-lite` on its own Postgres, token minted by a one-shot setup service). The spike kept Hatchet on a separate Postgres for isolation; production can collapse to one Postgres server with separate logical DBs (ADR Consequences). **Sharp edge (FINDINGS #15):** the Hatchet API token embeds the gRPC broadcast address, so any host-port remap must match `SERVER_GRPC_BROADCAST_ADDRESS` or the SDK points at the wrong engine.
+
+**Rationale.** The substrate ADR's own Consequences acknowledge the cost: "self-hosted by default" now means running a Rivet engine, Postgres, an Electric sync service (Elixir), and a Hatchet engine — heavier than the files-first promise. Mitigations: Rivet in-process in dev; Hatchet + Electric reuse the same Postgres server; each ships as a single binary/container. So Docker (or equivalent single binaries) is part of a clean install — the opposite of the earlier no-Docker claim — but it now hosts a queryable, multi-device-syncing, durable substrate rather than just an app image.
 
 ---
 
@@ -428,7 +439,7 @@ safety_honored: subset         # agent owns its loop; permission gate + fs/termi
 
 > **Status: GO-LATER.** Build the SDK *boundary* **now** as internal workspace-protocol packages; **defer** the npm publish behind four gates. Publishing is **DEFERRED, NOT CHOSEN** (phrased like the deferred-website decision in §10) — the publishable unit ships internally in v1 and nothing goes public yet. This **refines §§3 and 7** (it names the publishable unit and locks the dependency arrow) and adds **no new architecture** — the thin core already specced IS the SDK; we name it publishable-shaped and build-enforce the app→SDK arrow.
 
-- **Decision**: Extract the thin core into a standalone, eventually-publishable **SDK + CLI** that the app depends on (the eve/Flue framework-vs-app relationship), with Pawrrtal-the-app as the flagship consumer. In Flue vocabulary: **FRAMEWORK** = the publishable surface (`kernel` + `api-core` + the `@clients/*` wrappers + the `paw` AGENT group); **HARNESS** = the kernel (one loop + ports); **RUNTIME** = `apps/api` + `$PAWRRTAL_DATA` + Tailscale + profiles + Effect-RPC + the external façade. The dependency arrow is **app-depends-on-SDK, build-enforced** — the sentrux/import-boundary rule (§3) promoted from a lint warning to a **physical wall** (Story 1's demand). Keep the `pawrrtal`/`@pawrrtal/*` scope internally; **do not squat a public name** (a vendor-neutral `agentkit` scope may be aliased only **at publish**).
+- **Decision**: Extract the thin core into a standalone, eventually-publishable **SDK + CLI** that the app depends on (the eve/Flue framework-vs-app relationship), with Pawrrtal-the-app as the flagship consumer. In Flue vocabulary: **FRAMEWORK** = the publishable surface (`kernel` + `api-core` + the `@clients/*` wrappers + the `paw` AGENT group); **HARNESS** = the kernel (one loop + ports); **RUNTIME** = `apps/api` + the persistence substrate (Rivet actors + Postgres + Electric + Hatchet) + Tailscale + profiles + Effect-RPC + the external façade. The dependency arrow is **app-depends-on-SDK, build-enforced** — the sentrux/import-boundary rule (§3) promoted from a lint warning to a **physical wall** (Story 1's demand). Keep the `pawrrtal`/`@pawrrtal/*` scope internally; **do not squat a public name** (a vendor-neutral `agentkit` scope may be aliased only **at publish**).
 - **Why GO-LATER (calibrated to a solo maintainer + trusted users)**: ~90% of the benefit is the **package boundary already planned**; the npm release adds only cost until the gates clear. Costs of publishing now, grounded in repo:
 
   | Cost of publishing now | Evidence in repo |
@@ -447,7 +458,7 @@ safety_honored: subset         # agent owns its loop; permission gate + fs/termi
   | Loop | the turn loop + compaction | — |
   | Contracts | the four (`Part`/`PartDelta` fold invariant · ModelProvider/AgentProvider + `CapabilityManifest` · `SessionRecord` single context-owner · the gateway **internal** parts envelope) | — |
   | Ports | the ports as **interfaces only** (Provider, ToolRegistry + permission-check, Channel, SandboxRuntime, FileStore/SessionStore, Secret, Memory, Observability) + **trivial reference impls** (`LocalConfinedRuntime`, node-FS FileStore, dev provider stub) | concrete impls of **every** port |
-  | Persistence | the persistence **PORT** + JSONL helpers | the `$PAWRRTAL_DATA` layout + git data root + ripgrep search + exporter |
+  | Persistence | the persistence **PORT** + fold/replay helpers (+ a local-store reference impl) | the substrate realization — per-conversation Rivet actor + API-written Postgres record + Electric gatekeeper + Hatchet worker + the legacy→Postgres importer |
   | Wrappers | the `@clients/*` wrappers (anthropic/gemini/xai/codex/ai-sdk/mcp/acp/e2b/fireflies) on `@platform/*` | heavy sandbox drivers (docker-gvisor/kata/e2b/upstash-box) |
   | Generation | contract→HTTP/RPC/typed-client generation | — |
   | CLI | the `paw` **AGENT** command group | the `paw` **OPERATOR** command group |
@@ -455,11 +466,11 @@ safety_honored: subset         # agent owns its loop; permission gate + fs/termi
   | Identity/transport | — | Profiles · `tailscale serve` + `Tailscale-User-Login` trust · the v1 WebSocket transport (+ deferred MessagePort) · Electron/Expo shells · Infisical · OTel wiring · web/mobile/channels/active-recall |
   | **Gateway (the only split entity)** | internal envelope = SDK | external OpenAI/Anthropic **façade** = app |
 
-  **Rule**: if it changes when you add an agent/provider/channel/tool → it's a **wrapper, registry data, or a file** (NOT the SDK); if it's *this-tailnet/this-profile/this-`$PAWRRTAL_DATA`* specific → it's the **app**.
+  **Rule**: if it changes when you add an agent/provider/channel/tool → it's a **wrapper, registry data, or a file** (NOT the SDK); if it's *this-tailnet/this-profile/this-substrate (Rivet actor + Postgres + Electric)* specific → it's the **app**.
 
 - **Public API sketch (SDK; frozen only at the publish gate)**: `defineAgent({ model, instructions, tools?, skills?, sandbox? })`; `run`/`stream` (require a Provider + ToolRegistry); `defineTool` with **Effect Schema**; the ports as `Context.Tag` services (Provider, ToolRegistry, SandboxRuntime with a `LocalConfinedRuntime` default, FileStore, Channel, Secret, Observability); the contract types `Part`/`PartDelta`/`CapabilityManifest`/`SessionRecord`; filesystem discovery of an agent project. **Acceptance**: a two-file project (`instructions.md` + `agent.ts`) runs via `paw run` over a **local FileStore + one provider** with **NO gateway/profiles/Tailscale** — proving Story 1's "runs-with-no-capabilities" at the package level.
 - **CLI — ONE `paw` binary, two groups (do NOT split)**: the **AGENT** group is **kernel-only by construction** (the SDK surface) = `new`, `dev --no-ui`, `run --payload`, `build`, `info` (`run --payload` is the CI primitive + the non-HTTP dispatch entry on the same kernel); the **OPERATOR** group is the Pawrrtal HTTP/RPC client = `verify`, `lab`, `live-ops`, `profiles`. A command tree is cheap to version; the agent group stays kernel-only by construction; **alias it as an `agentkit` bin at publish**.
-- **Packages / first mechanical step**: keep the `pawrrtal`/`@pawrrtal/*` scope internally. Layout (only `api-core` + `apps/api` exist today; the rest are NEW): `packages/platform` (zero internal deps), `packages/kernel` (one loop + compaction + ports; imports nothing concrete), `packages/api-core` (EXISTS), `packages/api-client` (NEW, generated), `packages/clients/*` (NEW wrappers), `apps/api` (EXISTS — host: profiles/Tailscale/`$PAWRRTAL_DATA`/façade/channels), `apps/paw` (NEW; today Python at `backend/app/cli/paw`), `apps/web` + `apps/mobile` (NEW). The **publishable unit (internal in v1)** = kernel + api-core + clients + the paw agent group. **First mechanical step**: widen `backend-ts/package.json` workspaces to include `packages/clients/*` and add `kernel` + `platform`. Workspace-protocol deps, catalog versions, **no index barrels**.
+- **Packages / first mechanical step**: keep the `pawrrtal`/`@pawrrtal/*` scope internally. Layout (only `api-core` + `apps/api` exist today; the rest are NEW): `packages/platform` (zero internal deps), `packages/kernel` (one loop + compaction + ports; imports nothing concrete), `packages/api-core` (EXISTS), `packages/api-client` (NEW, generated), `packages/clients/*` (NEW wrappers), `apps/api` (EXISTS — host: profiles/Tailscale/substrate (Rivet+Postgres+Electric+Hatchet)/façade/channels), `apps/paw` (NEW; today Python at `backend/app/cli/paw`), `apps/web` + `apps/mobile` (NEW). The **publishable unit (internal in v1)** = kernel + api-core + clients + the paw agent group. **First mechanical step**: widen `backend-ts/package.json` workspaces to include `packages/clients/*` and add `kernel` + `platform`. Workspace-protocol deps, catalog versions, **no index barrels**.
 - **Deferrable defaults (locked now)**: gateway external façade = **APP** (only the internal envelope is SDK); `@clients/*` ships as a **CURATED STARTER SUBSET** at publish (all live in `packages/clients` regardless of what publishes); **public package name + license = decided AT publish-time**; the Effect-pin reconciliation = **publish blocker** (boundary still picks one now).
 - **Precedent comparison**:
 
@@ -473,7 +484,7 @@ safety_honored: subset         # agent owns its loop; permission gate + fs/termi
   | **Vercel eve** | agent = a directory, but Vercel IS the platform (conflated to sell hosting) | copy the ergonomics, avoid the substrate and the publish-to-sell-hosting posture |
 
   **Universal caveat**: every 2026-era agent framework is **pre-1.0**, which independently reinforces the deferral.
-- **What to copy / what to leave**: **Copy** — filesystem-first agent definition (filename = identity; markdown skills under `.agents/skills`, which Pawrrtal already uses); the tiny `define*` surface; named adapter ports; a channel-independent session/stream contract (Effect-RPC over WS is the analogue of eve's session route + NDJSON, §9); durable park/continue/terminate; the `paw` verbs. **Leave** — eve's managed durable-execution dependency (Pawrrtal does park/resume over its **pure-files** SessionStore/EventStreamStore; `messages.jsonl` already IS the event log, §12); Flue's stack (use **Effect Schema**, not valibot); the multi-deploy-target matrix (one runtime today — build the agent-definition + ports now, defer a second target).
+- **What to copy / what to leave**: **Copy** — filesystem-first agent definition (filename = identity; markdown skills under `.agents/skills`, which Pawrrtal already uses); the tiny `define*` surface; named adapter ports; a channel-independent session/stream contract (Effect-RPC over WS is the analogue of eve's session route + NDJSON, §9); durable park/continue/terminate; the `paw` verbs. **Leave** — eve's managed durable-execution dependency (Pawrrtal does park/resume over its SessionStore/EventStreamStore realized on the per-conversation Rivet actor — the actor's own transcript/turn store IS the durable session, and its scheduler covers session-scoped timers, §12); Flue's stack (use **Effect Schema**, not valibot); the multi-deploy-target matrix (one runtime today — build the agent-definition + ports now, defer a second target).
 - **Alternatives**: publish now (rejected — semver-as-promise on a beta substrate with N=1 consumer; ~90% of value is the boundary, not the release); never extract (rejected — the boundary is the thin core §§3/7 already demands, and build-enforcing the arrow is free). Open items carried to the consolidated list: items **13–17** (publish trigger + "an external party asks" definition · public scope/name · `@clients/*` ship scope · license · agent-definition discovery unify-or-duplicate).
 
 Sources: repo — `specs/003-pawrrtal-overhaul/{spec,plan,research,data-model}.md` + `contracts/`; `backend-ts/package.json` (`effect@4.0.0-beta.74`); `backend/app/cli/paw`; `backend/vendor/effect-smol`. External — Vercel eve docs; `flueframework.com` + `withastro/flue` + the Cloudflare Flue post; Claude Agent SDK docs; `openai-agents-js`; Mastra + VoltAgent; the LangChain-vs-LangGraph comparison; the eve-vs-Flue comparison; the Rule of Three.
