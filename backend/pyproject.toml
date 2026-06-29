@@ -9,7 +9,7 @@ dependencies = [
     "markdown-it-py>=3.0.0",
     "alembic>=1.13.0",
     # 0.22.1 hangs opening SQLite connections under Python 3.13 on this VPS.
-    "aiosqlite>=0.21.0,<0.22.0",
+    "aiosqlite>=0.21.0,<0.23.0",
     "anyio>=4.0.0",
     "apscheduler>=3.10.0",
     "agent-client-protocol>=0.10.0",
