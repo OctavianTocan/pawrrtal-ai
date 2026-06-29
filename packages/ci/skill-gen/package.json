@@ -11,8 +11,8 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@effect/platform-node": "4.0.0-beta.74",
-    "effect": "4.0.0-beta.74"
+    "@effect/platform-node": "4.0.0-beta.91",
+    "effect": "4.0.0-beta.91"
   },
   "devDependencies": {
     "@types/bun": "latest",
