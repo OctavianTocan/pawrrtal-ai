@@ -1,18 +1,19 @@
 # Pawrrtal Plugin
 
 The single home for Pawrrtal's project-specific agent skills and architecture
-rules. Previously these lived scattered across `.agents/skills/`,
-`.claude/skills/`, and `.claude/rules/`; they are now bundled here.
+rules. Skills are canonical in `.agent/skills/` (agentic-stack portable brain).
+Legacy discovery paths mirror that tree:
+
+- `.agents/skills/` → `.agent/skills/` (Codex)
+- `.claude/skills/` → `.agent/skills/` (Claude Code)
+- `.cursor/plugins/pawrrtal/skills/` → `.agent/skills/` (Cursor plugin)
 
 ## Contents
 
 ### Skills (`skills/`)
 
-The canonical copy of every Pawrrtal-specific skill lives here. Legacy
-discovery locations that still need to resolve (`.agents/skills/<name>` and,
-where they existed, `.claude/skills/<name>`) are **symlinks into this plugin**,
-so existing agents, CI path filters, and documentation references keep resolving
-while the plugin is the one source of truth.
+Symlinks into `.agent/skills/`. Edit generated skills with `bun run skill-gen:generate`
+(output target `.agent/skills/`); hand-written skills live there directly.
 
 | Skill | What it covers |
 |---|---|

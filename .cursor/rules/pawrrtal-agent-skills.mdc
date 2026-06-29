@@ -1,0 +1,12 @@
+---
+description: Pawrrtal skills canonical path under agentic-stack.
+alwaysApply: true
+---
+
+# Pawrrtal skills
+
+Canonical skills live in `.agent/skills/` (agentic-stack portable brain).
+Harness mirrors: `.agents/skills/`, `.claude/skills/`, `.cursor/plugins/pawrrtal/skills/`.
+
+Generated skills: `bun run skill-gen:generate` writes to `.agent/skills/`.
+Repo guidelines remain in root `AGENTS.md` / `CLAUDE.md`.

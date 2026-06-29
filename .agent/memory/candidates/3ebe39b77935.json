@@ -1,0 +1,58 @@
+{
+  "id": "3ebe39b77935",
+  "key": "pattern_ignoring-files_nnode_modules_dependencies_3ebe39",
+  "name": "pattern_ignoring-files_nnode_modules_dependencies_3ebe39",
+  "claim": "Wrote /mnt/work/code/personal/pawrrtal/.gitignore (202 lines)",
+  "conditions": [
+    "about",
+    "articles",
+    "cache",
+    "code",
+    "com",
+    "content",
+    "dependencies",
+    "env",
+    "file_path",
+    "files",
+    "github",
+    "gitignore",
+    "help",
+    "https",
+    "ignoring",
+    "ignoring-files",
+    "lines",
+    "local",
+    "mnt",
+    "more",
+    "mypy_cache",
+    "nnode_modules",
+    "pawrrtal",
+    "personal",
+    "pnp",
+    "pytest_cache",
+    "ruff_cache",
+    "see",
+    "venv",
+    "vscode",
+    "work",
+    "write",
+    "wrote"
+  ],
+  "evidence_ids": [
+    "2026-06-29T18:54:04.112830+00:00",
+    "2026-06-29T21:56:57.274505+00:00",
+    "2026-06-29T22:01:59.251346+00:00"
+  ],
+  "cluster_size": 3,
+  "canonical_salience": 13.5,
+  "staged_at": "2026-06-29T22:02:35.412935+00:00",
+  "status": "staged",
+  "decisions": [
+    {
+      "ts": "2026-06-29T22:02:35.412935+00:00",
+      "action": "staged",
+      "reviewer": "auto_dream"
+    }
+  ],
+  "rejection_count": 0
+}

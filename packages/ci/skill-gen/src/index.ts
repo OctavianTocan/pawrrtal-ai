@@ -8,7 +8,7 @@
 //
 // # skill-gen
 //
-// Scans source files for `//<skill-gen>` markers, extracts skill fragments (markdown with YAML frontmatter), merges them by skill name, and writes `SKILL.md` files to the configured output folder. Pawrrtal's repo scripts target `.cursor/plugins/pawrrtal/skills`.
+// Scans source files for `//<skill-gen>` markers, extracts skill fragments (markdown with YAML frontmatter), merges them by skill name, and writes `SKILL.md` files to the configured output folder. Pawrrtal's canonical output is `.agent/skills/` (agentic-stack brain); `.agents/skills/` and `.cursor/plugins/pawrrtal/skills/` mirror it.
 //
 // **Full specification:** `packages/ci/skill-gen/SPEC.md`
 //
@@ -154,7 +154,7 @@ async function runPipeline(
 
 /** Resolve the default output directory for a base directory. */
 function defaultOutputDir(baseDir: string): string {
-  return resolve(baseDir, '.agents', 'skills');
+  return resolve(baseDir, '.agent', 'skills');
 }
 
 const baseFlag = Flag.string('base').pipe(

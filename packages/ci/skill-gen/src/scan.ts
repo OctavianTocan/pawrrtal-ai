@@ -16,6 +16,7 @@ const SKIP_DIRS = new Set([
   'e2e-test-expected',
   'vendor',
   '.context',
+  '.worktrees',
 ]);
 
 const SCANNABLE_EXTENSIONS = new Set([

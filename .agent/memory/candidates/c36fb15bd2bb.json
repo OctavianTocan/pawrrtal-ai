@@ -1,0 +1,36 @@
+{
+  "id": "c36fb15bd2bb",
+  "key": "pattern_file_path_pawrrtal_personal_c36fb1",
+  "name": "pattern_file_path_pawrrtal_personal_c36fb1",
+  "claim": "Wrote /mnt/work/code/personal/pawrrtal/.agent/memory/personal/PREFERENCES.md (31 lines)",
+  "conditions": [
+    "agent",
+    "code",
+    "content",
+    "file_path",
+    "install",
+    "lines",
+    "mnt",
+    "pawrrtal",
+    "personal",
+    "work",
+    "write",
+    "wrote"
+  ],
+  "evidence_ids": [
+    "2026-06-29T18:53:57.660821+00:00",
+    "2026-06-29T18:54:49.218712+00:00"
+  ],
+  "cluster_size": 2,
+  "canonical_salience": 9.0,
+  "staged_at": "2026-06-29T18:55:06.364166+00:00",
+  "status": "staged",
+  "decisions": [
+    {
+      "ts": "2026-06-29T18:55:06.364166+00:00",
+      "action": "staged",
+      "reviewer": "auto_dream"
+    }
+  ],
+  "rejection_count": 0
+}

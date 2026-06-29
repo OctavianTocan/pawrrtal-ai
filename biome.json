@@ -10,6 +10,7 @@
     "ignoreUnknown": false,
     "includes": [
       "**",
+      "!**/.agent",
       "!**/.agents",
       "!**/.claude",
       "!**/.cursor",
@@ -182,7 +183,7 @@
       }
     },
     {
-      "includes": [".agents/**"],
+      "includes": [".agent/**", ".agents/**"],
       "linter": {
         "enabled": false
       }

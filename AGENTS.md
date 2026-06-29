@@ -1,5 +1,11 @@
 # Repository Guidelines
 
+## Portable brain (agentic-stack)
+
+This repo uses [agentic-stack](https://github.com/codejunkie99/agentic-stack). At session start, also read `.agent/AGENTS.md`, `.agent/memory/personal/PREFERENCES.md`, and `.agent/memory/semantic/LESSONS.md`. Skills are canonical in `.agent/skills/`; `.agent/skills/` mirrors for Codex.
+
+For deploy, migration, debug, or refactor work, run `python3 .agent/tools/recall.py "<task>"` before acting.
+
 - **Never describe a failure mode as "pre-existing" to justify leaving it broken.** If you encounter a lint warning, type error, runtime warning, console error, broken test, or regression — fix it. The user does not care who introduced it; they care whether the app works. Warnings need fixing too: they are latent errors that haven't been promoted to blocking yet (Biome rolls levels, React 19 hardened previously informational warnings into fatal hydration faults, etc.). If a fix would explode the PR scope, open a sibling PR and reference it; do not punt with genealogy. See `.claude/rules/general/no-pre-existing-excuse.md`.
 
 ## Project Structure & Architecture Boundaries
@@ -9,8 +15,8 @@
 - **Design system (`DESIGN.md`)**: Repo-root [DESIGN.md](https://github.com/google-labs-code/design.md)-format spec describing the Craft Agents-inspired visual identity — colors, typography, spacing, shapes, elevation, and component bindings. Canonical token values live in `frontend/app/globals.css`; `DESIGN.md` mirrors them as machine-readable YAML front matter so coding agents have a persistent, structured understanding of the system. Lint with `bun run design:lint`.
 - **Docs (`docs/`)**: Project documentation, migration plans, and design specs.
 - **Tasks (`.beans/`)**: Markdown-based task tracking. Update the status of `.beans` files as work is completed.
-- **Extension boundaries (`.agents/skills/extension-boundaries/SKILL.md`)**: Read this skill before touching channels, providers, tools, plugins, subagents, context providers, or turn orchestration. It defines where optional integrations live and how the kernel stays generic.
-- **Paw CLI skill (`.agents/skills/paw/SKILL.md`)**: Read this skill before using, changing, or documenting the `paw` CLI. It maps the current command tree, verification suites, lab/dogfood flows, output modes, exit codes, and the rule that end-to-end claims should go through `paw verify` or `paw lab` instead of direct backend imports.
+- **Extension boundaries (`.agent/skills/extension-boundaries/SKILL.md`)**: Read this skill before touching channels, providers, tools, plugins, subagents, context providers, or turn orchestration. It defines where optional integrations live and how the kernel stays generic.
+- **Paw CLI skill (`.agent/skills/paw/SKILL.md`)**: Read this skill before using, changing, or documenting the `paw` CLI. It maps the current command tree, verification suites, lab/dogfood flows, output modes, exit codes, and the rule that end-to-end claims should go through `paw verify` or `paw lab` instead of direct backend imports.
 - **Rule**: Always use the `beans` CLI (e.g. `beans create`, `beans update`) to manage `.beans` files. Never create or edit them manually.
 - **Rule (bean writing style)**: Write bean bodies so a junior engineer (or a future agent with zero context) can act on them without re-reading the codebase. Plain words over jargon. Use:
     - `## Goal` heading at the top (one sentence on what this step achieves).
@@ -173,7 +179,7 @@ The curated reading list for the highest-signal rules in this stack lives at [`d
 
 ## Learned User Preferences
 
-- When the user asks to log a technical or architectural decision, capture it in `frontend/content/docs/handbook/decisions/` (ADR-style) and tie it to task tracking (e.g. `beans`) when the flow already uses beans.
+- When the user asks to log a technical or architectural decision, capture it in `frontend/content/docs/handbook/decisions/` (ADR-style).
 - When adapting external UI references (screenshots, other products), use Pawrrtal naming and the repo theme tokens rather than copying third-party branding or palettes from the reference.
 - The user may ask for extremely terse “caveman” explanations when digging into complex technical changes; when they invoke `/caveman` or “caveman mode”, follow `.claude/skills/caveman/SKILL.md`.
 - When a UI fix establishes a reusable pattern, or when a surface fetches data as soon as it appears (for example integration connection state), use a loader or skeleton until the result is known; capture the approach in `DESIGN.md` so the design system stays the single narrative for “how we do this,” not only inline code comments.
@@ -183,7 +189,7 @@ The curated reading list for the highest-signal rules in this stack lives at [`d
 - In the Effect TS teaching workspace (`lessons/*.md`, `MISSION.md`, `learning-records/`), the user writes code and the agent reviews—do not ghost-write lesson assignment bodies or handler implementations. Lessons supply goals, concepts, file references, and verify commands, not function bodies; when stuck, point at a reference. When the user asks "what is X", answer in 2–3 sentences unless they ask for depth (recurring correction). When they ask for direction or review, use plain simple-speak prose with no headings or bullet lists unless they request structure. In Effect TS teaching arcs, skip frontend/UI strangler work (Next rewrites to `:8001`) unless the user asks; focus on backend-ts slices (authz, route groups, parity curls).
 - For Effect TypeScript work, treat `backend/vendor/effect-smol` as the v4 API source of truth (examples and `ai-docs`); do not assume npm Effect v3 import paths without checking the vendor tree. For module folder layout and thin-handler discipline, use the gitignored local clone at `backend/vendor/effect-api-layout/` (populated via `scripts/setup-vendor-effect-api-layout.sh`); do not name the upstream product in Pawrrtal docs; translate HttpApi/SQL/Schema calls against effect-smol, not effect-api-layout imports. Gitignored vendor clones under `backend/vendor/` (e.g. `effect-api-layout/`, `effect/`) are skipped by gitignore-aware Glob/ripgrep — read them by explicit path or list with `rg --files --no-ignore`.
 - When fixing code quality issues, correct inaccurate docstrings and comments too; keep them contract-only and brief (1–3 lines on exports), not architecture essays, vendor paths, or lesson references.
-- Canonical agent skills live in `.agents/skills/` (not a repo-root `skills/` folder). Inside `.cursor/plugins/pawrrtal/skills/`, folder names omit the redundant `pawrrtal-` prefix.
+- Canonical agent skills live in `.agent/skills/` (agentic-stack brain); `.agents/skills/`, `.claude/skills/`, and `.cursor/plugins/pawrrtal/skills/` mirror via symlinks. `bun run skill-gen:generate` writes to `.agent/skills/`. Inside the plugin mirror, folder names omit the redundant `pawrrtal-` prefix.
 - The user routinely asks for spike/experimental work to be done in a dedicated git worktree and to *stay* there ("make sure you do it in a worktree", "keep doing it in a worktree"); commit such throwaway work on its own worktree branch using a standard conventional type (e.g. `feat(spike): …` or `chore(003): spike …`), since the pre-commit conventional-commit hook only accepts standard types. Files open or recently-viewed in the IDE are the user's own parallel work — do not adopt them as your task or pivot to them ("ignore what I'm doing"); stay on the assigned worktree task.
 
 ## Learned Workspace Facts
@@ -195,8 +201,8 @@ The curated reading list for the highest-signal rules in this stack lives at [`d
 - Post-login navigation in `LoginForm` must use `window.location.replace('/')` (full-page navigation), not `router.push`. Client-side navigation keeps React in the same turn so authed queries (`NavChats`, etc.) can fire before the browser commits the `Set-Cookie` response, causing a 401 → redirect-to-login race. This is especially visible on Safari and when onboarding UI adds heavier post-login hydration. **Migration direction (003 overhaul):** `LoginForm`/`/login`/`/signup` are removed entirely and replaced by a profile-picker (no login flow); this fact applies only while the cookie-login UI still exists.
 - In staging/production the public app is one Cloudflared hostname protected by Cloudflare Access. Browser code calls same-origin `/api/v1`, `/auth`, and `/users`; Cloudflared routes those paths to FastAPI on `127.0.0.1:8000` and all other paths to Next.js on `127.0.0.1:3000`. Do not reintroduce `api.*` browser routing or frontend backend URL selection. **Migration direction (003 overhaul):** Cloudflare Access is retired for the app/API in favor of `tailscale serve` (tailnet-only, loopback-bound, never `funnel`); the **web** build stays same-origin, but **native shells (Electron/Expo) DO use a runtime-configured tailnet base URL** (`https://<node>.ts.net`, RPC over `wss://…/rpc`). So "no frontend backend URL selection" holds for web only — see `specs/003-pawrrtal-overhaul/research.md` §§10–11.
 - Canonical application font stack (with fallbacks): `Google Sans Flex`, `Google Sans`, `Helvetica Neue`, `sans-serif`; keep `DESIGN.md` and `frontend/app/globals.css` aligned when this changes.
-- backend-ts `Modules/Authentication/`: module-scoped `Config.ts` for env like `ALLOWED_EMAILS` (yieldable `Config`, not `Infrastructure/`); unit tests split as `Config.test.ts` (parser), `AllowedUser.test.ts` (allowlist gate with real middleware), while `Projects/Http.test.ts` keeps `AuthStub.ts` for handler wiring; no cookie-auth middleware unit tests yet (401 is lesson curl territory).
-- Custom React hooks use consistent `use-*` naming for modules and exports (for example `use-login-mutations.ts`).
+- Beans task tracking was removed from the repo; do not recreate `.beans/` files or use the beans CLI. Per-developer agent/editor dirs are gitignored (`.beans`, `.cline`, `.factory`, `.pi`, `.opencode`, `.goose`, `.zed`); repo-root `GLOSSARY.md` and `WARP.md` are likewise gitignored.
+- Root `tsconfig.json` includes only repo-root orchestrator scripts (`*.ts`, `scripts/**/*.ts`) and excludes `frontend/`, `backend-ts/`, `backend/vendor/`, `.worktrees/`, etc. `.vscode/settings.json` excludes vendor clones under `backend/vendor/` and `.worktrees/` from file watching and search — otherwise ~400 vendor `tsconfig.json` trees blow up tsserver memory.
 - When adding or extending GitHub Actions workflows, follow the repository pattern of running jobs on the team’s custom GitHub runner rather than assuming default hosted runners only.
 - Git `pre-commit` runs via `backend/.venv/bin/python3 -m pre_commit`; keep `pre-commit` in the backend `pyproject.toml` dev dependency group and run `cd backend && uv sync --group dev` so hooks do not fail with `No module named pre_commit`.
 - From `frontend/`, run scoped Vitest with `bun run test -- <file-or-pattern>` so paths are passed after `--` (avoid `bun run test --run <path>`, which does not match how Vitest is wired here).
@@ -314,5 +320,5 @@ Single-context. One `CONTEXT.md` at the repo root when created. ADRs live in `fr
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/003-pawrrtal-overhaul/plan.md
+at specs/004-effect-paw-cli/plan.md
 <!-- SPECKIT END -->

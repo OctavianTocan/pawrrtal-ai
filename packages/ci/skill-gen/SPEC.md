@@ -74,7 +74,7 @@ Each merged skill also tracks which source files contributed to it (for the gene
 
 ### 4. Output
 
-Write each merged skill to the **output folder** (default: `.agents/skills/`; Pawrrtal's root scripts pass `.cursor/plugins/pawrrtal/skills`) as `<name>/SKILL.md`.
+Write each merged skill to the **output folder** (default: `.agent/skills/`; Pawrrtal's root scripts pass the same path) as `<name>/SKILL.md`. Codex and the Pawrrtal plugin mirror `.agent/skills/` via symlinks — edit skills here, not in the mirrors.
 
 The output format is:
 
@@ -113,7 +113,7 @@ Commands:
 
 Options:
   --base <path>      Base folder to scan (default: repo root, detected via git)
-  --output <path>    Output folder for generated skills (default: <base>/.agents/skills)
+  --output <path>    Output folder for generated skills (default: <base>/.agent/skills)
   --verbose          Print discovered fragments and merge diagnostics
   --help             Show help
 ```
@@ -181,5 +181,5 @@ The e2e test suite should include:
 - **Symlinks**: follow symlinks (default `fs` behavior).
 - **Ignore patterns**: skip `node_modules/`, `.git/`, `vendor/`, `.context/`, and the output folder itself.
 - **Template variables in non-repo context**: if the tool cannot detect a git repo root (e.g. when scanning a standalone directory), `$$file` and `$$directory` resolve relative to the `--base` folder instead.
-- **Hand-written skills**: existing `.agents/skills/<name>/SKILL.md` files that do NOT have the `AUTO-GENERATED` header are left untouched. The generator only manages files it created.
+- **Hand-written skills**: existing `.agent/skills/<name>/SKILL.md` files that do NOT have the `AUTO-GENERATED` header are left untouched. The generator only manages files it created.
 - **References subdirectory**: the generator does NOT manage `references/` subdirectories. Those remain hand-written. Only `SKILL.md` is generated.

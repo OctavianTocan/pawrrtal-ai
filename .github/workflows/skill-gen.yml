@@ -6,7 +6,7 @@ on:
     paths:
       - 'backend/**/*.py'
       - 'packages/ci/skill-gen/**'
-      - '.cursor/plugins/pawrrtal/skills/**'
+      - '.agent/skills/**'
       - 'package.json'
       - 'bun.lock'
       - '.github/workflows/skill-gen.yml'
@@ -15,7 +15,7 @@ on:
     paths:
       - 'backend/**/*.py'
       - 'packages/ci/skill-gen/**'
-      - '.cursor/plugins/pawrrtal/skills/**'
+      - '.agent/skills/**'
       - 'package.json'
       - 'bun.lock'
       - '.github/workflows/skill-gen.yml'

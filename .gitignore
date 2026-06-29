@@ -22,6 +22,9 @@ node_modules/
 /private
 .private
 
+# Repo-root docs/ (local notes, plans, hyperframes). Not versioned.
+/docs/
+
 # Personal Effect-learning scaffolding (teach skill workspace). Not project artefacts.
 /MISSION.md
 /RESOURCES.md
@@ -194,3 +197,14 @@ backend/vendor/electric
 
 # Docker
 */.env.docker
+
+# agentic-stack runtime artefacts (memory content is committed; exports are not)
+.agent/memory/dream.log
+.agent/memory/.index/
+.agent/data-layer/
+.agent/flywheel/
+
+# Harness skill mirrors (canonical tree: .agent/skills/)
+.agents/skills
+.claude/skills
+.cursor/plugins/pawrrtal/skills/

@@ -33,7 +33,7 @@ established API endpoints, authenticated fetch helpers, or TanStack Query flows.
 Backend work MUST preserve the FastAPI layer boundaries in `backend/app/`.
 Optional integrations MUST stay outside the generic kernel: channels, providers,
 tools, plugins, subagents, context providers, and turn orchestration changes must
-follow `.agents/skills/extension-boundaries/SKILL.md`.
+follow `.agent/skills/extension-boundaries/SKILL.md`.
 
 ### III. Design System Consistency
 
