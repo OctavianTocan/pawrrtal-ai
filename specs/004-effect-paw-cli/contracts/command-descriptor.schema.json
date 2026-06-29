@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pawrrtal.local/specs/004-effect-paw-cli/command-descriptor.schema.json",
+  "title": "Paw CLI Command Descriptor",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "summary", "owner", "outputModes"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string"
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 1
+    },
+    "aliases": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*$"
+      },
+      "uniqueItems": true
+    },
+    "arguments": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/parameter"
+      }
+    },
+    "flags": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/parameter"
+      }
+    },
+    "subcommands": {
+      "type": "array",
+      "items": {
+        "$ref": "#"
+      }
+    },
+    "examples": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["command"],
+        "properties": {
+          "command": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "environment": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "purpose"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[A-Z][A-Z0-9_]*$"
+          },
+          "purpose": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "outputModes": {
+      "type": "array",
+      "items": {
+        "enum": ["human", "json", "plain"]
+      },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "inputSources": {
+      "type": "array",
+      "items": {
+        "enum": ["flag", "file", "stdin", "editor"]
+      },
+      "uniqueItems": true
+    },
+    "exitCodes": {
+      "type": "array",
+      "items": {
+        "type": "integer",
+        "enum": [0, 1, 2, 4, 5, 6]
+      },
+      "uniqueItems": true
+    },
+    "skillSections": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["skill", "heading", "body"],
+        "properties": {
+          "skill": {
+            "enum": ["paw", "domain-cli"]
+          },
+          "heading": {
+            "type": "string",
+            "minLength": 1
+          },
+          "body": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "parameter": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "description", "kind"],
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]*$"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": ["string", "boolean", "integer", "choice", "file"]
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "aliases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "choices": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "default": {}
+      }
+    }
+  }
+}

@@ -1,1 +1,3 @@
-{ "feature_directory": "specs/003-pawrrtal-overhaul" }
+{
+  "feature_directory": "specs/004-effect-paw-cli"
+}
