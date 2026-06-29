@@ -4,6 +4,7 @@ Compressed rules reused across lessons. **Read these before writing code** — l
 
 | Doc | Topic | Use when |
 |-----|-------|----------|
+| [api-core-contract.md](./api-core-contract.md) | `packages/api-core` contract modules | Any new HttpApi group before runtime handlers |
 | [config.md](./config.md) | Effect `Config` for env vars | Any feature-owned env read in `apps/api` |
 
 Populate the architecture reference vendor before grepping layout examples:

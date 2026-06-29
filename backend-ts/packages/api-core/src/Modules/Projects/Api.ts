@@ -1,7 +1,8 @@
 import { Schema } from "effect"
 import { HttpApiEndpoint, HttpApiGroup, HttpApiSchema, OpenApi } from "effect/unstable/httpapi"
+import { Ids } from "../../Lib/TypeIds"
 import { AllowedUserMiddlewareService, AuthenticationMiddlewareService } from "../Auth/Api"
-import { Project, ProjectCreateInput, ProjectId, ProjectUpdateInput } from "./Domain"
+import { Project, ProjectCreateInput, ProjectUpdateInput } from "./Domain"
 import { ProjectNotFoundError } from "./Errors"
 
 /** Authenticated CRUD for `/api/v1/projects`. */
@@ -24,7 +25,7 @@ export class ProjectsApi extends HttpApiGroup.make("projects")
   .add(
     HttpApiEndpoint.patch("update", "/:project_id", {
       params: {
-        project_id: ProjectId
+        project_id: Ids.project
       },
       payload: ProjectUpdateInput,
       success: Project,
@@ -36,7 +37,7 @@ export class ProjectsApi extends HttpApiGroup.make("projects")
   .add(
     HttpApiEndpoint.delete("delete", "/:project_id", {
       params: {
-        project_id: ProjectId
+        project_id: Ids.project
       },
       success: HttpApiSchema.NoContent,
       error: ProjectNotFoundError

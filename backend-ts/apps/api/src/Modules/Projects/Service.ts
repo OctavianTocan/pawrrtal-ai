@@ -1,10 +1,5 @@
-import type {
-  Project,
-  ProjectCreateInput,
-  ProjectId,
-  ProjectUpdateInput,
-  UserId
-} from "@pawrrtal/api-core/Modules/Projects/Domain"
+import type { ProjectId, UserId } from "@pawrrtal/api-core/Lib/TypeIds"
+import type { Project, ProjectCreateInput, ProjectUpdateInput } from "@pawrrtal/api-core/Modules/Projects/Domain"
 import { ProjectNotFoundError } from "@pawrrtal/api-core/Modules/Projects/Errors"
 import { Context, Effect, Layer } from "effect"
 import { ProjectsRepo, ProjectsRepoLive } from "./Repo"

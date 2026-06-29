@@ -1,12 +1,8 @@
 /** `ProjectsService` unit tests with a `Ref`-backed repo stub. */
 
 import { assert, layer } from "@effect/vitest"
-import type {
-  ProjectCreateInput,
-  ProjectId,
-  ProjectUpdateInput,
-  UserId
-} from "@pawrrtal/api-core/Modules/Projects/Domain"
+import type { ProjectId, UserId } from "@pawrrtal/api-core/Lib/TypeIds"
+import type { ProjectCreateInput, ProjectUpdateInput } from "@pawrrtal/api-core/Modules/Projects/Domain"
 import { Project } from "@pawrrtal/api-core/Modules/Projects/Domain"
 import { ProjectNotFoundError } from "@pawrrtal/api-core/Modules/Projects/Errors"
 import { Cause, Context, DateTime, Effect, Exit, Layer, Ref } from "effect"

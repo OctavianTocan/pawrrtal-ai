@@ -3,16 +3,11 @@
 import { Schema } from "effect"
 import { Ids } from "../../Lib/TypeIds"
 
-export const ProjectId = Ids.project
-export type ProjectId = Schema.Schema.Type<typeof ProjectId>
-
-export const UserId = Ids.user
-export type UserId = Schema.Schema.Type<typeof UserId>
-
+/** A project groups conversations together. */
 export class Project extends Schema.Class<Project>("Project")(
   {
-    id: ProjectId,
-    user_id: UserId,
+    id: Ids.project,
+    user_id: Ids.user,
     name: Schema.String.annotate({
       description: "Display name shown in the sidebar"
     }),
@@ -30,6 +25,7 @@ export class Project extends Schema.Class<Project>("Project")(
   }
 ) {}
 
+/** Payload for creating a new project. */
 export class ProjectCreateInput extends Schema.Class<ProjectCreateInput>("ProjectCreateInput")(
   {
     name: Schema.String.annotate({
@@ -43,6 +39,7 @@ export class ProjectCreateInput extends Schema.Class<ProjectCreateInput>("Projec
   }
 ) {}
 
+/** Payload for updating an existing project. */
 export class ProjectUpdateInput extends Schema.Class<ProjectUpdateInput>("ProjectUpdateInput")(
   {
     name: Schema.NullOr(Schema.String).annotate({

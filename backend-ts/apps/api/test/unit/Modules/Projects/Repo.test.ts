@@ -1,7 +1,7 @@
 /** `ProjectsRepo` SQL tests against `:memory:` SQLite. */
 
 import { assert, layer } from "@effect/vitest"
-import type { ProjectId, UserId } from "@pawrrtal/api-core/Modules/Projects/Domain"
+import type { ProjectId, UserId } from "@pawrrtal/api-core/Lib/TypeIds"
 import { Effect, Layer } from "effect"
 import { ProjectsRepo, ProjectsRepoBody } from "@/Modules/Projects/Repo"
 import { makeInMemoryDatabase } from "../../_helpers/InMemoryDatabase"

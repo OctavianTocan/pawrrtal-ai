@@ -1,6 +1,6 @@
+import type { UserId } from "@pawrrtal/api-core/Lib/TypeIds"
 import { AllowedUserMiddlewareService, AuthenticationMiddlewareService } from "@pawrrtal/api-core/Modules/Auth/Api"
 import { CurrentUser, User } from "@pawrrtal/api-core/Modules/Auth/Domain"
-import type { UserId } from "@pawrrtal/api-core/Modules/Projects/Domain"
 import { Effect, Layer } from "effect"
 
 const stubUser = new User({
