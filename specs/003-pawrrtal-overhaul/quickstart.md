@@ -4,10 +4,23 @@ This program plan ships no single deliverable; it is validated **slice by slice*
 
 ## Prerequisites
 
-- Repo at `/mnt/HC_Volume_105512717/dev/pawrrtal`; Python backend on `:8000`, Effect strangler on `:8001` (`just dev` / `bun dev.ts`; opt out of TS with `PAWRRTAL_SKIP_TS_API=1`).
+- Repo at `/mnt/work/code/personal/pawrrtal`; Python backend on `:8000`, Effect strangler on `:8001` (`just dev` / `bun dev.ts`; opt out of TS with `PAWRRTAL_SKIP_TS_API=1`).
 - Effect signatures verified against `backend/vendor/effect-smol` (never guessed). Style mirrored from `../use-agy` **code** (not its docs).
 
-## Gate 0 — Fix the strangler test gate (do first)
+## Gate 0A — Agent-native setup/customization spine (do first)
+
+The first visible slice teaches coding agents how to set up, recover, and customize Pawrrtal without hidden maintainer context. Prove the split spec by running the documented path from a fresh checkout or clean worktree:
+
+```bash
+# Names are allowed to change in the split spec; the gate is the behavior:
+paw setup --dry-run --json       # reports prerequisites, config files, secret refs, and first-run actions
+paw doctor --setup --json        # detects an interrupted setup and prints the exact resume command
+paw doctor --config --json       # validates schema-backed config files and rejects plaintext secrets
+```
+
+Done when: a coding agent can follow the root README/AGENTS/skills path to bootstrap the repo, intentionally interrupt and resume setup, wire one requested capability through a skills-on-demand path, validate typed config, and produce a first verified message. Pawrrtal keeps config files; the gate is that they are typed, generated/example-backed, and validated.
+
+## Gate 0B — Fix the strangler test gate
 
 The current backend-ts test gate is **falsely green**. Prove the fix:
 
