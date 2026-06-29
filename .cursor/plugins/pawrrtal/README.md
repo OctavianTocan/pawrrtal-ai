@@ -31,10 +31,14 @@ Symlinks into `.agent/skills/`. Edit generated skills with `bun run skill-gen:ge
 | `user-facing-text` | Conventions for every string a user reads across channels. |
 | `workflow-plan` | Planning ambiguous or multi-step work before implementation. |
 
-### Rules (`rules/`)
+### Rules
 
-Pawrrtal-specific architecture rules, moved here from `.claude/rules/` and
-converted to Cursor `.mdc` format:
+Path-scoped traps canonical in `.agent/rules/` (`.md` with `paths:` globs). Harness symlinks:
+
+- `.claude/rules` → `.agent/rules` (Claude Code)
+- `.agents/rules` → `.agent/rules` (Codex)
+
+Cursor-specific `.mdc` rules stay in this plugin:
 
 - `rules/clean-code/` — function design, naming, nesting, named constants,
   Python typing/logging, documentation preservation.
@@ -42,9 +46,7 @@ converted to Cursor `.mdc` format:
   `pull_request_target`, action pinning, workflow-race prevention, PR
   descriptions.
 
-> Note: these rules were moved out of `.claude/rules/`, so Claude Code no longer
-> auto-applies them from that path. Cursor loads them from this plugin once the
-> plugin is installed.
+> Note: these plugin rules were moved out of `.agent/rules/` because Cursor loads `.mdc` from the plugin. Claude does not auto-apply them from the brain tree.
 
 ## Installing
 

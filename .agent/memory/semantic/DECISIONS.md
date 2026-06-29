@@ -9,7 +9,12 @@
 **Alternatives considered:** _what else was on the table and why rejected_
 **Status:** active | revisited | superseded
 
-## 2026-01-01: Four-layer memory separation
+## 2026-06-30: Canonical path rules under `.agent/rules/`
+**Decision:** Move vendored claude-rules tree from `.claude/rules/` to `.agent/rules/`; symlink `.claude/rules` and `.agents/rules` for harness discovery (mirrors skills layout).
+**Rationale:** Path-scoped traps are durable project knowledge and belong in the portable brain, not a harness-only folder.
+**Alternatives considered:** Leave in `.claude/rules` only (breaks brain portability); merge all rules into skills (loses `paths:` auto-loading).
+**Status:** active
+
 **Decision:** Split memory into working / episodic / semantic / personal rather than one flat folder.
 **Rationale:** Each layer has different retention and retrieval needs. Flat memory breaks at ~6 weeks.
 **Alternatives considered:** Flat directory (fails at scale), vector store (over-engineered for single user).

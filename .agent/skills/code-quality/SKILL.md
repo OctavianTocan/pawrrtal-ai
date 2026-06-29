@@ -13,7 +13,7 @@ Day-to-day patterns for readable, maintainable code across Pawrrtal's three stac
 | Python backend | `backend/app/` — FastAPI, SQLAlchemy, providers/tools | `python-testing-patterns`, `returns`, `extension-boundaries` |
 | Effect strangler | `backend-ts/` — HttpApi, Repo/Service/Http layers | `domain-effect` |
 
-Hard gates (explicit return types, no unsafe casts, sentrux layers, 500-line file ceiling, nesting budget, preserve docs, run toolchain after writes) live in `AGENTS.md` and `.cursor/plugins/pawrrtal/rules/`. This skill is the authoring delta agents apply while editing.
+Hard gates are summarized in `memory/semantic/DOMAIN_KNOWLEDGE.md` and `.agent/AGENTS.md`; workflow in `repo-operations`; taste in `memory/personal/PREFERENCES.md`; path rules in `.agent/rules/`; Cursor plugin rules in `.cursor/plugins/pawrrtal/rules/`.
 
 ## Quick Reference
 

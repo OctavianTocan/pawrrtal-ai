@@ -74,3 +74,33 @@ Triggers: "draw", "diagram", "sketch", "wireframe", "flowchart",
 Constraints: get_canvas before edits; max 200 shapes per create_shape call.
 Requires: tldraw MCP server wired in the harness's MCP config; user has
 http://localhost:3030 open. Opt-in via `.features.json` (`tldraw: true`).
+
+## agents-md
+Authoring and restructuring root or nested AGENTS.md per the agents.md open
+standard. Triggers: "AGENTS.md", "edit CLAUDE.md", "agent briefing",
+"nested AGENTS.md", "what goes in AGENTS.md".
+
+## path-rules
+Path-scoped rule files under `.agent/rules/` (`paths:` globs, CURATED.md,
+harness symlinks). Triggers: "claude rules", "path rule", "add a rule",
+"curated rules", ".claude/rules".
+
+## repo-operations
+Beans tracker, git/PR policy, multi-agent safety, sentrux boundaries, and
+repo workflow migrated from the old monolithic CLAUDE.md. Triggers: "beans",
+"multi-agent", "sentrux", "commit", "pull request", "architecture layers".
+
+## workspace-context
+Task trigger for ports, auth, deploy routing — facts in
+`memory/semantic/DOMAIN_KNOWLEDGE.md`. Triggers: "localhost port",
+"cookie auth", "Projects API", "003 migration", "workspace facts".
+
+## github-actions
+Pawrrtal workflow YAML: actor gate, self-hosted runners, PR_target exception.
+Triggers: "GitHub Actions", "workflow", ".github/workflows", "CI job".
+For VPS runner ops use runner-ops.
+
+## code-quality
+Naming, signatures, docs, file splits, verification gates across frontend,
+Python, and backend-ts. Triggers: "code style", "review code", "refactor",
+"TSDoc", "nesting", "500 lines".

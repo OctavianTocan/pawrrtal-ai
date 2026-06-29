@@ -10,7 +10,7 @@ Run `python .agent/tools/list_candidates.py` for detail, then:
 
 ## Priority order (top 10)
 
-- **f38063370a75** (priority=999.00, size=74, rejections=0) — Wrote /mnt/work/code/personal/pawrrtal/.agent/memory/personal/PREFERENCES.md (31
+- **f38063370a75** (priority=2065.50, size=153, rejections=0) — Wrote /mnt/work/code/personal/pawrrtal/.agent/memory/personal/PREFERENCES.md (31
 - **284f86ce49f6** (priority=310.50, size=23, rejections=0) — Tool Shell completed successfully
 - **dfa44160cf0e** (priority=283.50, size=21, rejections=0) — Wrote /mnt/work/code/personal/pawrrtal/.agent/memory/personal/PREFERENCES.md (31
 - **c28949a4ae72** (priority=81.00, size=6, rejections=0) — Tool Shell completed successfully

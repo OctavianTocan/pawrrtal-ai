@@ -142,9 +142,9 @@
               "level": "error",
               "options": {
                 "paths": {
-                  "@/components/ui/dialog": "Feature code must use AppDialog from @/components/ui/app-dialog (responsive Modal+BottomSheet) instead of raw shadcn Dialog. See .claude/rules/react/use-octavian-overlay-for-modals.md.",
-                  "@/components/ui/alert-dialog": "Feature code must use AppDialog from @/components/ui/app-dialog instead of raw shadcn AlertDialog. See .claude/rules/react/use-octavian-overlay-for-modals.md.",
-                  "@/components/ui/sheet": "Feature code must use AppDialog or BottomSheet from @octavian-tocan/react-overlay instead of raw shadcn Sheet. See .claude/rules/react/use-octavian-overlay-for-modals.md."
+                  "@/components/ui/dialog": "Feature code must use AppDialog from @/components/ui/app-dialog (responsive Modal+BottomSheet) instead of raw shadcn Dialog. See .agent/rules/react/use-octavian-overlay-for-modals.md.",
+                  "@/components/ui/alert-dialog": "Feature code must use AppDialog from @/components/ui/app-dialog instead of raw shadcn AlertDialog. See .agent/rules/react/use-octavian-overlay-for-modals.md.",
+                  "@/components/ui/sheet": "Feature code must use AppDialog or BottomSheet from @octavian-tocan/react-overlay instead of raw shadcn Sheet. See .agent/rules/react/use-octavian-overlay-for-modals.md."
                 }
               }
             }

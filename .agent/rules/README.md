@@ -3,19 +3,21 @@ name: readme
 paths: [".no-match"]
 ---
 
-# claude-rules
+# Path-scoped rules (Pawrrtal brain)
 
-Personal coding rules for [Claude Code](https://claude.ai/code), auto-loaded via `~/.claude/rules/`. Every rule exists because something went wrong without it.
+**Canonical:** `.agent/rules/` in the portable brain. Harness symlinks: `.claude/rules`, `.agents/rules`.
 
-**227 rules** across 22 categories. Battle-tested from production bugs, code reviews, and hard-won debugging sessions across React Native, TypeScript, Rust, and CI/CD pipelines.
+Onboarding index: `CURATED.md`. Authoring guide: `AGENTS.md`. Skill: `path-rules`.
 
-## Quick start
+Vendored from [claude-rules](https://github.com/OctavianTocan/claude-rules). Every rule exists because something went wrong without it.
+
+## Quick start (global install — optional)
 
 ```bash
 git clone git@github.com:OctavianTocan/claude-rules.git ~/.claude/rules
 ```
 
-Rules load automatically on every Claude Code conversation. To update: `cd ~/.claude/rules && git pull`
+In **this repo**, edit `.agent/rules/` — do not rely on a global `~/.claude/rules` copy.
 
 ## Categories
 

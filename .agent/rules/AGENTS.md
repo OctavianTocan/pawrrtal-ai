@@ -3,9 +3,9 @@ name: agents
 paths: [".no-match"]
 ---
 
-# AGENTS.md — claude-rules
+# AGENTS.md — path rules
 
-Guide for humans and AI agents working on this repository. Covers philosophy, authoring, naming, categorization, and frontmatter conventions.
+Guide for humans and AI agents authoring rules in **`.agent/rules/`** (portable brain). Covers philosophy, naming, categorization, and frontmatter conventions. Harness loaders: `.claude/rules` and `.agents/rules` symlink here.
 
 ## Why This Repo Exists
 

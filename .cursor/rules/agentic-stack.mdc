@@ -8,10 +8,11 @@ alwaysApply: true
 This project uses a portable brain in `.agent/`. Treat it as authoritative.
 
 ## Before acting
-1. Read `.agent/AGENTS.md` (the map).
+1. Read `.agent/AGENTS.md` (entry contract).
 2. Read `.agent/memory/personal/PREFERENCES.md` (how the user works).
-3. Read `.agent/memory/semantic/LESSONS.md` (what we've learned).
-4. Read `.agent/protocols/permissions.md` (what you can and cannot do).
+3. Read `.agent/memory/semantic/DOMAIN_KNOWLEDGE.md` (stable repo facts).
+4. Read `.agent/memory/semantic/LESSONS.md` (what we've learned).
+5. Read `.agent/protocols/permissions.md` (what you can and cannot do).
 
 ## Recall before acting
 For any task involving deploy, ship, release, migration, schema change,
