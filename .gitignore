@@ -161,8 +161,18 @@ package-lock.json
 # Cursor Composer AI-generated plan files (ephemeral, not source-of-truth)
 .cursor/plans/
 
-# OpenCode internal generated artifacts
-.opencode/package-lock.json
+# Agent / editor tool docs (per-developer, not project config)
+/GLOSSARY.md
+/WARP.md
+
+# Agent / editor tool state (per-developer, not project config)
+.beans/
+.cline/
+.factory/
+.pi/
+.opencode/
+.goose/
+.zed/
 
 # Databases
 *.db

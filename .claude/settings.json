@@ -1,26 +1,4 @@
 {
-  "hooks": {
-    "SessionStart": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "beans prime"
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "beans prime"
-          }
-        ]
-      }
-    ]
-  },
   "enabledPlugins": {
     "pyright-lsp@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
