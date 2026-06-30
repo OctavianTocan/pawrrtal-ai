@@ -59,7 +59,23 @@ Before parsing, the following template variables are expanded in each fragment:
 | `$$file` | Relative path from repo root to the source file | `packages/server/api/src/server.ts` |
 | `$$directory` | Relative path from repo root to the source file's directory | `packages/server/api/src` |
 
-### 3. Accumulate / Merge
+### 3. Load Dynamic Fragments
+
+After parsing marker-scanned fragments, the pipeline loads registered dynamic
+fragment sources that exist under the active base folder. Dynamic sources return
+the same parsed fragment shape used by the marker parser, then the normal merge
+and output rules apply.
+
+The first registered dynamic source is:
+
+```text
+packages/paw-cli/src/Skills/Fragments.ts
+```
+
+It generates the `paw` and `domain-cli` skills from the live CLI command
+registry. Fixture roots that do not contain the dynamic source skip it.
+
+### 4. Accumulate / Merge
 
 Fragments that share the same `name` are **merged** into a single skill document. Merge rules:
 
@@ -72,7 +88,7 @@ Fragments that share the same `name` are **merged** into a single skill document
 
 Each merged skill also tracks which source files contributed to it (for the generated header comment).
 
-### 4. Output
+### 5. Output
 
 Write each merged skill to the **output folder** (default: `.agent/skills/`; Pawrrtal's root scripts pass the same path) as `<name>/SKILL.md`. Codex and the Pawrrtal plugin mirror `.agent/skills/` via symlinks — edit skills here, not in the mirrors.
 
@@ -147,6 +163,7 @@ packages/ci/skill-gen/
   tsconfig.json         typescript config
   src/
     index.ts            CLI entrypoint
+    dynamic-fragments.ts optional dynamic fragment imports
     scan.ts             file tree walker + fragment extractor
     parse.ts            comment stripping + frontmatter parsing
     merge.ts            merge logic (concatenate bodies)

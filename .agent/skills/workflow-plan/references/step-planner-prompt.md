@@ -29,7 +29,7 @@ Task tool:
     [LIST_OF_FILES_TO_READ]
 
     **Relevant skills to read:**
-    [LIST_OF_SKILL_NAMES — e.g., domain-effect, paw, paw-extend, extension-boundaries]
+    [LIST_OF_SKILL_NAMES — e.g., domain-effect, paw, domain-cli, extension-boundaries]
 
     **Writing format reference:**
     [CONTENT_OF_WRITING_PLANS_MD]

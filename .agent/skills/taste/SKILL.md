@@ -26,7 +26,7 @@ Use this skill to make Pawrrtal feel cleaner, simpler, and more deliberate. It a
 When rendering agent tool use in UI or Telegram, aim for:
 
 ```text
-List Folder: backend/app/cli/paw
+List Folder: packages/paw-cli/src
 12 items shown, 31 hidden
 ```
 

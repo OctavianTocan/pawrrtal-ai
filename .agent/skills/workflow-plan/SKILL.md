@@ -74,7 +74,7 @@ Present multiple approaches only when there is a genuine tradeoff. Otherwise, on
 
 ## Phase 2: Gather Context and Determine Steps
 
-Read `.context/plans/brainstorm.md`, relevant skill files (`domain-effect`, `paw`, `paw-extend`, `extension-boundaries`, `skill-gen`, etc.), `AGENTS.md`, and the key source files the brainstorm names.
+Read `.context/plans/brainstorm.md`, relevant skill files (`domain-effect`, `paw`, `domain-cli`, `extension-boundaries`, `skill-gen`, etc.), `AGENTS.md`, and the key source files the brainstorm names.
 
 Break the work into steps. Granularity is your call — simple work → fewer larger steps, complex work → more smaller steps. Each step is one coherent unit a sub-agent can execute. Decide ordering: independent steps in parallel, dependent steps sequential so later sub-agents can read earlier step files.
 

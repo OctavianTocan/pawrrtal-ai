@@ -14,11 +14,11 @@ dev:
 dev-telegram:
     TELEGRAM_MODE=polling bun run dev.ts
 
-# Run the Pawrrtal Agent CLI (paw) against the local backend.
+# Run the Bun-backed Pawrrtal CLI.
 # Examples:
 #   just paw doctor
 #   just paw doctor --json
-#   just paw doctor --profile staging
+#   just paw --profile staging context
 paw *ARGS:
     @scripts/paw {{ARGS}}
 
@@ -28,18 +28,18 @@ install-paw:
     ln -sf "{{justfile_directory()}}/scripts/paw" "$HOME/.local/bin/paw"
     @printf 'Installed paw launcher at %s\n' "$HOME/.local/bin/paw"
 
-# Fast local environment check for agents and CI smoke loops. This does not
-# start servers; it verifies writable cache/config paths, binaries, and ports.
+# Fast local CLI health check for agents and CI smoke loops.
 env-check:
-    PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" scripts/paw env check
+    PAW_HOME="{{justfile_directory()}}/.cache/paw" scripts/paw doctor
 
-# Start, probe, and stop the full local app. Use this before claiming that
-# the developer startup path works end-to-end.
+# Focused CLI gate. This avoids frontend/browser/design-system checks.
+paw-cli-check:
+    bun run --filter '@pawrrtal/cli' check
+    bun run skill-gen:check
+
+# Full app smoke is outside the first Bun CLI slice.
 smoke-dev:
-    PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" scripts/paw project preflight
-    PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" scripts/paw project up --boot-timeout 45
-    PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" scripts/paw project status
-    PAW_CONFIG_DIR="{{justfile_directory()}}/.cache/paw" UV_CACHE_DIR="{{justfile_directory()}}/.cache/uv" XDG_CACHE_HOME="{{justfile_directory()}}/.cache/xdg" scripts/paw project down
+    @printf 'Full app smoke is not part of the Bun CLI slice. Use `just dev` for app startup or `just paw-cli-check` for the focused CLI gate.\n'
 
 # Auto-generate conventional commit via Gemini
 commit *ARGS:

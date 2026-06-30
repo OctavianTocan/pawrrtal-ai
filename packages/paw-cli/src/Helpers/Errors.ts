@@ -20,36 +20,66 @@ type CliErrorFieldInput = {
   readonly details?: string | undefined;
 };
 
+/** Usage, validation, or ambiguous-input failure. */
 export class UsageError extends Data.TaggedError('UsageError')<CliErrorFields> {}
 
+/** Local filesystem or configuration failure. */
 export class ConfigError extends Data.TaggedError('ConfigError')<CliErrorFields> {}
 
+/** Authentication or active-context denial failure. */
 export class AuthError extends Data.TaggedError('AuthError')<CliErrorFields> {}
 
+/** Backend, network, external process, or dependency failure. */
 export class ExternalError extends Data.TaggedError('ExternalError')<CliErrorFields> {}
 
+/** Future assertion or verification failure. */
 export class VerificationError extends Data.TaggedError('VerificationError')<CliErrorFields> {}
 
+/** Unexpected runtime failure normalized for CLI rendering. */
 export class UnexpectedError extends Data.TaggedError('UnexpectedError')<CliErrorFields> {}
 
 export type PawCliError = UsageError | ConfigError | AuthError | ExternalError | VerificationError | UnexpectedError;
 
-/** Fails with a usage error. */
+/**
+ * Fails with a usage error.
+ *
+ * @param message - Human-readable validation failure.
+ * @param hint - Optional recovery hint for stderr.
+ * @returns Effect that fails with `UsageError`.
+ */
 export function failUsage(message: string, hint?: string): Effect.Effect<never, UsageError> {
   return Effect.fail(new UsageError(errorFields({ message, hint })));
 }
 
-/** Fails with a local configuration error. */
+/**
+ * Fails with a local configuration error.
+ *
+ * @param message - Human-readable configuration failure.
+ * @param hint - Optional recovery hint for stderr.
+ * @returns Effect that fails with `ConfigError`.
+ */
 export function failConfig(message: string, hint?: string): Effect.Effect<never, ConfigError> {
   return Effect.fail(new ConfigError(errorFields({ message, hint })));
 }
 
-/** Fails with an external dependency error. */
+/**
+ * Fails with an external dependency error.
+ *
+ * @param message - Human-readable dependency failure.
+ * @param hint - Optional recovery hint for stderr.
+ * @param details - Optional verbose diagnostic detail.
+ * @returns Effect that fails with `ExternalError`.
+ */
 export function failExternal(message: string, hint?: string, details?: string): Effect.Effect<never, ExternalError> {
   return Effect.fail(new ExternalError(errorFields({ message, hint, details })));
 }
 
-/** Converts an unknown value into a structured CLI error. */
+/**
+ * Converts an unknown value into a structured CLI error.
+ *
+ * @param error - Unknown failure value from Effect CLI or runtime code.
+ * @returns Tagged Paw CLI error with a public category.
+ */
 export function toCliError(error: unknown): PawCliError {
   if (isPawCliError(error)) {
     return error;
@@ -62,7 +92,12 @@ export function toCliError(error: unknown): PawCliError {
   return new UnexpectedError({ message: String(error) });
 }
 
-/** Returns true when an unknown thrown value is a Paw CLI tagged error. */
+/**
+ * Returns true when an unknown thrown value is a Paw CLI tagged error.
+ *
+ * @param error - Unknown value to narrow.
+ * @returns Whether the value is a supported Paw CLI error.
+ */
 export function isPawCliError(error: unknown): error is PawCliError {
   return (
     error instanceof UsageError ||
@@ -74,7 +109,12 @@ export function isPawCliError(error: unknown): error is PawCliError {
   );
 }
 
-/** Returns the public error category for a CLI error. */
+/**
+ * Returns the public error category for a CLI error.
+ *
+ * @param error - Tagged Paw CLI error.
+ * @returns Stable error kind for human and JSON rendering.
+ */
 export function errorKind(error: PawCliError): CliErrorKind {
   switch (error._tag) {
     case 'UsageError':
@@ -89,10 +129,17 @@ export function errorKind(error: PawCliError): CliErrorKind {
       return 'verification';
     case 'UnexpectedError':
       return 'unexpected';
+    default:
+      return assertNever(error);
   }
 }
 
-/** Maps a CLI error to the public exit code contract. */
+/**
+ * Maps a CLI error to the public exit code contract.
+ *
+ * @param error - Tagged Paw CLI error.
+ * @returns Public exit code for the error category.
+ */
 export function errorToExitCode(error: PawCliError): ExitCode {
   switch (error._tag) {
     case 'UsageError':
@@ -106,10 +153,18 @@ export function errorToExitCode(error: PawCliError): ExitCode {
       return ExitCode.external;
     case 'VerificationError':
       return ExitCode.verification;
+    default:
+      return assertNever(error);
   }
 }
 
-/** Renders an error for stderr. */
+/**
+ * Renders an error for stderr.
+ *
+ * @param error - Tagged Paw CLI error to render.
+ * @param options - Rendering options for JSON and verbose diagnostics.
+ * @returns Text ready to write to stderr.
+ */
 export function renderError(error: PawCliError, options: ErrorRenderOptions = {}): string {
   if (options.isJson === true) {
     return JSON.stringify(
@@ -143,4 +198,9 @@ function errorFields(input: CliErrorFieldInput): CliErrorFields {
     ...(input.hint ? { hint: input.hint } : {}),
     ...(input.details ? { details: input.details } : {}),
   };
+}
+
+/** Fails when a tagged CLI error union grows without renderer support. */
+function assertNever(error: never): never {
+  throw new Error(`Unhandled CLI error: ${String(error)}`);
 }

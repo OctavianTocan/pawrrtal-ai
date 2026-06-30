@@ -1,5 +1,6 @@
 import { Effect } from 'effect';
-import { failUsage, type UsageError } from './Errors';
+import type { UsageError } from './Errors';
+import { failUsage } from './Errors';
 
 export type BodySourceKind = 'inline' | 'file' | 'stdin' | 'editor';
 
@@ -20,7 +21,12 @@ export type BodySourceResolution =
   | { readonly _tag: 'None' }
   | { readonly _tag: 'Selected'; readonly source: BodySource };
 
-/** Resolves mutually exclusive body/document input sources. */
+/**
+ * Resolves mutually exclusive body/document input sources.
+ *
+ * @param options - Candidate body sources from flags, stdin, and terminal state.
+ * @returns The selected body source, or `None` when no source was supplied.
+ */
 export function resolveBodySource(options: BodySourceOptions): Effect.Effect<BodySourceResolution, UsageError> {
   const sources = selectedSources(options);
   if (sources.length > 1) {

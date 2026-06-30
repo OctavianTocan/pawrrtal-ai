@@ -1,31 +1,30 @@
-import type * as Command from 'effect/unstable/cli/Command';
-import type * as Completions from 'effect/unstable/cli/Completions';
-import { ExitCode } from './ExitCode.ts';
-import type { OutputMode } from './Output.ts';
+import type { Command, Completions } from 'effect/unstable/cli';
+import { ExitCode } from './ExitCode';
+import type { OutputMode } from './Output';
 
 export type ParameterKind = 'string' | 'boolean' | 'integer' | 'choice' | 'file' | 'directory';
 export type InputSource = 'flag' | 'file' | 'stdin' | 'editor';
 
-export interface ParameterMetadata {
+export type ParameterMetadata = {
   readonly name: string;
   readonly description: string;
   readonly kind: ParameterKind;
   readonly required?: boolean;
   readonly aliases?: ReadonlyArray<string>;
   readonly choices?: ReadonlyArray<string>;
-}
+};
 
-export interface EnvironmentMetadata {
+export type EnvironmentMetadata = {
   readonly name: string;
   readonly purpose: string;
-}
+};
 
-export interface ExampleMetadata {
+export type ExampleMetadata = {
   readonly command: string;
   readonly description?: string;
-}
+};
 
-export interface CommandMetadata {
+export type CommandMetadata = {
   readonly name: string;
   readonly summary: string;
   readonly description: string;
@@ -36,15 +35,16 @@ export interface CommandMetadata {
   readonly subcommands?: ReadonlyArray<CommandMetadata>;
   readonly examples?: ReadonlyArray<ExampleMetadata>;
   readonly environment?: ReadonlyArray<EnvironmentMetadata>;
+  readonly notes?: ReadonlyArray<string>;
   readonly outputModes: ReadonlyArray<OutputMode>;
   readonly inputSources?: ReadonlyArray<InputSource>;
   readonly exitCodes?: ReadonlyArray<ExitCode>;
-}
+};
 
-export interface CommandModule {
-  readonly command: Command.Command.Any;
+export type CommandModule<Name extends string, Input = never, ContextInput = unknown, E = never, R = never> = {
+  readonly command: Command.Command<Name, Input, ContextInput, E, R>;
   readonly metadata: CommandMetadata;
-}
+};
 
 const GLOBAL_FLAGS: ReadonlyArray<ParameterMetadata> = [
   {
@@ -77,7 +77,12 @@ const GLOBAL_FLAGS: ReadonlyArray<ParameterMetadata> = [
   },
 ];
 
-/** Build root command metadata from registered module metadata. */
+/**
+ * Builds root command metadata from registered module metadata.
+ *
+ * @param subcommands - Supported command metadata for the current CLI slice.
+ * @returns Metadata for the root `paw` command.
+ */
 export function makeRootMetadata(subcommands: ReadonlyArray<CommandMetadata>): CommandMetadata {
   return {
     name: 'paw',
@@ -99,12 +104,21 @@ export function makeRootMetadata(subcommands: ReadonlyArray<CommandMetadata>): C
       { name: 'XDG_CONFIG_HOME', purpose: 'Fallback config root when PAW_HOME is unset' },
       { name: 'XDG_CACHE_HOME', purpose: 'Fallback cache root when PAW_HOME is unset' },
     ],
+    notes: [
+      '`-V` prints the CLI version; `-v` enables verbose diagnostics.',
+      '`--profile` and `--backend-url` affect only the current invocation.',
+    ],
     outputModes: ['human'],
     exitCodes: [ExitCode.success, ExitCode.local, ExitCode.usage, ExitCode.external],
   };
 }
 
-/** Convert Paw metadata to Effect's completion descriptor shape. */
+/**
+ * Converts Paw command metadata to Effect completion descriptors.
+ *
+ * @param metadata - Command metadata used as the completion source.
+ * @returns Descriptor accepted by Effect's shell completion generator.
+ */
 export function metadataToCompletionDescriptor(metadata: CommandMetadata): Completions.CommandDescriptor {
   return {
     name: metadata.name,
@@ -115,6 +129,7 @@ export function metadataToCompletionDescriptor(metadata: CommandMetadata): Compl
   };
 }
 
+/** Converts a metadata parameter to a completion flag. */
 function parameterToFlagDescriptor(parameter: ParameterMetadata): Completions.FlagDescriptor {
   return {
     name: parameter.name,
@@ -124,6 +139,7 @@ function parameterToFlagDescriptor(parameter: ParameterMetadata): Completions.Fl
   };
 }
 
+/** Converts a metadata parameter to a completion argument. */
 function parameterToArgumentDescriptor(parameter: ParameterMetadata): Completions.ArgumentDescriptor {
   return {
     name: parameter.name,
@@ -134,6 +150,7 @@ function parameterToArgumentDescriptor(parameter: ParameterMetadata): Completion
   };
 }
 
+/** Converts a metadata kind to an Effect completion flag type. */
 function parameterToFlagType(parameter: ParameterMetadata): Completions.FlagType {
   switch (parameter.kind) {
     case 'boolean':
@@ -148,9 +165,12 @@ function parameterToFlagType(parameter: ParameterMetadata): Completions.FlagType
       return { _tag: 'Path', pathType: 'directory' };
     case 'string':
       return { _tag: 'String' };
+    default:
+      return assertNever(parameter.kind);
   }
 }
 
+/** Converts a metadata kind to an Effect completion argument type. */
 function parameterToArgumentType(parameter: ParameterMetadata): Completions.ArgumentType {
   switch (parameter.kind) {
     case 'integer':
@@ -164,5 +184,12 @@ function parameterToArgumentType(parameter: ParameterMetadata): Completions.Argu
     case 'boolean':
     case 'string':
       return { _tag: 'String' };
+    default:
+      return assertNever(parameter.kind);
   }
+}
+
+/** Fails when a metadata union grows without updating completion conversion. */
+function assertNever(value: never): never {
+  throw new Error(`Unhandled parameter kind: ${String(value)}`);
 }

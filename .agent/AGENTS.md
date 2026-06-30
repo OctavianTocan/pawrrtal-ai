@@ -30,6 +30,7 @@ Load full skills from `skills/_index.md` only when triggers match.
 - Never force-push `main` or `development`; no merge commits on those branches
 - Never hand-edit `memory/semantic/LESSONS.md` — use `graduate.py` / `reject.py` / `learn.py`
 - Never modify `protocols/permissions.md`
+- Load `skills/code-quality/SKILL.md` before writing or reviewing code in this project
 - `frontend/*` must not import `backend/*` (sentrux enforces this)
 
 Workflow preferences, git policy, beans, code style, and CI rules are **not** here — see memory and skills below.
@@ -50,7 +51,7 @@ Workflow preferences, git policy, beans, code style, and CI rules are **not** he
 | Providers, channels, tools, plugins | `skills/extension-boundaries/SKILL.md` |
 | Path-scoped file traps | `rules/**` (`.claude/rules` symlink), `.cursor/plugins/pawrrtal/rules/` |
 | Curated onboarding rules | `rules/CURATED.md` |
-| Handbook, design system, specs | `docs/`, `DESIGN.md`, `specs/003-pawrrtal-overhaul/plan.md` |
+| Handbook, design system | `frontend/content/docs/`, `DESIGN.md` |
 
 Nested package `AGENTS.md` files (e.g. `frontend/lib/react-overlay/`) override this briefing for work inside those trees.
 

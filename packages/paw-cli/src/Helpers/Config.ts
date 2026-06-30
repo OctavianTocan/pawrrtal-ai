@@ -1,7 +1,6 @@
-import { homedir } from 'node:os';
-import { dirname, join, parse, resolve } from 'node:path';
-import { Context, Effect, FileSystem, Layer, Option } from 'effect';
-import { ConfigError, failConfig, type PawCliError } from './Errors';
+import { Context, Effect, FileSystem, Layer, Option, Path } from 'effect';
+import type { PawCliError } from './Errors';
+import { ConfigError, failConfig } from './Errors';
 import type { RootOptions } from './Options';
 
 export type AuthState = 'not_applicable' | 'unknown' | 'authenticated' | 'unauthenticated';
@@ -36,7 +35,7 @@ export type ProfileConfigInput = {
 
 export type CliProcessShape = {
   readonly cwd: string;
-  readonly env: NodeJS.ProcessEnv;
+  readonly env: Readonly<Record<string, string | undefined>>;
   readonly home: string;
 };
 
@@ -62,28 +61,43 @@ const CONFIG_FILE = 'config.toml';
 const PROJECT_CONFIG_FILE = 'paw.toml';
 const PROFILE_DIR = 'profiles';
 
+/** Provides process-level facts that the Bun entrypoint reads once. */
 export class CliProcess extends Context.Service<CliProcess, CliProcessShape>()('@pawrrtal/cli/Process') {}
 
+/** Provides Bun process facts as an Effect layer. */
 export const CliProcessLive: Layer.Layer<CliProcess> = Layer.sync(CliProcess, () => ({
-  cwd: process.cwd(),
-  env: process.env,
-  home: homedir(),
+  cwd: Bun.env.PWD ?? '.',
+  env: Bun.env,
+  home: Bun.env.HOME ?? Bun.env.USERPROFILE ?? '/tmp',
 }));
 
-/** Resolves the active Paw CLI context from flags, environment, and TOML files. */
+/**
+ * Resolves the active Paw CLI context from flags, environment, and TOML files.
+ *
+ * @param options - Root command options and optional working directory override.
+ * @returns Active context with source metadata and no secret values.
+ */
 export function resolveActiveContext(
   options: ResolveContextOptions
-): Effect.Effect<ActiveContext, PawCliError, CliProcess | FileSystem.FileSystem> {
+): Effect.Effect<ActiveContext, PawCliError, CliProcess | FileSystem.FileSystem | Path.Path> {
   return Effect.gen(function* () {
     const processInfo = yield* CliProcess;
-    const cwd = resolve(options.cwd ?? processInfo.cwd);
-    const stateRoots = resolveStateRoots(processInfo.env, processInfo.home);
+    const pathService = yield* Path.Path;
+    const cwd = pathService.resolve(options.cwd ?? processInfo.cwd);
+    const stateRoots = resolveStateRoots({ env: processInfo.env, home: processInfo.home, path: pathService });
     const projectFile = yield* findUp(cwd, PROJECT_CONFIG_FILE);
     const projectConfig = yield* readTomlConfig(projectFile);
-    const userConfigPath = join(stateRoots.configRoot, CONFIG_FILE);
+    const userConfigPath = pathService.join(stateRoots.configRoot, CONFIG_FILE);
     const userConfig = yield* readTomlConfig(userConfigPath);
-    const profile = resolveProfile({ rootOptions: options.rootOptions, env: processInfo.env, projectFile, projectConfig, userConfig, userConfigPath });
-    const profileConfigPath = join(stateRoots.configRoot, PROFILE_DIR, `${profile.value}.toml`);
+    const profile = resolveProfile({
+      rootOptions: options.rootOptions,
+      env: processInfo.env,
+      projectFile,
+      projectConfig,
+      userConfig,
+      userConfigPath,
+    });
+    const profileConfigPath = pathService.join(stateRoots.configRoot, PROFILE_DIR, `${profile.value}.toml`);
     const profileConfig = yield* readTomlConfig(profileConfigPath);
     const backendTarget = resolveBackendTarget({
       rootOptions: options.rootOptions,
@@ -118,25 +132,41 @@ export function resolveActiveContext(
   });
 }
 
-/** Rejects profile config values that include secret-looking keys. */
+/**
+ * Rejects profile config values that include secret-looking keys.
+ *
+ * @param value - Profile config object to inspect.
+ * @param path - Logical path used in validation messages.
+ * @returns Effect that succeeds when no secret-looking key is present.
+ */
 export function validateNoSecrets(value: unknown, path = 'config'): Effect.Effect<void, ConfigError> {
   const secretPath = findSecretPath(value, path);
   return secretPath ? failConfig(`Profile config cannot persist secret field '${secretPath}'.`) : Effect.void;
 }
 
-/** Writes a non-secret profile TOML file under the resolved config root. */
+/**
+ * Writes a non-secret profile TOML file under the resolved config root.
+ *
+ * @param input - Profile name, config root, and string values to persist.
+ * @returns Absolute path to the written profile config file.
+ */
 export function writeProfileConfig(
   input: ProfileConfigInput
-): Effect.Effect<string, PawCliError, FileSystem.FileSystem> {
+): Effect.Effect<string, PawCliError, FileSystem.FileSystem | Path.Path> {
   return Effect.gen(function* () {
     yield* validateNoSecrets(input.values);
     const fs = yield* FileSystem.FileSystem;
-    const profileDir = join(input.configRoot, PROFILE_DIR);
+    const pathService = yield* Path.Path;
+    const profileDir = pathService.join(input.configRoot, PROFILE_DIR);
     yield* fs
       .makeDirectory(profileDir, { recursive: true })
-      .pipe(Effect.mapError((error) => new ConfigError({ message: `Could not create profile config directory.`, details: String(error) })));
+      .pipe(
+        Effect.mapError(
+          (error) => new ConfigError({ message: `Could not create profile config directory.`, details: String(error) })
+        )
+      );
 
-    const filePath = join(profileDir, `${input.profile}.toml`);
+    const filePath = pathService.join(profileDir, `${input.profile}.toml`);
     const body = Object.entries(input.values)
       .filter((entry): entry is [string, string] => nonEmpty(entry[1]) !== undefined)
       .map(([key, value]) => `${key} = ${JSON.stringify(value)}`)
@@ -144,20 +174,29 @@ export function writeProfileConfig(
 
     yield* fs
       .writeFileString(filePath, `${body}\n`)
-      .pipe(Effect.mapError((error) => new ConfigError({ message: `Could not write profile config.`, details: String(error) })));
+      .pipe(
+        Effect.mapError(
+          (error) => new ConfigError({ message: `Could not write profile config.`, details: String(error) })
+        )
+      );
 
     return filePath;
   });
 }
 
 /** Resolves state roots from Paw and XDG environment variables. */
-function resolveStateRoots(env: NodeJS.ProcessEnv, home: string): StateRoots {
+function resolveStateRoots(input: {
+  readonly env: Readonly<Record<string, string | undefined>>;
+  readonly home: string;
+  readonly path: Path.Path;
+}): StateRoots {
+  const { env, home, path } = input;
   const pawHome = nonEmpty(env.PAW_HOME);
   if (pawHome) {
-    const root = resolve(pawHome);
+    const root = path.resolve(pawHome);
     return {
-      configRoot: join(root, 'config'),
-      cacheRoot: join(root, 'cache'),
+      configRoot: path.join(root, 'config'),
+      cacheRoot: path.join(root, 'cache'),
       configSource: 'env:PAW_HOME',
       cacheSource: 'env:PAW_HOME',
     };
@@ -166,15 +205,17 @@ function resolveStateRoots(env: NodeJS.ProcessEnv, home: string): StateRoots {
   const xdgConfig = nonEmpty(env.XDG_CONFIG_HOME);
   const xdgCache = nonEmpty(env.XDG_CACHE_HOME);
   return {
-    configRoot: join(resolve(xdgConfig ?? join(home, '.config')), 'pawrrtal'),
-    cacheRoot: join(resolve(xdgCache ?? join(home, '.cache')), 'pawrrtal'),
+    configRoot: path.join(path.resolve(xdgConfig ?? path.join(home, '.config')), 'pawrrtal'),
+    cacheRoot: path.join(path.resolve(xdgCache ?? path.join(home, '.cache')), 'pawrrtal'),
     configSource: xdgConfig ? 'env:XDG_CONFIG_HOME' : 'home-default',
     cacheSource: xdgCache ? 'env:XDG_CACHE_HOME' : 'home-default',
   };
 }
 
 /** Reads a TOML config file, returning undefined when the file is absent. */
-function readTomlConfig(filePath: string | undefined): Effect.Effect<TomlConfig | undefined, ConfigError, FileSystem.FileSystem> {
+function readTomlConfig(
+  filePath: string | undefined
+): Effect.Effect<TomlConfig | undefined, ConfigError, FileSystem.FileSystem> {
   if (!filePath) {
     return Effect.succeed(undefined);
   }
@@ -188,7 +229,9 @@ function readTomlConfig(filePath: string | undefined): Effect.Effect<TomlConfig 
 
     const source = yield* fs
       .readFileString(filePath)
-      .pipe(Effect.mapError((error) => new ConfigError({ message: `Could not read ${filePath}.`, details: String(error) })));
+      .pipe(
+        Effect.mapError((error) => new ConfigError({ message: `Could not read ${filePath}.`, details: String(error) }))
+      );
     return yield* parseTomlConfig(source, filePath);
   });
 }
@@ -212,19 +255,23 @@ function parseTomlConfig(source: string, filePath: string): Effect.Effect<TomlCo
 }
 
 /** Finds a file by walking from a directory to the filesystem root. */
-function findUp(startDirectory: string, fileName: string): Effect.Effect<string | undefined, never, FileSystem.FileSystem> {
+function findUp(
+  startDirectory: string,
+  fileName: string
+): Effect.Effect<string | undefined, never, FileSystem.FileSystem | Path.Path> {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
+    const pathService = yield* Path.Path;
     let current = startDirectory;
     while (true) {
-      const candidate = join(current, fileName);
+      const candidate = pathService.join(current, fileName);
       const exists = yield* fs.exists(candidate).pipe(Effect.orElseSucceed(() => false));
       if (exists) {
         return candidate;
       }
 
-      const parent = dirname(current);
-      if (parent === current || parse(current).root === current) {
+      const parent = pathService.dirname(current);
+      if (parent === current || pathService.parse(current).root === current) {
         return undefined;
       }
       current = parent;
@@ -235,7 +282,7 @@ function findUp(startDirectory: string, fileName: string): Effect.Effect<string 
 /** Resolves the active profile source and value. */
 function resolveProfile(input: {
   readonly rootOptions: RootOptions;
-  readonly env: NodeJS.ProcessEnv;
+  readonly env: Readonly<Record<string, string | undefined>>;
   readonly projectFile: string | undefined;
   readonly projectConfig: TomlConfig | undefined;
   readonly userConfig: TomlConfig | undefined;
@@ -253,7 +300,7 @@ function resolveProfile(input: {
 /** Resolves the backend target source and value, if configured. */
 function resolveBackendTarget(input: {
   readonly rootOptions: RootOptions;
-  readonly env: NodeJS.ProcessEnv;
+  readonly env: Readonly<Record<string, string | undefined>>;
   readonly projectFile: string | undefined;
   readonly projectConfig: TomlConfig | undefined;
   readonly profileConfig: TomlConfig | undefined;
@@ -264,7 +311,10 @@ function resolveBackendTarget(input: {
   return firstOptionalValue([
     sourceValue('flag', optionString(input.rootOptions.backendUrl)),
     sourceValue('env:PAW_BACKEND_URL', input.env.PAW_BACKEND_URL),
-    sourceValue(input.projectFile ? `project:${input.projectFile}` : 'project:paw.toml', input.projectConfig?.backendUrl),
+    sourceValue(
+      input.projectFile ? `project:${input.projectFile}` : 'project:paw.toml',
+      input.projectConfig?.backendUrl
+    ),
     sourceValue(`profile:${input.profileConfigPath}`, input.profileConfig?.backendUrl),
     sourceValue(`user:${input.userConfigPath}`, input.userConfig?.backendUrl),
   ]);
@@ -276,7 +326,10 @@ function optionString(value: Option.Option<string>): string | undefined {
 }
 
 /** Removes absent TOML fields so exact optional types stay honest. */
-function compactTomlConfig(input: { readonly profile?: string | undefined; readonly backendUrl?: string | undefined }): TomlConfig {
+function compactTomlConfig(input: {
+  readonly profile?: string | undefined;
+  readonly backendUrl?: string | undefined;
+}): TomlConfig {
   return {
     ...(input.profile ? { profile: input.profile } : {}),
     ...(input.backendUrl ? { backendUrl: input.backendUrl } : {}),

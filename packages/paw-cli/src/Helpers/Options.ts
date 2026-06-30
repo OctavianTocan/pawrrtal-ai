@@ -13,6 +13,7 @@ export type AutomationOptions = {
   readonly plain: boolean;
 };
 
+/** Shared flags available at the root and every subcommand. */
 export const rootSharedFlags = {
   profile: Flag.string('profile').pipe(
     Flag.optional,
@@ -28,6 +29,7 @@ export const rootSharedFlags = {
   ),
 } as const satisfies CliCommand.Command.FlagConfig;
 
+/** Automation output flags reused by commands that print structured data. */
 export const automationFlags = {
   json: Flag.boolean('json').pipe(Flag.withDefault(false), Flag.withDescription('Print structured JSON to stdout')),
   plain: Flag.boolean('plain').pipe(

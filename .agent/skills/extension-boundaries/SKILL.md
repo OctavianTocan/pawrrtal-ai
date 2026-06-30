@@ -127,15 +127,12 @@ Smells to fix:
 
 ## Verification
 
-Use Paw as the operator surface. From the repo root, prefer `just paw`; from
-`backend/`, use `uv run paw`.
+Use Paw as the operator surface for the supported CLI slice. From the repo root,
+prefer `just paw`.
 
 ```bash
-just paw plugins spec --json
-just paw plugins list --json
-just paw plugins capabilities search --slot tasks --json
-just paw plugins slots list --json
-just paw plugins validate backend/plugins/<plugin_id>/plugin.json --source bundled --json
+just paw doctor --json
+just paw context --json
 ```
 
 For runtime changes, add focused tests and then run the relevant gates:
@@ -143,7 +140,6 @@ For runtime changes, add focused tests and then run the relevant gates:
 ```bash
 cd backend && uv run pytest tests/test_plugin_discovery.py tests/test_plugin_tools.py
 cd backend && uv run pytest tests/test_channel_plugins.py tests/test_provider_plugins.py
-cd backend && uv run paw verify chat-roundtrip --json
 ```
 
 Run broader CI gates before claiming the PR is ready.

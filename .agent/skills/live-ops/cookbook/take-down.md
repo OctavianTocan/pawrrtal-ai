@@ -10,24 +10,17 @@ Use this when the user asks to stop Pawrrtal, disable the live service, free por
 
 ```bash
 cd /mnt/HC_Volume_105512717/deploy/pawrrtal
-cd backend && uv run paw project status --json
+just paw doctor --json
 systemctl status pawrrtal.service --no-pager || true
 systemctl --user status pawrrtal-dev.service --no-pager || true
 ss -ltnp '( sport = :8000 or sport = :3000 or sport = :53001 )'
 ```
 
-If `paw project status --json` says `tracked=true`, Paw CLI owns the process.
-If root `pawrrtal.service` is active, it owns production. If only the user
+The current Bun CLI slice does not own app processes. If root
+`pawrrtal.service` is active, it owns production. If only the user
 `pawrrtal-dev.service` is active, treat that as a dev-service fallback.
 
 ### 2. Stop the app gracefully
-
-For Paw CLI owned processes:
-
-```bash
-cd backend
-uv run paw project down
-```
 
 For a systemd-owned process:
 
@@ -50,14 +43,6 @@ systemctl status cloudflared --no-pager || true
 systemctl status cloudflared@pawrrtal --no-pager || true
 systemctl stop cloudflared || true
 systemctl stop cloudflared@pawrrtal || true
-```
-
-If Paw CLI owns Cloudflared setup:
-
-```bash
-cd backend
-uv run paw project cloudflared status
-uv run paw project cloudflared uninstall
 ```
 
 Do not delete tunnel credentials manually unless explicitly asked and backed up.

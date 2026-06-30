@@ -57,10 +57,11 @@ Use this to detect shell/service mismatch. If a Paw CLI command fails because it
 curl -fsS http://127.0.0.1:8000/api/v1/health
 curl -fsS http://127.0.0.1:8000/api/v1/health/ready
 curl -fsSI http://127.0.0.1:3000 || curl -fsSI http://127.0.0.1:53001
-cd backend && uv run paw project status --json
+just paw doctor --json
 ```
 
-`paw project status --json` may report `tracked=false` when systemd owns the service. That is not a failure if the health checks and process table prove the service is live.
+`just paw doctor --json` only proves local CLI health in the current Bun CLI
+slice. Use the health checks and process table as the service-live evidence.
 If sandbox-local `curl` fails but systemd logs show Next or uvicorn bound to
 loopback, retry the same probes at host level before reporting an outage.
 

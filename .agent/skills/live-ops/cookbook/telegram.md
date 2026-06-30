@@ -98,17 +98,16 @@ default workspace can still fail later in the Telegram flow.
 For dev/prod parity requests, verify both targets independently. A prod binding
 does not imply a dev binding because the databases are separate by design.
 
-### 5. Run Paw diagnostics when the CLI environment is valid
+### 5. Run local CLI health, then use live diagnostics
 
 ```bash
-cd backend
-uv run paw channels diagnose-telegram --json
-uv run paw verify telegram --json
+just paw doctor --json
+just paw context --json
 ```
 
-If these commands fail before hitting HTTP because the shell has a broken
-`DATABASE_URL`, do not stop there. Continue with live logs, live process
-environment, and raw API checks.
+The current Bun CLI slice does not include Telegram diagnostics or verifier
+commands. Continue with live logs, live process environment, raw API checks, and
+focused backend tests.
 
 ### 6. Check Telegram API state without exposing the token
 
@@ -139,18 +138,11 @@ systemctl restart pawrrtal.service || systemctl --user restart pawrrtal-dev.serv
 
 Re-send a Telegram message after restart and re-read logs.
 
-### 8. Use simulated Telegram for fast regression checks
+### 8. Use focused tests for fast regression checks
 
-When `TELEGRAM_SIMULATE_ENABLED=true`:
-
-```bash
-cd backend
-uv run paw lab telegram chat --turns /tmp/telegram-turns.txt --new --verbose 2 --json
-uv run paw lab flows show telegram-polish-loop
-```
-
-Simulation proves Pawrrtal's dispatcher path. A real Telegram message still
-proves the external ingress path.
+When `TELEGRAM_SIMULATE_ENABLED=true`, use the backend's focused Telegram tests
+or a raw simulated update through the backend API. Simulation proves Pawrrtal's
+dispatcher path. A real Telegram message still proves the external ingress path.
 
 ### 9. State the root cause
 
