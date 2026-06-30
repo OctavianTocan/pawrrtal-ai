@@ -14,6 +14,7 @@ export const REPO_ROOT = decodeURIComponent(new URL('../../../..', import.meta.u
 
 const PACKAGE_ROOT = decodeURIComponent(new URL('../..', import.meta.url).pathname);
 const CLI_ENTRYPOINT = decodeURIComponent(new URL('../../src/Main.ts', import.meta.url).pathname);
+const LAUNCHER_ENTRYPOINT = pathJoin(REPO_ROOT, 'scripts', 'paw');
 const TEMP_ROOT = trimTrailingSlashes(Bun.env.TMPDIR ?? '/tmp');
 
 /**
@@ -24,6 +25,30 @@ const TEMP_ROOT = trimTrailingSlashes(Bun.env.TMPDIR ?? '/tmp');
  */
 export async function runCli(options: CliRunOptions): Promise<CliRunResult> {
   const subprocess = Bun.spawn(['bun', 'run', CLI_ENTRYPOINT, ...options.args], {
+    cwd: options.cwd ?? PACKAGE_ROOT,
+    env: compactEnv({ ...Bun.env, ...options.env }),
+    stdin: 'ignore',
+    stdout: 'pipe',
+    stderr: 'pipe',
+  });
+
+  const [stdout, stderr, exitCode] = await Promise.all([
+    subprocess.stdout.text(),
+    subprocess.stderr.text(),
+    subprocess.exited,
+  ]);
+
+  return { exitCode, stdout, stderr };
+}
+
+/**
+ * Runs the repository launcher script and captures stdio.
+ *
+ * @param options - Arguments, cwd, and environment overrides for this invocation.
+ * @returns Exit code plus captured stdout and stderr.
+ */
+export async function runLauncher(options: CliRunOptions): Promise<CliRunResult> {
+  const subprocess = Bun.spawn([LAUNCHER_ENTRYPOINT, ...options.args], {
     cwd: options.cwd ?? PACKAGE_ROOT,
     env: compactEnv({ ...Bun.env, ...options.env }),
     stdin: 'ignore',

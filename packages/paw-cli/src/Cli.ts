@@ -1,21 +1,21 @@
 import { BunServices } from '@effect/platform-bun';
 import type { FileSystem, Path } from 'effect';
-import { Console, Effect, Layer } from 'effect';
-import { Command } from 'effect/unstable/cli';
+import { Cause, Console, Effect, Layer } from 'effect';
+import { CliError, CliOutput, Command } from 'effect/unstable/cli';
 import type { RuntimeCommandRegistry } from './Commands';
 import { DefaultCommandRegistry, validateCommandRegistry } from './Commands';
 import { normalizeArgv } from './Helpers/Argv';
-import type { CommandMetadata, ParameterMetadata } from './Helpers/CommandMetadata';
+import { applyCommandMetadata } from './Helpers/CommandMetadata';
 import type { CliProcess } from './Helpers/Config';
 import { CliProcessLive, resolveActiveContext } from './Helpers/Config';
 import type { PawCliError, UsageError } from './Helpers/Errors';
-import { errorToExitCode, renderError, toCliError } from './Helpers/Errors';
+import { errorToExitCode, failUsage, renderError, toCliError } from './Helpers/Errors';
+import { ExitCode } from './Helpers/ExitCode';
+import { formatCommandHelp, formatHelp } from './Helpers/Help';
 import type { RootOptions } from './Helpers/Options';
 import { rootSharedFlags } from './Helpers/Options';
-import { ActiveCliContext } from './Modules/Context/Domain';
-
-/** Current CLI package version printed by `paw --version`. */
-export const VERSION = '0.1.0';
+import { CLI_VERSION } from './Helpers/Version';
+import { ActiveCliContext } from './Infrastructure/ActiveContext';
 
 type PawRootCommand = Command.Command<
   'paw',
@@ -25,20 +25,17 @@ type PawRootCommand = Command.Command<
   CliProcess | FileSystem.FileSystem | Path.Path
 >;
 
-const RootCommand = Command.make('paw').pipe(
-  Command.withSharedFlags(rootSharedFlags),
-  Command.withDescription(
-    'Operate Pawrrtal from a small, agent-friendly CLI. This first slice exposes local health, active context, shell completions, and stable output/config conventions.'
-  ),
-  Command.withExamples([
-    { command: 'paw doctor', description: 'Check local CLI readiness' },
-    { command: 'paw context --json', description: 'Print active context as JSON' },
-    { command: 'paw completions zsh', description: 'Print zsh completions' },
-  ])
-);
+/** Formatter used only for Effect parser failures; metadata owns normal help. */
+const PawCliOutputLayer = CliOutput.layer({
+  formatHelpDoc: (): string => '',
+  formatCliError: (error): string => error.message,
+  formatError: (error): string => `Error: ${error.message}`,
+  formatVersion: (_name, version): string => `paw v${version}`,
+  formatErrors: (): string => '',
+});
 
 /** Bun-backed layer required by the CLI entrypoint. */
-export const MainLayer = Layer.mergeAll(BunServices.layer, CliProcessLive);
+export const MainLayer = Layer.mergeAll(BunServices.layer, CliProcessLive, PawCliOutputLayer);
 
 /**
  * Builds the root command from a registry.
@@ -51,9 +48,13 @@ export function makeCliCommand(
 ): Effect.Effect<PawRootCommand, UsageError> {
   return validateCommandRegistry(registry).pipe(
     Effect.map((validRegistry) =>
-      RootCommand.pipe(
-        Command.withSubcommands(validRegistry.modules.map((module) => module.command)),
-        Command.provideEffect(ActiveCliContext, (rootOptions) => resolveActiveContext({ rootOptions }))
+      applyCommandMetadata(
+        Command.make('paw').pipe(
+          Command.withSharedFlags(rootSharedFlags),
+          Command.withSubcommands(validRegistry.modules.map((module) => module.command)),
+          Command.provideEffect(ActiveCliContext, (rootOptions) => resolveActiveContext({ rootOptions }))
+        ),
+        validRegistry.rootMetadata
       )
     )
   );
@@ -63,9 +64,9 @@ export function makeCliCommand(
  * Builds the runnable CLI effect for a process argument vector.
  *
  * @param args - Raw CLI arguments excluding the Bun executable and script path.
- * @returns Effect that prints command output or fails with a public exit code.
+ * @returns Effect that prints output and sets the process exit code for handled failures.
  */
-export function makeCli(args: ReadonlyArray<string>): Effect.Effect<void, number, never> {
+export function makeCli(args: ReadonlyArray<string>): Effect.Effect<void, never, never> {
   return Effect.gen(function* () {
     const normalizedArgs = normalizeArgv(args);
     const wasHandled = yield* runPreparsedSurface({ args: normalizedArgs, registry: DefaultCommandRegistry });
@@ -74,20 +75,47 @@ export function makeCli(args: ReadonlyArray<string>): Effect.Effect<void, number
     }
 
     const command = yield* makeCliCommand();
-    const run = Command.runWith(command, { version: VERSION });
+    const run = Command.runWith(command, { version: CLI_VERSION });
     yield* run(normalizedArgs);
-  }).pipe(
-    Effect.provide(MainLayer),
-    Effect.catchIf(() => true, translateCliError, translateCliError)
+  }).pipe(Effect.provide(MainLayer), catchAllCliFailures({ args: normalizeArgv(args) }));
+}
+
+/** Catches typed failures and defects through the public CLI renderer. */
+function catchAllCliFailures(options: {
+  readonly args: ReadonlyArray<string>;
+}): <A, E, R>(self: Effect.Effect<A, E, R>) => Effect.Effect<A | void, never, R> {
+  return Effect.catchCause((cause) =>
+    translateCliError(Cause.squash(cause), { isVerbose: hasVerboseFlag(options.args) })
   );
 }
 
 /** Translates any CLI failure into stderr output and an exit code. */
-function translateCliError(error: unknown): Effect.Effect<never, number> {
+function translateCliError(
+  error: unknown,
+  options: { readonly isVerbose: boolean }
+): Effect.Effect<void, never, never> {
+  if (CliError.isCliError(error) && error._tag === 'ShowHelp') {
+    if (error.errors.length === 0) {
+      return setExitCode(ExitCode.success);
+    }
+
+    return Effect.gen(function* () {
+      yield* Console.error(renderError(toCliError(error), { isVerbose: options.isVerbose }));
+      yield* setExitCode(ExitCode.usage);
+    });
+  }
+
   return Effect.gen(function* () {
     const cliError = toCliError(error);
-    yield* Console.error(renderError(cliError));
-    return yield* Effect.fail(errorToExitCode(cliError));
+    yield* Console.error(renderError(cliError, { isVerbose: options.isVerbose }));
+    yield* setExitCode(errorToExitCode(cliError));
+  });
+}
+
+/** Sets the process exit code without failing the Effect fiber. */
+function setExitCode(code: number): Effect.Effect<void> {
+  return Effect.sync(() => {
+    process.exitCode = code;
   });
 }
 
@@ -95,156 +123,73 @@ function translateCliError(error: unknown): Effect.Effect<never, number> {
 function runPreparsedSurface(input: {
   readonly args: ReadonlyArray<string>;
   readonly registry: RuntimeCommandRegistry;
-}): Effect.Effect<boolean> {
+}): Effect.Effect<boolean, UsageError> {
   return Effect.gen(function* () {
-    if (input.args.includes('--version')) {
-      yield* Console.log(`paw v${VERSION}`);
+    if (input.args.length === 0) {
+      yield* Console.log(formatHelp({ metadata: input.registry.rootMetadata }));
       return true;
     }
 
-    if (input.args.includes('--help') || input.args.includes('-h')) {
-      yield* Console.log(formatHelp({ args: input.args, metadata: input.registry.rootMetadata }));
+    if (input.args.length === 1 && input.args[0] === '--version') {
+      yield* Console.log(`paw v${CLI_VERSION}`);
       return true;
+    }
+
+    if (input.args.includes('--version')) {
+      return yield* failUsage('The version flag is only available at the root.', 'Run `paw --version`.');
+    }
+
+    if (input.args.some(isHelpFlag)) {
+      const commandName = selectedCommandName(input.args);
+      if (!commandName) {
+        yield* Console.log(formatHelp({ metadata: input.registry.rootMetadata }));
+        return true;
+      }
+
+      const command = input.registry.rootMetadata.subcommands?.find((candidate) =>
+        commandMatches(candidate, commandName)
+      );
+      if (command) {
+        yield* Console.log(formatCommandHelp(command));
+        return true;
+      }
+
+      return yield* failUsage(`Unknown subcommand "${commandName}" for "paw".`);
     }
 
     return false;
   });
 }
 
-/** Formats root or command help from module metadata. */
-function formatHelp(input: { readonly args: ReadonlyArray<string>; readonly metadata: CommandMetadata }): string {
-  const commandName = selectedCommandName(input.args);
-  const command = commandName
-    ? input.metadata.subcommands?.find((candidate) => commandMatches(candidate, commandName))
-    : undefined;
-
-  return command ? formatCommandHelp(command) : formatRootHelp(input.metadata);
-}
-
-/** Formats root help. */
-function formatRootHelp(metadata: CommandMetadata): string {
-  return [
-    'SUMMARY',
-    `  ${metadata.summary}`,
-    '',
-    'DESCRIPTION',
-    `  ${metadata.description}`,
-    '',
-    'USAGE',
-    '  paw <command> [options]',
-    '',
-    'GLOBAL OPTIONS',
-    '  -h, --help           Print help for the current command path',
-    '  -V, --version        Print CLI version',
-    '  -v, --verbose        Print expanded diagnostics and source chains',
-    '  --profile string     Run this invocation against a specific profile',
-    '  --backend-url string Run this invocation against a specific backend target',
-    '',
-    'COMMANDS',
-    ...(metadata.subcommands ?? []).map(formatCommandListItem),
-    '',
-    formatEnvironment(metadata.environment ?? []),
-    formatNotes(metadata.notes ?? []),
-    formatExamples(metadata),
-  ]
-    .filter((line) => line.length > 0)
-    .join('\n');
-}
-
-/** Formats help for one command. */
-function formatCommandHelp(metadata: CommandMetadata): string {
-  return [
-    'SUMMARY',
-    `  ${metadata.summary}`,
-    '',
-    'DESCRIPTION',
-    `  ${metadata.description}`,
-    '',
-    'USAGE',
-    `  paw ${metadata.name}${formatArgumentsUsage(metadata)} [options]`,
-    '',
-    formatArguments(metadata.arguments ?? []),
-    formatOptions(metadata.flags ?? []),
-    formatEnvironment(metadata.environment ?? []),
-    formatNotes(metadata.notes ?? []),
-    formatExamples(metadata),
-  ]
-    .filter((line) => line.length > 0)
-    .join('\n');
-}
-
 /** Returns the first command token from an argv list. */
 function selectedCommandName(args: ReadonlyArray<string>): string | undefined {
-  return args.find((arg) => !arg.startsWith('-'));
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === '--profile' || arg === '--backend-url') {
+      index += 1;
+      continue;
+    }
+    if (arg && !arg.startsWith('-')) {
+      return arg;
+    }
+  }
+  return undefined;
 }
 
 /** Returns true when a command metadata entry matches a name or alias. */
-function commandMatches(metadata: CommandMetadata, name: string): boolean {
+function commandMatches(
+  metadata: NonNullable<RuntimeCommandRegistry['rootMetadata']['subcommands']>[number],
+  name: string
+): boolean {
   return metadata.name === name || (metadata.aliases ?? []).includes(name);
 }
 
-/** Formats one command list line. */
-function formatCommandListItem(metadata: CommandMetadata): string {
-  const aliases = metadata.aliases?.length ? `, ${metadata.aliases.join(', ')}` : '';
-  return `  ${metadata.name}${aliases}  ${metadata.summary}`;
+/** Returns true when an argv token requests help. */
+function isHelpFlag(arg: string | undefined): boolean {
+  return arg === '--help' || arg === '-h';
 }
 
-/** Formats positional usage. */
-function formatArgumentsUsage(metadata: CommandMetadata): string {
-  const args = metadata.arguments ?? [];
-  if (args.length === 0) {
-    return '';
-  }
-  return ` ${args.map((arg) => `<${arg.name}>`).join(' ')}`;
-}
-
-/** Formats positional argument details. */
-function formatArguments(args: ReadonlyArray<ParameterMetadata>): string {
-  if (args.length === 0) {
-    return '';
-  }
-  return ['ARGUMENTS', ...args.map((arg) => `  ${arg.name}  ${arg.description}`), ''].join('\n');
-}
-
-/** Formats option details. */
-function formatOptions(flags: ReadonlyArray<ParameterMetadata>): string {
-  if (flags.length === 0) {
-    return '';
-  }
-  return ['OPTIONS', ...flags.map(formatFlag), ''].join('\n');
-}
-
-/** Formats environment variables that affect a command. */
-function formatEnvironment(environment: NonNullable<CommandMetadata['environment']>): string {
-  if (environment.length === 0) {
-    return '';
-  }
-  return ['ENVIRONMENT', ...environment.map((entry) => `  ${entry.name}  ${entry.purpose}`), ''].join('\n');
-}
-
-/** Formats command notes. */
-function formatNotes(notes: ReadonlyArray<string>): string {
-  if (notes.length === 0) {
-    return '';
-  }
-  return ['NOTES', ...notes.map((note) => `  ${note}`), ''].join('\n');
-}
-
-/** Formats one option line. */
-function formatFlag(flag: ParameterMetadata): string {
-  const aliases = flag.aliases?.map((alias) => `-${alias}, `).join('') ?? '';
-  return `  ${aliases}--${flag.name}  ${flag.description}`;
-}
-
-/** Formats command examples. */
-function formatExamples(metadata: CommandMetadata): string {
-  if (!metadata.examples?.length) {
-    return '';
-  }
-  return ['EXAMPLES', ...metadata.examples.flatMap(formatExample)].join('\n');
-}
-
-/** Formats one command example. */
-function formatExample(example: { readonly command: string; readonly description?: string }): ReadonlyArray<string> {
-  return example.description ? [`  # ${example.description}`, `  ${example.command}`] : [`  ${example.command}`];
+/** Returns true when verbose diagnostics were requested. */
+function hasVerboseFlag(args: ReadonlyArray<string>): boolean {
+  return args.includes('--verbose');
 }

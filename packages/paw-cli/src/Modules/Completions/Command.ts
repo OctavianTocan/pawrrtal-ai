@@ -1,7 +1,7 @@
 import { Console, Effect } from 'effect';
 import { Argument, Command, Completions } from 'effect/unstable/cli';
 import type { CommandMetadata, CommandModule } from '../../Helpers/CommandMetadata';
-import { metadataToCompletionDescriptor } from '../../Helpers/CommandMetadata';
+import { applyCommandMetadata, metadataToCompletionDescriptor } from '../../Helpers/CommandMetadata';
 import { ExitCode } from '../../Helpers/ExitCode';
 
 export type CompletionShell = 'bash' | 'zsh';
@@ -39,20 +39,19 @@ export function makeCompletionsCommand(
   rootMetadata: CommandMetadata
 ): CommandModule<'completions', { readonly shell: CompletionShell }, unknown, never, never> {
   return {
-    command: Command.make(
-      'completions',
-      {
-        shell: Argument.choice('shell', ['bash', 'zsh']),
-      },
-      ({ shell }) =>
-        Effect.gen(function* () {
-          const descriptor = metadataToCompletionDescriptor(rootMetadata);
-          yield* Console.log(Completions.generate('paw', shell, descriptor));
-        })
-    ).pipe(
-      Command.withDescription(COMPLETIONS_METADATA.description),
-      Command.withShortDescription(COMPLETIONS_METADATA.summary),
-      Command.withExamples(COMPLETIONS_METADATA.examples ?? [])
+    command: applyCommandMetadata(
+      Command.make(
+        'completions',
+        {
+          shell: Argument.choice('shell', ['bash', 'zsh']),
+        },
+        ({ shell }) =>
+          Effect.gen(function* () {
+            const descriptor = metadataToCompletionDescriptor(rootMetadata);
+            yield* Console.log(Completions.generate('paw', shell, descriptor));
+          })
+      ),
+      COMPLETIONS_METADATA
     ),
     metadata: COMPLETIONS_METADATA,
   };

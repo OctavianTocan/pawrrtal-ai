@@ -42,11 +42,7 @@ export const DefaultCommandRegistry = makeRuntimeCommandRegistry(BASE_COMMANDS);
  * @returns Registry with executable modules and root metadata.
  */
 export function makeCommandRegistry(modules: ReadonlyArray<RegisteredCommandModule>): CommandRegistry {
-  const rootMetadata = makeRootMetadata([...modules.map((module) => module.metadata), COMPLETIONS_METADATA]);
-  return {
-    modules: [...modules, makeCompletionsCommand(rootMetadata)],
-    rootMetadata,
-  };
+  return withCompletions(modules);
 }
 
 /**
@@ -74,6 +70,16 @@ export function validateCommandRegistry<Registry extends CommandRegistryLike>(
 
 /** Builds the typed runtime registry used by the executable root command. */
 function makeRuntimeCommandRegistry(modules: ReadonlyArray<RuntimeCommandModule>): RuntimeCommandRegistry {
+  return withCompletions(modules);
+}
+
+/** Adds the completions command after root metadata is known. */
+function withCompletions<Module extends RegisteredCommandModule>(
+  modules: ReadonlyArray<Module>
+): {
+  readonly modules: ReadonlyArray<Module | ReturnType<typeof makeCompletionsCommand>>;
+  readonly rootMetadata: ReturnType<typeof makeRootMetadata>;
+} {
   const rootMetadata = makeRootMetadata([...modules.map((module) => module.metadata), COMPLETIONS_METADATA]);
   return {
     modules: [...modules, makeCompletionsCommand(rootMetadata)],

@@ -1,6 +1,6 @@
 import { Context, Effect, FileSystem, Layer, Option, Path } from 'effect';
-import type { PawCliError } from './Errors';
-import { ConfigError, failConfig } from './Errors';
+import type { PawCliError, UsageError } from './Errors';
+import { ConfigError, failConfig, failUsage } from './Errors';
 import type { RootOptions } from './Options';
 
 export type AuthState = 'not_applicable' | 'unknown' | 'authenticated' | 'unauthenticated';
@@ -60,13 +60,14 @@ const DEFAULT_PROFILE = 'default';
 const CONFIG_FILE = 'config.toml';
 const PROJECT_CONFIG_FILE = 'paw.toml';
 const PROFILE_DIR = 'profiles';
+const PROFILE_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
 /** Provides process-level facts that the Bun entrypoint reads once. */
 export class CliProcess extends Context.Service<CliProcess, CliProcessShape>()('@pawrrtal/cli/Process') {}
 
 /** Provides Bun process facts as an Effect layer. */
 export const CliProcessLive: Layer.Layer<CliProcess> = Layer.sync(CliProcess, () => ({
-  cwd: Bun.env.PWD ?? '.',
+  cwd: process.cwd(),
   env: Bun.env,
   home: Bun.env.HOME ?? Bun.env.USERPROFILE ?? '/tmp',
 }));
@@ -89,7 +90,7 @@ export function resolveActiveContext(
     const projectConfig = yield* readTomlConfig(projectFile);
     const userConfigPath = pathService.join(stateRoots.configRoot, CONFIG_FILE);
     const userConfig = yield* readTomlConfig(userConfigPath);
-    const profile = resolveProfile({
+    const profile = yield* resolveProfile({
       rootOptions: options.rootOptions,
       env: processInfo.env,
       projectFile,
@@ -154,6 +155,7 @@ export function writeProfileConfig(
   input: ProfileConfigInput
 ): Effect.Effect<string, PawCliError, FileSystem.FileSystem | Path.Path> {
   return Effect.gen(function* () {
+    const profile = yield* validateProfileName(input.profile, 'profile');
     yield* validateNoSecrets(input.values);
     const fs = yield* FileSystem.FileSystem;
     const pathService = yield* Path.Path;
@@ -166,7 +168,7 @@ export function writeProfileConfig(
         )
       );
 
-    const filePath = pathService.join(profileDir, `${input.profile}.toml`);
+    const filePath = pathService.join(profileDir, `${profile}.toml`);
     const body = Object.entries(input.values)
       .filter((entry): entry is [string, string] => nonEmpty(entry[1]) !== undefined)
       .map(([key, value]) => `${key} = ${JSON.stringify(value)}`)
@@ -182,6 +184,26 @@ export function writeProfileConfig(
 
     return filePath;
   });
+}
+
+/**
+ * Validates a profile identifier before it is used in config paths.
+ *
+ * @param value - Profile name from flags, environment, TOML, or write input.
+ * @param source - Source label used in diagnostics.
+ * @returns Clean profile name, or a usage error when it is not a safe segment.
+ */
+export function validateProfileName(value: string, source: string): Effect.Effect<string, UsageError> {
+  const clean = nonEmpty(value);
+  if (!clean || clean === '.' || clean === '..' || !PROFILE_NAME_PATTERN.test(clean)) {
+    return failUsage(
+      `Invalid profile name '${value}'.`,
+      'Start with a letter or number, then use letters, numbers, dot, dash, or underscore.',
+      `Profile source: ${source}`
+    );
+  }
+
+  return Effect.succeed(clean);
 }
 
 /** Resolves state roots from Paw and XDG environment variables. */
@@ -287,14 +309,15 @@ function resolveProfile(input: {
   readonly projectConfig: TomlConfig | undefined;
   readonly userConfig: TomlConfig | undefined;
   readonly userConfigPath: string;
-}): SourceValue {
-  return firstValue([
+}): Effect.Effect<SourceValue, UsageError> {
+  const profile = firstValue([
     sourceValue('flag', optionString(input.rootOptions.profile)),
     sourceValue('env:PAW_PROFILE', input.env.PAW_PROFILE),
     sourceValue(input.projectFile ? `project:${input.projectFile}` : 'project:paw.toml', input.projectConfig?.profile),
     sourceValue(`user:${input.userConfigPath}`, input.userConfig?.profile),
     sourceValue('default', DEFAULT_PROFILE),
   ]);
+  return validateProfileName(profile.value, profile.source).pipe(Effect.as(profile));
 }
 
 /** Resolves the backend target source and value, if configured. */
@@ -401,6 +424,11 @@ function isSecretKey(key: string): boolean {
     normalized.includes('cookie') ||
     normalized.includes('password') ||
     normalized.includes('api_key') ||
+    normalized.includes('access_key') ||
+    normalized.includes('private_key') ||
+    normalized.includes('signing_key') ||
+    normalized.includes('auth_key') ||
+    normalized.includes('encryption_key') ||
     normalized === 'key'
   );
 }

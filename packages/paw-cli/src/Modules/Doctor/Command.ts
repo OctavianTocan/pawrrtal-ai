@@ -2,15 +2,17 @@ import type { FileSystem, Path } from 'effect';
 import { Console, Effect } from 'effect';
 import { Command } from 'effect/unstable/cli';
 import type { CommandMetadata, CommandModule } from '../../Helpers/CommandMetadata';
+import { AUTOMATION_FLAG_METADATA, applyCommandMetadata } from '../../Helpers/CommandMetadata';
 import type { CliProcess } from '../../Helpers/Config';
 import type { UsageError } from '../../Helpers/Errors';
 import { ExitCode } from '../../Helpers/ExitCode';
 import type { AutomationOptions } from '../../Helpers/Options';
 import { automationFlags } from '../../Helpers/Options';
 import { formatOutput, resolveOutputMode } from '../../Helpers/Output';
-import type { ActiveCliContext } from '../Context/Domain';
-import { DoctorService, DoctorServiceLive } from './Checks';
+import type { ActiveCliContext } from '../../Infrastructure/ActiveContext';
+import { DoctorServiceLive } from './Checks';
 import type { DoctorReport } from './Domain';
+import { DoctorService } from './Domain';
 
 const DOCTOR_METADATA = {
   name: 'doctor',
@@ -18,10 +20,7 @@ const DOCTOR_METADATA = {
   description:
     'Check local Paw CLI readiness without contacting the backend by default. Warnings mean setup can continue but something optional is missing.',
   owner: '@pawrrtal/cli/Modules/Doctor',
-  flags: [
-    { name: 'json', description: 'Print structured JSON to stdout', kind: 'boolean' },
-    { name: 'plain', description: 'Print tab-separated values to stdout with no headers', kind: 'boolean' },
-  ],
+  flags: AUTOMATION_FLAG_METADATA,
   examples: [
     { command: 'paw doctor', description: 'Run local health checks' },
     { command: 'paw doctor --json', description: 'Run local health checks for automation' },
@@ -38,16 +37,14 @@ const DOCTOR_METADATA = {
 
 /** Command module for local CLI health checks. */
 export const DoctorCommand = {
-  command: Command.make('doctor', automationFlags, handleDoctor).pipe(
-    Command.withDescription(DOCTOR_METADATA.description),
-    Command.withShortDescription(DOCTOR_METADATA.summary),
-    Command.withExamples(DOCTOR_METADATA.examples ?? []),
-    Command.provide(DoctorServiceLive)
+  command: applyCommandMetadata(
+    Command.make('doctor', automationFlags, handleDoctor).pipe(Command.provide(DoctorServiceLive)),
+    DOCTOR_METADATA
   ),
   metadata: DOCTOR_METADATA,
 } satisfies CommandModule<
   'doctor',
-  never,
+  AutomationOptions,
   unknown,
   UsageError,
   ActiveCliContext | CliProcess | FileSystem.FileSystem | Path.Path
@@ -71,5 +68,8 @@ const doctorFormatters = {
     ].join('\n'),
   json: (report: DoctorReport): unknown => report,
   plain: (report: DoctorReport): string =>
-    report.checks.map((check) => `${check.name}\t${check.status}\t${check.detail}`).join('\n'),
+    [
+      `status\t${report.status}\taggregate`,
+      ...report.checks.map((check) => `${check.name}\t${check.status}\t${check.detail}`),
+    ].join('\n'),
 };

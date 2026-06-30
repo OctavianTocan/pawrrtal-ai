@@ -1,15 +1,9 @@
-import { Context, Effect, FileSystem, Layer, Path } from 'effect';
+import { Effect, FileSystem, Layer, Path } from 'effect';
 import { CliProcess } from '../../Helpers/Config';
-import { ActiveCliContext } from '../Context/Domain';
-import type { DoctorReport, HealthCheck, HealthStatus } from './Domain';
-
-/** Runs local CLI health checks. */
-export class DoctorService extends Context.Service<
-  DoctorService,
-  {
-    readonly run: () => Effect.Effect<DoctorReport>;
-  }
->()('@pawrrtal/cli/Doctor/Service') {}
+import { CLI_VERSION } from '../../Helpers/Version';
+import { ActiveCliContext } from '../../Infrastructure/ActiveContext';
+import type { HealthCheck, HealthStatus } from './Domain';
+import { DoctorService } from './Domain';
 
 /** Provides local health checks from the active context and Bun filesystem. */
 export const DoctorServiceLive: Layer.Layer<
@@ -27,7 +21,7 @@ export const DoctorServiceLive: Layer.Layer<
     const run = Effect.fn('DoctorService.run')(function* () {
       const checks = yield* Effect.all(
         [
-          checkPass('cli-package-version', '0.1.0'),
+          checkPass('cli-package-version', CLI_VERSION),
           checkPath(fs, 'config-root', context.configRoot),
           checkPath(fs, 'cache-root', context.cacheRoot),
           checkPass('active-profile', context.profile),

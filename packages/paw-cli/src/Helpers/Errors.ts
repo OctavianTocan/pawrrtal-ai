@@ -1,4 +1,5 @@
 import { Data, Effect } from 'effect';
+import { CliError } from 'effect/unstable/cli';
 import { ExitCode } from './ExitCode';
 
 export type CliErrorKind = 'usage' | 'config' | 'auth' | 'external' | 'verification' | 'unexpected';
@@ -45,10 +46,11 @@ export type PawCliError = UsageError | ConfigError | AuthError | ExternalError |
  *
  * @param message - Human-readable validation failure.
  * @param hint - Optional recovery hint for stderr.
+ * @param details - Optional verbose diagnostic detail.
  * @returns Effect that fails with `UsageError`.
  */
-export function failUsage(message: string, hint?: string): Effect.Effect<never, UsageError> {
-  return Effect.fail(new UsageError(errorFields({ message, hint })));
+export function failUsage(message: string, hint?: string, details?: string): Effect.Effect<never, UsageError> {
+  return Effect.fail(new UsageError(errorFields({ message, hint, details })));
 }
 
 /**
@@ -85,11 +87,34 @@ export function toCliError(error: unknown): PawCliError {
     return error;
   }
 
+  if (CliError.isCliError(error)) {
+    return cliParserErrorToPawError(error);
+  }
+
   if (error instanceof Error) {
     return new UnexpectedError(errorFields({ message: error.message, details: error.stack }));
   }
 
   return new UnexpectedError({ message: String(error) });
+}
+
+/** Converts Effect CLI parser errors to Paw CLI errors. */
+function cliParserErrorToPawError(error: CliError.CliError): PawCliError {
+  if (error._tag === 'UserError') {
+    return toCliError(error.cause);
+  }
+
+  if (error._tag === 'DuplicateOption') {
+    return new ConfigError(errorFields({ message: error.message }));
+  }
+
+  if (error._tag === 'ShowHelp') {
+    const message = error.errors[0]?.message ?? error.message;
+    const details = error.errors.map((nestedError) => nestedError.message).join('\n');
+    return new UsageError(errorFields({ message, details }));
+  }
+
+  return new UsageError(errorFields({ message: error.message }));
 }
 
 /**

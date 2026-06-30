@@ -1,6 +1,7 @@
 import type { Option } from 'effect';
 import type { Command as CliCommand } from 'effect/unstable/cli';
 import { Flag } from 'effect/unstable/cli';
+import { AUTOMATION_FLAG_METADATA, GLOBAL_FLAG_METADATA } from './CommandMetadata';
 
 export type RootOptions = {
   readonly profile: Option.Option<string>;
@@ -17,23 +18,34 @@ export type AutomationOptions = {
 export const rootSharedFlags = {
   profile: Flag.string('profile').pipe(
     Flag.optional,
-    Flag.withDescription('Run this invocation against a specific profile')
+    Flag.withDescription(flagDescription('profile', GLOBAL_FLAG_METADATA))
   ),
   backendUrl: Flag.string('backend-url').pipe(
     Flag.optional,
-    Flag.withDescription('Run this invocation against a specific backend target')
+    Flag.withDescription(flagDescription('backend-url', GLOBAL_FLAG_METADATA))
   ),
   verbose: Flag.boolean('verbose').pipe(
     Flag.withDefault(false),
-    Flag.withDescription('Print expanded diagnostics and source chains')
+    Flag.withDescription(flagDescription('verbose', GLOBAL_FLAG_METADATA))
   ),
 } as const satisfies CliCommand.Command.FlagConfig;
 
 /** Automation output flags reused by commands that print structured data. */
 export const automationFlags = {
-  json: Flag.boolean('json').pipe(Flag.withDefault(false), Flag.withDescription('Print structured JSON to stdout')),
+  json: Flag.boolean('json').pipe(
+    Flag.withDefault(false),
+    Flag.withDescription(flagDescription('json', AUTOMATION_FLAG_METADATA))
+  ),
   plain: Flag.boolean('plain').pipe(
     Flag.withDefault(false),
-    Flag.withDescription('Print tab-separated values to stdout with no headers')
+    Flag.withDescription(flagDescription('plain', AUTOMATION_FLAG_METADATA))
   ),
 } as const satisfies CliCommand.Command.FlagConfig;
+
+/** Reads a flag description from the canonical metadata list. */
+function flagDescription(
+  name: string,
+  metadata: ReadonlyArray<{ readonly name: string; readonly description: string }>
+): string {
+  return metadata.find((flag) => flag.name === name)?.description ?? name;
+}

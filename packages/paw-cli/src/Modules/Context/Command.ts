@@ -1,13 +1,14 @@
 import { Console, Effect } from 'effect';
 import { Command } from 'effect/unstable/cli';
 import type { CommandMetadata, CommandModule } from '../../Helpers/CommandMetadata';
+import { AUTOMATION_FLAG_METADATA, applyCommandMetadata } from '../../Helpers/CommandMetadata';
 import type { ActiveContext, ConfigSource } from '../../Helpers/Config';
 import type { UsageError } from '../../Helpers/Errors';
 import { ExitCode } from '../../Helpers/ExitCode';
 import type { AutomationOptions } from '../../Helpers/Options';
 import { automationFlags } from '../../Helpers/Options';
 import { formatOutput, resolveOutputMode } from '../../Helpers/Output';
-import { ActiveCliContext } from './Domain';
+import { ActiveCliContext } from '../../Infrastructure/ActiveContext';
 
 const CONTEXT_METADATA = {
   name: 'context',
@@ -16,10 +17,7 @@ const CONTEXT_METADATA = {
     'Print the active profile, config root, cache root, backend target, auth state, and config source summary without exposing secrets.',
   owner: '@pawrrtal/cli/Modules/Context',
   aliases: ['whoami'],
-  flags: [
-    { name: 'json', description: 'Print structured JSON to stdout', kind: 'boolean' },
-    { name: 'plain', description: 'Print tab-separated values to stdout with no headers', kind: 'boolean' },
-  ],
+  flags: AUTOMATION_FLAG_METADATA,
   examples: [
     { command: 'paw context', description: 'Inspect the active context' },
     { command: 'paw context --json', description: 'Inspect the active context for automation' },
@@ -37,11 +35,9 @@ const CONTEXT_METADATA = {
 
 /** Command module for inspecting the active CLI context. */
 export const ContextCommand = {
-  command: Command.make('context', automationFlags, handleContext).pipe(
-    Command.withAlias('whoami'),
-    Command.withDescription(CONTEXT_METADATA.description),
-    Command.withShortDescription(CONTEXT_METADATA.summary),
-    Command.withExamples(CONTEXT_METADATA.examples ?? [])
+  command: applyCommandMetadata(
+    Command.make('context', automationFlags, handleContext).pipe(Command.withAlias('whoami')),
+    CONTEXT_METADATA
   ),
   metadata: CONTEXT_METADATA,
 } satisfies CommandModule<'context', AutomationOptions, unknown, UsageError, ActiveCliContext>;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { CLI_VERSION } from '../../src/Helpers/Version';
 import { runCli } from './harness';
 
 describe('doctor command', (): void => {
@@ -26,6 +27,7 @@ describe('doctor command', (): void => {
     });
 
     expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('cli-package-version\tpass\t0.1.0');
+    expect(result.stdout).toMatch(/^status\t(pass|warn|fail)\taggregate/m);
+    expect(result.stdout).toContain(`cli-package-version\tpass\t${CLI_VERSION}`);
   });
 });

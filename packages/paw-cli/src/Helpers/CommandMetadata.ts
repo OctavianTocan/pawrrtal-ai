@@ -1,9 +1,10 @@
-import type { Command, Completions } from 'effect/unstable/cli';
+import type { Completions } from 'effect/unstable/cli';
+import { Command } from 'effect/unstable/cli';
 import { ExitCode } from './ExitCode';
 import type { OutputMode } from './Output';
 
 export type ParameterKind = 'string' | 'boolean' | 'integer' | 'choice' | 'file' | 'directory';
-export type InputSource = 'flag' | 'file' | 'stdin' | 'editor';
+export type InputSource = 'inline' | 'file' | 'stdin' | 'editor';
 
 export type ParameterMetadata = {
   readonly name: string;
@@ -46,7 +47,7 @@ export type CommandModule<Name extends string, Input = never, ContextInput = unk
   readonly metadata: CommandMetadata;
 };
 
-const GLOBAL_FLAGS: ReadonlyArray<ParameterMetadata> = [
+export const GLOBAL_FLAG_METADATA: ReadonlyArray<ParameterMetadata> = [
   {
     name: 'help',
     description: 'Print help for the current command path',
@@ -77,6 +78,19 @@ const GLOBAL_FLAGS: ReadonlyArray<ParameterMetadata> = [
   },
 ];
 
+export const AUTOMATION_FLAG_METADATA: ReadonlyArray<ParameterMetadata> = [
+  {
+    name: 'json',
+    description: 'Print structured JSON to stdout',
+    kind: 'boolean',
+  },
+  {
+    name: 'plain',
+    description: 'Print tab-separated values to stdout with no headers',
+    kind: 'boolean',
+  },
+];
+
 /**
  * Builds root command metadata from registered module metadata.
  *
@@ -90,7 +104,7 @@ export function makeRootMetadata(subcommands: ReadonlyArray<CommandMetadata>): C
     description:
       'Operate Pawrrtal from a small, agent-friendly CLI. This first slice exposes local health, active context, shell completions, and stable output/config conventions.',
     owner: '@pawrrtal/cli',
-    flags: GLOBAL_FLAGS,
+    flags: GLOBAL_FLAG_METADATA,
     subcommands,
     examples: [
       { command: 'paw doctor', description: 'Check local CLI readiness' },
@@ -111,6 +125,24 @@ export function makeRootMetadata(subcommands: ReadonlyArray<CommandMetadata>): C
     outputModes: ['human'],
     exitCodes: [ExitCode.success, ExitCode.local, ExitCode.usage, ExitCode.external],
   };
+}
+
+/**
+ * Applies metadata-backed presentation fields to an Effect command.
+ *
+ * @param command - Command to decorate.
+ * @param metadata - Canonical command metadata for descriptions and examples.
+ * @returns Command with Effect presentation fields derived from metadata.
+ */
+export function applyCommandMetadata<const Name extends string, Input, ContextInput, E, R>(
+  command: Command.Command<Name, Input, ContextInput, E, R>,
+  metadata: CommandMetadata
+): Command.Command<Name, Input, ContextInput, E, R> {
+  return command.pipe(
+    Command.withDescription(metadata.description),
+    Command.withShortDescription(metadata.summary),
+    Command.withExamples(metadata.examples ?? [])
+  );
 }
 
 /**
