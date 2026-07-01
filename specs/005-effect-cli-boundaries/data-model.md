@@ -14,7 +14,7 @@ Represents a declared shape for data crossing a trust or public contract boundar
 **Validation Rules**
 
 - Every structured output and structured error contract must have an encoder path.
-- Every unknown input contract must have a decoder path.
+- Every untrusted input contract must have a decoder path.
 - Internal helper values that never cross a boundary do not need a contract.
 
 ## Active Context
@@ -29,7 +29,7 @@ Represents the context shown by `paw context` and injected into commands.
 - `backendTarget`: backend URL or `null`.
 - `backendTargetSource`: source label or `null`.
 - `backendTargetUnsetReason`: explanation when `backendTarget` is absent.
-- `authState`: `not_applicable`, `unknown`, `authenticated`, or `unauthenticated`.
+- `authState`: `not_applicable`, `unresolved`, `authenticated`, or `unauthenticated`.
 - `configSources`: ordered list of config source summaries.
 
 **Validation Rules**
@@ -64,7 +64,7 @@ Represents decoded project, user, or profile TOML input.
 
 **Validation Rules**
 
-- Unknown top-level keys are tolerated unless they look secret-like.
+- Unrecognized top-level keys are tolerated unless they look secret-like.
 - Supported keys must have string values after TOML parsing.
 - Empty strings are treated as unset.
 - Persisted profile config must reject secret-like keys before write.

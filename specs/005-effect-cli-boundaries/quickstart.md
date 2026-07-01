@@ -19,7 +19,7 @@ Expected outcome:
 ## 2. Verify Structured Context Output
 
 ```bash
-PAW_HOME="$(mktemp -d)" bun run --filter @pawrrtal/cli start -- context --json
+PAW_HOME="$(mktemp -d)" bun packages/paw-cli/src/Main.ts context --json
 ```
 
 Expected outcome:
@@ -32,7 +32,7 @@ Expected outcome:
 ## 3. Verify Doctor Output
 
 ```bash
-PAW_HOME="$(mktemp -d)" bun run --filter @pawrrtal/cli start -- doctor --json
+PAW_HOME="$(mktemp -d)" bun packages/paw-cli/src/Main.ts doctor --json
 ```
 
 Expected outcome:
@@ -63,7 +63,7 @@ Expected outcome:
 ## 5. Verify Output Mode Conflict
 
 ```bash
-bun run --filter @pawrrtal/cli start -- context --json --plain
+bun packages/paw-cli/src/Main.ts context --json --plain
 ```
 
 Expected outcome:

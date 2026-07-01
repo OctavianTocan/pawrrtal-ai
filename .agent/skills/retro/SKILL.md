@@ -10,6 +10,7 @@ Use this when the user wants the project to learn from a messy session. The goal
 ## Process
 
 1. **Extract incidents from evidence.** Use the current thread, git diff, PR state, logs, and commands. Do not rely on vibes or blame.
+   - If `.agent/skills/retro/scripts/collect-codex-retro-context.py` is missing, use the current conversation as primary evidence and run `/root/.agent/skills/retro/scripts/collect-codex-retro-context.py` when available.
 2. **Name each failure mode.** Phrase it as an action that should happen next time, such as "prove live Telegram with real delivery before claiming it works."
 3. **Choose the durable artifact.**
    - Repeated workflow mistake: create or update a skill.

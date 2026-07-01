@@ -1,14 +1,14 @@
 import { Console, Effect } from 'effect';
 import { Command } from 'effect/unstable/cli';
-import type { CommandMetadata, CommandModule } from '../../Helpers/CommandMetadata';
+import type { CommandMetadata, CommandModule, EmptyCommandContext } from '../../Helpers/CommandMetadata';
 import { AUTOMATION_FLAG_METADATA, applyCommandMetadata } from '../../Helpers/CommandMetadata';
-import type { ActiveContext, ConfigSource } from '../../Helpers/Config';
-import type { UsageError } from '../../Helpers/Errors';
+import type { UsageError, VerificationError } from '../../Helpers/Errors';
 import { ExitCode } from '../../Helpers/ExitCode';
 import type { AutomationOptions } from '../../Helpers/Options';
 import { automationFlags } from '../../Helpers/Options';
 import { formatOutput, resolveOutputMode } from '../../Helpers/Output';
-import { ActiveCliContext } from '../../Infrastructure/ActiveContext';
+import type { ConfigSource } from '../../Infrastructure/ActiveContext';
+import { ActiveCliContext, ActiveContext } from '../../Infrastructure/ActiveContext';
 
 const CONTEXT_METADATA = {
   name: 'context',
@@ -30,6 +30,13 @@ const CONTEXT_METADATA = {
   ],
   notes: ['`paw whoami` is an alias for this command.', 'Secret-like config values are never printed.'],
   outputModes: ['human', 'json', 'plain'],
+  structuredOutputs: [
+    {
+      mode: 'json',
+      contract: 'ActiveContext',
+      description: 'Schema-backed active profile, state roots, backend target, auth state, and config source summary.',
+    },
+  ],
   exitCodes: [ExitCode.success, ExitCode.usage, ExitCode.local],
 } satisfies CommandMetadata;
 
@@ -40,14 +47,23 @@ export const ContextCommand = {
     CONTEXT_METADATA
   ),
   metadata: CONTEXT_METADATA,
-} satisfies CommandModule<'context', AutomationOptions, unknown, UsageError, ActiveCliContext>;
+} satisfies CommandModule<
+  'context',
+  AutomationOptions,
+  EmptyCommandContext,
+  UsageError | VerificationError,
+  ActiveCliContext
+>;
 
 /** Prints the resolved active context. */
-function handleContext(options: AutomationOptions): Effect.Effect<void, UsageError, ActiveCliContext> {
+function handleContext(
+  options: AutomationOptions
+): Effect.Effect<void, UsageError | VerificationError, ActiveCliContext> {
   return Effect.gen(function* () {
     const mode = yield* resolveOutputMode(options);
     const context = yield* ActiveCliContext;
-    yield* Console.log(formatOutput(context, mode, contextFormatters));
+    const output = yield* formatOutput(context, mode, contextFormatters);
+    yield* Console.log(output);
   });
 }
 
@@ -62,7 +78,10 @@ const contextFormatters = {
       'Sources:',
       ...context.configSources.map((source: ConfigSource) => `  ${source.key}: ${source.source}`),
     ].join('\n'),
-  json: (context: ActiveContext): unknown => context,
+  json: {
+    schema: ActiveContext,
+    render: (context: ActiveContext): ActiveContext => context,
+  },
   plain: (context: ActiveContext): string =>
     [
       context.profile,

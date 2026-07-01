@@ -37,9 +37,9 @@ Supported project/user/profile TOML keys:
 
 Rules:
 
-- TOML parsing may still use Bun's TOML parser, but parsed `unknown` data must be decoded through the TOML config schema before use.
+- TOML parsing may still use Bun's TOML parser, but parsed untrusted data must be decoded through the TOML config schema before use.
 - Supported keys with non-string values fail with a config error naming the file source.
-- Unknown non-secret keys are tolerated for future feature-owned config.
+- Unrecognized non-secret keys are tolerated for future feature-owned config.
 - Secret-like persisted keys fail validation before profile config is written or trusted.
 
 ## Source Labels

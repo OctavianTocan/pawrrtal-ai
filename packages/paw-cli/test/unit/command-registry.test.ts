@@ -18,4 +18,17 @@ describe('command registry', (): void => {
     expect(commandNames).toEqual(['context', 'fixture', 'completions']);
     expect(rootCommandNames).toEqual(['context', 'fixture', 'completions']);
   });
+
+  it('keeps structured output metadata on feature-owned commands', (): void => {
+    const registry = makeCommandRegistry([FixtureCommand]);
+    const fixtureMetadata = registry.rootMetadata.subcommands?.find((command) => command.name === 'fixture');
+
+    expect(fixtureMetadata?.structuredOutputs).toEqual([
+      {
+        mode: 'json',
+        contract: 'FixtureOutput',
+        description: 'Test-only structured output contract for future command modules.',
+      },
+    ]);
+  });
 });

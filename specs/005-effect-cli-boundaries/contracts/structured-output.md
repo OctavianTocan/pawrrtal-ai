@@ -33,7 +33,7 @@ Structured success shape:
 
 Required enums:
 
-- `authState`: `not_applicable`, `unknown`, `authenticated`, `unauthenticated`
+- `authState`: `not_applicable`, `unresolved`, `authenticated`, `unauthenticated`
 
 ## `paw doctor --json`
 

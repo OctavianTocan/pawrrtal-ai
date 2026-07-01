@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
 import type { Command } from 'effect/unstable/cli';
 import type { CommandMetadata } from './Helpers/CommandMetadata';
-import { makeRootMetadata } from './Helpers/CommandMetadata';
+import { assertCommandMetadata, makeRootMetadata, validateCommandMetadata } from './Helpers/CommandMetadata';
 import type { UsageError } from './Helpers/Errors';
 import { failUsage } from './Helpers/Errors';
 import { COMPLETIONS_METADATA, makeCompletionsCommand } from './Modules/Completions/Command';
@@ -28,6 +28,7 @@ type CommandRegistryLike = {
   readonly modules: ReadonlyArray<{
     readonly metadata: CommandMetadata;
   }>;
+  readonly rootMetadata: CommandMetadata;
 };
 
 const BASE_COMMANDS = [DoctorCommand, ContextCommand] as const satisfies ReadonlyArray<RuntimeCommandModule>;
@@ -54,18 +55,21 @@ export function makeCommandRegistry(modules: ReadonlyArray<RegisteredCommandModu
 export function validateCommandRegistry<Registry extends CommandRegistryLike>(
   registry: Registry
 ): Effect.Effect<Registry, UsageError> {
-  const seen = new Set<string>();
-  for (const module of registry.modules) {
-    const metadata: CommandMetadata = module.metadata;
-    const names = [metadata.name, ...(metadata.aliases ?? [])];
-    for (const name of names) {
-      if (seen.has(name)) {
-        return failUsage(`Command name or alias '${name}' is registered more than once.`);
+  return Effect.gen(function* () {
+    const seen = new Set<string>();
+    for (const module of registry.modules) {
+      const metadata: CommandMetadata = yield* validateCommandMetadata(module.metadata);
+      const names = [metadata.name, ...(metadata.aliases ?? [])];
+      for (const name of names) {
+        if (seen.has(name)) {
+          return yield* failUsage(`Command name or alias '${name}' is registered more than once.`);
+        }
+        seen.add(name);
       }
-      seen.add(name);
     }
-  }
-  return Effect.succeed(registry);
+    yield* validateCommandMetadata(registry.rootMetadata);
+    return registry;
+  });
 }
 
 /** Builds the typed runtime registry used by the executable root command. */
@@ -80,9 +84,15 @@ function withCompletions<Module extends RegisteredCommandModule>(
   readonly modules: ReadonlyArray<Module | ReturnType<typeof makeCompletionsCommand>>;
   readonly rootMetadata: ReturnType<typeof makeRootMetadata>;
 } {
-  const rootMetadata = makeRootMetadata([...modules.map((module) => module.metadata), COMPLETIONS_METADATA]);
+  const validatedModules = modules.map((module) => ({
+    ...module,
+    metadata: assertCommandMetadata(module.metadata),
+  }));
+  const rootMetadata = assertCommandMetadata(
+    makeRootMetadata([...validatedModules.map((module) => module.metadata), COMPLETIONS_METADATA])
+  );
   return {
-    modules: [...modules, makeCompletionsCommand(rootMetadata)],
+    modules: [...validatedModules, makeCompletionsCommand(rootMetadata)],
     rootMetadata,
   };
 }

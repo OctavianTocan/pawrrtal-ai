@@ -61,6 +61,66 @@ describe('config resolution', (): void => {
     expect(context.backendTarget).toBeNull();
   });
 
+  it('rejects wrong-shaped supported TOML values with a config error', async (): Promise<void> => {
+    const root = await makeTempRoot();
+    const workspace = pathJoin(root, 'workspace');
+    const configPath = pathJoin(workspace, 'paw.toml');
+    await writeTextFile(configPath, 'profile = 123\n');
+
+    const result = await runCli({
+      args: ['context', '--json'],
+      cwd: workspace,
+      env: { HOME: pathJoin(root, 'home'), PAW_HOME: root },
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain(`Could not decode ${configPath}`);
+  });
+
+  it('reports environment profile and project backend sources independently', async (): Promise<void> => {
+    const root = await makeTempRoot();
+    const workspace = pathJoin(root, 'workspace');
+    const configPath = pathJoin(workspace, 'paw.toml');
+    await writeTextFile(configPath, 'profile = "project-profile"\nbackend_url = "http://project.example"\n');
+
+    const result = await runCli({
+      args: ['context', '--json'],
+      cwd: workspace,
+      env: { HOME: pathJoin(root, 'home'), PAW_HOME: root, PAW_PROFILE: 'env-profile' },
+    });
+
+    const context = JSON.parse(result.stdout) as {
+      readonly backendTarget: string;
+      readonly configSources: ReadonlyArray<{ readonly key: string; readonly source: string }>;
+      readonly profile: string;
+    };
+
+    expect(result.exitCode).toBe(0);
+    expect(context.profile).toBe('env-profile');
+    expect(context.backendTarget).toBe('http://project.example');
+    expect(context.configSources.find((source) => source.key === 'profile')?.source).toBe('env:PAW_PROFILE');
+    expect(context.configSources.find((source) => source.key === 'backendTarget')?.source).toBe(
+      `project:${configPath}`
+    );
+  });
+
+  it('rejects secret-like keys in trusted TOML config files', async (): Promise<void> => {
+    const root = await makeTempRoot();
+    const workspace = pathJoin(root, 'workspace');
+    await writeTextFile(pathJoin(workspace, 'paw.toml'), 'api_token = "secret"\n');
+
+    const result = await runCli({
+      args: ['context'],
+      cwd: workspace,
+      env: { HOME: pathJoin(root, 'home'), PAW_HOME: root },
+    });
+
+    expect(result.exitCode).toBe(1);
+    expect(result.stderr).toContain('Profile config cannot persist secret field');
+    expect(result.stderr).not.toContain('secret"');
+  });
+
   it('rejects profile names that can escape the profile directory', async (): Promise<void> => {
     const root = await makeTempRoot();
     const result = await runCli({

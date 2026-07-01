@@ -1,0 +1,41 @@
+{
+  "id": "54b96dcd408d",
+  "key": "manual_54b96d",
+  "name": "manual_54b96d",
+  "claim": "Treat AGY or other external model reviews of private or uncommitted repo code as external code sharing; get explicit approval after naming the risk, otherwise do a local review and report the blocker.",
+  "conditions": [
+    "agy-review",
+    "code-sharing",
+    "external-review",
+    "privacy"
+  ],
+  "evidence_ids": [
+    "2026-06-30T18:35:54.328936+00:00"
+  ],
+  "cluster_size": 1,
+  "canonical_salience": 8.0,
+  "staged_at": "2026-06-30T18:35:54.328936+00:00",
+  "status": "accepted",
+  "decisions": [
+    {
+      "ts": "2026-06-30T18:35:54.328936+00:00",
+      "action": "staged",
+      "reviewer": "learn"
+    },
+    {
+      "ts": "2026-06-30T18:35:54.356497+00:00",
+      "action": "graduated",
+      "reviewer": "learn.py",
+      "notes": "This session's AGY review attempt was blocked because it would send an uncommitted review packet to an external service. The workflow needs an explicit privacy boundary.",
+      "provisional": false,
+      "evidence_snapshot": [
+        "2026-06-30T18:35:54.328936+00:00"
+      ],
+      "lessons_sha": "76a26dc07e02"
+    }
+  ],
+  "rejection_count": 0,
+  "accepted_at": "2026-06-30T18:35:54.356490+00:00",
+  "reviewer": "learn.py",
+  "rationale": "This session's AGY review attempt was blocked because it would send an uncommitted review packet to an external service. The workflow needs an explicit privacy boundary."
+}

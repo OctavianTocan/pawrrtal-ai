@@ -1,6 +1,6 @@
 import { Console, Effect } from 'effect';
 import { Argument, Command, Completions } from 'effect/unstable/cli';
-import type { CommandMetadata, CommandModule } from '../../Helpers/CommandMetadata';
+import type { CommandMetadata, CommandModule, EmptyCommandContext } from '../../Helpers/CommandMetadata';
 import { applyCommandMetadata, metadataToCompletionDescriptor } from '../../Helpers/CommandMetadata';
 import { ExitCode } from '../../Helpers/ExitCode';
 
@@ -37,7 +37,7 @@ export const COMPLETIONS_METADATA = {
  */
 export function makeCompletionsCommand(
   rootMetadata: CommandMetadata
-): CommandModule<'completions', { readonly shell: CompletionShell }, unknown, never, never> {
+): CommandModule<'completions', { readonly shell: CompletionShell }, EmptyCommandContext, never, never> {
   return {
     command: applyCommandMetadata(
       Command.make(

@@ -13,10 +13,12 @@ describe('no-secret config validation', (): void => {
         ssh_public_key: 'public',
       }).pipe(
         Effect.exit,
-        Effect.map((exit) => {
-          expect(exit._tag).toBe('Success');
-          return undefined;
-        })
+        Effect.tap((exit) =>
+          Effect.sync(() => {
+            expect(exit._tag).toBe('Success');
+          })
+        ),
+        Effect.asVoid
       )
   );
 
@@ -29,10 +31,12 @@ describe('no-secret config validation', (): void => {
         },
       }).pipe(
         Effect.exit,
-        Effect.map((exit) => {
-          expect(exit._tag).toBe('Failure');
-          return undefined;
-        })
+        Effect.tap((exit) =>
+          Effect.sync(() => {
+            expect(exit._tag).toBe('Failure');
+          })
+        ),
+        Effect.asVoid
       )
   );
 
@@ -46,10 +50,31 @@ describe('no-secret config validation', (): void => {
         },
       }).pipe(
         Effect.exit,
-        Effect.map((exit) => {
-          expect(exit._tag).toBe('Failure');
-          return undefined;
-        })
+        Effect.tap((exit) =>
+          Effect.sync(() => {
+            expect(exit._tag).toBe('Failure');
+          })
+        ),
+        Effect.asVoid
+      )
+  );
+
+  it.effect(
+    'rejects secret-like persisted profile config before writing',
+    (): Effect.Effect<void> =>
+      writeProfileConfig({
+        profile: 'local',
+        configRoot: `/tmp/paw-cli-profile-secret-${crypto.randomUUID()}`,
+        values: { token: 'secret' },
+      }).pipe(
+        Effect.provide(BunServices.layer),
+        Effect.exit,
+        Effect.tap((exit) =>
+          Effect.sync(() => {
+            expect(exit._tag).toBe('Failure');
+          })
+        ),
+        Effect.asVoid
       )
   );
 
@@ -63,10 +88,12 @@ describe('no-secret config validation', (): void => {
       }).pipe(
         Effect.provide(BunServices.layer),
         Effect.exit,
-        Effect.map((exit) => {
-          expect(exit._tag).toBe('Failure');
-          return undefined;
-        })
+        Effect.tap((exit) =>
+          Effect.sync(() => {
+            expect(exit._tag).toBe('Failure');
+          })
+        ),
+        Effect.asVoid
       )
   );
 });

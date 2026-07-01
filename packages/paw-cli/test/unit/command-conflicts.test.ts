@@ -10,10 +10,12 @@ describe('command registry conflicts', (): void => {
     const registry = makeCommandRegistry([ContextCommand, ContextCommand]);
     return validateCommandRegistry(registry).pipe(
       Effect.exit,
-      Effect.map((exit) => {
-        expect(exit._tag).toBe('Failure');
-        return undefined;
-      })
+      Effect.tap((exit) =>
+        Effect.sync(() => {
+          expect(exit._tag).toBe('Failure');
+        })
+      ),
+      Effect.asVoid
     );
   });
 
@@ -22,10 +24,12 @@ describe('command registry conflicts', (): void => {
     const registry = makeCommandRegistry([ContextCommand, conflictingCommand]);
     return validateCommandRegistry(registry).pipe(
       Effect.exit,
-      Effect.map((exit) => {
-        expect(exit._tag).toBe('Failure');
-        return undefined;
-      })
+      Effect.tap((exit) =>
+        Effect.sync(() => {
+          expect(exit._tag).toBe('Failure');
+        })
+      ),
+      Effect.asVoid
     );
   });
 });

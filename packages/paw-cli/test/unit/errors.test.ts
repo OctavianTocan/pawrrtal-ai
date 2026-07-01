@@ -1,3 +1,4 @@
+import { Effect } from 'effect';
 import { describe, expect, it } from 'vitest';
 import {
   AuthError,
@@ -5,6 +6,7 @@ import {
   ExternalError,
   errorToExitCode,
   renderError,
+  renderErrorEffect,
   toCliError,
   UnexpectedError,
   UsageError,
@@ -22,7 +24,7 @@ describe('CLI errors', (): void => {
     expect(errorToExitCode(new UnexpectedError({ message: 'boom' }))).toBe(ExitCode.local);
   });
 
-  it('normalizes unknown errors for stderr rendering', (): void => {
+  it('normalizes thrown errors for stderr rendering', (): void => {
     const normalized = toCliError(new Error('surprise'));
 
     expect(normalized._tag).toBe('UnexpectedError');
@@ -32,7 +34,21 @@ describe('CLI errors', (): void => {
   it('renders verbose JSON error details only when requested', (): void => {
     const error = new ExternalError({ message: 'backend unavailable', details: 'socket closed' });
 
-    expect(renderError(error, { isJson: true })).toContain('"details": null');
+    expect(renderError(error, { isJson: true, isVerbose: false })).toContain('"details": null');
     expect(renderError(error, { isJson: true, isVerbose: true })).toContain('socket closed');
+  });
+
+  it('encodes structured JSON error payloads through the public schema', (): void => {
+    const error = new UsageError({ message: 'bad input', hint: 'try again' });
+    const rendered = Effect.runSync(renderErrorEffect(error, { isJson: true, isVerbose: false }));
+
+    expect(JSON.parse(rendered)).toEqual({
+      error: {
+        kind: 'usage',
+        message: 'bad input',
+        hint: 'try again',
+        details: null,
+      },
+    });
   });
 });

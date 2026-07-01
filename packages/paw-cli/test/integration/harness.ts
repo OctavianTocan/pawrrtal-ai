@@ -1,7 +1,7 @@
 export type CliRunOptions = {
   readonly args: ReadonlyArray<string>;
   readonly cwd?: string;
-  readonly env?: Readonly<Record<string, string | undefined>>;
+  readonly env?: Readonly<Record<string, string>>;
 };
 
 export type CliRunResult = {
@@ -15,7 +15,8 @@ export const REPO_ROOT = decodeURIComponent(new URL('../../../..', import.meta.u
 const PACKAGE_ROOT = decodeURIComponent(new URL('../..', import.meta.url).pathname);
 const CLI_ENTRYPOINT = decodeURIComponent(new URL('../../src/Main.ts', import.meta.url).pathname);
 const LAUNCHER_ENTRYPOINT = pathJoin(REPO_ROOT, 'scripts', 'paw');
-const TEMP_ROOT = trimTrailingSlashes(Bun.env.TMPDIR ?? '/tmp');
+// biome-ignore lint/complexity/useLiteralKeys: TS noPropertyAccessFromIndexSignature requires bracket access.
+const TEMP_ROOT = trimTrailingSlashes(Bun.env['TMPDIR'] ?? '/tmp');
 
 /**
  * Runs the real Bun CLI entrypoint and captures stdio.
@@ -26,7 +27,7 @@ const TEMP_ROOT = trimTrailingSlashes(Bun.env.TMPDIR ?? '/tmp');
 export async function runCli(options: CliRunOptions): Promise<CliRunResult> {
   const subprocess = Bun.spawn(['bun', 'run', CLI_ENTRYPOINT, ...options.args], {
     cwd: options.cwd ?? PACKAGE_ROOT,
-    env: compactEnv({ ...Bun.env, ...options.env }),
+    env: { ...processEnvironment(Bun.env), ...(options.env ?? {}) },
     stdin: 'ignore',
     stdout: 'pipe',
     stderr: 'pipe',
@@ -50,7 +51,7 @@ export async function runCli(options: CliRunOptions): Promise<CliRunResult> {
 export async function runLauncher(options: CliRunOptions): Promise<CliRunResult> {
   const subprocess = Bun.spawn([LAUNCHER_ENTRYPOINT, ...options.args], {
     cwd: options.cwd ?? PACKAGE_ROOT,
-    env: compactEnv({ ...Bun.env, ...options.env }),
+    env: { ...processEnvironment(Bun.env), ...(options.env ?? {}) },
     stdin: 'ignore',
     stdout: 'pipe',
     stderr: 'pipe',
@@ -116,9 +117,11 @@ export function pathJoin(...segments: ReadonlyArray<string>): string {
     .join('/');
 }
 
-/** Drops undefined environment overrides before spawning Bun. */
-function compactEnv(env: Readonly<Record<string, string | undefined>>): Record<string, string> {
-  return Object.fromEntries(Object.entries(env).filter((entry): entry is [string, string] => entry[1] !== undefined));
+/** Converts Bun's process environment to a string-only map. */
+function processEnvironment(env: typeof Bun.env): Record<string, string> {
+  return Object.fromEntries(
+    Object.entries(env).flatMap(([key, value]) => (typeof value === 'string' ? [[key, value] as const] : []))
+  );
 }
 
 /** Creates a directory and its missing parents. */

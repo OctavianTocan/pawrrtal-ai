@@ -14,9 +14,9 @@
 
 ## Decision: Schema belongs at CLI trust and public-contract boundaries
 
-**Decision**: Use Effect `Schema` for unknown config-file data, package metadata, public command output, public error JSON, and command metadata consumed by generated skills.
+**Decision**: Use Effect `Schema` for untrusted config-file data, package metadata, public command output, public error JSON, and command metadata consumed by generated skills.
 
-**Rationale**: Current CLI code parses TOML as `unknown`, hand-walks records, directly stringifies output, and uses unvalidated plain objects for generated skill metadata. Effect v4 provides `Schema.decodeUnknownEffect`, `Schema.encodeUnknownEffect`, `Schema.Class`, `Schema.Struct`, and `Schema.TaggedErrorClass`, matching the backend-ts convention that public domain shapes are schema-backed.
+**Rationale**: Current CLI code parsed TOML as untrusted runtime data, hand-walked records, directly stringified output, and used unvalidated plain objects for generated skill metadata. Effect v4 provides `Schema.decodeUnknownEffect`, `Schema.encodeUnknownEffect`, `Schema.Class`, `Schema.Struct`, and `Schema.TaggedErrorClass`, matching the backend-ts convention that public domain shapes are schema-backed.
 
 **Alternatives considered**:
 

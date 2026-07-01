@@ -2,8 +2,8 @@ import { Effect, FileSystem, Layer, Path } from 'effect';
 import { CliProcess } from '../../Helpers/Config';
 import { CLI_VERSION } from '../../Helpers/Version';
 import { ActiveCliContext } from '../../Infrastructure/ActiveContext';
-import type { HealthCheck, HealthStatus } from './Domain';
-import { DoctorService } from './Domain';
+import type { HealthStatus } from './Domain';
+import { DoctorReport, DoctorService, HealthCheck } from './Domain';
 
 /** Provides local health checks from the active context and Bun filesystem. */
 export const DoctorServiceLive: Layer.Layer<
@@ -38,10 +38,10 @@ export const DoctorServiceLive: Layer.Layer<
         { concurrency: 'unbounded' }
       );
 
-      return {
+      return new DoctorReport({
         status: overallStatus(checks),
         checks,
-      };
+      });
     });
 
     return { run } as const;
@@ -50,7 +50,7 @@ export const DoctorServiceLive: Layer.Layer<
 
 /** Returns a passing health check. */
 function checkPass(name: string, detail: string): Effect.Effect<HealthCheck> {
-  return Effect.succeed({ name, status: 'pass', detail });
+  return Effect.succeed(new HealthCheck({ name, status: 'pass', detail }));
 }
 
 /** Checks whether a filesystem path currently exists. */
@@ -61,17 +61,20 @@ function checkPath(fs: FileSystem.FileSystem, name: string, path: string): Effec
       status: exists ? ('pass' as const) : ('warn' as const),
       detail: exists ? path : `${path} does not exist yet`,
     })),
-    Effect.orElseSucceed(() => ({ name, status: 'warn' as const, detail: `${path} could not be inspected` }))
+    Effect.orElseSucceed(() => ({ name, status: 'warn' as const, detail: `${path} could not be inspected` })),
+    Effect.map((check) => new HealthCheck(check))
   );
 }
 
 /** Checks whether the backend target is configured. */
 function checkBackendTarget(backendTarget: string | null): Effect.Effect<HealthCheck> {
-  return Effect.succeed({
-    name: 'backend-target',
-    status: backendTarget ? 'pass' : 'warn',
-    detail: backendTarget ?? 'No backend target configured.',
-  });
+  return Effect.succeed(
+    new HealthCheck({
+      name: 'backend-target',
+      status: backendTarget ? 'pass' : 'warn',
+      detail: backendTarget ?? 'No backend target configured.',
+    })
+  );
 }
 
 /** Checks whether a generated skill file is present. */
@@ -93,7 +96,8 @@ function checkGeneratedSkill(input: {
       name: input.name,
       status: 'warn' as const,
       detail: `${input.skillName} skill could not be inspected`,
-    }))
+    })),
+    Effect.map((check) => new HealthCheck(check))
   );
 }
 

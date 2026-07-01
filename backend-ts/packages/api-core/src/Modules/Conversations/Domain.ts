@@ -34,7 +34,7 @@ export class ConversationUpdateInput extends Schema.Class<ConversationUpdateInpu
   /** New title; omit to keep the current title. */
   title: Schema.optional(ConversationTitle),
   /** New project linkage; omit to keep the current project. */
-  projectId: Schema.optional(Ids.project)
+  projectId: Schema.optionalKey(Ids.project)
 }) {}
 
 /** A chat message returned to clients. */

@@ -1,5 +1,7 @@
+import { Effect, Option, Schema } from 'effect';
 import type { Completions } from 'effect/unstable/cli';
 import { Command } from 'effect/unstable/cli';
+import { UsageError } from './Errors';
 import { ExitCode } from './ExitCode';
 import type { OutputMode } from './Output';
 
@@ -25,6 +27,12 @@ export type ExampleMetadata = {
   readonly description?: string;
 };
 
+export type StructuredOutputMetadata = {
+  readonly mode: 'json';
+  readonly contract: string;
+  readonly description: string;
+};
+
 export type CommandMetadata = {
   readonly name: string;
   readonly summary: string;
@@ -38,14 +46,145 @@ export type CommandMetadata = {
   readonly environment?: ReadonlyArray<EnvironmentMetadata>;
   readonly notes?: ReadonlyArray<string>;
   readonly outputModes: ReadonlyArray<OutputMode>;
+  readonly structuredOutputs?: ReadonlyArray<StructuredOutputMetadata>;
   readonly inputSources?: ReadonlyArray<InputSource>;
   readonly exitCodes?: ReadonlyArray<ExitCode>;
 };
 
-export type CommandModule<Name extends string, Input = never, ContextInput = unknown, E = never, R = never> = {
+export type EmptyCommandContext = Record<PropertyKey, never>;
+
+export type CommandModule<
+  Name extends string,
+  Input = never,
+  ContextInput = EmptyCommandContext,
+  E = never,
+  R = never,
+> = {
   readonly command: Command.Command<Name, Input, ContextInput, E, R>;
   readonly metadata: CommandMetadata;
 };
+
+export const ParameterKindSchema = Schema.Literals([
+  'string',
+  'boolean',
+  'integer',
+  'choice',
+  'file',
+  'directory',
+]).pipe(
+  Schema.annotate({
+    identifier: 'ParameterKind',
+    title: 'Parameter Kind',
+    description: 'Supported CLI parameter presentation kinds.',
+  })
+);
+export const InputSourceSchema = Schema.Literals(['inline', 'file', 'stdin', 'editor']).pipe(
+  Schema.annotate({
+    identifier: 'InputSource',
+    title: 'Input Source',
+    description: 'Supported body/document input sources for CLI commands.',
+  })
+);
+export const OutputModeSchema = Schema.Literals(['human', 'json', 'plain']).pipe(
+  Schema.annotate({
+    identifier: 'OutputMode',
+    title: 'Output Mode',
+    description: 'Supported stdout rendering modes.',
+  })
+);
+export const ExitCodeSchema = Schema.Literals([
+  ExitCode.success,
+  ExitCode.local,
+  ExitCode.usage,
+  ExitCode.auth,
+  ExitCode.external,
+  ExitCode.verification,
+]).pipe(
+  Schema.annotate({
+    identifier: 'ExitCode',
+    title: 'Exit Code',
+    description: 'Public Paw CLI exit-code contract.',
+  })
+);
+
+export const ParameterMetadataSchema = Schema.Struct({
+  name: Schema.NonEmptyString,
+  description: Schema.NonEmptyString,
+  kind: ParameterKindSchema,
+  required: Schema.optionalKey(Schema.Boolean),
+  aliases: Schema.optionalKey(Schema.Array(Schema.NonEmptyString)),
+  choices: Schema.optionalKey(Schema.Array(Schema.NonEmptyString)),
+}).pipe(
+  Schema.annotate({
+    identifier: 'ParameterMetadata',
+    title: 'Parameter Metadata',
+    description: 'Descriptor for a CLI argument or flag.',
+  })
+);
+
+export const EnvironmentMetadataSchema = Schema.Struct({
+  name: Schema.NonEmptyString,
+  purpose: Schema.NonEmptyString,
+}).pipe(
+  Schema.annotate({
+    identifier: 'EnvironmentMetadata',
+    title: 'Environment Metadata',
+    description: 'Descriptor for an environment variable that affects a command.',
+  })
+);
+
+export const ExampleMetadataSchema = Schema.Struct({
+  command: Schema.NonEmptyString,
+  description: Schema.optionalKey(Schema.String),
+}).pipe(
+  Schema.annotate({
+    identifier: 'ExampleMetadata',
+    title: 'Example Metadata',
+    description: 'Runnable command example shown in help and generated skills.',
+  })
+);
+
+export const StructuredOutputMetadataSchema = Schema.Struct({
+  mode: Schema.Literal('json'),
+  contract: Schema.NonEmptyString,
+  description: Schema.NonEmptyString,
+}).pipe(
+  Schema.annotate({
+    identifier: 'StructuredOutputMetadata',
+    title: 'Structured Output Metadata',
+    description: 'Descriptor for a schema-backed structured output mode.',
+  })
+);
+
+const MetadataNameSchema = Schema.Struct({
+  name: Schema.String,
+});
+
+export const CommandMetadataSchema: Schema.Codec<CommandMetadata> = Schema.Struct({
+  name: Schema.NonEmptyString,
+  summary: Schema.NonEmptyString,
+  description: Schema.NonEmptyString,
+  owner: Schema.NonEmptyString,
+  aliases: Schema.optionalKey(Schema.Array(Schema.NonEmptyString)),
+  arguments: Schema.optionalKey(Schema.Array(ParameterMetadataSchema)),
+  flags: Schema.optionalKey(Schema.Array(ParameterMetadataSchema)),
+  subcommands: Schema.optionalKey(
+    Schema.Array(Schema.suspend((): Schema.Codec<CommandMetadata> => CommandMetadataSchema))
+  ),
+  examples: Schema.optionalKey(Schema.Array(ExampleMetadataSchema)),
+  environment: Schema.optionalKey(Schema.Array(EnvironmentMetadataSchema)),
+  notes: Schema.optionalKey(Schema.Array(Schema.NonEmptyString)),
+  outputModes: Schema.Array(OutputModeSchema),
+  structuredOutputs: Schema.optionalKey(Schema.Array(StructuredOutputMetadataSchema)),
+  inputSources: Schema.optionalKey(Schema.Array(InputSourceSchema)),
+  exitCodes: Schema.optionalKey(Schema.Array(ExitCodeSchema)),
+}).pipe(
+  Schema.annotate({
+    identifier: 'CommandMetadata',
+    title: 'Command Metadata',
+    description: 'Canonical command descriptor used for help, completions, and generated skills.',
+  })
+);
 
 export const GLOBAL_FLAG_METADATA: ReadonlyArray<ParameterMetadata> = [
   {
@@ -128,6 +267,34 @@ export function makeRootMetadata(subcommands: ReadonlyArray<CommandMetadata>): C
 }
 
 /**
+ * Decodes command metadata before help, completions, and skill generation consume it.
+ *
+ * @param metadata - Metadata object to validate.
+ * @returns Schema-validated command metadata.
+ */
+export function validateCommandMetadata(metadata: object): Effect.Effect<CommandMetadata, UsageError> {
+  return Schema.decodeUnknownEffect(CommandMetadataSchema)(metadata).pipe(
+    Effect.mapError(
+      (schemaError) =>
+        new UsageError({
+          message: `Invalid command metadata for '${metadataName(metadata)}'.`,
+          details: String(schemaError),
+        })
+    )
+  );
+}
+
+/**
+ * Synchronously validates source-owned metadata during registry construction.
+ *
+ * @param metadata - Command metadata from source code.
+ * @returns Schema-validated metadata.
+ */
+export function assertCommandMetadata(metadata: CommandMetadata): CommandMetadata {
+  return Schema.decodeUnknownSync(CommandMetadataSchema)(metadata);
+}
+
+/**
  * Applies metadata-backed presentation fields to an Effect command.
  *
  * @param command - Command to decorate.
@@ -152,13 +319,22 @@ export function applyCommandMetadata<const Name extends string, Input, ContextIn
  * @returns Descriptor accepted by Effect's shell completion generator.
  */
 export function metadataToCompletionDescriptor(metadata: CommandMetadata): Completions.CommandDescriptor {
+  const validMetadata = assertCommandMetadata(metadata);
   return {
-    name: metadata.name,
-    description: metadata.summary,
-    flags: (metadata.flags ?? []).map(parameterToFlagDescriptor),
-    arguments: (metadata.arguments ?? []).map(parameterToArgumentDescriptor),
-    subcommands: (metadata.subcommands ?? []).map(metadataToCompletionDescriptor),
+    name: validMetadata.name,
+    description: validMetadata.summary,
+    flags: (validMetadata.flags ?? []).map(parameterToFlagDescriptor),
+    arguments: (validMetadata.arguments ?? []).map(parameterToArgumentDescriptor),
+    subcommands: (validMetadata.subcommands ?? []).map(metadataToCompletionDescriptor),
   };
+}
+
+/** Returns a best-effort metadata name for diagnostics. */
+function metadataName(metadata: object): string {
+  return Option.match(Schema.decodeUnknownOption(MetadataNameSchema)(metadata), {
+    onNone: () => 'unidentified',
+    onSome: (value) => value.name,
+  });
 }
 
 /** Converts a metadata parameter to a completion flag. */

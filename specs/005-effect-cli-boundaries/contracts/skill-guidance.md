@@ -17,7 +17,7 @@ The generated `domain-cli` skill must instruct future agents to:
 
 - Keep `effect`, `@effect/platform-bun`, and `@effect/vitest` aligned on the latest verified v4 beta line.
 - Use Bun runtime services and avoid Node-specific runtime imports in CLI source.
-- Define schemas for unknown input and public output before adding ad hoc parsing or rendering.
+- Define schemas for untrusted input and public output before adding ad hoc parsing or rendering.
 - Use `Schema.TaggedErrorClass` for expected public CLI failures.
 - Use Effect `Config` descriptors and deterministic `ConfigProvider` tests for environment-backed settings.
 - Preserve explicit Paw config precedence and source labels.

@@ -1,0 +1,42 @@
+{
+  "id": "4dc9bc7c45ea",
+  "key": "manual_4dc9bc",
+  "name": "manual_4dc9bc",
+  "claim": "For Bun Effect CLI work, load code-quality, domain-cli, and domain-effect/effect-smol before coding; Bun runtime, Effect v4 idioms, Schema boundaries, and contract docstrings are first-pass implementation constraints.",
+  "conditions": [
+    "bun",
+    "code-quality",
+    "effect-v4",
+    "paw-cli",
+    "schema"
+  ],
+  "evidence_ids": [
+    "2026-06-30T18:35:54.486463+00:00"
+  ],
+  "cluster_size": 1,
+  "canonical_salience": 8.0,
+  "staged_at": "2026-06-30T18:35:54.486463+00:00",
+  "status": "accepted",
+  "decisions": [
+    {
+      "ts": "2026-06-30T18:35:54.486463+00:00",
+      "action": "staged",
+      "reviewer": "learn"
+    },
+    {
+      "ts": "2026-06-30T18:35:54.535773+00:00",
+      "action": "graduated",
+      "reviewer": "learn.py",
+      "notes": "The initial CLI implementation had Node imports, non-effectful/manual parsing, weak docstrings, and missing Schema/Config usage; the user corrected these as core requirements, not cleanup preferences.",
+      "provisional": false,
+      "evidence_snapshot": [
+        "2026-06-30T18:35:54.486463+00:00"
+      ],
+      "lessons_sha": "6dcadad01194"
+    }
+  ],
+  "rejection_count": 0,
+  "accepted_at": "2026-06-30T18:35:54.535766+00:00",
+  "reviewer": "learn.py",
+  "rationale": "The initial CLI implementation had Node imports, non-effectful/manual parsing, weak docstrings, and missing Schema/Config usage; the user corrected these as core requirements, not cleanup preferences."
+}

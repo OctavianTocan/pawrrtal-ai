@@ -88,7 +88,7 @@ As a coding agent, I want the generated `domain-cli` skill to explain the schema
 ### Functional Requirements
 
 - **FR-001**: The CLI MUST declare public data contracts for active context, config source summaries, health reports, structured command output, and structured expected errors.
-- **FR-002**: The CLI MUST validate unknown config-file, environment-derived, package-metadata, and command-output data against the relevant declared contract before the data is trusted or printed as structured output.
+- **FR-002**: The CLI MUST validate untrusted config-file, environment-derived, package-metadata, and command-output data against the relevant declared contract before the data is trusted or printed as structured output.
 - **FR-003**: The CLI MUST encode structured command output through the declared public contract before writing structured output to stdout.
 - **FR-004**: The CLI MUST encode structured expected error output through the declared public contract before writing structured error output to stderr.
 - **FR-005**: The CLI MUST preserve the existing documented config precedence order: explicit flags, environment variables, project-local config, profile config, user config, and built-in defaults.

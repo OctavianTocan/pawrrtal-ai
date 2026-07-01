@@ -3,7 +3,7 @@ import { Schema } from "effect"
 /** Session store lookup failure. */
 export class SessionStoreError extends Schema.TaggedErrorClass<SessionStoreError>()("SessionStoreError", {
   message: Schema.String,
-  cause: Schema.Defect
+  cause: Schema.Unknown
 }) {}
 
 /** Missing or invalid session (HTTP 401). */
@@ -11,7 +11,7 @@ export class AuthenticationError extends Schema.TaggedErrorClass<AuthenticationE
   "AuthenticationError",
   {
     message: Schema.String,
-    cause: Schema.Defect
+    cause: Schema.Unknown
   },
   {
     httpApiStatus: 401
@@ -23,7 +23,7 @@ export class AuthorizationError extends Schema.TaggedErrorClass<AuthorizationErr
   "AuthorizationError",
   {
     message: Schema.String,
-    cause: Schema.Defect
+    cause: Schema.Unknown
   },
   {
     httpApiStatus: 403

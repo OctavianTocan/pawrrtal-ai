@@ -1,15 +1,15 @@
-import { Effect } from 'effect';
+import { Effect, Option } from 'effect';
 import type { UsageError } from './Errors';
 import { failUsage } from './Errors';
 
 export type BodySourceKind = 'inline' | 'file' | 'stdin' | 'editor';
 
 export type BodySourceOptions = {
-  readonly inline?: string;
-  readonly file?: string;
-  readonly stdin?: string;
-  readonly isEditorRequested?: boolean;
-  readonly isInteractive?: boolean;
+  readonly inline: Option.Option<string>;
+  readonly file: Option.Option<string>;
+  readonly stdin: Option.Option<string>;
+  readonly isEditorRequested: boolean;
+  readonly isInteractive: boolean;
 };
 
 export type BodySource = {
@@ -20,6 +20,14 @@ export type BodySource = {
 export type BodySourceResolution =
   | { readonly _tag: 'None' }
   | { readonly _tag: 'Selected'; readonly source: BodySource };
+
+export const EmptyBodySourceOptions: BodySourceOptions = {
+  inline: Option.none(),
+  file: Option.none(),
+  stdin: Option.none(),
+  isEditorRequested: false,
+  isInteractive: false,
+};
 
 /**
  * Resolves mutually exclusive body/document input sources.
@@ -54,22 +62,17 @@ export function resolveBodySource(options: BodySourceOptions): Effect.Effect<Bod
 /** Selects the input sources explicitly requested by the caller. */
 function selectedSources(options: BodySourceOptions): ReadonlyArray<BodySource> {
   const sources: BodySource[] = [];
-  if (hasText(options.inline)) {
-    sources.push({ kind: 'inline', value: options.inline ?? '' });
+  if (Option.isSome(options.inline)) {
+    sources.push({ kind: 'inline', value: options.inline.value });
   }
-  if (hasText(options.file)) {
-    sources.push({ kind: options.file === '-' ? 'stdin' : 'file', value: options.file ?? '' });
+  if (Option.isSome(options.file)) {
+    sources.push({ kind: options.file.value === '-' ? 'stdin' : 'file', value: options.file.value });
   }
-  if (hasText(options.stdin)) {
-    sources.push({ kind: 'stdin', value: options.stdin ?? '' });
+  if (Option.isSome(options.stdin)) {
+    sources.push({ kind: 'stdin', value: options.stdin.value });
   }
   if (options.isEditorRequested === true) {
     sources.push({ kind: 'editor', value: null });
   }
   return sources;
-}
-
-/** Returns true when a CLI-provided text value is intentionally present. */
-function hasText(value: string | undefined): boolean {
-  return value !== undefined && value.length > 0;
 }
