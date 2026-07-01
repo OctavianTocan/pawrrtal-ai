@@ -50,14 +50,14 @@ export class ConversationsApi extends HttpApiGroup.make("conversations")
       .annotate(OpenApi.Description, "Update a conversation by ID")
   )
   .add(
-    HttpApiEndpoint.delete("delete", "/:conversation_id", {
+    HttpApiEndpoint.delete("remove", "/:conversation_id", {
       params: {
         conversation_id: Ids.conversation
       },
       success: HttpApiSchema.NoContent,
       error: ConversationNotFoundError
     })
-      .annotate(OpenApi.Summary, "Delete conversation")
+      .annotate(OpenApi.Summary, "Remove conversation")
       .annotate(OpenApi.Description, "Delete a conversation by ID")
   )
   .add(

@@ -35,3 +35,5 @@ export type ProjectId = Schema.Schema.Type<typeof Ids.project>
 export type UserId = Schema.Schema.Type<typeof Ids.user>
 /** Conversation ID. */
 export type ConversationId = Schema.Schema.Type<typeof Ids.conversation>
+/** Chat message ID. */
+export type ChatMessageId = Schema.Schema.Type<typeof Ids.chatMessage>

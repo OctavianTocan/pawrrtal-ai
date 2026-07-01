@@ -13,7 +13,10 @@ const ConversationTitle: Schema.String = Schema.String.pipe(
 })
 
 /** Role of a chat message: `user` or `assistant`. */
-export const ChatMessageRole = Schema.Literals(["user", "assistant"])
+export const ChatMessageRole = Schema.Literals(["user", "assistant"]).annotate({
+  identifier: "ChatMessageRole",
+  description: "The role of the chat message."
+})
 
 /** A conversation groups chat messages under a single thread. */
 export class Conversation extends Schema.Class<Conversation>("Conversation")({
