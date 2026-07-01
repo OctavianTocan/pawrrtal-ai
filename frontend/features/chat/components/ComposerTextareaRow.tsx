@@ -29,11 +29,11 @@ function AnimatedComposerPlaceholder({
 
   return (
     <div
+      aria-hidden="true"
       // `top-2` matches the textarea's `pt-2` so the placeholder sits on
       // the same baseline as the user's first line of text; `top-3` left
       // the placeholder a pixel off when the textarea was tightened.
-      className="pointer-events-none absolute top-2 left-3 z-10 pr-6 text-[14px] leading-6 text-muted-foreground/70"
-      aria-hidden="true"
+      className="pointer-events-none absolute top-2 left-3 z-10 pr-6 text-[14px] text-muted-foreground/70 leading-6"
     >
       <span className="composer-placeholder-enter block" key={text}>
         {text}
@@ -64,7 +64,7 @@ function GhostSuggestionOverlay({
   return (
     <div
       aria-hidden="true"
-      className="pointer-events-none col-start-1 row-start-1 z-0 max-h-48 min-h-11 overflow-hidden px-3 pt-2 pb-1 text-[14px] leading-6 whitespace-pre-wrap break-words"
+      className="pointer-events-none z-0 col-start-1 row-start-1 max-h-48 min-h-11 overflow-hidden whitespace-pre-wrap break-words px-3 pt-2 pb-1 text-[14px] leading-6"
     >
       <span className="invisible">{value}</span>
       <span className="text-muted-foreground/50">{suggestion}</span>
@@ -139,7 +139,7 @@ export function ComposerTextareaRow({
   ghost,
 }: ComposerTextareaRowProps): React.JSX.Element {
   return (
-    <div className="relative grid grid-cols-1 grid-rows-1 w-full self-stretch">
+    <div className="relative grid w-full grid-cols-1 grid-rows-1 self-stretch">
       <AnimatedComposerPlaceholder isVisible={!hasContent} text={placeholder} />
       <GhostSuggestionOverlay suggestion={ghost.suggestion} value={value} />
       {/* `min-h-11` (44px) + `pt-2` lets a one-line draft sit
@@ -148,7 +148,7 @@ export function ComposerTextareaRow({
 			is shifted to `top-2` to track this in the parent. */}
       <PromptInputTextarea
         aria-label={placeholder}
-        className="col-start-1 row-start-1 relative z-10 max-h-48 min-h-11 w-full overflow-y-auto px-3 pt-2 pb-1 text-[14px] leading-6 outline-none placeholder:text-transparent focus-visible:outline-none"
+        className="relative z-10 col-start-1 row-start-1 max-h-48 min-h-11 w-full overflow-y-auto px-3 pt-2 pb-1 text-[14px] leading-6 outline-none placeholder:text-transparent focus-visible:outline-none"
         ghostSuggestion={ghost.suggestion}
         onAcceptSuggestion={ghost.handleAccept}
         onChange={onChange}

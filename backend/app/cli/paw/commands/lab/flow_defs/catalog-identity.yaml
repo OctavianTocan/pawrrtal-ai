@@ -1,9 +1,0 @@
-id: catalog-identity
-title: Model catalog identity check
-description: Ensure important user-facing model rows keep their exact id, display name, and short name.
-commands:
-  - paw models ls --json
-  - paw verify chat-roundtrip --model agy-api:google/gemini-3.5-flash-low --json
-checks:
-  - Important models are searchable by their expected display labels.
-  - Fallback rows are not renamed to generic provider descriptions.

@@ -5,7 +5,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { OnboardingWelcomeStep } from './onboarding-welcome-step';
 
 const wrap = (node: React.ReactElement): React.ReactElement => (
-  <Dialog open onOpenChange={() => undefined}>
+  <Dialog onOpenChange={() => undefined} open>
     {node}
   </Dialog>
 );

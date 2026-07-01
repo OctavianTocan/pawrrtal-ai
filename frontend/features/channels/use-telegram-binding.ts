@@ -19,13 +19,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { useAuthedQuery } from '@/hooks/use-authed-query';
 import { API_ENDPOINTS } from '@/lib/api';
-import {
-  type ChannelBinding,
-  ChannelNotConfiguredError,
-  issueTelegramLinkCode,
-  type TelegramLinkCode,
-  unlinkTelegram,
-} from '@/lib/channels';
+import type { ChannelBinding, TelegramLinkCode } from '@/lib/channels';
+import { ChannelNotConfiguredError, issueTelegramLinkCode, unlinkTelegram } from '@/lib/channels';
 
 const POLL_INTERVAL_MS = 2000;
 const PROVIDER = 'telegram';

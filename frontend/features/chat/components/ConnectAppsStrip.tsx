@@ -91,7 +91,7 @@ export function ConnectAppsStrip({ className, onDismiss }: ConnectAppsStripProps
         className
       )}
     >
-      <p className="min-w-0 truncate text-xs text-muted-foreground">Connect your apps to get better answers</p>
+      <p className="min-w-0 truncate text-muted-foreground text-xs">Connect your apps to get better answers</p>
       {/* Tightest grouping: `size-6` (24px) hit targets with `size-3`
 			    (12px) glyphs so the lineup reads as one cluster of brand
 			    chips instead of spaced affordances. */}

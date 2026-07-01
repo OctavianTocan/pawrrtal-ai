@@ -4,10 +4,8 @@ import { usePathname, useRouter } from 'next/navigation';
 import { startTransition, useState } from 'react';
 import { useSidebar } from '@/components/ui/sidebar';
 import type { Conversation } from '@/lib/types';
-import {
-  type UseConversationMetadataActionsResult,
-  useConversationMetadataActions,
-} from './use-conversation-metadata-actions';
+import type { UseConversationMetadataActionsResult } from './use-conversation-metadata-actions';
+import { useConversationMetadataActions } from './use-conversation-metadata-actions';
 import { useDeleteConversation, useRenameConversation } from './use-conversation-mutations';
 import { useExportConversation } from './use-export-conversation';
 

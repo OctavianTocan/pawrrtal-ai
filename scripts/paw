@@ -9,51 +9,19 @@ while [[ -L "${launcher_path}" ]]; do
 		launcher_path="${launcher_dir}/${launcher_path}"
 	fi
 done
+
 script_dir="$(cd -P -- "$(dirname -- "${launcher_path}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/.." && pwd)"
+cli_entrypoint="${repo_root}/packages/paw-cli/src/Main.ts"
 
-if [[ -n "${PAWRRTAL_BACKEND_DIR:-}" ]]; then
-	backend_dir="${PAWRRTAL_BACKEND_DIR}"
-elif [[ -d "${repo_root}/backend" ]]; then
-	backend_dir="${repo_root}/backend"
-else
-	printf 'Error: could not locate Pawrrtal backend. Set PAWRRTAL_BACKEND_DIR or run this launcher from the repository scripts directory.\n' >&2
+if ! command -v bun >/dev/null 2>&1; then
+	printf 'Error: Bun is required to run paw. Install Bun and try again.\n' >&2
 	exit 1
 fi
 
-if [[ ! -d "${backend_dir}" ]]; then
-	printf 'Error: Pawrrtal backend directory does not exist: %s\n' "${backend_dir}" >&2
+if [[ ! -f "${cli_entrypoint}" ]]; then
+	printf 'Error: could not locate Paw CLI entrypoint at %s\n' "${cli_entrypoint}" >&2
 	exit 1
 fi
 
-safe_branch="$(git -C "${repo_root}" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-safe_branch="$(printf '%s' "${safe_branch}" | sed -E 's/[^A-Za-z0-9._-]+/-/g; s/-+/-/g; s/^[-.]+//; s/[-.]+$//' | cut -c1-80)"
-if [[ -z "${safe_branch}" || "${safe_branch}" == "HEAD" ]]; then
-	safe_branch=""
-fi
-export DATABASE_URL="${DATABASE_URL-}"
-export SQLITE_DB_FILENAME="${SQLITE_DB_FILENAME:-${safe_branch:+pawrrtal-${safe_branch}.db}}"
-
-env_file="${PAWRRTAL_ENV_FILE:-}"
-if [[ -z "${env_file}" && -f "${backend_dir}/.env" ]]; then
-	env_file="${backend_dir}/.env"
-fi
-
-export UV_LINK_MODE="${UV_LINK_MODE:-copy}"
-export UV_CACHE_DIR="${UV_CACHE_DIR:-/tmp/pawrrtal-uv-cache}"
-mkdir -p "${UV_CACHE_DIR}"
-
-cd "${backend_dir}"
-if [[ "${1:-}" == "services" ]]; then
-	shift
-	if [[ -n "${env_file}" ]]; then
-		exec uv run python -m dotenv --file "${env_file}" run -- uv run python -m app.cli.paw.commands.services.cli "$@"
-	fi
-	exec uv run python -m app.cli.paw.commands.services.cli "$@"
-fi
-
-if [[ -n "${env_file}" ]]; then
-	exec uv run python -m dotenv --file "${env_file}" run -- uv run paw "$@"
-fi
-
-exec uv run paw "$@"
+exec bun run "${cli_entrypoint}" "$@"

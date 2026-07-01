@@ -14,7 +14,8 @@
 
 import { DropdownMenuItem, DropdownPanelMenu } from '@octavian-tocan/react-dropdown';
 import { ChevronDownIcon, ExternalLinkIcon, MessageCircleIcon } from 'lucide-react';
-import { Children, type ComponentProps, createContext, isValidElement, type ReactNode, use, useMemo } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
+import { Children, createContext, isValidElement, use, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -230,12 +231,12 @@ export const OpenIn = ({ query, children, className }: OpenInProps) => {
   return (
     <OpenInContext.Provider value={contextValue}>
       <DropdownPanelMenu
-        asChild
-        usePortal
         align="start"
+        asChild
         className={className}
-        contentClassName={cn('popover-styled p-1 w-[240px]')}
+        contentClassName={cn('popover-styled w-[240px] p-1')}
         trigger={triggerNode ?? DEFAULT_OPEN_IN_TRIGGER}
+        usePortal
       >
         {contentNode}
       </DropdownPanelMenu>

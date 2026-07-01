@@ -6,7 +6,8 @@
  *              other routes require the `session_token` cookie or redirect to `/login`.
  */
 
-import { type NextRequest, NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { NextResponse } from 'next/server';
 
 /** Application roots that require an authenticated session. */
 const protectedRoutes = ['/'];

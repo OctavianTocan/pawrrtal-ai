@@ -9,7 +9,8 @@
  */
 
 import { PlusIcon } from 'lucide-react';
-import { type FormEvent, type ReactNode, useState } from 'react';
+import type { FormEvent, ReactNode } from 'react';
+import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 export interface TaskQuickAddProps {
@@ -35,29 +36,29 @@ export function TaskQuickAdd({ onAdd }: TaskQuickAddProps): ReactNode {
 
   return (
     <form
-      onSubmit={handleSubmit}
       className={cn(
         'group/quick-add flex items-center gap-2 rounded-md border border-foreground/[0.08] bg-background px-3 py-2.5 transition-colors duration-150 ease-out',
         'focus-within:border-foreground/30 hover:border-foreground/15'
       )}
+      onSubmit={handleSubmit}
     >
       <span
         className={cn(
-          'flex size-5 items-center justify-center rounded-full border border-dashed border-foreground/30 text-muted-foreground transition-colors duration-150 ease-out',
-          trimmed && 'border-solid border-accent text-accent'
+          'flex size-5 items-center justify-center rounded-full border border-foreground/30 border-dashed text-muted-foreground transition-colors duration-150 ease-out',
+          trimmed && 'border-accent border-solid text-accent'
         )}
       >
         <PlusIcon aria-hidden="true" className="size-3" strokeWidth={2.5} />
       </span>
       <input
         aria-label="Add a task"
-        type="text"
-        value={value}
+        className="h-6 min-w-0 flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground"
         onChange={(event) => setValue(event.target.value)}
         placeholder="Add a task to today..."
-        className="h-6 min-w-0 flex-1 bg-transparent text-[13px] text-foreground outline-none placeholder:text-muted-foreground"
+        type="text"
+        value={value}
       />
-      <span className="hidden text-[11px] font-medium tracking-tight text-muted-foreground/70 sm:inline">
+      <span className="hidden font-medium text-[11px] text-muted-foreground/70 tracking-tight sm:inline">
         Press Enter to add
       </span>
     </form>

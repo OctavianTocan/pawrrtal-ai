@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "agentic_stack_version": "0.18.0",
+  "abs_target": "/mnt/work/code/personal/pawrrtal",
+  "installed_at": "2026-06-29T18:59:26Z",
+  "adapters": {
+    "cursor": {
+      "installed_at": "2026-06-29T18:53:05Z",
+      "files_written": [
+        ".cursor/rules/agentic-stack.mdc"
+      ],
+      "files_overwritten": [],
+      "files_alerted": [],
+      "file_results": [
+        {
+          "dst": ".cursor/rules/agentic-stack.mdc",
+          "result": "written_new"
+        }
+      ],
+      "post_install_results": []
+    },
+    "claude-code": {
+      "installed_at": "2026-06-29T18:54:30Z",
+      "files_written": [],
+      "files_overwritten": [
+        ".claude/settings.json"
+      ],
+      "files_alerted": [],
+      "file_results": [
+        {
+          "dst": ".claude/settings.json",
+          "result": "skipped_existing"
+        }
+      ],
+      "brain_root_primitive": "$CLAUDE_PROJECT_DIR",
+      "post_install_results": [],
+      "note": "Hooks merged manually into existing settings.json to preserve enabledPlugins."
+    },
+    "codex": {
+      "installed_at": "2026-06-29T18:59:26Z",
+      "files_written": [],
+      "files_overwritten": [],
+      "files_alerted": [
+        "AGENTS.md"
+      ],
+      "file_results": [
+        {
+          "dst": "AGENTS.md",
+          "result": "merge_alert"
+        }
+      ],
+      "post_install_results": [],
+      "skills_link": {
+        "target": ".agent/skills",
+        "dst": ".agents/skills",
+        "fallback": "rsync_with_delete"
+      },
+      "skills_link_pre_existed": false
+    }
+  }
+}

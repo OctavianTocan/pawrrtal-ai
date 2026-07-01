@@ -41,23 +41,23 @@ export function OnboardingLocalWorkspaceStep({
   return (
     <section className="popover-styled onboarding-panel flex w-full max-w-[32rem] select-none flex-col gap-6 rounded-surface-lg border border-border bg-background/95 p-6 text-foreground shadow-modal-small sm:p-7">
       <button
-        type="button"
-        className="-ml-1 flex h-8 w-fit cursor-pointer items-center gap-2 rounded-lg px-2 text-sm text-muted-foreground transition-[background-color,color] duration-150 ease-[cubic-bezier(0.25,1,0.5,1)] hover:bg-foreground/[0.045] hover:text-foreground active:bg-foreground/[0.035] focus-visible:ring-2 focus-visible:ring-ring/45"
-        onClick={onBack}
         aria-label="Back to workspace options"
+        className="-ml-1 flex h-8 w-fit cursor-pointer items-center gap-2 rounded-lg px-2 text-muted-foreground text-sm transition-[background-color,color] duration-150 ease-[cubic-bezier(0.25,1,0.5,1)] hover:bg-foreground/[0.045] hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring/45 active:bg-foreground/[0.035]"
+        onClick={onBack}
+        type="button"
       >
-        <HugeiconsIcon icon={ArrowLeft02Icon} size={16} strokeWidth={1.7} aria-hidden="true" />
+        <HugeiconsIcon aria-hidden="true" icon={ArrowLeft02Icon} size={16} strokeWidth={1.7} />
         <span>Back</span>
       </button>
 
       <DialogHeader className="gap-2 text-left">
         <div
-          className="text-balance text-[1.375rem] font-semibold leading-tight tracking-tight text-foreground"
           aria-hidden="true"
+          className="text-balance font-semibold text-[1.375rem] text-foreground leading-tight tracking-tight"
         >
           Choose folder
         </div>
-        <DialogDescription className="max-w-[26rem] text-[0.9375rem] leading-relaxed text-muted-foreground">
+        <DialogDescription className="max-w-[26rem] text-[0.9375rem] text-muted-foreground leading-relaxed">
           Pick the folder Pawrrtal can use as this workspace.
         </DialogDescription>
       </DialogHeader>
@@ -65,17 +65,17 @@ export function OnboardingLocalWorkspaceStep({
       {/*
         Cosmetic folder picker only — full workspace paths / persistence are future work.
       */}
-      <Label htmlFor={folderInputId} className="sr-only">
+      <Label className="sr-only" htmlFor={folderInputId}>
         Workspace folder
       </Label>
       <input
-        ref={folderInputRef}
-        id={folderInputId}
-        type="file"
         className="sr-only"
+        id={folderInputId}
         multiple
         onChange={onFolderChange}
+        ref={folderInputRef}
         tabIndex={-1}
+        type="file"
         {...({
           webkitdirectory: '',
           directory: '',
@@ -85,7 +85,7 @@ export function OnboardingLocalWorkspaceStep({
       <div
         className={cn(
           'flex min-h-[6.75rem] w-full select-none items-center gap-4 rounded-lg px-4 text-left ring-1',
-          isFolderSelected ? 'bg-foreground/[0.045] ring-border shadow-minimal' : 'bg-foreground/[0.025] ring-border'
+          isFolderSelected ? 'bg-foreground/[0.045] shadow-minimal ring-border' : 'bg-foreground/[0.025] ring-border'
         )}
       >
         <span
@@ -97,35 +97,35 @@ export function OnboardingLocalWorkspaceStep({
           )}
         >
           {isFolderSelected ? (
-            <HugeiconsIcon icon={FolderCheckIcon} size={20} strokeWidth={1.7} aria-hidden="true" />
+            <HugeiconsIcon aria-hidden="true" icon={FolderCheckIcon} size={20} strokeWidth={1.7} />
           ) : (
-            <HugeiconsIcon icon={FolderOpenIcon} size={20} strokeWidth={1.7} aria-hidden="true" />
+            <HugeiconsIcon aria-hidden="true" icon={FolderOpenIcon} size={20} strokeWidth={1.7} />
           )}
         </span>
-        <span className="min-w-0 flex-1" aria-live="polite">
-          <span className="block truncate text-[0.9375rem] font-medium text-foreground">
+        <span aria-live="polite" className="min-w-0 flex-1">
+          <span className="block truncate font-medium text-[0.9375rem] text-foreground">
             {folderLabel ?? 'Select a workspace folder'}
           </span>
-          <span className="mt-1 block text-sm leading-5 text-muted-foreground">
+          <span className="mt-1 block text-muted-foreground text-sm leading-5">
             {isFolderSelected
               ? 'Ready to open as your workspace.'
               : 'Browse your computer and choose the folder to use.'}
           </span>
         </span>
         <button
-          type="button"
-          className="inline-flex shrink-0 cursor-pointer rounded-lg bg-foreground/[0.045] px-3 py-2 text-sm font-medium text-foreground ring-1 ring-border transition-[background-color,color] duration-150 ease-[cubic-bezier(0.25,1,0.5,1)] hover:bg-foreground/[0.07] focus-visible:ring-2 focus-visible:ring-ring/45"
+          className="inline-flex shrink-0 cursor-pointer rounded-lg bg-foreground/[0.045] px-3 py-2 font-medium text-foreground text-sm ring-1 ring-border transition-[background-color,color] duration-150 ease-[cubic-bezier(0.25,1,0.5,1)] hover:bg-foreground/[0.07] focus-visible:ring-2 focus-visible:ring-ring/45"
           onClick={onSelectFolderClick}
+          type="button"
         >
           Browse
         </button>
       </div>
 
       <Button
-        type="button"
-        className="h-10 w-full cursor-pointer rounded-lg bg-foreground text-sm font-semibold text-background shadow-none transition-[background-color,box-shadow] duration-150 ease-[cubic-bezier(0.25,1,0.5,1)] hover:bg-foreground/90 hover:shadow-minimal active:bg-foreground/80 disabled:cursor-not-allowed disabled:bg-foreground/[0.09] disabled:text-muted-foreground"
-        onClick={onFinish}
+        className="h-10 w-full cursor-pointer rounded-lg bg-foreground font-semibold text-background text-sm shadow-none transition-[background-color,box-shadow] duration-150 ease-[cubic-bezier(0.25,1,0.5,1)] hover:bg-foreground/90 hover:shadow-minimal active:bg-foreground/80 disabled:cursor-not-allowed disabled:bg-foreground/[0.09] disabled:text-muted-foreground"
         disabled={!isFolderSelected}
+        onClick={onFinish}
+        type="button"
       >
         {isFolderSelected ? 'Open workspace' : 'Select a folder first'}
       </Button>

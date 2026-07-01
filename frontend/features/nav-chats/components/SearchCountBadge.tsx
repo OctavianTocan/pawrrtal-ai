@@ -6,7 +6,7 @@ export function SearchCountBadge({ count, isSelected }: { count: number; isSelec
   return (
     <span
       className={cn(
-        'inline-flex min-w-[24px] items-center justify-center whitespace-nowrap rounded-[6px] px-1 py-0.5 text-[10px] font-medium leading-tight tabular-nums shadow-tinted',
+        'inline-flex min-w-[24px] items-center justify-center whitespace-nowrap rounded-[6px] px-1 py-0.5 font-medium text-[10px] tabular-nums leading-tight shadow-tinted',
         isSelected
           ? 'border border-yellow-500 bg-yellow-300/50 text-yellow-900'
           : 'border border-yellow-600/20 bg-yellow-300/10 text-yellow-800'

@@ -32,13 +32,13 @@ export function TaskSection({ section, collapsed, onToggleCollapsed, children }:
   const taskCountLabel = `${section.tasks.length} ${section.tasks.length === 1 ? 'task' : 'tasks'}`;
 
   return (
-    <section className="border-b border-foreground/[0.08]">
+    <section className="border-foreground/[0.08] border-b">
       <header className="flex items-center justify-between gap-3 py-2 pr-3 pl-1">
         <button
-          type="button"
-          onClick={onToggleCollapsed}
           aria-expanded={!collapsed}
           className="group/header flex flex-1 cursor-pointer items-center gap-2 rounded-md py-1 pl-1 text-left transition-colors duration-150 ease-out hover:bg-foreground/[0.03] focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
+          onClick={onToggleCollapsed}
+          type="button"
         >
           <ChevronRightIcon
             aria-hidden="true"
@@ -48,20 +48,20 @@ export function TaskSection({ section, collapsed, onToggleCollapsed, children }:
             )}
             strokeWidth={2.5}
           />
-          <h2 className={cn('text-[13px] font-semibold tracking-tight tabular-nums', headingTone)}>{section.label}</h2>
+          <h2 className={cn('font-semibold text-[13px] tabular-nums tracking-tight', headingTone)}>{section.label}</h2>
           {section.subtitle ? (
-            <span className="text-[12px] font-normal text-muted-foreground">{section.subtitle}</span>
+            <span className="font-normal text-[12px] text-muted-foreground">{section.subtitle}</span>
           ) : null}
-          <span aria-hidden="true" className="text-[11px] font-medium tabular-nums text-muted-foreground/70">
+          <span aria-hidden="true" className="font-medium text-[11px] text-muted-foreground/70 tabular-nums">
             ·
           </span>
-          <span className="text-[12px] font-medium tabular-nums text-muted-foreground">{taskCountLabel}</span>
+          <span className="font-medium text-[12px] text-muted-foreground tabular-nums">{taskCountLabel}</span>
         </button>
         {section.rightAction ? (
           <button
-            type="button"
+            className="cursor-pointer font-medium text-[12px] text-accent transition-opacity duration-150 ease-out hover:opacity-80 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
             onClick={section.rightAction.onClick}
-            className="cursor-pointer text-[12px] font-medium text-accent transition-opacity duration-150 ease-out hover:opacity-80 focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
+            type="button"
           >
             {section.rightAction.label}
           </button>

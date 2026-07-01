@@ -18,7 +18,6 @@ import { handbookSource } from '@/lib/source';
 export default function HandbookLayout({ children }: { children: ReactNode }): React.ReactElement {
   return (
     <DocsLayout
-      tree={handbookSource.pageTree}
       containerProps={{ className: 'pawrrtal-docs' }}
       sidebar={{
         defaultOpenLevel: 1,
@@ -29,6 +28,7 @@ export default function HandbookLayout({ children }: { children: ReactNode }): R
         { title: 'Handbook', url: '/docs/handbook' },
         { title: 'Product', url: '/docs/product' },
       ]}
+      tree={handbookSource.pageTree}
       {...baseOptions()}
     >
       {children}

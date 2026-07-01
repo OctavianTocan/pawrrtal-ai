@@ -1,19 +1,19 @@
-import { HttpApiMiddleware, HttpApiSecurity } from "effect/unstable/httpapi"
-import type { CurrentUser } from "./Domain"
-import { AuthenticationError, AuthorizationError } from "./Errors"
+import { HttpApiMiddleware, HttpApiSecurity } from 'effect/unstable/httpapi';
+import type { CurrentUser } from './Domain';
+import { AuthenticationError, AuthorizationError } from './Errors';
 
 /** Cookie auth middleware contract; runtime in `apps/api/.../Authentication/Http.ts`. */
 export class AuthenticationMiddlewareService extends HttpApiMiddleware.Service<
   AuthenticationMiddlewareService,
   {
-    provides: CurrentUser
-    requires: never
+    provides: CurrentUser;
+    requires: never;
   }
->()("AuthenticationMiddlewareService", {
+>()('AuthenticationMiddlewareService', {
   error: AuthenticationError,
   requiredForClient: true,
   security: {
-    cookie: HttpApiSecurity.apiKey({ in: "cookie", key: "session_token" })
+    cookie: HttpApiSecurity.apiKey({ in: 'cookie', key: 'session_token' })
   }
 }) {}
 
@@ -21,10 +21,10 @@ export class AuthenticationMiddlewareService extends HttpApiMiddleware.Service<
 export class AllowedUserMiddlewareService extends HttpApiMiddleware.Service<
   AllowedUserMiddlewareService,
   {
-    requires: CurrentUser
-    provides: never
+    requires: CurrentUser;
+    provides: never;
   }
->()("AllowedUserMiddlewareService", {
+>()('AllowedUserMiddlewareService', {
   error: AuthorizationError,
   // Nothing to send to this one.
   requiredForClient: false

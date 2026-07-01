@@ -3,7 +3,8 @@
 import * as m from 'motion/react-m';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DecisionPill } from './DecisionPill';
-import { BOUNCY_SPRING, getInitials, type RequestRowProps } from './types';
+import type { RequestRowProps } from './types';
+import { BOUNCY_SPRING, getInitials } from './types';
 
 /**
  * A single user row inside the expanded access-request list.
@@ -25,10 +26,10 @@ import { BOUNCY_SPRING, getInitials, type RequestRowProps } from './types';
 export function RequestRow({ request, decision, onApprove, onReject, onReset }: RequestRowProps) {
   return (
     <m.div
-      initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      transition={{ duration: 0.15 }}
       className="flex items-center justify-between gap-3 px-4 py-2"
+      initial={{ opacity: 0 }}
+      transition={{ duration: 0.15 }}
     >
       <div className="flex items-center gap-3">
         {/*
@@ -38,16 +39,16 @@ export function RequestRow({ request, decision, onApprove, onReject, onReset }: 
          */}
         <m.div layoutId={`avatar-${request.id}`} transition={BOUNCY_SPRING}>
           <Avatar size="sm">
-            {request.avatarUrl && <AvatarImage src={request.avatarUrl} alt={request.name} />}
+            {request.avatarUrl && <AvatarImage alt={request.name} src={request.avatarUrl} />}
             <AvatarFallback>{getInitials(request.name)}</AvatarFallback>
           </Avatar>
         </m.div>
 
         {/* Scale bounce echoes the avatar spring for a cohesive row entry */}
         <m.span
-          className="text-sm font-medium"
-          initial={{ scale: 0.92, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
+          className="font-medium text-sm"
+          initial={{ scale: 0.92, opacity: 0 }}
           transition={BOUNCY_SPRING}
         >
           {request.name}
@@ -55,13 +56,13 @@ export function RequestRow({ request, decision, onApprove, onReject, onReset }: 
       </div>
 
       {/* Same spring as the name so the entire right side arrives together */}
-      <m.div initial={{ scale: 0.85, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={BOUNCY_SPRING}>
+      <m.div animate={{ scale: 1, opacity: 1 }} initial={{ scale: 0.85, opacity: 0 }} transition={BOUNCY_SPRING}>
         <DecisionPill
-          pillId={request.id}
           decision={decision}
           onApprove={onApprove}
           onReject={onReject}
           onReset={onReset}
+          pillId={request.id}
         />
       </m.div>
     </m.div>

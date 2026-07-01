@@ -8,7 +8,7 @@
 //
 // # skill-gen
 //
-// Scans source files for `//<skill-gen>` markers, extracts skill fragments (markdown with YAML frontmatter), merges them by skill name, and writes `SKILL.md` files to the configured output folder. Pawrrtal's repo scripts target `.cursor/plugins/pawrrtal/skills`.
+// Scans source files for `//<skill-gen>` markers, extracts skill fragments (markdown with YAML frontmatter), merges them by skill name, and writes `SKILL.md` files to the configured output folder. Pawrrtal's canonical output is `.agent/skills/` (agentic-stack brain); `.agents/skills/` and `.cursor/plugins/pawrrtal/skills/` mirror it.
 //
 // **Full specification:** `packages/ci/skill-gen/SPEC.md`
 //
@@ -111,6 +111,7 @@ import * as Effect from 'effect/Effect';
 import * as Option from 'effect/Option';
 import * as Command from 'effect/unstable/cli/Command';
 import * as Flag from 'effect/unstable/cli/Flag';
+import { loadDynamicFragments } from './dynamic-fragments';
 import { collectSkillFiles, compareFile } from './e2e';
 import { mergeFragments } from './merge';
 import { checkSkills, formatDiffs, writeSkills } from './output';
@@ -137,13 +138,14 @@ async function runPipeline(
   verbose: boolean
 ): Promise<ReturnType<typeof mergeFragments>> {
   const rawFragments = await scan(baseDir, outputDir, verbose);
+  const dynamicFragments = await loadDynamicFragments(baseDir, verbose);
 
   if (verbose) {
     process.stdout.write(`pipeline: found ${rawFragments.length} raw fragment(s)\n`);
   }
 
   const parsed = rawFragments.map(parseFragment).filter((f): f is NonNullable<typeof f> => f !== null);
-  const merged = mergeFragments(parsed);
+  const merged = mergeFragments([...parsed, ...dynamicFragments]);
 
   if (verbose) {
     process.stdout.write(`pipeline: merged into ${merged.size} skill(s)\n`);
@@ -154,7 +156,7 @@ async function runPipeline(
 
 /** Resolve the default output directory for a base directory. */
 function defaultOutputDir(baseDir: string): string {
-  return resolve(baseDir, '.agents', 'skills');
+  return resolve(baseDir, '.agent', 'skills');
 }
 
 const baseFlag = Flag.string('base').pipe(

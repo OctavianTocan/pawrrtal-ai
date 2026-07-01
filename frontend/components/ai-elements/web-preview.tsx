@@ -139,7 +139,7 @@ const WebPreviewUrlInput = ({ value, onChange, onKeyDown, url, setUrl, ...props 
 export const WebPreviewUrl = (props: WebPreviewUrlProps) => {
   const { url, setUrl } = useWebPreview();
 
-  return <WebPreviewUrlInput key={url} url={url} setUrl={setUrl} {...props} />;
+  return <WebPreviewUrlInput key={url} setUrl={setUrl} url={url} {...props} />;
 };
 
 export type WebPreviewBodyProps = ComponentProps<'iframe'> & {

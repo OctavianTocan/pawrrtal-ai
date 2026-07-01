@@ -32,7 +32,8 @@ import {
   UserPlusIcon,
   XIcon,
 } from 'lucide-react';
-import { type ReactNode, useCallback, useEffect, useReducer, useRef } from 'react';
+import type { ReactNode } from 'react';
+import { useCallback, useEffect, useReducer, useRef } from 'react';
 import { Streamdown } from 'streamdown';
 
 // ───────────────────────────────────────────────────────────────────────────
@@ -54,18 +55,18 @@ function EditActionsRow({
   return (
     <div className="flex items-center gap-1.5">
       <button
-        type="button"
-        onClick={onCancel}
+        className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md px-2.5 font-medium text-[12px] text-muted-foreground transition-colors duration-150 ease-out hover:bg-foreground-5 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
         disabled={isSaving}
-        className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md px-2.5 text-[12px] font-medium text-muted-foreground transition-colors duration-150 ease-out hover:bg-foreground-5 hover:text-foreground disabled:pointer-events-none disabled:opacity-50"
+        onClick={onCancel}
+        type="button"
       >
         Cancel
       </button>
       <button
-        type="button"
-        onClick={onSave}
+        className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md bg-foreground px-2.5 font-medium text-[12px] text-background transition-colors duration-150 ease-out hover:bg-foreground/90 disabled:pointer-events-none disabled:opacity-50"
         disabled={isSaving || !canSave}
-        className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md bg-foreground px-2.5 text-[12px] font-medium text-background transition-colors duration-150 ease-out hover:bg-foreground/90 disabled:pointer-events-none disabled:opacity-50"
+        onClick={onSave}
+        type="button"
       >
         {isSaving ? (
           <Loader2Icon aria-hidden="true" className="size-3.5 animate-spin" />
@@ -92,9 +93,9 @@ function ReadActionsRow({
     <div className="flex items-center gap-1.5">
       {canEdit && (
         <button
-          type="button"
+          className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md px-2 font-medium text-[12px] text-muted-foreground transition-colors duration-150 ease-out hover:bg-foreground-5 hover:text-foreground"
           onClick={onEdit}
-          className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md px-2 text-[12px] font-medium text-muted-foreground transition-colors duration-150 ease-out hover:bg-foreground-5 hover:text-foreground"
+          type="button"
         >
           <PencilIcon aria-hidden="true" className="size-3.5" />
           Edit
@@ -102,20 +103,20 @@ function ReadActionsRow({
       )}
 
       <DropdownPanelMenu
-        asChild
-        usePortal
         align="end"
+        asChild
         contentClassName="popover-styled p-1 min-w-44"
         trigger={
           <button
+            className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-full bg-foreground-5 pr-1.5 pl-3 font-medium text-[12px] text-foreground transition-colors duration-150 ease-out hover:bg-foreground-10"
             type="button"
-            className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-full bg-foreground-5 pr-1.5 pl-3 text-[12px] font-medium text-foreground transition-colors duration-150 ease-out hover:bg-foreground-10"
           >
             <SendIcon aria-hidden="true" className="size-3.5" />
             Publish
             <ChevronDownIcon aria-hidden="true" className="size-3.5" />
           </button>
         }
+        usePortal
       >
         <DropdownMenuItem>
           <CopyIcon className="size-3.5" />
@@ -141,10 +142,10 @@ function ReadActionsRow({
       </DropdownPanelMenu>
 
       <button
-        type="button"
-        onClick={onClose}
         aria-label="Close document"
         className="flex size-7 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 hover:bg-foreground-5 hover:text-foreground"
+        onClick={onClose}
+        type="button"
       >
         <XIcon aria-hidden="true" className="size-4" />
       </button>
@@ -179,18 +180,18 @@ function StaleWarningBanner({
         This file changed externally while you were editing. Saving now will overwrite the newer version.
       </span>
       <button
-        type="button"
-        onClick={onReload}
+        className="inline-flex h-6 cursor-pointer items-center gap-1 rounded-md border border-amber-500/40 bg-transparent px-2 font-medium text-[11px] text-amber-700 transition-colors duration-150 ease-out hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50 dark:text-amber-300"
         disabled={disabled}
-        className="inline-flex h-6 cursor-pointer items-center gap-1 rounded-md border border-amber-500/40 bg-transparent px-2 text-[11px] font-medium text-amber-700 transition-colors duration-150 ease-out hover:bg-amber-500/10 disabled:pointer-events-none disabled:opacity-50 dark:text-amber-300"
+        onClick={onReload}
+        type="button"
       >
         Reload from server
       </button>
       <button
-        type="button"
-        onClick={onDismiss}
+        className="inline-flex h-6 cursor-pointer items-center gap-1 rounded-md bg-amber-600 px-2 font-medium text-[11px] text-white transition-colors duration-150 ease-out hover:bg-amber-700 disabled:pointer-events-none disabled:opacity-50"
         disabled={disabled}
-        className="inline-flex h-6 cursor-pointer items-center gap-1 rounded-md bg-amber-600 px-2 text-[11px] font-medium text-white transition-colors duration-150 ease-out hover:bg-amber-700 disabled:pointer-events-none disabled:opacity-50"
+        onClick={onDismiss}
+        type="button"
       >
         Keep my draft
       </button>
@@ -228,12 +229,12 @@ function DocumentBody({
         <div className="mx-auto max-w-[680px]">
           <textarea
             aria-label="Document content editor"
-            value={editContent}
-            onChange={(e) => onChangeContent(e.target.value)}
+            className="w-full resize-none rounded-md border border-border bg-background px-4 py-3 font-mono text-[13px] text-foreground leading-relaxed focus:outline-none focus:ring-2 focus:ring-foreground/20 disabled:opacity-60"
             disabled={isSaving}
+            onChange={(e) => onChangeContent(e.target.value)}
             spellCheck={false}
-            className="w-full resize-none rounded-md border border-border bg-background px-4 py-3 font-mono text-[13px] leading-relaxed text-foreground focus:outline-none focus:ring-2 focus:ring-foreground/20 disabled:opacity-60"
             style={{ minHeight: '480px' }}
+            value={editContent}
           />
         </div>
       </div>
@@ -404,7 +405,7 @@ export function DocumentViewer({ filename, markdown, onClose, onSave }: Document
         <span className="flex-1 truncate text-[12px] text-muted-foreground">
           {filename}
           {isEditing && (
-            <span className="ml-1.5 rounded bg-amber-100 px-1 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+            <span className="ml-1.5 rounded bg-amber-100 px-1 py-0.5 font-medium text-[10px] text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
               editing
             </span>
           )}

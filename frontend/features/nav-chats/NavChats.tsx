@@ -2,12 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import useGetConversations from '@/hooks/get-conversations';
-import {
-  buildConversationGroups,
-  type ConversationGroup,
-  countGroupItems,
-  filterConversationGroups,
-} from '@/lib/conversation-groups';
+import type { ConversationGroup } from '@/lib/conversation-groups';
+import { buildConversationGroups, countGroupItems, filterConversationGroups } from '@/lib/conversation-groups';
 import type { Conversation } from '@/lib/types';
 import { NavChatsView } from './components/NavChatsView';
 import { ARCHIVED_GROUP_KEY, NAV_CHATS_STORAGE_KEYS } from './constants';
@@ -190,42 +186,42 @@ export function NavChats(): React.JSX.Element {
   return (
     <>
       <NavChatsView
-        searchQuery={searchQuery}
+        activeChatMatchInfo={listOrchestration.activeChatMatchInfo}
+        collapsedGroups={collapsedGroups}
+        contentSearchResults={listOrchestration.contentSearchResults}
+        filteredGroups={filteredGroups}
+        focusedConversationId={listOrchestration.focusedConversationId}
+        isEmpty={!activeConversations.length && !archivedConversations.length}
+        isLoading={isLoading}
+        isSearchActive={listOrchestration.isSearchActive}
+        multiSelectedIds={listOrchestration.multiSelectedIds}
+        navigatorRef={listOrchestration.navigatorRef}
+        onArchive={handleArchive}
+        onConversationClick={listOrchestration.onConversationClick}
+        onConversationKeyDown={listOrchestration.onConversationKeyDown}
+        onConversationMouseDown={listOrchestration.onConversationMouseDown}
+        onDelete={handleDeleteClick}
+        onExportMarkdown={handleExportMarkdown}
+        onFlag={handleFlag}
+        onMarkUnread={handleMarkUnread}
+        onNavigate={navigateTo}
+        onNavigatorMouseDown={listOrchestration.onNavigatorMouseDown}
+        onNewSession={() => navigateTo('/')}
+        onRegenerateTitle={handleRegenerateTitle}
+        onRename={handleRenameClick}
         onSearchChange={setSearchQuery}
         onSearchClose={() => setSearchQuery('')}
-        resultCount={resultCount}
-        isLoading={isLoading}
-        isEmpty={!activeConversations.length && !archivedConversations.length}
-        isSearchActive={listOrchestration.isSearchActive}
-        filteredGroups={filteredGroups}
-        collapsedGroups={collapsedGroups}
-        onToggleGroup={toggleGroupCollapse}
-        onNewSession={() => navigateTo('/')}
-        onNavigate={navigateTo}
-        onRename={handleRenameClick}
-        onDelete={handleDeleteClick}
-        onArchive={handleArchive}
-        onFlag={handleFlag}
         onSetStatus={handleSetStatus}
-        onMarkUnread={handleMarkUnread}
-        onRegenerateTitle={handleRegenerateTitle}
+        onToggleGroup={toggleGroupCollapse}
         onToggleLabel={handleToggleLabel}
-        onExportMarkdown={handleExportMarkdown}
-        navigatorRef={listOrchestration.navigatorRef}
-        contentSearchResults={listOrchestration.contentSearchResults}
-        activeChatMatchInfo={listOrchestration.activeChatMatchInfo}
-        multiSelectedIds={listOrchestration.multiSelectedIds}
-        focusedConversationId={listOrchestration.focusedConversationId}
-        onConversationClick={listOrchestration.onConversationClick}
-        onConversationMouseDown={listOrchestration.onConversationMouseDown}
-        onConversationKeyDown={listOrchestration.onConversationKeyDown}
         registerConversationElement={listOrchestration.registerConversationElement}
-        onNavigatorMouseDown={listOrchestration.onNavigatorMouseDown}
+        resultCount={resultCount}
+        searchQuery={searchQuery}
       />
       <ConversationRenameDialog
+        draftTitle={draftTitle}
         isOpen={!!renameDialogConversationId}
         isPending={isRenamePending}
-        draftTitle={draftTitle}
         onDraftTitleChange={setDraftTitle}
         onOpenChange={handleRenameDialogOpenChange}
         onSubmit={() => void handleRenameSubmit()}
@@ -233,8 +229,8 @@ export function NavChats(): React.JSX.Element {
       <ConversationDeleteDialog
         isOpen={!!deleteDialogConversationId}
         isPending={isDeletePending}
-        onOpenChange={handleDeleteDialogOpenChange}
         onConfirm={() => void handleDeleteConfirm()}
+        onOpenChange={handleDeleteDialogOpenChange}
       />
     </>
   );

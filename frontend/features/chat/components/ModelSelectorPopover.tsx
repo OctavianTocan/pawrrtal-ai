@@ -18,7 +18,8 @@ import type { ChatReasoningLevel } from '../constants';
 import type { ChatModelOption } from '../hooks/use-chat-models';
 import { hostLabel } from './model-picker-labels';
 import { MultiVendorHostMenuRow, SingleVendorHostMenuRow } from './model-selector-host-rows';
-import { groupModelsByHost, type ModelRowSlotProps } from './model-selector-types';
+import type { ModelRowSlotProps } from './model-selector-types';
+import { groupModelsByHost } from './model-selector-types';
 
 type ReasoningOption = {
   /** Stable reasoning value. */
@@ -54,7 +55,7 @@ function rootRowDisplay(row: RootRow): string {
  * Lifted to module scope so React does not re-create it on every render.
  */
 function renderModelRow({ model, isSelected, onSelect }: ModelRowSlotProps): React.JSX.Element {
-  return <ModelRow key={model.id} model={model} isSelected={isSelected} onSelect={onSelect} />;
+  return <ModelRow isSelected={isSelected} key={model.id} model={model} onSelect={onSelect} />;
 }
 
 /**
@@ -132,13 +133,13 @@ function ModelRow({
 
   return (
     <button
-      type="button"
       className={cn(
         'flex w-full cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-foreground/[0.04]',
         isSelected && 'bg-foreground/[0.07] font-medium'
       )}
       onClick={commitSelection.onClick}
       onPointerDown={commitSelection.onPointerDown}
+      type="button"
     >
       <div className="flex min-w-0 flex-1 flex-col text-left">
         <span className="truncate text-foreground">{model.short_name}</span>
@@ -169,13 +170,13 @@ function ReasoningRow({
 
   return (
     <button
-      type="button"
       className={cn(
         'flex w-full cursor-pointer items-center justify-between rounded-md px-2 py-1.5 text-sm hover:bg-foreground/[0.04]',
         isSelected && 'bg-foreground/[0.07]'
       )}
       onClick={commitSelection.onClick}
       onPointerDown={commitSelection.onPointerDown}
+      type="button"
     >
       <span>{option.label}</span>
     </button>
@@ -231,9 +232,9 @@ export function ModelSelectorPopover({
         <SingleVendorHostMenuRow
           group={group}
           isActiveHost={isActiveHost}
-          selectedModelId={selectedModelId}
           onSelectModel={onSelectModel}
           renderModelRow={renderModelRow}
+          selectedModelId={selectedModelId}
         />
       );
     }
@@ -243,10 +244,10 @@ export function ModelSelectorPopover({
       <MultiVendorHostMenuRow
         group={group}
         isActiveHost={isActiveHost}
-        selectedModel={selectedModel}
-        selectedModelId={selectedModelId}
         onSelectModel={onSelectModel}
         renderModelRow={renderModelRow}
+        selectedModel={selectedModel}
+        selectedModelId={selectedModelId}
       />
     );
   }
@@ -264,10 +265,8 @@ export function ModelSelectorPopover({
         <TooltipTrigger asChild>
           <span className="inline-flex">
             <DropdownMenu<RootRow>
-              asChild
-              usePortal
-              placement="top"
               align="start"
+              asChild
               // Submenu rows handle their own selection + closeDropdown,
               // so the root menu's onSelect is unused but required.
               closeOnSelect={false}
@@ -282,22 +281,7 @@ export function ModelSelectorPopover({
               onSelect={() => {
                 // no-op — submenu rows handle their own selection
               }}
-              trigger={
-                <Button
-                  aria-label="Select model and reasoning"
-                  className={cn(
-                    'h-7 max-w-[8.75rem] gap-1 rounded-[7px] border-0 bg-transparent px-2 text-[12px] font-normal text-muted-foreground hover:bg-foreground/[0.1] hover:text-foreground sm:max-w-none',
-                    menuOpen && 'bg-foreground/[0.08]'
-                  )}
-                  size="xs"
-                  type="button"
-                  variant="ghost"
-                >
-                  <span className="truncate text-foreground">{triggerLabel}</span>
-                  <span className="hidden sm:inline">{reasoningLabel}</span>
-                  <ChevronDownIcon aria-hidden="true" className="size-3" />
-                </Button>
-              }
+              placement="top"
               renderItem={(row) => {
                 if (row.kind === 'host') {
                   return renderHostRow(row.host);
@@ -311,19 +295,35 @@ export function ModelSelectorPopover({
                         <span className="truncate text-[11px] text-muted-foreground">Extended reasoning depth</span>
                       </div>
                     </DropdownSubmenuTrigger>
-                    <DropdownSubmenuContent className="chat-composer-dropdown-menu popover-styled p-1 min-w-32">
+                    <DropdownSubmenuContent className="chat-composer-dropdown-menu popover-styled min-w-32 p-1">
                       {REASONING_OPTIONS.map((option) => (
                         <ReasoningRow
-                          key={option.id}
-                          option={option}
                           isSelected={selectedReasoning === option.id}
+                          key={option.id}
                           onSelect={onSelectReasoning}
+                          option={option}
                         />
                       ))}
                     </DropdownSubmenuContent>
                   </DropdownSubmenu>
                 );
               }}
+              trigger={
+                <Button
+                  aria-label="Select model and reasoning"
+                  className={cn(
+                    'h-7 max-w-[8.75rem] gap-1 rounded-[7px] border-0 bg-transparent px-2 font-normal text-[12px] text-muted-foreground hover:bg-foreground/[0.1] hover:text-foreground sm:max-w-none',
+                    menuOpen && 'bg-foreground/[0.08]'
+                  )}
+                  size="xs"
+                  type="button"
+                  variant="ghost"
+                >
+                  <span className="truncate text-foreground">{triggerLabel}</span>
+                  <span className="hidden sm:inline">{reasoningLabel}</span>
+                  <ChevronDownIcon aria-hidden="true" className="size-3" />
+                </Button>
+              }
             />
           </span>
         </TooltipTrigger>

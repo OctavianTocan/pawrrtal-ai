@@ -17,7 +17,8 @@
  */
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { type ReactNode, Suspense, useCallback, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import { Suspense, useCallback, useMemo, useState } from 'react';
 import { usePersistedState } from '@/hooks/use-persisted-state';
 import { DEFAULT_TASK_VIEW, TASK_QUERY_KEYS, TASK_STORAGE_KEYS, TASK_VIEWS } from './constants';
 import { formatDueLabel, isOverdue } from './format-utils';
@@ -169,30 +170,30 @@ function TasksContainerContent(): ReactNode {
 
   return (
     <TasksView
-      activeView={activeView}
-      activeProjectId={activeProjectId}
-      onSelectView={handlers.handleSelectView}
-      onSelectProject={handlers.handleSelectProject}
-      title={derivations.pageMeta.title}
-      subtitle={derivations.pageMeta.subtitle}
-      sections={derivations.sections}
-      collapsedSectionIds={collapsedSections.value}
-      onToggleCollapsed={collapsedSections.toggle}
-      projectsById={projectsById}
-      projects={TASK_PROJECTS}
-      listCounts={derivations.listCounts}
-      projectCounts={derivations.projectCounts}
-      activeTask={activeTask}
       activeDueLabel={activeDueLabel}
       activeIsOverdue={activeIsOverdue}
+      activeProjectId={activeProjectId}
+      activeTask={activeTask}
+      activeView={activeView}
+      collapsedSectionIds={collapsedSections.value}
       dueLabels={derivations.dueLabels}
-      overdueIds={derivations.overdueIds}
-      onToggleComplete={handlers.handleToggleComplete}
-      onSelectTask={handlers.handleSelectTask}
-      onCloseDetail={handlers.handleCloseDetail}
-      onOpenRowMenu={handlers.handleOpenRowMenu}
+      listCounts={derivations.listCounts}
       onAddTask={handlers.handleAddTask}
+      onCloseDetail={handlers.handleCloseDetail}
       onNew={handlers.handleNew}
+      onOpenRowMenu={handlers.handleOpenRowMenu}
+      onSelectProject={handlers.handleSelectProject}
+      onSelectTask={handlers.handleSelectTask}
+      onSelectView={handlers.handleSelectView}
+      onToggleCollapsed={collapsedSections.toggle}
+      onToggleComplete={handlers.handleToggleComplete}
+      overdueIds={derivations.overdueIds}
+      projectCounts={derivations.projectCounts}
+      projects={TASK_PROJECTS}
+      projectsById={projectsById}
+      sections={derivations.sections}
+      subtitle={derivations.pageMeta.subtitle}
+      title={derivations.pageMeta.title}
     />
   );
 }

@@ -35,7 +35,7 @@ function PluginStatusBadge({ status }: { status: string }): React.JSX.Element {
         ? 'border-border bg-foreground/[0.04] text-muted-foreground'
         : 'border-amber-500/30 bg-amber-500/10 text-amber-200';
   return (
-    <span className={`inline-flex items-center gap-1 rounded-[6px] border px-2 py-0.5 text-xs font-medium ${tone}`}>
+    <span className={`inline-flex items-center gap-1 rounded-[6px] border px-2 py-0.5 font-medium text-xs ${tone}`}>
       {statusIcon(status)}
       {statusLabel(status)}
     </span>
@@ -57,20 +57,20 @@ function PluginCard({
   const controlDisabled = isUpdating || !plugin.manageable;
   return (
     <SettingsCard className="px-0 py-0">
-      <div className="flex items-start justify-between gap-4 border-b border-border/40 px-5 py-4">
+      <div className="flex items-start justify-between gap-4 border-border/40 border-b px-5 py-4">
         <div className="flex min-w-0 items-start gap-3">
           <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-[8px] border border-border/60 bg-foreground/[0.04] text-foreground">
             <Puzzle aria-hidden="true" className="size-4" />
           </span>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+              <h3 className="font-semibold text-foreground text-sm">{title}</h3>
               <PluginStatusBadge status={plugin.status} />
             </div>
-            <p className="mt-1 text-pretty text-sm leading-snug text-muted-foreground">
+            <p className="mt-1 text-pretty text-muted-foreground text-sm leading-snug">
               {plugin.description ?? plugin.plugin_id}
             </p>
-            <div className="mt-2 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
+            <div className="mt-2 flex flex-wrap gap-1.5 text-muted-foreground text-xs">
               <span>{plugin.source_type}</span>
               <span aria-hidden="true">/</span>
               <span>{plugin.version ?? 'unversioned'}</span>
@@ -78,7 +78,7 @@ function PluginCard({
               <span>{capabilityCount} capabilities</span>
             </div>
             {managementReason ? (
-              <p className="mt-2 max-w-xl text-xs leading-snug text-muted-foreground">{managementReason}</p>
+              <p className="mt-2 max-w-xl text-muted-foreground text-xs leading-snug">{managementReason}</p>
             ) : null}
           </div>
         </div>
@@ -92,14 +92,14 @@ function PluginCard({
       </div>
       <div className="px-5 py-3">
         {plugin.missing_env.length > 0 ? (
-          <div className="mb-3 rounded-[8px] border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200">
+          <div className="mb-3 rounded-[8px] border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-200 text-xs">
             Missing: {plugin.missing_env.join(', ')}
           </div>
         ) : null}
         <div className="flex flex-wrap gap-1.5">
           {plugin.capabilities.map((capability) => (
             <span
-              className="inline-flex items-center gap-1 rounded-[6px] border border-border/50 bg-foreground/[0.03] px-2 py-1 text-xs text-muted-foreground"
+              className="inline-flex items-center gap-1 rounded-[6px] border border-border/50 bg-foreground/[0.03] px-2 py-1 text-muted-foreground text-xs"
               key={capability.key}
             >
               <Box aria-hidden="true" className="size-3" />
@@ -108,7 +108,7 @@ function PluginCard({
             </span>
           ))}
         </div>
-        {plugin.reason ? <p className="mt-3 text-xs text-muted-foreground">{plugin.reason}</p> : null}
+        {plugin.reason ? <p className="mt-3 text-muted-foreground text-xs">{plugin.reason}</p> : null}
       </div>
     </SettingsCard>
   );
@@ -125,7 +125,7 @@ export function PluginsSectionView({
     <SettingsPage description="Manage optional tools, channels, providers, and workspace capabilities." title="Plugins">
       {errorMessage ? (
         <div
-          className="rounded-[8px] border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          className="rounded-[8px] border border-destructive/30 bg-destructive/10 px-3 py-2 text-destructive text-sm"
           role="alert"
         >
           {errorMessage}
@@ -133,12 +133,12 @@ export function PluginsSectionView({
       ) : null}
       {isLoading ? (
         <SettingsCard>
-          <div className="py-4 text-sm text-muted-foreground">Loading plugins...</div>
+          <div className="py-4 text-muted-foreground text-sm">Loading plugins...</div>
         </SettingsCard>
       ) : null}
       {!isLoading && plugins.length === 0 ? (
         <SettingsCard>
-          <div className="py-4 text-sm text-muted-foreground">No plugins installed.</div>
+          <div className="py-4 text-muted-foreground text-sm">No plugins installed.</div>
         </SettingsCard>
       ) : null}
       {!isLoading ? (

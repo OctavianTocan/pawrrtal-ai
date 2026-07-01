@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from 'vitest';
-import { type MergedSkill, mergeFragments } from '../src/merge';
+import type { MergedSkill } from '../src/merge';
+import { mergeFragments } from '../src/merge';
 import type { ParsedSkillFragment } from '../src/parse';
 
 /**

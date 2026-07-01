@@ -4,7 +4,8 @@
  * @fileoverview AI Elements — `checkpoint` icon subcomponent.
  */
 
-import { BookmarkIcon, type LucideProps } from 'lucide-react';
+import type { LucideProps } from 'lucide-react';
+import { BookmarkIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 export type CheckpointIconProps = LucideProps;

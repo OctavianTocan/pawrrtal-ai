@@ -108,28 +108,28 @@ function AppHistoryControls(): React.JSX.Element {
 function WorkspaceSelector(): React.JSX.Element {
   return (
     <DropdownPanelMenu
-      asChild
-      usePortal
       align="start"
+      asChild
       contentClassName="popover-styled p-1 min-w-56"
       trigger={
         <Button
           aria-label="Select workspace"
-          className="h-7 gap-2 rounded-[7px] border border-foreground/10 bg-foreground/[0.03] px-2.5 text-[13px] font-normal text-foreground hover:bg-foreground/[0.06] aria-expanded:bg-foreground/[0.06]"
+          className="h-7 gap-2 rounded-[7px] border border-foreground/10 bg-foreground/[0.03] px-2.5 font-normal text-[13px] text-foreground hover:bg-foreground/[0.06] aria-expanded:bg-foreground/[0.06]"
           type="button"
           variant="ghost"
         >
-          <span className="flex size-4.5 items-center justify-center rounded-full bg-foreground/10 text-[10px] font-medium">
+          <span className="flex size-4.5 items-center justify-center rounded-full bg-foreground/10 font-medium text-[10px]">
             A
           </span>
           <span>Pawrrtal</span>
           <ChevronDownIcon aria-hidden="true" className="size-3.5 text-muted-foreground" />
         </Button>
       }
+      usePortal
     >
       <DropdownMenuItem className="justify-between">
         <span className="flex items-center gap-2">
-          <span className="flex size-5 items-center justify-center rounded-full bg-foreground/10 text-[11px] font-medium">
+          <span className="flex size-5 items-center justify-center rounded-full bg-foreground/10 font-medium text-[11px]">
             A
           </span>
           Pawrrtal
@@ -155,9 +155,8 @@ function HelpMenu(): React.JSX.Element {
     <>
       <KeyboardShortcutsDialog isMac={isAppleLike} onOpenChange={setShortcutsOpen} open={shortcutsOpen} />
       <DropdownPanelMenu
-        asChild
-        usePortal
         align="end"
+        asChild
         contentClassName="popover-styled p-1 min-w-56"
         trigger={
           <Button
@@ -170,6 +169,7 @@ function HelpMenu(): React.JSX.Element {
             <CircleHelpIcon aria-hidden="true" className="size-4" />
           </Button>
         }
+        usePortal
       >
         {HELP_LINKS.map((link) => {
           const Icon = link.icon;
@@ -236,7 +236,7 @@ export function AppShellHeader(): React.JSX.Element {
       <div className={cn('flex items-center gap-2', isMacDesktop && '[-webkit-app-region:no-drag]')}>
         <SidebarTrigger className="size-7 cursor-pointer" />
         <AppHistoryControls />
-        <Separator orientation="vertical" className="ml-1 data-vertical:h-4 data-vertical:self-auto" />
+        <Separator className="ml-1 data-vertical:h-4 data-vertical:self-auto" orientation="vertical" />
         <WorkspaceSelector />
         {showHeaderNewSession ? <NewSessionButton layout="headerCompact" /> : null}
       </div>

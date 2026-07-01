@@ -17,30 +17,34 @@
  * module have been inlined here as static mock data.
  */
 
-import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { Input } from '@/components/ui/input';
-import { SelectButton, type SelectButtonOption } from '@/components/ui/select-button';
+import type { SelectButtonOption } from '@/components/ui/select-button';
+import { SelectButton } from '@/components/ui/select-button';
 import { cn } from '@/lib/utils';
 import { SettingsCard, SettingsPage, SettingsRow, SettingsSectionHeader, Slider, Switch } from '../primitives';
 import { ColorRow, FontRow } from './AppearanceRows';
+import type {
+  ColorSlot,
+  FontSlot,
+  MockAppearanceFonts,
+  MockAppearanceOptions,
+  MockThemeColors,
+  MockThemePreset,
+  ThemeMode,
+} from './appearance-helpers';
 import {
   COLOR_LABELS,
   COLOR_SLOTS,
-  type ColorSlot,
   DEFAULT_DARK_COLORS,
   DEFAULT_FONTS,
   DEFAULT_LIGHT_COLORS,
   DEFAULT_OPTIONS,
   FONT_LABELS,
   FONT_SLOTS,
-  type FontSlot,
-  type MockAppearanceFonts,
-  type MockAppearanceOptions,
-  type MockThemeColors,
-  type MockThemePreset,
   THEME_MODE_OPTIONS,
   THEME_PRESETS,
-  type ThemeMode,
 } from './appearance-helpers';
 import { WhimsySettingsCard } from './WhimsySettingsCard';
 
@@ -64,7 +68,7 @@ function ThemeModeToggle({
           <button
             aria-pressed={isActive}
             className={cn(
-              'flex cursor-pointer items-center gap-1.5 rounded-[6px] px-2.5 py-1 text-xs font-medium',
+              'flex cursor-pointer items-center gap-1.5 rounded-[6px] px-2.5 py-1 font-medium text-xs',
               'transition-colors duration-150 ease-out',
               isActive
                 ? 'bg-background text-foreground shadow-sm'
@@ -117,7 +121,7 @@ function ThemeColorCard({
         leading: (
           <span
             aria-hidden="true"
-            className="flex size-5 items-center justify-center rounded-[5px] border border-border/40 bg-background text-[11px] font-medium leading-none text-foreground"
+            className="flex size-5 items-center justify-center rounded-[5px] border border-border/40 bg-background font-medium text-[11px] text-foreground leading-none"
             style={{ fontFamily: preset.fonts.display }}
           >
             Aa
@@ -202,7 +206,7 @@ function TypographyCard({ overrides, uiFontSize, onFontCommit, onUiFontSize }: T
             type="number"
             value={uiFontSize}
           />
-          <span className="text-xs text-muted-foreground">px</span>
+          <span className="text-muted-foreground text-xs">px</span>
         </div>
       </SettingsRow>
     </SettingsCard>
@@ -265,7 +269,7 @@ function BehaviorCard({
             step={1}
             value={[contrast]}
           />
-          <span className="w-8 text-right text-xs tabular-nums text-muted-foreground">{contrast}</span>
+          <span className="w-8 text-right text-muted-foreground text-xs tabular-nums">{contrast}</span>
         </div>
       </SettingsRow>
     </SettingsCard>

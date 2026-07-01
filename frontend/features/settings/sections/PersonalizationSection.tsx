@@ -3,15 +3,15 @@
 import type * as React from 'react';
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { Button } from '@/components/ui/button';
-import { SelectButton, type SelectButtonOption } from '@/components/ui/select-button';
+import type { SelectButtonOption } from '@/components/ui/select-button';
+import { SelectButton } from '@/components/ui/select-button';
 import { Textarea } from '@/components/ui/textarea';
+import type { PersonalityId, PersonalizationProfile } from '@/lib/personalization/storage';
 import {
   EMPTY_PROFILE,
   loadPersonalizationProfile,
   PERSONALITY_OPTIONS,
   PERSONALIZATION_STORAGE_KEY,
-  type PersonalityId,
-  type PersonalizationProfile,
   savePersonalizationProfile,
 } from '@/lib/personalization/storage';
 import { SettingsCard, SettingsPage, SettingsRow, SettingsSectionHeader, Switch } from '../primitives';

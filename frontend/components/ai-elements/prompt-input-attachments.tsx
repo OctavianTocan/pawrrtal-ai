@@ -87,7 +87,7 @@ export function PromptInputAttachment({ data, className, ...props }: PromptInput
       <PromptInputHoverCardContent className="w-auto p-2">
         <div className="w-auto space-y-3">
           {isImage && (
-            <div className="flex max-size-96 items-center justify-center overflow-hidden rounded-md border">
+            <div className="max-size-96 flex items-center justify-center overflow-hidden rounded-md border">
               <Image
                 alt={filename || 'attachment preview'}
                 className="max-h-full max-w-full object-contain"

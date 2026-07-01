@@ -116,18 +116,18 @@ export function TasksView(props: TasksViewProps): ReactNode {
       style={{ backgroundColor: 'var(--background-elevated)' }}
     >
       <TasksSubSidebar
-        activeView={activeView}
         activeProjectId={activeProjectId}
-        onSelectView={onSelectView}
-        onSelectProject={onSelectProject}
-        onNew={onNew}
+        activeView={activeView}
         listCounts={listCounts}
-        projects={projects}
+        onNew={onNew}
+        onSelectProject={onSelectProject}
+        onSelectView={onSelectView}
         projectCounts={projectCounts}
+        projects={projects}
       />
 
       <section className="relative flex min-h-0 min-w-0 flex-1 flex-col">
-        <TasksHeader title={title} subtitle={subtitle} />
+        <TasksHeader subtitle={subtitle} title={title} />
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-10">
           {sections.length === 0 ? (
@@ -138,10 +138,10 @@ export function TasksView(props: TasksViewProps): ReactNode {
               <div className="flex flex-col">
                 {sections.map((section) => (
                   <TaskSection
-                    key={section.id}
-                    section={section}
                     collapsed={collapsedSectionIds.has(section.id)}
+                    key={section.id}
                     onToggleCollapsed={() => onToggleCollapsed(section.id)}
+                    section={section}
                   >
                     <ul className="flex flex-col">
                       {section.tasks.map((task) => {
@@ -150,14 +150,14 @@ export function TasksView(props: TasksViewProps): ReactNode {
                         return (
                           <li key={task.id}>
                             <TaskRow
-                              task={task}
-                              project={project}
                               dueLabel={dueLabels.get(task.id) ?? null}
-                              isOverdue={overdueIds.has(task.id)}
                               isActive={activeTask?.id === task.id}
-                              onToggleComplete={() => onToggleComplete(task.id)}
-                              onSelect={() => onSelectTask(task.id)}
+                              isOverdue={overdueIds.has(task.id)}
                               onOpenMenu={() => onOpenRowMenu(task.id)}
+                              onSelect={() => onSelectTask(task.id)}
+                              onToggleComplete={() => onToggleComplete(task.id)}
+                              project={project}
+                              task={task}
                             />
                           </li>
                         );
@@ -171,11 +171,11 @@ export function TasksView(props: TasksViewProps): ReactNode {
         </div>
 
         <TaskDetailPane
-          task={activeTask}
-          project={activeTask ? (projectsById.get(activeTask.projectId) ?? null) : null}
           dueLabel={activeDueLabel}
           isOverdue={activeIsOverdue}
           onClose={onCloseDetail}
+          project={activeTask ? (projectsById.get(activeTask.projectId) ?? null) : null}
+          task={activeTask}
         />
       </section>
     </div>
@@ -199,30 +199,30 @@ function TasksEmptyView({
   if (activeView === TASK_VIEWS.today) {
     return (
       <TasksEmptyState
-        icon={CalendarCheck2Icon}
-        title="All clear for today."
-        description="Nothing on the docket. Take the breather, or pull a few from Upcoming."
         action={{
           label: 'Plan tomorrow',
           onClick: () => onSelectView(TASK_VIEWS.upcoming),
         }}
+        description="Nothing on the docket. Take the breather, or pull a few from Upcoming."
+        icon={CalendarCheck2Icon}
+        title="All clear for today."
       />
     );
   }
   if (activeView === TASK_VIEWS.inbox) {
     return (
       <TasksEmptyState
+        description="Stash undated ideas here — they’ll wait for you to triage."
         icon={InboxIcon}
         title="Inbox at zero."
-        description="Stash undated ideas here — they’ll wait for you to triage."
       />
     );
   }
   return (
     <TasksEmptyState
+      description="Switch lists, or add a task using the bar above."
       icon={CalendarCheck2Icon}
       title="Nothing here yet."
-      description="Switch lists, or add a task using the bar above."
     />
   );
 }

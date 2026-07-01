@@ -17,7 +17,7 @@ export function SummaryText({ requests }: { requests: AccessRequest[] }) {
 
   if (requests.length === 1) {
     return (
-      <span className="text-sm text-muted-foreground">
+      <span className="text-muted-foreground text-sm">
         <span className="font-semibold text-foreground">@{first.name}</span> is requesting access
       </span>
     );
@@ -25,7 +25,7 @@ export function SummaryText({ requests }: { requests: AccessRequest[] }) {
 
   if (requests.length === 2 && second) {
     return (
-      <span className="text-sm text-muted-foreground">
+      <span className="text-muted-foreground text-sm">
         <span className="font-semibold text-foreground">@{first.name}</span> and{' '}
         <span className="font-semibold text-foreground">@{second.name}</span> are requesting access
       </span>
@@ -33,7 +33,7 @@ export function SummaryText({ requests }: { requests: AccessRequest[] }) {
   }
 
   return (
-    <span className="text-sm text-muted-foreground">
+    <span className="text-muted-foreground text-sm">
       <span className="font-semibold text-foreground">@{first.name}</span> and{' '}
       <span className="font-semibold text-foreground">{requests.length - 1} others</span> are requesting access
     </span>

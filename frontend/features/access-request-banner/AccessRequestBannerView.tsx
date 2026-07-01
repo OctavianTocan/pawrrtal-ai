@@ -51,20 +51,20 @@ export function AccessRequestBannerView({
         <div className="w-full overflow-hidden rounded-xl border border-border bg-card shadow-sm">
           <BannerHeader
             bannerState={bannerState}
-            requests={requests}
             collapsedAvatars={collapsedAvatars}
-            remainingCount={remainingCount}
-            onToggleExpand={onToggleExpand}
             onDismiss={onDismiss}
+            onToggleExpand={onToggleExpand}
+            remainingCount={remainingCount}
+            requests={requests}
           />
 
           <ExpandedRequestList
             bannerState={bannerState}
-            requests={requests}
             decisions={decisions}
             onApproveRequest={onApproveRequest}
             onRejectRequest={onRejectRequest}
             onResetRequest={onResetRequest}
+            requests={requests}
           />
         </div>
       </LayoutGroup>

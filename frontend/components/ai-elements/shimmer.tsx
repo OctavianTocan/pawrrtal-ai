@@ -8,7 +8,8 @@
 
 import { domAnimation, LazyMotion } from 'motion/react';
 import * as m from 'motion/react-m';
-import { type CSSProperties, type ElementType, memo, useMemo } from 'react';
+import type { CSSProperties, ElementType } from 'react';
+import { memo, useMemo } from 'react';
 import { cn } from '@/lib/utils';
 
 // `motion.create()` accepts both intrinsic-tag strings (`'p'`, `'span'`)

@@ -66,7 +66,7 @@ function TelegramConnectDialogBody({
 
 function TelegramNotConfigured({ error }: { error: string | null }): React.JSX.Element {
   return (
-    <div className="space-y-3 text-sm text-muted-foreground">
+    <div className="space-y-3 text-muted-foreground text-sm">
       <p>{error ?? 'Telegram is not configured on this deployment.'}</p>
       <p>
         Set <code>TELEGRAM_BOT_TOKEN</code> and <code>TELEGRAM_BOT_USERNAME</code> in
@@ -79,7 +79,7 @@ function TelegramNotConfigured({ error }: { error: string | null }): React.JSX.E
 function TelegramConnectedMessage({ displayHandle }: { displayHandle: string | null }): React.JSX.Element {
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2 text-sm font-medium text-success">
+      <div className="flex items-center gap-2 font-medium text-sm text-success">
         <Check aria-hidden="true" className="size-4" /> Connected as
         {displayHandle ? (
           <span className="font-semibold">@{displayHandle}</span>
@@ -87,7 +87,7 @@ function TelegramConnectedMessage({ displayHandle }: { displayHandle: string | n
           <span className="font-semibold">your Telegram account</span>
         )}
       </div>
-      <p className="text-sm text-muted-foreground">
+      <p className="text-muted-foreground text-sm">
         You can now message the bot directly and Pawrrtal will respond from your account. Disconnect anytime from
         Settings → Channels.
       </p>
@@ -110,7 +110,7 @@ function TelegramPendingCode({
 }: TelegramPendingCodeProps): React.JSX.Element {
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">
+      <p className="text-muted-foreground text-sm">
         Open Telegram, send the code below to{' '}
         {pendingCode.bot_username ? (
           <a
@@ -127,12 +127,12 @@ function TelegramPendingCode({
         , and we'll connect this account.
       </p>
       <div className="flex items-center justify-between gap-2 rounded-xl border border-foreground/10 bg-foreground/[0.04] px-4 py-3">
-        <code className="font-mono text-2xl font-semibold tracking-[0.25em]">{pendingCode.code}</code>
+        <code className="font-mono font-semibold text-2xl tracking-[0.25em]">{pendingCode.code}</code>
         <Button onClick={onCopy} size="sm" type="button" variant="outline">
           <Copy aria-hidden="true" className="mr-1 size-3.5" /> Copy
         </Button>
       </div>
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
+      <div className="flex items-center justify-between text-muted-foreground text-xs">
         <span>
           Code expires in <span className="font-mono text-foreground">{countdownLabel ?? '...'}</span>
         </span>
@@ -160,7 +160,7 @@ interface TelegramIdleStateProps {
 
 function TelegramIdleState({ error, isBusy, onStart }: TelegramIdleStateProps): React.JSX.Element {
   return (
-    <div className="space-y-4 text-sm text-muted-foreground">
+    <div className="space-y-4 text-muted-foreground text-sm">
       <p>Get Pawrrtal in your pocket: connect your Telegram account and chat with your assistant from anywhere.</p>
       <Button className="w-full" disabled={isBusy} onClick={onStart} size="lg" type="button">
         {isBusy ? 'Generating code...' : 'Generate connection code'}
@@ -273,7 +273,7 @@ export function TelegramConnectDialog({
       size="md"
     >
       <div className="space-y-4 p-6">
-        <h2 className="text-lg font-semibold" id={headingId}>
+        <h2 className="font-semibold text-lg" id={headingId}>
           Connect Telegram
         </h2>
         <TelegramConnectDialogBody countdownLabel={countdownLabel} onCopy={() => void handleCopy()} state={state} />

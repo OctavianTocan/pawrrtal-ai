@@ -26,5 +26,22 @@
     "noUnusedParameters": true,
     "forceConsistentCasingInFileNames": true,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  "include": ["*.ts", "scripts/**/*.ts"],
+  "exclude": [
+    "node_modules",
+    "frontend",
+    "backend-ts",
+    "backend",
+    "packages",
+    "electron",
+    "docs",
+    ".worktrees",
+    ".agents",
+    ".claude",
+    ".cursor",
+    ".factory",
+    ".goose",
+    ".pi"
+  ]
 }

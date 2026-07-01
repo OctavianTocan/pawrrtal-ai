@@ -3,7 +3,8 @@
 import type React from 'react';
 import { useCallback, useId, useRef, useState } from 'react';
 import { useDevAdminLoginMutation, useLoginMutation } from './hooks/use-login-mutations';
-import { type DevAdminLoginHandlers, LoginFormView } from './LoginFormView';
+import type { DevAdminLoginHandlers } from './LoginFormView';
+import { LoginFormView } from './LoginFormView';
 
 interface LoginFormProps extends React.ComponentProps<'div'> {
   canUseDevAdminLogin?: boolean;
@@ -129,20 +130,20 @@ export function LoginForm({
 
   return (
     <LoginFormView
-      className={className}
-      emailId={emailId}
-      passwordId={passwordId}
-      email={email}
-      onEmailChange={setEmail}
-      password={password}
-      onPasswordChange={setPassword}
-      errorMessage={currentError}
-      isLoading={isLoading}
       canUseDevAdminLogin={canUseDevAdminLogin}
+      className={className}
       devAdminFormId={devAdminFormId}
       devAdminLoginHandlers={devAdminLoginHandlers}
-      postLoginTarget={postLoginTarget}
+      email={email}
+      emailId={emailId}
+      errorMessage={currentError}
+      isLoading={isLoading}
+      onEmailChange={setEmail}
+      onPasswordChange={setPassword}
       onSubmit={handleSubmit}
+      password={password}
+      passwordId={passwordId}
+      postLoginTarget={postLoginTarget}
       {...divProps}
     />
   );

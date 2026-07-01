@@ -69,11 +69,11 @@ export function TasksSubSidebar({
   activeProjectId,
 }: TasksSubSidebarProps): ReactNode {
   return (
-    <aside className="flex w-[224px] shrink-0 flex-col gap-5 border-r border-border bg-foreground-2 p-3">
+    <aside className="flex w-[224px] shrink-0 flex-col gap-5 border-border border-r bg-foreground-2 p-3">
       <button
-        type="button"
+        className="flex h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-full bg-foreground font-medium text-[13px] text-background transition-[background-color,transform] duration-150 ease-out hover:bg-foreground/90 active:scale-[0.98] motion-reduce:transition-none"
         onClick={onNew}
-        className="flex h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-full bg-foreground text-[13px] font-medium text-background transition-[background-color,transform] duration-150 ease-out hover:bg-foreground/90 active:scale-[0.98] motion-reduce:transition-none"
+        type="button"
       >
         <PlusIcon aria-hidden="true" className="size-4" strokeWidth={2.5} />
         New task
@@ -85,7 +85,7 @@ export function TasksSubSidebar({
           const active = activeProjectId === null && activeView === item.id;
           const count = listCounts[item.id];
           return (
-            <NavRow key={item.id} active={active} onClick={() => onSelectView(item.id)} count={count}>
+            <NavRow active={active} count={count} key={item.id} onClick={() => onSelectView(item.id)}>
               <Icon aria-hidden="true" className="size-4 text-muted-foreground" strokeWidth={2} />
               {item.label}
             </NavRow>
@@ -98,10 +98,10 @@ export function TasksSubSidebar({
           const active = activeProjectId === project.id;
           return (
             <NavRow
-              key={project.id}
               active={active}
-              onClick={() => onSelectProject(project.id)}
               count={projectCounts[project.id] ?? 0}
+              key={project.id}
+              onClick={() => onSelectProject(project.id)}
             >
               {project.emoji ? (
                 <span aria-hidden="true" className="text-[13px] leading-none">
@@ -111,7 +111,7 @@ export function TasksSubSidebar({
                 <span
                   aria-hidden="true"
                   className={cn(
-                    'inline-flex size-4 items-center justify-center rounded-md text-[10px] font-semibold tracking-tight',
+                    'inline-flex size-4 items-center justify-center rounded-md font-semibold text-[10px] tracking-tight',
                     PROJECT_TONE_CLASSES[project.tone]
                   )}
                 >
@@ -168,7 +168,7 @@ function NavRow({ active, onClick, count, children }: NavRowProps): ReactNode {
         {typeof count === 'number' && count > 0 ? (
           <span
             className={cn(
-              'text-[11px] font-medium tabular-nums',
+              'font-medium text-[11px] tabular-nums',
               active ? 'text-foreground/70' : 'text-muted-foreground/80'
             )}
           >

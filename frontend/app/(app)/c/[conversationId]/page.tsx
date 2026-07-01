@@ -69,10 +69,10 @@ export default async function ConversationPage({ params }: ConversationPageProps
 
   return (
     <ChatContainer
-      key={conversationId}
       conversationId={conversationId}
       initialChatHistory={messages}
       initialModelId={conversation?.model_id ?? null}
+      key={conversationId}
     />
   );
 }

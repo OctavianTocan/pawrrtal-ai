@@ -118,10 +118,10 @@ export function NavChatsView({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <ConversationSearchHeader
-        searchQuery={searchQuery}
         onSearchChange={onSearchChange}
         onSearchClose={onSearchClose}
         resultCount={resultCount}
+        searchQuery={searchQuery}
       />
       {/* Single scroll container for the projects section + the
 			    conversation list so they scroll together as one group rather
@@ -134,11 +134,11 @@ export function NavChatsView({
 			    so list rows softly fade out when there's more content above
 			    or below the visible window. */}
       <div
-        ref={scrollRef}
-        data-nav-chats-scroll=""
-        data-scroll-up={canScrollUp ? 'true' : 'false'}
-        data-scroll-down={canScrollDown ? 'true' : 'false'}
         className="scrollbar-hover min-h-0 flex-1 overflow-y-auto"
+        data-nav-chats-scroll=""
+        data-scroll-down={canScrollDown ? 'true' : 'false'}
+        data-scroll-up={canScrollUp ? 'true' : 'false'}
+        ref={scrollRef}
       >
         {/* Hide the Projects section entirely while the chat list is empty —
 				    showing the "Create your first project" CTA alongside the
@@ -146,34 +146,34 @@ export function NavChatsView({
 				    Projects header causes the empty-state text to jump up/down. */}
         {!isEmpty && <ProjectsList />}
         <NavChatsContent
-          isLoading={isLoading}
-          isEmpty={isEmpty}
-          isSearchActive={isSearchActive}
-          resultCount={resultCount}
-          filteredGroups={filteredGroups}
-          collapsedGroups={collapsedGroups}
-          navigatorRef={navigatorRef}
-          searchQuery={searchQuery}
-          multiSelectedIds={multiSelectedIds}
-          contentSearchResults={contentSearchResults}
           activeChatMatchInfo={activeChatMatchInfo}
-          onToggleGroup={onToggleGroup}
-          onNewSession={onNewSession}
-          onNavigate={onNavigate}
-          onRename={onRename}
-          onDelete={onDelete}
+          collapsedGroups={collapsedGroups}
+          contentSearchResults={contentSearchResults}
+          filteredGroups={filteredGroups}
+          isEmpty={isEmpty}
+          isLoading={isLoading}
+          isSearchActive={isSearchActive}
+          multiSelectedIds={multiSelectedIds}
+          navigatorRef={navigatorRef}
           onArchive={onArchive}
-          onFlag={onFlag}
-          onSetStatus={onSetStatus}
-          onMarkUnread={onMarkUnread}
-          onRegenerateTitle={onRegenerateTitle}
-          onToggleLabel={onToggleLabel}
-          onExportMarkdown={onExportMarkdown}
           onConversationClick={onConversationClick}
-          onConversationMouseDown={onConversationMouseDown}
           onConversationKeyDown={onConversationKeyDown}
-          registerConversationElement={registerConversationElement}
+          onConversationMouseDown={onConversationMouseDown}
+          onDelete={onDelete}
+          onExportMarkdown={onExportMarkdown}
+          onFlag={onFlag}
+          onMarkUnread={onMarkUnread}
+          onNavigate={onNavigate}
           onNavigatorMouseDown={onNavigatorMouseDown}
+          onNewSession={onNewSession}
+          onRegenerateTitle={onRegenerateTitle}
+          onRename={onRename}
+          onSetStatus={onSetStatus}
+          onToggleGroup={onToggleGroup}
+          onToggleLabel={onToggleLabel}
+          registerConversationElement={registerConversationElement}
+          resultCount={resultCount}
+          searchQuery={searchQuery}
         />
       </div>
     </div>

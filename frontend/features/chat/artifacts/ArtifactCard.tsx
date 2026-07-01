@@ -10,7 +10,8 @@
  */
 
 import { ExpandIcon, FileTextIcon } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import type { ReactNode } from 'react';
+import { useState } from 'react';
 import type { ChatArtifactPayload } from '@/lib/types';
 import { ArtifactDialog } from './ArtifactDialog';
 
@@ -24,19 +25,19 @@ export function ArtifactCard({ artifact }: ArtifactCardProps): ReactNode {
   return (
     <>
       <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="artifact-preview-card"
         aria-label={`Open artifact "${artifact.title}"`}
+        className="artifact-preview-card"
+        onClick={() => setOpen(true)}
+        type="button"
       >
-        <div className="artifact-preview-card-icon" aria-hidden="true">
+        <div aria-hidden="true" className="artifact-preview-card-icon">
           <FileTextIcon className="size-4" />
         </div>
         <div className="artifact-preview-card-body">
           <div className="artifact-preview-card-title">{artifact.title}</div>
           <div className="artifact-preview-card-sub">Click to expand</div>
         </div>
-        <div className="artifact-preview-card-chev" aria-hidden="true">
+        <div aria-hidden="true" className="artifact-preview-card-chev">
           <ExpandIcon className="size-4" />
         </div>
       </button>

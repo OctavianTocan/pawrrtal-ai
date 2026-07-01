@@ -40,10 +40,8 @@ export function TaskCheckbox({
 }: TaskCheckboxProps): ReactNode {
   return (
     <button
-      type="button"
-      onClick={onToggle}
-      aria-pressed={checked}
       aria-label={ariaLabel}
+      aria-pressed={checked}
       className={cn(
         // 40×40 hit target with the visible circle centered inside.
         'group/check relative flex size-10 shrink-0 cursor-pointer items-center justify-center',
@@ -51,6 +49,8 @@ export function TaskCheckbox({
         'transition-transform duration-100 ease-out active:scale-[0.96] motion-reduce:transition-none motion-reduce:active:scale-100',
         'focus-visible:outline-none'
       )}
+      onClick={onToggle}
+      type="button"
     >
       <span
         className={cn(
@@ -66,13 +66,13 @@ export function TaskCheckbox({
       >
         <CheckIcon
           aria-hidden="true"
-          strokeWidth={3}
           className={cn(
             'size-3 transition-[opacity,transform] duration-150 ease-out motion-reduce:transition-none',
             checked
               ? 'scale-100 opacity-100'
               : 'scale-50 opacity-0 group-hover/check:scale-75 group-hover/check:opacity-30'
           )}
+          strokeWidth={3}
         />
       </span>
     </button>

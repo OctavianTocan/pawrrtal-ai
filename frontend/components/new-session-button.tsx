@@ -63,7 +63,7 @@ export function NewSessionButton({ layout = 'sidebar' }: NewSessionButtonProps):
               className={
                 isHeaderCompact
                   ? 'size-7 shrink-0 cursor-pointer rounded-[7px] border border-foreground/10 bg-foreground/[0.03] text-muted-foreground shadow-none hover:bg-foreground/[0.06] hover:text-foreground'
-                  : 'w-full cursor-pointer justify-start gap-2 rounded-soft bg-background px-2 py-[7px] text-[13px] font-normal shadow-minimal'
+                  : 'w-full cursor-pointer justify-start gap-2 rounded-soft bg-background px-2 py-[7px] font-normal text-[13px] shadow-minimal'
               }
               onClick={handleNewConversation}
               type="button"

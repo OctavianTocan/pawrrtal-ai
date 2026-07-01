@@ -1,7 +1,8 @@
 import { fireEvent, render } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { type DevAdminLoginHandlers, LoginFormView } from './LoginFormView';
+import type { DevAdminLoginHandlers } from './LoginFormView';
+import { LoginFormView } from './LoginFormView';
 
 function makeDevAdminHandlers(onCommit = vi.fn()): DevAdminLoginHandlers {
   return {

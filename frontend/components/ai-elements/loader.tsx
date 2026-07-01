@@ -4,7 +4,8 @@
  * @fileoverview AI Elements — `loader`.
  */
 
-import { type HTMLAttributes, useId } from 'react';
+import type { HTMLAttributes } from 'react';
+import { useId } from 'react';
 import { cn } from '@/lib/utils';
 
 type LoaderIconProps = {

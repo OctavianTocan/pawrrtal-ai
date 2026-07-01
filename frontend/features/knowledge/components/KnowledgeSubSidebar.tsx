@@ -65,32 +65,32 @@ export function KnowledgeSubSidebar({ activeView, onSelectView, onNew }: Knowled
     // the row tree inside it.
     <div className="flex h-full min-h-0 w-full flex-col gap-3 p-3">
       <button
-        type="button"
+        className="flex h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-full bg-foreground-10 font-medium text-[13px] text-foreground transition-colors duration-150 ease-out hover:bg-foreground/15"
         onClick={onNew}
-        className="flex h-9 w-full cursor-pointer items-center justify-center gap-1.5 rounded-full bg-foreground-10 text-[13px] font-medium text-foreground transition-colors duration-150 ease-out hover:bg-foreground/15"
+        type="button"
       >
         New
         <PlusIcon aria-hidden="true" className="size-4" />
       </button>
 
       {SUB_SIDEBAR_GROUPS.map((group) => (
-        <div key={group.label} className="flex flex-col gap-0.5">
-          <div className="px-2 pb-1 text-[12px] font-medium text-muted-foreground">{group.label}</div>
+        <div className="flex flex-col gap-0.5" key={group.label}>
+          <div className="px-2 pb-1 font-medium text-[12px] text-muted-foreground">{group.label}</div>
           {group.items.map((item) => {
             const isActive = item.id === activeView;
             const Icon = item.icon;
             return (
               <button
-                key={item.id}
-                type="button"
-                onClick={() => onSelectView(item.id)}
                 aria-current={isActive ? 'page' : undefined}
                 className={cn(
-                  'flex h-9 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left text-[14px] font-medium transition-colors duration-150 ease-out',
+                  'flex h-9 w-full cursor-pointer items-center gap-2 rounded-md px-2 text-left font-medium text-[14px] transition-colors duration-150 ease-out',
                   isActive
                     ? 'bg-foreground-10 text-foreground'
                     : 'text-foreground/80 hover:bg-foreground-5 hover:text-foreground'
                 )}
+                key={item.id}
+                onClick={() => onSelectView(item.id)}
+                type="button"
               >
                 <Icon aria-hidden="true" className="size-4 shrink-0" />
                 <span className="truncate">{item.label}</span>

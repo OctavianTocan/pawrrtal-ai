@@ -1,7 +1,8 @@
 'use client';
 
 import { ChevronRightIcon } from 'lucide-react';
-import { memo, type ReactNode, useMemo } from 'react';
+import type { ReactNode } from 'react';
+import { memo, useMemo } from 'react';
 import { Streamdown } from 'streamdown';
 import { Shimmer } from '@/components/ai-elements/shimmer';
 import type { ChatTimelineEntry } from '@/lib/types';
@@ -81,14 +82,14 @@ function stripLeadingIcon(text: string, icon: string | undefined): string {
  */
 function ThinkingStep({ title, content }: { title: string; content: string }): ReactNode {
   return (
-    <div className="flex flex-col gap-1 px-1.5 py-1 text-sm leading-snug text-muted-foreground">
+    <div className="flex flex-col gap-1 px-1.5 py-1 text-muted-foreground text-sm leading-snug">
       {title ? <div className="font-medium text-foreground/85">{title}</div> : null}
       {content ? (
         <Streamdown
           className={cn(
-            'text-sm text-muted-foreground',
+            'text-muted-foreground text-sm',
             '[&>*:first-child]:mt-0 [&>*:last-child]:mb-0',
-            '[&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0',
+            '[&_li]:my-0 [&_ol]:my-1 [&_p]:my-1 [&_ul]:my-1',
             '[&_p]:leading-snug'
           )}
         >
@@ -174,7 +175,7 @@ export const ChainOfThought = memo(function ChainOfThought({
 
   if (items.length === 0) {
     return (
-      <div className={cn('flex items-center gap-2 px-1.5 py-1 text-sm text-muted-foreground')}>
+      <div className={cn('flex items-center gap-2 px-1.5 py-1 text-muted-foreground text-sm')}>
         <ChevronRightIcon aria-hidden="true" className="size-3.5" />
         <Shimmer duration={1.2}>Thinking&hellip;</Shimmer>
       </div>

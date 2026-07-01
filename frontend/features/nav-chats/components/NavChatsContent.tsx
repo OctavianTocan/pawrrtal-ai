@@ -148,14 +148,7 @@ function ConversationRow({
 
   return (
     <ConversationSidebarItem
-      id={conversation.id}
-      title={isSearchActive ? highlightMatch(conversation.title, searchQuery) : conversation.title}
-      updatedAt={conversation.updated_at}
-      icon={
-        hasLiveIndicators ? (
-          <ConversationIndicators conversation={conversation} isProcessing={isProcessing} />
-        ) : undefined
-      }
+      appliedLabelIds={labels.filter((label): label is string => typeof label === 'string')}
       badges={
         labels.length > 0
           ? labels.map((label) => {
@@ -164,16 +157,6 @@ function ConversationRow({
             })
           : undefined
       }
-      titleTrailing={searchCountBadge}
-      state={{
-        isArchived: conversation.is_archived,
-        isFlagged: conversation.is_flagged,
-        isInMultiSelect: multiSelectedIds.size > 1 && isSelected,
-        isUnread: conversation.is_unread,
-        showSeparator: index > 0,
-      }}
-      onClick={() => onConversationClick(conversation.id, visibleIndex, href)}
-      onMouseDown={(event) => onConversationMouseDown(event, conversation.id, visibleIndex)}
       buttonProps={{
         ref: (element: HTMLDivElement | null) => registerConversationElement(conversation.id, element),
         // TODO(#83): tabIndex should be driven by focusedConversationId (roving tabindex)
@@ -185,18 +168,35 @@ function ConversationRow({
         'aria-selected': isSelected,
         onKeyDown: (event: ReactKeyboardEvent) => onConversationKeyDown(event, conversation, visibleIndex),
       }}
-      status={conversation.status}
-      appliedLabelIds={labels.filter((label): label is string => typeof label === 'string')}
-      onNavigate={onNavigate}
-      onRename={onRename}
-      onDelete={onDelete}
+      icon={
+        hasLiveIndicators ? (
+          <ConversationIndicators conversation={conversation} isProcessing={isProcessing} />
+        ) : undefined
+      }
+      id={conversation.id}
       onArchive={onArchive}
-      onFlag={onFlag}
-      onSetStatus={onSetStatus}
-      onMarkUnread={onMarkUnread}
-      onRegenerateTitle={onRegenerateTitle}
-      onToggleLabel={onToggleLabel}
+      onClick={() => onConversationClick(conversation.id, visibleIndex, href)}
+      onDelete={onDelete}
       onExportMarkdown={onExportMarkdown}
+      onFlag={onFlag}
+      onMarkUnread={onMarkUnread}
+      onMouseDown={(event) => onConversationMouseDown(event, conversation.id, visibleIndex)}
+      onNavigate={onNavigate}
+      onRegenerateTitle={onRegenerateTitle}
+      onRename={onRename}
+      onSetStatus={onSetStatus}
+      onToggleLabel={onToggleLabel}
+      state={{
+        isArchived: conversation.is_archived,
+        isFlagged: conversation.is_flagged,
+        isInMultiSelect: multiSelectedIds.size > 1 && isSelected,
+        isUnread: conversation.is_unread,
+        showSeparator: index > 0,
+      }}
+      status={conversation.status}
+      title={isSearchActive ? highlightMatch(conversation.title, searchQuery) : conversation.title}
+      titleTrailing={searchCountBadge}
+      updatedAt={conversation.updated_at}
     />
   );
 }
@@ -244,11 +244,11 @@ export function NavChatsContent({
   if (isEmpty) {
     return (
       <ConversationsEmptyState
-        icon={<Inbox className="size-4" />}
-        title="No sessions yet"
-        description="Sessions with your agent appear here. Start one to get going."
         buttonLabel="New Session"
+        description="Sessions with your agent appear here. Start one to get going."
+        icon={<Inbox className="size-4" />}
         onAction={onNewSession}
+        title="No sessions yet"
       />
     );
   }
@@ -256,9 +256,9 @@ export function NavChatsContent({
   if (isSearchActive && resultCount === 0) {
     return (
       <ConversationsEmptyState
+        description="Try a different title fragment. Search also digs through loaded chat history once you have at least two characters."
         icon={<Search className="size-4" />}
         title="No matching sessions"
-        description="Try a different title fragment. Search also digs through loaded chat history once you have at least two characters."
       />
     );
   }
@@ -281,13 +281,13 @@ export function NavChatsContent({
   return (
     <LazyMotion features={domAnimation}>
       <div
-        ref={navigatorRef}
-        className={CONVERSATION_LIST_CLASS}
-        role="listbox"
-        tabIndex={0}
         aria-label="Sessions"
         aria-multiselectable={true}
+        className={CONVERSATION_LIST_CLASS}
         onMouseDown={onNavigatorMouseDown}
+        ref={navigatorRef}
+        role="listbox"
+        tabIndex={0}
       >
         <ul className="flex w-full min-w-0 flex-col gap-0">
           {filteredGroups.map((group) => {
@@ -297,9 +297,9 @@ export function NavChatsContent({
               <Fragment key={group.key}>
                 {canCollapse ? (
                   <CollapsibleGroupHeader
-                    label={group.label}
                     isCollapsed={isCollapsed}
                     itemCount={group.items.length}
+                    label={group.label}
                     onToggle={() => onToggleGroup(group.key)}
                   />
                 ) : (
@@ -312,8 +312,6 @@ export function NavChatsContent({
                 <AnimatePresence initial={false}>
                   {!isCollapsed && (
                     <m.div
-                      key={`${group.key}-items`}
-                      initial={{ height: 0, opacity: 0 }}
                       animate={{
                         height: 'auto',
                         opacity: 1,
@@ -342,33 +340,35 @@ export function NavChatsContent({
                           },
                         },
                       }}
+                      initial={{ height: 0, opacity: 0 }}
+                      key={`${group.key}-items`}
                       style={{ overflow: 'hidden' }}
                     >
                       {group.items.map((conversation, index) => (
                         <ConversationRow
-                          key={conversation.id}
+                          activeChatMatchInfo={activeChatMatchInfo}
+                          contentSearchResults={contentSearchResults}
                           conversation={conversation}
                           index={index}
-                          visibleIndex={flatIndexMap.get(conversation.id) ?? 0}
                           isSearchActive={isSearchActive}
-                          searchQuery={searchQuery}
+                          key={conversation.id}
                           multiSelectedIds={multiSelectedIds}
-                          contentSearchResults={contentSearchResults}
-                          activeChatMatchInfo={activeChatMatchInfo}
-                          onConversationClick={onConversationClick}
-                          onConversationMouseDown={onConversationMouseDown}
-                          onConversationKeyDown={onConversationKeyDown}
-                          registerConversationElement={registerConversationElement}
-                          onNavigate={onNavigate}
-                          onRename={onRename}
-                          onDelete={onDelete}
                           onArchive={onArchive}
-                          onFlag={onFlag}
-                          onSetStatus={onSetStatus}
-                          onMarkUnread={onMarkUnread}
-                          onRegenerateTitle={onRegenerateTitle}
-                          onToggleLabel={onToggleLabel}
+                          onConversationClick={onConversationClick}
+                          onConversationKeyDown={onConversationKeyDown}
+                          onConversationMouseDown={onConversationMouseDown}
+                          onDelete={onDelete}
                           onExportMarkdown={onExportMarkdown}
+                          onFlag={onFlag}
+                          onMarkUnread={onMarkUnread}
+                          onNavigate={onNavigate}
+                          onRegenerateTitle={onRegenerateTitle}
+                          onRename={onRename}
+                          onSetStatus={onSetStatus}
+                          onToggleLabel={onToggleLabel}
+                          registerConversationElement={registerConversationElement}
+                          searchQuery={searchQuery}
+                          visibleIndex={flatIndexMap.get(conversation.id) ?? 0}
                         />
                       ))}
                     </m.div>

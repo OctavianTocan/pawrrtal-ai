@@ -1,0 +1,27 @@
+{
+  "name": "@pawrrtal/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "paw": "./src/Main.ts"
+  },
+  "scripts": {
+    "start": "bun run src/Main.ts",
+    "typecheck": "tsc --noEmit",
+    "typecheck:tsgo": "tsgo --noEmit",
+    "test": "bun --bun vitest run",
+    "check": "bun run typecheck && bun run test"
+  },
+  "dependencies": {
+    "@effect/platform-bun": "4.0.0-beta.92",
+    "effect": "4.0.0-beta.92"
+  },
+  "devDependencies": {
+    "@effect/vitest": "4.0.0-beta.92",
+    "@types/bun": "1.3.14",
+    "@typescript/native-preview": "7.0.0-dev.20260629.1",
+    "typescript": "6.0.3",
+    "vitest": "4.1.9"
+  }
+}

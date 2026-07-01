@@ -9,7 +9,7 @@ dependencies = [
     "markdown-it-py>=3.0.0",
     "alembic>=1.13.0",
     # 0.22.1 hangs opening SQLite connections under Python 3.13 on this VPS.
-    "aiosqlite>=0.21.0,<0.22.0",
+    "aiosqlite>=0.21.0,<0.23.0",
     "anyio>=4.0.0",
     "apscheduler>=3.10.0",
     "agent-client-protocol>=0.10.0",
@@ -40,13 +40,7 @@ dependencies = [
     "typer>=0.13",
 ]
 
-[project.scripts]
-paw = "app.cli.paw.main:app"
-
-# uv must package the project for `[project.scripts]` entry points to be
-# installed. Without this, `uv run paw` fails with "No such file or
-# directory" because the console script wrapper is never written into
-# the venv bin/.
+# uv packages the backend application for local development commands and tests.
 [tool.uv]
 package = true
 
@@ -181,11 +175,6 @@ ignore = [
     "T20",   # CLI scripts legitimately use print
     "S603",  # subprocess calls in CLI are operator-driven, not user-input
     "S607",  # `git` and similar trusted binaries on PATH are intentional
-]
-"tests/e2e_paw/**" = [
-    "S603",  # live E2E fixture spawns uvicorn + paw via subprocess by design
-    "S607",  # `uv` resolved from PATH is intentional; the whole point is to
-             # exercise the same entry the developer would type by hand
 ]
 "tests/test_alembic_postgres_upgrade.py" = [
     "S603",  # spawns the real `alembic` CLI (via sys.executable -m) on purpose:

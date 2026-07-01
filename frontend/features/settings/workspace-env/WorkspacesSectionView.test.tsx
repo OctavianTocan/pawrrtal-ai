@@ -11,8 +11,10 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { WORKSPACE_ENV_KEY_IDS, type WorkspaceEnvKey } from '@/features/settings/workspace-env/use-workspace-env';
-import { type WorkspaceEnvKeyMeta, WorkspacesSectionView } from './WorkspacesSectionView';
+import type { WorkspaceEnvKey } from '@/features/settings/workspace-env/use-workspace-env';
+import { WORKSPACE_ENV_KEY_IDS } from '@/features/settings/workspace-env/use-workspace-env';
+import type { WorkspaceEnvKeyMeta } from './WorkspacesSectionView';
+import { WorkspacesSectionView } from './WorkspacesSectionView';
 
 const KEY_METAS: readonly WorkspaceEnvKeyMeta[] = [
   {

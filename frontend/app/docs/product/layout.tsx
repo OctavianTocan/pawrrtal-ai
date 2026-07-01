@@ -23,7 +23,6 @@ import { productSource } from '@/lib/source';
 export default function ProductLayout({ children }: { children: ReactNode }): React.ReactElement {
   return (
     <DocsLayout
-      tree={productSource.pageTree}
       containerProps={{ className: 'pawrrtal-docs' }}
       sidebar={{
         defaultOpenLevel: 1,
@@ -34,6 +33,7 @@ export default function ProductLayout({ children }: { children: ReactNode }): Re
         { title: 'Handbook', url: '/docs/handbook' },
         { title: 'Product', url: '/docs/product' },
       ]}
+      tree={productSource.pageTree}
       {...baseOptions()}
     >
       {children}

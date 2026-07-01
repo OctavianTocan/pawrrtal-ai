@@ -1,0 +1,41 @@
+{
+  "id": "49da2c81d8a3",
+  "key": "manual_49da2c",
+  "name": "manual_49da2c",
+  "claim": "For Pawrrtal SpecKit work, verify the active feature directory and the user's latest explicit target before planning, tasks, or implementation; ask before changing feature scope or choosing a different spec number.",
+  "conditions": [
+    "active-spec",
+    "consultation",
+    "feature-scope",
+    "speckit"
+  ],
+  "evidence_ids": [
+    "2026-06-30T18:35:54.265754+00:00"
+  ],
+  "cluster_size": 1,
+  "canonical_salience": 8.0,
+  "staged_at": "2026-06-30T18:35:54.265754+00:00",
+  "status": "accepted",
+  "decisions": [
+    {
+      "ts": "2026-06-30T18:35:54.265754+00:00",
+      "action": "staged",
+      "reviewer": "learn"
+    },
+    {
+      "ts": "2026-06-30T18:35:54.302849+00:00",
+      "action": "graduated",
+      "reviewer": "learn.py",
+      "notes": "This session had a correction: 'Use 003. Stop deciding things without consulting me.' Future SpecKit work should not infer the target feature from stale context.",
+      "provisional": false,
+      "evidence_snapshot": [
+        "2026-06-30T18:35:54.265754+00:00"
+      ],
+      "lessons_sha": "80957d462266"
+    }
+  ],
+  "rejection_count": 0,
+  "accepted_at": "2026-06-30T18:35:54.302843+00:00",
+  "reviewer": "learn.py",
+  "rationale": "This session had a correction: 'Use 003. Stop deciding things without consulting me.' Future SpecKit work should not infer the target feature from stale context."
+}

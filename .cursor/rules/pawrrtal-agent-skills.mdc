@@ -1,0 +1,14 @@
+---
+description: Pawrrtal skills canonical path under agentic-stack.
+alwaysApply: true
+---
+
+# Pawrrtal skills
+
+Canonical skills live in `.agent/skills/` (agentic-stack portable brain).
+Harness mirrors: `.agents/skills/`, `.claude/skills/`, `.cursor/plugins/pawrrtal/skills/`.
+
+Generated skills: `bun run skill-gen:generate` writes to `.agent/skills/`.
+Root `AGENTS.md` is a stub pointing to `.agent/AGENTS.md` (entry contract).
+Facts → `memory/semantic/DOMAIN_KNOWLEDGE.md`; taste → `memory/personal/PREFERENCES.md`;
+procedures → skills (`repo-operations`, `code-quality`, …). Load `agents-md` before editing.

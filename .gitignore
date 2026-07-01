@@ -22,6 +22,20 @@ node_modules/
 /private
 .private
 
+# Repo-root docs/ (local notes, plans, hyperframes). Not versioned.
+/docs/
+
+# Spec-kit / feature specs (local planning artefacts). Not versioned.
+/specs/
+
+# Local reference notes (Effect teaching, contracts). Not versioned.
+/reference/
+
+# MCP client configs (local paths/keys). Not versioned.
+.mcp.json
+**/.mcp.json
+config/mcporter.json
+
 # Personal Effect-learning scaffolding (teach skill workspace). Not project artefacts.
 /MISSION.md
 /RESOURCES.md
@@ -161,8 +175,18 @@ package-lock.json
 # Cursor Composer AI-generated plan files (ephemeral, not source-of-truth)
 .cursor/plans/
 
-# OpenCode internal generated artifacts
-.opencode/package-lock.json
+# Agent / editor tool docs (per-developer, not project config)
+/GLOSSARY.md
+/WARP.md
+
+# Agent / editor tool state (per-developer, not project config)
+.beans/
+.cline/
+.factory/
+.pi/
+.opencode/
+.goose/
+.zed/
 
 # Databases
 *.db
@@ -184,3 +208,14 @@ backend/vendor/electric
 
 # Docker
 */.env.docker
+
+# agentic-stack runtime artefacts (memory content is committed; exports are not)
+.agent/memory/dream.log
+.agent/memory/.index/
+.agent/data-layer/
+.agent/flywheel/
+
+# Harness skill mirrors (canonical tree: .agent/skills/)
+.agents/skills
+.claude/skills
+.cursor/plugins/pawrrtal/skills/

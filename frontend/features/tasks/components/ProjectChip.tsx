@@ -35,7 +35,7 @@ export function ProjectChip({ label, tone, emoji, hideHash }: ProjectChipProps):
   return (
     <span
       className={cn(
-        'inline-flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium tracking-tight whitespace-nowrap',
+        'inline-flex h-6 items-center gap-1 whitespace-nowrap rounded-md px-2 font-medium text-xs tracking-tight',
         PROJECT_TONE_CLASSES[tone]
       )}
     >

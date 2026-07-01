@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import { useWhimsyTile } from '@/features/whimsy';
 import { cn } from '@/lib/utils';
-import { SETTINGS_SECTIONS, type SettingsSectionId } from './constants';
+import type { SettingsSectionId } from './constants';
+import { SETTINGS_SECTIONS } from './constants';
 import { AppearanceSection } from './sections/AppearanceSection';
 import { ArchivedChatsSection } from './sections/ArchivedChatsSection';
 import { ChannelsSection } from './sections/ChannelsSection';
@@ -56,7 +57,7 @@ function SettingsWhimsyOverlay(): React.JSX.Element | null {
       ) : null}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 text-foreground [mask-repeat:repeat] [-webkit-mask-repeat:repeat]"
+        className="pointer-events-none absolute inset-0 text-foreground [-webkit-mask-repeat:repeat] [mask-repeat:repeat]"
         style={{
           backgroundColor: whimsy.tintColor,
           opacity: whimsy.opacity,
@@ -89,9 +90,9 @@ export function SettingsLayout(): React.JSX.Element {
 			    settings nav, not a project list. The rail divider uses
 			    `border-border/60` so it tints itself per active theme
 			    instead of stamping a hard `foreground/8` line. */}
-      <aside className="sidepanel-text-scope flex h-full flex-col gap-4 overflow-y-auto border-r border-border/60 px-3 pb-4 pt-4">
+      <aside className="sidepanel-text-scope flex h-full flex-col gap-4 overflow-y-auto border-border/60 border-r px-3 pt-4 pb-4">
         <button
-          className="flex w-full cursor-pointer items-center gap-2 rounded-[8px] px-2 py-1.5 text-sm text-muted-foreground transition-colors duration-150 hover:bg-foreground/[0.05] hover:text-foreground"
+          className="flex w-full cursor-pointer items-center gap-2 rounded-[8px] px-2 py-1.5 text-muted-foreground text-sm transition-colors duration-150 hover:bg-foreground/[0.05] hover:text-foreground"
           onClick={() => push('/')}
           type="button"
         >

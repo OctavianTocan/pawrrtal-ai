@@ -115,7 +115,7 @@ describe('ModelSelectorPopover', () => {
   });
 
   it('displays the selected reasoning level in the trigger', () => {
-    render(<ModelSelectorPopover {...DEFAULT_PROPS} selectedReasoning="high" onSelectReasoning={vi.fn()} />);
+    render(<ModelSelectorPopover {...DEFAULT_PROPS} onSelectReasoning={vi.fn()} selectedReasoning="high" />);
     expect(screen.getByText('High')).toBeTruthy();
   });
 
@@ -123,8 +123,8 @@ describe('ModelSelectorPopover', () => {
     const { container } = render(
       <ModelSelectorPopover
         {...DEFAULT_PROPS}
-        selectedModelId="claude-code-pty:anthropic/claude-opus-4-7"
         onSelectModel={vi.fn()}
+        selectedModelId="claude-code-pty:anthropic/claude-opus-4-7"
       />
     );
     // The trigger should show 'Claude Opus 4.7' as the selected short name.
@@ -231,7 +231,7 @@ describe('ModelSelectorPopover', () => {
   it('renders without throwing for every model in the fixture catalog', () => {
     for (const model of FIXTURE_MODELS) {
       const { unmount } = render(
-        <ModelSelectorPopover {...DEFAULT_PROPS} selectedModelId={model.id} onSelectModel={vi.fn()} />
+        <ModelSelectorPopover {...DEFAULT_PROPS} onSelectModel={vi.fn()} selectedModelId={model.id} />
       );
       expect(screen.getAllByRole('button').length).toBeGreaterThan(0);
       unmount();
@@ -241,7 +241,7 @@ describe('ModelSelectorPopover', () => {
   it('renders without throwing for every reasoning level', () => {
     for (const reasoning of CHAT_REASONING_LEVELS) {
       const { unmount } = render(
-        <ModelSelectorPopover {...DEFAULT_PROPS} selectedReasoning={reasoning} onSelectReasoning={vi.fn()} />
+        <ModelSelectorPopover {...DEFAULT_PROPS} onSelectReasoning={vi.fn()} selectedReasoning={reasoning} />
       );
       expect(screen.getAllByRole('button').length).toBeGreaterThan(0);
       unmount();
@@ -260,9 +260,9 @@ describe('ModelSelectorPopover', () => {
     render(
       <ModelSelectorPopover
         {...DEFAULT_PROPS}
-        selectedModelId={firstModel.id}
         models={[firstModel, malformedModel]}
         onSelectModel={vi.fn()}
+        selectedModelId={firstModel.id}
       />
     );
 
@@ -281,8 +281,8 @@ describe('ModelSelectorPopover', () => {
     render(
       <ModelSelectorPopover
         {...DEFAULT_PROPS}
-        selectedModelId="claude-code-pty:anthropic/unknown-model"
         onSelectModel={vi.fn()}
+        selectedModelId="claude-code-pty:anthropic/unknown-model"
       />
     );
     expect(screen.getByText('Select model')).toBeTruthy();

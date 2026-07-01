@@ -4,7 +4,8 @@
  * Builds the standalone Next.js server, then runs it beside FastAPI on
  * loopback ports. Cloudflared owns the public surface.
  */
-import { type ChildProcess, spawn } from 'node:child_process';
+import type { ChildProcess } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { access, cp, mkdir, rm } from 'node:fs/promises';
 import { $ } from 'bun';
 import { DEV_BACKEND_PORT, DEV_FRONTEND_BIND_HOST, DEV_FRONTEND_PORT } from './scripts/dev-ports';

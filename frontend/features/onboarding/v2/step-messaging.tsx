@@ -6,11 +6,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { TelegramConnectDialog } from '@/features/channels/TelegramConnectDialog';
 import { listChannels } from '@/lib/channels';
-import {
-  MESSAGING_CHANNELS,
-  type MessagingChannelId,
-  type PersonalizationProfile,
-} from '@/lib/personalization/storage';
+import type { MessagingChannelId, PersonalizationProfile } from '@/lib/personalization/storage';
+import { MESSAGING_CHANNELS } from '@/lib/personalization/storage';
 import { cn } from '@/lib/utils';
 import { OnboardingShell } from './onboarding-shell';
 
@@ -90,7 +87,7 @@ export function StepMessaging({ profile, onPatch, onFinish }: StepMessagingProps
     <OnboardingShell
       footer={
         <Button
-          className="h-11 w-full max-w-sm cursor-pointer rounded-control bg-foreground px-8 text-sm font-semibold text-background shadow-none hover:bg-foreground/90 hover:shadow-minimal"
+          className="h-11 w-full max-w-sm cursor-pointer rounded-control bg-foreground px-8 font-semibold text-background text-sm shadow-none hover:bg-foreground/90 hover:shadow-minimal"
           disabled={!hasOne}
           onClick={onFinish}
           size="lg"
@@ -120,7 +117,7 @@ export function StepMessaging({ profile, onPatch, onFinish }: StepMessagingProps
                 >
                   {channel.label.charAt(0)}
                 </span>
-                <span className="text-sm font-medium text-foreground">Connect {channel.label}</span>
+                <span className="font-medium text-foreground text-sm">Connect {channel.label}</span>
               </div>
               {showTelegramSpinner ? (
                 <span className="flex h-9 min-w-24 items-center justify-center">

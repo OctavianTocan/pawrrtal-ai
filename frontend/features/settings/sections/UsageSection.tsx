@@ -17,12 +17,12 @@ function UsageLimitRow({
 }): React.JSX.Element {
   const clamped = Math.max(0, Math.min(100, percentLeft));
   return (
-    <SettingsRow description={resetLabel} label={<span className="text-sm text-foreground">{label}</span>}>
+    <SettingsRow description={resetLabel} label={<span className="text-foreground text-sm">{label}</span>}>
       <div className="flex items-center gap-3">
         <div className="h-1 w-32 overflow-hidden rounded-full bg-foreground/10">
           <div className={cn('h-full bg-foreground/85')} style={{ width: `${clamped}%` }} />
         </div>
-        <span className="w-16 text-right text-xs tabular-nums text-muted-foreground">{clamped}% left</span>
+        <span className="w-16 text-right text-muted-foreground text-xs tabular-nums">{clamped}% left</span>
       </div>
     </SettingsRow>
   );

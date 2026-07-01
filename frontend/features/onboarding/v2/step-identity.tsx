@@ -51,7 +51,7 @@ export function StepIdentity({ profile, onPatch, onContinue }: StepIdentityProps
     <OnboardingShell
       footer={
         <Button
-          className="h-11 w-full max-w-sm cursor-pointer rounded-control bg-foreground px-8 text-sm font-semibold text-background shadow-none hover:bg-foreground/90 hover:shadow-minimal"
+          className="h-11 w-full max-w-sm cursor-pointer rounded-control bg-foreground px-8 font-semibold text-background text-sm shadow-none hover:bg-foreground/90 hover:shadow-minimal"
           onClick={onContinue}
           size="lg"
           type="button"
@@ -95,7 +95,7 @@ export function StepIdentity({ profile, onPatch, onContinue }: StepIdentityProps
         />
       </Field>
       <div className="flex flex-col gap-2">
-        <span className="text-sm font-medium text-foreground">What do you want to accomplish?</span>
+        <span className="font-medium text-foreground text-sm">What do you want to accomplish?</span>
         <div className="flex flex-wrap gap-2">
           {GOAL_CHIPS.map((goal) => {
             const isOn = goals.includes(goal);
@@ -135,11 +135,11 @@ function Field({
 }): React.JSX.Element {
   return (
     <div className="flex flex-col gap-1.5">
-      <label className="text-sm font-medium text-foreground" htmlFor={htmlFor}>
+      <label className="font-medium text-foreground text-sm" htmlFor={htmlFor}>
         {label}
       </label>
       {children}
-      {helper ? <span className="text-sm text-muted-foreground">{helper}</span> : null}
+      {helper ? <span className="text-muted-foreground text-sm">{helper}</span> : null}
     </div>
   );
 }

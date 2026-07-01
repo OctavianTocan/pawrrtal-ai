@@ -69,6 +69,7 @@ const SKIP_DIRECTORIES = new Set([
   '.beans',
   '.claude',
   '.cursor',
+  '.agent',
   '.agents',
   '.codex',
   '.opencode',

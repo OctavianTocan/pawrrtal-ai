@@ -87,7 +87,7 @@ type ChatProps = {
 function ChatScrollAnchor({ track: _track }: { track: number }): React.ReactNode {
   const { scrollToBottom } = useStickToBottomContext();
   useEffect(() => {
-    scrollToBottom();
+    void scrollToBottom();
   }, [scrollToBottom]);
   return null;
 }
@@ -114,7 +114,7 @@ function WhimsyOverlay(): React.ReactNode {
       ) : null}
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 text-foreground [mask-repeat:repeat] [-webkit-mask-repeat:repeat]"
+        className="pointer-events-none absolute inset-0 text-foreground [-webkit-mask-repeat:repeat] [mask-repeat:repeat]"
         style={{
           backgroundColor: whimsy.tintColor,
           opacity: whimsy.opacity,
@@ -172,29 +172,29 @@ function LandingState({
   onSelectSuggestion: (prompt: string) => void;
 }): React.ReactNode {
   return (
-    <div className="relative mx-auto flex size-full max-w-[60rem] min-w-0 flex-col">
+    <div className="relative mx-auto flex size-full min-w-0 max-w-[60rem] flex-col">
       <div className="flex min-h-0 flex-1 flex-col items-center pt-[12vh] sm:pt-[24vh]">
-        <h1 className="mb-6 text-center text-[24px] font-medium tracking-normal text-balance text-foreground sm:mb-10 sm:text-[30px]">
+        <h1 className="mb-6 text-balance text-center font-medium text-[24px] text-foreground tracking-normal sm:mb-10 sm:text-[30px]">
           What should we build in Pawrrtal?
         </h1>
         <div className="relative flex w-full max-w-[48.75rem] flex-col">
           <ChatComposer
+            blockedMessage={composerBlockedMessage}
+            catalogStatus={catalogStatus}
             className="relative z-10"
             isLoading={isLoading}
-            catalogStatus={catalogStatus}
-            models={[...models]}
+            isSubmitBlocked={isComposerBlocked}
             message={{
               content: composerText,
               files: [],
             }}
-            onUpdateMessage={(event) => onChangeComposerText(event.target.value)}
+            models={[...models]}
+            onOpenOnboarding={onOpenOnboarding}
+            onReplaceMessageContent={onChangeComposerText}
             onSelectModel={onSelectModel}
             onSelectReasoning={(level) => onSelectReasoning(level as ChatReasoningLevel)}
             onSendMessage={onSendMessage}
-            isSubmitBlocked={isComposerBlocked}
-            blockedMessage={composerBlockedMessage}
-            onOpenOnboarding={onOpenOnboarding}
-            onReplaceMessageContent={onChangeComposerText}
+            onUpdateMessage={(event) => onChangeComposerText(event.target.value)}
             selectedModelId={selectedModelId}
             selectedReasoning={selectedReasoning}
           />
@@ -330,25 +330,25 @@ function ActiveConversationState({
       </Conversation>
       <div className="mx-auto flex w-full max-w-[60rem] shrink-0 justify-center pb-4">
         <ChatComposer
+          blockedMessage={composerBlockedMessage}
+          catalogStatus={catalogStatus}
           className="w-full max-w-[48.75rem]"
           isLoading={isLoading}
-          catalogStatus={catalogStatus}
-          models={[...models]}
+          isSubmitBlocked={isComposerBlocked}
           message={{
             content: composerText,
             files: [],
           }}
-          onUpdateMessage={(event) => onChangeComposerText(event.target.value)}
+          models={[...models]}
+          onOpenOnboarding={onOpenOnboarding}
+          onReplaceMessageContent={onChangeComposerText}
           onSelectModel={onSelectModel}
           onSelectReasoning={(level) => onSelectReasoning(level as ChatReasoningLevel)}
           onSendMessage={onSendMessage}
-          onReplaceMessageContent={onChangeComposerText}
-          isSubmitBlocked={isComposerBlocked}
-          blockedMessage={composerBlockedMessage}
-          onOpenOnboarding={onOpenOnboarding}
+          onUpdateMessage={(event) => onChangeComposerText(event.target.value)}
           placeholderOverride="Ask a follow up"
-          selectedReasoning={selectedReasoning}
           selectedModelId={selectedModelId}
+          selectedReasoning={selectedReasoning}
         />
       </div>
     </div>

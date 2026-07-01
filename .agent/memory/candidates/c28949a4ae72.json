@@ -1,0 +1,40 @@
+{
+  "id": "c28949a4ae72",
+  "key": "pattern_successfully_completed_pawrrtal_c28949",
+  "name": "pattern_successfully_completed_pawrrtal_c28949",
+  "claim": "Tool Shell completed successfully",
+  "conditions": [
+    "code",
+    "command",
+    "completed",
+    "cwd",
+    "mnt",
+    "pawrrtal",
+    "personal",
+    "shell",
+    "successfully",
+    "timeout",
+    "tool",
+    "work"
+  ],
+  "evidence_ids": [
+    "2026-06-29T18:54:11.940165+00:00",
+    "2026-06-29T18:54:12.444667+00:00",
+    "2026-06-29T18:54:30.250113+00:00",
+    "2026-06-29T18:54:30.832535+00:00",
+    "2026-06-29T18:54:31.539243+00:00",
+    "2026-06-29T18:54:56.760496+00:00"
+  ],
+  "cluster_size": 6,
+  "canonical_salience": 13.5,
+  "staged_at": "2026-06-29T18:55:06.364384+00:00",
+  "status": "staged",
+  "decisions": [
+    {
+      "ts": "2026-06-29T18:55:06.364384+00:00",
+      "action": "staged",
+      "reviewer": "auto_dream"
+    }
+  ],
+  "rejection_count": 0
+}

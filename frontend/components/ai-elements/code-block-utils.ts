@@ -5,7 +5,8 @@
  * export React components (react-doctor `only-export-components`).
  */
 
-import { type BundledLanguage, codeToTokens } from 'shiki';
+import type { BundledLanguage } from 'shiki';
+import { codeToTokens } from 'shiki';
 
 export type HighlightedToken = {
   content: string;

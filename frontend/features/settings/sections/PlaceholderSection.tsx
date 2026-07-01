@@ -13,7 +13,7 @@ import { SettingsPage } from '../primitives';
 export function PlaceholderSection({ title }: { title: string }): React.JSX.Element {
   return (
     <SettingsPage description="This section is on the roadmap but not yet implemented." title={title}>
-      <div className="flex items-center gap-3 rounded-[10px] border border-dashed border-foreground/15 bg-foreground/[0.02] px-5 py-8 text-sm text-muted-foreground">
+      <div className="flex items-center gap-3 rounded-[10px] border border-foreground/15 border-dashed bg-foreground/[0.02] px-5 py-8 text-muted-foreground text-sm">
         <Construction aria-hidden="true" className="size-4" />
         <span>This section is coming soon.</span>
       </div>

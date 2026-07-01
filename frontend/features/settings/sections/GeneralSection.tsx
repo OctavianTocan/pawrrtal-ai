@@ -99,36 +99,36 @@ export function GeneralSection(): React.JSX.Element {
           <Input
             aria-label="Full name"
             className="w-56"
-            value={name}
             onChange={(e) => {
               updateForm({ name: e.target.value });
               save({ name: e.target.value });
             }}
+            value={name}
           />
         </SettingsRow>
         <SettingsRow label="What should we call you?">
-          <Input aria-label="Nickname" className="w-56" value={nickname} readOnly />
+          <Input aria-label="Nickname" className="w-56" readOnly value={nickname} />
         </SettingsRow>
         <SettingsRow label="What best describes your work?">
           <Input
             aria-label="Work description"
             className="w-56"
-            value={role}
             onChange={(e) => {
               updateForm({ role: e.target.value });
               save({ role: e.target.value });
             }}
+            value={role}
           />
         </SettingsRow>
         <SettingsRow className="items-start" description="Kept in mind across chats." label="Instructions for Pawrrtal">
           <Textarea
             className="min-h-24 w-72 resize-none"
-            value={customInstructions}
             onChange={(e) => {
               updateForm({ customInstructions: e.target.value });
               save({ customInstructions: e.target.value });
             }}
             placeholder="e.g. keep explanations brief and to the point"
+            value={customInstructions}
           />
         </SettingsRow>
       </SettingsCard>

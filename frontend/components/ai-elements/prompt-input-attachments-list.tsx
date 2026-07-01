@@ -7,7 +7,8 @@
 'use client';
 
 import type { FileUIPart } from 'ai';
-import { Fragment, type HTMLAttributes, type ReactNode } from 'react';
+import type { HTMLAttributes, ReactNode } from 'react';
+import { Fragment } from 'react';
 import { cn } from '@/lib/utils';
 import { usePromptInputAttachments } from './prompt-input-context';
 

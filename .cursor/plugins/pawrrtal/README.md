@@ -1,18 +1,19 @@
 # Pawrrtal Plugin
 
 The single home for Pawrrtal's project-specific agent skills and architecture
-rules. Previously these lived scattered across `.agents/skills/`,
-`.claude/skills/`, and `.claude/rules/`; they are now bundled here.
+rules. Skills are canonical in `.agent/skills/` (agentic-stack portable brain).
+Legacy discovery paths mirror that tree:
+
+- `.agents/skills/` → `.agent/skills/` (Codex)
+- `.claude/skills/` → `.agent/skills/` (Claude Code)
+- `.cursor/plugins/pawrrtal/skills/` → `.agent/skills/` (Cursor plugin)
 
 ## Contents
 
 ### Skills (`skills/`)
 
-The canonical copy of every Pawrrtal-specific skill lives here. Legacy
-discovery locations that still need to resolve (`.agents/skills/<name>` and,
-where they existed, `.claude/skills/<name>`) are **symlinks into this plugin**,
-so existing agents, CI path filters, and documentation references keep resolving
-while the plugin is the one source of truth.
+Symlinks into `.agent/skills/`. Edit generated skills with `bun run skill-gen:generate`
+(output target `.agent/skills/`); hand-written skills live there directly.
 
 | Skill | What it covers |
 |---|---|
@@ -30,10 +31,14 @@ while the plugin is the one source of truth.
 | `user-facing-text` | Conventions for every string a user reads across channels. |
 | `workflow-plan` | Planning ambiguous or multi-step work before implementation. |
 
-### Rules (`rules/`)
+### Rules
 
-Pawrrtal-specific architecture rules, moved here from `.claude/rules/` and
-converted to Cursor `.mdc` format:
+Path-scoped traps canonical in `.agent/rules/` (`.md` with `paths:` globs). Harness symlinks:
+
+- `.claude/rules` → `.agent/rules` (Claude Code)
+- `.agents/rules` → `.agent/rules` (Codex)
+
+Cursor-specific `.mdc` rules stay in this plugin:
 
 - `rules/clean-code/` — function design, naming, nesting, named constants,
   Python typing/logging, documentation preservation.
@@ -41,9 +46,7 @@ converted to Cursor `.mdc` format:
   `pull_request_target`, action pinning, workflow-race prevention, PR
   descriptions.
 
-> Note: these rules were moved out of `.claude/rules/`, so Claude Code no longer
-> auto-applies them from that path. Cursor loads them from this plugin once the
-> plugin is installed.
+> Note: these plugin rules were moved out of `.agent/rules/` because Cursor loads `.mdc` from the plugin. Claude does not auto-apply them from the brain tree.
 
 ## Installing
 

@@ -32,17 +32,17 @@ export function TasksHeader({ title, subtitle, rightSlot }: TasksHeaderProps): R
   return (
     <header className="flex items-end justify-between gap-3 px-6 pt-7 pb-4">
       <div className="min-w-0">
-        <h1 className="font-display text-[40px] leading-none font-medium tracking-[-0.025em] text-balance text-foreground">
+        <h1 className="text-balance font-display font-medium text-[40px] text-foreground leading-none tracking-[-0.025em]">
           {title}
         </h1>
-        <p className="mt-2 text-[13px] tabular-nums text-muted-foreground">{subtitle}</p>
+        <p className="mt-2 text-[13px] text-muted-foreground tabular-nums">{subtitle}</p>
       </div>
       <div className="flex shrink-0 items-center gap-2 pb-1">
         {rightSlot}
         <button
-          type="button"
           aria-label="Tasks settings"
           className="flex size-8 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors duration-150 ease-out hover:bg-foreground/[0.05] hover:text-foreground focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-ring/40"
+          type="button"
         >
           <Settings2Icon aria-hidden="true" className="size-4" strokeWidth={2.25} />
         </button>

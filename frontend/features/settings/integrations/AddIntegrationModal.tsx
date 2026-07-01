@@ -5,7 +5,8 @@ import type * as React from 'react';
 import { useState } from 'react';
 import { AppDialog } from '@/components/ui/app-dialog';
 import { cn } from '@/lib/utils';
-import { type CatalogIntegration, INTEGRATION_CATALOG } from './catalog';
+import type { CatalogIntegration } from './catalog';
+import { INTEGRATION_CATALOG } from './catalog';
 
 /** Props for {@link AddIntegrationModal}. */
 export interface AddIntegrationModalProps {
@@ -36,7 +37,7 @@ export function AddIntegrationModal({ open, onDismiss, onAddCustom }: AddIntegra
     >
       <div className="flex flex-col gap-4 p-6">
         <header className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-foreground">Add integrations</h2>
+          <h2 className="font-semibold text-foreground text-lg">Add integrations</h2>
           <button
             aria-label="Close"
             className="rounded-[6px] p-1.5 text-muted-foreground hover:bg-foreground/[0.06] hover:text-foreground"
@@ -52,21 +53,21 @@ export function AddIntegrationModal({ open, onDismiss, onAddCustom }: AddIntegra
             <Search aria-hidden="true" className="absolute left-2.5 size-4 text-muted-foreground" />
             <input
               aria-label="Search integrations"
-              className="h-9 w-full rounded-[8px] border border-foreground/10 bg-foreground/[0.03] py-1 pr-3 pl-8 text-sm text-foreground outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
+              className="h-9 w-full rounded-[8px] border border-foreground/10 bg-foreground/[0.03] py-1 pr-3 pl-8 text-foreground text-sm outline-none placeholder:text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring/40"
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Search integrations..."
               value={query}
             />
           </div>
           <button
-            className="flex h-9 items-center gap-1 rounded-[8px] border border-foreground/10 bg-foreground/[0.03] px-2.5 text-xs text-foreground hover:bg-foreground/[0.06]"
+            className="flex h-9 items-center gap-1 rounded-[8px] border border-foreground/10 bg-foreground/[0.03] px-2.5 text-foreground text-xs hover:bg-foreground/[0.06]"
             type="button"
           >
             All
             <ChevronDown className="size-3.5" />
           </button>
           <button
-            className="flex h-9 items-center gap-1 rounded-[8px] border border-foreground/15 bg-foreground px-3 text-xs font-medium text-background hover:bg-foreground/85"
+            className="flex h-9 items-center gap-1 rounded-[8px] border border-foreground/15 bg-foreground px-3 font-medium text-background text-xs hover:bg-foreground/85"
             onClick={onAddCustom}
             type="button"
           >
@@ -101,7 +102,7 @@ function CatalogTile({ entry }: { entry: CatalogIntegration }): React.JSX.Elemen
           <entry.Icon className="size-4" />
         </span>
         <div className="flex flex-col gap-0.5">
-          <span className="text-sm font-medium text-foreground">{entry.name}</span>
+          <span className="font-medium text-foreground text-sm">{entry.name}</span>
           <span className="line-clamp-2 text-[11px] text-muted-foreground">{entry.description}</span>
         </div>
       </div>
@@ -115,7 +116,7 @@ function CatalogTile({ entry }: { entry: CatalogIntegration }): React.JSX.Elemen
         </button>
       ) : (
         <button
-          className="rounded-[7px] border border-foreground/10 bg-foreground/[0.04] px-2.5 py-1 text-xs font-medium text-foreground hover:bg-foreground/[0.08]"
+          className="rounded-[7px] border border-foreground/10 bg-foreground/[0.04] px-2.5 py-1 font-medium text-foreground text-xs hover:bg-foreground/[0.08]"
           type="button"
         >
           Connect
