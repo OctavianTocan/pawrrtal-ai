@@ -1,58 +1,58 @@
-import { Api } from "@pawrrtal/api-core"
-import { CurrentUser } from "@pawrrtal/api-core/Modules/Auth/Domain"
-import { Effect, Layer } from "effect"
-import { HttpApiBuilder } from "effect/unstable/httpapi"
-import { HttpAllowedUserLive, HttpAuthLive } from "../Authentication/Http"
-import { ConversationsService, ConversationsServiceLive } from "./Service"
+import { Api } from '@pawrrtal/api-core';
+import { CurrentUser } from '@pawrrtal/api-core/Modules/Auth/Domain';
+import { Effect, Layer } from 'effect';
+import { HttpApiBuilder } from 'effect/unstable/httpapi';
+import { HttpAllowedUserLive, HttpAuthLive } from '../Authentication/Http';
+import { ConversationsService, ConversationsServiceLive } from './Service';
 
 /** Live `conversations` handlers — auth provides `CurrentUser`, service scopes by `user.id`. */
 export const HttpConversationsLive = HttpApiBuilder.group(
   Api,
-  "conversations",
+  'conversations',
   Effect.fn(function* (handlers) {
-    const service = yield* ConversationsService
+    const service = yield* ConversationsService;
     return handlers
       .handle(
-        "list",
+        'list',
         Effect.fn(function* () {
-          const user = yield* CurrentUser
-          return yield* service.list(user.id)
+          const user = yield* CurrentUser;
+          return yield* service.list(user.id);
         })
       )
       .handle(
-        "create",
+        'create',
         Effect.fn(function* ({ payload }) {
-          const user = yield* CurrentUser
-          return yield* service.create(user.id, payload)
+          const user = yield* CurrentUser;
+          return yield* service.create(user.id, payload);
         })
       )
       .handle(
-        "get",
+        'get',
         Effect.fn(function* ({ params }) {
-          const user = yield* CurrentUser
-          return yield* service.get(user.id, params.conversation_id)
+          const user = yield* CurrentUser;
+          return yield* service.get(user.id, params.conversation_id);
         })
       )
       .handle(
-        "update",
+        'update',
         Effect.fn(function* ({ params, payload }) {
-          const user = yield* CurrentUser
-          return yield* service.update(user.id, params.conversation_id, payload)
+          const user = yield* CurrentUser;
+          return yield* service.update(user.id, params.conversation_id, payload);
         })
       )
       .handle(
-        "remove",
+        'remove',
         Effect.fn(function* ({ params }) {
-          const user = yield* CurrentUser
-          return yield* service.remove(user.id, params.conversation_id)
+          const user = yield* CurrentUser;
+          return yield* service.remove(user.id, params.conversation_id);
         })
       )
       .handle(
-        "messages",
+        'messages',
         Effect.fn(function* ({ params }) {
-          const user = yield* CurrentUser
-          return yield* service.getMessages(user.id, params.conversation_id)
+          const user = yield* CurrentUser;
+          return yield* service.getMessages(user.id, params.conversation_id);
         })
-      )
+      );
   })
-).pipe(Layer.provide([ConversationsServiceLive, HttpAuthLive, HttpAllowedUserLive]))
+).pipe(Layer.provide([ConversationsServiceLive, HttpAuthLive, HttpAllowedUserLive]));

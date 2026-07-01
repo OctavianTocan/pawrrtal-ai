@@ -1,8 +1,8 @@
-import { Schema } from "effect"
+import { Schema } from 'effect';
 
 /** Unexpected server failure (HTTP 500). */
 export class InternalError extends Schema.TaggedErrorClass<InternalError>()(
-  "InternalError",
+  'InternalError',
   {
     message: Schema.String,
     cause: Schema.optional(Schema.Unknown)

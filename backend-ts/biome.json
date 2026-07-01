@@ -10,22 +10,74 @@
   },
   "javascript": {
     "formatter": {
-      "quoteStyle": "double",
-      "semicolons": "asNeeded",
+      "quoteStyle": "single",
+      "semicolons": "always",
       "trailingCommas": "none",
       "arrowParentheses": "always"
     }
   },
+  "linter": {
+    "rules": {
+      "style": {
+        "useFilenamingConvention": {
+          "level": "error",
+          "options": {
+            "strictCase": false,
+            "filenameCases": ["camelCase", "kebab-case"]
+          }
+        }
+      },
+      "correctness": {
+        "useImportExtensions": "off"
+      }
+    }
+  },
   "overrides": [
     {
-      "includes": ["**/*"],
+      "includes": [
+        "**/Modules/**/*.ts",
+        "**/Lib/**/*.ts",
+        "**/Infrastructure/**/*.ts",
+        "**/test/**/*.ts",
+        "packages/api-core/src/Api.ts",
+        "apps/api/src/App.ts",
+        "apps/api/src/Main.ts"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "useFilenamingConvention": {
+              "level": "error",
+              "options": {
+                "strictCase": false,
+                "filenameCases": ["PascalCase"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/scratchpad/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "useFilenamingConvention": {
+              "level": "error",
+              "options": {
+                "filenameCases": ["camelCase", "kebab-case"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "includes": ["**/index.ts"],
       "linter": {
         "rules": {
           "style": {
             "useFilenamingConvention": "off"
-          },
-          "correctness": {
-            "useImportExtensions": "off"
           }
         }
       }
