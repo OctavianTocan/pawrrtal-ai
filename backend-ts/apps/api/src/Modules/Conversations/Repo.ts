@@ -8,7 +8,10 @@ import { DatabaseLive } from '@/Infrastructure/Database';
 /** Maps a SQL row to a `Conversation` instance. */
 const decodeConversation = (row: Record<string, unknown>): Conversation =>
   new Conversation({
-    id: row.id as ConversationId
+    id: row.id as ConversationId,
+    title: row.title as string,
+    createdAt: new Date(row.created_at as string),
+    updatedAt: new Date(row.updated_at as string)
   });
 
 /** Maps SQL rows to `Conversation` instances. */
