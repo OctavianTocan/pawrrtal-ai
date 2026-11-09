@@ -3,8 +3,8 @@
 > Goal of this README: keep one up-to-date, high-signal guide to the current state of the repository, how to run it locally, and which commands and entrypoints matter day to day.
 
 <p align="center">
-  <a href="docs/assets/header.mp4" title="Click for the full-resolution MP4">
-    <img src="docs/assets/header.gif" alt="Pawrrtal demo" width="100%" />
+  <a href=".github/media/header.mp4" title="Click for the full-resolution MP4">
+    <img src=".github/media/header.gif" alt="Pawrrtal demo" width="100%" />
   </a>
 </p>
 
