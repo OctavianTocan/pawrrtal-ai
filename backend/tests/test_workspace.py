@@ -40,10 +40,10 @@ def _make_personalization(**kwargs: Any) -> UserPersonalization:
     """Build an unpersisted UserPersonalization for the workspace seeder."""
     defaults: dict[str, Any] = {
         "user_id": uuid.uuid4(),
-        "name": "Tavi",
+        "name": "Octavian",
         "role": "Engineer",
         "company_website": "https://example.com",
-        "linkedin": "https://linkedin.com/in/tavi",
+        "linkedin": "https://linkedin.com/in/octavian",
         "goals": ["Build great products", "Automate toil"],
         "personality": "direct",
         "custom_instructions": None,

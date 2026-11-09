@@ -788,7 +788,7 @@ class TestHandlePlainMessage:
         """A known user must get a TelegramTurnContext with correct fields."""
         pawrrtal_uid = uuid.uuid4()
         conv_id = uuid.uuid4()
-        sender = TelegramSender(user_id=42, chat_id=42, username="tavi", full_name="Tavi")
+        sender = TelegramSender(user_id=42, chat_id=42, username="octavian", full_name="Octavian")
         session = AsyncMock()
 
         # Fake conversation row with no model override.
@@ -825,7 +825,7 @@ class TestHandlePlainMessage:
         """When conversation.model_id is set it must propagate into the context."""
         pawrrtal_uid = uuid.uuid4()
         conv_id = uuid.uuid4()
-        sender = TelegramSender(user_id=42, chat_id=42, username="tavi", full_name="Tavi")
+        sender = TelegramSender(user_id=42, chat_id=42, username="octavian", full_name="Octavian")
         session = AsyncMock()
 
         fake_conv = AsyncMock()

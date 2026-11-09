@@ -38,17 +38,17 @@ async def test_empty_allowlist_lets_everyone_through() -> None:
 async def test_allowlist_admits_listed_email_case_insensitive() -> None:
     """Listed users get through; matching is case-insensitive."""
     stub = SimpleNamespace(
-        allowed_emails_set=frozenset({"tavi@example.com", "esther@example.com"}),
+        allowed_emails_set=frozenset({"octavian@example.com", "sam@example.com"}),
     )
     with patch("app.infrastructure.auth.users.settings", stub):
-        result = await get_allowed_user(_user("Tavi@Example.com"))
-        assert result.email == "Tavi@Example.com"
+        result = await get_allowed_user(_user("Octavian@Example.com"))
+        assert result.email == "Octavian@Example.com"
 
 
 @pytest.mark.anyio
 async def test_allowlist_blocks_unlisted_email_with_generic_message() -> None:
     """Unlisted users get 403 with a deliberately generic message."""
-    stub = SimpleNamespace(allowed_emails_set=frozenset({"tavi@example.com"}))
+    stub = SimpleNamespace(allowed_emails_set=frozenset({"octavian@example.com"}))
     with patch("app.infrastructure.auth.users.settings", stub):
         with pytest.raises(HTTPException) as exc_info:
             await get_allowed_user(_user("stranger@example.com"))
@@ -63,7 +63,7 @@ def test_allowed_emails_set_parses_comma_separated_values() -> None:
 
     # Build a fresh Settings instance with our test value.  Use object.__setattr__
     # so we don't have to bother with the BaseSettings constructor.
-    raw = "  Tavi@example.com , esther@example.com,,  "
+    raw = "  Octavian@example.com , sam@example.com,,  "
 
     class _Stub(Settings):
         model_config = Settings.model_config
@@ -73,7 +73,7 @@ def test_allowed_emails_set_parses_comma_separated_values() -> None:
     from app.infrastructure.config import settings as real_settings
 
     overridden = real_settings.model_copy(update={"allowed_emails": raw})
-    assert overridden.allowed_emails_set == frozenset({"tavi@example.com", "esther@example.com"})
+    assert overridden.allowed_emails_set == frozenset({"octavian@example.com", "sam@example.com"})
 
 
 def test_allowed_emails_set_is_empty_when_unset() -> None:

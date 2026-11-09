@@ -24,7 +24,7 @@ def test_telegram_command_menu_includes_tools() -> None:
 
 @pytest.mark.anyio
 async def test_tools_command_requires_binding() -> None:
-    sender = TelegramSender(user_id=42, chat_id=42, username="tavi", full_name="Tavi")
+    sender = TelegramSender(user_id=42, chat_id=42, username="octavian", full_name="Octavian")
 
     with patch(
         "app.channels.telegram.tools_command.resolve_or_autolink_telegram_user",
@@ -42,7 +42,7 @@ async def test_tools_command_renders_actual_tools_and_plugin_capabilities(
     user_id = uuid.uuid4()
     workspace_id = uuid.uuid4()
     conversation_id = uuid.uuid4()
-    sender = TelegramSender(user_id=42, chat_id=42, username="tavi", full_name="Tavi")
+    sender = TelegramSender(user_id=42, chat_id=42, username="octavian", full_name="Octavian")
     workspace = SimpleNamespace(id=workspace_id, path=str(tmp_path))
     conversation = SimpleNamespace(
         id=conversation_id,

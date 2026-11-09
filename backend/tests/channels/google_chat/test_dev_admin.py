@@ -77,7 +77,7 @@ async def test_autolink_binds_configured_sender(
         session=db_session,
         external_user_id=DEV_ADMIN_SENDER,
         space_name=SPACE,
-        display="Tavi",
+        display="Octavian",
     )
 
     assert resolved == seeded_admin_user.id
@@ -143,13 +143,13 @@ async def test_autolink_returns_existing_binding(
         session=db_session,
         external_user_id=DEV_ADMIN_SENDER,
         space_name=SPACE,
-        display="Tavi",
+        display="Octavian",
     )
     second = await resolve_or_autolink_google_chat_user(
         session=db_session,
         external_user_id=DEV_ADMIN_SENDER,
         space_name=SPACE,
-        display="Tavi",
+        display="Octavian",
     )
 
     assert first == second == seeded_admin_user.id

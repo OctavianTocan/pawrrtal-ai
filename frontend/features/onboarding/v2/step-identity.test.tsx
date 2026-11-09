@@ -10,7 +10,7 @@ describe('StepIdentity', () => {
         onContinue={vi.fn()}
         onPatch={vi.fn()}
         profile={{
-          name: 'Tavi',
+          name: 'Octavian',
           companyWebsite: 'https://pawrrtal.dev',
           linkedin: '',
           role: 'Engineering',
@@ -18,7 +18,7 @@ describe('StepIdentity', () => {
         }}
       />
     );
-    expect(getByDisplayValue('Tavi')).toBeTruthy();
+    expect(getByDisplayValue('Octavian')).toBeTruthy();
     expect(getByDisplayValue('Engineering')).toBeTruthy();
     expect(getByDisplayValue('https://pawrrtal.dev')).toBeTruthy();
   });
