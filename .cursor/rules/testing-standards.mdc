@@ -54,7 +54,7 @@ alwaysApply: false
 ## Monorepo & Configuration
 
 ### 1. Package Imports
-- **Rule:** Tests should import from package public paths (`@twinmind/api`), not relative (`../src`).
+- **Rule:** Tests should import from package public paths (`@app/api`), not relative (`../src`).
 - **Why:** Validates public API and survives refactoring.
 
 ### 2. Jest & React

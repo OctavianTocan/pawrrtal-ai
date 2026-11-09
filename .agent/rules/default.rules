@@ -1,2 +1,1 @@
 prefix_rule(pattern=["gh", "auth", "status"], decision="allow")
-prefix_rule(pattern=["ssh", "-T", "-i", "~/.ssh/id_ed25519_twinmind", "-o", "IdentitiesOnly=yes", "git@github.com"], decision="allow")

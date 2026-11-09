@@ -37,7 +37,7 @@ gh pr merge fix-1 && gh pr merge fix-2 && gh pr merge fix-3
 ## References
 
 - brownfield-aar-native-crash-diagnosis skill: Shipping Fix Builds section
-- rn-twinmind-brownfield-ci skill: Beta publish from development
+- rn-brownfield-ci skill: Beta publish from development
 
 ## Verify
 

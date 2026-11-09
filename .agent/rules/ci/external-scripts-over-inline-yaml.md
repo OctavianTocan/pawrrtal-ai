@@ -38,7 +38,7 @@ Shell scripts can be tested locally; YAML `run:` blocks can't. Heredocs and mult
 
 ## References
 
-- rn-twinmind-brownfield-ci skill: Inline Python is a trap
+- rn-brownfield-ci skill: Inline Python is a trap
 - debug-ci-build-hangs skill: 5 approaches to multiline content in YAML
 - Root cause of permanent workflow_dispatch 422 errors
 

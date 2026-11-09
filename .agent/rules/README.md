@@ -29,7 +29,6 @@ In **this repo**, edit `.agent/rules/` — do not rely on a global `~/.claude/ru
 | **debugging/** | 18 | Always (general methodology) |
 | **brownfield/** | 15 | Editing native/RN brownfield files |
 | **git/** | 12 | Editing `.github/` configs, shell scripts |
-| **twinmind/** | 10 | Editing app-specific `.ts`/`.tsx`/native files |
 | **react-native/** | 11 | Editing `.ts`/`.tsx`/`.kt`/`.java`/`.swift` files |
 | **testing/** | 8 | Editing test files |
 | **state-management/** | 6 | Editing `.ts`/`.tsx`/native files |

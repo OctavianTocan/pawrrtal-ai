@@ -41,7 +41,7 @@ python3 -c "import yaml; yaml.safe_load(open('.github/workflows/e2e.yml'))"
 
 ## References
 
-- rn-twinmind-brownfield-ci skill: YAML heredocs break workflow_dispatch permanently
+- rn-brownfield-ci skill: YAML heredocs break workflow_dispatch permanently
 - brownfield-native-test-hosts skill: Heredoc YAML pitfall
 
 ## Verify

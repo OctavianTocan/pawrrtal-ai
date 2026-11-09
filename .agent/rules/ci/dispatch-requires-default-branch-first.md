@@ -41,7 +41,7 @@ gh workflow run e2e.yml --ref development
 ## References
 
 - expo-brownfield-ci skill: workflow_dispatch Not Discoverable on Non-Default Branch
-- rn-twinmind-brownfield-ci skill: workflow_dispatch requires file on default branch
+- rn-brownfield-ci skill: workflow_dispatch requires file on default branch
 
 ## Verify
 

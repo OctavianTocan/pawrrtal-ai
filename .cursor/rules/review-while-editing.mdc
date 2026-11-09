@@ -29,7 +29,7 @@ When you touch a file, review the code you're working in and fix problems you fi
 
 ### Inconsistent Logging
 - Mix of `console.error` and `logger.error` in the same file.
-- Use `logger` from `@twinmind/logger` everywhere. Follow the pattern: `logger.error({ err: error }, 'message')`.
+- Use `logger` from `@app/logger` everywhere. Follow the pattern: `logger.error({ err: error }, 'message')`.
 
 ### Silent Failures
 - `if (x) { doThing() }` with no `else` when `x` being falsy means something went wrong.

@@ -67,7 +67,7 @@ Rules are organized by the domain they protect, not by the technology they menti
 - **`general/`** — Cross-cutting principles that don't belong to one domain. "Diagnose before workaround." "Verify locally before blaming CI." Rules that apply everywhere because they're about how to think, not what to type.
   Example: `prefer-semantic-code-search.md` tells agents to try semantic code lookup before raw text search when CodeGraph, Serena, or an equivalent tool is available.
 
-Removed in 2026-05 audit because the underlying stack isn't in this repo: `brownfield/`, `expo/`, `react-native/`, `rust/`, `twinmind/`. If you ever ship a React Native or Rust target, restore those folders from `OctavianTocan/claude-rules` upstream.
+Removed in 2026-05 audit because the underlying stack isn't in this repo: `brownfield/`, `expo/`, `react-native/`, `rust/`. If you ever ship a React Native or Rust target, restore those folders from `OctavianTocan/claude-rules` upstream.
 
 **When in doubt:** If the rule mentions a specific tool, put it in that tool's folder. If it mentions a mindset or a cross-cutting principle, put it in `general/`. If a folder doesn't exist for the domain, create one — don't stuff it in `general/` to avoid making a decision.
 

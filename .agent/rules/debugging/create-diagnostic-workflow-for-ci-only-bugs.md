@@ -50,4 +50,4 @@ Good — diagnostic workflow with labeled theories:
 ## References
 
 - systematic-debugging skill: Phase 1.4b — When You Can't Reproduce Locally
-- rn-twinmind-brownfield-ci skill: Diagnostic CI pattern
+- rn-brownfield-ci skill: Diagnostic CI pattern

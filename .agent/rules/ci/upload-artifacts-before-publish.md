@@ -43,7 +43,7 @@ When Maven publish is slow and pushes the job past `timeout-minutes`, the artifa
 
 ## References
 
-- rn-twinmind-brownfield-ci skill: Step order matters section
+- rn-brownfield-ci skill: Step order matters section
 - debug-ci-build-hangs skill: Upload artifacts before optional slow steps
 
 ## Verify

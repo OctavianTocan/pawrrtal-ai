@@ -29,15 +29,15 @@ LATEST=$(git tag -l 'v*' | sort -V | tail -1)
 
 ```bash
 # Only matches strict semver (N.N.N)
-LATEST_STABLE=$(git tag -l 'twinmind-digest/v*' | \
-  sed 's|twinmind-digest/v||' | \
+LATEST_STABLE=$(git tag -l 'app-digest/v*' | \
+  sed 's|app-digest/v||' | \
   grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | \
   sort -V | tail -1)
 ```
 
 ## References
 
-- rn-twinmind-brownfield-ci skill: Semver tag parsing
+- rn-brownfield-ci skill: Semver tag parsing
 - brownfield-native-test-hosts skill: Publish version detection
 
 ## Verify
