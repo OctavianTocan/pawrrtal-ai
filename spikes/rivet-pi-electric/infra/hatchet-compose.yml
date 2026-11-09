@@ -1,0 +1,83 @@
+# Throwaway M8 spike infra: Hatchet (Postgres-backed durable task queue).
+#
+# Mirrors the reference's proven local setup (effect-api-layout/docker-compose.yml):
+# the all-in-one `hatchet-lite` image on its OWN Postgres, plus a one-shot
+# `hatchet-setup` that mints an API token into a host-readable file.
+#
+# Ports are remapped off the defaults (gRPC 7079, API 8899) because this host
+# already runs a separate, persistent Hatchet on 7077/8888. The minted token
+# embeds the gRPC BROADCAST address, so SERVER_GRPC_BROADCAST_ADDRESS must match
+# the host port we actually expose (localhost:7079) — otherwise the SDK would
+# dial the OTHER Hatchet. The in-container internal client still uses 7077.
+#
+# The durable WORK projects into the SAME app Postgres the rest of the spike
+# uses (infra/docker-compose.yml on :5499) — this stack only runs Hatchet.
+name: pawrrtal-spike-m8
+
+services:
+  hatchet-postgres:
+    image: postgres:17-alpine
+    container_name: spike-m8-hatchet-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: hatchet
+    ports:
+      - "127.0.0.1:5502:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hatchet"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  hatchet:
+    image: ghcr.io/hatchet-dev/hatchet/hatchet-lite:latest
+    container_name: spike-m8-hatchet
+    depends_on:
+      hatchet-postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8899:8888"
+      - "127.0.0.1:7079:7077"
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgres@hatchet-postgres:5432/hatchet?sslmode=disable"
+      SERVER_AUTH_COOKIE_DOMAIN: "localhost"
+      SERVER_AUTH_COOKIE_INSECURE: "t"
+      SERVER_AUTH_SET_EMAIL_VERIFIED: "t"
+      SERVER_GRPC_BIND_ADDRESS: "0.0.0.0"
+      SERVER_GRPC_INSECURE: "t"
+      SERVER_GRPC_PORT: "7077"
+      SERVER_GRPC_BROADCAST_ADDRESS: "localhost:7079"
+      SERVER_INTERNAL_CLIENT_INTERNAL_GRPC_BROADCAST_ADDRESS: "localhost:7077"
+      SERVER_URL: "http://localhost:8899"
+      SERVER_MSGQUEUE_KIND: "postgres"
+      SERVER_DEFAULT_ENGINE_VERSION: "V1"
+    volumes:
+      - hatchet_config:/config
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:8888 || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 15s
+
+  hatchet-setup:
+    image: ghcr.io/hatchet-dev/hatchet/hatchet-lite:latest
+    container_name: spike-m8-hatchet-setup
+    depends_on:
+      hatchet:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: "postgresql://postgres:postgres@hatchet-postgres:5432/hatchet?sslmode=disable"
+    volumes:
+      - hatchet_config:/config
+      - ./hatchet-creds:/output
+    entrypoint: >
+      /bin/sh -c "
+        echo 'Generating Hatchet API token...';
+        /hatchet-admin token create --config /config --tenant-id 707d0855-80ab-4e1f-a156-f1c4546cbf52 --name spike-m8 2>/dev/null > /output/api-token;
+        echo 'Done.';
+      "
+
+volumes:
+  hatchet_config:
