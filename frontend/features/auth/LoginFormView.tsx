@@ -117,12 +117,12 @@ export function LoginFormView({
           <form onSubmit={onSubmit}>
             <FieldGroup>
               {/* -- Alert -- */}
-              {errorMessage && (
+              {errorMessage ? (
                 <Alert variant="destructive">
                   <AlertTitle>Error</AlertTitle>
                   <AlertDescription>{errorMessage}</AlertDescription>
                 </Alert>
-              )}
+              ) : null}
               <Field>
                 <FieldLabel htmlFor={emailId}>Email</FieldLabel>
                 <Input
@@ -156,10 +156,10 @@ export function LoginFormView({
               </Field>
               <Field>
                 <Button className="cursor-pointer" disabled={isLoading} type="submit">
-                  {isLoading && <Loader2Icon aria-hidden="true" className="mr-2 size-4 animate-spin" />}
+                  {isLoading ? <Loader2Icon aria-hidden="true" className="mr-2 size-4 animate-spin" /> : null}
                   {isLoading ? 'Logging in...' : 'Login'}
                 </Button>
-                {canUseDevAdminLogin && (
+                {canUseDevAdminLogin ? (
                   <>
                     <Button
                       className="cursor-pointer"
@@ -176,7 +176,7 @@ export function LoginFormView({
                       Dev-only shortcut for the seeded admin account.
                     </FieldDescription>
                   </>
-                )}
+                ) : null}
                 <SsoButton
                   disabled={isLoading}
                   icon={<GoogleIcon className="size-4" />}
@@ -195,11 +195,11 @@ export function LoginFormView({
               </Field>
             </FieldGroup>
           </form>
-          {canUseDevAdminLogin && (
+          {canUseDevAdminLogin ? (
             <form action={buildDevLoginFormAction(postLoginTarget)} id={devAdminFormId} method="post">
               <input name="redirect_to" type="hidden" value={postLoginTarget} />
             </form>
-          )}
+          ) : null}
         </CardContent>
       </Card>
     </div>

@@ -29,7 +29,7 @@ Pawrrtal's Effect workspace is `backend-ts/`:
 - `backend/vendor/effect-smol` is the Effect v4 beta source of truth. Do not
   infer APIs from Effect v3 docs or `backend/vendor/effect`.
 
-Current package pins: `effect@4.0.0-beta.74` and matching `@effect/*` platform
+Current package pins: `effect@4.0.0-beta.93` and matching `@effect/*` platform
 packages. Do not `file:` link `effect-smol`; it contains internal workspace
 references.
 

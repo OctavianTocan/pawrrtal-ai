@@ -43,7 +43,7 @@ function CollapsedAvatarGroup({
           transition={BOUNCY_SPRING}
         >
           <Avatar>
-            {r.avatarUrl && <AvatarImage alt={r.name} src={r.avatarUrl} />}
+            {r.avatarUrl ? <AvatarImage alt={r.name} src={r.avatarUrl} /> : null}
             <AvatarFallback>{getInitials(r.name)}</AvatarFallback>
           </Avatar>
         </m.div>
@@ -133,7 +133,7 @@ export function BannerHeader({
         </m.div>
       </button>
 
-      {onDismiss && (
+      {onDismiss ? (
         <button
           aria-label="Dismiss"
           className="shrink-0 cursor-pointer rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
@@ -142,7 +142,7 @@ export function BannerHeader({
         >
           <IconX className="size-4" />
         </button>
-      )}
+      ) : null}
     </div>
   );
 }

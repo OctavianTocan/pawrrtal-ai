@@ -55,10 +55,11 @@ export type PlanTitleProps = Omit<ComponentProps<typeof CardTitle>, 'children'> 
 
 export const PlanTitle = ({ children, ...props }: PlanTitleProps) => {
   const { isStreaming } = usePlan();
+  const titleContent = isStreaming ? <Shimmer>{children}</Shimmer> : children;
 
   return (
     <CardTitle data-slot="plan-title" {...props}>
-      {isStreaming ? <Shimmer>{children}</Shimmer> : children}
+      {titleContent}
     </CardTitle>
   );
 };
@@ -69,10 +70,11 @@ export type PlanDescriptionProps = Omit<ComponentProps<typeof CardDescription>, 
 
 export const PlanDescription = ({ className, children, ...props }: PlanDescriptionProps) => {
   const { isStreaming } = usePlan();
+  const descriptionContent = isStreaming ? <Shimmer>{children}</Shimmer> : children;
 
   return (
     <CardDescription className={cn('text-balance', className)} data-slot="plan-description" {...props}>
-      {isStreaming ? <Shimmer>{children}</Shimmer> : children}
+      {descriptionContent}
     </CardDescription>
   );
 };

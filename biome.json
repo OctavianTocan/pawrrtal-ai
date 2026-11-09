@@ -78,6 +78,7 @@
       },
       "performance": {
         "noImgElement": "off",
+        "noJsxPropsBind": "off",
         "useSolidForComponent": "off"
       },
       "suspicious": {

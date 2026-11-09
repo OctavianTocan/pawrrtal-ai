@@ -91,7 +91,7 @@ function ReadActionsRow({
 }): ReactNode {
   return (
     <div className="flex items-center gap-1.5">
-      {canEdit && (
+      {canEdit ? (
         <button
           className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-md px-2 font-medium text-[12px] text-muted-foreground transition-colors duration-150 ease-out hover:bg-foreground-5 hover:text-foreground"
           onClick={onEdit}
@@ -100,7 +100,7 @@ function ReadActionsRow({
           <PencilIcon aria-hidden="true" className="size-3.5" />
           Edit
         </button>
-      )}
+      ) : null}
 
       <DropdownPanelMenu
         align="end"
@@ -404,11 +404,11 @@ export function DocumentViewer({ filename, markdown, onClose, onSave }: Document
       <header className="flex shrink-0 items-center gap-2 px-4 py-2">
         <span className="flex-1 truncate text-[12px] text-muted-foreground">
           {filename}
-          {isEditing && (
+          {isEditing ? (
             <span className="ml-1.5 rounded bg-amber-100 px-1 py-0.5 font-medium text-[10px] text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
               editing
             </span>
-          )}
+          ) : null}
         </span>
         {isEditing ? (
           <EditActionsRow canSave={Boolean(onSave)} isSaving={isSaving} onCancel={handleCancel} onSave={handleSave} />
@@ -416,14 +416,14 @@ export function DocumentViewer({ filename, markdown, onClose, onSave }: Document
           <ReadActionsRow canEdit={Boolean(onSave)} onClose={onClose} onEdit={handleEdit} />
         )}
       </header>
-      {saveError && <SaveErrorBanner message={saveError} />}
-      {showStaleWarning && (
+      {saveError ? <SaveErrorBanner message={saveError} /> : null}
+      {showStaleWarning ? (
         <StaleWarningBanner
           disabled={isSaving}
           onDismiss={() => dispatchViewer({ type: 'dismiss-stale-warning' })}
           onReload={handleReload}
         />
-      )}
+      ) : null}
       <DocumentBody
         editContent={editContent}
         isEditing={isEditing}

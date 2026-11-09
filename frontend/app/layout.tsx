@@ -65,7 +65,7 @@ export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
-}>) {
+}>): React.JSX.Element {
   return (
     <html
       className={`${newsreader.variable} ${geist.variable} ${geistMono.variable}`}
@@ -96,13 +96,13 @@ export default function RootLayout({
 				    on 2026-05-08. */}
         <Script src="/theme-detection.js" strategy="beforeInteractive" />
         {/* React Grab */}
-        {enableAgentation && (
+        {enableAgentation ? (
           <Script
             crossOrigin="anonymous"
             src="//unpkg.com/react-grab/dist/index.global.js"
             strategy="beforeInteractive"
           />
-        )}
+        ) : null}
       </head>
       <body>
         <RootProvider
@@ -129,7 +129,7 @@ export default function RootLayout({
           }}
         >
           <Providers>{children}</Providers>
-          {enableAgentation && <Agentation />}
+          {enableAgentation ? <Agentation /> : null}
         </RootProvider>
       </body>
     </html>

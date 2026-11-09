@@ -140,14 +140,14 @@ function TelegramPendingCode({
           Generate a new code
         </button>
       </div>
-      {pendingCode.deep_link && (
+      {pendingCode.deep_link ? (
         <Button asChild className="w-full" size="lg" type="button" variant="default">
           <a href={pendingCode.deep_link} rel="noopener noreferrer" target="_blank">
             <ExternalLink aria-hidden="true" className="mr-2 size-4" />
             Open Telegram
           </a>
         </Button>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -165,7 +165,7 @@ function TelegramIdleState({ error, isBusy, onStart }: TelegramIdleStateProps): 
       <Button className="w-full" disabled={isBusy} onClick={onStart} size="lg" type="button">
         {isBusy ? 'Generating code...' : 'Generate connection code'}
       </Button>
-      {error && <p className="text-destructive">{error}</p>}
+      {error ? <p className="text-destructive">{error}</p> : null}
     </div>
   );
 }

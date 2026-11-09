@@ -39,7 +39,7 @@ export function RequestRow({ request, decision, onApprove, onReject, onReset }: 
          */}
         <m.div layoutId={`avatar-${request.id}`} transition={BOUNCY_SPRING}>
           <Avatar size="sm">
-            {request.avatarUrl && <AvatarImage alt={request.name} src={request.avatarUrl} />}
+            {request.avatarUrl ? <AvatarImage alt={request.name} src={request.avatarUrl} /> : null}
             <AvatarFallback>{getInitials(request.name)}</AvatarFallback>
           </Avatar>
         </m.div>

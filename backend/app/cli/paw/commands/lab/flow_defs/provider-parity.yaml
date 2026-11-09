@@ -1,0 +1,12 @@
+id: provider-parity
+title: Provider parity and latency proof
+description: Compare one provider against its source CLI or closest baseline without hiding CLI overhead.
+commands:
+  - paw lab bench model --model MODEL --prompt "Say hello briefly." --runs 3 --warmup 1 --json
+  - paw lab bench model --model MODEL --prompt "Use one tool if available, then summarize." --runs 1 --json
+  - paw verify chat-roundtrip --model MODEL --json
+checks:
+  - Stream has no error events and terminates with done.
+  - Persisted assistant status is complete.
+  - Thinking and tool calls match the stream when present.
+  - Backend duration is compared separately from CLI wall time.

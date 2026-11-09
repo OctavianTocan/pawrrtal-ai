@@ -103,7 +103,9 @@ export function PromptInputAttachment({ data, className, ...props }: PromptInput
               <h4 className="truncate font-semibold text-sm leading-none">
                 {filename || (isImage ? 'Image' : 'Attachment')}
               </h4>
-              {data.mediaType && <p className="truncate font-mono text-muted-foreground text-xs">{data.mediaType}</p>}
+              {data.mediaType ? (
+                <p className="truncate font-mono text-muted-foreground text-xs">{data.mediaType}</p>
+              ) : null}
             </div>
           </div>
         </div>

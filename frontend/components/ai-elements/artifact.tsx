@@ -83,6 +83,7 @@ export const ArtifactAction = ({
   variant = 'ghost',
   ...props
 }: ArtifactActionProps) => {
+  const actionContent = Icon ? <Icon className="size-4" /> : children;
   const button = (
     <Button
       className={cn('size-8 p-0 text-muted-foreground hover:text-foreground', className)}
@@ -91,7 +92,7 @@ export const ArtifactAction = ({
       variant={variant}
       {...props}
     >
-      {Icon ? <Icon className="size-4" /> : children}
+      {actionContent}
       <span className="sr-only">{label || tooltip}</span>
     </Button>
   );

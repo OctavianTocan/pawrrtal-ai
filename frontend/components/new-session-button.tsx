@@ -9,6 +9,7 @@ import {
 import { AppWindow } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import type * as React from 'react';
+import { useCallback } from 'react';
 import { SquarePenRounded } from '@/components/icons/SquarePenRounded';
 import { Button } from '@/components/ui/button';
 import { useSidebar } from '@/components/ui/sidebar';
@@ -43,13 +44,18 @@ export function NewSessionButton({ layout = 'sidebar' }: NewSessionButtonProps):
   const { push } = useRouter();
   const { isMobile, setOpenMobile } = useSidebar();
 
-  /** Navigates to the root page, which generates a fresh conversation UUID. */
-  const handleNewConversation = (): void => {
+  const handleNewConversation = useCallback((): void => {
     if (isMobile) {
       setOpenMobile(false);
     }
     push('/');
-  };
+  }, [isMobile, push, setOpenMobile]);
+
+  const handleOpenNewWindow = useCallback((): void => {
+    if (typeof window !== 'undefined') {
+      window.open('/', '_blank', 'noopener,noreferrer');
+    }
+  }, []);
 
   const isHeaderCompact = layout === 'headerCompact';
 
@@ -75,13 +81,7 @@ export function NewSessionButton({ layout = 'sidebar' }: NewSessionButtonProps):
           </DropdownContextMenuTrigger>
         </TooltipTrigger>
         <DropdownContextMenuContent>
-          <DropdownMenuItem
-            onSelect={() => {
-              if (typeof window !== 'undefined') {
-                window.open('/', '_blank', 'noopener,noreferrer');
-              }
-            }}
-          >
+          <DropdownMenuItem onSelect={handleOpenNewWindow}>
             <AppWindow className="size-3.5" />
             <span className="flex-1">Open in New Window</span>
           </DropdownMenuItem>

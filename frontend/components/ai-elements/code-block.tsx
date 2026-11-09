@@ -166,7 +166,7 @@ export const CodeBlock = ({
             highlighted={highlighted.dark}
             showLineNumbers={showLineNumbers}
           />
-          {children && <div className="absolute top-2 right-2 flex items-center gap-2">{children}</div>}
+          {children ? <div className="absolute top-2 right-2 flex items-center gap-2">{children}</div> : null}
         </div>
       </div>
     </CodeBlockContext.Provider>

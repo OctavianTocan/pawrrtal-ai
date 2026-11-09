@@ -68,12 +68,12 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
         <form onSubmit={handleSubmit}>
           <FieldGroup>
             {/* -- Alert -- */}
-            {errorMessage && (
+            {errorMessage ? (
               <Alert variant="destructive">
                 <AlertTitle>Error</AlertTitle>
                 <AlertDescription>{errorMessage}</AlertDescription>
               </Alert>
-            )}
+            ) : null}
             <Field>
               <FieldLabel htmlFor={nameId}>Full Name</FieldLabel>
               <Input id={nameId} name="name" placeholder="John Doe" required type="text" />
@@ -99,7 +99,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
             <FieldGroup>
               <Field>
                 <Button disabled={isSubmitting} type="submit">
-                  {isSubmitting && <Loader2Icon aria-hidden="true" className="mr-2 size-4 animate-spin" />}
+                  {isSubmitting ? <Loader2Icon aria-hidden="true" className="mr-2 size-4 animate-spin" /> : null}
                   {isSubmitting ? 'Creating Account...' : 'Create Account'}
                 </Button>
                 {/* <Button variant="outline" type="button">

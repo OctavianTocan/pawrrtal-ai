@@ -34,12 +34,11 @@ env-check:
 
 # Focused CLI gate. This avoids frontend/browser/design-system checks.
 paw-cli-check:
-    bun run --filter '@pawrrtal/cli' check
     bun run skill-gen:check
 
 # Full app smoke is outside the first Bun CLI slice.
 smoke-dev:
-    @printf 'Full app smoke is not part of the Bun CLI slice. Use `just dev` for app startup or `just paw-cli-check` for the focused CLI gate.\n'
+    @printf 'Full app smoke is outside the first slice. Use `just dev` for app startup or `just paw-cli-check` for the focused CLI gate.\n'
 
 # Auto-generate conventional commit via Gemini
 commit *ARGS:
@@ -64,7 +63,6 @@ format: format-py
 # Check (read-only) — Biome + ruff lint + ruff format check + TS structural gates
 check: check-py
     bun biome check --no-errors-on-unmatched --files-ignore-unknown=true .
-    cd backend-ts && bun biome check .
     node scripts/check-file-lines.mjs
     node scripts/check-nesting.mjs
 
@@ -87,10 +85,9 @@ check-py:
     cd backend && uv run ruff check .
     cd backend && uv run ruff format --check .
 
-# Static type-check — Python (mypy) + Effect TS workspace (tsc). Gating — keep green.
+# Static type-check — Python (mypy) + TS workspaces (tsc). Gating — keep green.
 typecheck:
     cd backend && uv run mypy
-    cd backend-ts && bun run typecheck
 
 # Security scan with bandit (Python). Findings here are real and should fail.
 security-py:
@@ -157,16 +154,12 @@ test-backend:
 test-frontend:
     cd frontend && bun run test
 
-# Run backend-ts Vitest suite (CI-style, no watcher)
-test-backend-ts:
-    cd backend-ts && bun run test
-
 # Run frontend Vitest with v8 coverage; report drops under frontend/coverage/
 test-coverage:
     cd frontend && bun run test:coverage
 
-# Run all three suites. Use before pushing — local + CI parity (#271).
-test: test-backend test-backend-ts test-frontend
+# Run both backend and frontend suites. Use before pushing — local + CI parity (#271).
+test: test-backend test-frontend
 
 # Playwright E2E suite (frontend/e2e/). Requires backend + frontend dev
 # servers to be already running on the standard ports — start them with
@@ -191,7 +184,6 @@ stagehand-e2e:
 install:
 	bash -c 'if git rev-parse --git-dir >/dev/null 2>&1; then git submodule update --init --recursive; fi'
 	bun install
-	cd backend-ts && bun install
 	uv sync --project backend --group dev
 	just install-hooks
 

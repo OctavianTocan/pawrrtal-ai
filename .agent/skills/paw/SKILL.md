@@ -23,6 +23,8 @@ Use `paw` when you need the supported Pawrrtal CLI surface. This CLI is a Bun-ba
 | --- | --- | --- |
 | `paw doctor` | - | Check local Paw CLI readiness |
 | `paw context` | whoami | Print the active CLI context without secrets |
+| `paw providers` | - | Inspect Agent Providers |
+| `paw sessions` | - | Operate provider-backed Sessions |
 | `paw completions <shell>` | - | Generate shell completions |
 
 ## Common Usage
@@ -32,6 +34,11 @@ just paw --help
 just paw doctor --json
 just paw context --json
 just paw whoami --plain
+just paw providers list --json
+just paw providers doctor deterministic --json
+just paw sessions send <session-id> "hello" --json
+just paw sessions events <session-id> <turn-id> --follow --json
+just paw sessions cancel-turn <session-id> <turn-id> --reason "operator requested" --json
 just paw completions zsh
 bun run --filter @pawrrtal/cli start -- doctor
 ```
@@ -88,3 +95,6 @@ just paw-cli-check
 - `paw context --json` reports source labels such as `flag`, `env:PAW_PROFILE`, `project:<path>`, `user:<path>`, `home-default`, and `unset`.
 - `paw context` and `paw whoami` must not print secret values.
 - `paw doctor` is local-only in this slice and may warn when optional state has not been generated yet.
+- `paw providers` and `paw sessions` require `PAW_BACKEND_URL` or `--backend-url` because they use public backend contracts.
+- `paw providers doctor [provider]` reads provider conformance rows from the backend; it does not import provider adapters directly.
+- `paw sessions` turn reads include only selected Workspace identity and materialization status, never raw Workspace contents or snapshots.

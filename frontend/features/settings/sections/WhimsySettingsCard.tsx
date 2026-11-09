@@ -99,6 +99,7 @@ function WhimsyColorPicker({ value, onChange }: WhimsyColorPickerProps): React.J
   // transitions the value off ``'theme'``.
   const hexValue = value === 'theme' ? COLOR_PICKER_FALLBACK : value;
   const isThemeDefault = value === 'theme';
+  const colorLabel = isThemeDefault ? 'theme' : hexValue;
   return (
     <div className="flex items-center gap-2">
       <label
@@ -113,9 +114,7 @@ function WhimsyColorPicker({ value, onChange }: WhimsyColorPickerProps): React.J
           value={hexValue}
         />
       </label>
-      <span className="font-mono text-muted-foreground text-xs tabular-nums">
-        {isThemeDefault ? 'theme' : hexValue}
-      </span>
+      <span className="font-mono text-muted-foreground text-xs tabular-nums">{colorLabel}</span>
       {!isThemeDefault ? (
         <Button className="cursor-pointer" onClick={() => onChange('theme')} size="xs" type="button" variant="ghost">
           Reset

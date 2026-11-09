@@ -37,13 +37,13 @@ export function DecisionPill({
 		   Both halves are always the same size via grid columns. */
     <div className="relative grid w-[160px] shrink-0 grid-cols-2 overflow-hidden rounded-full border border-border">
       {/* Sliding highlight: animates between left/right halves via layoutId */}
-      {isDecided && (
+      {isDecided ? (
         <m.div
           className={`absolute inset-y-0 w-1/2 rounded-full bg-muted ${isApproved ? 'left-0' : 'left-1/2'}`}
           layoutId={`pill-highlight-${pillId}`}
           transition={BOUNCY_SPRING}
         />
-      )}
+      ) : null}
 
       {/* Approve side: always rendered, always same grid cell width */}
       <m.button

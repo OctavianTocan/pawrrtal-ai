@@ -100,7 +100,7 @@ export function WorkspacesSectionView({
                 <label className="font-medium text-foreground text-sm" htmlFor={`env-${key}`}>
                   {label}
                 </label>
-                {url && (
+                {url ? (
                   <a
                     className="text-muted-foreground text-xs underline"
                     href={url}
@@ -109,7 +109,7 @@ export function WorkspacesSectionView({
                   >
                     Get key
                   </a>
-                )}
+                ) : null}
               </div>
               <div className="relative flex items-center">
                 <input

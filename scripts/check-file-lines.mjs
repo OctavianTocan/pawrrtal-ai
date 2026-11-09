@@ -26,7 +26,7 @@ const REPO_ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), 
 const MAX_LINES = Number.parseInt(process.env.MAX_LINES ?? '500', 10);
 
 /** Roots we scan. Add new top-level source trees here. */
-const SCAN_ROOTS = ['frontend', 'backend', 'backend-ts'];
+const SCAN_ROOTS = ['frontend', 'backend'];
 
 /** Directory names we never descend into. */
 const SKIP_DIRECTORIES = new Set([

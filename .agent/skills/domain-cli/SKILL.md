@@ -48,6 +48,8 @@ packages/paw-cli/
 | --- | --- | --- |
 | `paw doctor` | - | Check local Paw CLI readiness |
 | `paw context` | whoami | Print the active CLI context without secrets |
+| `paw providers` | - | Inspect Agent Providers |
+| `paw sessions` | - | Operate provider-backed Sessions |
 | `paw completions <shell>` | - | Generate shell completions |
 
 ## Rules
@@ -58,6 +60,8 @@ packages/paw-cli/
 - Keep command modules under `src/Modules/<Name>/` with `Command.ts`, plus `Domain.ts` and focused helpers only when the command needs them.
 - Register command modules in `src/Commands.ts`; do not create placeholder command groups for future product ideas.
 - Feature-owned CLI commands must target real feature contracts. For 006 provider sessions, use `paw sessions ...` against session/Workspace/provider bindings; do not add `paw agents ...` until a real agent-management registry exists.
+- Provider diagnostics belong behind public backend contracts: `paw providers doctor [provider]` may read conformance rows, but the CLI must not import `@pawrrtal/harness` for normal commands.
+- Session turn output may show redacted Workspace identity/materialization status. Do not add Workspace preview, diff, or effective-context dumps to this CLI surface for 006.
 - CLI commands that call backend-ts should use public HTTP/RPC clients from `api-core`/`rpc-core`; normal CLI commands must not import provider adapters or `harness` internals.
 - Keep command metadata next to the command implementation and make generated skills read from that metadata.
 - Define schemas for external input and public output before adding ad hoc parsing or rendering code.

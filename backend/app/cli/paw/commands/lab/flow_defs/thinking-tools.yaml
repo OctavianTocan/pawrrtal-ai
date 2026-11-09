@@ -1,0 +1,10 @@
+id: thinking-tools
+title: Thinking and tool rendering parity
+description: Verify that thinking, tool use, tool result, and final content survive stream, database, web, and Telegram paths.
+commands:
+  - paw verify chat-roundtrip --model MODEL --json
+  - paw lab telegram chat --model MODEL --turns thinking-tools.txt --verbose 2 --json
+checks:
+  - Thinking text is persisted and has a positive duration.
+  - Tool call count matches stream tool_use events.
+  - Telegram output does not collapse thinking/tool sections.

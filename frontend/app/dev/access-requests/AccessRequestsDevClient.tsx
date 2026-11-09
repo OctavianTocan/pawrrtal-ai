@@ -11,13 +11,13 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { AccessRequest } from '@/features/access-request-banner';
 import { AccessRequestBanner } from '@/features/access-request-banner';
 
-/** Dev-only logger — isolates console usage to satisfy lint in the test page. */
+/** Logs dev-page banner actions for visual verification. */
 // biome-ignore lint/suspicious/noConsole: dev-only test page — actions are logged for visual verification
-const devLog = (...args: unknown[]): void => console.log(...args);
+const devLog = (action: string, id: string): void => console.log(action, id);
 
 /** Mock data for testing the banner with various name lengths and counts. */
 const MOCK_REQUESTS: AccessRequest[] = [
@@ -37,6 +37,30 @@ const MOCK_REQUESTS: AccessRequest[] = [
  */
 export function AccessRequestsDevClient(): React.JSX.Element {
   const [dismissed, setDismissed] = useState<Record<string, boolean>>({});
+  const handleApprove = useCallback((id: string): void => devLog('Approved:', id), []);
+  const handleReject = useCallback((id: string): void => devLog('Rejected:', id), []);
+  const handleDismissFull = useCallback((): void => {
+    setDismissed((current) => ({ ...current, full: true }));
+  }, []);
+  const handleDismissTwo = useCallback((): void => {
+    setDismissed((current) => ({ ...current, two: true }));
+  }, []);
+  const handleDismissSingle = useCallback((): void => {
+    setDismissed((current) => ({ ...current, single: true }));
+  }, []);
+  const handleDismissNarrow5 = useCallback((): void => {
+    setDismissed((current) => ({ ...current, narrow5: true }));
+  }, []);
+  const handleDismissNarrow1 = useCallback((): void => {
+    setDismissed((current) => ({ ...current, narrow1: true }));
+  }, []);
+  const handleDismissMedium = useCallback((): void => {
+    setDismissed((current) => ({ ...current, medium: true }));
+  }, []);
+  const handleReset = useCallback((): void => {
+    setDismissed({});
+  }, []);
+  const hasDismissedBanner = Object.keys(dismissed).length > 0;
 
   return (
     /* Fixed full-screen scroll container so scrollbar-gutter applies
@@ -55,9 +79,9 @@ export function AccessRequestsDevClient(): React.JSX.Element {
               <div>
                 <p className="mb-2 text-muted-foreground text-xs">5 users:</p>
                 <AccessRequestBanner
-                  onApprove={(id) => devLog('Approved:', id)}
-                  onDismiss={() => setDismissed((d) => ({ ...d, full: true }))}
-                  onReject={(id) => devLog('Rejected:', id)}
+                  onApprove={handleApprove}
+                  onDismiss={handleDismissFull}
+                  onReject={handleReject}
                   requests={MOCK_REQUESTS}
                 />
               </div>
@@ -68,9 +92,9 @@ export function AccessRequestsDevClient(): React.JSX.Element {
               <div>
                 <p className="mb-2 text-muted-foreground text-xs">2 users:</p>
                 <AccessRequestBanner
-                  onApprove={(id) => devLog('Approved:', id)}
-                  onDismiss={() => setDismissed((d) => ({ ...d, two: true }))}
-                  onReject={(id) => devLog('Rejected:', id)}
+                  onApprove={handleApprove}
+                  onDismiss={handleDismissTwo}
+                  onReject={handleReject}
                   requests={MOCK_REQUESTS.slice(0, 2)}
                 />
               </div>
@@ -81,9 +105,9 @@ export function AccessRequestsDevClient(): React.JSX.Element {
               <div>
                 <p className="mb-2 text-muted-foreground text-xs">1 user:</p>
                 <AccessRequestBanner
-                  onApprove={(id) => devLog('Approved:', id)}
-                  onDismiss={() => setDismissed((d) => ({ ...d, single: true }))}
-                  onReject={(id) => devLog('Rejected:', id)}
+                  onApprove={handleApprove}
+                  onDismiss={handleDismissSingle}
+                  onReject={handleReject}
                   requests={MOCK_REQUESTS.slice(0, 1)}
                 />
               </div>
@@ -99,14 +123,9 @@ export function AccessRequestsDevClient(): React.JSX.Element {
               <div>
                 <p className="mb-2 text-muted-foreground text-xs">5 users, narrow:</p>
                 <AccessRequestBanner
-                  onApprove={(id) => devLog('Approved:', id)}
-                  onDismiss={() =>
-                    setDismissed((d) => ({
-                      ...d,
-                      narrow5: true,
-                    }))
-                  }
-                  onReject={(id) => devLog('Rejected:', id)}
+                  onApprove={handleApprove}
+                  onDismiss={handleDismissNarrow5}
+                  onReject={handleReject}
                   requests={MOCK_REQUESTS}
                 />
               </div>
@@ -116,14 +135,9 @@ export function AccessRequestsDevClient(): React.JSX.Element {
               <div>
                 <p className="mb-2 text-muted-foreground text-xs">1 user, narrow:</p>
                 <AccessRequestBanner
-                  onApprove={(id) => devLog('Approved:', id)}
-                  onDismiss={() =>
-                    setDismissed((d) => ({
-                      ...d,
-                      narrow1: true,
-                    }))
-                  }
-                  onReject={(id) => devLog('Rejected:', id)}
+                  onApprove={handleApprove}
+                  onDismiss={handleDismissNarrow1}
+                  onReject={handleReject}
                   requests={MOCK_REQUESTS.slice(0, 1)}
                 />
               </div>
@@ -139,14 +153,9 @@ export function AccessRequestsDevClient(): React.JSX.Element {
               <div>
                 <p className="mb-2 text-muted-foreground text-xs">5 users, medium:</p>
                 <AccessRequestBanner
-                  onApprove={(id) => devLog('Approved:', id)}
-                  onDismiss={() =>
-                    setDismissed((d) => ({
-                      ...d,
-                      medium: true,
-                    }))
-                  }
-                  onReject={(id) => devLog('Rejected:', id)}
+                  onApprove={handleApprove}
+                  onDismiss={handleDismissMedium}
+                  onReject={handleReject}
                   requests={MOCK_REQUESTS}
                 />
               </div>
@@ -155,10 +164,10 @@ export function AccessRequestsDevClient(): React.JSX.Element {
         </section>
 
         {/* Reset button appears once any banner has been dismissed */}
-        {Object.keys(dismissed).length > 0 && (
+        {hasDismissedBanner && (
           <button
             className="cursor-pointer text-muted-foreground text-sm underline hover:text-foreground"
-            onClick={() => setDismissed({})}
+            onClick={handleReset}
             type="button"
           >
             Reset all banners

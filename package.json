@@ -14,9 +14,6 @@
     "skill-gen:generate": "bun run packages/ci/skill-gen/src/index.ts generate --output .agent/skills",
     "skill-gen:check": "bun run packages/ci/skill-gen/src/index.ts check --output .agent/skills",
     "skill-gen:e2e-test": "bun run packages/ci/skill-gen/src/index.ts e2e-test",
-    "paw-cli:typecheck": "bun run --filter @pawrrtal/cli typecheck",
-    "paw-cli:test": "bun run --filter @pawrrtal/cli test",
-    "paw-cli:check": "bun run --filter @pawrrtal/cli check",
     "design:lint": "bunx @google/design.md lint DESIGN.md",
     "design:diff": "bunx @google/design.md diff",
     "design:export:css": "bunx @google/design.md export --format css-tailwind DESIGN.md",
@@ -39,10 +36,7 @@
     "frontend/lib/react-dropdown",
     "frontend/lib/react-overlay",
     "frontend/lib/react-chat-composer",
-    "backend-ts/packages/api-core",
-    "backend-ts/apps/api",
-    "packages/ci/skill-gen",
-    "packages/paw-cli"
+    "packages/ci/skill-gen"
   ],
   "overrides": {
     "react": "19.2.7",

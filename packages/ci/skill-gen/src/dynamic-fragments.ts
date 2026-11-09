@@ -15,7 +15,7 @@ type DynamicFragmentModule = {
   readonly getSkillFragments?: () => ReadonlyArray<DynamicSkillFragment> | Promise<ReadonlyArray<DynamicSkillFragment>>;
 };
 
-const DYNAMIC_FRAGMENT_MODULES = ['packages/paw-cli/src/Skills/Fragments.ts'] as const;
+const DYNAMIC_FRAGMENT_MODULES = [] as const;
 
 /**
  * Loads generated skill fragments from registered dynamic sources.

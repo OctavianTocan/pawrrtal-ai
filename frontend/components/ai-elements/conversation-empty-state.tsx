@@ -27,10 +27,10 @@ export const ConversationEmptyState = ({
   >
     {children ?? (
       <>
-        {icon && <div className="text-muted-foreground">{icon}</div>}
+        {icon ? <div className="text-muted-foreground">{icon}</div> : null}
         <div className="space-y-1">
           <h3 className="font-medium text-sm">{title}</h3>
-          {description && <p className="text-muted-foreground text-sm">{description}</p>}
+          {description ? <p className="text-muted-foreground text-sm">{description}</p> : null}
         </div>
       </>
     )}

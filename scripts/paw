@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Paw CLI launcher. Resolves symlinks so it works when invoked directly
+# from anywhere on PATH (`paw doctor`) and delegates to the Python paw CLI
+# inside `backend/app/cli/paw/`.
 set -euo pipefail
 
 launcher_path="${BASH_SOURCE[0]}"
@@ -12,16 +15,17 @@ done
 
 script_dir="$(cd -P -- "$(dirname -- "${launcher_path}")" && pwd)"
 repo_root="$(cd -- "${script_dir}/.." && pwd)"
-cli_entrypoint="${repo_root}/packages/paw-cli/src/Main.ts"
+backend_dir="${repo_root}/backend"
 
-if ! command -v bun >/dev/null 2>&1; then
-	printf 'Error: Bun is required to run paw. Install Bun and try again.\n' >&2
+if [[ ! -d "${backend_dir}" ]]; then
+	printf 'Error: could not locate Pawrrtal backend at %s\n' "${backend_dir}" >&2
 	exit 1
 fi
 
-if [[ ! -f "${cli_entrypoint}" ]]; then
-	printf 'Error: could not locate Paw CLI entrypoint at %s\n' "${cli_entrypoint}" >&2
+if ! command -v uv >/dev/null 2>&1; then
+	printf 'Error: uv is required to run paw. Install uv (https://docs.astral.sh/uv/) and try again.\n' >&2
 	exit 1
 fi
 
-exec bun run "${cli_entrypoint}" "$@"
+cd "${backend_dir}"
+exec uv run python -m app.cli.paw "$@"
