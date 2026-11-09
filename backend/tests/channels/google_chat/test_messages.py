@@ -56,7 +56,7 @@ def test_event_extractors_read_message_fields() -> None:
     assert space_name(event) == SPACE
     assert thread_name(event) == THREAD
     assert sender_name(event) == DEV_ADMIN_SENDER
-    assert sender_display(event) == "Tavi"
+    assert sender_display(event) == "Octavian"
 
 
 def test_addon_event_type_is_message() -> None:
@@ -70,7 +70,7 @@ def test_addon_event_extractors_read_message_fields() -> None:
     assert space_name(event) == SPACE
     assert thread_name(event) == THREAD
     assert sender_name(event) == DEV_ADMIN_SENDER
-    assert sender_display(event) == "Tavi"
+    assert sender_display(event) == "Octavian"
 
 
 def test_decode_pubsub_message_decodes_addon_event() -> None:

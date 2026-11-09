@@ -30,7 +30,7 @@ def chat_event(*, text: str = "hello", sender: str = DEV_ADMIN_SENDER) -> dict[s
         "message": {
             "name": f"{SPACE}/messages/MMMM",
             "text": text,
-            "sender": {"name": sender, "displayName": "Tavi", "type": "HUMAN"},
+            "sender": {"name": sender, "displayName": "Octavian", "type": "HUMAN"},
             "thread": {"name": THREAD},
         },
     }
@@ -49,7 +49,7 @@ def addon_event(*, text: str = "hello", sender: str = DEV_ADMIN_SENDER) -> dict[
     the classic top-level ``type``/``message``/``space`` keys. This mirrors a
     real DM event captured from a live add-on Chat app.
     """
-    sender_obj = {"name": sender, "displayName": "Tavi", "type": "HUMAN"}
+    sender_obj = {"name": sender, "displayName": "Octavian", "type": "HUMAN"}
     return {
         "commonEventObject": {"userLocale": "en", "hostApp": "CHAT"},
         "chat": {
@@ -75,7 +75,7 @@ def addon_command_event(*, command_text: str, argument_text: str | None = None) 
     return {
         "commonEventObject": {"hostApp": "CHAT"},
         "chat": {
-            "user": {"name": DEV_ADMIN_SENDER, "displayName": "Tavi"},
+            "user": {"name": DEV_ADMIN_SENDER, "displayName": "Octavian"},
             "appCommandPayload": {"space": {"name": SPACE}, "message": message},
         },
     }
@@ -90,7 +90,7 @@ def click_event(*, function: str, value: str) -> dict[str, Any]:
             "parameters": {"value": value},
         },
         "chat": {
-            "user": {"name": DEV_ADMIN_SENDER, "displayName": "Tavi"},
+            "user": {"name": DEV_ADMIN_SENDER, "displayName": "Octavian"},
             "buttonClickedPayload": {
                 "message": {"name": f"{SPACE}/messages/CARD"},
                 "space": {"name": SPACE},

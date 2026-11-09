@@ -95,7 +95,7 @@ async def test_returns_429_after_the_limit_is_exceeded() -> None:
         mock_settings.chat_rate_limit_per_minute = 3
         transport = ASGITransport(app=_build_app())
         async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-            client.cookies.set("session_token", "tavi.session.jwt")
+            client.cookies.set("session_token", "octavian.session.jwt")
             for _ in range(3):
                 response = await client.post(f"{CHAT_PATH_PREFIX}/")
                 assert response.status_code == 200
@@ -116,13 +116,13 @@ async def test_separate_users_have_independent_windows() -> None:
         mock_settings.chat_rate_limit_per_minute = 2
         transport = ASGITransport(app=_build_app())
         async with AsyncClient(transport=transport, base_url="http://testserver") as client:
-            # Tavi hits the limit.
-            client.cookies.set("session_token", "tavi.jwt")
+            # Octavian hits the limit.
+            client.cookies.set("session_token", "octavian.jwt")
             assert (await client.post(f"{CHAT_PATH_PREFIX}/")).status_code == 200
             assert (await client.post(f"{CHAT_PATH_PREFIX}/")).status_code == 200
             assert (await client.post(f"{CHAT_PATH_PREFIX}/")).status_code == 429
-            # Esther is unaffected.
-            client.cookies.set("session_token", "esther.jwt")
+            # Sam is unaffected.
+            client.cookies.set("session_token", "sam.jwt")
             assert (await client.post(f"{CHAT_PATH_PREFIX}/")).status_code == 200
 
 

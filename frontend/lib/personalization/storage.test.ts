@@ -52,13 +52,13 @@ describe('personalization storage', () => {
 
 	it('round-trips a saved profile via savePersonalizationProfile', () => {
 		savePersonalizationProfile({
-			name: 'Tavi',
+			name: 'Octavian',
 			personality: 'goose',
 			goals: ['SEO'],
 		});
 
 		const loaded = loadPersonalizationProfile();
-		expect(loaded.name).toBe('Tavi');
+		expect(loaded.name).toBe('Octavian');
 		expect(loaded.personality).toBe('goose');
 		expect(loaded.goals).toEqual(['SEO']);
 		expect(loaded.connectedChannels).toEqual([]);

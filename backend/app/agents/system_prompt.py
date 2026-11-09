@@ -1,6 +1,6 @@
 r"""Shared system-prompt fallback for the agent loop.
 
-Tavi pushed back on per-provider system-prompt defaults: each provider
+Octavian pushed back on per-provider system-prompt defaults: each provider
 having its own default means \"who the agent is\" silently changes
 based on which model the user picked, which is exactly the behaviour
 the workspace AGENTS.md system prompt (PR #113) was meant to

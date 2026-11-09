@@ -134,5 +134,5 @@ In rough order of authority:
 - The Pawrrtal migration off Next.js (PR #126), where the first pass
   reinvented three things that all had official answers, all of which
   surfaced the moment the agent skills were installed.
-- Tavi's standing instruction: "find official tools before inventing or
+- Octavian's standing instruction: "find official tools before inventing or
   hacking, especially for AI tooling and frameworks."

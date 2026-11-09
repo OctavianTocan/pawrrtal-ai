@@ -368,7 +368,7 @@ class AgentSafetyConfig:
     workflow eating wall-clock) while leaving generous room for normal
     long agent turns (research, multi-step refactors).
 
-    Tavi can disable any of these in `Settings` when running an agent
+    Octavian can disable any of these in `Settings` when running an agent
     that legitimately needs longer.  Set ``None`` to disable a specific
     guard; set the whole field to ``AgentSafetyConfig.disabled()`` to
     opt out entirely (escape hatch for trusted automations).

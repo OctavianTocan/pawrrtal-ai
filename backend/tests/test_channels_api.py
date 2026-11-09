@@ -370,8 +370,8 @@ async def test_redeem_via_start_handler_creates_binding(
     sender = TelegramSender(
         user_id=987654321,
         chat_id=987654321,
-        username="tavi_test",
-        full_name="Tavi Test",
+        username="octavian_test",
+        full_name="Octavian Test",
     )
     reply = await handle_start_command(sender=sender, payload=code, session=db_session)
     assert "Connected" in reply
@@ -386,7 +386,7 @@ async def test_redeem_via_start_handler_creates_binding(
     bindings = await list_bindings(user_id=test_user.id, session=db_session)
     assert len(bindings) == 1
     assert bindings[0].external_chat_id == "987654321"
-    assert bindings[0].display_handle == "tavi_test"
+    assert bindings[0].display_handle == "octavian_test"
 
 
 async def test_redeem_rejects_replay(

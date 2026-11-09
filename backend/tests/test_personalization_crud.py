@@ -64,10 +64,10 @@ async def test_get_returns_persisted_row_after_upsert(
     """After upsert the get-side reads the same payload back."""
     await upsert_personalization(
         test_user.id,
-        PersonalizationProfile(name="Tavi", custom_instructions="Be terse."),
+        PersonalizationProfile(name="Octavian", custom_instructions="Be terse."),
         db_session,
     )
     fetched = await get_personalization(test_user.id, db_session)
     assert fetched is not None
-    assert fetched.name == "Tavi"
+    assert fetched.name == "Octavian"
     assert fetched.custom_instructions == "Be terse."
